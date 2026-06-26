@@ -19,7 +19,13 @@ import { DialogContent, DialogRoot, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+<<<<<<< HEAD
 import { AgentIdentityAvatar } from '@/components/avatars'
+||||||| parent of 0ea7b8c9 (carry: graft VoiceMod panel under SOUL in profiles-screen)
+=======
+// carry: fleet VoiceMod — per-agent voice identity, rendered under the SOUL/Description.
+import { VoiceModPanel } from '@/screens/voicemod'
+>>>>>>> 0ea7b8c9 (carry: graft VoiceMod panel under SOUL in profiles-screen)
 
 type ProfileSummary = {
   name: string
@@ -957,6 +963,8 @@ export function ProfilesScreen() {
                     here after refresh.
                   </p>
                 </div>
+                {/* carry: fleet VoiceMod — per-agent voice identity directly under the SOUL/Description. */}
+                <VoiceModPanel profile={detailQuery.data.profile.name} />
                 <div className="rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
                   <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
                     <HugeiconsIcon
