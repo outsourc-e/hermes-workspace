@@ -107,5 +107,11 @@ export function useVoiceMod(profile: string | null) {
 
   const setDefault = useCallback(() => post({ action: 'set-default' }), [post])
 
-  return { voices, state, loading, busy, error, enroll, refresh, save, reset, setDefault }
+  const setSeed = useCallback(
+    (input: { seed?: number; release?: boolean }) =>
+      post({ action: 'set-seed', seed: input.seed, release: input.release }),
+    [post],
+  )
+
+  return { voices, state, loading, busy, error, enroll, refresh, save, reset, setDefault, setSeed }
 }

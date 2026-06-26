@@ -24,18 +24,21 @@ import {
   enrollViaMicPath,
   getProfileVoice,
   listVoices,
-  resetVoice,
+  revertToDefault,
   setDefaultVoice,
+  setSeed,
   type VoiceEngine,
   type VoiceOverlay,
 } from '../../server/voicemod'
 
 interface VoiceModPost {
-  action?: 'alter' | 'reset' | 'save' | 'set-default'
+  action?: 'alter' | 'reset' | 'save' | 'set-default' | 'set-seed'
   profile?: string
   voice?: string
   engine?: VoiceEngine
   flair?: string
+  seed?: number
+  release?: boolean
 }
 
 export const Route = createFileRoute('/api/voicemod')({
@@ -82,7 +85,12 @@ export const Route = createFileRoute('/api/voicemod')({
 
         try {
           if (action === 'reset') {
-            await resetVoice(profile)
+            await revertToDefault(profile)
+            return json({ ok: true, profile: await getProfileVoice(profile) })
+          }
+
+          if (action === 'set-seed') {
+            await setSeed(profile, { seed: body.seed, release: body.release })
             return json({ ok: true, profile: await getProfileVoice(profile) })
           }
 

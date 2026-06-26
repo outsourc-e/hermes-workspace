@@ -28,12 +28,13 @@ const controlBase =
   'h-9 w-full rounded-lg border border-primary-200 bg-transparent px-3 text-sm text-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-950'
 
 export function VoiceModPanel({ profile, className }: VoiceModPanelProps) {
-  const { voices, state, loading, busy, error, enroll, save, reset, setDefault } =
+  const { voices, state, loading, busy, error, enroll, save, reset, setDefault, setSeed } =
     useVoiceMod(profile)
 
   // branded reference (core kit present) => protected default + revert only.
   // custom profile (no core) => offer "Set as default" to lock their build.
   const isBranded = state?.hasCoreKit ?? false
+  const [seedDraft, setSeedDraft] = useState<string>('')
 
   const [engine, setEngine] = useState<VoiceEngine>('cosy')
   const [voice, setVoice] = useState<string>('')
@@ -46,6 +47,7 @@ export function VoiceModPanel({ profile, className }: VoiceModPanelProps) {
     setEngine(e)
     setVoice(state.overlay?.voice ?? '')
     setFlair(state.overlay?.flair ?? state.flair ?? '')
+    setSeedDraft(state.seed != null ? String(state.seed) : '')
   }, [state])
 
   const voiceOptions = engine === 'qwen' ? voices.qwen : voices.cosy
@@ -127,18 +129,42 @@ export function VoiceModPanel({ profile, className }: VoiceModPanelProps) {
         />
       </label>
 
-      {/* seed — read-only until the kit writer lands (step #2) */}
-      <div className="flex items-center justify-between rounded-lg bg-primary-50 px-3 py-2">
-        <div className="flex flex-col">
+      {/* seed — fixed-seed mitigation: pin a fixed seed or release it (date-based) */}
+      <div className="flex flex-col gap-1.5 rounded-lg bg-primary-50 px-3 py-2">
+        <div className="flex items-center justify-between">
           <span className={fieldLabel}>Seed (identity lock)</span>
-          <span className="text-sm text-primary-900">
-            {state?.seed ?? '—'}
-            {state?.hasCustomKit ? ' · custom kit' : ' · pinned (branded core)'}
+          <span className="text-xs text-primary-400">
+            {state?.hasCustomKit ? 'custom kit' : 'pinned (branded core)'} · live next utterance
           </span>
         </div>
-        <span className="text-xs text-primary-400">
-          fixed-seed mitigation — editable in step&nbsp;#2
-        </span>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            className={cn(controlBase, 'h-8 flex-1')}
+            value={seedDraft}
+            disabled={busy}
+            placeholder="0 = released (date-based)"
+            onChange={(ev) => setSeedDraft(ev.target.value)}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={busy || seedDraft === '' || Number.isNaN(Number(seedDraft))}
+            onClick={() => setSeed({ seed: Number(seedDraft) })}
+            title="Pin this exact seed → reproducible voice (stops accent drift)"
+          >
+            Pin
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            onClick={() => setSeed({ release: true })}
+            title="Release the seed → cosy falls back to the date-based seed"
+          >
+            Release
+          </Button>
+        </div>
       </div>
 
       {/* mood palette (from the layered kit) */}

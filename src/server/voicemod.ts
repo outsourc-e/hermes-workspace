@@ -203,32 +203,89 @@ export async function resetVoice(profile: string): Promise<void> {
   await pexecFile(VOICEMOD_BIN, ['reset', profile], { timeout: 20_000 })
 }
 
+// ── voice_kit writers: seed / set-default / revert (step #2 — now live) ──────
+async function runVoiceKit(args: Array<string>): Promise<string> {
+  const { stdout } = await pexecFile(PYTHON, [VOICE_KIT_PY, ...args], { timeout: 15_000 })
+  return stdout.trim()
+}
+
+/** Pin a fixed seed (fixed-seed mitigation) or release it, into the custom kit.
+ *  cosy re-reads the kit per synth, so this takes effect on the next utterance. */
+export async function setSeed(
+  profile: string,
+  opts: { seed?: number; release?: boolean },
+): Promise<void> {
+  assertProfile(profile)
+  if (opts.release) {
+    await runVoiceKit(['set', profile, '--release-seed'])
+  } else if (opts.seed != null && Number.isFinite(opts.seed)) {
+    await runVoiceKit(['set', profile, '--seed', String(Math.trunc(opts.seed))])
+  } else {
+    throw new Error('setSeed requires a finite seed or release=true')
+  }
+}
+
+interface DefaultSnapshot {
+  voice?: string
+  engine?: VoiceEngine
+  flair?: string
+  seed?: number
+}
+
+async function getDefault(profile: string): Promise<DefaultSnapshot | null> {
+  try {
+    const snap = JSON.parse(await runVoiceKit(['get-default', profile])) as DefaultSnapshot
+    return snap && snap.voice ? snap : null
+  } catch {
+    return null
+  }
+}
+
 /**
- * "Set as default" — for a CUSTOM profile (no protected branded core), lock the
- * current build in as this profile's default so "revert to default" restores it.
- * Refuses on branded profiles: their default is the protected reference core,
- * which is never overwritten.
- *
- * Persists by writing the profile's baseline kit (voice/engine/flair + pinned
- * seed) — that's the voice_kit writer landing in step #2. Reports honestly until
- * then rather than writing a malformed kit into the read-only core store.
+ * "Set as default" — snapshot a CUSTOM profile's current build (voice/engine/flair
+ * + seed) to defaults/<profile>.json so revert restores it. Refuses on branded
+ * profiles (their default is the protected core). Requires a saved overlay first.
  */
 export async function setDefaultVoice(profile: string): Promise<EnrollResult> {
   assertProfile(profile)
   if (hasCoreKit(profile)) {
-    return {
-      ok: false,
-      output:
-        `${profile} has a protected branded reference default — it cannot be ` +
-        `overwritten. Use "revert to default" to restore it.`,
-    }
+    return { ok: false, output: `${profile} has a protected branded default — set-default is for custom profiles only.` }
   }
-  return {
-    ok: false,
-    output:
-      `Set-default backend not built yet (step #2): writes core/${profile}.json ` +
-      `(voice/engine/flair + pinned seed) via the voice_kit writer to lock this ` +
-      `custom profile's baseline. Until then the build is saved as a reversible overlay.`,
+  const state = await getProfileVoice(profile)
+  const voice = state.overlay?.voice
+  const engine = state.overlay?.engine
+  if (!voice || !engine) {
+    return { ok: false, output: 'Save a voice for this profile first, then Set as default.' }
+  }
+  const args = ['set-default', profile, '--voice', voice, '--engine', engine]
+  if (state.overlay?.flair) args.push('--flair', state.overlay.flair.slice(0, 500))
+  if (state.seed != null) args.push('--seed', String(state.seed))
+  try {
+    return { ok: true, output: await runVoiceKit(args) }
+  } catch (err) {
+    return { ok: false, output: (err as Error).message }
+  }
+}
+
+/**
+ * "Revert to default":
+ *  - custom profile WITH a set-as-default snapshot → restore that build.
+ *  - otherwise (branded, or custom w/o snapshot) → drop the overlay + custom kit
+ *    so the protected branded core / broker default returns.
+ */
+export async function revertToDefault(profile: string): Promise<void> {
+  assertProfile(profile)
+  const snap = await getDefault(profile)
+  if (snap?.voice && snap.engine) {
+    await alterVoice(profile, { voice: snap.voice, engine: snap.engine, flair: snap.flair })
+    if (snap.seed != null) await setSeed(profile, { seed: snap.seed })
+    return
+  }
+  await resetVoice(profile) // drop the voicemod overlay
+  try {
+    await runVoiceKit(['reset', profile]) // drop the custom kit (seed/flair)
+  } catch {
+    /* no custom kit to clear */
   }
 }
 
