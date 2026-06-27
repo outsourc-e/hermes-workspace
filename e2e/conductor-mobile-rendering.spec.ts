@@ -1,14 +1,12 @@
 import { test, expect } from '@playwright/test'
 
-const BASE = process.env.HERMES_WORKSPACE_URL || 'http://localhost:3002'
-
 test.describe('Conductor mobile rendering', () => {
   test.use({
     viewport: { width: 375, height: 667 }, // iPhone SE
   })
 
   test('conductor home page renders without clipping on mobile', async ({ page }) => {
-    await page.goto(`${BASE}/conductor`)
+    await page.goto('/conductor')
     await page.waitForTimeout(2000)
 
     // Check that the main container is present
@@ -40,7 +38,7 @@ test.describe('Conductor mobile rendering', () => {
   })
 
   test('conductor page has no horizontal overflow on mobile', async ({ page }) => {
-    await page.goto(`${BASE}/conductor`)
+    await page.goto('/conductor')
     await page.waitForTimeout(2000)
 
     // Check for horizontal overflow
@@ -51,7 +49,7 @@ test.describe('Conductor mobile rendering', () => {
   })
 
   test('conductor action buttons are present on mobile', async ({ page }) => {
-    await page.goto(`${BASE}/conductor`)
+    await page.goto('/conductor')
     await page.waitForTimeout(2000)
 
     // Check for action buttons — they should be visible and clickable
@@ -61,7 +59,7 @@ test.describe('Conductor mobile rendering', () => {
   })
 
   test('conductor main container has proper bottom padding on mobile', async ({ page }) => {
-    await page.goto(`${BASE}/conductor`)
+    await page.goto('/conductor')
     await page.waitForTimeout(2000)
 
     // Check the bottom padding of main elements
@@ -77,7 +75,7 @@ test.describe('Conductor mobile rendering', () => {
   })
 
   test('conductor page body fills full viewport height without clipping at bottom', async ({ page }) => {
-    await page.goto(`${BASE}/conductor`)
+    await page.goto('/conductor')
     await page.waitForTimeout(2000)
 
     // Verify body fills the viewport and can scroll

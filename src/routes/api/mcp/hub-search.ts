@@ -6,7 +6,8 @@
  * Query params:
  *   q       Free-text search query (default '')
  *   source  'all' | 'mcp-get' | 'local' (default 'all')
- *   limit   Max results 1..100 (default 20)
+ *   limit   Max results 1..500 (default 20)
+ *   offset  Pagination offset (default 0)
  *
  * Auth-gated via isAuthenticated.
  * Rate-limited: 60 req/min per IP.
