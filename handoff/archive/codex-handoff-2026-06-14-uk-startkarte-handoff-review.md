@@ -1,3 +1,8 @@
+# Archiviert: Codex Handoff
+
+Status: automatisch abgeschlossen und archiviert am 2026-06-27
+Ergebnis: `/Users/zondrius/hermes-workspace/handoff/codex-outbox/codex-result-2026-06-13-uk-startkarte-handoff-review.md`
+
 # Codex Handoff
 
 ## Ziel

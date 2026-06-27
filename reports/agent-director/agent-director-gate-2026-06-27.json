@@ -1,0 +1,99 @@
+{
+  "date": "2026-06-27",
+  "generated_at": "2026-06-27T17:41:31.492925+02:00",
+  "wake_agent": true,
+  "recommended_status": "CAPTURE_TO_TRIAGE",
+  "recommended_focus": "11 capture file(s) changed in last 24h",
+  "signals": [
+    {
+      "domain": "codex_outbox_context",
+      "strength": 1,
+      "status": "OUTBOX_CONTEXT_ONLY",
+      "reason": "codex outbox has 13 historical result(s), but inbox is clear",
+      "path": "/Users/zondrius/hermes-workspace/handoff/codex-outbox"
+    },
+    {
+      "domain": "telegram_capture",
+      "strength": 2,
+      "status": "CAPTURE_TO_TRIAGE",
+      "reason": "11 capture file(s) changed in last 24h",
+      "path": "/Users/zondrius/hermes-workspace/inbox/telegram-capture/unclear-candidates.md"
+    },
+    {
+      "domain": "runtime",
+      "strength": 2,
+      "status": "COMPACT_RUNTIME_GUARD",
+      "reason": "1 enabled job(s) have recent timeout/connection errors",
+      "path": "/Users/zondrius/.hermes/profiles/neva/cron/jobs.json"
+    }
+  ],
+  "latest": {
+    "codex_inbox": {
+      "path": null,
+      "status": "missing",
+      "mtime": null
+    },
+    "codex_outbox": {
+      "path": "/Users/zondrius/hermes-workspace/handoff/codex-outbox/codex-result-2026-06-13-uk-startkarte-handoff-review.md",
+      "status": "present",
+      "mtime": "2026-06-27T12:12:40.293150+02:00"
+    },
+    "feedback": {
+      "path": "/Users/zondrius/hermes-workspace/inbox/chris-feedback/proof-ledger.md",
+      "status": "present",
+      "mtime": "2026-06-15T14:07:18.489350+02:00"
+    },
+    "telegram_capture": {
+      "path": "/Users/zondrius/hermes-workspace/inbox/telegram-capture/unclear-candidates.md",
+      "status": "present",
+      "mtime": "2026-06-26T18:05:14.849230+02:00"
+    },
+    "meta_ceo": {
+      "path": "/Users/zondrius/hermes-workspace/reports/meta-ceo/meta-ceo-2026-06-27.md",
+      "status": "REVIEW_QUEUE_FIRST",
+      "mtime": "2026-06-27T00:21:20.221217+02:00"
+    },
+    "codex_factory": {
+      "path": "/Users/zondrius/hermes-workspace/reports/codex-factory/codex-factory-2026-06-27.md",
+      "status": "REVIEW_QUEUE_FIRST. Heute wird kein neuer Factory-Brief und keine neue Codex-Arbeit vorbereitet, weil Meta-CEO bereits R",
+      "mtime": "2026-06-27T04:42:07.944045+02:00"
+    },
+    "night_app": {
+      "path": "/Users/zondrius/hermes-workspace/reports/night-app-studio/night-app-studio-2026-06-27.md",
+      "status": "NUR REVIEW",
+      "mtime": "2026-06-27T01:31:05.928664+02:00"
+    },
+    "nayyal": {
+      "path": "/Users/zondrius/hermes-workspace/reports/nayyal-hub-radar/nayyal-public-research-private-map-2026-06-24.md",
+      "status": "present",
+      "mtime": "2026-06-24T04:07:05.768964+02:00"
+    },
+    "ai_prompt": {
+      "path": "/Users/zondrius/hermes-workspace/reports/ai-intelligence-radar/ai-intelligence-radar-2026-06-25.md",
+      "status": "Green. Heute ist kein einzelner „Hype-Durchbruch“ wichtiger als ein stabiler Arbeitsmuster-Wechsel: gute KI-Nutzung vers",
+      "mtime": "2026-06-25T21:43:27.906787+02:00"
+    },
+    "teacher": {
+      "path": "/Users/zondrius/hermes-workspace/projects/ge-lernwerkstatt/reports/teacher-nextday-2026-06-26.md",
+      "status": "present",
+      "mtime": "2026-06-26T21:31:58.952840+02:00"
+    },
+    "hermes_control": {
+      "path": "/Users/zondrius/hermes-workspace/reports/hermes-control/handoff-janitor-2026-06-27.md",
+      "status": "Green",
+      "mtime": "2026-06-27T17:40:45.456410+02:00"
+    }
+  },
+  "runtime_alerts": [
+    {
+      "name": "NAYYAL_HUB_RADAR_DAILY",
+      "error": "RuntimeError: [Errno 32] Broken pipe"
+    }
+  ],
+  "rules": [
+    "If wake_agent is false, Meta-CEO should write compact STOP_OR_PARK.",
+    "If REVIEW_QUEUE_FIRST appears, do not create new Codex handoffs or builds.",
+    "Fresh Chris feedback overrides older reports.",
+    "Runtime errors trigger compact review, not broader searches."
+  ]
+}

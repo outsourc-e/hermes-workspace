@@ -1,3 +1,8 @@
+# Archiviert: Codex Handoff
+
+Status: automatisch abgeschlossen und archiviert am 2026-06-25
+Ergebnis: `/Users/zondrius/hermes-workspace/handoff/codex-outbox/codex-result-2026-06-15-lernwerkstatt-startseite-entmischen.md`
+
 # Codex Handoff
 
 ## Ziel
