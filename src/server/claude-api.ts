@@ -203,12 +203,13 @@ export async function getMessages(
   const resp = await claudeGet<{
     items?: Array<ClaudeMessage>
     data?: Array<ClaudeMessage>
+    messages?: Array<ClaudeMessage>
     total?: number
   }>(`/api/sessions/${sessionId}/messages`)
   // Gateway (OpenAI-compat) returns { object: 'list', data: [...] }; dashboard / older
-  // shape uses { items: [...] }. Accept either, and never return undefined (callers
-  // read .length / .map / .slice on this).
-  return resp.items ?? resp.data ?? []
+  // shape uses { items: [...] }; some message endpoints use { messages: [...] }.
+  // Accept any, and never return undefined (callers read .length / .map / .slice).
+  return resp.items ?? resp.data ?? resp.messages ?? []
 }
 
 export async function searchSessions(
