@@ -757,7 +757,15 @@ async function autoDetectGatewayUrl(): Promise<void> {
 }
 
 async function autoDetectDashboardUrl(): Promise<void> {
-  if (process.env.CLAUDE_DASHBOARD_URL) return
+  // Mirror autoDetectGatewayUrl: skip discovery when the dashboard URL was set
+  // explicitly. HERMES_DASHBOARD_URL is the documented primary var (see the
+  // resolution order at the top of this file); CLAUDE_DASHBOARD_URL is the
+  // legacy alias. Probing only the hard-coded :9119 candidate when
+  // HERMES_DASHBOARD_URL points elsewhere lets a co-located dashboard on the
+  // default port silently override the operator's explicit choice — e.g. in a
+  // multi-user setup it attaches to another user's dashboard and leaks their
+  // session list. Honor both vars so an explicit setting always wins.
+  if (process.env.HERMES_DASHBOARD_URL || process.env.CLAUDE_DASHBOARD_URL) return
 
   const candidates = ['http://127.0.0.1:9119']
   for (const candidate of candidates) {
