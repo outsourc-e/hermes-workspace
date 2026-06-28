@@ -37,6 +37,11 @@ import {
   createSyntheticLiveToolTracker,
 } from './-send-stream-live-tools'
 import type {OpenAICompatContentPart, OpenAICompatMessage} from '../../server/openai-compat-api';
+import { readRoutingConfig } from '../../server/hermes-config-store'
+import { classifyTask, parseManualOverride } from '../../server/task-classifier'
+import { route } from '../../server/executive-router'
+import { getOpusSpendToday, recordUsage } from '../../server/model-usage-tracker'
+import type { RouteDecision } from '../../types/router-config'
 // Claude agent runs can take 5+ minutes with complex tool chains
 const SEND_STREAM_RUN_TIMEOUT_MS = 600_000
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
@@ -365,6 +370,34 @@ export const Route = createFileRoute('/api/send-stream')({
             }
           }
         }
+        // ── Executive Router — engage only when enabled and user gave no explicit model ──
+        let routerDecision: RouteDecision | null = null
+        if (!requestModel) {
+          try {
+            const _rCfg = readRoutingConfig()
+            if (_rCfg.enabled) {
+              const _lastMsg = typeof body.message === 'string' ? body.message : ''
+              routerDecision = route({
+                classification: classifyTask({
+                  messages: [{ role: 'user', content: _lastMsg }],
+                  hasAttachments: Array.isArray(attachments) && attachments.length > 0,
+                }),
+                config: _rCfg,
+                opusSpentToday: getOpusSpendToday(),
+                manualOverride: parseManualOverride(_lastMsg),
+              })
+              if (routerDecision.base_url) {
+                chatMode = 'portable'
+                localBaseUrl = routerDecision.base_url
+              } else if (routerDecision.provider !== 'anthropic') {
+                chatMode = 'portable'
+              }
+            }
+          } catch {
+            // Router failure must never block chat — fall through to defaults
+          }
+        }
+
         if (chatMode === 'portable' && sessionKey === 'new') {
           sessionKey = crypto.randomUUID()
           resolvedFriendlyId = sessionKey
@@ -551,6 +584,7 @@ export const Route = createFileRoute('/api/send-stream')({
                   friendlyId: portableFriendlyId,
                 })
                 lastActivity = 'Processing your message...'
+                let _streamStart = 0
 
                 try {
                   const userContent = buildMultimodalContent(
@@ -622,7 +656,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         input: scopedMessage,
                         conversationHistory: effectiveHistory,
                         model:
-                          typeof body.model === 'string' ? body.model : undefined,
+                          routerDecision?.model ?? (typeof body.model === 'string' ? body.model : undefined),
                         sessionId: portableSessionKey,
                         signal: abortController.signal,
                       })
@@ -757,8 +791,9 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   }
 
+                  _streamStart = Date.now()
                   const stream = await openaiChat(portableMessages, {
-                    model: localBaseUrl ? bareModel : (typeof body.model === 'string' ? body.model : undefined),
+                    model: routerDecision?.model ?? (localBaseUrl ? bareModel : (typeof body.model === 'string' ? body.model : undefined)),
                     temperature:
                       typeof body.temperature === 'number'
                         ? body.temperature
@@ -842,6 +877,22 @@ export const Route = createFileRoute('/api/send-stream')({
                   })
                   touchLocalSession(portableSessionKey)
 
+                  if (routerDecision) {
+                    recordUsage({
+                      provider: routerDecision.provider,
+                      model: routerDecision.model,
+                      input_tokens: Math.round(
+                        portableMessages.reduce(
+                          (s, m) => s + (typeof m.content === 'string' ? m.content.length : 0),
+                          0,
+                        ) / 4,
+                      ),
+                      output_tokens: Math.round(accumulated.length / 4),
+                      latency_ms: Date.now() - _streamStart,
+                      success: true,
+                    })
+                  }
+
                   persistActiveRun((runSessionKey, activeId) =>
                     markRunStatus(runSessionKey, activeId, 'complete'),
                   )
@@ -859,6 +910,17 @@ export const Route = createFileRoute('/api/send-stream')({
                   })
                   closeStream()
                 } catch (err) {
+                  if (routerDecision) {
+                    recordUsage({
+                      provider: routerDecision.provider,
+                      model: routerDecision.model,
+                      input_tokens: 0,
+                      output_tokens: 0,
+                      latency_ms: Date.now() - _streamStart,
+                      success: false,
+                      error: err instanceof Error ? err.message : String(err),
+                    })
+                  }
                   if (!streamClosed) {
                     const errorMessage = normalizeClaudeErrorMessage(err)
                     persistActiveRun((runSessionKey, activeId) =>
@@ -1011,7 +1073,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 {
                   message: scopedMessage,
                   model:
-                    typeof body.model === 'string' ? body.model : undefined,
+                    routerDecision?.model ?? (typeof body.model === 'string' ? body.model : undefined),
                   system_message: thinking,
                   attachments: attachments || undefined,
                 },
