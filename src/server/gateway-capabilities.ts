@@ -257,9 +257,17 @@ let lastProbeAt = 0
 let lastLoggedSummary = ''
 let dashboardTokenPromise: Promise<string> | null = null
 let dashboardTokenCache = ''
+let dashboardCookieCache = ''
+let dashboardCookieExpiresAt = 0
+let dashboardCookieLoginPromise: Promise<string> | null = null
+type DashboardAuthMode = 'bearer' | 'cookie'
+let dashboardAuthMode: DashboardAuthMode = 'bearer'
 
 /** Optional bearer token for authenticated gateway endpoints. */
 export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
+// Credentials for cookie-based dashboard login (agent >= v0.17.0).
+const DASHBOARD_BASIC_AUTH_USERNAME = process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME ?? ''
+const DASHBOARD_BASIC_AUTH_PASSWORD = process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD ?? ''
 
 /**
  * Dashboard API auth uses the ephemeral session token injected into the
@@ -272,6 +280,77 @@ function authHeaders(): Record<string, string> {
 }
 
 /**
+ * Authenticate with the agent dashboard via POST /auth/password-login and
+ * cache the hermes_session_at access cookie.  Called when
+ * HERMES_DASHBOARD_BASIC_AUTH_USERNAME / _PASSWORD are configured.
+ *
+ * Agent >= v0.17.0 issues a stateless HMAC-signed JWT in hermes_session_at
+ * (Max-Age defaults to 43200 s / 12 h).  We parse Set-Cookie to extract the
+ * value and schedule refresh 60 s before Max-Age so callers always see a live
+ * token.
+ */
+async function loginWithBasicAuth(): Promise<string> {
+  const res = await fetch(`${CLAUDE_DASHBOARD_URL}/auth/password-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      provider: 'basic',
+      username: DASHBOARD_BASIC_AUTH_USERNAME,
+      password: DASHBOARD_BASIC_AUTH_PASSWORD,
+      next: '/',
+    }),
+    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+  })
+  if (!res.ok) {
+    throw new Error(
+      `[gateway] Dashboard basic-auth login failed: HTTP ${res.status}. ` +
+        'Verify HERMES_DASHBOARD_BASIC_AUTH_USERNAME and _PASSWORD.',
+    )
+  }
+
+  // Node >= 18 exposes Headers.getSetCookie() to correctly handle multiple
+  // Set-Cookie response headers (RFC 7230 s3.2.2 forbids folding them).
+  // Node 22 always has it; the cast silences older @types/node.
+  const rawCookies: string[] =
+    typeof (res.headers as unknown as { getSetCookie?(): string[] }).getSetCookie === 'function'
+      ? (res.headers as unknown as { getSetCookie(): string[] }).getSetCookie()
+      : (res.headers.get('set-cookie') ?? '').split(/,(?=\s*[a-zA-Z_]+=)/).filter(Boolean)
+
+  let accessToken = ''
+  let maxAge = 43_200 // default 12 h
+
+  for (const raw of rawCookies) {
+    const [nameValue, ...attrs] = raw.split(';')
+    const eqIdx = nameValue.indexOf('=')
+    if (eqIdx === -1) continue
+    const cookieName = nameValue.slice(0, eqIdx).trim()
+    // uvicorn/starlette wraps cookie values in double-quotes; strip them.
+    const cookieValue = nameValue.slice(eqIdx + 1).trim().replace(/^"|"$/g, '')
+    if (cookieName === 'hermes_session_at') {
+      accessToken = cookieValue
+      const maxAgeAttr = attrs.find(a => /^\s*max-age\s*=/i.test(a))
+      if (maxAgeAttr) {
+        const parsed = parseInt(maxAgeAttr.split('=')[1] ?? '', 10)
+        if (Number.isFinite(parsed) && parsed > 0) maxAge = parsed
+      }
+    }
+  }
+
+  if (!accessToken) {
+    throw new Error(
+      '[gateway] Dashboard login returned HTTP 200 but hermes_session_at was absent ' +
+        'from Set-Cookie. Check agent dashboard logs for auth errors.',
+    )
+  }
+
+  dashboardCookieCache = accessToken
+  dashboardAuthMode = 'cookie'
+  // Refresh 60 s before real expiry so every outbound call sees a live token.
+  dashboardCookieExpiresAt = Date.now() + (maxAge - 60) * 1_000
+  return accessToken
+}
+
+/**
  * Resolve the current dashboard session token by scraping the dashboard root
  * HTML. The dashboard injects a fresh ephemeral token at boot, so cached or
  * manually copied env tokens become invalid after restarts.
@@ -281,6 +360,23 @@ export async function fetchDashboardToken(options?: {
 }): Promise<string> {
   const force = options?.force === true
 
+  // -- Path B: cookie-based login (agent v0.17.0+) ----------------------
+  // Agent v0.17.0 hardened dashboard auth: HERMES_DASHBOARD_INSECURE is now
+  // a no-op; the middleware rejects Authorization: Bearer with
+  // {"reason":"no_cookie"} and only accepts hermes_session_at cookies.
+  // See issue #650.
+  if (DASHBOARD_BASIC_AUTH_USERNAME && DASHBOARD_BASIC_AUTH_PASSWORD) {
+    if (!force && dashboardCookieCache && Date.now() < dashboardCookieExpiresAt) {
+      return dashboardCookieCache
+    }
+    if (!force && dashboardCookieLoginPromise) return dashboardCookieLoginPromise
+    dashboardCookieLoginPromise = loginWithBasicAuth().finally(() => {
+      dashboardCookieLoginPromise = null
+    })
+    return dashboardCookieLoginPromise
+  }
+
+  // -- Path C: legacy HTML-scrape (broken on agent v0.17.0+) ------------
   if (!force && dashboardTokenCache) return dashboardTokenCache
   if (!force && dashboardTokenPromise) return dashboardTokenPromise
 
@@ -319,7 +415,12 @@ export async function dashboardAuthHeaders(options?: {
   force?: boolean
 }): Promise<Record<string, string>> {
   const token = await getDashboardToken(options)
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  if (!token) return {}
+  // Cookie-based tokens (agent v0.17.0+) must arrive as a Cookie header;
+  // the dashboard auth middleware checks req.cookies, not Authorization.
+  return dashboardAuthMode === 'cookie'
+    ? { Cookie: `hermes_session_at=${token}` }
+    : { Authorization: `Bearer ${token}` }
 }
 
 function withDashboardBase(path: string): string {
@@ -362,6 +463,7 @@ export async function dashboardFetch(
   let res = await doFetch(false)
   if (res.status === 401) {
     dashboardTokenCache = ''
+    dashboardCookieCache = ''
     res = await doFetch(true)
   }
   return res
