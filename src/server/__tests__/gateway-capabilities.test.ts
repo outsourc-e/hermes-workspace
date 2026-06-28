@@ -138,6 +138,33 @@ describe('gateway-capabilities', () => {
     expect(mod.CLAUDE_API).toBe('http://localhost:9000')
   })
 
+  it('does not let dashboard auto-detect override an explicit HERMES_DASHBOARD_URL', async () => {
+    // Regression: autoDetectDashboardUrl() only skipped discovery when
+    // CLAUDE_DASHBOARD_URL was set, ignoring the documented primary var
+    // HERMES_DASHBOARD_URL. With a co-located dashboard answering on the
+    // hard-coded :9119 candidate, the probe overwrote the operator's explicit
+    // URL — in multi-user setups attaching to another user's dashboard and
+    // leaking their session list. The explicit URL must always win.
+    process.env.HERMES_DASHBOARD_URL = 'http://127.0.0.1:9120'
+    // A default-port dashboard is up and would answer the auto-detect probe.
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === 'http://127.0.0.1:9119/api/status') {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      }
+      return new Response(null, { status: 404 })
+    })
+    const mod = await loadMod()
+    await mod.probeGateway({ force: true })
+    // The :9119 auto-detect probe must never have run, and the explicit
+    // :9120 URL must be preserved.
+    expect(
+      fetchMock.mock.calls.some(
+        ([u]) => u === 'http://127.0.0.1:9119/api/status',
+      ),
+    ).toBe(false)
+    expect(mod.CLAUDE_DASHBOARD_URL).toBe('http://127.0.0.1:9120')
+  })
+
   it('getResolvedUrls reports default source when no env or file override', async () => {
     const mod = await loadMod()
     const resolved = mod.getResolvedUrls()
