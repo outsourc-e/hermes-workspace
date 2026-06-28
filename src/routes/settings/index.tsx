@@ -1046,12 +1046,22 @@ type ClaudeProvider = {
   maskedKeys: Record<string, string>
 }
 
+type RoutingConfigSnapshot = {
+  enabled: boolean
+  default_provider: string
+  default_model: string
+  escalation: { opus_threshold: number; daily_opus_budget_usd: number }
+  pool: unknown[]
+  policy: unknown[]
+}
+
 type ClaudeConfigData = {
   config: Record<string, unknown>
   providers: Array<ClaudeProvider>
   activeProvider: string
   activeModel: string
   claudeHome: string
+  routingConfig?: RoutingConfigSnapshot
 }
 
 const CLAUDE_API =
@@ -1263,6 +1273,11 @@ function ClaudeConfigSection({
   const [fallbackBaseUrlInput, setFallbackBaseUrlInput] = useState('')
   const [showFallbackRow, setShowFallbackRow] = useState(false)
 
+  const [routingDefaultProvider, setRoutingDefaultProvider] = useState('anthropic')
+  const [routingDefaultModel, setRoutingDefaultModel] = useState('claude-sonnet-4-6')
+  const [routingOpusThreshold, setRoutingOpusThreshold] = useState('0.75')
+  const [routingOpusBudget, setRoutingOpusBudget] = useState('5.0')
+
   const [availableProviders, setAvailableProviders] = useState<
     Array<{ id: string; label: string; authenticated: boolean }>
   >([])
@@ -1283,6 +1298,14 @@ function ClaudeConfigSection({
     setShowFallbackRow(Boolean(fb.provider || fb.model || fb.baseUrl))
 
     setCustomBaseUrl(readManifestBlockBaseUrl(cfg))
+
+    const rc = configData.routingConfig
+    if (rc) {
+      setRoutingDefaultProvider(rc.default_provider)
+      setRoutingDefaultModel(rc.default_model)
+      setRoutingOpusThreshold(String(rc.escalation.opus_threshold))
+      setRoutingOpusBudget(String(rc.escalation.daily_opus_budget_usd))
+    }
   }, [])
 
   const fetchConfig = useCallback(async () => {
@@ -1374,6 +1397,25 @@ function ClaudeConfigSection({
     const value = rawValue === '' ? fallback : Number(rawValue)
     if (!Number.isFinite(value)) return
     void saveConfig({ config: { [section]: { [field]: value } } })
+  }
+
+  const saveRoutingConfig = async (patch: Record<string, unknown>) => {
+    setSaving(true)
+    setSaveMessage(null)
+    try {
+      const res = await fetch('/api/hermes-config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set-routing-config', routing: patch }),
+      })
+      const result = (await res.json()) as { message?: string }
+      setSaveMessage(result.message || 'Saved')
+      await fetchConfig()
+      setTimeout(() => setSaveMessage(null), 3000)
+    } catch {
+      setSaveMessage('Failed to save')
+    }
+    setSaving(false)
   }
 
   if (loading) {
@@ -2439,86 +2481,169 @@ function ClaudeConfigSection({
     </SettingsSection>
   )
 
-  const renderSmartRouting = () => (
-    <SettingsSection
-      title="Smart Model Routing"
-      description="Automatically route simple queries to cheaper models."
-      icon={SparklesIcon}
-    >
-      <SettingsRow
-        label="Enable smart routing"
-        description="Route simple queries to a cheaper model automatically."
-      >
-        <Switch
-          checked={readBoolean(smartRouting.enabled, false)}
-          onCheckedChange={(checked) =>
-            void saveConfig({
-              config: { smart_model_routing: { enabled: checked } },
-            })
-          }
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Cheap model"
-        description="Model to use for simple queries."
-      >
-        <select
-          value={(smartRouting.cheap_model as string) || ''}
-          onChange={(e) =>
-            void saveConfig({
-              config: { smart_model_routing: { cheap_model: e.target.value } },
-            })
-          }
-          className={selectClassName}
+  const renderExecutiveRouting = () => {
+    const rc = data.routingConfig
+    return (
+      <div className="space-y-4">
+        <SettingsSection
+          title="Executive Router"
+          description="Route each request to the best provider and model based on task type, complexity, and your daily Opus budget. Disabled by default — flip the toggle to activate."
+          icon={SparklesIcon}
         >
-          <option value="">Select model</option>
-          {availableModels.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.id}
-            </option>
-          ))}
-        </select>
-      </SettingsRow>
-      <SettingsRow
-        label="Max simple chars"
-        description="Messages shorter than this use the cheap model."
-      >
-        <Input
-          type="number"
-          min={1}
-          value={readNumber(smartRouting.max_simple_chars, 500)}
-          onChange={(e) =>
-            saveNumberField(
-              'smart_model_routing',
-              'max_simple_chars',
-              e.target.value,
-              500,
-            )
-          }
-          className="md:w-32"
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Max simple words"
-        description="Messages with fewer words use the cheap model."
-      >
-        <Input
-          type="number"
-          min={1}
-          value={readNumber(smartRouting.max_simple_words, 80)}
-          onChange={(e) =>
-            saveNumberField(
-              'smart_model_routing',
-              'max_simple_words',
-              e.target.value,
-              80,
-            )
-          }
-          className="md:w-32"
-        />
-      </SettingsRow>
-    </SettingsSection>
-  )
+          <SettingsRow
+            label="Enable routing"
+            description="When on, every message is classified and sent to the most appropriate model."
+          >
+            <Switch
+              checked={rc?.enabled ?? false}
+              onCheckedChange={(checked) =>
+                void saveRoutingConfig({ enabled: checked })
+              }
+              disabled={saving}
+            />
+          </SettingsRow>
+
+          <SettingsRow
+            label="Default provider"
+            description="Fallback provider when no policy rule matches."
+          >
+            <div className="flex gap-2">
+              <Input
+                value={routingDefaultProvider}
+                onChange={(e) => setRoutingDefaultProvider(e.target.value)}
+                placeholder="anthropic"
+                className="md:w-40"
+                disabled={saving}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  void saveRoutingConfig({ default_provider: routingDefaultProvider })
+                }
+                disabled={saving}
+              >
+                Save
+              </Button>
+            </div>
+          </SettingsRow>
+
+          <SettingsRow
+            label="Default model"
+            description="Fallback model when no policy rule matches."
+          >
+            <div className="flex gap-2">
+              <Input
+                value={routingDefaultModel}
+                onChange={(e) => setRoutingDefaultModel(e.target.value)}
+                placeholder="claude-sonnet-4-6"
+                className="md:w-56"
+                disabled={saving}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  void saveRoutingConfig({ default_model: routingDefaultModel })
+                }
+                disabled={saving}
+              >
+                Save
+              </Button>
+            </div>
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Opus Escalation"
+          description="Controls when the router escalates to Claude Opus and enforces a hard daily spend cap."
+          icon={SparklesIcon}
+        >
+          <SettingsRow
+            label="Complexity threshold"
+            description="Requests scored above this (0.0–1.0) are escalated to Opus. Default: 0.75."
+          >
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={routingOpusThreshold}
+                onChange={(e) => setRoutingOpusThreshold(e.target.value)}
+                className="md:w-24"
+                disabled={saving}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const v = Number(routingOpusThreshold)
+                  if (!Number.isFinite(v)) return
+                  void saveRoutingConfig({ escalation: { opus_threshold: v } })
+                }}
+                disabled={saving}
+              >
+                Save
+              </Button>
+            </div>
+          </SettingsRow>
+
+          <SettingsRow
+            label="Daily Opus budget (USD)"
+            description="Hard cap on Opus spend per day. Router falls back to default model when reached. Set 0 to disable Opus entirely."
+          >
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={0}
+                step={0.5}
+                value={routingOpusBudget}
+                onChange={(e) => setRoutingOpusBudget(e.target.value)}
+                className="md:w-24"
+                disabled={saving}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const v = Number(routingOpusBudget)
+                  if (!Number.isFinite(v)) return
+                  void saveRoutingConfig({ escalation: { daily_opus_budget_usd: v } })
+                }}
+                disabled={saving}
+              >
+                Save
+              </Button>
+            </div>
+          </SettingsRow>
+        </SettingsSection>
+
+        {rc && (rc.pool.length > 0 || rc.policy.length > 0) && (
+          <SettingsSection
+            title="Pool & Policy"
+            description="Advanced routing rules from ~/.hermes/config.yaml. Edit the YAML file directly to add provider pool entries and policy rules."
+            icon={SparklesIcon}
+          >
+            {rc.pool.length > 0 && (
+              <SettingsRow label="Provider pool" description={`${rc.pool.length} entr${rc.pool.length === 1 ? 'y' : 'ies'} configured`}>
+                <span className="text-xs font-mono" style={{ color: 'var(--theme-muted)' }}>
+                  {rc.pool.length} provider{rc.pool.length !== 1 ? 's' : ''}
+                </span>
+              </SettingsRow>
+            )}
+            {rc.policy.length > 0 && (
+              <SettingsRow label="Policy rules" description={`${rc.policy.length} rule${rc.policy.length === 1 ? '' : 's'} — first match wins`}>
+                <span className="text-xs font-mono" style={{ color: 'var(--theme-muted)' }}>
+                  {rc.policy.length} rule{rc.policy.length !== 1 ? 's' : ''}
+                </span>
+              </SettingsRow>
+            )}
+          </SettingsSection>
+        )}
+      </div>
+    )
+  }
 
   const renderVoice = () => (
     <div className="space-y-4">
@@ -2802,7 +2927,7 @@ function ClaudeConfigSection({
   const sectionContent = {
     claude: renderClaudeOverview(),
     agent: renderAgentBehavior(),
-    routing: renderSmartRouting(),
+    routing: renderExecutiveRouting(),
     voice: renderVoice(),
     display: renderDisplay(),
   } as const
