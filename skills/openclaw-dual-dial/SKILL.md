@@ -42,7 +42,39 @@ scripts/hermes-openclaw-dial --live --manual-call --number +16502198152
 ```
 
 Flags: `--live` (required to actually call), `--number`, `--duration N`
-(seconds, default 150), `--first-line "..."`, `--manual-call`.
+(seconds, default 150), `--first-line "..."`, `--greet-after N` (seconds before
+the agent first speaks, default 10), `--repeats N` (times to repeat the opening
+line, default 4), `--interval N` (seconds between repeats, default 15),
+`--manual-call`.
+
+## Verified-working recipe (2026-06-30)
+
+Confirmed live: the caller heard the agent deliver a spoken message end-to-end.
+The opening line is repeated (`--repeats 4 --interval 15`, first at
+`--greet-after 10`) so a caller who answers a few seconds into the ring still
+hears the whole thing. For a one-way announcement leave the defaults; for a
+two-way chat, drop `--repeats` to 1 so the agent stops talking and starts
+listening sooner.
+
+## Gotchas that silence the call (learned the hard way)
+
+1. **Call a DIFFERENT phone than the Mac's own iPhone.** If `--number` is the
+   iPhone that is physically tethered to this Mac mini (the one macOS shows as
+   `iPhone Microphone` / Continuity), the call is a self-loop and carries no
+   audio — total silence both ways even though it rings. Dial a separate device.
+2. **FaceTime mic must be `BlackHole 2ch`, output `BlackHole 16ch`.** Each
+   BlackHole device is listed in BOTH the Microphone and Output sections of
+   FaceTime's Video menu (mic entry first). The dialer now presses the output
+   device at the correct occurrence; if you ever see the caller hear nothing,
+   check that FaceTime's mic didn't get set to `BlackHole 16ch` by mistake.
+3. **PortAudio `-9986` / "Unspecified Audio Hardware Error" = CoreAudio wedged.**
+   Reset it: `sudo killall coreaudiod` (auto-relaunches in ~1s). If even the
+   default mic won't open after that, the iPhone Continuity link is stuck —
+   reboot the Mac mini.
+4. **Do NOT place rapid back-to-back calls.** Repeated dialing wedges FaceTime
+   and CoreAudio (the pre-kernel-panic pattern). Space calls out; the dialer's
+   health-check will quit/relaunch a wedged FaceTime, but a wedged CoreAudio
+   still needs the reset in #3.
 
 ## Audio routing (dual-route)
 
