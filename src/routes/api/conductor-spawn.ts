@@ -5,7 +5,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
-import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
+import { missionFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
 import { sanitizeConductorMissionGoal } from '../../server/conductor-mission-sanitize'
 import { getSwarmMission, recordMissionCheckpoint  } from '../../server/swarm-missions'
 import { getSwarmProfilePath } from '../../server/swarm-foundation'
@@ -113,7 +113,7 @@ async function createDashboardConductorMission(payload: { name: string; prompt: 
   sessionKey?: string
   error?: string
 }> {
-  const res = await dashboardFetch('/api/conductor/missions', {
+  const res = await missionFetch('/api/conductor/missions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: payload.name, prompt: payload.prompt }),
@@ -394,7 +394,7 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           return json({ ok: false, error: 'Conductor mission not found in native swarm store and dashboard Conductor API is unavailable' }, { status: 404 })
         }
 
-        const res = await dashboardFetch(`/api/conductor/missions/${encodeURIComponent(missionId)}?lines=${lines}`)
+        const res = await missionFetch(`/api/conductor/missions/${encodeURIComponent(missionId)}?lines=${lines}`)
         const text = await res.text()
         let mission: Record<string, unknown> = {}
         try {

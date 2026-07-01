@@ -322,16 +322,59 @@ export async function dashboardAuthHeaders(options?: {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-function withDashboardBase(path: string): string {
+function withBase(base: string, path: string): string {
   if (/^https?:\/\//i.test(path)) return path
-  return `${CLAUDE_DASHBOARD_URL}${path.startsWith('/') ? path : `/${path}`}`
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+function withDashboardBase(path: string): string {
+  return withBase(CLAUDE_DASHBOARD_URL, path)
+}
+
+/**
+ * Base URL for Conductor mission dispatch. Defaults to the dashboard URL, so
+ * when `HERMES_MISSION_API_URL` is unset behavior is identical to before.
+ *
+ * Setting it decouples mission dispatch from the dashboard: an external fleet
+ * manager (e.g. a bridge to a separate orchestrator) can answer the small set of
+ * `/api/conductor/*` calls without having to sit in front of the whole dashboard.
+ * All other dashboard traffic (sessions, skills, config, MCP, …) keeps going to
+ * `HERMES_DASHBOARD_URL` untouched.
+ */
+export function missionApiBase(): string {
+  return normalizeUrl(process.env.HERMES_MISSION_API_URL || '') || CLAUDE_DASHBOARD_URL
+}
+
+function withMissionBase(path: string): string {
+  return withBase(missionApiBase(), path)
 }
 
 export async function dashboardFetch(
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const requestPath = withDashboardBase(path)
+  return baseFetch(withDashboardBase(path), init)
+}
+
+/**
+ * Like {@link dashboardFetch}, but targets the mission API base
+ * ({@link missionApiBase}, from `HERMES_MISSION_API_URL`). Used for the
+ * `/api/conductor/*` mission-dispatch calls so they can be pointed at an external
+ * fleet manager independently of the dashboard. Auth is injected the same way, so
+ * the mission endpoint is expected to be dashboard-token compatible (a bridge can
+ * accept or ignore it).
+ */
+export async function missionFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  return baseFetch(withMissionBase(path), init)
+}
+
+async function baseFetch(
+  requestPath: string,
+  init: RequestInit = {},
+): Promise<Response> {
   const method = (init.method || 'GET').toUpperCase()
   const doFetch = async (forceToken = false) => {
     const headers = new Headers(init.headers)
@@ -581,7 +624,7 @@ async function probeDashboard(): Promise<{ available: boolean; url: string }> {
 async function probeConductor(dashboardAvailable: boolean): Promise<boolean> {
   if (!dashboardAvailable) return false
   try {
-    const res = await dashboardFetch('/api/conductor/missions', {
+    const res = await missionFetch('/api/conductor/missions', {
       method: 'GET',
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
