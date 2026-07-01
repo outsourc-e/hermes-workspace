@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# hermes-openclaw-dial — bridge from Hermes to the proven openclaw dual-route
+# local FaceTime dialer (openclaw-phone-voice/scripts/call_contact.sh).
+#
+# This runs the OPENCLAW voice agent (whisper.cpp + Ollama + macOS `say`), NOT
+# the Hermes brain/tools/ElevenLabs voice. It exists so Hermes can place a call
+# whose audio actually works — caller hears the agent, agent hears the caller —
+# via dual-BlackHole routing (BlackHole 2ch uplink, BlackHole 16ch downlink).
+#
+# See openclaw-phone-voice/CALLING_STATUS.md for the working recipe, and
+# hermes-workspace/docs/openclaw-dual-route-port-plan.md for the deeper port
+# that would put Hermes's own brain on the call with this audio fix.
+set -euo pipefail
+
+OPENCLAW_SCRIPTS="${OPENCLAW_SCRIPTS:-/Users/destrynewiger/openclaw-phone-voice/scripts}"
+if [[ ! -x "$OPENCLAW_SCRIPTS/call_contact.sh" ]]; then
+  found="$(find "$HOME" -maxdepth 6 -type d -path '*openclaw-phone-voice/scripts' 2>/dev/null | head -1 || true)"
+  [[ -n "$found" ]] && OPENCLAW_SCRIPTS="$found"
+fi
+DIALER="$OPENCLAW_SCRIPTS/call_contact.sh"
+if [[ ! -x "$DIALER" ]]; then
+  echo "Cannot find openclaw dialer (call_contact.sh). Set OPENCLAW_SCRIPTS=<path>." >&2
+  exit 1
+fi
+
+number="${HERMES_ALEX_PHONE:-+16502198152}"
+duration="150"
+first_line="Hi, it's your local agent. Ask me anything."
+manual=0
+live=0
+
+usage() {
+  cat <<'EOF'
+Usage:
+  hermes-openclaw-dial [--live] [--number +1XXXXXXXXXX] [--duration N]
+                       [--first-line "..."] [--manual-call]
+
+Bridges to the openclaw dual-route local FaceTime dialer. Without --live this is
+a DRY RUN: it prints what it would do and places no call.
+
+Runs the openclaw agent (whisper.cpp + Ollama qwen3:4b-instruct + Samantha voice)
+with --dual-route audio so the caller can actually hear it. This is NOT the
+Hermes brain — no Hermes tools, memory, or ElevenLabs voice.
+
+--manual-call waits for a human to click the green Call button (needs a real
+terminal). Omit it to auto-press the button.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --live) live=1; shift ;;
+    --number) number="$2"; shift 2 ;;
+    --duration) duration="$2"; shift 2 ;;
+    --first-line) first_line="$2"; shift 2 ;;
+    --manual-call) manual=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    +*) number="$1"; shift ;;
+    *) echo "Unknown arg: $1" >&2; usage; exit 2 ;;
+  esac
+done
+
+args=(--dual-route --duration "$duration")
+[[ "$manual" -eq 1 ]] && args+=(--manual-call)
+args+=("$number")
+
+if [[ "$live" -eq 0 ]]; then
+  echo "[dry-run] openclaw dialer: $DIALER"
+  echo "[dry-run] would run: VOICE_AGENT_BACKEND=local VOICE_AGENT_FIRST_LINE='$first_line' \\"
+  echo "            $DIALER ${args[*]}"
+  echo "[dry-run] add --live to place the call to $number."
+  exit 0
+fi
+
+exec env VOICE_AGENT_BACKEND=local \
+  VOICE_AGENT_FIRST_LINE="$first_line" \
+  "$DIALER" "${args[@]}"
