@@ -57,6 +57,15 @@ Start here: [docs/swarm/](./docs/swarm/)
 - 📱 **PWA + Tailscale** — Install as a native-feeling app; access from any device on your tailnet
 - ⚙️ **Capability gates** — Features that need upstream endpoints (Conductor) show a clean placeholder instead of failing mid-action
 
+## Companion X/Twitter Workspace
+
+For social monitoring missions, pair Hermes Workspace with
+[Hermes Tweet](https://github.com/Xquik-dev/hermes-tweet). Hermes Tweet can
+collect X/Twitter account, post, or trend context inside Hermes, while Workspace
+keeps the related chat, files, memory, skills, terminal, dashboard, jobs, and
+swarm handoffs in one interface. Hermes Tweet is a third-party project
+maintained by Xquik-dev, not by this repository.
+
 ---
 
 ## 📸 Screenshots
