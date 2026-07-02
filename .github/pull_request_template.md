@@ -89,7 +89,7 @@ Closes #<!-- Issue-Nummer(n), z. B. #123, #456 -->
 - [ ] Bei neuen Features: README.md oder entsprechende Doku aktualisiert
 - [ ] Bei API-Änderungen: Typen und Interfaces dokumentiert
 - [ ] Bei Konfigurationsänderungen: `.env.example` aktualisiert
-- [ ] Bei neuen Umgebungsvariablen: in allen `.env.example`-Dateien dokumentiert
+- [ ] Bei neuen Umgebungsvariablen: `.env.example` aktualisiert
 
 ### Migration / Datenbank (falls zutreffend)
 
