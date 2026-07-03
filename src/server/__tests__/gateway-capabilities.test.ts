@@ -173,6 +173,23 @@ describe('gateway-capabilities', () => {
       await expect(mod.fetchDashboardToken()).resolves.toBe('live-token')
       expect(fetchMock.mock.calls.some(([url]) => url === 'http://127.0.0.1:9119/')).toBe(true)
     })
+
+    it('returns an empty token instead of throwing when dashboard root fails', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
+      })
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const mod = await loadMod()
+
+      await expect(mod.fetchDashboardToken()).resolves.toBe('')
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[gateway] Dashboard index returned 500 — token unavailable',
+      )
+      warnSpy.mockRestore()
+    })
   })
 
   it('does not mark Conductor available when dashboard returns SPA HTML fallback', async () => {

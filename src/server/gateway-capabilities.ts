@@ -287,19 +287,35 @@ export async function fetchDashboardToken(options?: {
   dashboardTokenPromise = (async () => {
     // Dashboard injects the session token inline on `/` (root), not on
     // `/index.html` which serves the raw Vite-built HTML without the token.
-    const res = await fetch(`${CLAUDE_DASHBOARD_URL}/`, {
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    })
-    if (!res.ok) {
-      throw new Error(`Dashboard index failed: ${res.status}`)
+    // When the dashboard requires auth (302 → /auth/login) or the login page
+    // is broken (500), return empty string so protected API calls degrade
+    // gracefully — the caller already handles 401/non-ok via safeJson.
+    try {
+      const res = await fetch(`${CLAUDE_DASHBOARD_URL}/`, {
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
+      if (!res.ok) {
+        console.warn(
+          `[gateway] Dashboard index returned ${res.status} — token unavailable`,
+        )
+        return ''
+      }
+      const html = await res.text()
+      const token = html.match(DASHBOARD_TOKEN_REGEX)?.[1]?.trim() || ''
+      if (!token) {
+        console.warn(
+          '[gateway] Dashboard session token not found in root HTML',
+        )
+        return ''
+      }
+      dashboardTokenCache = token
+      return token
+    } catch (err) {
+      console.warn(
+        `[gateway] Failed to fetch dashboard token: ${err instanceof Error ? err.message : err}`,
+      )
+      return ''
     }
-    const html = await res.text()
-    const token = html.match(DASHBOARD_TOKEN_REGEX)?.[1]?.trim() || ''
-    if (!token) {
-      throw new Error('Dashboard session token not found in root HTML')
-    }
-    dashboardTokenCache = token
-    return token
   })()
 
   try {
