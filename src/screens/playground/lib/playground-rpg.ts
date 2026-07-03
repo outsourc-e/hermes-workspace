@@ -1,4 +1,4 @@
-import type { AvatarConfig } from './avatar-config'
+﻿import type { AvatarConfig } from './avatar-config'
 
 /**
  * Hermes Playground RPG data model.
@@ -75,7 +75,7 @@ export type PlaygroundQuest = {
   chapter: string
   title: string
   description: string
-  /** What this quest teaches about Hermes Agent / product-building. */
+  /** What this quest teaches about Nova gateway / product-building. */
   lesson?: string
   /** Why the player should care, shown in the journal as practical payoff. */
   payoff?: string
@@ -188,37 +188,37 @@ export const PLAYGROUND_SKILLS: PlaygroundSkill[] = [
   {
     id: 'promptcraft',
     name: 'Promptcraft',
-    icon: '📜',
+    icon: 'ðŸ“œ',
     description: 'Shape agent behavior with clear instructions and reusable rituals.',
   },
   {
     id: 'worldsmithing',
     name: 'Worldsmithing',
-    icon: '🏗️',
+    icon: 'ðŸ—ï¸',
     description: 'Generate playable realms from lore, art, music, and code.',
   },
   {
     id: 'summoning',
     name: 'Summoning',
-    icon: '🧬',
+    icon: 'ðŸ§¬',
     description: 'Bring specialized AI agents into the world as companions and NPCs.',
   },
   {
     id: 'engineering',
     name: 'Engineering',
-    icon: '⚙️',
+    icon: 'âš™ï¸',
     description: 'Turn quests into working tools, PRs, integrations, and automations.',
   },
   {
     id: 'oracle',
     name: 'Oracle',
-    icon: '🔮',
+    icon: 'ðŸ”®',
     description: 'Research, remember, and reveal hidden context from the knowledge graph.',
   },
   {
     id: 'diplomacy',
     name: 'Diplomacy',
-    icon: '🤝',
+    icon: 'ðŸ¤',
     description: 'Coordinate with humans, guilds, and agents in shared missions.',
   },
 ]
@@ -227,7 +227,7 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
   {
     id: 'hermes-sigil',
     name: 'Hermes Sigil',
-    icon: '🜂',
+    icon: 'ðŸœ‚',
     rarity: 'rare',
     description: 'A starter sigil that marks you as a builder entering the Training Grounds.',
     slot: 'artifact',
@@ -237,7 +237,7 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
   {
     id: 'training-blade',
     name: 'Training Blade',
-    icon: '🗡️',
+    icon: 'ðŸ—¡ï¸',
     rarity: 'common',
     description: 'A lightweight practice blade tuned for first combat drills.',
     slot: 'weapon',
@@ -247,7 +247,7 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
   {
     id: 'novice-cloak',
     name: 'Novice Cloak',
-    icon: '🧥',
+    icon: 'ðŸ§¥',
     rarity: 'common',
     description: 'A teal field cloak stitched for new worldsmiths.',
     slot: 'cloak',
@@ -257,7 +257,7 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
   {
     id: 'initiate-circlet',
     name: 'Initiate Circlet',
-    icon: '👑',
+    icon: 'ðŸ‘‘',
     rarity: 'rare',
     description: 'A thin gold circlet awarded to builders who finish the first loop.',
     slot: 'head',
@@ -267,7 +267,7 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
   {
     id: 'archive-lens',
     name: 'Archive Lens',
-    icon: '🔎',
+    icon: 'ðŸ”Ž',
     rarity: 'rare',
     description: 'Helps you see memory, docs, and hidden links between tools.',
     slot: 'artifact',
@@ -277,7 +277,7 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
   {
     id: 'wisp-core',
     name: 'Wisp Core',
-    icon: '🫧',
+    icon: 'ðŸ«§',
     rarity: 'rare',
     description: 'A tiny core left behind by a defeated Glitch Wisp.',
     slot: 'artifact',
@@ -287,70 +287,70 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
   {
     id: 'hermes-token',
     name: 'Hermes Token',
-    icon: '🪽',
+    icon: 'ðŸª½',
     rarity: 'common',
     description: 'Proof you entered the Playground. Warm to the touch, weirdly useful.',
   },
   {
     id: 'athena-scroll',
     name: "Athena's Scroll",
-    icon: '📜',
+    icon: 'ðŸ“œ',
     rarity: 'rare',
     description: 'Unlocks guided agent dialogue and the first world generation ritual.',
   },
   {
     id: 'portal-key',
     name: 'Portal Key',
-    icon: '🗝️',
+    icon: 'ðŸ—ï¸',
     rarity: 'rare',
     description: 'Opens the first generated world: The Forge.',
   },
   {
     id: 'forge-shard',
     name: 'Forge Shard',
-    icon: '💠',
+    icon: 'ðŸ’ ',
     rarity: 'epic',
     description: 'A shard of generated world-state. Used to unlock deeper realms.',
   },
   {
     id: 'oracle-crystal',
     name: 'Oracle Crystal',
-    icon: '🔮',
+    icon: 'ðŸ”®',
     rarity: 'epic',
     description: 'Stores lore, context, and memories from completed quests.',
   },
   {
     id: 'kimi-sigil',
     name: 'Kimi Sigil',
-    icon: '🌙',
+    icon: 'ðŸŒ™',
     rarity: 'legendary',
     description: 'A hackathon relic. Opens the Benchmark Arena.',
   },
   {
     id: 'grove-leaf',
     name: 'Grove Leaf',
-    icon: '🍃',
+    icon: 'ðŸƒ',
     rarity: 'rare',
     description: 'A glowing leaf from the bioluminescent forest. Sings on touch.',
   },
   {
     id: 'song-fragment',
     name: 'Song Fragment',
-    icon: '🎶',
+    icon: 'ðŸŽ¶',
     rarity: 'epic',
     description: 'A piece of a generative agent symphony. Three fragments unlock the Grove ritual.',
   },
   {
     id: 'oracle-riddle',
     name: "Oracle's Riddle",
-    icon: '🤔',
+    icon: 'ðŸ¤”',
     rarity: 'epic',
     description: 'A sealed scroll of an unsolved question.',
   },
   {
     id: 'arena-medal',
     name: 'Arena Medal',
-    icon: '🏅',
+    icon: 'ðŸ…',
     rarity: 'legendary',
     description: 'Awarded for surviving the Duel of Models in the Benchmark Arena.',
   },
@@ -362,7 +362,7 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
     chapter: 'Training Grounds Tutorial',
     title: 'Move and Speak',
     description: 'Walk to Athena at the Arrival Circle and accept the Hermes Sigil.',
-    lesson: 'Hermes Agent is the messenger layer for your workflow: one place to route prompts to models, tools, files, memory, and channels.',
+    lesson: 'Nova gateway is the messenger layer for your workflow: one place to route prompts to models, tools, files, memory, and channels.',
     payoff: 'You learn the basic interaction loop: approach an agent, choose a response, receive useful work back.',
     objectives: [
       {
@@ -496,11 +496,11 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
   },
   {
     id: 'agora-diplomacy',
-    chapter: 'Agora Bonus — Diplomacy',
+    chapter: 'Agora Bonus â€” Diplomacy',
     title: 'Pact of the Agora',
     description: 'Find another live builder in the Agora Commons. Stand within speaking distance and exchange a chat.',
     lesson: 'Hermes Diplomacy: agents shine when they coordinate with others. The first protocol is presence; the second is acknowledging another mind.',
-    payoff: 'Multiplayer coordination is a real Hermes skill — not just a flourish. Every collab pipeline starts here.',
+    payoff: 'Multiplayer coordination is a real Hermes skill â€” not just a flourish. Every collab pipeline starts here.',
     optional: true,
     objectives: [
       { id: 'meet-builder', type: 'meet_player', label: 'Stand near another live builder in the Agora' },
@@ -514,11 +514,11 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
   },
   {
     id: 'forge-summon',
-    chapter: 'Forge Bonus — Summoning',
+    chapter: 'Forge Bonus â€” Summoning',
     title: 'Summon a Forge Familiar',
     description: 'Channel a temporary Hermes familiar at the Forge. It walks beside you for one minute.',
     lesson: 'Hermes Summoning: orchestrate sub-agents on demand to extend your reach without bloating your context.',
-    payoff: 'You learn the foundation of agent composition — spawn helpers, get value, dismiss cleanly.',
+    payoff: 'You learn the foundation of agent composition â€” spawn helpers, get value, dismiss cleanly.',
     optional: true,
     objectives: [
       { id: 'enter-forge-bonus', type: 'enter_world', label: 'Enter the Forge', target: 'forge' },
@@ -534,7 +534,7 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
     id: 'training-bonus-wisp',
     chapter: 'Training Grounds Bonus',
     title: 'Clear the Glitch Wisp',
-    description: 'Defeat the unstable wisp haunting the Trainer’s Ring.',
+    description: 'Defeat the unstable wisp haunting the Trainerâ€™s Ring.',
     lesson: 'Real projects create glitches: bad prompts, broken tools, missing context, failing auth, and noisy feedback loops.',
     payoff: 'You learn the product habit Hermes rewards: detect the issue, choose the right tool, and clear the blocker.',
     optional: true,
@@ -560,7 +560,7 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
   },
   {
     id: 'grove-ritual',
-    chapter: 'Chapter II — The Grove Ritual',
+    chapter: 'Chapter II â€” The Grove Ritual',
     title: 'The Grove Ritual',
     description: 'Walk into the Grove and gather a Song Fragment from the bioluminescent forest.',
     objectives: [
@@ -576,12 +576,12 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
   },
   {
     id: 'oracle-riddle',
-    chapter: 'Chapter III — Oracle’s Riddle',
-    title: 'Oracle’s Riddle',
+    chapter: 'Chapter III â€” Oracleâ€™s Riddle',
+    title: 'Oracleâ€™s Riddle',
     description: 'Visit the Oracle Temple and accept a riddle from Athena the Oracle.',
     objectives: [
       { id: 'enter-oracle', type: 'enter_world', label: 'Enter the Oracle Temple', target: 'oracle' },
-      { id: 'riddle', type: 'collect_item', label: 'Receive Oracle’s Riddle', target: 'oracle-riddle' },
+      { id: 'riddle', type: 'collect_item', label: 'Receive Oracleâ€™s Riddle', target: 'oracle-riddle' },
     ],
     reward: {
       xp: 200,
@@ -592,7 +592,7 @@ export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
   },
   {
     id: 'arena-duel',
-    chapter: 'Chapter IV — Arena of Models',
+    chapter: 'Chapter IV â€” Arena of Models',
     title: 'Duel of Models',
     description: 'Step into the Benchmark Arena. Survive the duel and earn the Kimi Sigil.',
     objectives: [

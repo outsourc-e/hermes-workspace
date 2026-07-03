@@ -1,4 +1,4 @@
-import { formatModelName } from '@/screens/dashboard/lib/formatters'
+﻿import { formatModelName } from '@/screens/dashboard/lib/formatters'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
 function formatCount(n: number): string {
@@ -26,11 +26,11 @@ export function ActiveModelKpi({
   analytics: DashboardOverview['analytics']
 }) {
   const connected = !!modelInfo
-  const display = modelInfo ? formatModelName(modelInfo.model) : '—'
-  const provider = modelInfo?.provider ?? '—'
+  const display = modelInfo ? formatModelName(modelInfo.model) : 'â€”'
+  const provider = modelInfo?.provider ?? 'â€”'
 
   // Routing share (proxy): % of calls in the analytics window that hit
-  // the active model. Hermes Agent confirmed this is the closest
+  // the active model. Nova gateway confirmed this is the closest
   // available metric without a dedicated routing-decisions endpoint.
   const share = ((): number | null => {
     if (!modelInfo || !analytics) return null
@@ -120,7 +120,7 @@ export function ActiveModelKpi({
         >
           {provider}
           {sessionsForModel !== null
-            ? ` · ${formatCount(sessionsForModel)} sessions`
+            ? ` Â· ${formatCount(sessionsForModel)} sessions`
             : ''}
         </span>
         {modelInfo?.effectiveContextLength ? (

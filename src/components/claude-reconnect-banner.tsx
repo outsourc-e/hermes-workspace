@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 
 const POLL_INTERVAL_MS = 10_000
 const FLASH_DURATION_MS = 1_800
@@ -11,7 +11,7 @@ type BannerState = 'hidden' | 'disconnected' | 'connected'
 
 async function probeClaudeHealth(): Promise<boolean> {
   // Use the portable-aware connection status endpoint first,
-  // which works with both Hermes Agent and OpenAI-compatible backends.
+  // which works with both Nova gateway and OpenAI-compatible backends.
   try {
     const response = await fetch('/api/connection-status', {
       cache: 'no-store',
@@ -47,7 +47,7 @@ export function ClaudeReconnectBanner({
   const wasDisconnectedRef = useRef(false)
   const flashTimerRef = useRef<number | null>(null)
   // Silent auto-restart: if the gateway disappears mid-session, fire
-  // /api/start-claude once. After that, fall back to the manual "Start Agent"
+  // /api/start-claude once. After that, fall back to the manual "Start gateway"
   // button so we don't loop forever on a busted environment.
   const autoRestartTriedAtRef = useRef<number>(0)
   // Cool-down so a permanently-dead gateway doesn't get poked every probe.
@@ -132,7 +132,7 @@ export function ClaudeReconnectBanner({
                   if (res.ok && data.ok) {
                     setMessage(
                       data.message ||
-                        'Auto-restarting Hermes Agent gateway…',
+                        'Auto-restarting Nova gateway...',
                     )
                     // Probe again shortly so the banner clears as soon as
                     // the gateway answers /health.
@@ -144,7 +144,7 @@ export function ClaudeReconnectBanner({
                   }
                 })
                 .catch(() => {
-                  // silent: user can still hit "Start Agent"
+                  // silent: user can still hit "Start gateway"
                 })
             }
           }
@@ -210,17 +210,17 @@ export function ClaudeReconnectBanner({
       }
 
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || 'Failed to start Hermes Agent')
+        throw new Error(payload.error || 'Failed to start Nova gateway')
       }
 
       setMessage(
         payload.message === 'already running'
-          ? 'Hermes Agent is already running'
-          : 'Starting Hermes Agent…',
+          ? 'Nova gateway is already running'
+          : 'Starting Nova gateway...',
       )
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : 'Failed to start Hermes Agent',
+        error instanceof Error ? error.message : 'Failed to start Nova gateway',
       )
     } finally {
       setIsStarting(false)
@@ -260,7 +260,7 @@ export function ClaudeReconnectBanner({
           />
           <div className="min-w-0">
             <p className="text-sm font-semibold">
-              {isDisconnected ? 'Hermes Agent not connected' : 'Connected'}
+              {isDisconnected ? 'Nova gateway not connected' : 'Connected'}
             </p>
             {message ? (
               <p className="truncate text-xs opacity-80">{message}</p>
@@ -281,7 +281,7 @@ export function ClaudeReconnectBanner({
                 color: 'inherit',
               }}
             >
-              {isChecking ? 'Retrying…' : 'Retry'}
+              {isChecking ? 'Retrying...' : 'Retry'}
             </button>
             <button
               type="button"
@@ -292,7 +292,7 @@ export function ClaudeReconnectBanner({
                 background: 'var(--theme-danger)',
               }}
             >
-              {isStarting ? 'Starting…' : 'Start Agent'}
+              {isStarting ? 'Starting...' : 'Start gateway'}
             </button>
           </div>
         ) : null}

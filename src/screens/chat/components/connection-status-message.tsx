@@ -25,8 +25,8 @@ function classifyConnectionError(
   if (!normalizedError && !status) {
     return {
       title: 'Not connected',
-      description: "Hermes Workspace can't reach Hermes Agent.",
-      action: 'Check that Hermes is running, then try again.',
+      description: "Nova can't reach the local gateway.",
+      action: 'Check that the gateway is running, then try again.',
     }
   }
 
@@ -38,8 +38,8 @@ function classifyConnectionError(
   ) {
     return {
       title: 'Authentication required',
-      description: 'Hermes Agent rejected the connection token.',
-      action: 'Go to Settings -> Advanced -> Hermes Agent to update your token.',
+      description: 'The local gateway rejected the connection token.',
+      action: 'Go to Settings -> Advanced to update your token.',
     }
   }
 
@@ -50,15 +50,15 @@ function classifyConnectionError(
   ) {
     return {
       title: 'Pairing required',
-      description: "This device isn't paired with Hermes Agent yet.",
-      action: 'Check Hermes Agent connection.',
+      description: "This device isn't paired with the gateway yet.",
+      action: 'Check the Nova gateway connection.',
     }
   }
 
   if (lower.includes('econnrefused') && lower.includes('8642')) {
     return {
-      title: 'Hermes Agent gateway not running',
-      description: 'The Hermes Agent gateway is not running on port 8642.',
+      title: 'Nova gateway not running',
+      description: 'The local gateway is not running on port 8642.',
       action: 'Run the official Hermes installer, then start the gateway with: hermes gateway run',
     }
   }
@@ -71,16 +71,16 @@ function classifyConnectionError(
     lower.includes('timeout')
   ) {
     return {
-      title: 'Hermes Agent unreachable',
-      description: "Can't connect to Hermes Agent at the configured URL.",
-      action: 'Make sure Hermes is running and the URL is correct.',
+      title: 'Nova gateway unreachable',
+      description: "Can't connect to the gateway at the configured URL.",
+      action: 'Make sure the gateway is running and the URL is correct.',
     }
   }
 
   return {
     title: 'Connection error',
     description: normalizedError || 'Something went wrong.',
-    action: 'Try refreshing or check Settings -> Advanced -> Hermes.',
+    action: 'Try refreshing or check Settings -> Advanced.',
   }
 }
 
@@ -133,7 +133,7 @@ export function ConnectionStatusMessage({
         />
         <div className="flex-1 text-xs">
           <p className="font-medium">
-            {isChecking ? 'Connecting to Hermes Agent...' : errorInfo.title}
+            {isChecking ? 'Connecting to Nova gateway...' : errorInfo.title}
           </p>
           {!isChecking ? (
             <>

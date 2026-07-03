@@ -1,4 +1,4 @@
-// Stub — connection overlay (not used in Hermes Workspace)
+﻿// Stub â€” connection overlay (not used in Nova Mission Control)
 export function useConnectionRestart() {
   return {
     triggerRestart: async (fn: () => Promise<void>) => {

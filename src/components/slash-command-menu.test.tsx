@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_SLASH_COMMANDS, mergeSlashCommands } from './slash-command-menu'
 
@@ -49,7 +49,7 @@ describe('mergeSlashCommands', () => {
     const merged = mergeSlashCommands(DEFAULT_SLASH_COMMANDS, [
       {
         command: '/hermes-agent',
-        description: 'Complete guide to using and extending Hermes Agent',
+        description: 'Complete guide to using and extending Nova gateway',
       },
     ])
 

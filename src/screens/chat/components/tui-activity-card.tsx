@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+﻿import { memo, useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -7,14 +7,14 @@ import { cn } from '@/lib/utils'
  * Renders thinking + all tool calls as a single card above the assistant
  * message bubble. Rows mimic Claude Code / Codex CLI tool output:
  *
- *   💭 Thinking 4s
- *     ⎿ Looking at chat component…
- *   ● Read message-item.tsx
- *     ⎿ 1240 lines
- *   ● Edit message-item.tsx
- *     ⎿ 2 changes
- *   ○ exec pnpm build
- *     ⎿ running…
+ *   ðŸ’­ Thinking 4s
+ *     âŽ¿ Looking at chat componentâ€¦
+ *   â— Read message-item.tsx
+ *     âŽ¿ 1240 lines
+ *   â— Edit message-item.tsx
+ *     âŽ¿ 2 changes
+ *   â—‹ exec pnpm build
+ *     âŽ¿ runningâ€¦
  */
 
 export type TuiToolSection = {
@@ -47,10 +47,10 @@ function statusDot(
   state: TuiToolSection['state'],
   isStreamingActive: boolean,
 ): string {
-  if (state === 'output-error') return '✗'
-  if (state === 'output-available') return '●'
+  if (state === 'output-error') return 'âœ—'
+  if (state === 'output-available') return 'â—'
   // input-available / input-streaming = pending
-  return isStreamingActive ? '○' : '●'
+  return isStreamingActive ? 'â—‹' : 'â—'
 }
 
 function statusColor(
@@ -71,7 +71,7 @@ function summarizeOutput(text: string, maxLen = 120): string {
   const firstLine = trimmed.split('\n').find((line) => line.trim()) ?? ''
   const compact = firstLine.replace(/\s+/g, ' ').trim()
   if (compact.length <= maxLen) return compact
-  return `${compact.slice(0, maxLen - 1)}…`
+  return `${compact.slice(0, maxLen - 1)}â€¦`
 }
 
 function formatElapsed(seconds: number): string {
@@ -119,12 +119,12 @@ function ToolRow({
   const arg = formatArg(section.type, section.input)
   const argLabel = section.preview ?? arg ?? null
   const argTruncated =
-    argLabel && argLabel.length > 60 ? `${argLabel.slice(0, 57)}…` : argLabel
+    argLabel && argLabel.length > 60 ? `${argLabel.slice(0, 57)}â€¦` : argLabel
 
   const outputText = section.outputText || section.errorText || ''
   const outputSummary = isPending
     ? isStreamingActive
-      ? 'running…'
+      ? 'runningâ€¦'
       : 'pending'
     : summarizeOutput(outputText) || (isDone ? 'done' : 'failed')
 
@@ -184,16 +184,16 @@ function ToolRow({
             className="shrink-0 text-[10px] opacity-40"
             style={{ color: 'var(--theme-muted)' }}
           >
-            {open ? '▾' : '▸'}
+            {open ? 'â–¾' : 'â–¸'}
           </span>
         ) : null}
       </button>
-      {/* Output preview line — TUI-style ⎿ */}
+      {/* Output preview line â€” TUI-style âŽ¿ */}
       <div
         className="flex items-baseline gap-1.5 px-3 pl-7 pb-0.5 opacity-70"
         style={{ color: isError ? 'var(--theme-danger, #ef4444)' : 'var(--theme-muted)' }}
       >
-        <span className="shrink-0 leading-none opacity-50">⎿</span>
+        <span className="shrink-0 leading-none opacity-50">âŽ¿</span>
         <span className="truncate min-w-0">{outputSummary}</span>
       </div>
       {open && canExpand ? (
@@ -266,7 +266,7 @@ function ThinkingRow({
     if (expandAll) setOpen(true)
   }, [expandAll])
 
-  const summary = summarizeOutput(thinking) || 'thinking…'
+  const summary = summarizeOutput(thinking) || 'thinkingâ€¦'
 
   return (
     <div className="font-mono text-[12px] leading-relaxed">
@@ -275,7 +275,7 @@ function ThinkingRow({
         onClick={() => setOpen((v) => !v)}
         className="group flex w-full items-baseline gap-2 px-3 py-1.5 text-left rounded-sm hover:bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)]"
       >
-        <span className="shrink-0 leading-none">💭</span>
+        <span className="shrink-0 leading-none">ðŸ’­</span>
         <span
           className="shrink-0 font-semibold"
           style={{ color: 'var(--theme-text)' }}
@@ -295,14 +295,14 @@ function ThinkingRow({
           className="shrink-0 text-[10px] opacity-40"
           style={{ color: 'var(--theme-muted)' }}
         >
-          {open ? '▾' : '▸'}
+          {open ? 'â–¾' : 'â–¸'}
         </span>
       </button>
       <div
         className="flex items-baseline gap-1.5 px-3 pl-7 pb-0.5 opacity-70"
         style={{ color: 'var(--theme-muted)' }}
       >
-        <span className="shrink-0 leading-none opacity-50">⎿</span>
+        <span className="shrink-0 leading-none opacity-50">âŽ¿</span>
         <span className="truncate min-w-0 italic">{summary}</span>
       </div>
       {open ? (
@@ -346,9 +346,9 @@ function TuiActivityCardComponent({
     ).length
     const done = total - errors - running
 
-    if (errors > 0) return `${errors} failed · ${done} done`
-    if (running > 0) return `${running} running · ${done} done`
-    return `${total} ${total === 1 ? 'tool' : 'tools'} · done`
+    if (errors > 0) return `${errors} failed Â· ${done} done`
+    if (running > 0) return `${running} running Â· ${done} done`
+    return `${total} ${total === 1 ? 'tool' : 'tools'} Â· done`
   }, [toolSections, hasTools])
 
   const summaryColor =
@@ -360,7 +360,7 @@ function TuiActivityCardComponent({
 
   // During streaming with nothing to show yet, render a minimal "working" stub
   // so we don't pretend the agent is thinking when no thinking text was emitted.
-  // (Hermes Agent currently emits tool.completed only after the run, not live.)
+  // (Nova gateway currently emits tool.completed only after the run, not live.)
   const isWorkingStub = !hasThinking && !hasTools && isStreaming
   if (!hasThinking && !hasTools && !isWorkingStub) return null
 
@@ -387,7 +387,7 @@ function TuiActivityCardComponent({
           className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em]"
           style={{ color: 'var(--theme-muted)' }}
         >
-          {isStreaming ? '⚡ Working' : 'Activity'}
+          {isStreaming ? 'âš¡ Working' : 'Activity'}
         </span>
         <span className="flex-1" />
         {summary ? (
@@ -433,7 +433,7 @@ function TuiActivityCardComponent({
               className="size-1.5 rounded-full animate-pulse"
               style={{ background: 'var(--theme-accent, #6366f1)' }}
             />
-            <span className="opacity-80">working…</span>
+            <span className="opacity-80">workingâ€¦</span>
             <span className="opacity-50 text-[10px]">
               tool activity will appear after the run
             </span>

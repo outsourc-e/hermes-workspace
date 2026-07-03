@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { WaveChatPanelsShowcase } from './components/wave-chat-panels-showcase'
 
 // v1 web client (WebGL build, char-select + world entry verified). Sets
@@ -50,7 +50,7 @@ export function HermesWorldEmbed() {
               className="h-14 w-14 animate-pulse rounded-2xl shadow-[0_0_34px_rgba(34,211,238,.25)]"
             />
             <div className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-200/70">
-              Loading HermesWorld…
+              Loading HermesWorldâ€¦
             </div>
           </div>
         </div>
@@ -62,13 +62,13 @@ export function HermesWorldEmbed() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(168,85,247,.24),transparent_48%),#050015]" />
           <div className="relative max-w-xl rounded-3xl border border-white/12 bg-black/45 px-6 py-6 text-center shadow-2xl backdrop-blur-xl">
             <div className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-200/70">
-              Hermes Workspace
+              Nova Mission Control
             </div>
             <h1 className="mt-2 text-3xl font-black tracking-tight">
               Open HermesWorld in a full tab
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-white/65">
-              The embedded client couldn’t load here. Open the full web build in
+              The embedded client couldnâ€™t load here. Open the full web build in
               a new tab to play.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -101,7 +101,7 @@ export function HermesWorldEmbed() {
           rel="noopener noreferrer"
           className="absolute right-3 top-3 z-10 rounded-full border border-white/15 bg-black/55 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/75 backdrop-blur-md transition hover:border-cyan-200/40 hover:text-white"
         >
-          Open full ↗
+          Open full â†—
         </a>
       )}
     </main>

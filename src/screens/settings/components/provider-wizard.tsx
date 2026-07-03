@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowLeft01Icon,
   Cancel01Icon,
   Copy01Icon,
@@ -72,7 +72,7 @@ function getAuthTypeMeta(authType: ProviderAuthType): AuthTypeMeta {
   if (authType === 'api-key') {
     return {
       title: 'API Key',
-      description: 'Paste your API key — saved directly to local config',
+      description: 'Paste your API key â€” saved directly to local config',
     }
   }
 
@@ -87,7 +87,7 @@ function getAuthTypeMeta(authType: ProviderAuthType): AuthTypeMeta {
   if (authType === 'oauth') {
     return {
       title: 'OAuth',
-      description: 'Sign in via browser — launches OAuth flow automatically',
+      description: 'Sign in via browser â€” launches OAuth flow automatically',
     }
   }
 
@@ -131,7 +131,7 @@ async function pollForProvider(
         }
       }
     } catch {
-      // network blip — keep polling
+      // network blip â€” keep polling
     }
 
     const remaining = deadline - Date.now()
@@ -277,7 +277,7 @@ export function ProviderWizard({
       setSaveState('saved')
       setVerifyState('checking')
       setVerificationMessage(
-        `${providerName} API key saved. Hermes Agent is restarting…`,
+        `${providerName} API key saved. Nova gateway is restartingâ€¦`,
       )
       setStep('verify')
 
@@ -288,7 +288,7 @@ export function ProviderWizard({
       if (!pollingRef.current) {
         pollingRef.current = true
         setVerificationMessage(
-          `Checking if ${providerName} models are available…`,
+          `Checking if ${providerName} models are availableâ€¦`,
         )
 
         const found = await pollForProvider(providerId)
@@ -301,7 +301,7 @@ export function ProviderWizard({
         } else {
           setVerifyState('warning')
           setVerificationMessage(
-            `Hermes Agent restarted, but ${providerName} models haven't appeared yet. ` +
+            `Nova gateway restarted, but ${providerName} models haven't appeared yet. ` +
               `Check your API key or wait a moment and refresh.`,
           )
         }
@@ -334,10 +334,10 @@ export function ProviderWizard({
 
   const verifyTitle =
     verifyState === 'success'
-      ? 'Connection Verified ✓'
+      ? 'Connection Verified âœ“'
       : verifyState === 'warning'
         ? 'Connected (models pending)'
-        : 'Checking connection…'
+        : 'Checking connectionâ€¦'
 
   return (
     <DialogRoot open={open} onOpenChange={handleDialogOpenChange}>
@@ -572,7 +572,7 @@ export function ProviderWizard({
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
                             'Run "hermes setup" in the terminal and select Google OAuth when prompted. ' +
-                              'A browser window will open for sign-in. Once complete, Hermes Agent will restart automatically.',
+                              'A browser window will open for sign-in. Once complete, Nova gateway will restart automatically.',
                           )
                           setVerifyState('warning')
                           setStep('verify')
@@ -589,7 +589,7 @@ export function ProviderWizard({
                           hermes setup
                         </pre>
                         <p className="mt-1.5 text-xs text-primary-600 text-pretty">
-                          Select <strong>Google Antigravity</strong> →{' '}
+                          Select <strong>Google Antigravity</strong> â†’{' '}
                           <strong>OAuth</strong>. A browser tab will open for
                           Google sign-in.
                         </p>
@@ -604,7 +604,7 @@ export function ProviderWizard({
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the Hermes Agent docs
+                            See the Nova gateway docs
                           </a>{' '}
                           for setup instructions.
                         </p>
@@ -615,7 +615,7 @@ export function ProviderWizard({
                   <>
                     <p className="mt-1 text-sm text-primary-600 text-pretty">
                       If you have Claude Code or the Hermes CLI installed,
-                      Hermes Agent can use the same auth token. Run the configure
+                      Nova gateway can use the same auth token. Run the configure
                       command to detect and import it automatically.
                     </p>
 
@@ -625,7 +625,7 @@ export function ProviderWizard({
                         onClick={function onLaunchCLI() {
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
-                            'Run "hermes setup" in the terminal and select Anthropic → CLI Token. ' +
+                            'Run "hermes setup" in the terminal and select Anthropic â†’ CLI Token. ' +
                               'It will detect compatible local credentials and import them automatically.',
                           )
                           setVerifyState('warning')
@@ -643,7 +643,7 @@ export function ProviderWizard({
                           hermes setup
                         </pre>
                         <p className="mt-1.5 text-xs text-primary-600 text-pretty">
-                          Select <strong>Anthropic</strong> →{' '}
+                          Select <strong>Anthropic</strong> â†’{' '}
                           <strong>Setup Token (Hermes CLI)</strong>. It will
                           detect your existing Claude credentials from{' '}
                           <code className="font-mono">~/.hermes/</code>.
@@ -668,7 +668,7 @@ export function ProviderWizard({
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the Hermes Agent docs
+                            See the Nova gateway docs
                           </a>{' '}
                           for CLI token setup instructions.
                         </p>
@@ -704,9 +704,9 @@ export function ProviderWizard({
                           }}
                         >
                           {saveState === 'saving'
-                            ? 'Saving…'
+                            ? 'Savingâ€¦'
                             : saveState === 'saved'
-                              ? 'Saved ✓'
+                              ? 'Saved âœ“'
                               : 'Save & Connect'}
                         </Button>
                       </div>
@@ -723,7 +723,7 @@ export function ProviderWizard({
                             strokeWidth={1.5}
                             className="inline mr-1"
                           />
-                          Key saved! Hermes Agent is restarting to apply changes.
+                          Key saved! Nova gateway is restarting to apply changes.
                         </p>
                       ) : null}
                     </div>
@@ -856,7 +856,7 @@ export function ProviderWizard({
                     {verifyTitle}
                   </p>
                   <p className="mt-1 text-sm text-primary-600 text-pretty">
-                    {verificationMessage || 'Waiting for Hermes Agent to respond…'}
+                    {verificationMessage || 'Waiting for Nova gateway to respondâ€¦'}
                   </p>
                 </div>
 

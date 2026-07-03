@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import type { AuthStatus } from '@/lib/claude-auth'
 import { writeTextToClipboard } from '@/lib/clipboard'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
@@ -29,15 +29,15 @@ function getSetupSteps(
       note: 'Portable chat works with any backend that exposes /v1/chat/completions (Ollama, LiteLLM, vLLM, etc.)',
     },
     {
-      title: 'Optional: install Hermes Agent locally',
+      title: 'Optional: install Nova gateway locally',
       command:
         'curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash',
-      note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically — no fork required',
+      note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically â€” no fork required',
     },
     {
       title: 'Set up your agent',
       command: 'hermes setup',
-      note: 'Pick your providers once; Hermes Agent stores them under ~/.hermes',
+      note: 'Pick your providers once; Nova gateway stores them under ~/.hermes',
     },
     {
       title: 'Start the gateway',
@@ -113,7 +113,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           setServerLog([
             String(
               data.message ||
-                'Auto-started Hermes Agent gateway — reconnecting…',
+                'Auto-started Nova gateway gateway â€” reconnectingâ€¦',
             ),
           ])
         }
@@ -187,7 +187,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
       const data = (await res.json()) as Record<string, unknown>
       if (res.ok && data.ok) {
         setServerLog([
-          String(data.message || 'Started — waiting for connection...'),
+          String(data.message || 'Started â€” waiting for connection...'),
         ])
         setServerStarting(false)
         return
@@ -241,7 +241,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           <span>Connection: checking</span>
         </div>
 
-        {/* Failure state — setup guide */}
+        {/* Failure state â€” setup guide */}
         <div
           className={[
             'w-full overflow-hidden transition-all duration-500 ease-out',
@@ -339,7 +339,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                         onClick={() => handleCopy(step.command, idx)}
                         className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white/80"
                       >
-                        {copiedIdx === idx ? '✓ Copied' : 'Copy'}
+                        {copiedIdx === idx ? 'âœ“ Copied' : 'Copy'}
                       </button>
                     </div>
                     <pre className="mt-2 overflow-x-auto rounded-lg bg-black/40 p-3 font-mono text-xs leading-5 text-white/80">

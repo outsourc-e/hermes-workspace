@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChatAttachment, ChatMessage } from '../types'
 import { readResolvedSessionHeaders } from '@/lib/send-stream-session-headers'
 import { useChatStore } from '@/stores/chat-store'
@@ -9,7 +9,7 @@ import { pushActivity } from '@/components/inspector/activity-store'
  * onSessionResolved (which navigates the route). Only bootstrap keys
  * ("new", "main") should promote a backend-returned session ID to the
  * Workspace route identity. Concrete sessions must never be overridden
- * by a backend-derived api-* ID — that causes session splits (#297).
+ * by a backend-derived api-* ID â€” that causes session splits (#297).
  */
 export function shouldResolveStreamSession({
   requestedSessionKey,
@@ -22,14 +22,14 @@ export function shouldResolveStreamSession({
   resolvedSessionKey: string
   pinMainSession?: boolean
 }): boolean {
-  // No change → nothing to resolve
+  // No change â†’ nothing to resolve
   if (resolvedSessionKey === currentSessionKey) return false
   // "new" should resolve once to a concrete session.
   if (requestedSessionKey === 'new') return true
   // "main" only stays pinned when the current route is intentionally bound to
   // the portable Workspace session in zero-fork mode.
   if (requestedSessionKey === 'main') return !pinMainSession
-  // Concrete session → never promote a different backend ID
+  // Concrete session â†’ never promote a different backend ID
   return false
 }
 
@@ -392,7 +392,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       lifecyclePhaseRef.current = 'complete'
       clearHandoffTimer()
       // Delay runId unregistration so chat-events dedup continues filtering
-      // for a few seconds after completion — prevents late duplicate messages
+      // for a few seconds after completion â€” prevents late duplicate messages
       if (delayedUnregisterTimerRef.current) {
         clearTimeout(delayedUnregisterTimerRef.current)
         delayedUnregisterTimerRef.current = null
@@ -440,7 +440,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       const payload = data as Record<string, unknown>
 
       // [DEBUG TUI] Log every SSE event so we can see whether tool.* events arrive
-      // from Hermes Agent through Workspace. Toggle off by setting
+      // from Nova gateway through Workspace. Toggle off by setting
       // localStorage.removeItem('hermes:debug:sse')
       if (
         typeof window !== 'undefined' &&
@@ -643,13 +643,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           pushActivity({
             type: 'artifact',
             time: new Date().toLocaleTimeString(),
-            text: path ? `${title} — ${path}` : title,
+            text: path ? `${title} â€” ${path}` : title,
           })
           processStoreEvent({
             type: 'tool',
             phase: 'complete',
             name: `artifact:${kind}`,
-            result: path ? `${title} — ${path}` : title,
+            result: path ? `${title} â€” ${path}` : title,
             preview:
               typeof payload.preview === 'string' && payload.preview.trim()
                 ? payload.preview.trim()
@@ -770,7 +770,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           ) {
             transitionToHandoff()
           } else {
-            markFailed('Hermes Agent connection closed')
+            markFailed('Nova gateway connection closed')
           }
           break
         }
@@ -893,7 +893,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         if (resolvedSessionKey !== activeSessionKeyRef.current) {
           // Only promote a backend-returned session ID when the original
           // request was a bootstrap key ("new"/"main"). Concrete Workspace
-          // sessions must never be overridden — that causes splits (#297).
+          // sessions must never be overridden â€” that causes splits (#297).
           if (
             shouldResolveStreamSession({
               requestedSessionKey: params.sessionKey,
@@ -913,8 +913,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         markAccepted()
         schedulePostAcceptanceTimeout('accepted')
 
-        // HTTP 200 — message accepted by Hermes Agent. Clear optimistic "sending"
-        // status so the Retry timer never fires. Hermes Agent does NOT echo
+        // HTTP 200 â€” message accepted by Nova gateway. Clear optimistic "sending"
+        // status so the Retry timer never fires. Nova gateway does NOT echo
         // user messages via SSE, so this is the only confirmation we get.
         if (params.idempotencyKey && onMessageAccepted) {
           onMessageAccepted(
@@ -958,7 +958,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           for (const eventBlock of events) {
             if (!eventBlock.trim()) continue
 
-            // Re-check between events as well — a single read() can yield a
+            // Re-check between events as well â€” a single read() can yield a
             // batch of buffered events; if a new stream started mid-batch,
             // the rest of this batch must be dropped.
             if (streamGenerationRef.current !== myGeneration) break
@@ -991,14 +991,14 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           // If the stream ended cleanly (no 'done' event) but we never received
           // any response text, treat it as a failure rather than a successful
           // empty completion. This happens when a proxy (e.g., Tailscale Serve)
-          // closes the connection after an idle timeout — the reader returns
+          // closes the connection after an idle timeout â€” the reader returns
           // { done: true } but the model was still generating. Fixes #512.
           if (
             !fullTextRef.current &&
             (lifecyclePhase === 'accepted' || lifecyclePhase === 'active')
           ) {
             markFailed(
-              'Connection closed before response was received. The backend may still be processing — check server logs or retry.',
+              'Connection closed before response was received. The backend may still be processing â€” check server logs or retry.',
             )
           } else {
             finishStream()

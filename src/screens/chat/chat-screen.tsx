@@ -1,4 +1,4 @@
-// Module-level local model override — set by composer when user picks a local model
+﻿// Module-level local model override â€” set by composer when user picks a local model
 // Avoids prop threading. Reset when switching back to cloud models.
 import {
   useCallback,
@@ -104,11 +104,11 @@ import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
-// ContextMeter removed — ContextBar (PR #32) replaces it
+// ContextMeter removed â€” ContextBar (PR #32) replaces it
 import { persistRecoveryMessage, useChatStore } from '@/stores/chat-store'
 import { useSessionModelStore } from '@/stores/session-model-store'
 import { useResearchCard } from '@/hooks/use-research-card'
-// MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
+// MOBILE_TAB_BAR_OFFSET removed â€” tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
 import {  useChatActivityStore } from '@/stores/chat-activity-store'
@@ -504,7 +504,7 @@ export function ChatScreen({
   >([])
   const [isCompacting, setIsCompacting] = useState(false)
   const [researchResetKey, setResearchResetKey] = useState(0)
-  // Per-session thinking level — stored in sessionStorage keyed by session
+  // Per-session thinking level â€” stored in sessionStorage keyed by session
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
     if (typeof window === 'undefined') return 'low'
     const key = `claude-thinking-${activeFriendlyId || 'new'}`
@@ -621,7 +621,7 @@ export function ChatScreen({
     if (!key) return hasPendingSend() || hasPendingGeneration()
 
     // If we restored waiting state from sessionStorage but haven't verified
-    // with the API yet, don't show thinking — it might be stale (Issue #449).
+    // with the API yet, don't show thinking â€” it might be stale (Issue #449).
     if (
       storeWaiting.has(key) &&
       pendingVerifySessionKeyRef.current === key &&
@@ -652,7 +652,7 @@ export function ChatScreen({
       pendingVerifySessionKeyRef.current = currentSessionKey
       setActiveRunCheckDone(false)
     } else {
-      // No restored waiting state — no need to verify
+      // No restored waiting state â€” no need to verify
       pendingVerifySessionKeyRef.current = undefined
       setActiveRunCheckDone(true)
     }
@@ -704,7 +704,7 @@ export function ChatScreen({
           ))) &&
       !isRedirecting,
     onUserMessage: useCallback(() => {
-      // External message arrived (e.g. from Telegram) — show thinking indicator
+      // External message arrived (e.g. from Telegram) â€” show thinking indicator
       setWaitingForResponse(true)
       setPendingGeneration(true)
     }, []),
@@ -778,7 +778,7 @@ export function ChatScreen({
     }, []),
   })
 
-  // Keep activity stream open persistently — opens on mount so it's ready
+  // Keep activity stream open persistently â€” opens on mount so it's ready
   // before the first tool call fires (avoids connection latency gap).
   const waitingForResponseRef = useRef(waitingForResponse)
   useEffect(() => {
@@ -788,7 +788,7 @@ export function ChatScreen({
   useEffect(() => {
     const events = new EventSource('/api/events')
     const onActivity = (event: MessageEvent) => {
-      // Only populate pills while waiting — but connection stays warm always
+      // Only populate pills while waiting â€” but connection stays warm always
       if (!waitingForResponseRef.current) return
       try {
         const payload = JSON.parse(event.data) as {
@@ -813,7 +813,7 @@ export function ChatScreen({
       events.removeEventListener('activity', onActivity)
       events.close()
     }
-  }, []) // mount only — stays open for session lifetime
+  }, []) // mount only â€” stays open for session lifetime
 
   // Clear tool pills after response arrives (with brief delay so last pill is visible)
   useEffect(() => {
@@ -896,7 +896,7 @@ export function ChatScreen({
 
   const streamStart = useCallback(() => {
     if (!activeFriendlyId || isNewChat) return
-    // No aggressive delayed refetch here — it wipes optimistic user messages
+    // No aggressive delayed refetch here â€” it wipes optimistic user messages
     // from the cache before the server has echoed them, causing the user's
     // message to disappear until the agent completes. The existing failsafes
     // (5s + 10s timeouts at lines below, active-run polling) handle the case
@@ -908,7 +908,7 @@ export function ChatScreen({
     if (historyQuery.isFetching) return
 
     // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
-    // The refetch replaces the query cache with server data — if the server
+    // The refetch replaces the query cache with server data â€” if the server
     // hasn't processed the user's POST yet, the optimistic message vanishes.
     const historySessionKey = isPortableMode
       ? 'main'
@@ -961,7 +961,7 @@ export function ChatScreen({
         if (!res.ok) return
         const data = await res.json()
         if (!data.ok) return
-        // Run not yet registered (gateway lag during silent processing) → keep waiting
+        // Run not yet registered (gateway lag during silent processing) â†’ keep waiting
         if (!data.run) return
         // Treat unknown / transient statuses as still-active to avoid premature teardown
         if (isTerminalActiveRunStatus(data.run.status)) {
@@ -1201,7 +1201,7 @@ export function ChatScreen({
       setSending(false)
       // Clear waitingForResponse so ThinkingBubble hides and message renders
       streamFinish()
-      // Play notification sound if the user opted in (Settings → Chat).
+      // Play notification sound if the user opted in (Settings â†’ Chat).
       // Read directly from the store to avoid re-creating this callback on every settings change.
       if (useChatSettingsStore.getState().settings.soundOnChatComplete) {
         playChatComplete()
@@ -1243,7 +1243,7 @@ export function ChatScreen({
     ),
     onMessageAccepted: useCallback(
       (_sessionKey: string, friendlyId: string, clientId: string) => {
-        // HTTP 200 received — server accepted the message. Clear "sending"
+        // HTTP 200 received â€” server accepted the message. Clear "sending"
         // status immediately so the Retry timer never fires. This is the
         // primary confirmation path since the server does NOT echo user
         // messages back via SSE.
@@ -1280,7 +1280,7 @@ export function ChatScreen({
 
   // Cancel any in-flight stream when the user navigates between sessions or
   // starts a new chat. Without this, an SSE stream from session A keeps
-  // running after the user navigates away — and any chunks it had already
+  // running after the user navigates away â€” and any chunks it had already
   // buffered before our abort takes effect could land in session B (the
   // newly active session). See #297 (cross-session response contamination).
   // Note: useStreamingMessage also has its own generation-token guard for
@@ -1446,7 +1446,7 @@ export function ChatScreen({
       if (msg.role !== 'assistant') return false
       if (msg.__streamingStatus === 'streaming') return false
       // Any non-streaming assistant message that appears after the last user
-      // message is potentially the same response — match by text overlap
+      // message is potentially the same response â€” match by text overlap
       if (streamingText.length > 0) {
         const msgText = textFromMessage(msg).trim()
         if (msgText.length > 0 && (
@@ -1662,7 +1662,7 @@ export function ChatScreen({
           }
         : statusQuery.data && !statusQuery.data.ok
           ? {
-              message: statusQuery.data.error || 'Hermes Agent unavailable',
+              message: statusQuery.data.error || 'Nova gateway unavailable',
               status: statusQuery.data.status,
             }
           : null
@@ -1789,7 +1789,7 @@ export function ChatScreen({
       : historyError
         ? `Failed to load history. ${historyError}`
         : statusError
-          ? `Hermes Agent unavailable. ${statusError.message}`
+          ? `Nova gateway unavailable. ${statusError.message}`
           : null
     if (message) setError(message)
   }, [
@@ -1870,7 +1870,7 @@ export function ChatScreen({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [chatFocusMode, setChatFocusMode])
 
-  // ⌘. (Mac) / Ctrl+. (Win) to toggle focus mode
+  // âŒ˜. (Mac) / Ctrl+. (Win) to toggle focus mode
   useEffect(() => {
     if (compact) return
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -2215,7 +2215,7 @@ export function ChatScreen({
 
   useEffect(() => {
     if (false) {
-      // Server connection checks removed — Hermes Agent uses direct API
+      // Server connection checks removed â€” Nova gateway uses direct API
       hasSeenDisconnectRef.current = true
       retriedQueuedMessageKeysRef.current.clear()
       return
@@ -2455,7 +2455,7 @@ export function ChatScreen({
       )
 
       if (isNewChat) {
-        // In portable mode, use 'main' — no server-side sessions exist.
+        // In portable mode, use 'main' â€” no server-side sessions exist.
         // In enhanced mode, create a UUID thread for the sessions API.
         const threadId = isPortableMode ? 'main' : crypto.randomUUID()
         const { optimisticMessage } = createOptimisticMessage(

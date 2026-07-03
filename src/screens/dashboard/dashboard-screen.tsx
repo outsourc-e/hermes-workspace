@@ -1,4 +1,4 @@
-import {
+﻿import {
   BubbleChatAddIcon,
   CheckmarkCircle02Icon,
   ConsoleIcon,
@@ -57,7 +57,7 @@ import { useFeatureAvailable } from '@/hooks/use-feature-available'
 // inferred type from a real icon import for prop typing.
 type HugeIcon = typeof Settings02Icon
 
-// ── Helpers ──────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function timeAgo(ts: number): string {
   const diff = Date.now() / 1000 - ts
@@ -118,7 +118,7 @@ function useDashboardPalette() {
   return palette
 }
 
-// ── Glass Card ───────────────────────────────────────────────────
+// â”€â”€ Glass Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function GlassCard({
   title,
@@ -206,7 +206,7 @@ function UnavailableWidget({
   )
 }
 
-// ── Metric Tile ──────────────────────────────────────────────────
+// â”€â”€ Metric Tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function MetricTile({
   label,
@@ -244,7 +244,7 @@ function MetricTile({
   )
 }
 
-// ── Activity Chart ───────────────────────────────────────────────
+// â”€â”€ Activity Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ActivityChart({
   sessions,
@@ -377,7 +377,7 @@ function ActivityChart({
   )
 }
 
-// ── Skills Widget ────────────────────────────────────────────────
+// â”€â”€ Skills Widget â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SkillsWidget({
   palette,
@@ -412,7 +412,7 @@ function SkillsWidget({
     )
   }
 
-  // Summary view per Hermes Agent feedback: 'don’t enumerate, summarise.'
+  // Summary view per Nova gateway feedback: 'donâ€™t enumerate, summarise.'
   // Prefer real usage signal from /api/analytics/usage when present
   // (counts what the agent *actually used*, not just what's installed).
   const installed = skills.length
@@ -421,7 +421,7 @@ function SkillsWidget({
   const topUsed = usage?.topSkills[0]
   const topInstalled =
     skills.find((s) => s.enabled !== false) ?? skills.at(0)
-  const topName = topUsed?.skill ?? String(topInstalled?.name ?? '—')
+  const topName = topUsed?.skill ?? String(topInstalled?.name ?? 'â€”')
 
   return (
     <button
@@ -451,7 +451,7 @@ function SkillsWidget({
           className="font-mono text-[9px] uppercase tracking-[0.15em]"
           style={{ color: 'var(--theme-muted)' }}
         >
-          manage →
+          manage â†’
         </span>
       </div>
       <div
@@ -467,14 +467,14 @@ function SkillsWidget({
         {installed === 0
           ? 'no skills installed'
           : usedThisWindow !== null && usedThisWindow > 0
-            ? `${enabled} enabled · ${usedThisWindow} used · top: ${topName}`
-            : `${enabled} enabled · top: ${topName}`}
+            ? `${enabled} enabled Â· ${usedThisWindow} used Â· top: ${topName}`
+            : `${enabled} enabled Â· top: ${topName}`}
       </div>
     </button>
   )
 }
 
-// ── Secondary action (smaller, monochrome) ─────────────────────
+// â”€â”€ Secondary action (smaller, monochrome) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SecondaryAction({
   label,
@@ -511,7 +511,7 @@ function SecondaryAction({
   )
 }
 
-// ── Quick Action ─────────────────────────────────────────────────
+// â”€â”€ Quick Action â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function QuickAction({
   label,
@@ -568,7 +568,7 @@ function QuickAction({
   )
 }
 
-// ── Session Row (minimal) ────────────────────────────────────────
+// â”€â”€ Session Row (minimal) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SessionRow({
   session,
@@ -629,21 +629,21 @@ function SessionRow({
   )
 }
 
-// ── Main Dashboard ───────────────────────────────────────────────
+// â”€â”€ Main Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function DashboardScreen() {
   const navigate = useNavigate()
   const skillsAvailable = useFeatureAvailable('skills')
   const sessionsQuery = useQuery({
-    // Use a dedicated query key — NOT chatQueryKeys.sessions — to avoid
+    // Use a dedicated query key â€” NOT chatQueryKeys.sessions â€” to avoid
     // cache collisions with the chat sidebar which fetches fewer sessions
     // and overwrites the dashboard's larger dataset.
     // Also use the workspace proxy (/api/sessions) rather than the server-side
-    // listSessions() — the latter calls the gateway via CLAUDE_API which is
+    // listSessions() â€” the latter calls the gateway via CLAUDE_API which is
     // only available server-side and returns nothing when called from the client.
     // Do not gate this direct proof behind /api/gateway-status. That probe can
     // be stale/loading while /api/sessions already works, which made the
-    // dashboard show a bogus “Enhanced API required” warning even though
+    // dashboard show a bogus â€œEnhanced API requiredâ€ warning even though
     // sessions were healthy.
     queryKey: ['dashboard', 'sessions'],
     queryFn: async () => {
@@ -802,7 +802,7 @@ export function DashboardScreen() {
     }
   }, [period])
 
-  // Aggregate dashboard overview — surfaces the data the native
+  // Aggregate dashboard overview â€” surfaces the data the native
   // Hermes dashboard exposes (status, platforms, cron, achievements,
   // model info, analytics) in a single round trip with per-section
   // graceful fallbacks. Each card renders only when its slice resolves.
@@ -874,11 +874,11 @@ export function DashboardScreen() {
         </button>
       </div>
       <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
-      {/* ── Header: brand lockup left, action cluster right.
+      {/* â”€â”€ Header: brand lockup left, action cluster right.
            Iteration 010: dropped redundant "Dashboard" eyebrow (the
-           page IS the dashboard); promoted "Hermes Workspace" to
+           page IS the dashboard); promoted "Nova Mission Control" to
            the primary heading at a larger weight. Logo bumped from
-           36px → 44px and gets a soft accent glow + ring so the
+           36px â†’ 44px and gets a soft accent glow + ring so the
            lockup commands the left side instead of feeling like
            filler before the action cluster. Kept anchored left
            (not centered) on purpose: ops dashboards put brand left
@@ -906,9 +906,9 @@ export function DashboardScreen() {
               style={{ background: 'transparent' }}
             />
           </span>
-          {/* Iter 011: dropped the 'Operator console · vX.Y.Z'
+          {/* Iter 011: dropped the 'Operator console Â· vX.Y.Z'
               eyebrow. The gateway version is already on the OpsStrip
-              (♦ GATEWAY V0.12.0), so the eyebrow was duplicating it.
+              (â™¦ GATEWAY V0.12.0), so the eyebrow was duplicating it.
               Single bold lockup feels cleaner; vertical centering on
               the lockup matches the height of the action cluster on
               the right so they don't visually drift. */}
@@ -925,7 +925,7 @@ export function DashboardScreen() {
             </h1>
           </div>
         </div>
-        {/* Action row: hierarchy per Hermes Agent review.
+        {/* Action row: hierarchy per Nova gateway review.
            New Chat is primary (full button + accent), Terminal +
            Skills are secondary, Settings collapses to icon-only. */}
         <div className="flex w-full flex-wrap items-center gap-2 lg:justify-end lg:max-w-xl">
@@ -1019,7 +1019,7 @@ export function DashboardScreen() {
         </div>
       </div>
 
-      {/* ── Attention marquee ──
+      {/* â”€â”€ Attention marquee â”€â”€
            Iteration 008: lifted *out* of the OpsStrip into its own
            dedicated row above it. Fixed Eric's 'feels cluttered'
            concern by giving the ticker its own visual chamber
@@ -1029,7 +1029,7 @@ export function DashboardScreen() {
         <AttentionMarquee overview={overview ?? null} />
       ) : null}
 
-      {/* ── Ops strip (gateway + version drift + platforms + cron pulse). ── */}
+      {/* â”€â”€ Ops strip (gateway + version drift + platforms + cron pulse). â”€â”€ */}
       <OpsStrip
         status={overview?.status ?? null}
         cron={overview?.cron ?? null}
@@ -1039,7 +1039,7 @@ export function DashboardScreen() {
 
       <DailyCheckCard />
 
-      {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
+      {/* â”€â”€ Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 â”€â”€ */}
       <HeroMetrics
         analytics={overview?.analytics ?? null}
         fallback={{
@@ -1056,13 +1056,13 @@ export function DashboardScreen() {
         }
       />
 
-      {/* ── Edit-mode banner (only renders when toggled). ── */}
+      {/* â”€â”€ Edit-mode banner (only renders when toggled). â”€â”€ */}
       <EditModePanel layout={layout} />
 
-      {/* ── Analytics chart (left) + Top models / Provider mix / Cache
+      {/* â”€â”€ Analytics chart (left) + Top models / Provider mix / Cache
            efficiency stacked on the right. The right-side stack now
            occupies the full vertical of the chart so we don't get the
-           floating-card empty-space Eric flagged in iter 008. ── */}
+           floating-card empty-space Eric flagged in iter 008. â”€â”€ */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         {layout.isVisible('analytics_chart') ? (
           <div className="lg:col-span-8">
@@ -1122,7 +1122,7 @@ export function DashboardScreen() {
         ) : null}
       </div>
 
-      {/* ── Primary content: Sessions Intelligence (replaces 14d Activity) + side rail ──
+      {/* â”€â”€ Primary content: Sessions Intelligence (replaces 14d Activity) + side rail â”€â”€
            Iteration 006 layout per Eric:
            - Attention now rides the OpsStrip marquee, not the rail.
            - Achievements moved up to sit beside Top Models would push the chart out
@@ -1169,7 +1169,7 @@ export function DashboardScreen() {
         {/* Side rail. Achievements is now first (sits beside Top Models
             visually since the rail is right of the chart row + sessions),
             then Skills, then the rhythm card. Mix & rhythm is the unique
-            chart in this column — keeping it.
+            chart in this column â€” keeping it.
             `min-h-full` + the trailing `flex-1` rhythm card together
             stretch the rail to match Sessions Intelligence height so
             we don't get the dangling gap Eric flagged in iter 007. */}

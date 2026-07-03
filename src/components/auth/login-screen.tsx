@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import type { FormEvent } from 'react'
 
 export function LoginScreen() {
@@ -113,7 +113,7 @@ export function LoginScreen() {
             rel="noopener noreferrer"
             className="text-accent-500 hover:text-accent-600 transition-colors"
           >
-            Hermes Agent
+            Nova gateway
           </a>
         </p>
       </div>

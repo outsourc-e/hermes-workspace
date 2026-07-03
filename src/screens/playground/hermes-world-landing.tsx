@@ -1,4 +1,4 @@
-import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
+﻿import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
 
 const HERMES_REPO_URL = 'https://github.com/outsourc-e/hermes-workspace'
 const HERMES_ROADMAP_URL = 'https://github.com/outsourc-e/hermes-workspace/blob/main/docs/hermesworld/master-roadmap.md'
@@ -8,12 +8,12 @@ const HERMES_FEATURES_URL = 'https://github.com/outsourc-e/hermes-workspace/blob
 const externalLinkProps = { target: '_blank', rel: 'noreferrer' }
 
 const capabilities = [
-  { label: 'Persistent World', copy: 'World state keeps moving while agents continue work.', icon: '✦' },
-  { label: 'Live Agents', copy: 'Companions follow, plan, craft, scout, and report back.', icon: '◈' },
-  { label: 'Zones & Quests', copy: 'Each zone gives humans and agents a place to act.', icon: '◇' },
-  { label: 'Memory Progression', copy: 'Agents carry context, unlocks, and completed history.', icon: '◎' },
-  { label: 'Hermes Sigils', copy: 'Make invisible agent progress visible and collectible.', icon: '⚚' },
-  { label: 'Multiplayer Presence', copy: 'Humans and agents share the same world layer.', icon: '◌' },
+  { label: 'Persistent World', copy: 'World state keeps moving while agents continue work.', icon: 'âœ¦' },
+  { label: 'Live Agents', copy: 'Companions follow, plan, craft, scout, and report back.', icon: 'â—ˆ' },
+  { label: 'Zones & Quests', copy: 'Each zone gives humans and agents a place to act.', icon: 'â—‡' },
+  { label: 'Memory Progression', copy: 'Agents carry context, unlocks, and completed history.', icon: 'â—Ž' },
+  { label: 'Hermes Sigils', copy: 'Make invisible agent progress visible and collectible.', icon: 'âšš' },
+  { label: 'Multiplayer Presence', copy: 'Humans and agents share the same world layer.', icon: 'â—Œ' },
 ]
 
 const zones = [
@@ -107,7 +107,7 @@ export function HermesWorldLanding() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <a href="/playground" className="group inline-flex items-center justify-center rounded-xl border border-[#ffe7a3]/50 bg-[linear-gradient(180deg,#ffe7a3,#d9a63f)] px-6 py-4 text-sm font-black uppercase tracking-[0.14em] text-[#11100b] shadow-[0_24px_80px_rgba(217,179,95,.28)] transition hover:-translate-y-0.5 hover:brightness-110">
-              ▶ Play Now <span className="ml-2 transition group-hover:translate-x-1">→</span>
+              â–¶ Play Now <span className="ml-2 transition group-hover:translate-x-1">â†’</span>
             </a>
             <a href={HERMES_REPO_URL} {...externalLinkProps} className="inline-flex items-center justify-center rounded-xl border border-[#d9b35f]/24 bg-[#0b1118]/78 px-6 py-4 text-sm font-black uppercase tracking-[0.14em] text-[#f8e4ac] shadow-[inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-xl transition hover:border-[#d9b35f]/50 hover:bg-[#121823]">
               View on GitHub
@@ -119,15 +119,15 @@ export function HermesWorldLanding() {
 
           <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#bfb49a]/60">
             <span>Preview build</span>
-            <span className="text-[#d9b35f]/55">✦</span>
+            <span className="text-[#d9b35f]/55">âœ¦</span>
             <span>Persistent agents</span>
-            <span className="text-[#d9b35f]/55">✦</span>
+            <span className="text-[#d9b35f]/55">âœ¦</span>
             <span>Zones, quests, sigils</span>
           </div>
 
           <div className="mt-7 max-w-xl rounded-2xl border border-[#d9b35f]/18 bg-[#05080e]/70 p-4 shadow-[0_20px_70px_rgba(0,0,0,.28),inset_0_1px_0_rgba(255,255,255,.06)] backdrop-blur-xl">
             <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d9b35f]/35 bg-[#d9b35f]/12 text-lg shadow-[0_0_28px_rgba(217,179,95,.16)]">🏆</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d9b35f]/35 bg-[#d9b35f]/12 text-lg shadow-[0_0_28px_rgba(217,179,95,.16)]">ðŸ†</span>
               <div>
                 <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#d9b35f]/70">Dropping today</div>
                 <div className="mt-1 text-sm font-bold leading-5 text-[#fff6df]">HermesWorld landing page, roadmap, feature list, and the first public build notes.</div>
@@ -168,7 +168,7 @@ function Header() {
         <a href="#preview" className="transition hover:text-[#f8e4ac]">Preview</a>
         <a href="#today" className="transition hover:text-[#f8e4ac]">Today</a>
         <a href={HERMES_DOCS_URL} {...externalLinkProps} className="transition hover:text-[#f8e4ac]">Docs</a>
-        <a href="/playground" className="rounded-lg border border-[#ffe7a3]/55 bg-[linear-gradient(180deg,#ffe7a3,#d9a63f)] px-4 py-2 font-black text-[#11100b] shadow-[0_0_30px_rgba(217,179,95,.18)] transition hover:brightness-110">▶ Play</a>
+        <a href="/playground" className="rounded-lg border border-[#ffe7a3]/55 bg-[linear-gradient(180deg,#ffe7a3,#d9a63f)] px-4 py-2 font-black text-[#11100b] shadow-[0_0_30px_rgba(217,179,95,.18)] transition hover:brightness-110">â–¶ Play</a>
         <a href={HERMES_REPO_URL} {...externalLinkProps} className="rounded-lg border border-[#d9b35f]/30 bg-[#d9b35f]/10 px-4 py-2 text-[#f8e4ac] shadow-[0_0_30px_rgba(217,179,95,.08)] transition hover:bg-[#d9b35f]/18">GitHub</a>
       </nav>
     </header>
@@ -200,7 +200,7 @@ function HeroWorldFrame() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,transparent_36%,rgba(3,6,10,.28)_78%),linear-gradient(180deg,rgba(3,6,10,.02),rgba(3,6,10,.62))]" />
           <div className="absolute left-4 top-4 rounded-xl border border-[#d9b35f]/24 bg-[#05080e]/70 px-3 py-2 shadow-2xl backdrop-blur-xl">
             <div className="text-[9px] font-black uppercase tracking-[0.2em] text-[#f8e4ac]/70">HermesWorld Entry</div>
-            <div className="mt-1 text-xs text-[#d7d0bd]/70">Portal online · Zones awakening · Sigils active</div>
+            <div className="mt-1 text-xs text-[#d7d0bd]/70">Portal online Â· Zones awakening Â· Sigils active</div>
           </div>
           <div className="absolute bottom-4 left-4 max-w-[320px] rounded-xl border border-cyan-200/20 bg-[#05080e]/72 p-3 shadow-2xl backdrop-blur-xl">
             <div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/72">World State</div>
@@ -242,7 +242,7 @@ function TodayDropSection() {
         <div className="grid gap-8 lg:grid-cols-[0.74fr_1.26fr] lg:items-center">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[#d9b35f]/24 bg-[#d9b35f]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#f8e4ac]">
-              <span>🏆</span>
+              <span>ðŸ†</span>
               Launch drop
             </div>
             <h2 className="mt-4 font-serif text-4xl font-bold leading-[0.92] tracking-[-0.055em] text-[#fff6df] sm:text-5xl lg:text-6xl">
@@ -333,11 +333,11 @@ function AgentsSection() {
             <div className="mb-4 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100/62">Agent Console</div>
             <div className="min-h-[340px] rounded-xl border border-white/8 bg-black/36 p-4 font-mono text-xs leading-7 text-[#bff9ff]/72">
               {consoleLines.map((line) => (
-                <div key={line}><span className="text-[#d9b35f]">›</span> {line}</div>
+                <div key={line}><span className="text-[#d9b35f]">â€º</span> {line}</div>
               ))}
               <div className="mt-3 text-[#76d88f]">quest accepted: Open the Northern Gate</div>
-              <div className="text-[#a78bfa]">agent route planned: Oracle → Grove → Forge</div>
-              <div className="mt-3 animate-pulse text-[#f8e4ac]">▌</div>
+              <div className="text-[#a78bfa]">agent route planned: Oracle â†’ Grove â†’ Forge</div>
+              <div className="mt-3 animate-pulse text-[#f8e4ac]">â–Œ</div>
             </div>
           </div>
         </div>
@@ -383,9 +383,9 @@ function FinalCta() {
       <div className="mx-auto max-w-[880px] rounded-[2rem] border border-[#d9b35f]/24 bg-[#05080e]/78 p-8 text-center shadow-[0_40px_140px_rgba(0,0,0,.52)] backdrop-blur-xl sm:p-12">
         <div className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-100/62">Enter the world</div>
         <h2 className="mt-3 font-serif text-4xl font-bold tracking-[-0.055em] text-[#fff6df] sm:text-6xl">Build with agents in a world, not a chat box.</h2>
-        <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[#d7d0bd]/62">Enter HermesWorld and explore the first playable layer of Hermes Workspace: zones, quests, companions, sigils, and persistent agent progression.</p>
+        <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[#d7d0bd]/62">Enter HermesWorld and explore the first playable layer of Nova Mission Control: zones, quests, companions, sigils, and persistent agent progression.</p>
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <a href="/playground" className="rounded-xl bg-[#f8e4ac] px-7 py-4 text-sm font-black uppercase tracking-[0.14em] text-[#11100b] transition hover:-translate-y-0.5 hover:bg-white">▶ Play Now</a>
+          <a href="/playground" className="rounded-xl bg-[#f8e4ac] px-7 py-4 text-sm font-black uppercase tracking-[0.14em] text-[#11100b] transition hover:-translate-y-0.5 hover:bg-white">â–¶ Play Now</a>
           <a href={HERMES_DOCS_URL} {...externalLinkProps} className="rounded-xl border border-white/12 bg-white/[0.055] px-7 py-4 text-sm font-black uppercase tracking-[0.14em] text-white/78 transition hover:bg-white/[0.1]">Read Docs</a>
           <a href={HERMES_REPO_URL} {...externalLinkProps} className="rounded-xl border border-white/12 bg-white/[0.055] px-7 py-4 text-sm font-black uppercase tracking-[0.14em] text-white/78 transition hover:bg-white/[0.1]">View GitHub</a>
           <a href={HERMES_ROADMAP_URL} {...externalLinkProps} className="rounded-xl border border-white/12 bg-white/[0.055] px-7 py-4 text-sm font-black uppercase tracking-[0.14em] text-white/78 transition hover:bg-white/[0.1]">Read Roadmap</a>
@@ -407,7 +407,7 @@ function Footer() {
         <a href={HERMES_DOCS_URL} {...externalLinkProps} className="hover:text-[#f8e4ac]">Docs</a>
         <a href={HERMES_ROADMAP_URL} {...externalLinkProps} className="hover:text-[#f8e4ac]">Roadmap</a>
         <a href={HERMES_FEATURES_URL} {...externalLinkProps} className="hover:text-[#f8e4ac]">Feature List</a>
-        <a href="#today" className="hover:text-[#f8e4ac]">Today’s Drop</a>
+        <a href="#today" className="hover:text-[#f8e4ac]">Todayâ€™s Drop</a>
       </div>
     </footer>
   )

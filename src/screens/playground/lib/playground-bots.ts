@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Convincing fake multiplayer for hackathon.
  *
  * Real WS multiplayer is in the spec for v0.2 but is not safe to ship in
- * the same-day window — TanStack Start would need a custom WS plugin or
+ * the same-day window â€” TanStack Start would need a custom WS plugin or
  * sidecar process. Instead, render 2-4 "online" bots per world with
  * generated names + persona avatars. They wander via a lightweight
  * waypoint walker that looks like real player movement.
@@ -58,7 +58,7 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'eros',
       color: '#f472b6',
       spawn: [7, 0, 7],
-      lines: ['promptcraft is wildly fun', 'who else is on Hermes Workspace?', 'see u in the Grove'],
+      lines: ['promptcraft is wildly fun', 'who else is on Nova Mission Control?', 'see u in the Grove'],
     },
     {
       id: 'bot-agora-3',
@@ -130,7 +130,7 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'nike',
       color: '#fb7185',
       spawn: [-5, 0, 0],
-      lines: ['undefeated tonight', 'kimi vs claude — go', 'who\u2019s next'],
+      lines: ['undefeated tonight', 'kimi vs claude â€” go', 'who\u2019s next'],
     },
     {
       id: 'bot-arena-2',

@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ChatMessage,
   SessionMeta,
   SessionSummary,
@@ -286,7 +286,7 @@ export async function readError(res: Response): Promise<string> {
 }
 
 export const missingAuthMessage =
-  'Hermes Agent connection failed. Make sure Hermes Agent is running and HERMES_API_URL is set correctly.'
+  'Nova gateway connection failed. Make sure Nova gateway is running and HERMES_API_URL is set correctly.'
 
 export function isMissingAuth(message: string): boolean {
   return message.includes(missingAuthMessage)
