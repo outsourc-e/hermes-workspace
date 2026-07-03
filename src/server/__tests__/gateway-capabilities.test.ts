@@ -190,6 +190,109 @@ describe('gateway-capabilities', () => {
       )
       warnSpy.mockRestore()
     })
+
+    it('falls back to /auth/password-login when root scrape returns 500', async () => {
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME = 'hermes'
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD = 'qwe123'
+
+      fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url === 'http://127.0.0.1:9119/') {
+          return {
+            ok: false,
+            status: 500,
+            text: async () => 'Internal Server Error',
+            headers: { get: () => null },
+          } as unknown as Response
+        }
+        if (url === 'http://127.0.0.1:9119/auth/password-login') {
+          return {
+            ok: true,
+            status: 200,
+            text: async () => '{}',
+            headers: {
+              get: (name: string) =>
+                name.toLowerCase() === 'set-cookie'
+                  ? 'session=abc123; Path=/; HttpOnly'
+                  : null,
+            },
+          } as unknown as Response
+        }
+        return {
+          ok: false,
+          status: 404,
+          text: async () => '',
+          headers: { get: () => null },
+        } as unknown as Response
+      })
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const mod = await loadMod()
+
+      await expect(mod.fetchDashboardToken()).resolves.toBe('cookie_login_ok')
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://127.0.0.1:9119/auth/password-login',
+        expect.objectContaining({ method: 'POST' }),
+      )
+      expect(logSpy).toHaveBeenCalledWith(
+        '[gateway] Dashboard password-login OK; captured 1 cookie(s).',
+      )
+
+      const auth = await mod.dashboardAuthHeaders({ force: true })
+      expect(auth).toEqual({ Cookie: 'session=abc123' })
+
+      logSpy.mockRestore()
+      warnSpy.mockRestore()
+      delete process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+      delete process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
+    })
+
+    it('returns empty token and warns when password login fails', async () => {
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME = 'hermes'
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD = 'wrong'
+
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url === 'http://127.0.0.1:9119/') {
+          return {
+            ok: false,
+            status: 500,
+            text: async () => 'Internal Server Error',
+            headers: { get: () => null },
+          } as unknown as Response
+        }
+        if (url === 'http://127.0.0.1:9119/auth/password-login') {
+          return {
+            ok: false,
+            status: 401,
+            text: async () => '{"error":"invalid"}',
+            headers: { get: () => null },
+          } as unknown as Response
+        }
+        return {
+          ok: false,
+          status: 404,
+          text: async () => '',
+          headers: { get: () => null },
+        } as unknown as Response
+      })
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const mod = await loadMod()
+
+      await expect(mod.fetchDashboardToken()).resolves.toBe('')
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('password-login POST failed: 401'),
+      )
+
+      const auth = await mod.dashboardAuthHeaders({ force: true })
+      expect(auth).toEqual({})
+
+      warnSpy.mockRestore()
+      delete process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+      delete process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
+    })
   })
 
   it('does not mark Conductor available when dashboard returns SPA HTML fallback', async () => {

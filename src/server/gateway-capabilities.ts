@@ -258,6 +258,92 @@ let lastLoggedSummary = ''
 let dashboardTokenPromise: Promise<string> | null = null
 let dashboardTokenCache = ''
 
+// Cookie jar populated by POSTing to /auth/password-login. The dashboard
+// authenticates /api/* via session cookie, not bearer — see dashboardAuthHeaders.
+let dashboardCookieJar: Record<string, string> = {}
+
+const DASHBOARD_USERNAME =
+  process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME ||
+  process.env.CLAUDE_DASHBOARD_USERNAME ||
+  process.env.HERMES_DASHBOARD_USERNAME ||
+  'hermes'
+const DASHBOARD_PASSWORD =
+  process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD ||
+  process.env.CLAUDE_DASHBOARD_PASSWORD ||
+  process.env.HERMES_DASHBOARD_PASSWORD ||
+  ''
+
+function parseSetCookie(setCookieHeader: string | null): Record<string, string> {
+  if (!setCookieHeader) return {}
+  const jar: Record<string, string> = {}
+  const entries = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader]
+  for (const raw of entries) {
+    const first = raw.split(';')[0]
+    const eq = first.indexOf('=')
+    if (eq > 0) {
+      const name = first.slice(0, eq).trim()
+      const value = first.slice(eq + 1).trim()
+      if (name) jar[name] = value
+    }
+  }
+  return jar
+}
+
+function cookieHeaderFromJar(jar: Record<string, string>): string {
+  return Object.entries(jar)
+    .map(([k, v]) => `${k}=${v}`)
+    .join('; ')
+}
+
+async function dashboardPasswordLogin(): Promise<boolean> {
+  if (!DASHBOARD_PASSWORD) {
+    console.warn(
+      '[gateway] DASHBOARD_PASSWORD env not set; cannot POST login.',
+    )
+    return false
+  }
+  try {
+    const loginUrl = `${CLAUDE_DASHBOARD_URL}/auth/password-login`
+    const res = await fetch(loginUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: DASHBOARD_USERNAME,
+        password: DASHBOARD_PASSWORD,
+        next: '/',
+        provider: 'basic',
+      }),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS * 2),
+      credentials: 'include',
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      console.warn(
+        `[gateway] Dashboard password-login POST failed: ${res.status} ${body.slice(0, 200)}`,
+      )
+      return false
+    }
+    const setCookie = res.headers.get('set-cookie')
+    const parsed = parseSetCookie(setCookie)
+    if (Object.keys(parsed).length === 0) {
+      console.warn(
+        '[gateway] Dashboard login POST returned no Set-Cookie; auth will not work.',
+      )
+      return false
+    }
+    dashboardCookieJar = { ...dashboardCookieJar, ...parsed }
+    console.log(
+      `[gateway] Dashboard password-login OK; captured ${Object.keys(parsed).length} cookie(s).`,
+    )
+    return true
+  } catch (err) {
+    console.warn(
+      `[gateway] Dashboard password-login POST threw: ${err instanceof Error ? err.message : err}`,
+    )
+    return false
+  }
+}
+
 /** Optional bearer token for authenticated gateway endpoints. */
 export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
 
@@ -318,6 +404,13 @@ export async function fetchDashboardToken(options?: {
     }
   })()
 
+  // Scrape path returned nothing (auth-gated, 500, no inline token).
+  // Try programmatic basic-auth login so dashboardFetch can attach the
+  // session cookie on subsequent calls.
+  if (await dashboardPasswordLogin()) {
+    return 'cookie_login_ok'
+  }
+
   try {
     return await dashboardTokenPromise
   } finally {
@@ -334,8 +427,12 @@ export async function getDashboardToken(options?: {
 export async function dashboardAuthHeaders(options?: {
   force?: boolean
 }): Promise<Record<string, string>> {
-  const token = await getDashboardToken(options)
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  // /api/* on the dashboard requires the session cookie set by
+  // /auth/password-login. fetchDashboardToken populates the jar via the
+  // POST-login fallback when root-token scraping fails.
+  await getDashboardToken(options)
+  const cookieHeader = cookieHeaderFromJar(dashboardCookieJar)
+  return cookieHeader ? { Cookie: cookieHeader } : {}
 }
 
 function withDashboardBase(path: string): string {
@@ -372,12 +469,14 @@ export async function dashboardFetch(
       ...init,
       method,
       headers,
+      credentials: 'include',
     })
   }
 
   let res = await doFetch(false)
   if (res.status === 401) {
     dashboardTokenCache = ''
+    dashboardCookieJar = {}
     res = await doFetch(true)
   }
   return res
