@@ -27,6 +27,7 @@ import { AnalyticsChartCard } from './components/analytics-chart-card'
 import { AttentionMarquee } from './components/attention-marquee'
 import { CacheEfficiencyCard } from './components/cache-efficiency-card'
 import { CostLedgerCard } from './components/cost-ledger-card'
+import { DailyCheckCard } from './components/daily-check-card'
 import { EditModePanel } from './components/edit-mode-panel'
 import { HeroMetrics } from './components/hero-metrics'
 import { LogsTailCard } from './components/logs-tail-card'
@@ -858,10 +859,10 @@ export function DashboardScreen() {
               'claude-slate': 'claude-slate-light',
               'claude-slate-light': 'claude-slate',
             }
-            const cur = document.documentElement.getAttribute('data-theme') || 'claude-official'
-            const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? 'claude-official-light' : 'claude-official')
+            const cur = document.documentElement.getAttribute('data-theme') || 'scifi'
+            const nextDataTheme = LIGHT_DARK_PAIRS[cur] || 'scifi'
             import('@/lib/theme').then(({ setTheme }) => { setTheme(nextDataTheme as any) })
-            const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
+            const nextMode = 'dark'
             applyTheme(nextMode)
             updateSettings({ theme: nextMode })
             setIsDark(nextMode === 'dark')
@@ -899,9 +900,9 @@ export function DashboardScreen() {
             }}
           >
             <img
-              src="/claude-avatar.webp"
-              alt="Hermes Workspace logo"
-              className="size-8 rounded-md"
+              src="/nova-idle-poster.png"
+              alt="Nova Mission Control"
+              className="size-8 rounded-md object-cover"
               style={{ background: 'transparent' }}
             />
           </span>
@@ -920,7 +921,7 @@ export function DashboardScreen() {
                 lineHeight: 1.1,
               }}
             >
-              Hermes Workspace
+              Nova Mission Control
             </h1>
           </div>
         </div>
@@ -956,7 +957,7 @@ export function DashboardScreen() {
               size={16}
               strokeWidth={1.8}
             />
-            <span>New Chat</span>
+            <span>Jack in</span>
           </button>
           <SecondaryAction
             label="Terminal"
@@ -1035,6 +1036,8 @@ export function DashboardScreen() {
         kanban={overview?.kanban ?? null}
         platforms={overview?.platforms ?? []}
       />
+
+      <DailyCheckCard />
 
       {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
       <HeroMetrics

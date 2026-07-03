@@ -31,7 +31,7 @@ const QUERY_KEY = ['claude', 'tasks'] as const
 const ASSIGNEES_KEY = ['claude', 'tasks', 'assignees'] as const
 
 export const TASKS_BOARD_HELP_TEXT =
-  'Workspace Tasks is a lightweight task board. Drag cards to change status. Use Dashboard Kanban for native multi-board controls.'
+  'Mission tasks stay lightweight here. Drag cards to change status; dashboard kanban still handles native multi-board controls.'
 
 function SkeletonCard() {
   return (
@@ -183,10 +183,12 @@ export function TasksScreen() {
     <div className="min-h-full overflow-y-auto bg-surface text-ink">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
       {/* Header */}
-      <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
+      <header className="rounded-xl border border-amber-500/25 bg-[#080d12]/90 p-4 backdrop-blur-xl">
         <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <h1 className="text-2xl font-medium text-ink">Tasks</h1>
+          <h1 className="font-mono text-2xl font-medium text-amber-50">
+            Mission tasks
+          </h1>
           {assigneeFilter && (
             <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
               <span>Filtered by: <span className="capitalize" style={{ color: '#f59e0b' }}>{assigneeFilter}</span></span>
@@ -231,7 +233,7 @@ export function TasksScreen() {
                 : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-accent)]',
             )}
           >
-            {showDone ? 'Hide Done' : 'Show Done'}
+            {showDone ? 'Hide closed' : 'Show closed'}
           </button>
           <button
             onClick={invalidate}
@@ -246,7 +248,7 @@ export function TasksScreen() {
             style={{ background: 'var(--theme-accent)' }}
           >
             <HugeiconsIcon icon={Add01Icon} size={14} />
-            New Task
+            New task
           </button>
         </div>
       </div>
@@ -270,7 +272,7 @@ export function TasksScreen() {
               key={col}
               className={cn(
                 'flex flex-col rounded-xl border min-w-[180px] w-full shrink-0 flex-1',
-                'bg-[var(--theme-card)] border-[var(--theme-border)]',
+                'bg-[#080d12]/92 border-amber-500/20',
                 'transition-colors shadow-[0_2px_12px_rgba(0,0,0,0.25)]',
                 isDragOver && 'border-[var(--theme-accent)] bg-[var(--theme-hover)]',
               )}

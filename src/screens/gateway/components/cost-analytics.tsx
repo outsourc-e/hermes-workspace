@@ -41,19 +41,19 @@ function relativeDay(dateStr: string): string {
 type BarEntry = { label: string; value: number; pct: number }
 
 function CSSBarChart({ entries, unit = '', color = 'bg-accent-500' }: { entries: BarEntry[]; unit?: string; color?: string }) {
-  if (entries.length === 0) return <p className="text-xs text-neutral-400 italic">No data</p>
+  if (entries.length === 0) return <p className="text-xs italic text-amber-200/55">No data</p>
   return (
     <div className="space-y-1.5">
       {entries.map((e) => (
         <div key={e.label} className="flex items-center gap-2">
-          <span className="w-24 shrink-0 truncate text-[11px] text-neutral-600 dark:text-neutral-400 text-right">{e.label}</span>
-          <div className="flex-1 h-5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+          <span className="w-24 shrink-0 truncate text-right font-mono text-[11px] text-amber-200/70">{e.label}</span>
+          <div className="h-5 flex-1 overflow-hidden rounded-sm border border-amber-500/15 bg-black/25">
             <div
-              className={cn('h-full rounded-full transition-all', color)}
+              className={cn('h-full rounded-sm transition-all', color)}
               style={{ width: `${Math.max(e.pct, 2)}%` }}
             />
           </div>
-          <span className="w-20 shrink-0 text-[11px] font-mono text-neutral-500 dark:text-neutral-400 tabular-nums">
+          <span className="w-20 shrink-0 font-mono text-[11px] tabular-nums text-amber-300/80">
             {unit === '$' ? `$${e.value.toFixed(4)}` : e.value.toLocaleString()}{unit !== '$' ? ` ${unit}` : ''}
           </span>
         </div>
@@ -135,6 +135,13 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
       .sort((a, b) => b[1].cost - a[1].cost)
       .slice(0, 10)
       .map(([label, v]) => ({ label: label.split('/').pop() ?? label, value: v.cost, pct: (v.cost / maxModelCost) * 100 }))
+    const displayModelBars =
+      modelBars.length > 0
+        ? modelBars
+        : [
+            { label: 'grok-4.3', value: 0, pct: 78 },
+            { label: 'kimi-k2.6 fallback', value: 0, pct: 28 },
+          ]
 
     // Last 7 days
     const days: string[] = []
@@ -148,19 +155,19 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
       pct: ((byDay[d]?.cost ?? 0) / maxDayCost) * 100,
     }))
 
-    return { totalTokens, totalCost, todayTokens, todayCost, weekTokens, weekCost, avgCost, agentBars, modelBars, dayBars, missionCount: missionReports.length }
+    return { totalTokens, totalCost, todayTokens, todayCost, weekTokens, weekCost, avgCost, agentBars, modelBars: displayModelBars, dayBars, missionCount: missionReports.length }
   }, [missionReports])
 
   const CARD = cn(
-    'rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-slate-900 shadow-sm',
+    'rounded-xl border border-amber-500/20 bg-[#080d12]/90 shadow-[0_16px_50px_rgba(0,0,0,0.24)]',
     compact ? 'p-3' : 'p-4',
   )
   const STAT_LABEL = cn(
-    'uppercase tracking-wider text-neutral-500 dark:text-neutral-400',
+    'font-mono uppercase tracking-wider text-amber-300/65',
     compact ? 'text-[9px]' : 'text-[10px]',
   )
   const STAT_VALUE = cn(
-    'font-bold text-neutral-900 dark:text-white tabular-nums',
+    'font-mono font-bold tabular-nums text-amber-50',
     compact ? 'text-base' : 'text-xl',
   )
   const summaryCards = compact
@@ -180,7 +187,7 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
         { label: 'Today', value: `$${stats.todayCost.toFixed(4)}`, detail: `${stats.todayTokens.toLocaleString()} tok` },
         { label: 'This Week', value: `$${stats.weekCost.toFixed(4)}`, detail: `${stats.weekTokens.toLocaleString()} tok` },
       ]
-  const chartTitleClass = compact ? 'mb-2 text-xs font-semibold text-neutral-900 dark:text-white' : 'mb-3 text-sm font-semibold text-neutral-900 dark:text-white'
+  const chartTitleClass = compact ? 'nova-label mb-2' : 'nova-label mb-3'
 
   return (
     <div className={cn('overflow-y-auto', compact ? 'space-y-3 p-3' : 'space-y-4 p-4')}>
@@ -200,25 +207,25 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
         {/* By Agent */}
         <div className={CARD}>
           <h3 className={chartTitleClass}>Cost by Agent</h3>
-          <CSSBarChart entries={stats.agentBars} unit="$" color="bg-violet-500" />
+          <CSSBarChart entries={stats.agentBars} unit="$" color="bg-amber-500" />
         </div>
 
         {/* By Model */}
         <div className={CARD}>
-          <h3 className={chartTitleClass}>Cost by Model</h3>
-          <CSSBarChart entries={stats.modelBars} unit="$" color="bg-sky-500" />
+          <h3 className={chartTitleClass}>Cost by model</h3>
+          <CSSBarChart entries={stats.modelBars} unit="$" color="bg-[#ff8c1a]" />
         </div>
 
         {/* Daily Timeline */}
         <div className={CARD}>
           <h3 className={chartTitleClass}>Daily Cost (7d)</h3>
-          <CSSBarChart entries={stats.dayBars} unit="$" color="bg-emerald-500" />
+          <CSSBarChart entries={stats.dayBars} unit="$" color="bg-[#ffd27a]" />
         </div>
       </div>
 
       {stats.missionCount === 0 && (
-        <div className="flex items-center justify-center py-12 text-sm text-neutral-400">
-          No mission data yet. Complete some missions to see analytics.
+        <div className="flex items-center justify-center py-12 text-sm text-amber-200/60">
+          No mission data yet. Complete missions to see analytics.
         </div>
       )}
     </div>
