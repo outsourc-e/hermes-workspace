@@ -80,20 +80,20 @@ export const THEMES: Array<{
   },
   {
     id: 'scifi',
-    label: 'SciFi',
+    label: 'Nova',
     description: 'Cyberpunk HUD — deep navy, cyan neon, orange highlights',
     icon: '🌌',
   },
   {
     id: 'scifi-light',
-    label: 'SciFi Light',
+    label: 'Nova',
     description: 'Cold steel and teal — cyberpunk interface in daylight',
     icon: '🌌',
   },
 ]
 
 const STORAGE_KEY = 'claude-theme'
-const DEFAULT_THEME: ThemeId = 'claude-nous'
+const DEFAULT_THEME: ThemeId = 'scifi'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
 const LIGHT_THEME_MAP: Record<
   Exclude<ThemeId, `${string}-light`>,

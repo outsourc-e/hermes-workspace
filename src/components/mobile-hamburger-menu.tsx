@@ -4,7 +4,6 @@ import {
   BrainIcon,
   Building01Icon,
   Cancel01Icon,
-  Castle02Icon,
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
@@ -21,7 +20,7 @@ import {
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
-import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
+import { setTheme } from '@/lib/theme'
 import {
   selectChatProfileDisplayName,
   useChatSettingsStore,
@@ -42,13 +41,6 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     icon: DashboardSquare01Icon,
     to: '/dashboard',
     match: (p: string) => p.startsWith('/dashboard'),
-  },
-  {
-    id: 'playground',
-    label: 'HermesWorld',
-    icon: Castle02Icon,
-    to: '/playground',
-    match: (p: string) => p.startsWith('/playground'),
   },
   {
     id: 'terminal',
@@ -227,23 +219,21 @@ export function MobileHamburgerMenu() {
           style={{ borderBottom: '1px solid var(--color-border, #e5e7eb)' }}
         >
           <div className="flex items-center gap-2.5">
-            <img
-              src="/claude-avatar.webp"
-              alt="Hermes Agent"
-              className="size-8 rounded-xl shrink-0"
-            />
+            <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[var(--theme-accent-border)] bg-[var(--theme-accent-subtle)] font-mono text-xs text-[var(--theme-accent-secondary)]">
+              =
+            </span>
             <div className="flex flex-col leading-tight">
               <span
                 className="font-bold text-[15px] tracking-tight"
                 style={{ color: 'var(--color-ink, #111)' }}
               >
-                Hermes Agent
+                Nova Mission Control
               </span>
               <span
                 className="text-[11px]"
                 style={{ color: 'var(--color-muted, #888)' }}
               >
-                Workspace
+                SoulSync // Stable
               </span>
             </div>
           </div>
@@ -356,10 +346,7 @@ export function MobileHamburgerMenu() {
             <button
               type="button"
               onClick={() => {
-                const current = getTheme()
-                const dark = isDarkTheme(current)
-                const next = getThemeVariant(current, dark ? 'light' : 'dark')
-                setTheme(next)
+                setTheme('scifi')
               }}
               className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors"
               aria-label="Toggle theme"

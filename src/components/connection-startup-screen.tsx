@@ -220,13 +220,13 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
     >
       <div className="flex w-full max-w-lg flex-col items-center text-center">
         <img
-          src="/claude-avatar.webp"
-          alt="Hermes Agent"
-          className="mb-5 h-20 w-20 rounded-2xl object-cover shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
+          src="/nova-idle-poster.png"
+          alt="Nova"
+          className="mb-5 h-24 w-24 rounded-2xl object-cover shadow-[0_12px_40px_rgba(255,140,26,0.28)]"
         />
 
-        <h1 className="text-[2rem] font-semibold tracking-tight text-white">
-          Hermes Workspace
+        <h1 className="text-[2rem] font-semibold tracking-tight text-[var(--theme-text-strong)]">
+          Nova Mission Control
         </h1>
 
         {/* Connecting spinner */}
@@ -238,7 +238,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           aria-hidden={showFailureState}
         >
           <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
-          <span>Connecting to your backend...</span>
+          <span>Connection: checking</span>
         </div>
 
         {/* Failure state — setup guide */}
@@ -252,12 +252,11 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         >
           <div className="w-full rounded-3xl border border-white/10 bg-white/5 p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-sm">
             <p className="text-base font-medium text-white">
-              Welcome! Let&apos;s connect your backend
+              Jack in to your backend
             </p>
             <p className="mt-2 text-sm leading-6 text-white/60">
-              Hermes Workspace works with any OpenAI-compatible backend. Hermes Agent
-              gateway APIs unlock enhanced features automatically when they are
-              available.
+              Nova can work with any OpenAI-compatible backend. The local
+              gateway unlocks richer workspace features when it is available.
             </p>
 
             {/* Auto-start section */}
@@ -279,7 +278,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                     Detecting...
                   </span>
                 ) : (
-                  'Auto-Start Hermes Agent Gateway'
+                  'Jack in'
                 )}
               </button>
 

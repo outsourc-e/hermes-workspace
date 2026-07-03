@@ -61,14 +61,14 @@ export function LoginScreen() {
                 <circle cx="50" cy="50" r="15" fill="currentColor" />
               </svg>
               <h1 className="text-2xl font-bold tracking-tight text-primary-900">
-                Hermes Workspace
+                Nova Mission Control
               </h1>
             </div>
           </div>
 
           {/* Title */}
           <h2 className="mb-2 text-center text-lg font-semibold text-primary-900">
-            Enter Password
+            Enter password
           </h2>
           <p className="mb-6 text-center text-sm text-primary-600">
             This workspace is password-protected
@@ -106,7 +106,7 @@ export function LoginScreen() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-primary-500">
-          Powered by{' '}
+          Backend by{' '}
           <a
             href="https://github.com/NousResearch/hermes-agent"
             target="_blank"

@@ -57,6 +57,60 @@ type WorkspaceShellProps = {
   children?: React.ReactNode
 }
 
+function NovaTopBar() {
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const clock = new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(now)
+
+  return (
+    <div
+      className="absolute inset-x-0 top-0 z-20 flex h-11 items-center justify-between gap-3 border-b px-4 backdrop-blur-md"
+      style={{
+        background: 'var(--theme-header-bg)',
+        borderColor: 'var(--theme-header-border)',
+        color: 'var(--theme-text)',
+      }}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="font-mono text-[11px] text-[var(--theme-muted)] tabular-nums">
+          {clock}
+        </span>
+        <span className="hidden h-4 w-px bg-[var(--theme-border-subtle)] sm:block" />
+        <span className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] px-2.5 py-1 font-mono text-[11px] text-[var(--theme-accent-secondary)]">
+          <span className="size-2 rounded-full bg-[var(--theme-accent)] shadow-[var(--theme-glow-low)]" />
+          SoulSync // Stable
+        </span>
+        <span className="hidden items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] px-2.5 py-1 font-mono text-[11px] text-[var(--theme-accent-secondary)] md:inline-flex">
+          <span className="size-2 rounded-full bg-[var(--theme-success)]" />
+          Connection: Secure
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          className="rounded-full border border-[var(--theme-border)] bg-transparent px-3 py-1 text-xs font-medium text-[var(--theme-accent-secondary)] transition-colors hover:bg-[var(--theme-accent-subtle)]"
+        >
+          Pause
+        </button>
+        <span className="hidden rounded-full border border-[var(--theme-border-subtle)] px-2 py-1 font-mono text-[10px] text-[var(--theme-muted)] lg:inline-flex">
+          alerts clear
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const navigate = useNavigate()
   const pathname = useRouterState({
@@ -334,7 +388,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 className="text-[13px] font-medium select-none"
                 style={{ color: 'var(--theme-accent, #B98A44)' }}
               >
-                Hermes
+                Nova
               </span>
             </div>
             {/* Right spacer to balance */}
@@ -387,12 +441,13 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             ].join(' ')}
             data-tour="chat-area"
           >
+            {!isChromeFreeSurface ? <NovaTopBar /> : null}
             {/* Persistent terminal — stays mounted to preserve session across navigation */}
             <div
               className="flex flex-col"
               style={{
                 position: 'absolute',
-                inset: 0,
+                inset: isChromeFreeSurface ? 0 : '44px 0 0 0',
                 visibility: isOnTerminalRoute ? 'visible' : 'hidden',
                 pointerEvents: isOnTerminalRoute ? 'auto' : 'none',
                 zIndex: isOnTerminalRoute ? 1 : -1,
@@ -419,6 +474,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               className={[
                 'page-transition flex flex-col',
                 isChromeFreeSurface ? 'min-h-full' : 'h-full',
+                !isChromeFreeSurface ? 'pt-11' : '',
                 slideClass,
                 isOnTerminalRoute ? 'hidden' : '',
               ]

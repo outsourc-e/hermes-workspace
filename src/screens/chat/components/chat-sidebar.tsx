@@ -5,7 +5,6 @@ import {
   ArrowRight01Icon,
   BrainIcon,
   Building01Icon,
-  Castle02Icon,
   Chat01Icon,
   CheckListIcon,
   Clock01Icon,
@@ -164,6 +163,80 @@ export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
 
 export async function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
   return []
+}
+
+function NovaStatusChip({ label }: { label: string }) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] px-2.5 py-1 font-mono text-[11px] text-[var(--theme-accent-secondary)]">
+      <span className="size-2 rounded-full bg-[var(--theme-accent)] shadow-[var(--theme-glow-low)]" />
+      {label}
+    </div>
+  )
+}
+
+function NovaVisualLinkFrame() {
+  const [failed, setFailed] = useState(false)
+
+  return (
+    <section className="mx-2 mb-2 rounded-xl border border-[var(--theme-accent-border)] bg-[var(--theme-card)] p-2 shadow-[var(--theme-glow-low)]">
+      <div className="relative aspect-square overflow-hidden rounded-lg border border-[var(--theme-border-subtle)] bg-[var(--theme-bg)]">
+        {!failed ? (
+          <video
+            className="h-full w-full object-cover"
+            src="/nova-idle.mp4"
+            poster="/nova-idle-poster.png"
+            muted
+            autoPlay
+            loop
+            playsInline
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <div className="grid h-full place-items-center bg-[var(--theme-bg)]">
+            <div className="nova-emblem-breathe grid size-16 place-items-center rounded-full border border-[var(--theme-accent)]">
+              <div className="h-1.5 w-8 rounded-full bg-[var(--theme-accent)]" />
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+        {failed ? 'visual link -- standby' : 'visual link -- live'}
+      </div>
+    </section>
+  )
+}
+
+const NOVA_AGENT_ROSTER = [
+  { name: 'Nova', activity: 'Memory keeper', model: 'grok-4.3', tokens: '18.2k' },
+  { name: 'Astra', activity: 'Planning orbit', model: 'grok-4.3', tokens: '7.4k' },
+  { name: 'Claude', activity: 'Code support', model: 'kimi-k2.6 fallback', tokens: '42.1k' },
+] as const
+
+function NovaAgentRoster() {
+  return (
+    <section className="mx-2 mb-2 space-y-2 rounded-xl border border-[var(--theme-border-subtle)] bg-[var(--theme-panel)] p-2">
+      <div className="nova-label">Agent roster</div>
+      {NOVA_AGENT_ROSTER.map((agent) => (
+        <div
+          key={agent.name}
+          className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[var(--theme-card)] px-2 py-2"
+        >
+          <span className="size-2 rounded-full bg-[var(--theme-accent)] shadow-[var(--theme-glow-low)]" />
+          <div className="min-w-0">
+            <div className="truncate text-xs font-semibold text-[var(--theme-text-strong)]">
+              {agent.name}
+            </div>
+            <div className="truncate text-[10px] text-[var(--theme-muted)]">
+              {agent.activity} / {agent.model}
+            </div>
+          </div>
+          <div className="font-mono text-[10px] text-[var(--theme-accent-secondary)]">
+            {agent.tokens}
+          </div>
+        </div>
+      ))}
+    </section>
+  )
 }
 
 function NavItem({
@@ -578,7 +651,6 @@ function ChatSidebarComponent({
   const isSkillsActive = pathname === '/skills'
   const isMcpActive = pathname === '/mcp'
   const isFilesActive = pathname === '/files'
-  const isPlaygroundActive = pathname === '/playground'
   const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
@@ -950,16 +1022,14 @@ function ChatSidebarComponent({
                   'w-full pl-1.5 justify-start gap-2',
                 )}
               >
-                <img
-                  src="/claude-avatar.webp"
-                  alt="Hermes Agent"
-                  className="size-6 rounded-lg"
-                />
+                <span className="grid size-7 place-items-center rounded-full border border-[var(--theme-accent-border)] bg-[var(--theme-accent-subtle)] font-mono text-xs text-[var(--theme-accent-secondary)] shadow-[var(--theme-glow-low)]">
+                  =
+                </span>
                 <span
                   className="text-sm font-semibold tracking-tight"
                   style={{ color: 'var(--theme-text)' }}
                 >
-                  Hermes Workspace
+                  Nova Mission Control
                 </span>
               </Link>
             </motion.div>
@@ -1002,6 +1072,17 @@ function ChatSidebarComponent({
         </TooltipProvider>
       </motion.div>
 
+      {!isVisuallyCollapsed ? (
+        <>
+          <NovaVisualLinkFrame />
+          <div className="mx-2 mb-2 flex flex-col gap-1.5">
+            <NovaStatusChip label="SoulSync // Stable" />
+            <NovaStatusChip label="Connection: Secure" />
+          </div>
+          <NovaAgentRoster />
+        </>
+      ) : null}
+
       {/* ── Search (ChatGPT-style, above sections) ─────────────────── */}
       <div className="px-2 pb-1">
         <motion.div
@@ -1041,51 +1122,13 @@ function ChatSidebarComponent({
               strokeWidth={1.5}
               className="size-5 shrink-0"
             />
-            <span>New Session</span>
+            <span>Jack in</span>
           </Link>
         </div>
       )}
 
       {/* ── HermesWorld featured link (gold castle, NEW badge) ────── */}
       {/* Hide when VITE_HERMESWORLD_ENABLED is explicitly '0' */}
-      {!isVisuallyCollapsed &&
-        (import.meta as any).env?.VITE_HERMESWORLD_ENABLED !== '0' && (
-        <div className="px-2 pb-2">
-          <Link
-            to="/playground"
-            onClick={() => onSelectSession?.()}
-            className={cn(
-              buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'group w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
-              isPlaygroundActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
-            )}
-            data-tour="hermesworld"
-          >
-            <HugeiconsIcon
-              icon={Castle02Icon}
-              size={20}
-              strokeWidth={1.5}
-              className="size-5 shrink-0"
-              style={{ color: '#facc15' }}
-            />
-            <span>HermesWorld</span>
-            <span
-              className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
-              style={{
-                background:
-                  'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
-                color: '#0b1320',
-                boxShadow: '0 0 8px rgba(250,204,21,0.4)',
-                letterSpacing: '0.08em',
-              }}
-            >
-              NEW
-            </span>
-          </Link>
-        </div>
-      )}
-
       {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
         {/* Navigation sections */}
