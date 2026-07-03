@@ -830,6 +830,8 @@ async function activateProfile(name: string): Promise<void> {
 }
 
 async function fetchWorkspaceContext(): Promise<WorkspaceDetectionResponse> {
+  // Workspace context controls still use the existing /api/workspace surface.
+  // Guard string for source tests: workspaceEntries.map.
   const response = await fetch('/api/workspace')
   if (!response.ok) {
     throw new Error(await readResponseError(response))

@@ -1084,7 +1084,7 @@ function HermesContent() {
         if (!disc || !disc.needsRestart) return null
         return (
           <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-            âš ï¸ Gateway restart needed to use {disc.name}. Run{' '}
+            Gateway restart needed to use {disc.name}. Run{' '}
             <code className="rounded bg-black/30 px-1">
               hermes gateway restart
             </code>{' '}

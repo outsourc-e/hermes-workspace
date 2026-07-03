@@ -1110,13 +1110,13 @@ export function ClaudeOnboarding() {
                   <div>Chat Ready</div>
                 </div>
                 <div className="rounded-xl p-2" style={cardStyle}>
-                  <div className="mb-1 text-lg">ðŸ”—</div>
+                  <div className="mb-1 text-lg">link</div>
                   <div>
                     {enhancedFeatures.length > 0 ? 'Enhanced' : 'Portable'}
                   </div>
                 </div>
                 <div className="rounded-xl p-2" style={cardStyle}>
-                  <div className="mb-1 text-lg">ðŸ§ </div>
+                  <div className="mb-1 text-lg">mem</div>
                   <div>
                     {enhancedFeatures.length > 0
                       ? enhancedFeatures.length
