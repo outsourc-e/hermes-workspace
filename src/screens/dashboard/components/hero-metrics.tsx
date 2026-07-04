@@ -213,13 +213,13 @@ export function HeroMetrics({
   const useAnalytics = !!analytics && analytics.source === 'analytics'
 
   const dailyTokens = useAnalytics
-    ? analytics!.daily.map((d) => d.inputTokens + d.outputTokens)
+    ? analytics.daily.map((d) => d.inputTokens + d.outputTokens)
     : []
   const dailySessions = useAnalytics
-    ? analytics!.daily.map((d) => d.sessions)
+    ? analytics.daily.map((d) => d.sessions)
     : []
   const dailyCalls = useAnalytics
-    ? analytics!.daily.map((d) => d.apiCalls)
+    ? analytics.daily.map((d) => d.apiCalls)
     : []
 
   // Period-over-period deltas: split daily into the latter half vs the prior half.
@@ -235,16 +235,16 @@ export function HeroMetrics({
   const [tokCurr, tokPrev] = splitSum(dailyTokens)
 
   const tokensTotal = useAnalytics
-    ? analytics!.totalTokens
+    ? analytics.totalTokens
     : fallback.tokens
   const sessionsTotal = useAnalytics
-    ? analytics!.totalSessions
+    ? analytics.totalSessions
     : fallback.sessions
   const apiCalls = useAnalytics
-    ? analytics!.totalApiCalls
+    ? analytics.totalApiCalls
     : fallback.toolCalls
 
-  const window = useAnalytics ? `${analytics!.windowDays}d` : 'all time'
+  const window = useAnalytics ? `${analytics.windowDays}d` : 'all time'
 
   const tiles: Array<HeroTileProps> = useMemo(
     () => [
@@ -261,7 +261,7 @@ export function HeroMetrics({
         label: 'Tokens',
         value: formatTokens(tokensTotal),
         sub: useAnalytics
-          ? `${formatTokens(analytics!.cacheReadTokens)} cached`
+          ? `${formatTokens(analytics.cacheReadTokens)} cached`
           : 'Hermes ledger',
         delta: useAnalytics ? deltaPct(tokCurr, tokPrev) : null,
         spark: useAnalytics ? dailyTokens : undefined,

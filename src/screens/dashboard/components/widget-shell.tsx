@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
+import type {DashboardLayout, WidgetId} from '@/screens/dashboard/lib/use-dashboard-layout';
 import {
-  WIDGET_CATALOG,
-  type DashboardLayout,
-  type WidgetId,
+
+  WIDGET_CATALOG
+
 } from '@/screens/dashboard/lib/use-dashboard-layout'
 
 /**

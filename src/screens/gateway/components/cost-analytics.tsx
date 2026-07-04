@@ -15,7 +15,7 @@ export type MissionReportEntry = {
 }
 
 export type CostAnalyticsDashboardProps = {
-  missionReports: MissionReportEntry[]
+  missionReports: Array<MissionReportEntry>
   compact?: boolean
 }
 
@@ -40,7 +40,7 @@ function relativeDay(dateStr: string): string {
 
 type BarEntry = { label: string; value: number; pct: number }
 
-function CSSBarChart({ entries, unit = '', color = 'bg-accent-500' }: { entries: BarEntry[]; unit?: string; color?: string }) {
+function CSSBarChart({ entries, unit = '', color = 'bg-accent-500' }: { entries: Array<BarEntry>; unit?: string; color?: string }) {
   if (entries.length === 0) return <p className="text-xs text-neutral-400 italic">No data</p>
   return (
     <div className="space-y-1.5">
@@ -125,24 +125,24 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
 
     // Build bar entries
     const maxAgentCost = Math.max(...Object.values(byAgent).map((a) => a.cost), 0.0001)
-    const agentBars: BarEntry[] = Object.entries(byAgent)
+    const agentBars: Array<BarEntry> = Object.entries(byAgent)
       .sort((a, b) => b[1].cost - a[1].cost)
       .slice(0, 10)
       .map(([label, v]) => ({ label, value: v.cost, pct: (v.cost / maxAgentCost) * 100 }))
 
     const maxModelCost = Math.max(...Object.values(byModel).map((m) => m.cost), 0.0001)
-    const modelBars: BarEntry[] = Object.entries(byModel)
+    const modelBars: Array<BarEntry> = Object.entries(byModel)
       .sort((a, b) => b[1].cost - a[1].cost)
       .slice(0, 10)
       .map(([label, v]) => ({ label: label.split('/').pop() ?? label, value: v.cost, pct: (v.cost / maxModelCost) * 100 }))
 
     // Last 7 days
-    const days: string[] = []
+    const days: Array<string> = []
     for (let i = 6; i >= 0; i--) {
       days.push(new Date(now - i * 86400000).toISOString().slice(0, 10))
     }
     const maxDayCost = Math.max(...days.map((d) => byDay[d]?.cost ?? 0), 0.0001)
-    const dayBars: BarEntry[] = days.map((d) => ({
+    const dayBars: Array<BarEntry> = days.map((d) => ({
       label: relativeDay(d),
       value: byDay[d]?.cost ?? 0,
       pct: ((byDay[d]?.cost ?? 0) / maxDayCost) * 100,

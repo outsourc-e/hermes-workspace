@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {  useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon, ArrowRight01Icon, PlayIcon, Rocket01Icon, Search01Icon, Settings01Icon, TaskDone01Icon } from '@hugeicons/core-free-icons'
+import { OfficeView } from './components/office-view'
+import {   useConductorGateway } from './hooks/use-conductor-gateway'
+import type {CSSProperties} from 'react';
+import type { AgentWorkingRow } from './components/agents-working-panel'
+import type {GatewaySession} from '@/lib/gateway-api';
+import type {MissionHistoryEntry, MissionHistoryWorkerDetail} from './hooks/use-conductor-gateway';
 import { Button } from '@/components/ui/button'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 import { Markdown } from '@/components/prompt-kit/markdown'
-import { OfficeView } from './components/office-view'
-import type { AgentWorkingRow } from './components/agents-working-panel'
-import { type GatewaySession } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
-import { type MissionHistoryEntry, type MissionHistoryWorkerDetail, useConductorGateway } from './hooks/use-conductor-gateway'
 
 type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
 type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
@@ -136,7 +138,7 @@ function formatUsd(value: number): string {
   return `$${value.toFixed(value >= 0.1 ? 2 : 3)}`
 }
 
-function MissionCostSection({ totalTokens, workers, expanded, onToggle }: { totalTokens: number; workers: MissionCostWorker[]; expanded: boolean; onToggle: () => void }) {
+function MissionCostSection({ totalTokens, workers, expanded, onToggle }: { totalTokens: number; workers: Array<MissionCostWorker>; expanded: boolean; onToggle: () => void }) {
   const estimatedCost = estimateTokenCost(totalTokens)
 
   return (
@@ -206,7 +208,7 @@ const WORKING_STEPS = [
   '🚀 Almost there…',
 ]
 
-function CyclingStatus({ steps, intervalMs = 3000, isPaused = false }: { steps: string[]; intervalMs?: number; isPaused?: boolean }) {
+function CyclingStatus({ steps, intervalMs = 3000, isPaused = false }: { steps: Array<string>; intervalMs?: number; isPaused?: boolean }) {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
@@ -249,7 +251,7 @@ function formatMissionTimestamp(value: string | null | undefined): string | null
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
 }
 
-function buildProjectPathCandidates(workers: Array<{ label: string }>, missionStartedAt: string | null | undefined): string[] {
+function buildProjectPathCandidates(workers: Array<{ label: string }>, missionStartedAt: string | null | undefined): Array<string> {
   const timestamp = formatMissionTimestamp(missionStartedAt)
   const candidates = new Set<string>()
 
@@ -339,7 +341,7 @@ function WorkerCard({
 }) {
   const dot = getWorkerDot(worker.status)
   const persona = getAgentPersona(index)
-  const workerOutput = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+  const workerOutput = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)
   const workerStartedAt = typeof worker.raw.createdAt === 'string' ? worker.raw.createdAt : typeof worker.raw.startedAt === 'string' ? worker.raw.startedAt : conductor.missionStartedAt
   const workerEndTime =
     worker.status === 'complete' || worker.status === 'stale' ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime() : conductor.isPaused ? (conductor.pausedAtMs ?? now) : now
@@ -464,8 +466,8 @@ function getProviderLabel(provider: string | null | undefined): string {
     .join(' ')
 }
 
-function groupModelsByProvider(models: AvailableModel[]) {
-  const groups = new Map<string, AvailableModel[]>()
+function groupModelsByProvider(models: Array<AvailableModel>) {
+  const groups = new Map<string, Array<AvailableModel>>()
 
   for (const model of models) {
     const provider = getProviderLabel(model.provider)
@@ -485,7 +487,7 @@ function groupModelsByProvider(models: AvailableModel[]) {
     }))
 }
 
-function getDirectoryPathSegments(pathValue: string): string[] {
+function getDirectoryPathSegments(pathValue: string): Array<string> {
   const normalized = pathValue.trim()
   if (!normalized) return ['~']
   if (normalized === '~') return ['~']
@@ -499,7 +501,7 @@ function getDirectoryPathSegments(pathValue: string): string[] {
   return normalized.split('/').filter(Boolean)
 }
 
-function buildDirectoryPathFromSegments(segments: string[]): string {
+function buildDirectoryPathFromSegments(segments: Array<string>): string {
   if (segments.length === 0) return '~'
   if (segments[0] === '~') {
     return segments.length === 1 ? '~' : `~/${segments.slice(1).join('/')}`
@@ -530,7 +532,7 @@ function ModelSelectorDropdown({
   label: string
   value: string
   onChange: (nextValue: string) => void
-  models: AvailableModel[]
+  models: Array<AvailableModel>
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -653,7 +655,7 @@ function extractMessageText(message: HistoryMessage | undefined): string {
   return ''
 }
 
-function getLastAssistantMessage(messages: HistoryMessage[] | undefined): string {
+function getLastAssistantMessage(messages: Array<HistoryMessage> | undefined): string {
   if (!Array.isArray(messages)) return ''
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
@@ -726,7 +728,7 @@ export function Conductor() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [directoryBrowserOpen, setDirectoryBrowserOpen] = useState(false)
   const [directoryBrowserPath, setDirectoryBrowserPath] = useState('~')
-  const [directoryBrowserEntries, setDirectoryBrowserEntries] = useState<FileBrowserEntry[]>([])
+  const [directoryBrowserEntries, setDirectoryBrowserEntries] = useState<Array<FileBrowserEntry>>([])
   const [directoryBrowserLoading, setDirectoryBrowserLoading] = useState(false)
   const [directoryBrowserError, setDirectoryBrowserError] = useState<string | null>(null)
   const modelsQuery = useQuery({
@@ -854,7 +856,7 @@ export function Conductor() {
     const continuationSummarySource =
       completeSummary ??
       Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
-      conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)).find((output) => output.trim()) ??
+      conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)).find((output) => output.trim()) ??
       conductor.streamText
 
     const combinedPrompt = [
@@ -902,7 +904,7 @@ export function Conductor() {
   const missionProgress = totalWorkers > 0 ? Math.round((completedWorkers / totalWorkers) * 100) : 0
   const totalTokens = conductor.workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
   const selectedHistoryEntry = conductor.selectedHistoryEntry
-  const completeMissionCostWorkers = useMemo<MissionCostWorker[]>(
+  const completeMissionCostWorkers = useMemo<Array<MissionCostWorker>>(
     () =>
       conductor.workers.map((worker, index) => {
         const persona = getAgentPersona(index)
@@ -916,7 +918,7 @@ export function Conductor() {
       }),
     [conductor.workers],
   )
-  const historyMissionCostWorkers = useMemo<MissionCostWorker[]>(
+  const historyMissionCostWorkers = useMemo<Array<MissionCostWorker>>(
     () =>
       (selectedHistoryEntry?.workerDetails ?? []).map((worker, index) => ({
         id: `${selectedHistoryEntry?.id ?? 'history'}-${index}`,
@@ -928,7 +930,7 @@ export function Conductor() {
     [selectedHistoryEntry],
   )
   const OFFICE_NAMES = ['Nova', 'Pixel', 'Blaze', 'Echo', 'Sage', 'Drift']
-  const homeOfficeRows = useMemo<AgentWorkingRow[]>(() => {
+  const homeOfficeRows = useMemo<Array<AgentWorkingRow>>(() => {
     const sessions = conductor.recentSessions
     if (sessions.length === 0) {
       return OFFICE_NAMES.slice(0, 3).map((name, i) => ({
@@ -942,7 +944,7 @@ export function Conductor() {
       }))
     }
     return sessions.slice(0, 6).map((session, i) => {
-      const s = session as GatewaySession
+      const s = session
       const updatedAt = typeof s.updatedAt === 'string' ? new Date(s.updatedAt).getTime() : typeof s.updatedAt === 'number' ? s.updatedAt : 0
       const statusText = `${s.status ?? ''} ${s.kind ?? ''}`.toLowerCase()
       const status = /error|failed/.test(statusText) ? ('error' as const) : /pause/.test(statusText) ? ('paused' as const) : Date.now() - updatedAt < 120_000 ? ('active' as const) : ('idle' as const)
@@ -960,12 +962,12 @@ export function Conductor() {
     })
   }, [conductor.recentSessions])
 
-  const officeAgentRows = useMemo<AgentWorkingRow[]>(() => {
+  const officeAgentRows = useMemo<Array<AgentWorkingRow>>(() => {
     if (conductor.workers.length > 0) {
       return conductor.workers.map((worker, index) => {
         const persona = getAgentPersona(index)
         const currentTask = conductor.tasks.find((task) => task.workerKey === worker.key && task.status === 'running')?.title
-        const lastLine = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+        const lastLine = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)
         const isWorkerPaused = conductor.isPaused && (worker.status === 'running' || worker.status === 'idle')
 
         return {
@@ -999,7 +1001,7 @@ export function Conductor() {
   }, [conductor.conductorSettings.workerModel, conductor.goal, conductor.isPaused, conductor.tasks, conductor.workerOutputs, conductor.workers])
 
   const completePhaseProjectPath = useMemo(() => {
-    const workerOutputTexts = [...Object.values(conductor.workerOutputs), ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined))].filter(
+    const workerOutputTexts = [...Object.values(conductor.workerOutputs), ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined))].filter(
       Boolean,
     )
 
@@ -1081,7 +1083,7 @@ export function Conductor() {
     const summarySource =
       completeSummary ??
       Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
-      conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)).find((output) => output.trim()) ??
+      conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)).find((output) => output.trim()) ??
       conductor.streamText
     return truncateContinuationText(summarySource ?? '')
   }, [completeSummary, conductor.streamText, conductor.workerOutputs, conductor.workers])
@@ -1096,7 +1098,7 @@ export function Conductor() {
   const filteredSessions = (() => {
     const sessions = conductor.recentSessions
     if (activityFilter === 'all') return sessions
-    return sessions.filter((session) => ((session.label as string) ?? '').startsWith('worker-')).filter((session) => deriveSessionStatus(session as GatewaySession) === activityFilter)
+    return sessions.filter((session) => ((session.label as string) ?? '').startsWith('worker-')).filter((session) => deriveSessionStatus(session) === activityFilter)
   })()
   const activityItems: Array<MissionHistoryEntry | GatewaySession> = hasMissionHistory ? filteredHistory : filteredSessions
   const ACTIVITY_PAGE_SIZE = 3
@@ -2025,7 +2027,7 @@ export function Conductor() {
               (() => {
                 const outputSections = conductor.workers
                   .map((worker, index) => {
-                    const output = (conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)).trim()
+                    const output = (conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)).trim()
                     if (!output) return null
                     const persona = getAgentPersona(index)
                     return {

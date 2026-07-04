@@ -21,7 +21,8 @@ import {
   useState,
 } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
+import type {AuthStatus} from '@/lib/claude-auth';
+import {  fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
@@ -42,6 +43,7 @@ import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
+import { isTruthyWarRoomFlag } from '@/lib/war-room/living-v3/route-flags'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 
 const TerminalWorkspace = lazy(() =>
@@ -61,6 +63,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const navigate = useNavigate()
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
+  })
+  const routeSearch = useRouterState({
+    select: (state) => state.location.search as Record<string, unknown>,
   })
   const isElectron = useMemo(
     () =>
@@ -83,6 +88,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(max-width: 767px)').matches
   })
+  const [warRoomNavigationOpen, setWarRoomNavigationOpen] = useState(false)
 
   // Slide transition direction tracking (mobile only)
   const [slideClass, setSlideClass] = useState<string>('')
@@ -168,6 +174,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (pathname.startsWith('/files')) return 'Files'
     if (pathname.startsWith('/jobs')) return 'Jobs'
     if (pathname.startsWith('/conductor')) return 'Conductor'
+    if (pathname.startsWith('/war-room')) return 'Etsy Ops War Room'
     if (pathname.startsWith('/operations')) return 'Operations'
     if (pathname.startsWith('/swarm2') || pathname === '/swarm') return 'Swarm'
     if (pathname.startsWith('/memory')) return 'Memory'
@@ -185,9 +192,14 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
   const isOnPlaygroundRoute = pathname === '/playground' || pathname.startsWith('/playground/')
-  const hideChatSidebar = isOnChatRoute && chatFocusMode
+  const isOnWarRoomRoute = pathname.startsWith('/war-room')
+  const isWarRoomFocusMode = isOnWarRoomRoute && (
+    isTruthyWarRoomFlag(routeSearch.etsyOps)
+    || isTruthyWarRoomFlag(routeSearch.livingV3)
+  )
+  const hideChatSidebar = (isOnChatRoute && chatFocusMode) || (isWarRoomFocusMode && !warRoomNavigationOpen)
   const showDesktopSidebarBackdrop =
-    !isMobile && !isOnChatRoute && !sidebarCollapsed
+    !isMobile && !isOnChatRoute && !sidebarCollapsed && !isWarRoomFocusMode
 
   const isNewChat = activeFriendlyId === 'new'
 
@@ -245,6 +257,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (!isMobile) return
     setSidebarCollapsed(true)
   }, [isMobile, pathname, setSidebarCollapsed])
+
+  useEffect(() => {
+    setWarRoomNavigationOpen(false)
+  }, [pathname, routeSearch.etsyOps, routeSearch.livingV3])
 
   // Slide transitions on mobile tab navigation
   useEffect(() => {
@@ -364,6 +380,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 ? 'pb-[calc(var(--tabbar-h,0px)+0.5rem)]'
                 : !isMobile &&
                     !isOnChatRoute &&
+                    !isWarRoomFocusMode &&
                     settings.showSystemMetricsFooter
                   ? 'pb-7'
                   : '',
@@ -416,11 +433,33 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           </main>
 
           {/* Chat panel — visible on non-chat routes (but not in HermesWorld, which has its own in-game chat) */}
-          {!isOnChatRoute && !isOnPlaygroundRoute && !isMobile && <ChatPanel />}
+          {!isOnChatRoute && !isOnPlaygroundRoute && !isOnWarRoomRoute && !isMobile && <ChatPanel />}
         </div>
 
+        {!isMobile && isWarRoomFocusMode && hideChatSidebar ? (
+          <button
+            type="button"
+            aria-label="Open workspace navigation"
+            onClick={() => setWarRoomNavigationOpen(true)}
+            className="fixed left-3 top-[calc(var(--titlebar-h,0px)+0.75rem)] z-50 min-h-10 rounded-md border border-primary-300/40 bg-[var(--theme-card)] px-3 text-sm font-semibold text-[var(--theme-text)] shadow-lg"
+          >
+            Menu
+          </button>
+        ) : null}
+
+        {!isMobile && isWarRoomFocusMode && warRoomNavigationOpen ? (
+          <button
+            type="button"
+            aria-label="Hide workspace navigation"
+            onClick={() => setWarRoomNavigationOpen(false)}
+            className="fixed left-[306px] top-[calc(var(--titlebar-h,0px)+0.75rem)] z-50 h-10 w-10 rounded-md border border-primary-300/40 bg-[var(--theme-card)] text-sm font-semibold text-[var(--theme-text)] shadow-lg"
+          >
+            x
+          </button>
+        ) : null}
+
         {/* Floating chat toggle — visible on non-chat routes (but not in HermesWorld) */}
-        {!isOnChatRoute && !isOnPlaygroundRoute && !isMobile && <ChatPanelToggle />}
+        {!isOnChatRoute && !isOnPlaygroundRoute && !isOnWarRoomRoute && !isMobile && <ChatPanelToggle />}
 
         {showDesktopSidebarBackdrop ? (
           <button
@@ -437,7 +476,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       </div>
 
       <MobileHamburgerMenu />
-      {!isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
+      {!isMobile && !isOnChatRoute && !isWarRoomFocusMode && settings.showSystemMetricsFooter ? (
         <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
       ) : null}
       <CommandPalette pathname={pathname} sessions={sessions} />

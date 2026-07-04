@@ -11,6 +11,8 @@ describe('listProfiles', () => {
   beforeEach(() => {
     tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-profiles-'))
     vi.spyOn(os, 'homedir').mockReturnValue(tempHome)
+    delete process.env.HERMES_HOME
+    delete process.env.CLAUDE_HOME
   })
 
   afterEach(() => {

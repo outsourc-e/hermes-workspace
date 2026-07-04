@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   estimateContextTokensFromCacheRead,
   estimateContextTokensFromMessages,
-} from './context-usage'
+} from '@/server/context-usage'
 
 describe('context usage estimation', () => {
   it('counts serialized content arrays and tool results instead of only string lengths', () => {

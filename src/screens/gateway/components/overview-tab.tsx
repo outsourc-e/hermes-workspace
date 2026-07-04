@@ -2,11 +2,11 @@
 // The Overview content is instead rendered inline via renderOverviewContent().
 // To reduce agent-hub-layout.tsx size, the inline overview rendering could be
 // migrated to use this component instead.
-import { cn } from '@/lib/utils'
+import { AGENT_ACCENT_COLORS, AgentAvatar, resolveAgentAvatarIndex } from './agent-avatar'
+import { OfficeView, getAgentStatusMeta, getOfficeModelLabel } from './office-view'
 import type { AgentWorkingRow } from './agents-working-panel'
 import type { TeamMember } from './team-panel'
-import { AGENT_ACCENT_COLORS, AgentAvatar, resolveAgentAvatarIndex } from './agent-avatar'
-import { getAgentStatusMeta, getOfficeModelLabel, OfficeView } from './office-view'
+import { cn } from '@/lib/utils'
 
 export interface OverviewTabProps {
   missionActive: boolean
@@ -19,13 +19,13 @@ export interface OverviewTabProps {
   teamCount: number
   teamLabel: string
   pendingApprovalCount: number
-  agentWorkingRows: AgentWorkingRow[]
+  agentWorkingRows: Array<AgentWorkingRow>
   teamById: Map<string, TeamMember>
   overviewAgentsView: 'cards' | 'live'
   selectedOutputAgentId?: string
   activeTemplateName?: string
   processType: 'sequential' | 'hierarchical' | 'parallel'
-  recentActivityItems: string[]
+  recentActivityItems: Array<string>
   truncateMissionGoal: (goal: string, max?: number) => string
   onViewMission: () => void
   onStopMission: () => void

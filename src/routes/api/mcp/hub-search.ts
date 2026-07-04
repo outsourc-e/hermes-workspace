@@ -15,7 +15,7 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import { rateLimit, getClientIp, rateLimitResponse, safeErrorMessage } from '../../../server/rate-limit'
+import { getClientIp, rateLimit, rateLimitResponse, safeErrorMessage } from '../../../server/rate-limit'
 import { unifiedSearch } from '../../../server/mcp-hub/index'
 import type { SearchSource } from '../../../server/mcp-hub/index'
 

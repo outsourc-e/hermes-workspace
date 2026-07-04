@@ -1,7 +1,12 @@
 /**
  * Tests for GET /api/mcp/hub-search route handler.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { isAuthenticated } from '../../../server/auth-middleware'
+import { getClientIp, rateLimit, rateLimitResponse } from '../../../server/rate-limit'
+import { unifiedSearch } from '../../../server/mcp-hub/index'
+import { Route } from './hub-search'
 
 vi.mock('../../../server/auth-middleware', () => ({
   isAuthenticated: vi.fn(),
@@ -16,16 +21,13 @@ vi.mock('../../../server/mcp-hub/index', () => ({
   unifiedSearch: vi.fn(),
 }))
 
-import { isAuthenticated } from '../../../server/auth-middleware'
-import { rateLimit, getClientIp, rateLimitResponse } from '../../../server/rate-limit'
-import { unifiedSearch } from '../../../server/mcp-hub/index'
-import { Route } from './hub-search'
-
 const mockIsAuthenticated = vi.mocked(isAuthenticated)
 const mockRateLimit = vi.mocked(rateLimit)
 const mockGetClientIp = vi.mocked(getClientIp)
 const mockRateLimitResponse = vi.mocked(rateLimitResponse)
 const mockUnifiedSearch = vi.mocked(unifiedSearch)
+
+type GetHandler = (ctx: { request: Request }) => Response | Promise<Response>
 
 function makeRequest(url: string): Request {
   return new Request(url)
@@ -33,9 +35,12 @@ function makeRequest(url: string): Request {
 
 async function callGet(url: string): Promise<Response> {
   const request = makeRequest(url)
-  const handler = Route.options.server?.handlers?.GET
+  const handlers = Route.options.server?.handlers as
+    | { GET?: GetHandler }
+    | undefined
+  const handler = handlers?.GET
   if (!handler) throw new Error('No GET handler')
-  return handler({ request } as Parameters<typeof handler>[0])
+  return handler({ request })
 }
 
 beforeEach(() => {

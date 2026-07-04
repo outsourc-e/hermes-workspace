@@ -1,9 +1,9 @@
 import { join } from 'node:path'
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 import { getSwarmProfilePath } from './swarm-foundation'
 import { publishChatEvent } from './chat-event-bus'
+import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 
 const ORCHESTRATOR_WORKER_ID = process.env.SWARM_ORCHESTRATOR_WORKER_ID?.trim() || 'swarm3'
 const ORCHESTRATOR_TMUX_SESSION = `swarm-${ORCHESTRATOR_WORKER_ID}`

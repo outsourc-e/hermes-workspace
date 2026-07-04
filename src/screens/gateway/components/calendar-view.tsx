@@ -17,7 +17,7 @@ type ParsedCronSchedule = {
   kind: 'daily' | 'weekly' | 'monthly'
   hour: number
   minute: number
-  weekdays: number[]
+  weekdays: Array<number>
   monthDay: number
 }
 
@@ -75,7 +75,7 @@ function parseHourMinute(schedule: string, fallbackDate: Date): { hour: number; 
   return { hour: fallbackDate.getHours(), minute: fallbackDate.getMinutes() }
 }
 
-function parseCronWeekdays(value: string): number[] {
+function parseCronWeekdays(value: string): Array<number> {
   const parts = value.split(',').map((part) => part.trim()).filter(Boolean)
   const weekdays = new Set<number>()
 
@@ -191,7 +191,7 @@ function parseSchedule(schedule: string, fallbackDate: Date): ParsedCronSchedule
   }
 }
 
-function getMonthGrid(referenceDate: Date): { gridStart: Date; gridEnd: Date; days: Date[] } {
+function getMonthGrid(referenceDate: Date): { gridStart: Date; gridEnd: Date; days: Array<Date> } {
   const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1)
   const monthEnd = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0)
   const gridStart = startOfWeek(monthStart)
@@ -232,7 +232,7 @@ export function CalendarView({ cronJobs, missionRuns, onSelectEvent }: CalendarV
     const rangeStart = startOfDay(activeRange.start)
     const rangeEnd = addDays(startOfDay(activeRange.end), 1)
 
-    const output: CalendarEvent[] = []
+    const output: Array<CalendarEvent> = []
 
     for (const job of cronJobs) {
       if (!job.enabled) continue
@@ -278,7 +278,7 @@ export function CalendarView({ cronJobs, missionRuns, onSelectEvent }: CalendarV
   }, [activeRange.end, activeRange.start, cronJobs, missionRuns])
 
   const eventsByDay = useMemo(() => {
-    const grouped = new Map<string, CalendarEvent[]>()
+    const grouped = new Map<string, Array<CalendarEvent>>()
     for (const event of events) {
       const key = getDayKey(event.date)
       const list = grouped.get(key)

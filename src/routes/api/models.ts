@@ -12,8 +12,8 @@ import {
 import { BEARER_TOKEN, CLAUDE_API } from '../../server/gateway-capabilities'
 import {
   ensureDiscovery,
-  getDiscoveredModels,
   ensureProviderInConfig,
+  getDiscoveredModels,
 } from '../../server/local-provider-discovery'
 
 const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')

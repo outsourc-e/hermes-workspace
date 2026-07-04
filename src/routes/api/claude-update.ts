@@ -1,8 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 
 type RemoteName = 'origin' | 'upstream'
@@ -42,7 +42,7 @@ export const UPDATE_REMOTE_DEFINITIONS: Array<RemoteDefinition> = [
   },
 ]
 
-function git(args: string[], timeout = 5000): string | null {
+function git(args: Array<string>, timeout = 5000): string | null {
   try {
     return execFileSync('git', args, { cwd: process.cwd(), encoding: 'utf8', timeout }).trim() || null
   } catch {

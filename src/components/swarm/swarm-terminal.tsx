@@ -172,13 +172,14 @@ export const SwarmTerminal = memo(function SwarmTerminal({
 
       const viewport = containerRef.current.querySelector(
         '.xterm-viewport',
-      ) as HTMLElement | null
-      const wheelHandler = (event: WheelEvent) => {
+      )
+      const wheelHandler: EventListener = (event) => {
+        const wheelEvent = event as WheelEvent
         // Make wheel scrolling reliably review terminal scrollback instead of
         // being interpreted as shell/tmux history navigation.
-        event.preventDefault()
-        event.stopPropagation()
-        const lines = Math.max(-8, Math.min(8, Math.round(event.deltaY / 40)))
+        wheelEvent.preventDefault()
+        wheelEvent.stopPropagation()
+        const lines = Math.max(-8, Math.min(8, Math.round(wheelEvent.deltaY / 40)))
         if (lines !== 0) {
           terminal.scrollLines(lines)
         }
@@ -310,7 +311,6 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         /* noop */
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workerId, command.join('|'), cwd, reconnectKey, focusTerminal, flushPendingInput])
 
   useEffect(() => {

@@ -60,6 +60,9 @@ export const SidebarSessions = memo(function SidebarSessions({
     return [pinned, unpinned] as const
   }, [pinnedSessionKeys, sessions])
 
+  const visibleUnpinnedSessions = useMemo(() => unpinnedSessions.slice(0, 30), [unpinnedSessions])
+  const hiddenUnpinnedCount = Math.max(0, unpinnedSessions.length - visibleUnpinnedSessions.length)
+
   function handleTogglePin(session: SessionMeta) {
     togglePinnedSession(session.key)
   }
@@ -129,7 +132,7 @@ export const SidebarSessions = memo(function SidebarSessions({
                   {pinnedSessions.length > 0 ? (
                     <div className="my-1 border-t border-primary-200/80" />
                   ) : null}
-                  {unpinnedSessions.map((session) => (
+                  {visibleUnpinnedSessions.map((session) => (
                     <SessionItem
                       key={session.key}
                       session={session}
@@ -141,6 +144,11 @@ export const SidebarSessions = memo(function SidebarSessions({
                       onDelete={onDelete}
                     />
                   ))}
+                  {hiddenUnpinnedCount > 0 ? (
+                    <div className="px-2 py-2 text-[11px] text-primary-400">
+                      Showing latest 30 sessions. {hiddenUnpinnedCount} older sessions hidden for Workspace stability.
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <div className="px-2 py-2 text-xs text-primary-500">

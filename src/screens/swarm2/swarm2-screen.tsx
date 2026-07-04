@@ -1,13 +1,13 @@
 'use client'
 
 import {
+
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
-  type CSSProperties,
+  useState
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -17,21 +17,29 @@ import {
   MessageMultiple01Icon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
-import type { CrewMember } from '@/hooks/use-crew-status'
-import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
-import { toast } from '@/components/ui/toast'
 import { OperationalWorkerCard } from './operational-worker-card'
 import { Swarm2OrchestratorCard } from './swarm2-orchestrator-card'
 import { Swarm2Wires } from './swarm2-wires'
 import { Swarm2ActivityFeed } from './swarm2-activity-feed'
 import { Swarm2KanbanBoard } from './swarm2-kanban-board'
-import { Swarm2ReportsView, buildSwarm2InboxLanes, type Swarm2InboxItem } from './swarm2-reports-view'
+import {  Swarm2ReportsView, buildSwarm2InboxLanes } from './swarm2-reports-view'
+import type {Swarm2InboxItem} from './swarm2-reports-view';
+import type {CSSProperties} from 'react';
+import type { CrewMember } from '@/hooks/use-crew-status'
+import { toast } from '@/components/ui/toast'
+import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 import { cn } from '@/lib/utils'
 
 const SWARM2_ROOM_STORAGE_KEY = 'claude-swarm2-room-v1'
+
+// User-safe stability mode: keep Swarm usable for routing without mounting
+// live terminals/log tails or unapproved profiles that have repeatedly crashed
+// this Workspace setup.
+const SWARM2_SAFE_MODE = true
+const APPROVED_SWARM_WORKER_IDS = new Set(['chatgptheavy', 'workerkimi', 'swarm1', 'swarm6', 'swarm11', 'swarm12'])
 
 const SWARM2_OPERATION_THEME: CSSProperties = {
   ['--theme-bg' as string]: 'var(--color-surface)',
@@ -57,7 +65,7 @@ const SWARM2_OPERATION_THEME: CSSProperties = {
 
 export const SWARM2_INFORMATION_HIERARCHY = [
   'Status header: online workers, active room, refresh state, view switch.',
-  'Orchestrator hub card: top-center primary routing hub with aggregate state and router affordance.',
+  'Aurora/orchestrator hub card: top-center primary routing hub with aggregate state and router affordance.',
   'Visible routing wires: subdued connection lines from the orchestrator to every worker, highlighted for selected and wired room nodes.',
   'Operations-style worker node cards: role, state, current task, last useful signal, direct inline chat/action affordances.',
   'Minimal attention rail: only auth, worker availability, room count, selected runtime metadata.',
@@ -150,7 +158,9 @@ type RuntimeEntry = {
   cwd: string | null
   phase?: string | null
   lastSummary?: string | null
+  lastRealSummary?: string | null
   lastResult?: string | null
+  lastRealResult?: string | null
   blockedReason?: string | null
   checkpointStatus?: string | null
   needsHuman?: boolean | null
@@ -365,7 +375,7 @@ async function fetchRoster(): Promise<Array<SwarmRosterWorker>> {
   const res = await fetch('/api/swarm-roster')
   if (!res.ok) throw new Error(`Roster request failed: ${res.status}`)
   const data = (await res.json()) as SwarmRosterResponse
-  return Array.isArray(data.roster?.workers) ? data.roster!.workers! : []
+  return Array.isArray(data.roster?.workers) ? data.roster.workers : []
 }
 
 async function fetchMissions(): Promise<Array<SwarmMissionSummary>> {
@@ -457,9 +467,9 @@ export function commandForRuntime(
 function recentLines(entry: RuntimeEntry | undefined): Array<string> {
   return (entry?.recentLogTail ?? '')
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => cleanSwarmLabel(line.trim(), '', 180))
     .filter(Boolean)
-    .slice(-4)
+    .slice(-3)
 }
 
 function rankMember(roomIds: Array<string>) {
@@ -474,14 +484,29 @@ function rankMember(roomIds: Array<string>) {
 
 function sortSwarmMembers(members: Array<CrewMember>, roomIds: Array<string>) {
   const rank = rankMember(roomIds)
-  return [...members]
-    .filter((member) => member.id && member.id.trim().length > 0)
+  const byId = new Map<string, CrewMember>()
+  for (const member of members) {
+    const id = member.id?.trim()
+    if (!id) continue
+    const normalized = { ...member, id }
+    const existing = byId.get(id)
+    if (!existing) {
+      byId.set(id, normalized)
+      continue
+    }
+    // Prefer the richer/live record when crew-status and roster/runtime both
+    // surface the same worker id. Duplicate ids crash React lists during Route.
+    const existingScore = (existing.profileFound ? 4 : 0) + (existing.processAlive ? 2 : 0) + (existing.gatewayState === 'online' ? 1 : 0)
+    const nextScore = (normalized.profileFound ? 4 : 0) + (normalized.processAlive ? 2 : 0) + (normalized.gatewayState === 'online' ? 1 : 0)
+    if (nextScore > existingScore) byId.set(id, normalized)
+  }
+  return [...byId.values()]
     .sort((a, b) => {
       const r = rank(a) - rank(b)
       if (r !== 0) return r
       const numA = parseInt(a.id.replace(/\D/g, ''), 10) || 0
       const numB = parseInt(b.id.replace(/\D/g, ''), 10) || 0
-      return numA - numB
+      return numA - numB || a.id.localeCompare(b.id)
     })
 }
 
@@ -507,7 +532,7 @@ function scrollNodeToTop(node: HTMLElement | null) {
 function withInstantScroll<T>(anchor: HTMLElement | null, fn: () => T): T {
   if (typeof window === 'undefined') return fn()
 
-  const targets: HTMLElement[] = []
+  const targets: Array<HTMLElement> = []
   if (document.documentElement instanceof HTMLElement) targets.push(document.documentElement)
   if (document.body instanceof HTMLElement) targets.push(document.body)
 
@@ -567,8 +592,8 @@ function scheduleScrollContextToTop(anchor: HTMLElement | null) {
   if (typeof window === 'undefined') return () => {}
 
   let cancelled = false
-  const timers: number[] = []
-  const frames: number[] = []
+  const timers: Array<number> = []
+  const frames: Array<number> = []
 
   const run = () => {
     if (cancelled) return
@@ -790,13 +815,15 @@ function ControlPlaneStage({
       className="relative overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 shadow-[0_24px_80px_var(--theme-shadow)]"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,var(--theme-accent-soft),transparent_42%)]" />
-      <Swarm2Wires
-        containerRef={stageRef}
-        anchorRef={anchorRef}
-        workerRefs={workerRefsMap.current}
-        workers={wireTargets}
-        version={refsVersion}
-      />
+      {SWARM2_SAFE_MODE ? null : (
+        <Swarm2Wires
+          containerRef={stageRef}
+          anchorRef={anchorRef}
+          workerRefs={workerRefsMap.current}
+          workers={wireTargets}
+          version={refsVersion}
+        />
+      )}
       <div className="relative z-10 flex flex-col items-center gap-4">
         <Swarm2OrchestratorCard
           totalWorkers={members.length}
@@ -826,7 +853,27 @@ function ControlPlaneStage({
         <div className="relative w-full pt-3">
           <div className={cn('relative z-10', viewMode === 'cards' ? 'block' : 'hidden')}>
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 min-[1680px]:grid-cols-3">
-              {members.length === 0 ? (
+              {SWARM2_SAFE_MODE ? (
+                <div className="col-span-full rounded-[1.5rem] border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 text-sm text-[var(--theme-muted)]">
+                  <div className="font-semibold text-[var(--theme-text)]">Swarm Safe Mode is on.</div>
+                  <div className="mt-2">Worker cards and old log output are hidden to prevent browser crashes. Use the ROUTER box above for Route plan only and Dispatch planned tasks.</div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {members.map((member) => (
+                      <div key={member.id} className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-2">
+                        <div className="font-semibold text-[var(--theme-text)]">{member.displayName || member.id}</div>
+                        <div className="text-xs text-[var(--theme-muted)]">{member.id}</div>
+                        <div className="mt-2 space-y-1 text-xs text-[var(--theme-muted)]">
+                          <div><span className="text-[var(--theme-text)]">Role:</span> {member.role || 'Worker'}</div>
+                          <div><span className="text-[var(--theme-text)]">Model:</span> {member.model || 'unknown'}</div>
+                          <div><span className="text-[var(--theme-text)]">Provider:</span> {member.provider || 'unknown'}</div>
+                          {member.specialty ? <div><span className="text-[var(--theme-text)]">Specialty:</span> {member.specialty}</div> : null}
+                          <div><span className="text-[var(--theme-text)]">Sessions:</span> {member.sessionCount ?? 0} · <span className="text-[var(--theme-text)]">Messages:</span> {member.messageCount ?? 0}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : members.length === 0 ? (
                 <div className="col-span-full rounded-[1.5rem] border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-8 text-sm text-[var(--theme-muted)]">
                   No swarm workers discovered from crew status yet.
                 </div>
@@ -841,7 +888,7 @@ function ControlPlaneStage({
                       currentTask={runtime?.currentTask ?? null}
                       recentLines={recentLines(runtime)}
                       recentOutputAt={runtime?.lastOutputAt ?? runtime?.lastSessionStartedAt ?? null}
-                      recentSummary={runtime?.lastRealSummary ?? runtime?.lastRealResult ?? runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? null}
+                      recentSummary={cleanSwarmLabel(runtime?.lastRealSummary ?? runtime?.lastRealResult ?? runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? '', '', 220) || null}
                       artifacts={runtime?.artifacts ?? []}
                       previews={runtime?.previews ?? []}
                       inRoom={roomIds.includes(member.id)}
@@ -858,7 +905,12 @@ function ControlPlaneStage({
           </div>
 
           <div className={cn('relative z-10 flex flex-col gap-3', viewMode === 'runtime' ? 'block' : 'hidden')}>
-            {!tmuxAvailable ? (
+            {SWARM2_SAFE_MODE ? (
+              <div className="rounded-[1.5rem] border border-[var(--theme-border)] bg-[var(--theme-card)] p-8 text-sm text-[var(--theme-muted)]">
+                <div className="font-semibold text-[var(--theme-text)]">Runtime terminals are disabled in safe mode.</div>
+                <div className="mt-2">This prevents Swarm tests from crashing Workspace by opening live tmux/log panels. Use Route plan only and Dispatch from the Control view; results are collected through one-shot dispatch and mission reports.</div>
+              </div>
+            ) : !tmuxAvailable ? (
               <div className="rounded-xl border border-amber-300/40 bg-amber-300/10 px-4 py-2.5 text-xs text-amber-100">
                 <div className="font-semibold text-amber-50">tmux not installed on this host</div>
                 <div className="mt-1 text-amber-100/80">Spawning a Hermes swarm worker requires tmux. Without it, the worker can start but cannot dispatch tasks (you'll see &lsquo;can't find pane: swarm-&lt;id&gt;&rsquo; errors). Install tmux:</div>
@@ -989,7 +1041,7 @@ export function Swarm2Screen() {
       return []
     }
   })
-  const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [viewMode, setViewMode] = useState<ViewMode>('reports')
   const [routerOpen, setRouterOpen] = useState(false)
   const [routerSeed, setRouterSeed] = useState<{ key: number; prompt: string; mode: 'auto' | 'manual' | 'broadcast' } | null>(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -1050,28 +1102,18 @@ export function Swarm2Screen() {
           try { parsed = JSON.parse(text) } catch {}
           const msg = parsed.error || text || `HTTP ${res.status}`
           if (msg.includes('tmux not installed')) {
-            toast({
-              title: 'tmux not installed',
-              description:
-                `Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (‘brew install tmux’ or ‘apt install tmux’) and try again. See #244.`,
-              variant: 'destructive',
-            })
+            toast(
+              `tmux not installed: Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (‘brew install tmux’ or ‘apt install tmux’) and try again. See #244.`,
+              { type: 'error' },
+            )
           } else {
-            toast({
-              title: `Failed to start ${workerId}`,
-              description: msg,
-              variant: 'destructive',
-            })
+            toast(`Failed to start ${workerId}: ${msg}`, { type: 'error' })
           }
-          // eslint-disable-next-line no-console
+
           console.error('[swarm2] start session failed:', res.status, text)
         }
       } catch (err) {
-        toast({
-          title: `Failed to start ${workerId}`,
-          description: err instanceof Error ? err.message : String(err),
-          variant: 'destructive',
-        })
+        toast(`Failed to start ${workerId}: ${err instanceof Error ? err.message : String(err)}`, { type: 'error' })
       } finally {
         setPendingTmux((prev) => {
           const next = new Set(prev)
@@ -1095,7 +1137,7 @@ export function Swarm2Screen() {
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
-          // eslint-disable-next-line no-console
+
           console.error('[swarm2] stop session failed:', res.status, text)
         }
       } finally {
@@ -1120,11 +1162,11 @@ export function Swarm2Screen() {
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
-          // eslint-disable-next-line no-console
+
           console.error('[swarm2] tmux scroll failed:', res.status, text)
         }
       } catch (error) {
-        // eslint-disable-next-line no-console
+
         console.error('[swarm2] tmux scroll exception:', error)
       }
     },
@@ -1184,6 +1226,8 @@ export function Swarm2Screen() {
         assignedTaskCount: 0,
       }))
     return sortSwarmMembers([...merged, ...extras], roomIds)
+      .filter((member) => APPROVED_SWARM_WORKER_IDS.has(member.id.toLowerCase()))
+      .slice(0, 6)
   }, [crew, roomIds, runtimeByWorker, rosterQuery.data])
 
   useEffect(() => {
@@ -1247,9 +1291,11 @@ export function Swarm2Screen() {
       ? members.filter((member) => member.id === selectedId)
       : []
   }, [members, roomIds, runtimeByWorker, selectedId])
-  const terminalTargets = focusedRuntimeWorkerId
-    ? autoMountTargets.filter((member) => member.id === focusedRuntimeWorkerId)
-    : autoMountTargets
+  const terminalTargets = SWARM2_SAFE_MODE
+    ? []
+    : focusedRuntimeWorkerId
+      ? autoMountTargets.filter((member) => member.id === focusedRuntimeWorkerId)
+      : autoMountTargets
   const rosterLanes = useMemo(() => {
     const map = new Map<string, { role: string; count: number; active: number }>()
     for (const member of members) {

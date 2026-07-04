@@ -225,7 +225,6 @@ export function OperatorTipCard({
     const n = Number(raw)
     if (Number.isFinite(n) && n >= 0) setIndex(n % Math.max(1, ranked.length))
     // Only restore on first mount; tip rotation thereafter is manual.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

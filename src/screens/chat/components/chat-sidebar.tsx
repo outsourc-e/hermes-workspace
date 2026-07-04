@@ -254,7 +254,7 @@ function NavItem({
               render={
                 <Link
                   to={item.to}
-                  search={item.search}
+                  search={item.search as never}
                   hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
@@ -272,7 +272,7 @@ function NavItem({
     return (
       <Link
         to={item.to}
-        search={item.search}
+        search={item.search as never}
         hash={item.hash}
         onClick={handleSelect}
         className={cls}
@@ -584,6 +584,9 @@ function ChatSidebarComponent({
   const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
   const isTasksActive = pathname === '/tasks'
+  const isProductResearchActive = pathname === '/product-research'
+  const isProductIntelligenceActive = pathname === '/product-intelligence'
+  const isWarRoomActive = pathname === '/war-room'
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
@@ -823,6 +826,29 @@ function ChatSidebarComponent({
       icon: CheckListIcon,
       label: t('nav.tasks'),
       active: isTasksActive,
+    },
+    {
+      kind: 'link',
+      to: '/product-research',
+      icon: Search01Icon,
+      label: 'Product Research',
+      active: isProductResearchActive,
+    },
+    {
+      kind: 'link',
+      to: '/product-intelligence',
+      icon: Building01Icon,
+      label: 'Product Intelligence DB',
+      active: isProductIntelligenceActive,
+    },
+    {
+      kind: 'link',
+      to: '/war-room',
+      search: { etsyOps: 1 },
+      icon: Castle02Icon,
+      label: 'Etsy Ops War Room',
+      active: isWarRoomActive,
+      badge: 'ACTIVE',
     },
     {
       kind: 'link',

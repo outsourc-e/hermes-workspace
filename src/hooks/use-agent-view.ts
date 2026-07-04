@@ -340,7 +340,11 @@ function readStatus(
     if (tokens === 0 && staleness > 120_000) return 'idle'
   }
 
-  return 'running'
+  // A session with no explicit runtime status is just a historical/idle chat.
+  // Treating every status-less session as running makes the Workspace show
+  // phantom agents and keeps the chat UI in a permanent "Thinking..." state
+  // after the actual stream has already completed.
+  return 'idle'
 }
 
 function readModel(

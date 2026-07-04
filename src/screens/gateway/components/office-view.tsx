@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { AGENT_ACCENT_COLORS } from './agent-avatar'
 import type { AgentWorkingRow, AgentWorkingStatus } from './agents-working-panel'
 import type { ModelPresetId } from './team-panel'
-import { AGENT_ACCENT_COLORS, AgentAvatar } from './agent-avatar'
+import { cn } from '@/lib/utils'
 
 export type RemoteSession = {
   sessionKey: string
@@ -15,8 +15,45 @@ export type RemoteSession = {
   tokenCount?: number
 }
 
+const WORKER_STANDARD_ASSET_VERSION = '20260516-hermes-worker-standard-v1'
+const WORKER_STANDARD_ASSET_BASE = '/war-room/olympus-command/hermes-90frame-v1/processed'
+
+function WorkerStandardModel({
+  size,
+  mode = 'idle',
+}: {
+  size: number
+  mode?: 'idle' | 'walk' | 'work'
+}) {
+  const animated = mode !== 'idle'
+  const frameCount = animated ? 6 : 1
+  const asset = mode === 'walk'
+    ? `${WORKER_STANDARD_ASSET_BASE}/hermes-walk-strip.png`
+    : mode === 'work'
+      ? `${WORKER_STANDARD_ASSET_BASE}/hermes-work-strip.png`
+      : `${WORKER_STANDARD_ASSET_BASE}/hermes-model.png`
+
+  return (
+    <span
+      className="block shrink-0 bg-no-repeat [image-rendering:pixelated] drop-shadow-[0_6px_7px_rgba(15,23,42,.38)]"
+      style={{
+        width: size,
+        height: size,
+        backgroundImage: `url(${asset}?v=${WORKER_STANDARD_ASSET_VERSION})`,
+        backgroundSize: `${size * frameCount}px ${size}px`,
+        backgroundPosition: '0 0',
+        ['--worker-strip-travel' as string]: `${size * frameCount}px`,
+        animation: animated
+          ? `worker-standard-${mode}-cycle ${mode === 'work' ? '920ms' : '780ms'} steps(6, end) infinite`
+          : undefined,
+      }}
+      aria-hidden
+    />
+  )
+}
+
 export type OfficeViewProps = {
-  agentRows: AgentWorkingRow[]
+  agentRows: Array<AgentWorkingRow>
   missionRunning: boolean
   onViewOutput: (agentId: string) => void
   onNewMission?: () => void
@@ -25,7 +62,7 @@ export type OfficeViewProps = {
   processType: 'sequential' | 'hierarchical' | 'parallel'
   companyName?: string
   agentTasks?: Record<string, string>
-  remoteSessions?: RemoteSession[]
+  remoteSessions?: Array<RemoteSession>
   onViewRemoteOutput?: (sessionKey: string, label: string) => void
   /** Fixed pixel height for the office container (compact mode) */
   containerHeight?: number
@@ -113,21 +150,21 @@ const WARROOM_DESK_POSITIONS = [
   { x: 504, y: 420 }, { x: 642, y: 420 }, { x: 780, y: 420 },
 ]
 
-const GRID_SOCIAL_SPOTS: SocialSpot[] = [
+const GRID_SOCIAL_SPOTS: Array<SocialSpot> = [
   { x: 840, y: 140, type: 'coffee' as const },
   { x: 840, y: 300, type: 'water' as const },
   { x: 60, y: 440, type: 'plant' as const },
   { x: 840, y: 460, type: 'snack' as const },
 ]
 
-const ROUNDTABLE_SOCIAL_SPOTS: SocialSpot[] = [
+const ROUNDTABLE_SOCIAL_SPOTS: Array<SocialSpot> = [
   { x: 450, y: 320, type: 'plant' },
   { x: 510, y: 320, type: 'snack' },
   { x: 870, y: 120, type: 'coffee' },
   { x: 870, y: 480, type: 'water' },
 ]
 
-const WARROOM_SOCIAL_SPOTS: SocialSpot[] = [
+const WARROOM_SOCIAL_SPOTS: Array<SocialSpot> = [
   { x: 56, y: 300, type: 'coffee' },
   { x: 56, y: 350, type: 'water' },
   { x: 904, y: 300, type: 'snack' },
@@ -140,7 +177,7 @@ const DESK_POSITIONS_BY_TEMPLATE: Record<OfficeLayoutTemplate, Array<{ x: number
   warroom: WARROOM_DESK_POSITIONS,
 }
 
-const SOCIAL_SPOTS_BY_TEMPLATE: Record<OfficeLayoutTemplate, SocialSpot[]> = {
+const SOCIAL_SPOTS_BY_TEMPLATE: Record<OfficeLayoutTemplate, Array<SocialSpot>> = {
   grid: GRID_SOCIAL_SPOTS,
   roundtable: ROUNDTABLE_SOCIAL_SPOTS,
   warroom: WARROOM_SOCIAL_SPOTS,
@@ -180,21 +217,6 @@ function getStatusDotClass(status: AgentWorkingStatus): string {
     case 'paused': return 'bg-amber-500'
     case 'error': return 'bg-red-500'
     default: return 'bg-neutral-400'
-  }
-}
-
-function getAgentStatusGlowClass(status: AgentWorkingStatus): string {
-  switch (status) {
-    case 'active':
-      return 'office-status-glow-active'
-    case 'spawning':
-      return 'office-status-glow-starting'
-    case 'paused':
-      return 'office-status-glow-paused'
-    case 'error':
-      return 'office-status-glow-error'
-    default:
-      return 'office-status-glow-idle'
   }
 }
 
@@ -585,8 +607,7 @@ export function OfficeView({
       {/* Mobile: compact list instead of desk grid */}
       <div className="flex-1 overflow-y-auto p-3 md:hidden">
         <div className="space-y-2">
-          {agentRows.map((agent, index) => {
-            const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+          {agentRows.map((agent) => {
             const statusMeta = getAgentStatusMeta(agent.status)
             const emoji = getAgentEmoji(agent)
             return (
@@ -596,11 +617,11 @@ export function OfficeView({
                 onClick={() => onViewOutput(agent.id)}
                 className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
               >
-                <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-full', accent.avatar)}>
+                <div className="flex size-9 shrink-0 items-center justify-center bg-transparent">
                   {emoji ? (
                     <span className="text-base leading-none" aria-hidden>{emoji}</span>
                   ) : (
-                    <AgentAvatar index={index % 10} color={accent.hex} size={22} />
+                    <WorkerStandardModel size={28} mode={agent.status === 'active' ? 'work' : 'idle'} />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -652,43 +673,16 @@ export function OfficeView({
             0%, 100% { transform: translateY(-3px); }
             50% { transform: translateY(3px); }
           }
-          @keyframes office-status-glow-green {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.38), 0 0 14px 2px rgba(16, 185, 129, 0.3); }
-            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0), 0 0 22px 6px rgba(16, 185, 129, 0.38); }
+          @keyframes worker-standard-walk-cycle {
+            from { background-position-x: 0; }
+            to { background-position-x: calc(-1 * var(--worker-strip-travel, 264px)); }
           }
-          @keyframes office-status-glow-amber {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.32), 0 0 12px 2px rgba(245, 158, 11, 0.26); }
-            50% { box-shadow: 0 0 0 7px rgba(245, 158, 11, 0), 0 0 18px 4px rgba(245, 158, 11, 0.34); }
-          }
-          @keyframes office-status-glow-blue {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3), 0 0 12px 2px rgba(59, 130, 246, 0.25); }
-            50% { box-shadow: 0 0 0 7px rgba(59, 130, 246, 0), 0 0 18px 4px rgba(59, 130, 246, 0.32); }
-          }
-          @keyframes office-status-glow-neutral {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(115, 115, 115, 0.18), 0 0 10px 2px rgba(115, 115, 115, 0.2); }
-            50% { box-shadow: 0 0 0 6px rgba(115, 115, 115, 0), 0 0 14px 3px rgba(115, 115, 115, 0.24); }
-          }
-          @keyframes office-status-glow-red {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.34), 0 0 12px 2px rgba(239, 68, 68, 0.3); }
-            50% { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0), 0 0 19px 5px rgba(239, 68, 68, 0.36); }
+          @keyframes worker-standard-work-cycle {
+            from { background-position-x: 0; }
+            to { background-position-x: calc(-1 * var(--worker-strip-travel, 264px)); }
           }
           .office-agent-stationary {
             animation: office-idle-float 3s ease-in-out infinite;
-          }
-          .office-status-glow-active {
-            animation: office-status-glow-green 2.2s ease-in-out infinite;
-          }
-          .office-status-glow-idle {
-            animation: office-status-glow-neutral 2.6s ease-in-out infinite;
-          }
-          .office-status-glow-starting {
-            animation: office-status-glow-blue 2.4s ease-in-out infinite;
-          }
-          .office-status-glow-paused {
-            animation: office-status-glow-amber 2.6s ease-in-out infinite;
-          }
-          .office-status-glow-error {
-            animation: office-status-glow-red 2.2s ease-in-out infinite;
           }
         `}</style>
 
@@ -769,12 +763,12 @@ export function OfficeView({
             Position scaling: SVG uses viewBox 0 0 sceneW sceneH and scales to fit container,
             so we express positions as percentages of the scene to match the SVG's scale. */}
         {agentRows.map((agent, index) => {
-          const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
           const pos = agentPositions[index]
           const emoji = getAgentEmoji(agent)
           const isSelected = agent.id === selectedOutputAgentId
           const isActive = agent.status === 'active'
           const isIdle = agent.status === 'idle' || agent.status === 'ready'
+          const workerModelMode = !pos.stationary ? 'walk' : isActive ? 'work' : 'idle'
           const statusMeta = getAgentStatusMeta(agent.status)
           const speechLine = getSpeechLine(agent, tick + index * 7)
           const showSpeech = !compact && Boolean(speechLine) && agentRows.length <= 8 && ((tick + index * 3) % 8 < 6)
@@ -808,28 +802,22 @@ export function OfficeView({
               ) : null}
 
               {/* Avatar */}
-              <div
-                className={cn(
-                  'relative rounded-full transition-transform duration-300 group-hover:scale-105',
-                  getAgentStatusGlowClass(agent.status),
-                )}
-              >
+              <div className="relative transition-transform duration-300 group-hover:scale-105">
                 <div
                   className={cn(
-                    'flex items-center justify-center rounded-full bg-transparent',
+                    'flex items-center justify-center bg-transparent',
                     pos.stationary && 'office-agent-stationary',
                   )}
-                  style={{ width: isActive ? 46 : 40, height: isActive ? 46 : 40 }}
+                  style={{ width: isActive ? 44 : 38, height: isActive ? 44 : 38 }}
                 >
                   {emoji ? (
                     <span className="select-none leading-none" style={{ fontSize: isActive ? 30 : 26 }} aria-hidden>
                       {emoji}
                     </span>
                   ) : (
-                    <AgentAvatar
-                      index={index % 10}
-                      color={accent.hex}
+                    <WorkerStandardModel
                       size={isActive ? 44 : 38}
+                      mode={workerModelMode}
                     />
                   )}
                 </div>

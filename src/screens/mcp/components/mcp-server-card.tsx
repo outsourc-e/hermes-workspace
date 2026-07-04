@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
 import {
   useConfigureMcpServer,
   useDeleteMcpServer,
@@ -11,6 +9,8 @@ import { useMcpCapabilityMode } from '../hooks/use-mcp-capability-mode'
 import { useMcpOauth } from '../hooks/use-mcp-oauth'
 import { isArgPlaceholder, isUrlPlaceholder } from '../lib/placeholder-detect'
 import type { McpServer, McpTestResult } from '@/types/mcp'
+import { Switch } from '@/components/ui/switch'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   server: McpServer

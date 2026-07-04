@@ -213,8 +213,8 @@ export function AgendaView({
   const nowTs = now.getTime()
   const greeting = getGreeting(now.getHours())
 
-  const needsAttention = useMemo<NeedsAttentionItem[]>(() => {
-    const missionAlerts: NeedsAttentionItem[] = activeMissions
+  const needsAttention = useMemo<Array<NeedsAttentionItem>>(() => {
+    const missionAlerts: Array<NeedsAttentionItem> = activeMissions
       .filter((mission) => mission.status === 'needs_input' || mission.status === 'failed')
       .map((mission) => ({
         id: mission.id,
@@ -224,7 +224,7 @@ export function AgendaView({
         at: mission.startedAt,
       }))
 
-    const failedRuns: NeedsAttentionItem[] = recentCompletions
+    const failedRuns: Array<NeedsAttentionItem> = recentCompletions
       .filter((completion) => completion.status === 'failed')
       .map((completion) => ({
         id: completion.id,

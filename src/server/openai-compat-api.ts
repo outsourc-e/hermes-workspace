@@ -191,7 +191,7 @@ export async function* parseOpenAIStream(
       buffer = buffer.slice(boundary + 2)
 
       let eventName = ''
-      const dataLines: string[] = []
+      const dataLines: Array<string> = []
 
       for (const line of rawEvent.split('\n')) {
         const trimmed = line.trim()

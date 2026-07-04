@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDown01Icon, Cancel01Icon, Settings01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Button } from '@/components/ui/button'
-import { fetchModels, type GatewayModelCatalogEntry } from '@/lib/gateway-api'
-import { cn } from '@/lib/utils'
 import type { OperationsSettings } from '../hooks/use-operations'
+import type {GatewayModelCatalogEntry} from '@/lib/gateway-api';
+import { Button } from '@/components/ui/button'
+import {  fetchModels } from '@/lib/gateway-api'
+import { cn } from '@/lib/utils'
 
 type AvailableModel = {
   id: string
@@ -39,7 +40,7 @@ function ModelSelector({
 }: {
   value: string
   onChange: (nextValue: string) => void
-  models: AvailableModel[]
+  models: Array<AvailableModel>
 }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)

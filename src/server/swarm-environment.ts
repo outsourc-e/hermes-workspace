@@ -1,7 +1,7 @@
 import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { getHermesRoot, getProfilesDir, getLocalBinDir } from './claude-paths'
+import { getHermesRoot, getLocalBinDir, getProfilesDir } from './claude-paths'
 
 export const SWARM_CANONICAL_REPO = resolve(process.cwd())
 export const SWARM_MEMORY_ROOT = join(homedir(), '.openclaw', 'workspace')
@@ -25,11 +25,11 @@ export type SwarmEnvironment = {
   defaultBuildCommand: string
   defaultTestCommand: string
   defaultDevCommand: string
-  runtimeApis: string[]
-  writableRoots: string[]
-  readOnlyRoots: string[]
-  forbiddenRoots: string[]
-  notes: string[]
+  runtimeApis: Array<string>
+  writableRoots: Array<string>
+  readOnlyRoots: Array<string>
+  forbiddenRoots: Array<string>
+  notes: Array<string>
 }
 
 export function getSwarmEnvironment(): SwarmEnvironment {

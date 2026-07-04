@@ -1,4 +1,10 @@
 import { useEffect, useState } from 'react'
+import {
+  useDiscoverMcpTools,
+  useUpsertMcpServer,
+} from '../hooks/use-mcp-mutations'
+import { useMcpCapabilityMode } from '../hooks/use-mcp-capability-mode'
+import type { McpClientInput, McpServer } from '@/types/mcp'
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -12,12 +18,6 @@ import {
   ScrollAreaThumb,
   ScrollAreaViewport,
 } from '@/components/ui/scroll-area'
-import {
-  useDiscoverMcpTools,
-  useUpsertMcpServer,
-} from '../hooks/use-mcp-mutations'
-import { useMcpCapabilityMode } from '../hooks/use-mcp-capability-mode'
-import type { McpClientInput, McpServer } from '@/types/mcp'
 
 interface Props {
   open: boolean

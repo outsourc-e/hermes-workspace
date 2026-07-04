@@ -81,7 +81,7 @@ export const Route = createFileRoute('/api/session-status')({
 
           const session = await getSession(sessionKey)
           const config = capabilities.config
-            ? await getConfig()
+            ? await getConfig().catch(() => ({ model: '', provider: '' } as const))
             : ({ model: '', provider: '' } as const)
 
           const inputTokens = session.input_tokens ?? 0

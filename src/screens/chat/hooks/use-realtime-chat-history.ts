@@ -8,7 +8,7 @@ import { textFromMessage } from '../utils'
 import type { ChatMessage } from '../types'
 import type { StreamingState } from '../../../stores/chat-store'
 
-const PORTABLE_HISTORY_STORAGE_KEY = 'claude_portable_chat_main'
+const PORTABLE_HISTORY_STORAGE_KEY = 'claude_portable_chat_main_v2'
 const PORTABLE_HISTORY_LIMIT = 100
 
 /** Read clientId from a message using either camelCase or snake_case field. */
@@ -429,7 +429,6 @@ export function useRealtimeChatHistory({
   const mergedMessages = useMemo(() => {
     if (effectiveSessionKey === 'new') return historyMessages
     return mergeHistoryMessages(effectiveSessionKey, historyMessages)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveSessionKey, historyMessages, mergeHistoryMessages, lastEventAt])
 
   useEffect(() => {

@@ -63,7 +63,7 @@ async function sendDirectChat(
   if (!data || !('delivered' in data) || !data.delivered) {
     throw new Error((data as { error?: string } | null)?.error || 'Direct chat did not reach worker')
   }
-  return data as DirectChatResponse
+  return data
 }
 
 export type UseSwarmChatOptions = {

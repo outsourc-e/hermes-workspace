@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { getSwarmMission, listSwarmMissions, listSwarmReports, SWARM_MISSIONS_PATH } from '../../server/swarm-missions'
+import { SWARM_MISSIONS_PATH, getSwarmMission, listSwarmMissions, listSwarmReports } from '../../server/swarm-missions'
 
 export const Route = createFileRoute('/api/swarm-missions')({
   server: {

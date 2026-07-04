@@ -12,11 +12,11 @@ import {
 } from 'recharts'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  ChartLineData01Icon,
   CancelIcon,
+  ChartLineData01Icon,
 } from '@hugeicons/core-free-icons'
-import { formatModelName } from '@/screens/dashboard/lib/formatters'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 function formatTokens(n: number): string {
   if (!n || n <= 0) return '0'

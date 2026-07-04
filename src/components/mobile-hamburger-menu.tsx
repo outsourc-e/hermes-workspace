@@ -50,6 +50,21 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/playground'),
   },
   {
+    id: 'war-room',
+    label: 'Etsy Ops War Room',
+    icon: Castle02Icon,
+    to: '/war-room',
+    search: { etsyOps: 1 },
+    match: (p: string) => p === '/war-room',
+  },
+  {
+    id: 'product-intelligence',
+    label: 'Product Intelligence DB',
+    icon: Building01Icon,
+    to: '/product-intelligence',
+    match: (p: string) => p.startsWith('/product-intelligence'),
+  },
+  {
     id: 'terminal',
     label: 'Terminal',
     icon: CommandLineIcon,
@@ -162,9 +177,9 @@ export function MobileHamburgerMenu() {
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
-  function handleNav(to: string) {
+  function handleNav(to: string, search?: Record<string, unknown>) {
     hapticTap()
-    void navigate({ to })
+    void navigate({ to, search: search as never })
     setOpen(false)
   }
 
@@ -252,7 +267,7 @@ export function MobileHamburgerMenu() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => handleNav(item.to)}
+                onClick={() => handleNav(item.to, item.search)}
                 className={cn(
                   'flex items-center gap-3 px-3 py-3 rounded-xl text-left w-full',
                   'transition-all duration-150 active:scale-[0.98]',

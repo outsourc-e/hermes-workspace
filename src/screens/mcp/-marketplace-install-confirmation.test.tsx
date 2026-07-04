@@ -7,9 +7,12 @@
  * Uses React.act + createRoot directly (not @testing-library/react) to avoid
  * the vitest ESM/CJS dual-instance issue with React 19 hooks in jsdom.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+
+import { InstallConfirmationDialog } from './components/install-confirmation-dialog'
+import type { HubMcpEntry } from './hooks/use-mcp-hub'
 
 // Mock UI primitives before importing the component so vi.mock hoisting works.
 // The factories use the same React import as the test (ESM) to avoid dual-instance.
@@ -42,9 +45,6 @@ vi.mock('@/components/ui/button', () => ({
     [k: string]: unknown
   }) => React.createElement('button', { onClick, disabled, ...props }, children),
 }))
-
-import { InstallConfirmationDialog } from './components/install-confirmation-dialog'
-import type { HubMcpEntry } from './hooks/use-mcp-hub'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -344,7 +344,7 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
 
     // Signal should exist and not yet aborted
     expect(capturedSignal).not.toBeNull()
-    expect((capturedSignal as AbortSignal).aborted).toBe(false)
+    expect((capturedSignal as unknown as AbortSignal).aborted).toBe(false)
 
     // Now close the dialog while installing — Cancel button is disabled, so
     // we test via onOpenChange: simulate the dialog requesting close

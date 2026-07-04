@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { InlineApprovalCard } from './inline-approval-card'
+import { StreamingText } from './streaming-text'
+import type { HubTask } from './task-board'
+import type { ApprovalRequest } from '../lib/approvals-store'
+import type {SessionHistoryMessage} from '@/lib/gateway-api';
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/prompt-kit/markdown'
-import { fetchSessionHistory, type SessionHistoryMessage } from '@/lib/gateway-api'
-import type { HubTask } from './task-board'
-import { InlineApprovalCard } from './inline-approval-card'
-import type { ApprovalRequest } from '../lib/approvals-store'
-import { StreamingText } from './streaming-text'
+import {  fetchSessionHistory } from '@/lib/gateway-api'
 
 type OutputMessage = {
   role: 'assistant' | 'user' | 'tool'
@@ -15,7 +16,7 @@ type OutputMessage = {
 }
 
 type SessionOutputCacheEntry = {
-  messages: OutputMessage[]
+  messages: Array<OutputMessage>
   sessionEnded: boolean
   tokenCount: number
 }
@@ -26,7 +27,7 @@ const sessionOutputCache = new Map<string, SessionOutputCacheEntry>()
 export type AgentOutputPanelProps = {
   agentName: string
   sessionKey: string | null
-  tasks: HubTask[]
+  tasks: Array<HubTask>
   onClose: () => void
   onLine?: (line: string) => void
   /** Model preset id — shown in header badge e.g. 'pc1-coder', 'sonnet' */
@@ -47,13 +48,13 @@ export type AgentOutputPanelProps = {
    * the internal `messages` state. This is the Option A fix for the live
    * output panel — the parent already has the data, just pass it down.
    */
-  outputLines?: string[]
+  outputLines?: Array<string>
   /** Enable inline message input at the bottom of the output panel */
   enableMessaging?: boolean
   /** Callback when user sends a message to this agent */
   onSendMessage?: (sessionKey: string, message: string) => void
   /** Pending approval requests for this agent — shown as inline cards */
-  approvals?: ApprovalRequest[]
+  approvals?: Array<ApprovalRequest>
   /** Called when user approves an inline request */
   onApprove?: (id: string) => void
   /** Called when user denies an inline request */
@@ -169,10 +170,10 @@ function readEventRole(payload: Record<string, unknown>): 'assistant' | 'user' |
 }
 
 function upsertAssistantStream(
-  previous: OutputMessage[],
+  previous: Array<OutputMessage>,
   text: string,
   replace: boolean,
-): OutputMessage[] {
+): Array<OutputMessage> {
   const last = previous[previous.length - 1]
   if (last && last.role === 'assistant' && !last.done) {
     return [
@@ -183,7 +184,7 @@ function upsertAssistantStream(
   return [...previous, { role: 'assistant', content: text, timestamp: Date.now() }]
 }
 
-function appendAssistantMessage(previous: OutputMessage[], text: string): OutputMessage[] {
+function appendAssistantMessage(previous: Array<OutputMessage>, text: string): Array<OutputMessage> {
   const last = previous[previous.length - 1]
   if (last && last.role === 'assistant' && !last.done) {
     // Always finalize the last in-progress assistant message with the complete text.
@@ -200,12 +201,12 @@ function appendAssistantMessage(previous: OutputMessage[], text: string): Output
   return [...previous, { role: 'assistant', content: text, timestamp: Date.now(), done: true }]
 }
 
-function trimMessages(messages: OutputMessage[]): OutputMessage[] {
+function trimMessages(messages: Array<OutputMessage>): Array<OutputMessage> {
   if (messages.length <= MAX_CACHED_MESSAGES) return messages
   return messages.slice(-MAX_CACHED_MESSAGES)
 }
 
-function appendBoundedMessage(previous: OutputMessage[], message: OutputMessage): OutputMessage[] {
+function appendBoundedMessage(previous: Array<OutputMessage>, message: OutputMessage): Array<OutputMessage> {
   // Deduplicate: skip if an identical role+content message exists in the recent tail
   const tail = previous.slice(-10)
   if (tail.some((msg) => msg.role === message.role && msg.content === message.content)) {
@@ -240,7 +241,7 @@ export function AgentOutputPanel({
   const [sendingMessage, setSendingMessage] = useState(false)
   const messageInputRef = useRef<HTMLInputElement>(null)
   const cachedInitial = readCachedSessionState(sessionKey)
-  const [messages, setMessages] = useState<OutputMessage[]>(cachedInitial?.messages ?? [])
+  const [messages, setMessages] = useState<Array<OutputMessage>>(cachedInitial?.messages ?? [])
   const [sessionEnded, setSessionEnded] = useState(cachedInitial?.sessionEnded ?? false)
   const [tokenCount, setTokenCount] = useState(cachedInitial?.tokenCount ?? 0)
   const [streamDisconnected, setStreamDisconnected] = useState(false)

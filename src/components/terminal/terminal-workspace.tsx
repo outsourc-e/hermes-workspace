@@ -618,11 +618,12 @@ export function TerminalWorkspace({
 
   useEffect(
     function initializeVisibleTabs() {
+      if (!panelVisible) return
       for (const tab of tabs) {
         ensureTerminalForTab(tab)
       }
     },
-    [ensureTerminalForTab, tabs],
+    [ensureTerminalForTab, panelVisible, tabs],
   )
 
   useEffect(
@@ -650,6 +651,8 @@ export function TerminalWorkspace({
 
   useEffect(
     function fitOnResize() {
+      if (!panelVisible) return undefined
+
       function refitAll() {
         for (const fitAddon of fitMapRef.current.values()) {
           try {

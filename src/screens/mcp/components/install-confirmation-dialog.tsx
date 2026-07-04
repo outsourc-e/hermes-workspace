@@ -17,6 +17,13 @@
  * US-501: placeholder detection + inline fill.
  */
 import { useRef, useState } from 'react'
+import {
+  detectPlaceholders,
+  isStillPlaceholder,
+} from '../lib/placeholder-detect'
+import type { HubMcpEntry } from '../hooks/use-mcp-hub'
+import type { McpClientInput } from '@/types/mcp'
+import type { PlaceholderField } from '../lib/placeholder-detect'
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -25,13 +32,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/toast'
-import type { HubMcpEntry } from '../hooks/use-mcp-hub'
-import type { McpClientInput } from '@/types/mcp'
-import {
-  detectPlaceholders,
-  isStillPlaceholder,
-} from '../lib/placeholder-detect'
-import type { PlaceholderField } from '../lib/placeholder-detect'
 
 interface Props {
   entry: HubMcpEntry | null

@@ -11,7 +11,7 @@ export type ActionSlot = {
   color: string
 }
 
-const ACTIONS: ActionSlot[] = [
+const ACTIONS: Array<ActionSlot> = [
   {
     id: 'strike',
     key: '1',

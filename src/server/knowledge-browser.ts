@@ -3,9 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
 import {
-  readKnowledgeBaseConfig,
-  type KnowledgeBaseSource,
+
+  readKnowledgeBaseConfig
 } from './knowledge-config'
+import type {KnowledgeBaseSource} from './knowledge-config';
 
 export type WikiPageMeta = {
   path: string

@@ -22,7 +22,7 @@ export function OperationsAgentJobs({
   slugifyJobLabel,
 }: {
   agentId: string
-  jobs: CronJob[]
+  jobs: Array<CronJob>
   slugifyJobLabel: (value: string) => string
 }) {
   const queryClient = useQueryClient()

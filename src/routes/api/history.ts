@@ -9,8 +9,8 @@ import {
   toChatMessage,
 } from '../../server/claude-api'
 import { resolveSessionKey } from '../../server/session-utils'
+import { getLocalMessages, getLocalSession } from '../../server/local-session-store'
 import { isAuthenticated } from '@/server/auth-middleware'
-import { getLocalSession, getLocalMessages } from '../../server/local-session-store'
 
 export const Route = createFileRoute('/api/history')({
   server: {
@@ -19,8 +19,31 @@ export const Route = createFileRoute('/api/history')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const url = new URL(request.url)
+        const limit = Number(url.searchParams.get('limit') || '200')
+        const rawSessionKey = url.searchParams.get('sessionKey')?.trim()
+        const friendlyId = url.searchParams.get('friendlyId')?.trim()
+
         await ensureGatewayProbed()
         if (!getGatewayCapabilities().sessions) {
+          const localSessionKey = rawSessionKey || friendlyId || 'main'
+          const localSession = localSessionKey !== 'new' ? getLocalSession(localSessionKey) : null
+          if (localSession) {
+            const localMessages = getLocalMessages(localSessionKey)
+            const boundedMessages = limit > 0 ? localMessages.slice(-limit) : localMessages
+            return json({
+              sessionKey: localSessionKey,
+              sessionId: localSessionKey,
+              source: 'local',
+              messages: boundedMessages.map((m, index) => ({
+                id: m.id,
+                role: m.role,
+                content: [{ type: 'text', text: m.content }],
+                timestamp: m.timestamp,
+                historyIndex: index,
+              })),
+            })
+          }
           return json({
             sessionKey: 'new',
             sessionId: 'new',
@@ -30,10 +53,6 @@ export const Route = createFileRoute('/api/history')({
           })
         }
         try {
-          const url = new URL(request.url)
-          const limit = Number(url.searchParams.get('limit') || '200')
-          const rawSessionKey = url.searchParams.get('sessionKey')?.trim()
-          const friendlyId = url.searchParams.get('friendlyId')?.trim()
           let { sessionKey } = await resolveSessionKey({
             rawSessionKey,
             friendlyId,

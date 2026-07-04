@@ -6,11 +6,12 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import {
-  AGORA_PROFILE_STORAGE_KEY,
-  type AgoraAvatarId,
-  type AgoraProfile,
-  type AgoraStatus,
+  AGORA_PROFILE_STORAGE_KEY
+
+
+
 } from '../lib/agora-types'
+import type {AgoraAvatarId, AgoraProfile, AgoraStatus} from '../lib/agora-types';
 
 const FUNNY_ANIMALS = [
   'Owl', 'Fox', 'Wolf', 'Otter', 'Hawk', 'Lynx', 'Crow', 'Stag', 'Heron',

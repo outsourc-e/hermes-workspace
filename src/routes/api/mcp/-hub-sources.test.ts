@@ -3,7 +3,12 @@
  *
  * Uses vi.mock to isolate store functions from real filesystem I/O.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { addHubSource, deleteHubSource, readHubSources, updateHubSource } from '../../../server/mcp-hub-sources-store'
+import { isAuthenticated } from '../../../server/auth-middleware'
+import { Route as HubSourcesRoute } from './hub-sources'
+import { Route as HubSourcesIdRoute } from './hub-sources.$id'
 
 vi.mock('../../../server/mcp-hub-sources-store', () => ({
   readHubSources: vi.fn(),
@@ -14,11 +19,6 @@ vi.mock('../../../server/mcp-hub-sources-store', () => ({
 vi.mock('../../../server/auth-middleware', () => ({
   isAuthenticated: vi.fn(),
 }))
-
-import { readHubSources, addHubSource, updateHubSource, deleteHubSource } from '../../../server/mcp-hub-sources-store'
-import { isAuthenticated } from '../../../server/auth-middleware'
-import { Route as HubSourcesRoute } from './hub-sources'
-import { Route as HubSourcesIdRoute } from './hub-sources.$id'
 
 const mockReadHubSources = vi.mocked(readHubSources)
 const mockAddHubSource = vi.mocked(addHubSource)

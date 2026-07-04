@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
-import type { TeamMember, TeamTemplateId } from './team-panel'
 import { TEAM_TEMPLATES } from './team-panel'
+import type { TeamMember, TeamTemplateId } from './team-panel'
+import { cn } from '@/lib/utils'
 
 // ─── Provider metadata ────────────────────────────────────────────────────────
 
@@ -774,17 +774,17 @@ type AddTeamModalProps = {
   currentTeam: Array<{ id: string; name: string; modelId: string }>
   quickStartTemplates: Array<{
     id: string; icon: string; label: string; description: string;
-    tier: string; agents: string[]; templateId?: string
+    tier: string; agents: Array<string>; templateId?: string
   }>
   /** Icons already in use by existing teams — new team will get a different one */
-  existingIcons?: string[]
+  existingIcons?: Array<string>
   /** Called with team name, icon, and the IDs of agents to include */
-  onSaveCurrentAs: (name: string, icon: string, selectedAgentIds: string[]) => void
+  onSaveCurrentAs: (name: string, icon: string, selectedAgentIds: Array<string>) => void
   onApplyTemplate: (templateId: TeamTemplateId) => void
   onClose: () => void
 }
 
-function pickUniqueTeamIcon(existing: string[]): string {
+function pickUniqueTeamIcon(existing: Array<string>): string {
   const usedSet = new Set(existing)
   const available = INLINE_TEAM_ICONS.filter((ic) => !usedSet.has(ic))
   const pool = available.length > 0 ? available : INLINE_TEAM_ICONS

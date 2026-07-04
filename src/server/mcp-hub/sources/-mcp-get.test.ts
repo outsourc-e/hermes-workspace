@@ -3,7 +3,11 @@
  * Uses vi.mock for cache and undici-style fetch interceptor (vi.stubGlobal)
  * so no live network calls are made.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { getCache, setCache, touchCache } from '../cache'
+import { fetchMcpGet } from './mcp-get'
+import type { CachePayload } from '../cache'
 
 // Mock cache module
 vi.mock('../cache', () => ({
@@ -11,10 +15,6 @@ vi.mock('../cache', () => ({
   setCache: vi.fn(),
   touchCache: vi.fn(),
 }))
-
-import { getCache, setCache, touchCache } from '../cache'
-import { fetchMcpGet } from './mcp-get'
-import type { CachePayload } from '../cache'
 
 const mockGetCache = vi.mocked(getCache)
 const mockSetCache = vi.mocked(setCache)

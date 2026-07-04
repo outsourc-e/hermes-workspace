@@ -340,7 +340,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
   const recentFailures: DashboardCronSection['recentFailures'] = []
   for (const job of jobs) {
     if (!job || typeof job !== 'object') continue
-    const j = job as Record<string, unknown>
+    const j = job
     const state = readString(j.state || j.status).toLowerCase()
     if (state === 'paused') paused += 1
     else if (state === 'running') running += 1
@@ -349,7 +349,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       typeof j.last_error === 'string'
         ? j.last_error
         : typeof j.last_delivery_error === 'string'
-          ? (j.last_delivery_error as string)
+          ? (j.last_delivery_error)
           : null
     const isFailure =
       lastStatus === 'failed' ||
@@ -367,9 +367,9 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       typeof j.next_run_at === 'string' ? Date.parse(j.next_run_at) : NaN,
       typeof j.next_run === 'string' ? Date.parse(j.next_run) : NaN,
       typeof j.next_run_at === 'number'
-        ? (j.next_run_at as number) * 1000
+        ? (j.next_run_at) * 1000
         : NaN,
-    ].filter((v) => Number.isFinite(v)) as Array<number>
+    ].filter((v) => Number.isFinite(v))
     for (const ts of candidates) {
       if (nextRunMs === null || ts < nextRunMs) nextRunMs = ts
     }
@@ -400,7 +400,7 @@ function normalizeAchievementUnlock(
     icon: readString(r.icon) || 'Star',
     tier: typeof r.tier === 'string' ? r.tier : null,
     unlockedAt:
-      typeof r.unlocked_at === 'number' ? (r.unlocked_at as number) : null,
+      typeof r.unlocked_at === 'number' ? (r.unlocked_at) : null,
   }
 }
 
@@ -475,7 +475,7 @@ function normalizeSkillsUsage(
         percentage: readNumber(e.percentage),
         lastUsedAt:
           typeof e.last_used_at === 'number'
-            ? (e.last_used_at as number)
+            ? (e.last_used_at)
             : null,
       }
     })

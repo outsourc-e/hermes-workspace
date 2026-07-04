@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTab, TabsPanel } from '@/components/ui/tabs'
 import { McpServerCard } from './components/mcp-server-card'
 import { McpServerDialog } from './components/mcp-server-dialog'
 import { InstallConfirmationDialog } from './components/install-confirmation-dialog'
 import { useMcpCapabilityMode } from './hooks/use-mcp-capability-mode'
 import { useMcpServers } from './hooks/use-mcp-servers'
-import { useMcpHub, type HubMcpEntry } from './hooks/use-mcp-hub'
+import {  useMcpHub } from './hooks/use-mcp-hub'
 import { SourcesManagerDialog } from './components/sources-manager-dialog'
+import type {HubMcpEntry} from './hooks/use-mcp-hub';
 import type { McpClientInput, McpServer } from '@/types/mcp'
+import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 
 type Tab = 'installed' | 'marketplace'
 

@@ -27,6 +27,9 @@ vi.mock('node:os', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  delete process.env.HERMES_HOME
+  delete process.env.HERMES_API_URL
+  delete process.env.HERMES_DASHBOARD_URL
   delete process.env.CLAUDE_HOME
   delete process.env.CLAUDE_API_URL
   delete process.env.CLAUDE_DASHBOARD_URL

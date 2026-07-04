@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import path from 'node:path'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, copyFileSync, renameSync, readdirSync, statSync } = vi.hoisted(() => ({
   existsSync: vi.fn().mockReturnValue(false),

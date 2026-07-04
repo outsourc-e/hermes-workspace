@@ -44,17 +44,17 @@ export function clearMissionCheckpoint(): void {
 export function archiveMissionToHistory(cp: MissionCheckpoint): void {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
-    const history: MissionCheckpoint[] = raw ? (JSON.parse(raw) as MissionCheckpoint[]) : []
+    const history: Array<MissionCheckpoint> = raw ? (JSON.parse(raw) as Array<MissionCheckpoint>) : []
     history.unshift({ ...cp, completedAt: Date.now() })
     if (history.length > MAX_HISTORY) history.splice(MAX_HISTORY)
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
   } catch { /* ignore */ }
 }
 
-export function loadMissionHistory(): MissionCheckpoint[] {
+export function loadMissionHistory(): Array<MissionCheckpoint> {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
     if (!raw) return []
-    return JSON.parse(raw) as MissionCheckpoint[]
+    return JSON.parse(raw) as Array<MissionCheckpoint>
   } catch { return [] }
 }

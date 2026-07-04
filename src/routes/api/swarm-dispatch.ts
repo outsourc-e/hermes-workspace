@@ -1,16 +1,18 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { newestCheckpointFromMessages, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
+import {  newestCheckpointFromMessages, parseSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { createOrUpdateMission, markMissionAssignmentDispatched, recordMissionCheckpoint } from '../../server/swarm-missions'
-import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
-import { rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
+import { appendSwarmMemoryEvent, buildSwarmStartupSnapshot } from '../../server/swarm-memory'
+import {  rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
+import type {SwarmRosterWorker} from '../../server/swarm-roster';
+import type {ParsedSwarmCheckpoint} from '../../server/swarm-checkpoints';
 
 const HERMES_BIN_CANDIDATES = [
   process.env.HERMES_CLI_BIN,
@@ -82,6 +84,9 @@ const MAX_PROMPT_CHARS = 32_000
 const MAX_OUTPUT_CHARS = 200_000
 const DEFAULT_TIMEOUT_S = 240
 const MAX_TIMEOUT_S = 600
+const LOCAL_BROWSER_HARNESS_BIN = '/Users/mac/.local/bin/hermes-browser-harness'
+const NORMAL_BROWSER_HARNESS_BIN = '/Users/mac/.local/bin/browser-harness'
+const LOCAL_BROWSER_HARNESS_REPO = '/Users/mac/Developer/browser-harness'
 
 function getProfilesDir(): string {
   const base = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME
@@ -105,6 +110,18 @@ function getProfilePath(workerId: string): string {
 
 function validateWorkerId(workerId: string): boolean {
   return /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(workerId)
+}
+
+const APPROVED_WORKER_IDS = new Set(['chatgptheavy', 'workerkimi', 'swarm1', 'swarm6', 'swarm11', 'swarm12'])
+
+function isDispatchableWorkerId(workerId: string): boolean {
+  const id = workerId.trim().toLowerCase()
+  if (!validateWorkerId(id)) return false
+  if (!APPROVED_WORKER_IDS.has(id)) return false
+  if (id === 'workspace' || id.includes('dashboard')) return false
+  if (id.includes('claude') || id.includes('anthropic')) return false
+  if (id === 'swarm4') return false
+  return true
 }
 
 const TMUX_BIN_CANDIDATES = [
@@ -194,6 +211,51 @@ function shellEscapeSingle(value: string): string {
   return value.replace(/'/g, `'\\''`)
 }
 
+function needsLocalBrowserHarnessRules(task: string): boolean {
+  const lower = task.toLowerCase()
+  return (
+    lower.includes('browse') ||
+    lower.includes('browser') ||
+    lower.includes('website') ||
+    lower.includes('web site') ||
+    lower.includes('open ') ||
+    lower.includes('look up') ||
+    lower.includes('search the internet') ||
+    lower.includes('http://') ||
+    lower.includes('https://') ||
+    lower.includes('www.') ||
+    lower.includes('etsy') ||
+    lower.includes('dolaroboutique') ||
+    lower.includes('shop manager') ||
+    lower.includes('browser-harness') ||
+    lower.includes('browser use') ||
+    lower.includes('aliexpress') ||
+    lower.includes('alibaba')
+  )
+}
+
+function localBrowserHarnessRules(): Array<string> {
+  return [
+    '## Local Browser / Web / Etsy / Sourcing Safety Rules',
+    '- This assignment appears to involve browsing, web research, Etsy, DolaroBoutique, browser-harness, AliExpress, or Alibaba sourcing. Use these rules exactly.',
+    `- Use the Hermes Chrome automation browser-harness path first: \`${LOCAL_BROWSER_HARNESS_BIN}\`.`,
+    `- Quick check command: \`${LOCAL_BROWSER_HARNESS_BIN} -c "print(page_info())"\`. Do not use the normal Chrome doctor as the routine path.`,
+    '- For browsing tasks, use the dedicated Hermes Chrome automation profile as the primary browser path. It persists at ~/.hermes/chrome-cdp-profile and avoids repeated Remote Debugging approval popups.',
+    `- Use the normal personal Chrome path \`${NORMAL_BROWSER_HARNESS_BIN}\` only if the automation profile lacks a required login/extension or the user explicitly asks for normal Chrome. Generic browser_navigate, remote/cloud Browser Use, Jina, Google, web-search APIs, and remote browsers are supplemental/fallback only and must be labelled clearly.`,
+    '- Etsy is READ-ONLY. Do not edit listings, renew listings, change prices, message customers, open orders, refund/cancel/complete orders, make purchases, or click any shop/account/listing button that changes state.',
+    '- For Etsy stats, prefer all-time stats over short ranges. Navigate/read only. If all-time stats are not visible or require manual UI selection, return STATE: NEEDS_INPUT with exact instructions for the user to select All time; do not guess from a week of stats.',
+    '- Prefer public shop/listing pages and visible read-only Shop Manager analytics only if already accessible. Do not expose API keys or cookies.',
+    '- For AliExpress/Alibaba sourcing, exact product pages are required when possible; search-result links alone are lower quality and must be labelled as SEARCH_ONLY.',
+    '- For each supplier/product page, verify and report: product URL, supplier/platform, order count or sold count if visible, average star rating if visible, review count if visible, whether review photos exist, number of product images visible, whether images look high-quality/usable for recreation, available variants, approximate unit price/shipping if visible, and a VERDICT: PASS / MAYBE / REJECT.',
+    '- Do not recommend a product as PASS unless the page has enough evidence for a user to later scrape/recreate the product listing: specific product URL, adequate images, visible demand/social proof, and no obvious quality red flags.',
+    '- For AliExpress/Alibaba, research product candidates through Hermes Chrome automation browser-harness when possible. Do not log in, contact suppliers, message sellers, add to cart, place orders, or submit forms.',
+    '- CAPTCHA / slider / DataDome rule: do NOT attempt to bypass or solve CAPTCHA automatically. If a CAPTCHA appears, return STATE: NEEDS_INPUT or STATE: BLOCKED with the exact URL and instruction: user must solve the CAPTCHA manually in Hermes Chrome, then rerun/continue. After the user solves it, retry through the same Hermes Chrome automation session.',
+    '- If Hermes Chrome browser-harness cannot access an Etsy, AliExpress, or Alibaba page, return STATE: BLOCKED with the exact command/error. Do not guess and do not switch to anti-bot-triggering remote browsing.',
+    '- Your final checkpoint must include the exact browser-harness commands used, concrete visible evidence observed, and a simple final report section that a non-technical user can read.',
+    '',
+  ]
+}
+
 function parseAssignments(value: unknown): Array<AssignmentRequest> {
   if (!Array.isArray(value)) return []
   const assignments: Array<AssignmentRequest> = []
@@ -206,7 +268,7 @@ function parseAssignments(value: unknown): Array<AssignmentRequest> {
     const dependsOn = Array.isArray(obj.dependsOn) ? obj.dependsOn.filter((value): value is string => typeof value === 'string' && value.trim().length > 0) : undefined
     const reviewRequired = typeof obj.reviewRequired === 'boolean' ? obj.reviewRequired : undefined
     const direct = typeof obj.direct === 'boolean' ? obj.direct : undefined
-    if (!workerId || !task || !validateWorkerId(workerId)) continue
+    if (!workerId || !task || !isDispatchableWorkerId(workerId)) continue
     assignments.push({ workerId, task, rationale, dependsOn, reviewRequired, direct })
   }
   return assignments
@@ -380,7 +442,8 @@ function buildWorkerPrompt(input: {
   missionId?: string | null
   taskTitle?: string | null
 }): string {
-  if (input.direct) return input.task
+  const includeLocalBrowserRules = needsLocalBrowserHarnessRules(input.task)
+  if (input.direct && !includeLocalBrowserRules) return input.task
   const roster = input.roster
   const role = roster?.role || 'Worker'
   const skills = roster?.skills?.length ? roster.skills.join(', ') : 'swarm-worker-core'
@@ -416,6 +479,9 @@ function buildWorkerPrompt(input: {
   if (snapshotSection) {
     lines.push(snapshotSection)
     lines.push('')
+  }
+  if (includeLocalBrowserRules) {
+    lines.push(...localBrowserHarnessRules())
   }
   lines.push(
     '## Assigned Task',
@@ -672,8 +738,9 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
 }
 
 function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: SwarmRosterWorker | undefined, options?: { waitForCheckpoint?: boolean; checkpointPollMs?: number; missionId?: string | null; notifySessionKey?: string | null }): Promise<WorkerResult> {
-  return new Promise(async (resolve) => {
-    const workerId = assignment.workerId
+  return new Promise((resolve) => {
+    void (async () => {
+      const workerId = assignment.workerId
     const prompt = buildWorkerPrompt({
       workerId,
       task: assignment.task,
@@ -713,8 +780,12 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
     const startedAt = Date.now()
     const wrapperPath = getWrapperPath(workerId)
 
-    // Prefer the persistent live agent session when available/startable.
-    const liveResult = await sendPromptToLiveSession(workerId, prompt)
+    // Prefer one-shot worker execution by default. Live tmux TUI delivery can
+    // leave prompts sitting in panels or keep missions stuck as in_progress.
+    // Enable live tmux only for explicit debugging with HERMES_SWARM_USE_LIVE_TMUX=1.
+    const liveResult = process.env.HERMES_SWARM_USE_LIVE_TMUX === '1'
+      ? await sendPromptToLiveSession(workerId, prompt)
+      : null
     if (liveResult) {
       markDispatchResult(workerId, liveResult)
       if (options?.waitForCheckpoint && liveResult.ok) {
@@ -805,6 +876,9 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       HERMES_HOME: profilePath,
+      PATH: `/Users/mac/.local/bin:${process.env.PATH ?? ''}`,
+      BROWSER_HARNESS_BIN: LOCAL_BROWSER_HARNESS_BIN,
+      BROWSER_HARNESS_REPO: LOCAL_BROWSER_HARNESS_REPO,
     }
     const ghToken = resolveGithubToken()
     if (ghToken) {
@@ -854,17 +928,46 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
           delivery: 'oneshot',
         }
         markDispatchResult(workerId, result)
+        const checkpoint = parseSwarmCheckpoint(out)
+        if (checkpoint) {
+          markCheckpointResult(workerId, checkpoint, options?.notifySessionKey ?? 'main')
+          recordMissionCheckpoint({
+            missionId: options?.missionId,
+            assignmentId: assignment.assignmentId ?? null,
+            workerId,
+            checkpoint,
+            source: 'swarm-dispatch',
+          })
+          result.checkpoint = checkpoint
+          result.checkpointStatus = 'checkpointed'
+        } else {
+          result.checkpointStatus = 'not-requested'
+        }
         resolve(result)
       },
     )
 
-    proc.on('error', (error) => {
+      proc.on('error', (error) => {
+        const result: WorkerResult = {
+          workerId,
+          ok: false,
+          output: '',
+          error: error.message,
+          durationMs: Date.now() - startedAt,
+          exitCode: null,
+          delivery: 'oneshot',
+        }
+        markDispatchResult(workerId, result)
+        resolve(result)
+      })
+    })().catch((error: unknown) => {
+      const workerId = assignment.workerId
       const result: WorkerResult = {
         workerId,
         ok: false,
         output: '',
-        error: error.message,
-        durationMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: 0,
         exitCode: null,
         delivery: 'oneshot',
       }
@@ -897,7 +1000,7 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
           const workerIds = workerIdsRaw
             .filter((value): value is string => typeof value === 'string')
             .map((value) => value.trim())
-            .filter((value) => value.length > 0 && validateWorkerId(value))
+            .filter((value) => value.length > 0 && isDispatchableWorkerId(value))
           assignments = workerIds.map((workerId) => ({ workerId, task: prompt, rationale: 'Legacy broadcast dispatch.', direct: body.direct === true }))
         }
 
@@ -917,12 +1020,10 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         const timeoutRaw = typeof body.timeoutSeconds === 'number' ? body.timeoutSeconds : DEFAULT_TIMEOUT_S
         const timeoutSeconds = Math.max(10, Math.min(MAX_TIMEOUT_S, Math.floor(timeoutRaw)))
         const timeoutMs = timeoutSeconds * 1000
-        // Swarm2 control-plane dispatches should be observable by default:
-        // wait for a fresh checkpoint so completion/blocker notifications can
-        // be published and worker progress cards can resolve. Callers that
-        // intentionally want fire-and-forget delivery must opt out with both
-        // waitForCheckpoint:false and allowAsync:true.
-        const waitForCheckpoint = !(body.waitForCheckpoint === false && body.allowAsync === true)
+        // Do not make Workspace callers wait for long checkpoint polling by default.
+        // One-shot workers return their output directly; live tmux checkpoint waiting
+        // is only used when a caller explicitly requests waitForCheckpoint:true.
+        const waitForCheckpoint = body.waitForCheckpoint === true
         const pollRaw = typeof body.checkpointPollSeconds === 'number' ? body.checkpointPollSeconds : 90
         const checkpointPollSeconds = Math.max(5, Math.min(300, Math.floor(pollRaw)))
         const notifySessionKey = typeof body.notifySessionKey === 'string' && body.notifySessionKey.trim() ? body.notifySessionKey.trim() : 'main'
@@ -931,7 +1032,7 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         const hasExplicitMissionTitle = typeof body.missionTitle === 'string' && body.missionTitle.trim()
         const missionTitle = hasExplicitMissionTitle
           ? (body.missionTitle as string).trim()
-          : requestedMissionId ? '' : assignments.length === 1 ? assignments[0].task.slice(0, 120) : `${assignments.length} assigned tasks` 
+          : requestedMissionId ? '' : assignments.length === 1 ? assignments[0].task.slice(0, 120) : `${assignments.length} assigned tasks`
         const mission = createOrUpdateMission({
           missionId: requestedMissionId || null,
           title: missionTitle,

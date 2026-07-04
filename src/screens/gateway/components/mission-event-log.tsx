@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AiBrain01Icon,
   AlertDiamondIcon,
   ArrowTurnBackwardIcon,
+  Chat01Icon,
   CheckmarkCircle02Icon,
   PlayCircleIcon,
   Rocket01Icon,
-  Task01Icon,
-  AiBrain01Icon,
-  Chat01Icon,
   Target01Icon,
+  Task01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { AnimatePresence, motion } from 'motion/react'
-import { cn } from '@/lib/utils'
 import type { MissionEvent } from '@/screens/gateway/lib/mission-events'
+import { cn } from '@/lib/utils'
 
 type MissionEventLogProps = {
-  events: MissionEvent[]
+  events: Array<MissionEvent>
   agentNames?: Record<string, string>
   className?: string
 }

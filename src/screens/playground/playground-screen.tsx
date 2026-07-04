@@ -1,6 +1,6 @@
-import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Component,  useEffect, useMemo, useRef, useState } from 'react'
 import { PlaygroundActionBar } from './components/playground-actionbar'
-import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
+import {  PlaygroundChat } from './components/playground-chat'
 import { PlaygroundCustomizer } from './components/playground-customizer'
 import { PlaygroundDialog } from './components/playground-dialog'
 import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
@@ -12,9 +12,12 @@ import { PlaygroundSidePanel } from './components/playground-sidepanel'
 import { PlaygroundWorld3D } from './components/playground-world-3d'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
 import { playgroundAudio, usePlaygroundAudioMuted } from './lib/playground-audio'
-import { autoNarrateWorld, cancelNarration, isNarrationMuted, setNarrationMuted, narrateWorldNow } from './lib/playground-narration'
+import { autoNarrateWorld, cancelNarration, isNarrationMuted, narrateWorldNow, setNarrationMuted } from './lib/playground-narration'
 import { botsFor } from './lib/playground-bots'
-import { itemById, PLAYGROUND_WORLDS, type PlaygroundItemId, type PlaygroundWorldId } from './lib/playground-rpg'
+import { PLAYGROUND_WORLDS,   itemById } from './lib/playground-rpg'
+import type {ChatMessage} from './components/playground-chat';
+import type {ReactNode} from 'react';
+import type {PlaygroundItemId, PlaygroundWorldId} from './lib/playground-rpg';
 import type { RemotePlayer } from './hooks/use-playground-multiplayer'
 
 const WORLD_META: Record<PlaygroundWorldId, { name: string; accent: string }> = {
@@ -64,7 +67,7 @@ export function PlaygroundScreen() {
   const [journalOpen, setJournalOpen] = useState(false)
   const [customizerOpen, setCustomizerOpen] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<Array<ChatMessage>>([])
   const [botBubbles, setBotBubbles] = useState<Record<string, string>>({})
   const [mapOpen, setMapOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
@@ -413,7 +416,7 @@ export function PlaygroundScreen() {
       void enterForgeFromTraining()
       return
     }
-    const order: PlaygroundWorldId[] = ['training', 'forge', 'agora', 'grove', 'oracle', 'arena']
+    const order: Array<PlaygroundWorldId> = ['training', 'forge', 'agora', 'grove', 'oracle', 'arena']
     const unlocked = order.filter((id) => rpg.state.unlockedWorlds.includes(id))
     const currentIndex = unlocked.indexOf(world)
     const next = unlocked[(currentIndex + 1) % unlocked.length] ?? world
@@ -771,7 +774,7 @@ function TitleScreen({
                 margin: 0,
                 textShadow: '0 0 8px rgba(245,217,122,0.3)',
               }}
-            >{`_   _                             __        __         _     _ 
+            >{`_   _                             __        __         _     _
 | | | | ___ _ __ _ __ ___   ___  __\\ \\      / /__  _ __| | __| |
 | |_| |/ _ \\ '__| '_ \` _ \\ / _ \\/ __\\ \\ /\\ / / _ \\| '__| |/ _\` |
 |  _  |  __/ |  | | | | | |  __/\\__ \\\\ V  V / (_) | |  | | (_| |
@@ -1028,7 +1031,7 @@ function ForgeArrivalOverlay({
   )
 }
 
-function NearbyBuildersChip({ players }: { players: RemotePlayer[] }) {
+function NearbyBuildersChip({ players }: { players: Array<RemotePlayer> }) {
   const [pingedId, setPingedId] = useState<string | null>(null)
 
   if (players.length === 0) return null
@@ -1236,7 +1239,7 @@ function PlaygroundUtilityDock({
     const canvas = document.querySelector('canvas')
     if (!canvas) return
     try {
-      const dataUrl = (canvas as HTMLCanvasElement).toDataURL('image/png')
+      const dataUrl = (canvas).toDataURL('image/png')
       const a = document.createElement('a')
       a.href = dataUrl
       a.download = `hermesworld-${new Date().toISOString().replace(/[:.]/g, '-')}.png`

@@ -2,7 +2,13 @@
  * Tests for unifiedSearch.
  * Mocks source adapters and claude-dashboard-api to avoid I/O.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { getConfig } from '../claude-dashboard-api'
+import { fetchLocalFile } from './sources/local-file'
+import { fetchMcpGet } from './sources/mcp-get'
+import { unifiedSearch } from './index'
+import type { HubMcpEntry } from './types'
 
 vi.mock('./sources/local-file', () => ({
   fetchLocalFile: vi.fn(),
@@ -13,12 +19,6 @@ vi.mock('./sources/mcp-get', () => ({
 vi.mock('../claude-dashboard-api', () => ({
   getConfig: vi.fn(),
 }))
-
-import { fetchLocalFile } from './sources/local-file'
-import { fetchMcpGet } from './sources/mcp-get'
-import { getConfig } from '../claude-dashboard-api'
-import { unifiedSearch } from './index'
-import type { HubMcpEntry } from './types'
 
 const mockFetchLocalFile = vi.mocked(fetchLocalFile)
 const mockFetchMcpGet = vi.mocked(fetchMcpGet)

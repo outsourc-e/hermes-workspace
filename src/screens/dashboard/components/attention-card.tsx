@@ -3,9 +3,9 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertCircleIcon,
   CheckmarkCircle02Icon,
-  Time04Icon,
-  Settings02Icon,
   ConsoleIcon,
+  Settings02Icon,
+  Time04Icon,
 } from '@hugeicons/core-free-icons'
 import type {
   DashboardIncident,

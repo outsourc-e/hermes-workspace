@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type {GatewaySession} from '@/lib/gateway-api';
 import { formatModelName } from '@/lib/format-model-name'
 import { cn } from '@/lib/utils'
-import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
+import {  fetchSessions } from '@/lib/gateway-api'
 
 export type RemoteAgentsPanelProps = {
-  localSessionKeys: string[]
+  localSessionKeys: Array<string>
 }
 
 function shouldHideSession(session: GatewaySession): boolean {
@@ -63,7 +64,7 @@ function getLastMessageText(session: GatewaySession): string {
 }
 
 export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) {
-  const [sessions, setSessions] = useState<GatewaySession[]>([])
+  const [sessions, setSessions] = useState<Array<GatewaySession>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const localSet = useMemo(() => new Set(localSessionKeys), [localSessionKeys])

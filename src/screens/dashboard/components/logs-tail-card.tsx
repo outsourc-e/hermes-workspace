@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  AlertCircleIcon,
   CancelIcon,
   ConsoleIcon,
-  AlertCircleIcon,
 } from '@hugeicons/core-free-icons'
+import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
 // Hugeicons free pack ships `ConsoleIcon` (terminal-prompt glyph) but
 // no `TerminalIcon`. Aliasing keeps call sites readable.
 const TerminalIcon = ConsoleIcon
-import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
 const ERROR_RX = /\b(error|exception|traceback|failed|fatal)\b/i
 const WARN_RX = /\b(warn|warning|deprecated)\b/i

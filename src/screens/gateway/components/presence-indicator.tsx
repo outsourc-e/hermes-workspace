@@ -44,7 +44,7 @@ function getPresenceColor(id: string): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PresenceIndicator({ currentTab }: { currentTab: string }) {
-  const [peers, setPeers] = useState<PresenceUser[]>([])
+  const [peers, setPeers] = useState<Array<PresenceUser>>([])
   const myId = useRef(getPresenceId())
   const channelRef = useRef<BroadcastChannel | null>(null)
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)

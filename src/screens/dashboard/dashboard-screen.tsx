@@ -1,19 +1,38 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import { HugeiconsIcon } from '@hugeicons/react'
+import {
+  BubbleChatAddIcon,
+  CheckmarkCircle02Icon,
+  ConsoleIcon,
+  Edit02Icon,
+  Moon02Icon,
+  PuzzleIcon,
+  Settings02Icon,
+  Sun02Icon,
+} from '@hugeicons/core-free-icons'
 import { OpsStrip } from './components/ops-strip'
 import { AchievementsCard } from './components/achievements-card'
 import { HeroMetrics } from './components/hero-metrics'
 import {
-  AnalyticsChartCard,
-  type AnalyticsPeriod,
+  AnalyticsChartCard
+
 } from './components/analytics-chart-card'
 import { TopModelsCard } from './components/top-models-card'
 import { LogsTailCard } from './components/logs-tail-card'
 import {
-  SessionsIntelligenceCard,
-  type SessionRowData,
+
+  SessionsIntelligenceCard
 } from './components/sessions-intelligence-card'
 import { SkillsUsageCard } from './components/skills-usage-card'
 import { TokenMixHourCard } from './components/token-mix-hour-card'
@@ -27,15 +46,9 @@ import { OperatorTipCard } from './components/operator-tip-card'
 import { WidgetShell } from './components/widget-shell'
 import { EditModePanel } from './components/edit-mode-panel'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import type {SessionRowData} from './components/sessions-intelligence-card';
+import type {AnalyticsPeriod} from './components/analytics-chart-card';
+import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import type { ReactNode } from 'react'
 import type { ClaudeSession } from '@/server/claude-api'
 import { getUnavailableReason } from '@/lib/feature-gates'
@@ -43,17 +56,6 @@ import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Moon02Icon,
-  Sun02Icon,
-  BubbleChatAddIcon,
-  ConsoleIcon,
-  PuzzleIcon,
-  Edit02Icon,
-  CheckmarkCircle02Icon,
-  Settings02Icon,
-} from '@hugeicons/core-free-icons'
 
 // `IconSvgObject` isn't exported from @hugeicons/react; reuse the
 // inferred type from a real icon import for prop typing.
@@ -635,6 +637,103 @@ function SessionRow({
   )
 }
 
+// ── Workspace Health Dashboard ───────────────────────────────────
+
+type WorkspaceHealthState = 'pass' | 'warn' | 'fail' | 'blocked' | 'unknown'
+
+type WorkspaceHealthPayload = {
+  ok: boolean
+  checkedAt: number
+  latestGateDir?: string | null
+  overall: WorkspaceHealthState
+  counts: Record<WorkspaceHealthState, number>
+  checks: Array<{
+    id: string
+    label: string
+    state: WorkspaceHealthState
+    detail: string
+    artifactPath?: string
+  }>
+}
+
+const workspaceHealthTone: Record<WorkspaceHealthState, { label: string; className: string }> = {
+  pass: { label: 'GREEN', className: 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' },
+  warn: { label: 'YELLOW', className: 'border-amber-400/45 bg-amber-500/10 text-amber-100' },
+  fail: { label: 'RED', className: 'border-red-400/50 bg-red-500/10 text-red-100' },
+  blocked: { label: 'BLOCKED', className: 'border-sky-400/45 bg-sky-500/10 text-sky-100' },
+  unknown: { label: 'UNKNOWN', className: 'border-neutral-400/35 bg-neutral-500/10 text-neutral-200' },
+}
+
+function WorkspaceHealthCard() {
+  const healthQuery = useQuery<WorkspaceHealthPayload>({
+    queryKey: ['workspace-health'],
+    queryFn: async () => {
+      const res = await fetch('/api/workspace-health')
+      if (!res.ok) throw new Error(`workspace health ${res.status}`)
+      return (await res.json()) as WorkspaceHealthPayload
+    },
+    staleTime: 5_000,
+    refetchInterval: 45_000,
+  })
+  const payload = healthQuery.data ?? null
+  const checks = payload?.checks ?? []
+  const overall = payload?.overall ?? 'unknown'
+  const tone = workspaceHealthTone[overall]
+  const lastGate = payload?.latestGateDir?.split('/').at(-1) ?? 'no gate yet'
+
+  return (
+    <section
+      className="rounded-2xl border p-4 shadow-sm"
+      style={{
+        borderColor: 'color-mix(in srgb, var(--theme-border) 82%, var(--theme-accent))',
+        background: 'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 94%, var(--theme-accent) 6%), var(--theme-card))',
+        color: 'var(--theme-text)',
+      }}
+      data-workspace-health-card="v1"
+      aria-label="Workspace health dashboard"
+    >
+      <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--theme-muted)' }}>Workspace Health</p>
+          <h2 className="text-lg font-bold tracking-tight">Real gates, honest blockers</h2>
+          <p className="mt-1 max-w-3xl text-xs leading-5" style={{ color: 'var(--theme-muted)' }}>
+            Reads git live and the latest saved gate artifacts. Warnings are not hidden: dirty repo, blocked hardware, and approval-gated Etsy actions stay visible.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={cn('rounded-full border px-3 py-1 text-xs font-black tracking-[0.12em]', tone.className)}>{tone.label}</span>
+          <span className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-muted)' }}>{lastGate}</span>
+        </div>
+      </div>
+
+      {healthQuery.isError ? (
+        <div className="rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-100">
+          Workspace health API failed: {healthQuery.error instanceof Error ? healthQuery.error.message : 'unknown error'}
+        </div>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {checks.length ? checks.map((check) => {
+            const checkTone = workspaceHealthTone[check.state]
+            return (
+              <article key={check.id} className="min-h-[112px] rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)', background: 'color-mix(in srgb, var(--theme-card) 92%, transparent)' }} data-health-state={check.state}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold">{check.label}</h3>
+                  <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-black', checkTone.className)}>{checkTone.label}</span>
+                </div>
+                <p className="text-xs leading-5" style={{ color: 'var(--theme-muted)' }}>{check.detail}</p>
+              </article>
+            )
+          }) : (
+            <div className="rounded-xl border p-3 text-sm" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-muted)' }}>
+              Loading workspace health…
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ── Main Dashboard ───────────────────────────────────────────────
 
 export function DashboardScreen() {
@@ -664,9 +763,7 @@ export function DashboardScreen() {
 
   // Raw rows from the sessions endpoint. Used both for hero stats
   // (count/tokens) and for the SessionsIntelligenceCard below.
-  const rawSessions = (sessionsQuery.data ?? []) as Array<
-    Record<string, unknown>
-  >
+  const rawSessions = (sessionsQuery.data ?? [])
 
   // Adapter shape kept for the legacy fallbacks that still reference
   // ClaudeSession (HeroMetrics fallback path, etc.).
@@ -1035,6 +1132,8 @@ export function DashboardScreen() {
         cron={overview?.cron ?? null}
         platforms={overview?.platforms ?? []}
       />
+
+      <WorkspaceHealthCard />
 
       {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
       <HeroMetrics

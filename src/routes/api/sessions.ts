@@ -13,8 +13,8 @@ import {
   toSessionSummary,
   updateSession,
 } from '../../server/claude-api'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { deleteLocalSession, getLocalSession, listLocalSessions } from '../../server/local-session-store'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -25,45 +25,45 @@ export const Route = createFileRoute('/api/sessions')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         const capabilities = await ensureGatewayProbed()
+        const localSessions = listLocalSessions()
+        const localGatewayShape = localSessions.map((ls) => ({
+          key: ls.id,
+          id: ls.id,
+          title: ls.title || 'Local Chat',
+          startedAt: ls.createdAt,
+          updatedAt: ls.updatedAt,
+          message_count: ls.messageCount,
+          model: ls.model,
+          source: 'local',
+        }))
+
         if (!capabilities.sessions) {
           return json({
             ok: true,
-            sessions: [],
-            source: 'unavailable',
-            message: SESSIONS_API_UNAVAILABLE_MESSAGE,
+            sessions: localGatewayShape,
+            source: localGatewayShape.length ? 'local-only' : 'unavailable',
+            message: localGatewayShape.length ? undefined : SESSIONS_API_UNAVAILABLE_MESSAGE,
           })
         }
 
         try {
           const sessions = await listSessions(50, 0)
-          const gatewaySessions = sessions.map(toSessionSummary)
+          const gatewaySessions = Array.isArray(sessions) ? sessions.map(toSessionSummary) : []
 
           // Merge local portable sessions (Ollama, Atomic Chat, etc.)
-          const localSessions = listLocalSessions()
           const gatewayIds = new Set(gatewaySessions.map((s: any) => s.key || s.id))
-          for (const ls of localSessions) {
-            if (!gatewayIds.has(ls.id)) {
-              gatewaySessions.push({
-                key: ls.id,
-                id: ls.id,
-                title: ls.title || 'Local Chat',
-                startedAt: ls.createdAt,
-                updatedAt: ls.updatedAt,
-                message_count: ls.messageCount,
-                model: ls.model,
-                source: 'local',
-              } as any)
-            }
+          for (const ls of localGatewayShape) {
+            if (!gatewayIds.has(ls.id)) gatewaySessions.push(ls as any)
           }
 
-          return json({ sessions: gatewaySessions })
+          return json({ ok: true, sessions: gatewaySessions, source: 'gateway' })
         } catch (err) {
-          return json(
-            {
-              error: err instanceof Error ? err.message : String(err),
-            },
-            { status: 500 },
-          )
+          return json({
+            ok: true,
+            sessions: localGatewayShape,
+            source: 'local-with-gateway-error',
+            warning: err instanceof Error ? err.message : String(err),
+          })
         }
       },
       POST: async ({ request }) => {

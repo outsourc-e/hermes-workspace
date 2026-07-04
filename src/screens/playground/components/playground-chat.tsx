@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import { botsFor } from '../lib/playground-bots'
+import type { PlaygroundWorldId } from '../lib/playground-rpg'
 
 export type ChatMessage = {
   id: string
@@ -13,7 +13,7 @@ export type ChatMessage = {
 
 type Props = {
   worldId: PlaygroundWorldId
-  messages: ChatMessage[]
+  messages: Array<ChatMessage>
   onSend: (body: string) => void
   collapsed?: boolean
   onToggle?: () => void

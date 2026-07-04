@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { LOCALE_LABELS, t, type LocaleId } from './i18n'
+import { LOCALE_LABELS,  t } from './i18n'
+import type {LocaleId} from './i18n';
 
 function withLocale<T>(locale: LocaleId, fn: () => T): T {
   const originalWindow = globalThis.window
@@ -57,7 +58,7 @@ describe('i18n translations', () => {
   })
 
   it('exposes readable locale labels for contributor-targeted languages', () => {
-    expect(LOCALE_LABELS.zh).toBe('中文')
+    expect(LOCALE_LABELS.zh).toBe('中文（简体）')
     expect(LOCALE_LABELS.ru).toBe('Русский')
   })
 })

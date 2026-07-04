@@ -15,7 +15,7 @@ export type BotProfile = {
   avatar: string
   color: string
   spawn: [number, number, number]
-  lines: string[]
+  lines: Array<string>
 }
 
 const COMMUNITY_NAMES = [
@@ -24,7 +24,7 @@ const COMMUNITY_NAMES = [
   'BuilderAva', 'GroveSpirit', 'ForgeBaron', 'OracleNote', 'ArenaRook',
 ]
 
-export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
+export const BOT_PROFILES: Record<PlaygroundWorldId, Array<BotProfile>> = {
   training: [
     {
       id: 'bot-training-1',
@@ -143,6 +143,6 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
   ],
 }
 
-export function botsFor(worldId: PlaygroundWorldId): BotProfile[] {
+export function botsFor(worldId: PlaygroundWorldId): Array<BotProfile> {
   return BOT_PROFILES[worldId] ?? []
 }

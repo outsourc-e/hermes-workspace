@@ -10,12 +10,13 @@ import {
   Wifi01Icon,
   WifiOffIcon,
 } from '@hugeicons/core-free-icons'
+import type {CrewMember, CrewOnlineStatus} from '@/hooks/use-crew-status';
 import { cn } from '@/lib/utils'
 import {
-  useCrewStatus,
+
+
   getOnlineStatus,
-  type CrewMember,
-  type CrewOnlineStatus,
+  useCrewStatus
 } from '@/hooks/use-crew-status'
 
 // ── Helpers ─────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
-import { cn } from '@/lib/utils'
 import type { ClaudeTask } from '@/lib/tasks-api'
+import { cn } from '@/lib/utils'
 import { PRIORITY_COLORS, isOverdue } from '@/lib/tasks-api'
 
 type Props = {
@@ -86,7 +86,7 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
             )}
             <span className={overdue ? 'text-red-400 font-semibold' : 'text-[var(--theme-muted)]'}>
               {(() => {
-                const [y, m, d] = task.due_date!.split('-').map(Number)
+                const [y, m, d] = task.due_date.split('-').map(Number)
                 return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               })()}
             </span>

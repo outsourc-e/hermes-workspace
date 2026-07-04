@@ -1,8 +1,5 @@
 // Module-level local model override — set by composer when user picks a local model
 // Avoids prop threading. Reset when switching back to cloud models.
-export let _localModelOverride = ''
-export function setLocalModelOverride(model: string) { _localModelOverride = model }
-
 import {
   useCallback,
   useEffect,
@@ -51,8 +48,6 @@ import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
 import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useStreamingMessage } from './hooks/use-streaming-message'
-import { playChatComplete } from '@/lib/sounds'
-import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { useActiveRunCheck } from './hooks/use-active-run-check'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
@@ -74,6 +69,9 @@ import type {
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type { ChatRunCommandDetail } from './chat-events'
+import type {AgentActivity} from '@/stores/chat-activity-store';
+import { useChatSettingsStore } from '@/hooks/use-chat-settings'
+import { playChatComplete } from '@/lib/sounds'
 import {
   addApproval,
   loadApprovals,
@@ -101,7 +99,10 @@ import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
-import { useChatActivityStore, type AgentActivity } from '@/stores/chat-activity-store'
+import {  useChatActivityStore } from '@/stores/chat-activity-store'
+
+export let _localModelOverride = ''
+export function setLocalModelOverride(model: string) { _localModelOverride = model }
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -495,6 +496,12 @@ export function ChatScreen({
       store.setSessionWaiting(key)
     } else {
       store.clearSessionWaiting(key)
+      // New-chat sends start life under the synthetic "new" key, then the
+      // server resolves them to a real session id. If completion happens after
+      // that resolution, clearing only the current key leaves the synthetic key
+      // stuck in the persistent store and the UI keeps showing "Thinking...".
+      store.clearSessionWaiting('new')
+      store.clearSessionWaiting('main')
     }
   }, [])
   const [liveToolActivity, setLiveToolActivity] = useState<
@@ -1587,7 +1594,7 @@ export function ChatScreen({
       void historyQuery.refetch()
     }, 2000)
     return () => window.clearTimeout(timer)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only
+  }, [])
 
   useEffect(() => {
     function handleSSEDrop() {
@@ -2090,13 +2097,6 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (false) {
-      // Server connection checks removed — Hermes Agent uses direct API
-      hasSeenDisconnectRef.current = true
-      retriedQueuedMessageKeysRef.current.clear()
-      return
-    }
-
     if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
       hasSeenDisconnectRef.current = false
       flushRetryableMessages()

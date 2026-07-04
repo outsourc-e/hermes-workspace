@@ -1,4 +1,4 @@
-import { randomUUID, generateKeyPairSync, createPrivateKey, createPublicKey, createHash, sign as cryptoSign } from 'node:crypto'
+import { createHash, createPrivateKey, createPublicKey, sign as cryptoSign, generateKeyPairSync, randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
@@ -115,7 +115,7 @@ export function getGatewayConfig() {
   // Check if browser set a custom gateway URL (for network/mobile access)
   const browserUrl = typeof window !== 'undefined' ? (window as any).__GATEWAY_URL__ : undefined
   const url = browserUrl || process.env.CLAUDE_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
-  let token = process.env.CLAUDE_GATEWAY_TOKEN?.trim() || ''
+  const token = process.env.CLAUDE_GATEWAY_TOKEN?.trim() || ''
   const password = process.env.CLAUDE_GATEWAY_PASSWORD?.trim() || ''
 
   // Allow connecting without shared auth — device identity signature handles authentication.
@@ -745,9 +745,9 @@ function rawDataToString(data: RawData): string {
 const GW_KEY = '__clawsuite_gateway_client__' as const
 const ACTIVE_SEND_RUNS_KEY = '__clawsuite_active_send_stream_runs__' as const
 declare global {
-  // eslint-disable-next-line no-var
+
   var __clawsuite_gateway_client__: GatewayClient | undefined
-  // eslint-disable-next-line no-var
+
   var __clawsuite_active_send_stream_runs__: Set<string> | undefined
 }
 const existingClient = (globalThis as any)[GW_KEY] as GatewayClient | undefined

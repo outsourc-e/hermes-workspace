@@ -40,6 +40,73 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 
 const CHARS_PER_TOKEN = 3.5
 
+type ContextUsageMessage = {
+  content?: unknown
+  text?: unknown
+  reasoning?: unknown
+  tool_calls?: unknown
+}
+
+function estimateTokensFromChars(charCount: number): number {
+  return Math.ceil(charCount / CHARS_PER_TOKEN)
+}
+
+function textLength(value: unknown): number {
+  return typeof value === 'string' ? value.length : 0
+}
+
+function serializedLength(value: unknown): number {
+  if (value == null) return 0
+  if (typeof value === 'string') return value.length
+  try {
+    return JSON.stringify(value).length
+  } catch {
+    return String(value).length
+  }
+}
+
+function contentContainsText(content: unknown, text: string): boolean {
+  if (content === text) return true
+  if (!Array.isArray(content)) return false
+
+  return content.some((part) => {
+    if (!part || typeof part !== 'object') return false
+    return (part as { text?: unknown }).text === text
+  })
+}
+
+export function estimateContextTokensFromMessages(
+  messages: Array<ContextUsageMessage>,
+): number {
+  let totalChars = 0
+
+  for (const msg of messages) {
+    const contentChars = serializedLength(msg.content)
+    totalChars += contentChars
+    totalChars += textLength(msg.reasoning)
+    totalChars += serializedLength(msg.tool_calls)
+
+    const textChars = textLength(msg.text)
+    if (
+      typeof msg.text === 'string' &&
+      textChars > 0 &&
+      !contentContainsText(msg.content, msg.text)
+    ) {
+      totalChars += textChars
+    }
+  }
+
+  return estimateTokensFromChars(totalChars)
+}
+
+export function estimateContextTokensFromCacheRead(
+  cacheReadTokens: number,
+  messageCount: number,
+): number {
+  const assistantTurns = Math.max(1, Math.ceil(messageCount / 2))
+  return Math.ceil((cacheReadTokens / assistantTurns) * 1.2)
+}
+
 function getContextWindow(model: string): number {
   if (MODEL_CONTEXT_WINDOWS[model]) return MODEL_CONTEXT_WINDOWS[model]
   for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
@@ -134,10 +201,12 @@ export async function readContextUsage(
     const messageCount = Number(sessionData.message_count) || 0
 
     let usedTokens = 0
-    const assistantTurns = Math.max(1, Math.ceil(messageCount / 2))
 
-    if (cacheReadTokens > 0 && assistantTurns > 0) {
-      usedTokens = Math.ceil((cacheReadTokens / assistantTurns) * 1.2)
+    if (cacheReadTokens > 0) {
+      usedTokens = estimateContextTokensFromCacheRead(
+        cacheReadTokens,
+        messageCount,
+      )
     } else if (messageCount > 0) {
       try {
         const targetSessionId = sessionId || String(sessionData.id || '')
@@ -161,11 +230,13 @@ export async function readContextUsage(
             const msgData = (await msgRes.json()) as {
               items?: Array<{
                 content?: string
+                text?: string
                 tool_calls?: unknown
                 reasoning?: string
               }>
               messages?: Array<{
                 content?: string
+                text?: string
                 tool_calls?: unknown
                 reasoning?: string
               }>
@@ -173,13 +244,7 @@ export async function readContextUsage(
             const messages = capabilitiesNow.dashboard.available
               ? (msgData.messages ?? [])
               : (msgData.items ?? [])
-            let totalChars = 0
-            for (const msg of messages) {
-              totalChars += (msg.content || '').length
-              if (msg.reasoning) totalChars += msg.reasoning.length
-              if (msg.tool_calls) totalChars += JSON.stringify(msg.tool_calls).length
-            }
-            usedTokens = Math.ceil(totalChars / CHARS_PER_TOKEN)
+            usedTokens = estimateContextTokensFromMessages(messages)
           }
         }
       } catch {

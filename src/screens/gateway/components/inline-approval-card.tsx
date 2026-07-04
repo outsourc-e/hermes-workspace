@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
 import type { ApprovalRequest } from '../lib/approvals-store'
+import { cn } from '@/lib/utils'
 
 type InlineApprovalCardProps = {
   approval: ApprovalRequest

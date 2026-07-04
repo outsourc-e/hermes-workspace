@@ -3,7 +3,8 @@
  * Connects to /api/gateway/sessions and tracks live agent sessions.
  */
 import { create } from 'zustand'
-import { BASE_URL, type GatewaySession } from '@/lib/gateway-api'
+import type {GatewaySession} from '@/lib/gateway-api';
+import { BASE_URL  } from '@/lib/gateway-api'
 
 export type SwarmSession = GatewaySession & {
   /** Derived status for UI rendering */
@@ -13,7 +14,7 @@ export type SwarmSession = GatewaySession & {
 }
 
 type SwarmState = {
-  sessions: SwarmSession[]
+  sessions: Array<SwarmSession>
   isConnected: boolean
   lastFetchedAt: number
   error: string | null
@@ -109,7 +110,7 @@ export const useSwarmStore = create<SwarmState>((set, get) => ({
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
 
-      const rawSessions: GatewaySession[] =
+      const rawSessions: Array<GatewaySession> =
         json?.data?.sessions ?? json?.sessions ?? []
 
       // Only show subagent sessions in the swarm (not main chat, cron, etc.)

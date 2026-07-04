@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
+import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
 import {
   DialogContent,
+  DialogDescription,
   DialogRoot,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { ClaudeTask, CreateTaskInput, TaskColumn, TaskPriority, TaskAssignee } from '@/lib/tasks-api'
 import { COLUMN_LABELS, COLUMN_ORDER } from '@/lib/tasks-api'
 
 type Props = {

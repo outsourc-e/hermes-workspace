@@ -408,7 +408,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         typeof window !== 'undefined' &&
         window.localStorage?.getItem('hermes:debug:sse') === '1'
       ) {
-        // eslint-disable-next-line no-console
+
         console.log(
           '[hermes-sse]',
           event,

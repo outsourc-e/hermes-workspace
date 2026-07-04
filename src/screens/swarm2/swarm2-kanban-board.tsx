@@ -10,7 +10,7 @@ type SwarmKanbanCard = {
   id: string
   title: string
   spec: string
-  acceptanceCriteria: string[]
+  acceptanceCriteria: Array<string>
   assignedWorker: string | null
   reviewer: string | null
   status: KanbanLane
@@ -28,7 +28,7 @@ type KanbanWorker = {
 }
 
 type KanbanBackendMeta = {
-  id: 'local' | 'claude'
+  id: 'local' | 'claude' | 'hermes-proxy'
   label: string
   detected: boolean
   writable: boolean
@@ -138,7 +138,7 @@ async function fetchKanbanCards(): Promise<{ cards: Array<SwarmKanbanCard>; back
 async function createKanbanCard(input: {
   title: string
   spec: string
-  acceptanceCriteria: string[]
+  acceptanceCriteria: Array<string>
   assignedWorker: string | null
   reviewer: string | null
   status: KanbanLane
@@ -165,7 +165,7 @@ async function updateKanbanCard(id: string, updates: Partial<SwarmKanbanCard>): 
   return data.card
 }
 
-function splitCriteria(value: string): string[] {
+function splitCriteria(value: string): Array<string> {
   return value
     .split('\n')
     .map((line) => line.replace(/^[-*]\s*/, '').trim())

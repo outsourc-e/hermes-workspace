@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type {SessionHistoryMessage} from '@/lib/gateway-api';
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import {
+
   fetchSessionHistory,
   sendToSession,
-  steerAgent,
-  type SessionHistoryMessage,
+  steerAgent
 } from '@/lib/gateway-api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ export function AgentChatPanel({
   isRunning,
   onClose,
 }: AgentChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<Array<ChatMessage>>([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(false)

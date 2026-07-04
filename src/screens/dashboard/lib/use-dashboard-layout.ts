@@ -172,7 +172,7 @@ function readLayout(): StoredLayout {
     const valid = new Set<WidgetId>(WIDGET_CATALOG.map((w) => w.id))
     const incoming = Array.isArray(parsed.hidden) ? parsed.hidden : []
     const filtered = incoming.filter((id): id is WidgetId =>
-      valid.has(id as WidgetId),
+      valid.has(id),
     )
     // Schema migration: when we introduce new widgets that should be
     // off-by-default, bump STORAGE_VERSION and union the prior user

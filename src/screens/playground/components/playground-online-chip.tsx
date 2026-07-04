@@ -84,7 +84,6 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
       window.removeEventListener('hermes-playground-count', onCount)
       window.removeEventListener('hermes-playground-transport', onTransport)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Hide entirely when no stats URL configured AND no WS event ever arrived.

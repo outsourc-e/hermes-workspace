@@ -3,20 +3,20 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
+  useRouterState,
 } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
+import { getRootSurfaceState } from './-root-layout-state'
+import type {AuthStatus} from '@/lib/claude-auth';
 import { SearchModal } from '@/components/search/search-modal'
 import { UsageMeter } from '@/components/usage-meter'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import { WorkspaceShell } from '@/components/workspace-shell'
-import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
-import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
-import { UpdateCenterNotifier } from '@/components/update-center-notifier'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
 import { useApplyChatWidth } from '@/hooks/use-chat-settings'
 import {
@@ -26,8 +26,8 @@ import {
 } from '@/components/onboarding/claude-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
-import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
-import { getRootSurfaceState } from './-root-layout-state'
+import {  fetchClaudeAuthStatus } from '@/lib/claude-auth'
+import { isTruthyWarRoomFlag } from '@/lib/war-room/living-v3/route-flags'
 
 const APP_CSP = [
   "default-src 'self'",
@@ -36,9 +36,9 @@ const APP_CSP = [
   "form-action 'self'",
   // frame-ancestors is ignored in meta CSP and must be sent as an HTTP header.
   "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
   "img-src 'self' data: blob: https:",
-  "font-src 'self' data: https://fonts.gstatic.com",
+  "font-src 'self' data:",
   "connect-src 'self' ws: wss: http: https:",
   "worker-src 'self' blob:",
   "media-src 'self' blob: data:",
@@ -257,6 +257,12 @@ export async function unregisterServiceWorkers({
 }
 
 function RootLayout() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const routeSearch = useRouterState({
+    select: (state) => state.location.search as Record<string, unknown>,
+  })
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null,
   )
@@ -348,6 +354,12 @@ function RootLayout() {
   }, [])
 
   const rootSurfaceState = getRootSurfaceState(onboardingComplete, authStatus)
+  const isWarRoomFocusMode =
+    pathname.startsWith('/war-room') &&
+    (isTruthyWarRoomFlag(routeSearch.etsyOps) ||
+      isTruthyWarRoomFlag(routeSearch.goblinOps) ||
+      isTruthyWarRoomFlag(routeSearch.goblinFocus) ||
+      isTruthyWarRoomFlag(routeSearch.livingV3))
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -370,15 +382,13 @@ function RootLayout() {
           <SearchModal />
           {/* UsageMeter must be mounted at root so the OPEN_USAGE event from
               the search modal's Usage tile has a listener. See #258. */}
-          <UsageMeter />
+          <div hidden={isWarRoomFocusMode}>
+            <UsageMeter />
+          </div>
           <KeyboardShortcutsModal />
-          <UpdateCenterNotifier />
-          {rootSurfaceState.showPostOnboardingOverlays ? (
-            <>
-              <MobilePromptTrigger />
-              <OnboardingTour />
-            </>
-          ) : null}
+          {/* Local stability mode: update/mobile/onboarding popups were covering
+              the right-side chat panel and making it look broken. Keep these
+              non-essential overlays unmounted in this Workspace setup. */}
         </>
       ) : null}
     </QueryClientProvider>
@@ -420,6 +430,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             __html: wrapInlineScript(`
           (function(){
             if (document.getElementById('splash-screen')) return;
+            if (window.location && window.location.pathname === '/war-room') return;
             var bg = '#031A1A', txt = '#F8F1E3', muted = '#9CB2AE', accent = '#FFAC02';
             try {
               var theme = localStorage.getItem('${THEME_STORAGE_KEY}') || '${DEFAULT_THEME}';

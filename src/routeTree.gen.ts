@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WarRoomRouteImport } from './routes/war-room'
 import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as Swarm2RouteImport } from './routes/swarm2'
@@ -16,6 +17,8 @@ import { Route as SwarmRouteImport } from './routes/swarm'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfilesRouteImport } from './routes/profiles'
+import { Route as ProductResearchRouteImport } from './routes/product-research'
+import { Route as ProductIntelligenceRouteImport } from './routes/product-intelligence'
 import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as MemoryRouteImport } from './routes/memory'
@@ -31,7 +34,9 @@ import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
+import { Route as ApiWorkspaceHealthRouteImport } from './routes/api/workspace-health'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
+import { Route as ApiWarRoomEtsyOpsRouteImport } from './routes/api/war-room-etsy-ops'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
@@ -66,6 +71,8 @@ import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-hist
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
+import { Route as ApiProductResearchRouteImport } from './routes/api/product-research'
+import { Route as ApiProductIntelligenceRouteImport } from './routes/api/product-intelligence'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
 import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-npc'
@@ -78,6 +85,7 @@ import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-provid
 import { Route as ApiIntegrationsRouteImport } from './routes/api/integrations'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
+import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
@@ -95,6 +103,26 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as ApiWarRoomToolRouterRouteImport } from './routes/api/war-room/tool-router'
+import { Route as ApiWarRoomTerraSlicePlanRouteImport } from './routes/api/war-room/terra-slice-plan'
+import { Route as ApiWarRoomTerraPrinterFrameRouteImport } from './routes/api/war-room/terra-printer-frame'
+import { Route as ApiWarRoomTerraPrinterRouteImport } from './routes/api/war-room/terra-printer'
+import { Route as ApiWarRoomTerraPrintQaRouteImport } from './routes/api/war-room/terra-print-qa'
+import { Route as ApiWarRoomTerraModelSearchRouteImport } from './routes/api/war-room/terra-model-search'
+import { Route as ApiWarRoomTerraCapabilitiesRouteImport } from './routes/api/war-room/terra-capabilities'
+import { Route as ApiWarRoomTerraAssetsRouteImport } from './routes/api/war-room/terra-assets'
+import { Route as ApiWarRoomTasksRouteImport } from './routes/api/war-room/tasks'
+import { Route as ApiWarRoomStationActionRouterRouteImport } from './routes/api/war-room/station-action-router'
+import { Route as ApiWarRoomStateRouteImport } from './routes/api/war-room/state'
+import { Route as ApiWarRoomOracleAluraSearchRouteImport } from './routes/api/war-room/oracle-alura-search'
+import { Route as ApiWarRoomIntentsRouteImport } from './routes/api/war-room/intents'
+import { Route as ApiWarRoomGoblinAnalyticsRouteImport } from './routes/api/war-room/goblin-analytics'
+import { Route as ApiWarRoomEventsRouteImport } from './routes/api/war-room/events'
+import { Route as ApiWarRoomEtsySheetIntakeRouteImport } from './routes/api/war-room/etsy-sheet-intake'
+import { Route as ApiWarRoomEtsyEvidenceRouteImport } from './routes/api/war-room/etsy-evidence'
+import { Route as ApiWarRoomCapabilitiesRouteImport } from './routes/api/war-room/capabilities'
+import { Route as ApiWarRoomApprovalsRouteImport } from './routes/api/war-room/approvals'
+import { Route as ApiWarRoomAgentControlRouteImport } from './routes/api/war-room/agent-control'
 import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
 import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
 import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
@@ -136,11 +164,33 @@ import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-ta
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
 import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
+import { Route as ApiWarRoomWorkspaceKernelStateRouteImport } from './routes/api/war-room/workspace-kernel/state'
+import { Route as ApiWarRoomWorkspaceKernelRouteActionRouteImport } from './routes/api/war-room/workspace-kernel/route-action'
+import { Route as ApiWarRoomWorkspaceKernelResetLocalDemoRouteImport } from './routes/api/war-room/workspace-kernel/reset-local-demo'
+import { Route as ApiWarRoomWorkspaceKernelEventsRouteImport } from './routes/api/war-room/workspace-kernel/events'
+import { Route as ApiWarRoomObsidianContextPacketRouteImport } from './routes/api/war-room/obsidian-context/packet'
+import { Route as ApiWarRoomEtsyLiveStateRouteImport } from './routes/api/war-room/etsy-live/state'
+import { Route as ApiWarRoomEtsyLiveSharedRoomRouteImport } from './routes/api/war-room/etsy-live/shared-room'
+import { Route as ApiWarRoomEtsyLiveScoutRouteImport } from './routes/api/war-room/etsy-live/scout'
+import { Route as ApiWarRoomCouncilRunRouteImport } from './routes/api/war-room/council/run'
+import { Route as ApiWarRoomCouncilFollowUpRouteImport } from './routes/api/war-room/council/follow-up'
+import { Route as ApiWarRoomAgentControlRunAthenaRouteImport } from './routes/api/war-room/agent-control/run-athena'
+import { Route as ApiWarRoomAgentControlRunAgentRouteImport } from './routes/api/war-room/agent-control/run-agent'
+import { Route as ApiWarRoomAgentControlLocalOnlyRouteImport } from './routes/api/war-room/agent-control/local-only'
+import { Route as ApiWarRoomAgentControlLiveChatRouteImport } from './routes/api/war-room/agent-control/live-chat'
+import { Route as ApiWarRoomAgentControlFreezeRouteImport } from './routes/api/war-room/agent-control/freeze'
+import { Route as ApiWarRoomAgentControlDisconnectRouteImport } from './routes/api/war-room/agent-control/disconnect'
+import { Route as ApiWarRoomAgentControlArmRouteImport } from './routes/api/war-room/agent-control/arm'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
 
+const WarRoomRoute = WarRoomRouteImport.update({
+  id: '/war-room',
+  path: '/war-room',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
   path: '/terminal',
@@ -174,6 +224,16 @@ const SettingsRoute = SettingsRouteImport.update({
 const ProfilesRoute = ProfilesRouteImport.update({
   id: '/profiles',
   path: '/profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductResearchRoute = ProductResearchRouteImport.update({
+  id: '/product-research',
+  path: '/product-research',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductIntelligenceRoute = ProductIntelligenceRouteImport.update({
+  id: '/product-intelligence',
+  path: '/product-intelligence',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaygroundRoute = PlaygroundRouteImport.update({
@@ -251,9 +311,19 @@ const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   path: '/chat/$sessionKey',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceHealthRoute = ApiWorkspaceHealthRouteImport.update({
+  id: '/api/workspace-health',
+  path: '/api/workspace-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
   id: '/api/workspace',
   path: '/api/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomEtsyOpsRoute = ApiWarRoomEtsyOpsRouteImport.update({
+  id: '/api/war-room-etsy-ops',
+  path: '/api/war-room-etsy-ops',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
@@ -427,6 +497,16 @@ const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
   path: '/api/provider-usage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProductResearchRoute = ApiProductResearchRouteImport.update({
+  id: '/api/product-research',
+  path: '/api/product-research',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProductIntelligenceRoute = ApiProductIntelligenceRouteImport.update({
+  id: '/api/product-intelligence',
+  path: '/api/product-intelligence',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
   id: '/api/preview-file',
   path: '/api/preview-file',
@@ -485,6 +565,11 @@ const ApiHistoryRoute = ApiHistoryRouteImport.update({
 const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
   id: '/api/gateway-status',
   path: '/api/gateway-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGatewayReprobeRoute = ApiGatewayReprobeRouteImport.update({
+  id: '/api/gateway-reprobe',
+  path: '/api/gateway-reprobe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFilesRoute = ApiFilesRouteImport.update({
@@ -570,6 +655,114 @@ const ApiAuthRoute = ApiAuthRouteImport.update({
 const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   id: '/api/artifacts',
   path: '/api/artifacts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomToolRouterRoute = ApiWarRoomToolRouterRouteImport.update({
+  id: '/api/war-room/tool-router',
+  path: '/api/war-room/tool-router',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomTerraSlicePlanRoute =
+  ApiWarRoomTerraSlicePlanRouteImport.update({
+    id: '/api/war-room/terra-slice-plan',
+    path: '/api/war-room/terra-slice-plan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomTerraPrinterFrameRoute =
+  ApiWarRoomTerraPrinterFrameRouteImport.update({
+    id: '/api/war-room/terra-printer-frame',
+    path: '/api/war-room/terra-printer-frame',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomTerraPrinterRoute = ApiWarRoomTerraPrinterRouteImport.update({
+  id: '/api/war-room/terra-printer',
+  path: '/api/war-room/terra-printer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomTerraPrintQaRoute = ApiWarRoomTerraPrintQaRouteImport.update({
+  id: '/api/war-room/terra-print-qa',
+  path: '/api/war-room/terra-print-qa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomTerraModelSearchRoute =
+  ApiWarRoomTerraModelSearchRouteImport.update({
+    id: '/api/war-room/terra-model-search',
+    path: '/api/war-room/terra-model-search',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomTerraCapabilitiesRoute =
+  ApiWarRoomTerraCapabilitiesRouteImport.update({
+    id: '/api/war-room/terra-capabilities',
+    path: '/api/war-room/terra-capabilities',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomTerraAssetsRoute = ApiWarRoomTerraAssetsRouteImport.update({
+  id: '/api/war-room/terra-assets',
+  path: '/api/war-room/terra-assets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomTasksRoute = ApiWarRoomTasksRouteImport.update({
+  id: '/api/war-room/tasks',
+  path: '/api/war-room/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomStationActionRouterRoute =
+  ApiWarRoomStationActionRouterRouteImport.update({
+    id: '/api/war-room/station-action-router',
+    path: '/api/war-room/station-action-router',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomStateRoute = ApiWarRoomStateRouteImport.update({
+  id: '/api/war-room/state',
+  path: '/api/war-room/state',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomOracleAluraSearchRoute =
+  ApiWarRoomOracleAluraSearchRouteImport.update({
+    id: '/api/war-room/oracle-alura-search',
+    path: '/api/war-room/oracle-alura-search',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomIntentsRoute = ApiWarRoomIntentsRouteImport.update({
+  id: '/api/war-room/intents',
+  path: '/api/war-room/intents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomGoblinAnalyticsRoute =
+  ApiWarRoomGoblinAnalyticsRouteImport.update({
+    id: '/api/war-room/goblin-analytics',
+    path: '/api/war-room/goblin-analytics',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomEventsRoute = ApiWarRoomEventsRouteImport.update({
+  id: '/api/war-room/events',
+  path: '/api/war-room/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomEtsySheetIntakeRoute =
+  ApiWarRoomEtsySheetIntakeRouteImport.update({
+    id: '/api/war-room/etsy-sheet-intake',
+    path: '/api/war-room/etsy-sheet-intake',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomEtsyEvidenceRoute = ApiWarRoomEtsyEvidenceRouteImport.update({
+  id: '/api/war-room/etsy-evidence',
+  path: '/api/war-room/etsy-evidence',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomCapabilitiesRoute = ApiWarRoomCapabilitiesRouteImport.update({
+  id: '/api/war-room/capabilities',
+  path: '/api/war-room/capabilities',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomApprovalsRoute = ApiWarRoomApprovalsRouteImport.update({
+  id: '/api/war-room/approvals',
+  path: '/api/war-room/approvals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomAgentControlRoute = ApiWarRoomAgentControlRouteImport.update({
+  id: '/api/war-room/agent-control',
+  path: '/api/war-room/agent-control',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUpdateWorkspaceRoute = ApiUpdateWorkspaceRouteImport.update({
@@ -777,6 +970,105 @@ const ApiArtifactsArtifactIdRoute = ApiArtifactsArtifactIdRouteImport.update({
   path: '/$artifactId',
   getParentRoute: () => ApiArtifactsRoute,
 } as any)
+const ApiWarRoomWorkspaceKernelStateRoute =
+  ApiWarRoomWorkspaceKernelStateRouteImport.update({
+    id: '/api/war-room/workspace-kernel/state',
+    path: '/api/war-room/workspace-kernel/state',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomWorkspaceKernelRouteActionRoute =
+  ApiWarRoomWorkspaceKernelRouteActionRouteImport.update({
+    id: '/api/war-room/workspace-kernel/route-action',
+    path: '/api/war-room/workspace-kernel/route-action',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomWorkspaceKernelResetLocalDemoRoute =
+  ApiWarRoomWorkspaceKernelResetLocalDemoRouteImport.update({
+    id: '/api/war-room/workspace-kernel/reset-local-demo',
+    path: '/api/war-room/workspace-kernel/reset-local-demo',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomWorkspaceKernelEventsRoute =
+  ApiWarRoomWorkspaceKernelEventsRouteImport.update({
+    id: '/api/war-room/workspace-kernel/events',
+    path: '/api/war-room/workspace-kernel/events',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomObsidianContextPacketRoute =
+  ApiWarRoomObsidianContextPacketRouteImport.update({
+    id: '/api/war-room/obsidian-context/packet',
+    path: '/api/war-room/obsidian-context/packet',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomEtsyLiveStateRoute = ApiWarRoomEtsyLiveStateRouteImport.update({
+  id: '/api/war-room/etsy-live/state',
+  path: '/api/war-room/etsy-live/state',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomEtsyLiveSharedRoomRoute =
+  ApiWarRoomEtsyLiveSharedRoomRouteImport.update({
+    id: '/api/war-room/etsy-live/shared-room',
+    path: '/api/war-room/etsy-live/shared-room',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomEtsyLiveScoutRoute = ApiWarRoomEtsyLiveScoutRouteImport.update({
+  id: '/api/war-room/etsy-live/scout',
+  path: '/api/war-room/etsy-live/scout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomCouncilRunRoute = ApiWarRoomCouncilRunRouteImport.update({
+  id: '/api/war-room/council/run',
+  path: '/api/war-room/council/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomCouncilFollowUpRoute =
+  ApiWarRoomCouncilFollowUpRouteImport.update({
+    id: '/api/war-room/council/follow-up',
+    path: '/api/war-room/council/follow-up',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomAgentControlRunAthenaRoute =
+  ApiWarRoomAgentControlRunAthenaRouteImport.update({
+    id: '/run-athena',
+    path: '/run-athena',
+    getParentRoute: () => ApiWarRoomAgentControlRoute,
+  } as any)
+const ApiWarRoomAgentControlRunAgentRoute =
+  ApiWarRoomAgentControlRunAgentRouteImport.update({
+    id: '/run-agent',
+    path: '/run-agent',
+    getParentRoute: () => ApiWarRoomAgentControlRoute,
+  } as any)
+const ApiWarRoomAgentControlLocalOnlyRoute =
+  ApiWarRoomAgentControlLocalOnlyRouteImport.update({
+    id: '/local-only',
+    path: '/local-only',
+    getParentRoute: () => ApiWarRoomAgentControlRoute,
+  } as any)
+const ApiWarRoomAgentControlLiveChatRoute =
+  ApiWarRoomAgentControlLiveChatRouteImport.update({
+    id: '/live-chat',
+    path: '/live-chat',
+    getParentRoute: () => ApiWarRoomAgentControlRoute,
+  } as any)
+const ApiWarRoomAgentControlFreezeRoute =
+  ApiWarRoomAgentControlFreezeRouteImport.update({
+    id: '/freeze',
+    path: '/freeze',
+    getParentRoute: () => ApiWarRoomAgentControlRoute,
+  } as any)
+const ApiWarRoomAgentControlDisconnectRoute =
+  ApiWarRoomAgentControlDisconnectRouteImport.update({
+    id: '/disconnect',
+    path: '/disconnect',
+    getParentRoute: () => ApiWarRoomAgentControlRoute,
+  } as any)
+const ApiWarRoomAgentControlArmRoute =
+  ApiWarRoomAgentControlArmRouteImport.update({
+    id: '/arm',
+    path: '/arm',
+    getParentRoute: () => ApiWarRoomAgentControlRoute,
+  } as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -812,6 +1104,8 @@ export interface FileRoutesByFullPath {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
+  '/product-intelligence': typeof ProductIntelligenceRoute
+  '/product-research': typeof ProductResearchRoute
   '/profiles': typeof ProfilesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -819,6 +1113,7 @@ export interface FileRoutesByFullPath {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/war-room': typeof WarRoomRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -836,6 +1131,7 @@ export interface FileRoutesByFullPath {
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
@@ -848,6 +1144,8 @@ export interface FileRoutesByFullPath {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/product-intelligence': typeof ApiProductIntelligenceRoute
+  '/api/product-research': typeof ApiProductResearchRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -882,7 +1180,9 @@ export interface FileRoutesByFullPath {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/war-room-etsy-ops': typeof ApiWarRoomEtsyOpsRoute
   '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/workspace-health': typeof ApiWorkspaceHealthRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -928,10 +1228,47 @@ export interface FileRoutesByFullPath {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/war-room/agent-control': typeof ApiWarRoomAgentControlRouteWithChildren
+  '/api/war-room/approvals': typeof ApiWarRoomApprovalsRoute
+  '/api/war-room/capabilities': typeof ApiWarRoomCapabilitiesRoute
+  '/api/war-room/etsy-evidence': typeof ApiWarRoomEtsyEvidenceRoute
+  '/api/war-room/etsy-sheet-intake': typeof ApiWarRoomEtsySheetIntakeRoute
+  '/api/war-room/events': typeof ApiWarRoomEventsRoute
+  '/api/war-room/goblin-analytics': typeof ApiWarRoomGoblinAnalyticsRoute
+  '/api/war-room/intents': typeof ApiWarRoomIntentsRoute
+  '/api/war-room/oracle-alura-search': typeof ApiWarRoomOracleAluraSearchRoute
+  '/api/war-room/state': typeof ApiWarRoomStateRoute
+  '/api/war-room/station-action-router': typeof ApiWarRoomStationActionRouterRoute
+  '/api/war-room/tasks': typeof ApiWarRoomTasksRoute
+  '/api/war-room/terra-assets': typeof ApiWarRoomTerraAssetsRoute
+  '/api/war-room/terra-capabilities': typeof ApiWarRoomTerraCapabilitiesRoute
+  '/api/war-room/terra-model-search': typeof ApiWarRoomTerraModelSearchRoute
+  '/api/war-room/terra-print-qa': typeof ApiWarRoomTerraPrintQaRoute
+  '/api/war-room/terra-printer': typeof ApiWarRoomTerraPrinterRoute
+  '/api/war-room/terra-printer-frame': typeof ApiWarRoomTerraPrinterFrameRoute
+  '/api/war-room/terra-slice-plan': typeof ApiWarRoomTerraSlicePlanRoute
+  '/api/war-room/tool-router': typeof ApiWarRoomToolRouterRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/war-room/agent-control/arm': typeof ApiWarRoomAgentControlArmRoute
+  '/api/war-room/agent-control/disconnect': typeof ApiWarRoomAgentControlDisconnectRoute
+  '/api/war-room/agent-control/freeze': typeof ApiWarRoomAgentControlFreezeRoute
+  '/api/war-room/agent-control/live-chat': typeof ApiWarRoomAgentControlLiveChatRoute
+  '/api/war-room/agent-control/local-only': typeof ApiWarRoomAgentControlLocalOnlyRoute
+  '/api/war-room/agent-control/run-agent': typeof ApiWarRoomAgentControlRunAgentRoute
+  '/api/war-room/agent-control/run-athena': typeof ApiWarRoomAgentControlRunAthenaRoute
+  '/api/war-room/council/follow-up': typeof ApiWarRoomCouncilFollowUpRoute
+  '/api/war-room/council/run': typeof ApiWarRoomCouncilRunRoute
+  '/api/war-room/etsy-live/scout': typeof ApiWarRoomEtsyLiveScoutRoute
+  '/api/war-room/etsy-live/shared-room': typeof ApiWarRoomEtsyLiveSharedRoomRoute
+  '/api/war-room/etsy-live/state': typeof ApiWarRoomEtsyLiveStateRoute
+  '/api/war-room/obsidian-context/packet': typeof ApiWarRoomObsidianContextPacketRoute
+  '/api/war-room/workspace-kernel/events': typeof ApiWarRoomWorkspaceKernelEventsRoute
+  '/api/war-room/workspace-kernel/reset-local-demo': typeof ApiWarRoomWorkspaceKernelResetLocalDemoRoute
+  '/api/war-room/workspace-kernel/route-action': typeof ApiWarRoomWorkspaceKernelRouteActionRoute
+  '/api/war-room/workspace-kernel/state': typeof ApiWarRoomWorkspaceKernelStateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -945,12 +1282,15 @@ export interface FileRoutesByTo {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
+  '/product-intelligence': typeof ProductIntelligenceRoute
+  '/product-research': typeof ProductResearchRoute
   '/profiles': typeof ProfilesRoute
   '/skills': typeof SkillsRoute
   '/swarm': typeof SwarmRoute
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/war-room': typeof WarRoomRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -968,6 +1308,7 @@ export interface FileRoutesByTo {
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
@@ -980,6 +1321,8 @@ export interface FileRoutesByTo {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/product-intelligence': typeof ApiProductIntelligenceRoute
+  '/api/product-research': typeof ApiProductResearchRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1014,7 +1357,9 @@ export interface FileRoutesByTo {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/war-room-etsy-ops': typeof ApiWarRoomEtsyOpsRoute
   '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/workspace-health': typeof ApiWorkspaceHealthRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
@@ -1060,10 +1405,47 @@ export interface FileRoutesByTo {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/war-room/agent-control': typeof ApiWarRoomAgentControlRouteWithChildren
+  '/api/war-room/approvals': typeof ApiWarRoomApprovalsRoute
+  '/api/war-room/capabilities': typeof ApiWarRoomCapabilitiesRoute
+  '/api/war-room/etsy-evidence': typeof ApiWarRoomEtsyEvidenceRoute
+  '/api/war-room/etsy-sheet-intake': typeof ApiWarRoomEtsySheetIntakeRoute
+  '/api/war-room/events': typeof ApiWarRoomEventsRoute
+  '/api/war-room/goblin-analytics': typeof ApiWarRoomGoblinAnalyticsRoute
+  '/api/war-room/intents': typeof ApiWarRoomIntentsRoute
+  '/api/war-room/oracle-alura-search': typeof ApiWarRoomOracleAluraSearchRoute
+  '/api/war-room/state': typeof ApiWarRoomStateRoute
+  '/api/war-room/station-action-router': typeof ApiWarRoomStationActionRouterRoute
+  '/api/war-room/tasks': typeof ApiWarRoomTasksRoute
+  '/api/war-room/terra-assets': typeof ApiWarRoomTerraAssetsRoute
+  '/api/war-room/terra-capabilities': typeof ApiWarRoomTerraCapabilitiesRoute
+  '/api/war-room/terra-model-search': typeof ApiWarRoomTerraModelSearchRoute
+  '/api/war-room/terra-print-qa': typeof ApiWarRoomTerraPrintQaRoute
+  '/api/war-room/terra-printer': typeof ApiWarRoomTerraPrinterRoute
+  '/api/war-room/terra-printer-frame': typeof ApiWarRoomTerraPrinterFrameRoute
+  '/api/war-room/terra-slice-plan': typeof ApiWarRoomTerraSlicePlanRoute
+  '/api/war-room/tool-router': typeof ApiWarRoomToolRouterRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/war-room/agent-control/arm': typeof ApiWarRoomAgentControlArmRoute
+  '/api/war-room/agent-control/disconnect': typeof ApiWarRoomAgentControlDisconnectRoute
+  '/api/war-room/agent-control/freeze': typeof ApiWarRoomAgentControlFreezeRoute
+  '/api/war-room/agent-control/live-chat': typeof ApiWarRoomAgentControlLiveChatRoute
+  '/api/war-room/agent-control/local-only': typeof ApiWarRoomAgentControlLocalOnlyRoute
+  '/api/war-room/agent-control/run-agent': typeof ApiWarRoomAgentControlRunAgentRoute
+  '/api/war-room/agent-control/run-athena': typeof ApiWarRoomAgentControlRunAthenaRoute
+  '/api/war-room/council/follow-up': typeof ApiWarRoomCouncilFollowUpRoute
+  '/api/war-room/council/run': typeof ApiWarRoomCouncilRunRoute
+  '/api/war-room/etsy-live/scout': typeof ApiWarRoomEtsyLiveScoutRoute
+  '/api/war-room/etsy-live/shared-room': typeof ApiWarRoomEtsyLiveSharedRoomRoute
+  '/api/war-room/etsy-live/state': typeof ApiWarRoomEtsyLiveStateRoute
+  '/api/war-room/obsidian-context/packet': typeof ApiWarRoomObsidianContextPacketRoute
+  '/api/war-room/workspace-kernel/events': typeof ApiWarRoomWorkspaceKernelEventsRoute
+  '/api/war-room/workspace-kernel/reset-local-demo': typeof ApiWarRoomWorkspaceKernelResetLocalDemoRoute
+  '/api/war-room/workspace-kernel/route-action': typeof ApiWarRoomWorkspaceKernelRouteActionRoute
+  '/api/war-room/workspace-kernel/state': typeof ApiWarRoomWorkspaceKernelStateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1078,6 +1460,8 @@ export interface FileRoutesById {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
+  '/product-intelligence': typeof ProductIntelligenceRoute
+  '/product-research': typeof ProductResearchRoute
   '/profiles': typeof ProfilesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1085,6 +1469,7 @@ export interface FileRoutesById {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/war-room': typeof WarRoomRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1102,6 +1487,7 @@ export interface FileRoutesById {
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/integrations': typeof ApiIntegrationsRoute
@@ -1114,6 +1500,8 @@ export interface FileRoutesById {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/product-intelligence': typeof ApiProductIntelligenceRoute
+  '/api/product-research': typeof ApiProductResearchRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1148,7 +1536,9 @@ export interface FileRoutesById {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/war-room-etsy-ops': typeof ApiWarRoomEtsyOpsRoute
   '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/workspace-health': typeof ApiWorkspaceHealthRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -1194,10 +1584,47 @@ export interface FileRoutesById {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/war-room/agent-control': typeof ApiWarRoomAgentControlRouteWithChildren
+  '/api/war-room/approvals': typeof ApiWarRoomApprovalsRoute
+  '/api/war-room/capabilities': typeof ApiWarRoomCapabilitiesRoute
+  '/api/war-room/etsy-evidence': typeof ApiWarRoomEtsyEvidenceRoute
+  '/api/war-room/etsy-sheet-intake': typeof ApiWarRoomEtsySheetIntakeRoute
+  '/api/war-room/events': typeof ApiWarRoomEventsRoute
+  '/api/war-room/goblin-analytics': typeof ApiWarRoomGoblinAnalyticsRoute
+  '/api/war-room/intents': typeof ApiWarRoomIntentsRoute
+  '/api/war-room/oracle-alura-search': typeof ApiWarRoomOracleAluraSearchRoute
+  '/api/war-room/state': typeof ApiWarRoomStateRoute
+  '/api/war-room/station-action-router': typeof ApiWarRoomStationActionRouterRoute
+  '/api/war-room/tasks': typeof ApiWarRoomTasksRoute
+  '/api/war-room/terra-assets': typeof ApiWarRoomTerraAssetsRoute
+  '/api/war-room/terra-capabilities': typeof ApiWarRoomTerraCapabilitiesRoute
+  '/api/war-room/terra-model-search': typeof ApiWarRoomTerraModelSearchRoute
+  '/api/war-room/terra-print-qa': typeof ApiWarRoomTerraPrintQaRoute
+  '/api/war-room/terra-printer': typeof ApiWarRoomTerraPrinterRoute
+  '/api/war-room/terra-printer-frame': typeof ApiWarRoomTerraPrinterFrameRoute
+  '/api/war-room/terra-slice-plan': typeof ApiWarRoomTerraSlicePlanRoute
+  '/api/war-room/tool-router': typeof ApiWarRoomToolRouterRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/war-room/agent-control/arm': typeof ApiWarRoomAgentControlArmRoute
+  '/api/war-room/agent-control/disconnect': typeof ApiWarRoomAgentControlDisconnectRoute
+  '/api/war-room/agent-control/freeze': typeof ApiWarRoomAgentControlFreezeRoute
+  '/api/war-room/agent-control/live-chat': typeof ApiWarRoomAgentControlLiveChatRoute
+  '/api/war-room/agent-control/local-only': typeof ApiWarRoomAgentControlLocalOnlyRoute
+  '/api/war-room/agent-control/run-agent': typeof ApiWarRoomAgentControlRunAgentRoute
+  '/api/war-room/agent-control/run-athena': typeof ApiWarRoomAgentControlRunAthenaRoute
+  '/api/war-room/council/follow-up': typeof ApiWarRoomCouncilFollowUpRoute
+  '/api/war-room/council/run': typeof ApiWarRoomCouncilRunRoute
+  '/api/war-room/etsy-live/scout': typeof ApiWarRoomEtsyLiveScoutRoute
+  '/api/war-room/etsy-live/shared-room': typeof ApiWarRoomEtsyLiveSharedRoomRoute
+  '/api/war-room/etsy-live/state': typeof ApiWarRoomEtsyLiveStateRoute
+  '/api/war-room/obsidian-context/packet': typeof ApiWarRoomObsidianContextPacketRoute
+  '/api/war-room/workspace-kernel/events': typeof ApiWarRoomWorkspaceKernelEventsRoute
+  '/api/war-room/workspace-kernel/reset-local-demo': typeof ApiWarRoomWorkspaceKernelResetLocalDemoRoute
+  '/api/war-room/workspace-kernel/route-action': typeof ApiWarRoomWorkspaceKernelRouteActionRoute
+  '/api/war-room/workspace-kernel/state': typeof ApiWarRoomWorkspaceKernelStateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1213,6 +1640,8 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/playground'
+    | '/product-intelligence'
+    | '/product-research'
     | '/profiles'
     | '/settings'
     | '/skills'
@@ -1220,6 +1649,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/war-room'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1237,6 +1667,7 @@ export interface FileRouteTypes {
     | '/api/crew-status'
     | '/api/events'
     | '/api/files'
+    | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/history'
     | '/api/integrations'
@@ -1249,6 +1680,8 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/product-intelligence'
+    | '/api/product-research'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1283,7 +1716,9 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/war-room-etsy-ops'
     | '/api/workspace'
+    | '/api/workspace-health'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
@@ -1329,10 +1764,47 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/war-room/agent-control'
+    | '/api/war-room/approvals'
+    | '/api/war-room/capabilities'
+    | '/api/war-room/etsy-evidence'
+    | '/api/war-room/etsy-sheet-intake'
+    | '/api/war-room/events'
+    | '/api/war-room/goblin-analytics'
+    | '/api/war-room/intents'
+    | '/api/war-room/oracle-alura-search'
+    | '/api/war-room/state'
+    | '/api/war-room/station-action-router'
+    | '/api/war-room/tasks'
+    | '/api/war-room/terra-assets'
+    | '/api/war-room/terra-capabilities'
+    | '/api/war-room/terra-model-search'
+    | '/api/war-room/terra-print-qa'
+    | '/api/war-room/terra-printer'
+    | '/api/war-room/terra-printer-frame'
+    | '/api/war-room/terra-slice-plan'
+    | '/api/war-room/tool-router'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/war-room/agent-control/arm'
+    | '/api/war-room/agent-control/disconnect'
+    | '/api/war-room/agent-control/freeze'
+    | '/api/war-room/agent-control/live-chat'
+    | '/api/war-room/agent-control/local-only'
+    | '/api/war-room/agent-control/run-agent'
+    | '/api/war-room/agent-control/run-athena'
+    | '/api/war-room/council/follow-up'
+    | '/api/war-room/council/run'
+    | '/api/war-room/etsy-live/scout'
+    | '/api/war-room/etsy-live/shared-room'
+    | '/api/war-room/etsy-live/state'
+    | '/api/war-room/obsidian-context/packet'
+    | '/api/war-room/workspace-kernel/events'
+    | '/api/war-room/workspace-kernel/reset-local-demo'
+    | '/api/war-room/workspace-kernel/route-action'
+    | '/api/war-room/workspace-kernel/state'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1346,12 +1818,15 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/playground'
+    | '/product-intelligence'
+    | '/product-research'
     | '/profiles'
     | '/skills'
     | '/swarm'
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/war-room'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1369,6 +1844,7 @@ export interface FileRouteTypes {
     | '/api/crew-status'
     | '/api/events'
     | '/api/files'
+    | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/history'
     | '/api/integrations'
@@ -1381,6 +1857,8 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/product-intelligence'
+    | '/api/product-research'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1415,7 +1893,9 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/war-room-etsy-ops'
     | '/api/workspace'
+    | '/api/workspace-health'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat'
@@ -1461,10 +1941,47 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/war-room/agent-control'
+    | '/api/war-room/approvals'
+    | '/api/war-room/capabilities'
+    | '/api/war-room/etsy-evidence'
+    | '/api/war-room/etsy-sheet-intake'
+    | '/api/war-room/events'
+    | '/api/war-room/goblin-analytics'
+    | '/api/war-room/intents'
+    | '/api/war-room/oracle-alura-search'
+    | '/api/war-room/state'
+    | '/api/war-room/station-action-router'
+    | '/api/war-room/tasks'
+    | '/api/war-room/terra-assets'
+    | '/api/war-room/terra-capabilities'
+    | '/api/war-room/terra-model-search'
+    | '/api/war-room/terra-print-qa'
+    | '/api/war-room/terra-printer'
+    | '/api/war-room/terra-printer-frame'
+    | '/api/war-room/terra-slice-plan'
+    | '/api/war-room/tool-router'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/war-room/agent-control/arm'
+    | '/api/war-room/agent-control/disconnect'
+    | '/api/war-room/agent-control/freeze'
+    | '/api/war-room/agent-control/live-chat'
+    | '/api/war-room/agent-control/local-only'
+    | '/api/war-room/agent-control/run-agent'
+    | '/api/war-room/agent-control/run-athena'
+    | '/api/war-room/council/follow-up'
+    | '/api/war-room/council/run'
+    | '/api/war-room/etsy-live/scout'
+    | '/api/war-room/etsy-live/shared-room'
+    | '/api/war-room/etsy-live/state'
+    | '/api/war-room/obsidian-context/packet'
+    | '/api/war-room/workspace-kernel/events'
+    | '/api/war-room/workspace-kernel/reset-local-demo'
+    | '/api/war-room/workspace-kernel/route-action'
+    | '/api/war-room/workspace-kernel/state'
   id:
     | '__root__'
     | '/'
@@ -1478,6 +1995,8 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/playground'
+    | '/product-intelligence'
+    | '/product-research'
     | '/profiles'
     | '/settings'
     | '/skills'
@@ -1485,6 +2004,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/war-room'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1502,6 +2022,7 @@ export interface FileRouteTypes {
     | '/api/crew-status'
     | '/api/events'
     | '/api/files'
+    | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/history'
     | '/api/integrations'
@@ -1514,6 +2035,8 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/product-intelligence'
+    | '/api/product-research'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1548,7 +2071,9 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/war-room-etsy-ops'
     | '/api/workspace'
+    | '/api/workspace-health'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
@@ -1594,10 +2119,47 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/war-room/agent-control'
+    | '/api/war-room/approvals'
+    | '/api/war-room/capabilities'
+    | '/api/war-room/etsy-evidence'
+    | '/api/war-room/etsy-sheet-intake'
+    | '/api/war-room/events'
+    | '/api/war-room/goblin-analytics'
+    | '/api/war-room/intents'
+    | '/api/war-room/oracle-alura-search'
+    | '/api/war-room/state'
+    | '/api/war-room/station-action-router'
+    | '/api/war-room/tasks'
+    | '/api/war-room/terra-assets'
+    | '/api/war-room/terra-capabilities'
+    | '/api/war-room/terra-model-search'
+    | '/api/war-room/terra-print-qa'
+    | '/api/war-room/terra-printer'
+    | '/api/war-room/terra-printer-frame'
+    | '/api/war-room/terra-slice-plan'
+    | '/api/war-room/tool-router'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/war-room/agent-control/arm'
+    | '/api/war-room/agent-control/disconnect'
+    | '/api/war-room/agent-control/freeze'
+    | '/api/war-room/agent-control/live-chat'
+    | '/api/war-room/agent-control/local-only'
+    | '/api/war-room/agent-control/run-agent'
+    | '/api/war-room/agent-control/run-athena'
+    | '/api/war-room/council/follow-up'
+    | '/api/war-room/council/run'
+    | '/api/war-room/etsy-live/scout'
+    | '/api/war-room/etsy-live/shared-room'
+    | '/api/war-room/etsy-live/state'
+    | '/api/war-room/obsidian-context/packet'
+    | '/api/war-room/workspace-kernel/events'
+    | '/api/war-room/workspace-kernel/reset-local-demo'
+    | '/api/war-room/workspace-kernel/route-action'
+    | '/api/war-room/workspace-kernel/state'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1612,6 +2174,8 @@ export interface RootRouteChildren {
   MemoryRoute: typeof MemoryRoute
   OperationsRoute: typeof OperationsRoute
   PlaygroundRoute: typeof PlaygroundRoute
+  ProductIntelligenceRoute: typeof ProductIntelligenceRoute
+  ProductResearchRoute: typeof ProductResearchRoute
   ProfilesRoute: typeof ProfilesRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -1619,6 +2183,7 @@ export interface RootRouteChildren {
   Swarm2Route: typeof Swarm2Route
   TasksRoute: typeof TasksRoute
   TerminalRoute: typeof TerminalRoute
+  WarRoomRoute: typeof WarRoomRoute
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
   ApiAuthRoute: typeof ApiAuthRoute
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
@@ -1636,6 +2201,7 @@ export interface RootRouteChildren {
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
+  ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiIntegrationsRoute: typeof ApiIntegrationsRoute
@@ -1648,6 +2214,8 @@ export interface RootRouteChildren {
   ApiPlaygroundNpcRoute: typeof ApiPlaygroundNpcRoute
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
+  ApiProductIntelligenceRoute: typeof ApiProductIntelligenceRoute
+  ApiProductResearchRoute: typeof ApiProductResearchRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
@@ -1682,7 +2250,9 @@ export interface RootRouteChildren {
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
+  ApiWarRoomEtsyOpsRoute: typeof ApiWarRoomEtsyOpsRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
+  ApiWorkspaceHealthRoute: typeof ApiWorkspaceHealthRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiClaudeProxySplatRoute: typeof ApiClaudeProxySplatRoute
@@ -1706,10 +2276,47 @@ export interface RootRouteChildren {
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
   ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
+  ApiWarRoomAgentControlRoute: typeof ApiWarRoomAgentControlRouteWithChildren
+  ApiWarRoomApprovalsRoute: typeof ApiWarRoomApprovalsRoute
+  ApiWarRoomCapabilitiesRoute: typeof ApiWarRoomCapabilitiesRoute
+  ApiWarRoomEtsyEvidenceRoute: typeof ApiWarRoomEtsyEvidenceRoute
+  ApiWarRoomEtsySheetIntakeRoute: typeof ApiWarRoomEtsySheetIntakeRoute
+  ApiWarRoomEventsRoute: typeof ApiWarRoomEventsRoute
+  ApiWarRoomGoblinAnalyticsRoute: typeof ApiWarRoomGoblinAnalyticsRoute
+  ApiWarRoomIntentsRoute: typeof ApiWarRoomIntentsRoute
+  ApiWarRoomOracleAluraSearchRoute: typeof ApiWarRoomOracleAluraSearchRoute
+  ApiWarRoomStateRoute: typeof ApiWarRoomStateRoute
+  ApiWarRoomStationActionRouterRoute: typeof ApiWarRoomStationActionRouterRoute
+  ApiWarRoomTasksRoute: typeof ApiWarRoomTasksRoute
+  ApiWarRoomTerraAssetsRoute: typeof ApiWarRoomTerraAssetsRoute
+  ApiWarRoomTerraCapabilitiesRoute: typeof ApiWarRoomTerraCapabilitiesRoute
+  ApiWarRoomTerraModelSearchRoute: typeof ApiWarRoomTerraModelSearchRoute
+  ApiWarRoomTerraPrintQaRoute: typeof ApiWarRoomTerraPrintQaRoute
+  ApiWarRoomTerraPrinterRoute: typeof ApiWarRoomTerraPrinterRoute
+  ApiWarRoomTerraPrinterFrameRoute: typeof ApiWarRoomTerraPrinterFrameRoute
+  ApiWarRoomTerraSlicePlanRoute: typeof ApiWarRoomTerraSlicePlanRoute
+  ApiWarRoomToolRouterRoute: typeof ApiWarRoomToolRouterRoute
+  ApiWarRoomCouncilFollowUpRoute: typeof ApiWarRoomCouncilFollowUpRoute
+  ApiWarRoomCouncilRunRoute: typeof ApiWarRoomCouncilRunRoute
+  ApiWarRoomEtsyLiveScoutRoute: typeof ApiWarRoomEtsyLiveScoutRoute
+  ApiWarRoomEtsyLiveSharedRoomRoute: typeof ApiWarRoomEtsyLiveSharedRoomRoute
+  ApiWarRoomEtsyLiveStateRoute: typeof ApiWarRoomEtsyLiveStateRoute
+  ApiWarRoomObsidianContextPacketRoute: typeof ApiWarRoomObsidianContextPacketRoute
+  ApiWarRoomWorkspaceKernelEventsRoute: typeof ApiWarRoomWorkspaceKernelEventsRoute
+  ApiWarRoomWorkspaceKernelResetLocalDemoRoute: typeof ApiWarRoomWorkspaceKernelResetLocalDemoRoute
+  ApiWarRoomWorkspaceKernelRouteActionRoute: typeof ApiWarRoomWorkspaceKernelRouteActionRoute
+  ApiWarRoomWorkspaceKernelStateRoute: typeof ApiWarRoomWorkspaceKernelStateRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/war-room': {
+      id: '/war-room'
+      path: '/war-room'
+      fullPath: '/war-room'
+      preLoaderRoute: typeof WarRoomRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/terminal': {
       id: '/terminal'
       path: '/terminal'
@@ -1757,6 +2364,20 @@ declare module '@tanstack/react-router' {
       path: '/profiles'
       fullPath: '/profiles'
       preLoaderRoute: typeof ProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product-research': {
+      id: '/product-research'
+      path: '/product-research'
+      fullPath: '/product-research'
+      preLoaderRoute: typeof ProductResearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product-intelligence': {
+      id: '/product-intelligence'
+      path: '/product-intelligence'
+      fullPath: '/product-intelligence'
+      preLoaderRoute: typeof ProductIntelligenceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/playground': {
@@ -1864,11 +2485,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatSessionKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace-health': {
+      id: '/api/workspace-health'
+      path: '/api/workspace-health'
+      fullPath: '/api/workspace-health'
+      preLoaderRoute: typeof ApiWorkspaceHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/workspace': {
       id: '/api/workspace'
       path: '/api/workspace'
       fullPath: '/api/workspace'
       preLoaderRoute: typeof ApiWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room-etsy-ops': {
+      id: '/api/war-room-etsy-ops'
+      path: '/api/war-room-etsy-ops'
+      fullPath: '/api/war-room-etsy-ops'
+      preLoaderRoute: typeof ApiWarRoomEtsyOpsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/terminal-stream': {
@@ -2109,6 +2744,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProviderUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/product-research': {
+      id: '/api/product-research'
+      path: '/api/product-research'
+      fullPath: '/api/product-research'
+      preLoaderRoute: typeof ApiProductResearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/product-intelligence': {
+      id: '/api/product-intelligence'
+      path: '/api/product-intelligence'
+      fullPath: '/api/product-intelligence'
+      preLoaderRoute: typeof ApiProductIntelligenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/preview-file': {
       id: '/api/preview-file'
       path: '/api/preview-file'
@@ -2191,6 +2840,13 @@ declare module '@tanstack/react-router' {
       path: '/api/gateway-status'
       fullPath: '/api/gateway-status'
       preLoaderRoute: typeof ApiGatewayStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway-reprobe': {
+      id: '/api/gateway-reprobe'
+      path: '/api/gateway-reprobe'
+      fullPath: '/api/gateway-reprobe'
+      preLoaderRoute: typeof ApiGatewayReprobeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/files': {
@@ -2310,6 +2966,146 @@ declare module '@tanstack/react-router' {
       path: '/api/artifacts'
       fullPath: '/api/artifacts'
       preLoaderRoute: typeof ApiArtifactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/tool-router': {
+      id: '/api/war-room/tool-router'
+      path: '/api/war-room/tool-router'
+      fullPath: '/api/war-room/tool-router'
+      preLoaderRoute: typeof ApiWarRoomToolRouterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/terra-slice-plan': {
+      id: '/api/war-room/terra-slice-plan'
+      path: '/api/war-room/terra-slice-plan'
+      fullPath: '/api/war-room/terra-slice-plan'
+      preLoaderRoute: typeof ApiWarRoomTerraSlicePlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/terra-printer-frame': {
+      id: '/api/war-room/terra-printer-frame'
+      path: '/api/war-room/terra-printer-frame'
+      fullPath: '/api/war-room/terra-printer-frame'
+      preLoaderRoute: typeof ApiWarRoomTerraPrinterFrameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/terra-printer': {
+      id: '/api/war-room/terra-printer'
+      path: '/api/war-room/terra-printer'
+      fullPath: '/api/war-room/terra-printer'
+      preLoaderRoute: typeof ApiWarRoomTerraPrinterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/terra-print-qa': {
+      id: '/api/war-room/terra-print-qa'
+      path: '/api/war-room/terra-print-qa'
+      fullPath: '/api/war-room/terra-print-qa'
+      preLoaderRoute: typeof ApiWarRoomTerraPrintQaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/terra-model-search': {
+      id: '/api/war-room/terra-model-search'
+      path: '/api/war-room/terra-model-search'
+      fullPath: '/api/war-room/terra-model-search'
+      preLoaderRoute: typeof ApiWarRoomTerraModelSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/terra-capabilities': {
+      id: '/api/war-room/terra-capabilities'
+      path: '/api/war-room/terra-capabilities'
+      fullPath: '/api/war-room/terra-capabilities'
+      preLoaderRoute: typeof ApiWarRoomTerraCapabilitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/terra-assets': {
+      id: '/api/war-room/terra-assets'
+      path: '/api/war-room/terra-assets'
+      fullPath: '/api/war-room/terra-assets'
+      preLoaderRoute: typeof ApiWarRoomTerraAssetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/tasks': {
+      id: '/api/war-room/tasks'
+      path: '/api/war-room/tasks'
+      fullPath: '/api/war-room/tasks'
+      preLoaderRoute: typeof ApiWarRoomTasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/station-action-router': {
+      id: '/api/war-room/station-action-router'
+      path: '/api/war-room/station-action-router'
+      fullPath: '/api/war-room/station-action-router'
+      preLoaderRoute: typeof ApiWarRoomStationActionRouterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/state': {
+      id: '/api/war-room/state'
+      path: '/api/war-room/state'
+      fullPath: '/api/war-room/state'
+      preLoaderRoute: typeof ApiWarRoomStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/oracle-alura-search': {
+      id: '/api/war-room/oracle-alura-search'
+      path: '/api/war-room/oracle-alura-search'
+      fullPath: '/api/war-room/oracle-alura-search'
+      preLoaderRoute: typeof ApiWarRoomOracleAluraSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/intents': {
+      id: '/api/war-room/intents'
+      path: '/api/war-room/intents'
+      fullPath: '/api/war-room/intents'
+      preLoaderRoute: typeof ApiWarRoomIntentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/goblin-analytics': {
+      id: '/api/war-room/goblin-analytics'
+      path: '/api/war-room/goblin-analytics'
+      fullPath: '/api/war-room/goblin-analytics'
+      preLoaderRoute: typeof ApiWarRoomGoblinAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/events': {
+      id: '/api/war-room/events'
+      path: '/api/war-room/events'
+      fullPath: '/api/war-room/events'
+      preLoaderRoute: typeof ApiWarRoomEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/etsy-sheet-intake': {
+      id: '/api/war-room/etsy-sheet-intake'
+      path: '/api/war-room/etsy-sheet-intake'
+      fullPath: '/api/war-room/etsy-sheet-intake'
+      preLoaderRoute: typeof ApiWarRoomEtsySheetIntakeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/etsy-evidence': {
+      id: '/api/war-room/etsy-evidence'
+      path: '/api/war-room/etsy-evidence'
+      fullPath: '/api/war-room/etsy-evidence'
+      preLoaderRoute: typeof ApiWarRoomEtsyEvidenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/capabilities': {
+      id: '/api/war-room/capabilities'
+      path: '/api/war-room/capabilities'
+      fullPath: '/api/war-room/capabilities'
+      preLoaderRoute: typeof ApiWarRoomCapabilitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/approvals': {
+      id: '/api/war-room/approvals'
+      path: '/api/war-room/approvals'
+      fullPath: '/api/war-room/approvals'
+      preLoaderRoute: typeof ApiWarRoomApprovalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/agent-control': {
+      id: '/api/war-room/agent-control'
+      path: '/api/war-room/agent-control'
+      fullPath: '/api/war-room/agent-control'
+      preLoaderRoute: typeof ApiWarRoomAgentControlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/update/workspace': {
@@ -2599,6 +3395,125 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArtifactsArtifactIdRouteImport
       parentRoute: typeof ApiArtifactsRoute
     }
+    '/api/war-room/workspace-kernel/state': {
+      id: '/api/war-room/workspace-kernel/state'
+      path: '/api/war-room/workspace-kernel/state'
+      fullPath: '/api/war-room/workspace-kernel/state'
+      preLoaderRoute: typeof ApiWarRoomWorkspaceKernelStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/workspace-kernel/route-action': {
+      id: '/api/war-room/workspace-kernel/route-action'
+      path: '/api/war-room/workspace-kernel/route-action'
+      fullPath: '/api/war-room/workspace-kernel/route-action'
+      preLoaderRoute: typeof ApiWarRoomWorkspaceKernelRouteActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/workspace-kernel/reset-local-demo': {
+      id: '/api/war-room/workspace-kernel/reset-local-demo'
+      path: '/api/war-room/workspace-kernel/reset-local-demo'
+      fullPath: '/api/war-room/workspace-kernel/reset-local-demo'
+      preLoaderRoute: typeof ApiWarRoomWorkspaceKernelResetLocalDemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/workspace-kernel/events': {
+      id: '/api/war-room/workspace-kernel/events'
+      path: '/api/war-room/workspace-kernel/events'
+      fullPath: '/api/war-room/workspace-kernel/events'
+      preLoaderRoute: typeof ApiWarRoomWorkspaceKernelEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/obsidian-context/packet': {
+      id: '/api/war-room/obsidian-context/packet'
+      path: '/api/war-room/obsidian-context/packet'
+      fullPath: '/api/war-room/obsidian-context/packet'
+      preLoaderRoute: typeof ApiWarRoomObsidianContextPacketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/etsy-live/state': {
+      id: '/api/war-room/etsy-live/state'
+      path: '/api/war-room/etsy-live/state'
+      fullPath: '/api/war-room/etsy-live/state'
+      preLoaderRoute: typeof ApiWarRoomEtsyLiveStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/etsy-live/shared-room': {
+      id: '/api/war-room/etsy-live/shared-room'
+      path: '/api/war-room/etsy-live/shared-room'
+      fullPath: '/api/war-room/etsy-live/shared-room'
+      preLoaderRoute: typeof ApiWarRoomEtsyLiveSharedRoomRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/etsy-live/scout': {
+      id: '/api/war-room/etsy-live/scout'
+      path: '/api/war-room/etsy-live/scout'
+      fullPath: '/api/war-room/etsy-live/scout'
+      preLoaderRoute: typeof ApiWarRoomEtsyLiveScoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/council/run': {
+      id: '/api/war-room/council/run'
+      path: '/api/war-room/council/run'
+      fullPath: '/api/war-room/council/run'
+      preLoaderRoute: typeof ApiWarRoomCouncilRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/council/follow-up': {
+      id: '/api/war-room/council/follow-up'
+      path: '/api/war-room/council/follow-up'
+      fullPath: '/api/war-room/council/follow-up'
+      preLoaderRoute: typeof ApiWarRoomCouncilFollowUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/agent-control/run-athena': {
+      id: '/api/war-room/agent-control/run-athena'
+      path: '/run-athena'
+      fullPath: '/api/war-room/agent-control/run-athena'
+      preLoaderRoute: typeof ApiWarRoomAgentControlRunAthenaRouteImport
+      parentRoute: typeof ApiWarRoomAgentControlRoute
+    }
+    '/api/war-room/agent-control/run-agent': {
+      id: '/api/war-room/agent-control/run-agent'
+      path: '/run-agent'
+      fullPath: '/api/war-room/agent-control/run-agent'
+      preLoaderRoute: typeof ApiWarRoomAgentControlRunAgentRouteImport
+      parentRoute: typeof ApiWarRoomAgentControlRoute
+    }
+    '/api/war-room/agent-control/local-only': {
+      id: '/api/war-room/agent-control/local-only'
+      path: '/local-only'
+      fullPath: '/api/war-room/agent-control/local-only'
+      preLoaderRoute: typeof ApiWarRoomAgentControlLocalOnlyRouteImport
+      parentRoute: typeof ApiWarRoomAgentControlRoute
+    }
+    '/api/war-room/agent-control/live-chat': {
+      id: '/api/war-room/agent-control/live-chat'
+      path: '/live-chat'
+      fullPath: '/api/war-room/agent-control/live-chat'
+      preLoaderRoute: typeof ApiWarRoomAgentControlLiveChatRouteImport
+      parentRoute: typeof ApiWarRoomAgentControlRoute
+    }
+    '/api/war-room/agent-control/freeze': {
+      id: '/api/war-room/agent-control/freeze'
+      path: '/freeze'
+      fullPath: '/api/war-room/agent-control/freeze'
+      preLoaderRoute: typeof ApiWarRoomAgentControlFreezeRouteImport
+      parentRoute: typeof ApiWarRoomAgentControlRoute
+    }
+    '/api/war-room/agent-control/disconnect': {
+      id: '/api/war-room/agent-control/disconnect'
+      path: '/disconnect'
+      fullPath: '/api/war-room/agent-control/disconnect'
+      preLoaderRoute: typeof ApiWarRoomAgentControlDisconnectRouteImport
+      parentRoute: typeof ApiWarRoomAgentControlRoute
+    }
+    '/api/war-room/agent-control/arm': {
+      id: '/api/war-room/agent-control/arm'
+      path: '/arm'
+      fullPath: '/api/war-room/agent-control/arm'
+      preLoaderRoute: typeof ApiWarRoomAgentControlArmRouteImport
+      parentRoute: typeof ApiWarRoomAgentControlRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -2790,6 +3705,33 @@ const ApiSwarmMemoryRouteWithChildren = ApiSwarmMemoryRoute._addFileChildren(
   ApiSwarmMemoryRouteChildren,
 )
 
+interface ApiWarRoomAgentControlRouteChildren {
+  ApiWarRoomAgentControlArmRoute: typeof ApiWarRoomAgentControlArmRoute
+  ApiWarRoomAgentControlDisconnectRoute: typeof ApiWarRoomAgentControlDisconnectRoute
+  ApiWarRoomAgentControlFreezeRoute: typeof ApiWarRoomAgentControlFreezeRoute
+  ApiWarRoomAgentControlLiveChatRoute: typeof ApiWarRoomAgentControlLiveChatRoute
+  ApiWarRoomAgentControlLocalOnlyRoute: typeof ApiWarRoomAgentControlLocalOnlyRoute
+  ApiWarRoomAgentControlRunAgentRoute: typeof ApiWarRoomAgentControlRunAgentRoute
+  ApiWarRoomAgentControlRunAthenaRoute: typeof ApiWarRoomAgentControlRunAthenaRoute
+}
+
+const ApiWarRoomAgentControlRouteChildren: ApiWarRoomAgentControlRouteChildren =
+  {
+    ApiWarRoomAgentControlArmRoute: ApiWarRoomAgentControlArmRoute,
+    ApiWarRoomAgentControlDisconnectRoute:
+      ApiWarRoomAgentControlDisconnectRoute,
+    ApiWarRoomAgentControlFreezeRoute: ApiWarRoomAgentControlFreezeRoute,
+    ApiWarRoomAgentControlLiveChatRoute: ApiWarRoomAgentControlLiveChatRoute,
+    ApiWarRoomAgentControlLocalOnlyRoute: ApiWarRoomAgentControlLocalOnlyRoute,
+    ApiWarRoomAgentControlRunAgentRoute: ApiWarRoomAgentControlRunAgentRoute,
+    ApiWarRoomAgentControlRunAthenaRoute: ApiWarRoomAgentControlRunAthenaRoute,
+  }
+
+const ApiWarRoomAgentControlRouteWithChildren =
+  ApiWarRoomAgentControlRoute._addFileChildren(
+    ApiWarRoomAgentControlRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
@@ -2802,6 +3744,8 @@ const rootRouteChildren: RootRouteChildren = {
   MemoryRoute: MemoryRoute,
   OperationsRoute: OperationsRoute,
   PlaygroundRoute: PlaygroundRoute,
+  ProductIntelligenceRoute: ProductIntelligenceRoute,
+  ProductResearchRoute: ProductResearchRoute,
   ProfilesRoute: ProfilesRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
@@ -2809,6 +3753,7 @@ const rootRouteChildren: RootRouteChildren = {
   Swarm2Route: Swarm2Route,
   TasksRoute: TasksRoute,
   TerminalRoute: TerminalRoute,
+  WarRoomRoute: WarRoomRoute,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
   ApiAuthRoute: ApiAuthRoute,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
@@ -2826,6 +3771,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
+  ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiIntegrationsRoute: ApiIntegrationsRoute,
@@ -2838,6 +3784,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPlaygroundNpcRoute: ApiPlaygroundNpcRoute,
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
+  ApiProductIntelligenceRoute: ApiProductIntelligenceRoute,
+  ApiProductResearchRoute: ApiProductResearchRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
@@ -2872,7 +3820,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
+  ApiWarRoomEtsyOpsRoute: ApiWarRoomEtsyOpsRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
+  ApiWorkspaceHealthRoute: ApiWorkspaceHealthRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiClaudeProxySplatRoute: ApiClaudeProxySplatRoute,
@@ -2896,6 +3846,38 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,
   ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,
+  ApiWarRoomAgentControlRoute: ApiWarRoomAgentControlRouteWithChildren,
+  ApiWarRoomApprovalsRoute: ApiWarRoomApprovalsRoute,
+  ApiWarRoomCapabilitiesRoute: ApiWarRoomCapabilitiesRoute,
+  ApiWarRoomEtsyEvidenceRoute: ApiWarRoomEtsyEvidenceRoute,
+  ApiWarRoomEtsySheetIntakeRoute: ApiWarRoomEtsySheetIntakeRoute,
+  ApiWarRoomEventsRoute: ApiWarRoomEventsRoute,
+  ApiWarRoomGoblinAnalyticsRoute: ApiWarRoomGoblinAnalyticsRoute,
+  ApiWarRoomIntentsRoute: ApiWarRoomIntentsRoute,
+  ApiWarRoomOracleAluraSearchRoute: ApiWarRoomOracleAluraSearchRoute,
+  ApiWarRoomStateRoute: ApiWarRoomStateRoute,
+  ApiWarRoomStationActionRouterRoute: ApiWarRoomStationActionRouterRoute,
+  ApiWarRoomTasksRoute: ApiWarRoomTasksRoute,
+  ApiWarRoomTerraAssetsRoute: ApiWarRoomTerraAssetsRoute,
+  ApiWarRoomTerraCapabilitiesRoute: ApiWarRoomTerraCapabilitiesRoute,
+  ApiWarRoomTerraModelSearchRoute: ApiWarRoomTerraModelSearchRoute,
+  ApiWarRoomTerraPrintQaRoute: ApiWarRoomTerraPrintQaRoute,
+  ApiWarRoomTerraPrinterRoute: ApiWarRoomTerraPrinterRoute,
+  ApiWarRoomTerraPrinterFrameRoute: ApiWarRoomTerraPrinterFrameRoute,
+  ApiWarRoomTerraSlicePlanRoute: ApiWarRoomTerraSlicePlanRoute,
+  ApiWarRoomToolRouterRoute: ApiWarRoomToolRouterRoute,
+  ApiWarRoomCouncilFollowUpRoute: ApiWarRoomCouncilFollowUpRoute,
+  ApiWarRoomCouncilRunRoute: ApiWarRoomCouncilRunRoute,
+  ApiWarRoomEtsyLiveScoutRoute: ApiWarRoomEtsyLiveScoutRoute,
+  ApiWarRoomEtsyLiveSharedRoomRoute: ApiWarRoomEtsyLiveSharedRoomRoute,
+  ApiWarRoomEtsyLiveStateRoute: ApiWarRoomEtsyLiveStateRoute,
+  ApiWarRoomObsidianContextPacketRoute: ApiWarRoomObsidianContextPacketRoute,
+  ApiWarRoomWorkspaceKernelEventsRoute: ApiWarRoomWorkspaceKernelEventsRoute,
+  ApiWarRoomWorkspaceKernelResetLocalDemoRoute:
+    ApiWarRoomWorkspaceKernelResetLocalDemoRoute,
+  ApiWarRoomWorkspaceKernelRouteActionRoute:
+    ApiWarRoomWorkspaceKernelRouteActionRoute,
+  ApiWarRoomWorkspaceKernelStateRoute: ApiWarRoomWorkspaceKernelStateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

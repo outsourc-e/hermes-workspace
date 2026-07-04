@@ -14,11 +14,11 @@ import {
   toChatMessage,
 } from '../../server/claude-api'
 import { resolveSessionKey } from '../../server/session-utils'
-import { isAuthenticated } from '@/server/auth-middleware'
 import {
   getLocalMessages,
   getLocalSession,
 } from '../../server/local-session-store'
+import { isAuthenticated } from '@/server/auth-middleware'
 
 export const Route = createFileRoute('/api/session-history')({
   server: {

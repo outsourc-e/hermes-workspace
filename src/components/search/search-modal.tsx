@@ -72,7 +72,7 @@ export function SearchModal() {
   const deferredQuery = useDeferredValue(debouncedQuery)
 
   // Real data (Phase 3.2)
-  const { sessions, files, skills } = useSearchData(scope)
+  const { sessions, files, skills } = useSearchData(scope, { enabled: isOpen })
   const searchableFiles = useMemo(
     () => files.filter((entry) => entry.type === 'file'),
     [files],

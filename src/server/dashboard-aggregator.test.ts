@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildDashboardOverview,
-  type DashboardFetcher,
+
+  buildDashboardOverview
 } from './dashboard-aggregator'
+import type {DashboardFetcher} from './dashboard-aggregator';
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {

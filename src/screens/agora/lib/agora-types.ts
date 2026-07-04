@@ -40,7 +40,7 @@ export interface AgoraProfile {
   bio: string
   status: AgoraStatus
   /** Optional links (twitter, github, etc) */
-  links?: { label: string; url: string }[]
+  links?: Array<{ label: string; url: string }>
   /** Current activity hint, e.g. "Building Hermes Workspace" */
   activity?: string
 }

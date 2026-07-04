@@ -22,9 +22,10 @@ import {
   gatewayFetch,
 } from '../../../server/gateway-capabilities'
 import {
-  buildDashboardOverview,
-  type DashboardFetcher,
+
+  buildDashboardOverview
 } from '../../../server/dashboard-aggregator'
+import type {DashboardFetcher} from '../../../server/dashboard-aggregator';
 
 const overviewFetcher: DashboardFetcher = (path) => dashboardFetch(path)
 // Gateway fetcher hits the gateway URL (8645/8642), which is where

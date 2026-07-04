@@ -24,7 +24,7 @@ function formatDuration(ms: number): string {
 }
 
 function generateMarkdown(report: ExportableMissionReport): string {
-  const lines: string[] = []
+  const lines: Array<string> = []
   const completedDate = report.completedAt
     ? new Date(report.completedAt).toLocaleString()
     : 'Unknown'

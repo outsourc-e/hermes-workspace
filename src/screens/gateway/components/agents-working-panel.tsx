@@ -35,7 +35,7 @@ export type AgentWorkingRow = {
 }
 
 type AgentsWorkingPanelProps = {
-  agents: AgentWorkingRow[]
+  agents: Array<AgentWorkingRow>
   className?: string
   onSelectAgent?: (agentId: string) => void
   onKillAgent?: (agentId: string) => void

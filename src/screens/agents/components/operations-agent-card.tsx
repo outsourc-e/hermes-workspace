@@ -9,6 +9,9 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { AnimatePresence, motion } from 'motion/react'
+import {  useAgentChat } from '../hooks/use-agent-chat'
+import type {OperationsChatMessage} from '../hooks/use-agent-chat';
+import type { OperationsAgent } from '../hooks/use-operations'
 import { Button } from '@/components/ui/button'
 import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
@@ -16,8 +19,6 @@ import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { runCronJob, toggleCronJob } from '@/lib/cron-api'
 import { cn } from '@/lib/utils'
-import { useAgentChat, type OperationsChatMessage } from '../hooks/use-agent-chat'
-import type { OperationsAgent } from '../hooks/use-operations'
 
 function getStatusStyles(status: OperationsAgent['status']) {
   if (status === 'error') {
@@ -72,7 +73,7 @@ export function OperationsInlineChat({
   error,
 }: {
   agentName: string
-  messages: OperationsChatMessage[]
+  messages: Array<OperationsChatMessage>
   sendMessage: (message: string) => Promise<unknown>
   isSending: boolean
   error: string | null

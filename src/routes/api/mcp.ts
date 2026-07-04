@@ -18,10 +18,10 @@ import {
   normalizeMcpServerFromConfig,
 } from '../../server/mcp-normalize'
 import { getConfig, saveConfig } from '../../server/claude-dashboard-api'
-import type { McpServerInput } from '../../types/mcp-input'
 import { parseMcpServerInput } from '../../server/mcp-input-validate'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { getProbe } from '../../server/mcp-tools-cache'
+import type { McpServerInput } from '../../types/mcp-input'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 const KNOWN_CATEGORIES = ['All', 'Connected', 'Failed', 'Disabled'] as const
 const REQUEST_TIMEOUT_MS = 30_000

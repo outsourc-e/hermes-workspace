@@ -28,13 +28,13 @@ type HealthResponse = {
   workspaceModel: string | null
   agentApiUrl?: string | null
   claudeApiUrl?: string | null
-  workers: WorkerHealth[]
+  workers: Array<WorkerHealth>
   summary: {
     totalWorkers: number
     wrappersConfigured: number
     totalAuthErrors24h: number
-    distinctModels: string[]
-    distinctProviders: string[]
+    distinctModels: Array<string>
+    distinctProviders: Array<string>
   }
 }
 

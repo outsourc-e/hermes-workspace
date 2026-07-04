@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import {
-  itemById,
+
   PLAYGROUND_QUESTS,
-  type EquipmentSlot,
-  type PlaygroundItemId,
-  type PlaygroundWorldId,
+
+
+  itemById
 } from '../lib/playground-rpg'
+import type {EquipmentSlot, PlaygroundItemId, PlaygroundWorldId} from '../lib/playground-rpg';
 import type { PlaygroundRpgState } from '../hooks/use-playground-rpg'
 
 type TabId = 'inventory' | 'skills' | 'quests' | 'worlds' | 'settings'
@@ -213,7 +214,7 @@ function InventoryTab({
         <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/55">Equipped</div>
         <div className="grid grid-cols-2 gap-2">
           {SLOT_LABELS.map(({ slot, label }) => {
-            const item = equipped[slot] ? itemById(equipped[slot]!) : null
+            const item = equipped[slot] ? itemById(equipped[slot]) : null
             return (
               <button
                 key={slot}

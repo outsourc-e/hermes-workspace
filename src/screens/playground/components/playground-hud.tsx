@@ -10,7 +10,7 @@ type HudProps = {
   levelProgress: { current: number; needed: number; pct: number }
   currentWorld: PlaygroundWorldId
   worldAccent: string
-  toasts: RewardToast[]
+  toasts: Array<RewardToast>
   objectiveTarget?: string | null
 }
 

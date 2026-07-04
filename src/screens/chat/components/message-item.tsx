@@ -7,6 +7,11 @@ import {
   textFromMessage,
 } from '../utils'
 import { MessageActionsBar } from './message-actions-bar'
+import {
+  buildHermesActivitySummary,
+  shouldAutoExpandHermesActivityCard,
+} from './streaming-activity-ui'
+import { TuiActivityCard } from './tui-activity-card'
 import type { ChatAttachment, ChatMessage, ToolCallContent } from '../types'
 import type { ToolPart } from '@/components/prompt-kit/tool'
 import { AssistantAvatar, UserAvatar } from '@/components/avatars'
@@ -25,11 +30,6 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
-import {
-  buildHermesActivitySummary,
-  shouldAutoExpandHermesActivityCard,
-} from './streaming-activity-ui'
-import { TuiActivityCard } from './tui-activity-card'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50

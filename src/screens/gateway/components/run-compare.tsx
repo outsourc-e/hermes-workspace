@@ -5,7 +5,7 @@ type RunSnapshot = {
   duration: string
   tokenCount: number
   costEstimate: number
-  agents: string[]
+  agents: Array<string>
   startedAt: number
 }
 

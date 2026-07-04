@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { CronJob } from '@/components/cron-manager/cron-types'
+import type {GatewaySession} from '@/lib/gateway-api';
 import { toast } from '@/components/ui/toast'
 import { fetchCronJobs } from '@/lib/cron-api'
-import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
+import {  fetchSessions } from '@/lib/gateway-api'
 import { formatModelName, formatRelativeTime } from '@/screens/dashboard/lib/formatters'
 
 // Claude-Workspace adapter: Operations is backed by Hermes profiles
@@ -59,15 +60,15 @@ export type OperationsAgent = GatewayConfigAgent & {
   shortModel: string
   status: OperationsAgentStatus
   sessionKey: string
-  sessions: GatewaySession[]
+  sessions: Array<GatewaySession>
   latestSession: GatewaySession | null
-  jobs: CronJob[]
+  jobs: Array<CronJob>
   nextRunAt: number | null
   lastActivityAt: number | null
   activityLabel: string
   progressValue: number
   progressStatus: 'running' | 'queued' | 'failed' | 'complete' | 'thinking'
-  recentOutputs: OperationsOutputItem[]
+  recentOutputs: Array<OperationsOutputItem>
   /**
    * True when the agent's profile has no model configured (blank model in
    * config.yaml). Dispatching into an unconfigured agent hangs because
@@ -83,7 +84,7 @@ type ConfigPayload = {
   payload?: {
     parsed?: {
       agents?: {
-        list?: unknown[]
+        list?: Array<unknown>
       }
       defaultModel?: string
       [key: string]: unknown
@@ -93,7 +94,7 @@ type ConfigPayload = {
   }
   parsed?: {
     agents?: {
-      list?: unknown[]
+      list?: Array<unknown>
     }
     defaultModel?: string
     [key: string]: unknown
@@ -186,10 +187,10 @@ function truncate(text: string, maxLength = 120): string {
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
 }
 
-function normalizeAgentList(input: unknown): GatewayConfigAgent[] {
+function normalizeAgentList(input: unknown): Array<GatewayConfigAgent> {
   if (!Array.isArray(input)) return []
 
-  const agents: GatewayConfigAgent[] = []
+  const agents: Array<GatewayConfigAgent> = []
 
   for (const entry of input) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
@@ -219,14 +220,14 @@ function parseConfigPayload(payload: ConfigPayload): ConfigPayload {
   return payload
 }
 
-async function fetchClaudeProfiles(): Promise<ClaudeProfileSummary[]> {
+async function fetchClaudeProfiles(): Promise<Array<ClaudeProfileSummary>> {
   const response = await fetch('/api/profiles/list')
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('json')) {
     throw new Error('/api/profiles/list returned non-JSON')
   }
   const payload = (await response.json().catch(() => ({}))) as {
-    profiles?: ClaudeProfileSummary[]
+    profiles?: Array<ClaudeProfileSummary>
     error?: string
   }
   if (!response.ok || payload.error) {
@@ -396,11 +397,11 @@ function persistSettings(settings: OperationsSettings) {
 
 
 
-function getAgentJobs(agentId: string, jobs: CronJob[]): CronJob[] {
+function getAgentJobs(agentId: string, jobs: Array<CronJob>): Array<CronJob> {
   return jobs.filter((job) => job.name?.startsWith(`ops:${agentId}:`))
 }
 
-function getAgentSessions(agentId: string, sessions: GatewaySession[]): GatewaySession[] {
+function getAgentSessions(agentId: string, sessions: Array<GatewaySession>): Array<GatewaySession> {
   return [...sessions]
     .filter((session) => {
       const label = readString(session.label)

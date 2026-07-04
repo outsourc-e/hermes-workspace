@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type {SessionHistoryMessage} from '@/lib/gateway-api';
 import {
+
   fetchSessionHistory,
-  sendToSession,
-  type SessionHistoryMessage,
+  sendToSession
 } from '@/lib/gateway-api'
 
 export type OperationsChatMessage = {
@@ -57,7 +58,7 @@ export function useAgentChat(sessionKey: string) {
         const res = await fetch(`/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=50`)
         if (res.ok) {
           const data = await res.json()
-          if (Array.isArray(data.messages)) return data.messages as SessionHistoryMessage[]
+          if (Array.isArray(data.messages)) return data.messages as Array<SessionHistoryMessage>
         }
       } catch {
         // fall through

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import path from 'node:path'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, readdirSync } = vi.hoisted(() => ({
   existsSync: vi.fn().mockReturnValue(false),
@@ -22,6 +22,7 @@ vi.mock('node:fs', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  delete process.env.HERMES_HOME
   delete process.env.CLAUDE_HOME
 })
 

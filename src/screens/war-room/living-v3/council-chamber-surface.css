@@ -1,0 +1,4533 @@
+.council-chamber {
+  position: absolute;
+  inset: 58px 18px 52px;
+  z-index: 36;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(246, 197, 111, 0.34);
+  border-radius: 30px;
+  color: #f8edd5;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Hebrew", "Arial", sans-serif;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(246, 197, 111, 0.18), transparent 34%),
+    radial-gradient(circle at 20% 80%, rgba(123, 75, 28, 0.22), transparent 36%),
+    linear-gradient(145deg, rgba(20, 15, 11, 0.98), rgba(42, 28, 18, 0.96));
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.58), inset 0 1px rgba(255, 244, 209, 0.14);
+}
+
+.council-chamber *,
+.council-chamber textarea,
+.council-chamber button {
+  font-family: inherit;
+}
+
+.council-chamber::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at 50% 50%, black 0 62%, transparent 82%);
+}
+
+.council-chamber__header {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 20px 8px;
+  border-bottom: 1px solid rgba(246, 197, 111, 0.18);
+}
+
+.council-chamber__header span,
+.council-chamber__safety span,
+.council-chamber__status-strip span,
+.council-chamber__decision span,
+.council-chamber__selected span,
+.council-chamber__ask span,
+.council-chamber__operator span,
+.council-chamber__chat span {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.67rem;
+  color: rgba(248, 237, 213, 0.62);
+  font-weight: 720;
+}
+
+.council-chamber [dir="rtl"],
+.council-chamber textarea[dir="auto"] {
+  letter-spacing: normal;
+}
+
+.council-chamber__header h2 {
+  margin: 3px 0 4px;
+  font-size: clamp(1.16rem, 2vw, 1.58rem);
+  line-height: 1.08;
+  font-weight: 780;
+}
+
+.council-chamber__header p {
+  max-width: 760px;
+  margin: 0;
+  color: rgba(248, 237, 213, 0.72);
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.council-chamber__safety {
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid rgba(144, 224, 168, 0.28);
+  border-radius: 18px;
+  background: rgba(22, 72, 48, 0.28);
+}
+
+.council-chamber__safety b {
+  color: #a9f0bf;
+}
+
+.council-chamber__close,
+.council-chamber__actions button {
+  min-height: 42px;
+  border: 1px solid rgba(246, 197, 111, 0.32);
+  border-radius: 999px;
+  color: #fff3d0;
+  font-weight: 720;
+  background: linear-gradient(135deg, rgba(246, 197, 111, 0.16), rgba(88, 52, 24, 0.52));
+  box-shadow: inset 0 1px rgba(255,255,255,0.08);
+}
+
+.council-chamber__close {
+  padding: 0 16px;
+}
+
+.council-chamber__grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(500px, 0.94fr) minmax(540px, 1.06fr);
+  gap: 18px;
+  min-height: 0;
+  height: 100%;
+  padding: 10px 14px 12px;
+}
+
+.council-chamber__room {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(246, 197, 111, 0.22);
+  border-radius: 28px;
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(255, 214, 139, 0.18), transparent 29%),
+    radial-gradient(ellipse at 50% 52%, rgba(19, 13, 8, 0.35), transparent 58%),
+    linear-gradient(135deg, #20150e, #4b2d18 44%, #19110c);
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 209, 0.06), inset 0 -80px 120px rgba(0, 0, 0, 0.24);
+}
+
+.council-chamber__floor {
+  position: absolute;
+  inset: 22px;
+  border-radius: 32px;
+  border: 1px solid rgba(246, 197, 111, 0.16);
+  background:
+    repeating-conic-gradient(from 45deg at 50% 50%, rgba(255, 229, 168, 0.035) 0 8deg, transparent 8deg 16deg),
+    radial-gradient(ellipse at 50% 50%, rgba(248, 189, 92, 0.08), transparent 56%);
+}
+
+.council-chamber__table {
+  position: absolute;
+  left: 50%;
+  top: 53%;
+  width: min(54%, 500px);
+  aspect-ratio: 1.62;
+  padding: 0;
+  color: inherit;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 221, 150, 0.44);
+  border-radius: 50%;
+  cursor: pointer;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 236, 180, 0.18), transparent 25%),
+    radial-gradient(ellipse at 50% 62%, rgba(66, 34, 13, 0.72), rgba(33, 18, 10, 0.96) 68%),
+    linear-gradient(145deg, #664019, #2b170c);
+  box-shadow:
+    0 22px 54px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 14px rgba(111, 65, 24, 0.55),
+    inset 0 0 0 17px rgba(246, 197, 111, 0.18);
+}
+
+.council-chamber__table:hover,
+.council-chamber__table:focus-visible {
+  border-color: rgba(255, 232, 170, 0.72);
+  box-shadow:
+    0 24px 58px rgba(0, 0, 0, 0.44),
+    0 0 30px rgba(246, 197, 111, 0.22),
+    inset 0 0 0 14px rgba(111, 65, 24, 0.55),
+    inset 0 0 0 17px rgba(246, 197, 111, 0.22);
+}
+
+.council-chamber__table::before {
+  content: '';
+  position: absolute;
+  inset: 19%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 232, 170, 0.22);
+  background: radial-gradient(ellipse at center, rgba(246, 197, 111, 0.16), rgba(0,0,0,0.12));
+}
+
+.council-chamber__table-core {
+  position: absolute;
+  inset: 28% 23%;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  text-align: center;
+  border-radius: 999px;
+  background: rgba(14, 10, 8, 0.66);
+  box-shadow: inset 0 0 28px rgba(246, 197, 111, 0.08);
+}
+
+.council-chamber__table-core span,
+.council-chamber__table-core small {
+  color: rgba(248, 237, 213, 0.65);
+  font-size: 0.68rem;
+}
+
+.council-chamber__table-core b {
+  max-width: 85%;
+  color: #ffe4a6;
+  font-size: clamp(0.74rem, 1vw, 0.95rem);
+}
+
+.council-chamber__general {
+  --general-layer: 3;
+  --roam-drift-x: 14px;
+  --roam-drift-y: 10px;
+  --roam-duration: 14s;
+  --roam-delay: 0s;
+  position: absolute;
+  left: var(--general-x);
+  top: var(--general-y);
+  z-index: var(--general-layer);
+  width: clamp(74px, 7.6vw, 112px);
+  min-height: 112px;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  color: #fff1d0;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  filter: drop-shadow(0 16px 18px rgba(0,0,0,0.38));
+  transition: left 0.18s ease-out, top 0.18s ease-out, filter 0.22s ease;
+}
+
+.council-chamber__general.is-roaming {
+  animation: council-slow-roam var(--roam-duration) ease-in-out infinite alternate;
+  animation-delay: var(--roam-delay);
+}
+
+.council-chamber__general.is-convening {
+  filter: drop-shadow(0 20px 22px rgba(0,0,0,0.42)) drop-shadow(0 0 18px rgba(246,197,111,0.18));
+  transition-duration: 0.16s;
+}
+
+@keyframes council-slow-roam {
+  0% { transform: translate(calc(-50% - var(--roam-drift-x)), calc(-50% - var(--roam-drift-y))); }
+  100% { transform: translate(calc(-50% + var(--roam-drift-x)), calc(-50% + var(--roam-drift-y))); }
+}
+
+.council-chamber__general::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  width: 82%;
+  height: 34px;
+  transform: translateX(-50%);
+  border: 1px solid color-mix(in srgb, var(--general-accent) 38%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--general-accent) 22%, transparent), rgba(0,0,0,0.18) 72%);
+  opacity: 0.78;
+}
+
+.council-chamber__general.is-selected::before {
+  opacity: 1;
+  box-shadow: 0 0 26px color-mix(in srgb, var(--general-accent) 42%, transparent);
+}
+
+.council-chamber__sprite {
+  --chair-row-y: 0%;
+  width: clamp(68px, 6.4vw, 96px);
+  aspect-ratio: 192 / 208;
+  background-repeat: no-repeat;
+  background-size: 800% 900%;
+  background-position: 0% 12.5%;
+  image-rendering: auto;
+  transform-origin: 50% 88%;
+}
+
+.council-chamber__general.is-roaming .council-chamber__sprite {
+  animation: council-walk-slow 1.45s steps(1, end) infinite;
+}
+
+.council-chamber__general.is-convening .council-chamber__sprite {
+  animation: council-running-to-table 0.38s steps(1, end) infinite;
+}
+
+.council-chamber__general.is-seated .council-chamber__sprite {
+  background-size: 600% 800%;
+  background-position: 0% var(--chair-row-y);
+  animation: council-chair-sitting 1.08s steps(1, end) infinite;
+}
+
+@keyframes council-walk-slow {
+  0%, 12.4% { background-position: 0% 12.5%; }
+  12.5%, 24.9% { background-position: 14.2857% 12.5%; }
+  25%, 37.4% { background-position: 28.5714% 12.5%; }
+  37.5%, 49.9% { background-position: 42.8571% 12.5%; }
+  50%, 62.4% { background-position: 57.1429% 12.5%; }
+  62.5%, 74.9% { background-position: 71.4286% 12.5%; }
+  75%, 87.4% { background-position: 85.7143% 12.5%; }
+  87.5%, 100% { background-position: 100% 12.5%; }
+}
+
+@keyframes council-running-to-table {
+  0%, 12.4% { background-position: 0% 12.5%; }
+  12.5%, 24.9% { background-position: 14.2857% 12.5%; }
+  25%, 37.4% { background-position: 28.5714% 12.5%; }
+  37.5%, 49.9% { background-position: 42.8571% 12.5%; }
+  50%, 62.4% { background-position: 57.1429% 12.5%; }
+  62.5%, 74.9% { background-position: 71.4286% 12.5%; }
+  75%, 87.4% { background-position: 85.7143% 12.5%; }
+  87.5%, 100% { background-position: 100% 12.5%; }
+}
+
+@keyframes council-chair-sitting {
+  0%, 16.5% { background-position: 0% var(--chair-row-y); }
+  16.6%, 33.2% { background-position: 20% var(--chair-row-y); }
+  33.3%, 49.9% { background-position: 40% var(--chair-row-y); }
+  50%, 66.5% { background-position: 60% var(--chair-row-y); }
+  66.6%, 83.2% { background-position: 80% var(--chair-row-y); }
+  83.3%, 100% { background-position: 100% var(--chair-row-y); }
+}
+
+.council-chamber__nameplate {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  min-width: 78px;
+  margin-top: -6px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--general-accent) 38%, rgba(255,255,255,0.08));
+  border-radius: 999px;
+  text-align: center;
+  background: rgba(18, 12, 9, 0.76);
+  backdrop-filter: blur(10px);
+}
+
+.council-chamber__nameplate b {
+  font-size: 0.78rem;
+}
+
+.council-chamber__nameplate small {
+  color: color-mix(in srgb, var(--general-accent) 78%, #ffffff 22%);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.council-chamber__vote-dot {
+  position: absolute;
+  right: 12px;
+  top: 14px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.55);
+}
+
+.council-chamber__vote-dot.is-support { background: #70e7a0; }
+.council-chamber__vote-dot.is-neutral { background: #80d9ff; }
+.council-chamber__vote-dot.is-against { background: #ff7b6f; }
+
+.council-chamber__tool {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(150px, 1fr) auto auto;
+  gap: 7px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__tool {
+  grid-template-rows: minmax(92px, auto) minmax(220px, 1fr) auto auto;
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__status-strip,
+.council-chamber[data-council-responses-visible="true"] .council-chamber__ask {
+  display: none;
+}
+
+.council-chamber__status-strip {
+  order: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.council-chamber__status-strip > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(128, 217, 255, 0.2);
+  border-radius: 16px;
+  background: rgba(20, 29, 38, 0.58);
+}
+
+.council-chamber__status-strip b {
+  overflow: hidden;
+  color: #f7f0df;
+  font-size: 0.82rem;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber__ask,
+.council-chamber__operator,
+.council-chamber__selected,
+.council-chamber__chat,
+.council-chamber__decision {
+  border: 1px solid rgba(246, 197, 111, 0.2);
+  border-radius: 22px;
+  background: rgba(12, 10, 8, 0.58);
+  box-shadow: inset 0 1px rgba(255, 244, 209, 0.08);
+}
+
+.council-chamber__ask { order: 1; }
+.council-chamber__selected { order: 2; }
+.council-chamber__chat { order: 3; }
+.council-chamber__operator { order: 4; }
+.council-chamber__decision { order: 5; }
+
+.council-chamber__ask,
+.council-chamber__operator {
+  padding: 8px;
+}
+
+.council-chamber__operator {
+  display: grid;
+  gap: 7px;
+  border-color: rgba(128, 217, 255, 0.22);
+  background: linear-gradient(135deg, rgba(28, 63, 92, 0.32), rgba(12, 10, 8, 0.64));
+}
+
+.council-chamber__operator small {
+  color: rgba(248, 237, 213, 0.58);
+  font-size: 0.72rem;
+}
+
+.council-chamber__ask label,
+.council-chamber__operator label {
+  display: grid;
+  gap: 6px;
+}
+
+.council-chamber__ask textarea,
+.council-chamber__operator textarea {
+  min-height: 46px;
+  max-height: 52px;
+  resize: none;
+  border: 1px solid rgba(246, 197, 111, 0.22);
+  border-radius: 16px;
+  padding: 9px 11px;
+  color: #fff6df;
+  font-size: 0.94rem;
+  line-height: 1.35;
+  background: rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+.council-chamber__operator textarea {
+  min-height: 58px;
+  max-height: 72px;
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__operator {
+  gap: 5px;
+  padding: 7px;
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__operator textarea {
+  min-height: 56px;
+  max-height: 82px;
+  padding-block: 8px;
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__operator small {
+  display: block;
+}
+
+.council-chamber__ask textarea:focus,
+.council-chamber__operator textarea:focus {
+  border-color: rgba(246, 197, 111, 0.62);
+  box-shadow: 0 0 0 3px rgba(246, 197, 111, 0.12);
+}
+
+.council-chamber__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 7px;
+  margin-top: 6px;
+}
+
+.council-chamber__actions--handoff {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.council-chamber__actions button {
+  min-height: 32px;
+  font-size: 0.88rem;
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__actions button {
+  min-height: 30px;
+  font-size: 0.82rem;
+}
+
+.council-chamber__actions button:first-child {
+  border-color: rgba(144, 224, 168, 0.36);
+  background: linear-gradient(135deg, rgba(60, 133, 89, 0.34), rgba(32, 53, 34, 0.78));
+}
+
+.council-chamber__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.council-chamber__prompt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.council-chamber__prompt-chips button {
+  min-height: 28px;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(128, 217, 255, 0.2);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: rgba(232, 244, 255, 0.86);
+  font-size: 0.75rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(28, 63, 92, 0.24);
+}
+
+.council-chamber__prompt-chips button:first-child {
+  flex-basis: 100%;
+  justify-content: start;
+  color: #dff7ff;
+  text-align: start;
+}
+
+.council-chamber__prompt-chips button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.council-chamber__selected {
+  display: grid;
+  gap: 7px;
+  padding: 13px 14px;
+  border-color: color-mix(in srgb, var(--general-accent) 35%, rgba(246,197,111,0.18));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--general-accent) 10%, transparent), rgba(12,10,8,0.64));
+}
+
+.council-chamber__selected {
+  display: grid;
+  max-height: 190px;
+  overflow: auto;
+}
+
+.council-chamber__selected-meta {
+  display: grid;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--general-accent) 24%, transparent);
+}
+
+.council-chamber__selected-meta span {
+  overflow: hidden;
+  color: rgba(255, 244, 220, 0.72);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber__selected h3,
+.council-chamber__decision h3 {
+  margin: 0;
+  color: #ffe2a2;
+}
+
+.council-chamber__selected p,
+.council-chamber__decision p,
+.council-chamber__bubble p {
+  margin: 0;
+  color: rgba(255, 248, 232, 0.92);
+  line-height: 1.48;
+  font-size: 0.9rem;
+}
+
+.council-chamber__bubble p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.council-chamber__selected small,
+.council-chamber__decision small,
+.council-chamber__bubble small {
+  color: rgba(248, 237, 213, 0.58);
+}
+
+.council-chamber__bubble small {
+  display: none;
+}
+
+.council-chamber__chat {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  scrollbar-gutter: stable;
+}
+
+.council-chamber__round-label {
+  padding: 7px 9px;
+  border: 1px solid rgba(246, 197, 111, 0.18);
+  border-radius: 14px;
+  color: rgba(255, 232, 170, 0.78);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  background: rgba(18, 12, 8, 0.78);
+}
+
+.council-chamber__round {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(246, 197, 111, 0.16);
+}
+
+.council-chamber__operator-note {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px solid rgba(128, 217, 255, 0.2);
+  border-radius: 18px;
+  background: rgba(28, 63, 92, 0.28);
+}
+
+.council-chamber__operator-note p {
+  margin: 0;
+  color: rgba(232, 244, 255, 0.88);
+  line-height: 1.32;
+  font-size: 0.8rem;
+}
+
+.council-chamber__bubble {
+  display: grid;
+  gap: 8px;
+  padding: 12px 13px;
+  border: 1px solid color-mix(in srgb, var(--general-accent) 42%, rgba(255,255,255,0.1));
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--general-accent) 15%, rgba(0,0,0,0.18)), rgba(15, 13, 11, 0.82)),
+    rgba(0, 0, 0, 0.28);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18), inset 0 1px rgba(255, 244, 209, 0.06);
+}
+
+.council-chamber__message-row {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.council-chamber__message-body {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.council-chamber__avatar {
+  --chair-row-y: 0%;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--general-accent, #f6c56f) 54%, rgba(255,255,255,0.18));
+  border-radius: 50%;
+  color: #f8edd5;
+  font-size: 0.62rem;
+  font-weight: 860;
+  background-color: rgba(0,0,0,0.34);
+  background-repeat: no-repeat;
+  background-size: 600% 800%;
+  background-position: 0% var(--chair-row-y);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.28), 0 0 0 3px rgba(255,255,255,0.035);
+}
+
+.council-chamber__avatar--portrait {
+  background-size: 84% auto;
+  background-position: 50% 76%;
+  background-color: rgba(5, 5, 4, 0.52);
+}
+
+.council-chamber__avatar--dlv {
+  border-color: rgba(128, 217, 255, 0.56);
+  background: linear-gradient(135deg, rgba(21, 106, 159, 0.9), rgba(6, 28, 47, 0.96));
+}
+
+.council-chamber__bubble-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.council-chamber__bubble-head > span {
+  color: rgba(255, 246, 221, 0.92);
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+}
+
+.council-chamber__bubble-head em {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--general-accent, #f6c56f) 72%, #ffffff 28%);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber__bubble-head > b {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+}
+
+.council-chamber__bubble.is-support .council-chamber__bubble-head > b { color: #10351f; background: #8af0ac; }
+.council-chamber__bubble.is-neutral .council-chamber__bubble-head > b { color: #062a3f; background: #9adfff; }
+.council-chamber__bubble.is-against .council-chamber__bubble-head > b { color: #3b0c08; background: #ff9a8f; }
+
+.council-chamber__reply-context {
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border-inline-start: 3px solid color-mix(in srgb, var(--general-accent) 62%, transparent);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.council-chamber__reply-context span {
+  color: color-mix(in srgb, var(--general-accent) 74%, #ffffff 26%);
+  font-size: 0.66rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.council-chamber__reply-context p {
+  display: block;
+  margin: 0;
+  color: rgba(248, 237, 213, 0.8);
+  font-size: 0.82rem;
+  line-height: 1.32;
+}
+
+.council-chamber__typing {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  max-width: 92%;
+  padding: 11px 13px;
+  border: 1px dashed color-mix(in srgb, var(--general-accent, #f6c56f) 30%, rgba(255,255,255,0.1));
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.council-chamber__typing div {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(248, 237, 213, 0.86);
+  font-size: 0.9rem;
+}
+
+.council-chamber__typing div > span[aria-hidden="true"] {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.council-chamber__typing i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(248, 237, 213, 0.72);
+  animation: council-typing-dot 0.9s ease-in-out infinite;
+}
+
+.council-chamber__typing i:nth-child(2) { animation-delay: 0.14s; }
+.council-chamber__typing i:nth-child(3) { animation-delay: 0.28s; }
+
+@keyframes council-typing-dot {
+  0%, 100% { transform: translateY(0); opacity: 0.44; }
+  50% { transform: translateY(-3px); opacity: 1; }
+}
+
+.council-chamber__bubble--dlv {
+  margin-left: 24px;
+  border-color: rgba(128, 217, 255, 0.32);
+  background: linear-gradient(135deg, rgba(28, 83, 124, 0.54), rgba(14, 26, 39, 0.72));
+}
+
+.council-chamber__bubble--dlv .council-chamber__bubble-head > b {
+  color: #082033;
+  background: #9adfff;
+}
+
+.council-chamber__reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.council-chamber__reactions span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: rgba(248, 237, 213, 0.9);
+  font-size: 0.76rem;
+  letter-spacing: normal;
+  text-transform: none;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.council-chamber__reactions em {
+  font-style: normal;
+}
+
+.council-chamber__reactions b {
+  color: rgba(248, 237, 213, 0.84);
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.council-chamber__read-receipts {
+  color: rgba(194, 228, 246, 0.72);
+  font-size: 0.72rem;
+  text-align: end;
+}
+
+.council-chamber__empty {
+  display: grid;
+  gap: 8px;
+  min-height: 170px;
+  place-content: center;
+  padding: 28px;
+  text-align: center;
+  color: rgba(248, 237, 213, 0.64);
+}
+
+.council-chamber__empty b {
+  color: #ffe2a2;
+}
+
+.council-chamber__decision {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border-color: rgba(144, 224, 168, 0.28);
+  background: linear-gradient(135deg, rgba(36, 82, 56, 0.46), rgba(12, 10, 8, 0.7));
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__decision {
+  gap: 1px;
+  min-height: 0;
+  padding: 6px 9px;
+}
+
+.council-chamber__decision h3 {
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__decision h3 {
+  overflow: hidden;
+  font-size: 0.86rem;
+  line-height: 1.16;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber__decision p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  margin-top: 2px;
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__decision p {
+  -webkit-line-clamp: 2;
+  margin-top: 0;
+  font-size: 0.8rem;
+  line-height: 1.24;
+}
+
+.council-chamber[data-council-responses-visible="true"] .council-chamber__decision small {
+  display: none;
+}
+
+.living-v3--council-primary-workspace .living-v3__stage {
+  filter: saturate(0.72) brightness(0.58);
+}
+
+.living-v3--council-primary-workspace .living-v3__room-edge,
+.living-v3--council-primary-workspace .living-v3__alert-stack {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .council-chamber {
+    inset: 64px 10px 42px;
+  }
+
+  .council-chamber__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    align-items: start;
+    padding: 10px 14px 8px;
+  }
+
+  .council-chamber__header p {
+    font-size: 0.92rem;
+    line-height: 1.25;
+  }
+
+  .council-chamber__safety {
+    grid-column: 1 / -1;
+    min-width: 0;
+    padding: 8px 10px;
+  }
+
+  .council-chamber__close {
+    min-height: 38px;
+    padding: 0 14px;
+  }
+
+  .council-chamber__grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    overflow: auto;
+    padding: 10px;
+  }
+
+  .council-chamber__room {
+    min-height: min(440px, 52vh);
+  }
+
+  .council-chamber__general {
+    width: clamp(62px, 8.2vw, 92px);
+    min-height: 94px;
+  }
+
+  .council-chamber__sprite {
+    width: clamp(56px, 7.4vw, 80px);
+  }
+
+  .council-chamber__nameplate {
+    min-width: 64px;
+  }
+
+  .council-chamber__actions--handoff {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .council-chamber__header h2 {
+    font-size: 1.45rem;
+  }
+
+  .council-chamber__header p {
+    display: none;
+  }
+
+  .council-chamber__room {
+    min-height: 410px;
+  }
+}
+
+/* Council V2 — summary-first decision UI. Long/static proof is collapsed by default. */
+.council-chamber[data-council-summary-first="true"] .council-chamber__header {
+  padding: 8px 18px 7px;
+}
+
+.council-chamber[data-council-summary-first="true"] .council-chamber__header h2 {
+  margin: 0;
+  font-size: clamp(1.08rem, 1.6vw, 1.32rem);
+}
+
+.council-chamber__proof {
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(144, 224, 168, 0.22);
+  border-radius: 999px;
+  background: rgba(22, 72, 48, 0.18);
+}
+
+.council-chamber__proof summary {
+  cursor: pointer;
+  color: #a9f0bf;
+  font-size: 0.78rem;
+  font-weight: 780;
+  list-style: none;
+}
+
+.council-chamber__proof summary::-webkit-details-marker { display: none; }
+.council-chamber__proof[open] { border-radius: 16px; }
+.council-chamber__proof span {
+  display: block;
+  margin-top: 4px;
+  color: rgba(248, 237, 213, 0.66);
+  font-size: 0.7rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.council-chamber[data-council-summary-first="true"] .council-chamber__tool,
+.council-chamber[data-council-summary-first="true"][data-council-responses-visible="true"] .council-chamber__tool {
+  grid-template-rows: auto auto auto auto auto auto;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.council-chamber__question-card,
+.council-chamber__planning-guide,
+.council-chamber__consensus,
+.council-chamber__general-summary,
+.council-chamber__transcript {
+  border: 1px solid rgba(246, 197, 111, 0.2);
+  border-radius: 22px;
+  background: rgba(12, 10, 8, 0.58);
+  box-shadow: inset 0 1px rgba(255, 244, 209, 0.08);
+}
+
+.council-chamber__question-card,
+.council-chamber__planning-guide,
+.council-chamber__consensus,
+.council-chamber__general-summary {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+}
+
+.council-chamber__question-card {
+  order: 1;
+  border-color: rgba(128, 217, 255, 0.24);
+  background: linear-gradient(135deg, rgba(28, 63, 92, 0.24), rgba(12, 10, 8, 0.62));
+}
+
+.council-chamber__planning-guide {
+  order: 2;
+  border-color: rgba(128, 217, 255, 0.2);
+  background: linear-gradient(135deg, rgba(24, 50, 72, 0.36), rgba(12, 10, 8, 0.62));
+}
+
+.council-chamber__operator { order: 3; }
+.council-chamber__selected { order: 4; }
+.council-chamber__general-summary { order: 5; }
+
+.council-chamber__consensus {
+  order: 6;
+  border-color: rgba(144, 224, 168, 0.32);
+  background: linear-gradient(135deg, rgba(36, 82, 56, 0.42), rgba(12, 10, 8, 0.72));
+}
+
+.council-chamber__transcript { order: 7; }
+
+.council-chamber__question-card span,
+.council-chamber__planning-guide span,
+.council-chamber__operator-head span,
+.council-chamber__consensus span,
+.council-chamber__general-summary span,
+.council-chamber__next-step span {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.67rem;
+  color: rgba(248, 237, 213, 0.62);
+  font-weight: 720;
+}
+
+.council-chamber__question-card p,
+.council-chamber__consensus p {
+  margin: 0;
+  color: rgba(255, 248, 232, 0.92);
+  font-size: 0.92rem;
+  line-height: 1.36;
+}
+
+.council-chamber__question-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.council-chamber__planning-guide div,
+.council-chamber__operator-head {
+  display: grid;
+  gap: 3px;
+}
+
+.council-chamber__planning-guide b,
+.council-chamber__operator-head b {
+  color: rgba(255, 248, 232, 0.95);
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.council-chamber__planning-guide small,
+.council-chamber__operator-head small {
+  color: rgba(248, 237, 213, 0.58);
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+.council-chamber__question-card label {
+  display: grid;
+}
+
+.council-chamber__question-card textarea {
+  min-height: 42px;
+  max-height: 52px;
+  resize: none;
+  border: 1px solid rgba(246, 197, 111, 0.22);
+  border-radius: 16px;
+  padding: 9px 11px;
+  color: #fff6df;
+  font-size: 0.94rem;
+  line-height: 1.35;
+  background: rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+.council-chamber__question-card textarea:focus {
+  border-color: rgba(246, 197, 111, 0.62);
+  box-shadow: 0 0 0 3px rgba(246, 197, 111, 0.12);
+}
+
+.council-chamber__consensus h3 {
+  margin: 0;
+  color: #d8ffd8;
+  font-size: clamp(1.18rem, 2vw, 1.6rem);
+  line-height: 1.08;
+}
+
+.council-chamber__recommendation-proof {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid rgba(121, 240, 171, 0.26);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(88, 218, 137, 0.13), rgba(255, 255, 255, 0.035));
+}
+
+.council-chamber__recommendation-proof b {
+  color: #dfffdc;
+  font-size: 0.95rem;
+}
+
+.council-chamber__recommendation-proof span {
+  color: rgba(255, 248, 226, 0.72);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.council-chamber__option-rank {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.council-chamber__option-rank em {
+  border: 1px solid rgba(255, 244, 214, 0.14);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 248, 226, 0.78);
+  font-size: 0.72rem;
+  font-style: normal;
+  padding: 5px 9px;
+}
+
+.council-chamber__vote-summary,
+.council-chamber__next-step {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.council-chamber__vote-summary b,
+.council-chamber__next-step b {
+  color: #fff8e8;
+  font-size: 0.86rem;
+}
+
+.council-chamber__vote-summary small {
+  color: rgba(248, 237, 213, 0.56);
+  font-size: 0.72rem;
+}
+
+.council-chamber__general-summary > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.council-chamber__general-card {
+  display: grid;
+  grid-template-columns: minmax(54px, auto) auto;
+  gap: 4px 8px;
+  min-height: 54px;
+  padding: 8px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 16px;
+  color: #fff8e8;
+  text-align: start;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.council-chamber__general-card.is-active {
+  border-color: rgba(246, 197, 111, 0.52);
+  box-shadow: 0 0 0 2px rgba(246, 197, 111, 0.1);
+}
+
+.council-chamber__general-card b,
+.council-chamber__general-card em {
+  font-size: 0.8rem;
+  font-style: normal;
+}
+
+.council-chamber__general-card em {
+  justify-self: end;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.council-chamber__general-card small {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: rgba(248, 237, 213, 0.64);
+  font-size: 0.72rem;
+  line-height: 1.22;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber__general-card.is-support em,
+.council-chamber__bubble.is-support .council-chamber__bubble-head > b { color: #10351f; background: #8af0ac; }
+.council-chamber__general-card.is-neutral em,
+.council-chamber__bubble.is-neutral .council-chamber__bubble-head > b { color: #062a3f; background: #9adfff; }
+.council-chamber__general-card.is-against em,
+.council-chamber__bubble.is-against .council-chamber__bubble-head > b { color: #3b0c08; background: #ff9a8f; }
+.council-chamber__general-card.is-abstain em,
+.council-chamber__bubble.is-abstain .council-chamber__bubble-head > b { color: #211a10; background: #d2c5ac; }
+
+.council-chamber__vote-dot.is-neutral { background: #80d9ff; }
+.council-chamber__vote-dot.is-against { background: #ff7b6f; }
+.council-chamber__vote-dot.is-abstain { background: #b9b0a1; }
+
+.council-chamber__selected summary,
+.council-chamber__transcript summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.council-chamber__selected summary::-webkit-details-marker,
+.council-chamber__transcript summary::-webkit-details-marker { display: none; }
+
+.council-chamber__selected:not([open]) > :not(summary) { display: none; }
+.council-chamber__selected[open] {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.council-chamber__selected summary b {
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #10100c;
+  background: color-mix(in srgb, var(--general-accent) 76%, #ffffff 24%);
+}
+
+.council-chamber__transcript {
+  padding: 10px 12px;
+}
+
+.council-chamber__transcript:not([open]) .council-chamber__chat { display: none; }
+.council-chamber__transcript[open] .council-chamber__chat {
+  max-height: 320px;
+  margin-top: 10px;
+}
+
+/* Council V3 — persistence-first decision brief. Product surface, not fantasy/debug drawer. */
+.council-chamber[data-council-design-pass="decision-brief-v3"] {
+  inset: 58px 18px 70px;
+  border-color: rgba(148, 163, 184, 0.22);
+  border-radius: 24px;
+  color: #eef2ff;
+  background:
+    radial-gradient(circle at 74% 12%, rgba(34, 197, 94, 0.13), transparent 30%),
+    radial-gradient(circle at 18% 84%, rgba(56, 189, 248, 0.12), transparent 34%),
+    linear-gradient(145deg, rgba(8, 11, 18, 0.98), rgba(14, 18, 29, 0.98));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.52), inset 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"]::before {
+  opacity: 0.22;
+  background:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 58px 58px;
+  mask-image: linear-gradient(90deg, transparent, black 18%, black 82%, transparent);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__header {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 58px;
+  padding: 10px 16px;
+  border-bottom-color: rgba(148, 163, 184, 0.16);
+  background: rgba(6, 9, 16, 0.42);
+  backdrop-filter: blur(18px);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__header-copy > span {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid rgba(45, 212, 191, 0.26);
+  border-radius: 999px;
+  color: #a7f3d0;
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: none;
+  background: rgba(20, 184, 166, 0.08);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__header h2 {
+  margin-top: 4px;
+  color: #f8fafc;
+  font-size: clamp(1.22rem, 1.9vw, 1.62rem);
+  letter-spacing: -0.02em;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__proof,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__close {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.66);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__proof summary {
+  color: #cbd5e1;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__close,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__actions button {
+  color: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.92));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 8px 20px rgba(0, 0, 0, 0.18);
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__actions button:first-child,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__actions--handoff button:first-child {
+  color: #062617;
+  border-color: rgba(74, 222, 128, 0.44);
+  background: linear-gradient(180deg, #8af0ac, #4ade80);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__actions button:not(:disabled):active,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__close:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__grid {
+  grid-template-columns: minmax(390px, 0.78fr) minmax(620px, 1.22fr);
+  gap: 14px;
+  padding: 12px;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__room,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__question-card,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__consensus,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-summary,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__operator,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__selected,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__transcript {
+  border-color: rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.58);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__room {
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(45, 212, 191, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.88), rgba(2, 6, 23, 0.92));
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__floor {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: radial-gradient(ellipse at 50% 50%, rgba(148, 163, 184, 0.08), transparent 58%);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__table {
+  width: min(50%, 380px);
+  border-color: rgba(45, 212, 191, 0.42);
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(45, 212, 191, 0.16), transparent 28%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(6, 12, 24, 0.98));
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.36), inset 0 0 0 10px rgba(45, 212, 191, 0.045);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__table::before {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__table-core {
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__table-core b {
+  color: #ccfbf1;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__nameplate {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(2, 6, 23, 0.76);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__tool {
+  gap: 10px;
+  padding-right: 2px;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__question-card {
+  border-color: rgba(56, 189, 248, 0.22);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.10), rgba(15, 23, 42, 0.72));
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__question-card span,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__consensus span,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-summary span,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__next-step span {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__question-card textarea,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__operator textarea {
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #f8fafc;
+  background: rgba(2, 6, 23, 0.54);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__question-card textarea:focus,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__operator textarea:focus {
+  border-color: rgba(56, 189, 248, 0.66);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__consensus {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(74, 222, 128, 0.34);
+  background:
+    linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(15, 23, 42, 0.78)),
+    rgba(15, 23, 42, 0.8);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__consensus::before {
+  content: '';
+  position: absolute;
+  inset-block: 12px;
+  inset-inline-start: 0;
+  width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #86efac, #22d3ee);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__consensus h3 {
+  max-width: 18ch;
+  color: #ecfdf5;
+  font-size: clamp(1.55rem, 3vw, 2.45rem);
+  letter-spacing: -0.045em;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__consensus p {
+  color: #dbeafe;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__recommendation-proof {
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+  align-items: start;
+  border-color: rgba(74, 222, 128, 0.22);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.28);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__recommendation-proof b {
+  color: #bbf7d0;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__recommendation-proof span {
+  color: #cbd5e1;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__vote-summary,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__next-step {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(2, 6, 23, 0.34);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-summary > div {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-card {
+  min-height: 64px;
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(2, 6, 23, 0.28);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-card.is-active {
+  border-color: rgba(56, 189, 248, 0.48);
+  background: rgba(14, 165, 233, 0.10);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.08);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-card small {
+  color: #94a3b8;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__operator {
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__selected[open],
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__transcript[open] .council-chamber__chat {
+  border-color: rgba(56, 189, 248, 0.24);
+}
+
+@media (max-width: 1100px) {
+  .council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-summary > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .council-chamber[data-council-design-pass="decision-brief-v3"] {
+    inset: 54px 8px 32px;
+    border-radius: 18px;
+  }
+
+  .council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__proof {
+    grid-column: 1 / -1;
+    width: fit-content;
+  }
+
+  .council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__recommendation-proof,
+  .council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-summary > div {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Council V3 layout fix — the recommendation card must never collapse into a thin grid row. */
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__tool,
+.council-chamber[data-council-design-pass="decision-brief-v3"][data-council-summary-first="true"] .council-chamber__tool,
+.council-chamber[data-council-design-pass="decision-brief-v3"][data-council-responses-visible="true"] .council-chamber__tool {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__question-card,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__consensus,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-summary,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__operator,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__selected,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__transcript {
+  flex: 0 0 auto;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__consensus {
+  min-height: 238px;
+  overflow: visible;
+  padding: 16px 18px 15px;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__consensus h3 {
+  margin-block: 2px 4px;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__recommendation-proof,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__vote-summary,
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__next-step {
+  position: relative;
+  z-index: 1;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__general-summary {
+  max-height: none;
+}
+
+.council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__operator textarea {
+  min-height: 48px;
+  max-height: 64px;
+}
+
+@media (max-height: 760px) and (min-width: 1101px) {
+  .council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__grid {
+    grid-template-columns: minmax(330px, 0.58fr) minmax(680px, 1.42fr);
+  }
+
+  .council-chamber[data-council-design-pass="decision-brief-v3"] .council-chamber__room {
+    min-height: 0;
+  }
+}
+
+/* Council V4 guided planning flow - professional workbench elements, not rectangle copy blocks. */
+.council-chamber[data-council-planning-workspace="true"] {
+  --council-flow-accent: #5eead4;
+  --council-flow-blue: #60a5fa;
+  --council-flow-surface: rgba(8, 13, 24, 0.76);
+  --council-flow-line: rgba(148, 163, 184, 0.18);
+  font-feature-settings: "cv01", "ss03", "kern";
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__header-copy p {
+  max-width: 820px;
+  color: rgba(226, 232, 240, 0.74);
+  font-size: 0.88rem;
+  line-height: 1.32;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__tool {
+  padding-inline-end: 4px;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  overflow: hidden;
+  border: 1px solid rgba(94, 234, 212, 0.22);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 4% 50%, rgba(94, 234, 212, 0.18), transparent 24%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.76), rgba(2, 6, 23, 0.68));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide::before {
+  content: '';
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(94, 234, 212, 0.42);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(94, 234, 212, 0.44), rgba(94, 234, 212, 0.08) 46%, transparent 49%),
+    rgba(2, 6, 23, 0.72);
+  box-shadow:
+    0 0 0 7px rgba(94, 234, 212, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide > span {
+  position: absolute;
+  inset-inline-start: 58px;
+  inset-block-start: 9px;
+  color: #99f6e4;
+  font-size: 0.72rem;
+  font-weight: 760;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide div {
+  display: grid;
+  gap: 3px;
+  padding-block-start: 10px;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide b {
+  color: #f8fafc;
+  font-size: 0.92rem;
+  line-height: 1.28;
+  font-weight: 680;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide small {
+  color: rgba(203, 213, 225, 0.66);
+  font-size: 0.76rem;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card,
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator,
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__selected,
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-summary {
+  position: relative;
+  isolation: isolate;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card::after,
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator::after,
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__selected::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), transparent 32%, rgba(94, 234, 212, 0.04));
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card textarea,
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator textarea {
+  min-height: 58px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.66), rgba(15, 23, 42, 0.44));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    inset 0 -12px 24px rgba(15, 23, 42, 0.32);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-summary {
+  padding: 10px 10px 12px;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.62));
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-summary > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 4px 9px;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 720;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-summary > div {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 4px;
+  scrollbar-width: thin;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card {
+  position: relative;
+  flex: 0 0 minmax(128px, 1fr);
+  min-width: 128px;
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 11px 12px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.78));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 18px rgba(0,0,0,0.14);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.62);
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.08);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card.is-support::before { background: #86efac; box-shadow: 0 0 0 4px rgba(134, 239, 172, 0.12); }
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card.is-neutral::before { background: #93c5fd; box-shadow: 0 0 0 4px rgba(147, 197, 253, 0.12); }
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card.is-against::before { background: #fca5a5; box-shadow: 0 0 0 4px rgba(252, 165, 165, 0.12); }
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card.is-active {
+  border-color: rgba(94, 234, 212, 0.5);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(94, 234, 212, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(20, 184, 166, 0.16), rgba(2, 6, 23, 0.78));
+  box-shadow:
+    0 0 0 1px rgba(94, 234, 212, 0.18),
+    0 14px 32px rgba(20, 184, 166, 0.08),
+    inset 0 1px 0 rgba(255,255,255,0.09);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card b,
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator-head b {
+  color: #f8fafc;
+  font-size: 0.96rem;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card em {
+  justify-self: end;
+  padding: 3px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-style: normal;
+  font-size: 0.72rem;
+  background: rgba(2, 6, 23, 0.44);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card small {
+  grid-column: 1 / -1;
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(203, 213, 225, 0.72);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 24px;
+  border-color: rgba(96, 165, 250, 0.24);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96, 165, 250, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(2, 6, 23, 0.74));
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 10px;
+  align-items: center;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator-head::before {
+  content: '';
+  grid-row: 1 / span 3;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(96, 165, 250, 0.38);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(96, 165, 250, 0.32), rgba(94, 234, 212, 0.08)),
+    rgba(2, 6, 23, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 10px 22px rgba(0,0,0,0.2);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator-head span {
+  color: #93c5fd;
+  font-size: 0.73rem;
+  font-weight: 760;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator-head small {
+  color: rgba(219, 234, 254, 0.7);
+  font-size: 0.78rem;
+  line-height: 1.22;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__actions--consult {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  margin-top: 0;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__actions--consult button:last-child {
+  color: #dbeafe;
+  border-color: rgba(96, 165, 250, 0.28);
+  background:
+    linear-gradient(180deg, rgba(30, 41, 59, 0.78), rgba(15, 23, 42, 0.84));
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__prompt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__prompt-chips button {
+  min-height: 32px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-size: 0.76rem;
+  font-weight: 680;
+  line-height: 1.2;
+  text-align: start;
+  background:
+    linear-gradient(180deg, rgba(30, 41, 59, 0.7), rgba(2, 6, 23, 0.66));
+  box-shadow: inset 0 1px rgba(255,255,255,0.06);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__prompt-chips button:first-child {
+  flex-basis: 100%;
+  color: #ecfeff;
+  border-color: rgba(94, 234, 212, 0.26);
+  background:
+    linear-gradient(180deg, rgba(20, 184, 166, 0.16), rgba(2, 6, 23, 0.66));
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__prompt-chips button:not(:disabled):hover,
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-card:not(:disabled):hover {
+  border-color: rgba(94, 234, 212, 0.36);
+  transform: translateY(-1px);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__selected[open] {
+  max-height: none;
+  border-radius: 24px;
+  border-color: color-mix(in srgb, var(--general-accent) 44%, rgba(148, 163, 184, 0.16));
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--general-accent) 18%, transparent), transparent 34%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.68));
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__selected summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__selected summary span {
+  color: color-mix(in srgb, var(--general-accent) 72%, #e2e8f0);
+  font-size: 0.76rem;
+  font-weight: 760;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__selected h3 {
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__selected p {
+  color: rgba(248, 250, 252, 0.9);
+  font-size: 0.92rem;
+  line-height: 1.42;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__actions--handoff button:first-child {
+  color: #052e16;
+  border-color: rgba(134, 239, 172, 0.46);
+  background: linear-gradient(180deg, #bbf7d0, #86efac);
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__actions--handoff button:last-child {
+  color: #ecfeff;
+  border-color: rgba(94, 234, 212, 0.3);
+  background:
+    linear-gradient(180deg, rgba(20, 184, 166, 0.2), rgba(15, 23, 42, 0.86));
+}
+
+.council-chamber[data-council-planning-workspace="true"] button:focus-visible,
+.council-chamber[data-council-planning-workspace="true"] textarea:focus-visible,
+.council-chamber[data-council-planning-workspace="true"] summary:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.72);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .council-chamber[data-council-planning-workspace="true"] *,
+  .council-chamber[data-council-planning-workspace="true"] *::before,
+  .council-chamber[data-council-planning-workspace="true"] *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide {
+    border-radius: 22px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__operator-head,
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__actions--consult {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Council V4 flow order fix - topic, stepper, status, advisor dock, consult. */
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card { order: 1; }
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide { order: 2; }
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__consensus { order: 3; }
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__general-summary { order: 4; }
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator { order: 5; }
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__selected { order: 6; }
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__transcript { order: 7; }
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide {
+  min-height: 64px;
+  border-radius: 24px;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide > span {
+  position: static;
+  inset: auto;
+  align-self: end;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide::before {
+  grid-row: 1 / span 2;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide div {
+  grid-column: 2;
+  grid-row: 2;
+  padding-block-start: 0;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__consensus {
+  min-height: 214px;
+  padding: 13px 16px 14px;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__consensus h3 {
+  font-size: clamp(1.34rem, 2.3vw, 2rem);
+  max-width: 24ch;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__consensus p {
+  font-size: 0.92rem;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card textarea {
+  min-height: 48px;
+}
+
+.council-chamber[data-council-planning-workspace="true"] .council-chamber__operator textarea {
+  min-height: 52px;
+  max-height: 78px;
+}
+
+/* Council V4 desktop split flow - status and 1:1 consult visible together. */
+@media (min-width: 1101px) {
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__tool,
+  .council-chamber[data-council-planning-workspace="true"][data-council-summary-first="true"] .council-chamber__tool,
+  .council-chamber[data-council-planning-workspace="true"][data-council-responses-visible="true"] .council-chamber__tool {
+    display: grid;
+    grid-template-columns: minmax(300px, 0.95fr) minmax(330px, 1.05fr);
+    grid-auto-rows: auto;
+    align-content: start;
+    gap: 10px;
+    overflow: auto;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(300px, 1.08fr);
+    gap: 8px 12px;
+    align-items: end;
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card > span,
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card > p {
+    grid-column: 1;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card > p {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 0;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card > label {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card textarea {
+    min-height: 54px;
+    max-height: 70px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card .council-chamber__actions {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    margin-top: 0;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide {
+    grid-column: 1 / -1;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__consensus {
+    grid-column: 1;
+    grid-row: 3;
+    min-height: 280px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__operator {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    min-height: 280px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__general-summary {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__selected {
+    grid-column: 1 / -1;
+    grid-row: 5;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__transcript {
+    grid-column: 1 / -1;
+    grid-row: 6;
+  }
+}
+
+/* Council V4 question compact fix - keep topic editable but prevent collapse. */
+@media (min-width: 1101px) {
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card {
+    min-height: 116px;
+    overflow: visible;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card > span {
+    align-self: end;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card > label,
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card .council-chamber__actions {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+/* Council V4 first-screen fit - keep consult input visible on 16:9 dashboard height. */
+@media (min-width: 1101px) {
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card {
+    min-height: 92px;
+    padding: 9px 12px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card textarea {
+    min-height: 42px;
+    max-height: 50px;
+    padding-block: 7px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__question-card .council-chamber__actions button {
+    min-height: 28px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide {
+    min-height: 52px;
+    padding-block: 8px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide::before {
+    width: 30px;
+    height: 30px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__planning-guide b {
+    font-size: 0.86rem;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__consensus,
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__operator {
+    min-height: 220px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__operator {
+    padding: 10px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__operator textarea {
+    min-height: 44px;
+    max-height: 56px;
+  }
+
+  .council-chamber[data-council-planning-workspace="true"] .council-chamber__prompt-chips button {
+    min-height: 28px;
+    padding-block: 5px;
+  }
+}
+
+/* Council Minimal Rescue V1 - chat-first planning room, not a dashboard cockpit. */
+.council-chamber[data-council-minimal-rescue="true"] {
+  --council-minimal-surface: rgba(11, 10, 9, 0.78);
+  --council-minimal-line: rgba(255, 231, 173, 0.16);
+  --council-minimal-strong: #ffe5ad;
+  --council-minimal-soft: rgba(255, 239, 206, 0.68);
+  --council-minimal-muted: rgba(255, 239, 206, 0.46);
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__header {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding-block: 8px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__header h2 {
+  margin: 1px 0 0;
+  font-size: clamp(1.08rem, 1.7vw, 1.38rem);
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__header-copy p {
+  max-width: 540px;
+  font-size: 0.8rem;
+  color: var(--council-minimal-muted);
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__proof {
+  opacity: 0.72;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__grid {
+  grid-template-columns: minmax(470px, 1.04fr) minmax(420px, 0.96fr);
+  gap: 14px;
+  padding: 10px 12px 12px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__room {
+  border-radius: 28px;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255, 213, 139, 0.18), transparent 30%),
+    linear-gradient(135deg, #1d140e, #3a2415 48%, #130e0a);
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__tool {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: center;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+  padding: clamp(12px, 1.8vw, 22px);
+  border: 1px solid var(--council-minimal-line);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 230, 170, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(18, 13, 10, 0.74), rgba(8, 7, 6, 0.66));
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__planning-guide,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__selected,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__transcript,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__recommendation-proof,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__vote-summary,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__next-step {
+  display: none;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__question-card,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__consensus,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator {
+  display: none;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="start"] .council-chamber__question-card,
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="council"] .council-chamber__consensus,
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="council"] .council-chamber__general-summary,
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator,
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__general-summary {
+  display: grid;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__question-card,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__consensus,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary {
+  width: min(100%, 620px);
+  margin: 0 auto;
+  border: 1px solid var(--council-minimal-line);
+  border-radius: 26px;
+  background: var(--council-minimal-surface);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__question-card {
+  gap: 14px;
+  min-height: 0;
+  padding: 24px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__question-card > span,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__consensus > span,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary > span,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator-head > span {
+  color: var(--council-minimal-muted);
+  font-size: 0.74rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__question-card > p {
+  margin: 0;
+  color: var(--council-minimal-soft);
+  font-size: clamp(1rem, 1.35vw, 1.18rem);
+  line-height: 1.42;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__question-card textarea,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator textarea {
+  min-height: 112px;
+  max-height: none;
+  padding: 16px 18px;
+  border-radius: 22px;
+  border-color: rgba(255, 229, 173, 0.22);
+  font-size: 1rem;
+  line-height: 1.45;
+  background: rgba(3, 3, 3, 0.34);
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__actions button {
+  min-height: 46px;
+  border-radius: 999px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__actions button:first-child {
+  color: #180f07;
+  border-color: rgba(255, 225, 163, 0.78);
+  background: linear-gradient(135deg, #ffe2a4, #f7b95a);
+  box-shadow: 0 14px 30px rgba(246, 197, 111, 0.18);
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__consensus {
+  gap: 14px;
+  padding: 24px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__consensus h3 {
+  margin: 0;
+  color: var(--council-minimal-strong);
+  font-size: clamp(1.36rem, 2vw, 2rem);
+  line-height: 1.12;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__consensus p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--council-minimal-soft);
+  font-size: 0.98rem;
+  line-height: 1.48;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__actions--handoff {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary {
+  gap: 10px;
+  padding: 12px;
+  box-shadow: none;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary > div {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card {
+  min-width: 96px;
+  max-width: 120px;
+  padding: 10px 12px;
+  border-radius: 18px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card small {
+  display: none;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator {
+  gap: 14px;
+  padding: 22px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator-head {
+  display: grid;
+  gap: 6px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator-head b {
+  color: var(--council-minimal-strong);
+  font-size: clamp(1.3rem, 1.8vw, 1.8rem);
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator-head small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--council-minimal-soft);
+  font-size: 0.94rem;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__actions--consult {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  order: 4;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__prompt-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__prompt-chips button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .council-chamber[data-council-minimal-rescue="true"] .council-chamber__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .council-chamber[data-council-minimal-rescue="true"] .council-chamber__room {
+    min-height: 330px;
+  }
+
+  .council-chamber[data-council-minimal-rescue="true"] .council-chamber__actions,
+  .council-chamber[data-council-minimal-rescue="true"] .council-chamber__actions--handoff,
+  .council-chamber[data-council-minimal-rescue="true"] .council-chamber__actions--consult {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Council Minimal Rescue V1 compact selector fix - advisor dock must not clip. */
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary {
+  max-height: 96px;
+  overflow: hidden;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary > span {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary > div {
+  gap: 6px;
+  padding: 0 2px 2px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card {
+  min-height: 40px;
+  min-width: 88px;
+  max-width: 112px;
+  padding: 7px 10px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card b {
+  font-size: 0.82rem;
+  line-height: 1.05;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card em {
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+/* Council Minimal Rescue V1 advisor dock row fix - keep selector visible and usable. */
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary {
+  grid-template-rows: auto auto;
+  max-height: 118px;
+  min-height: 82px;
+  overflow: hidden;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary > div {
+  min-height: 48px;
+  height: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card {
+  min-height: 44px;
+}
+
+/* Council Minimal Rescue V1 advisor chip label trim - dot plus name is enough. */
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card em {
+  display: none;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card {
+  align-content: center;
+}
+
+/* Council Minimal Rescue V1 single-column override - neutralize older V4 desktop grid placement. */
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__question-card,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__consensus,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary {
+  grid-column: 1 / -1;
+  grid-row: auto;
+  box-sizing: border-box;
+  max-width: min(100%, 620px);
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator {
+  max-width: min(100%, 560px);
+  min-height: 0;
+  padding: 18px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator textarea {
+  min-height: 84px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__actions--consult {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+/* Council Minimal Rescue V1 advisor fit fix - keep chat panel inside the tool frame. */
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__question-card,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__consensus,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary {
+  width: 100%;
+  max-width: 100%;
+  margin-inline: 0;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__tool {
+  align-content: start;
+  gap: 8px;
+  padding: 14px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__general-summary {
+  min-height: 70px;
+  max-height: 82px;
+  padding: 7px 9px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator {
+  gap: 9px;
+  padding: 14px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator-head {
+  gap: 3px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator-head b {
+  font-size: 1.3rem;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator-head small {
+  -webkit-line-clamp: 2;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator textarea {
+  min-height: 58px;
+  padding: 11px 13px;
+  border-radius: 16px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__actions button {
+  min-height: 34px;
+  padding-inline: 12px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__prompt-chips button {
+  min-height: 30px;
+  padding: 0 11px;
+  font-size: 0.72rem;
+}
+
+/* Council Minimal Rescue V1 tool grid fit - one column must stay inside the right-side tool frame. */
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__tool {
+  grid-template-columns: minmax(0, 1fr) !important;
+  justify-items: stretch;
+  overflow-x: hidden;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__question-card,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__consensus,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__operator,
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary {
+  min-width: 0;
+  justify-self: stretch;
+  width: auto;
+  max-width: 100%;
+}
+
+/* Council Minimal Rescue V1 advisor dock all-visible grid - no horizontal chip clipping. */
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary {
+  min-height: 98px;
+  max-height: 108px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-summary > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  min-height: 64px;
+  overflow: hidden;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card {
+  min-width: 0;
+  max-width: none;
+  min-height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Council Minimal Rescue V1 advisor vertical fit - hide prompt chips so one-advisor chat fits the frame. */
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__prompt-chips {
+  display: none;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator {
+  gap: 8px;
+  padding: 12px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator textarea {
+  min-height: 52px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__actions--consult {
+  gap: 6px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__actions--consult button {
+  min-height: 32px;
+  padding-inline: 10px;
+}
+
+/* Council Command Rail V2 - stop rounded-card dashboard; make continuation and step-plan actions obvious. */
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__tool {
+  gap: 10px;
+  padding: 16px;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__consensus {
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(255, 210, 132, 0.24);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 210, 132, 0.12), transparent 45%),
+    linear-gradient(145deg, rgba(18, 13, 8, 0.98), rgba(6, 6, 5, 0.94));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px);
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__consensus > span {
+  display: none;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__consensus h3 {
+  margin: 0;
+  padding: 22px 24px 4px;
+  max-width: 18ch;
+  color: #ffe7ad;
+  font-size: clamp(1.75rem, 2.25vw, 3rem);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__consensus p {
+  margin: 0;
+  padding: 0 24px 14px;
+  max-width: 60ch;
+  color: rgba(255, 235, 192, 0.68);
+  font-size: 0.95rem;
+  line-height: 1.42;
+  -webkit-line-clamp: 2;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__recommendation-proof,
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__vote-summary {
+  display: none;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__next-step {
+  display: grid;
+  gap: 3px;
+  margin: 0 24px 14px;
+  padding: 9px 0 0;
+  border-top: 1px solid rgba(255, 210, 132, 0.18);
+  background: transparent;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-rail {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-top: 1px solid rgba(255, 210, 132, 0.2);
+  background:
+    linear-gradient(90deg, rgba(247, 185, 90, 0.12), transparent 45%),
+    rgba(255, 236, 190, 0.035);
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  color: rgba(255, 235, 192, 0.72);
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-rail-head span {
+  color: rgba(255, 235, 192, 0.48);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-rail-head b {
+  font-size: 0.92rem;
+  font-weight: 750;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-input textarea {
+  width: 100%;
+  min-height: 58px;
+  resize: vertical;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 224, 163, 0.32);
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  color: #fff0c5;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-input textarea:focus {
+  border-bottom-color: #f7c76c;
+  box-shadow: 0 10px 26px rgba(247, 199, 108, 0.09);
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-input textarea::placeholder {
+  color: rgba(255, 235, 192, 0.42);
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.05fr) minmax(0, 0.85fr);
+  gap: 8px;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-actions button,
+.council-chamber[data-council-command-rail="v2"] .council-chamber__handoff-strip button {
+  min-height: 40px;
+  border: 1px solid rgba(255, 224, 163, 0.24);
+  border-radius: 4px;
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  background: rgba(255, 235, 192, 0.055);
+  color: rgba(255, 240, 197, 0.9);
+  font-weight: 850;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-actions button:first-child {
+  border-color: rgba(247, 199, 108, 0.62);
+  background: linear-gradient(135deg, #ffe4aa, #dda24b);
+  color: #170f07;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-actions button:disabled,
+.council-chamber[data-council-command-rail="v2"] .council-chamber__handoff-strip button:disabled {
+  opacity: 0.38;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__handoff-strip {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__handoff-strip button {
+  min-height: 30px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+  background: transparent;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__general-summary {
+  border: 0;
+  border-top: 1px solid rgba(255, 210, 132, 0.14);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__general-summary > span {
+  color: rgba(255, 235, 192, 0.44);
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__general-card {
+  border-radius: 4px;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  background: rgba(18, 25, 34, 0.62);
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__general-card.is-active {
+  background: linear-gradient(135deg, rgba(0, 120, 105, 0.72), rgba(10, 26, 32, 0.88));
+}
+
+@media (max-width: 1200px) {
+  .council-chamber[data-council-command-rail="v2"] .council-chamber__command-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Council Command Rail V2 fit refinement - council mode is decision + command input, not advisor chips. */
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__general-summary {
+  display: none;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__consensus {
+  max-height: none;
+  min-height: 0;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__consensus h3 {
+  padding: 16px 20px 2px;
+  max-width: 20ch;
+  font-size: clamp(1.42rem, 1.9vw, 2.35rem);
+  line-height: 1.04;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__consensus p {
+  padding: 0 20px 8px;
+  font-size: 0.88rem;
+  line-height: 1.32;
+  -webkit-line-clamp: 1;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__next-step {
+  margin: 0 20px 8px;
+  padding-top: 7px;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__next-step span {
+  font-size: 0.68rem;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__next-step b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-rail {
+  gap: 7px;
+  padding: 9px 12px 10px;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-rail-head b {
+  font-size: 0.82rem;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-input textarea {
+  min-height: 42px;
+  padding: 7px 0;
+  line-height: 1.32;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-actions {
+  gap: 6px;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-actions button {
+  min-height: 34px;
+  font-size: 0.78rem;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__handoff-strip {
+  padding-top: 0;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__handoff-strip button {
+  min-height: 26px;
+  font-size: 0.72rem;
+}
+
+/* Council Archive + Clean Stage V1 — DLV asked for new discussion/archive and removal of marked static HUD clutter. */
+.council-chamber[data-council-archive="local-restore-v1"] .council-chamber__header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.council-chamber__session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+.council-chamber__session-actions .living-v3__workspace-room-switcher {
+  min-height: 34px;
+  max-width: 190px;
+  border-color: rgba(114, 224, 212, 0.44);
+  border-radius: 0;
+  background: rgba(3, 17, 18, 0.82);
+  color: #eafff8;
+  font-weight: 900;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+
+.council-chamber__session-actions button,
+.council-chamber__archive-item button {
+  min-height: 34px;
+  border: 1px solid rgba(114, 224, 212, 0.44);
+  border-radius: 0;
+  background: rgba(3, 17, 18, 0.76);
+  color: #eafff8;
+  cursor: pointer;
+  font-weight: 900;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+
+.council-chamber__session-actions button {
+  padding: 0 12px;
+}
+
+.council-chamber__session-actions button:disabled,
+.council-chamber__archive-item button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.council-chamber__archive {
+  display: grid;
+  gap: 8px;
+  max-height: 28vh;
+  min-height: 0;
+  margin: -4px 0 8px;
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid rgba(114, 224, 212, 0.34);
+  background:
+    linear-gradient(135deg, rgba(114, 224, 212, 0.12), transparent 36%),
+    rgba(3, 16, 18, 0.88);
+  box-shadow: inset 0 1px 0 rgba(114, 224, 212, 0.18);
+}
+
+.council-chamber__archive-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.council-chamber__archive-head span,
+.council-chamber__archive-item span,
+.council-chamber__archive p {
+  color: rgba(229, 246, 240, 0.68);
+  font-size: 12px;
+}
+
+.council-chamber__archive-head b,
+.council-chamber__archive-item b {
+  color: #fff2c8;
+}
+
+.council-chamber__archive-list {
+  display: grid;
+  gap: 6px;
+}
+
+.council-chamber__archive-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(229, 191, 116, 0.25);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.council-chamber__archive-item div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.council-chamber__archive-item b,
+.council-chamber__archive-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.living-v3[data-council-clean-stage="true"] .living-v3__hud {
+  grid-template-columns: minmax(0, auto) 1fr;
+}
+
+.living-v3[data-council-clean-stage="true"] .living-v3__chips,
+.living-v3[data-council-clean-stage="true"] .living-v3__actions,
+.living-v3[data-council-clean-stage="true"] .living-v3__room-edge,
+.living-v3[data-council-clean-stage="true"] .living-v3__alert-stack,
+.living-v3[data-council-clean-stage="true"] .living-v3__kernel-telemetry-strip,
+.living-v3[data-council-clean-stage="true"] .living-v3__event-readback {
+  display: none !important;
+}
+
+@media (max-width: 940px) {
+  .council-chamber[data-council-archive="local-restore-v1"] .council-chamber__header {
+    grid-template-columns: 1fr;
+  }
+
+  .council-chamber__session-actions {
+    justify-content: stretch;
+  }
+
+  .council-chamber__session-actions button {
+    flex: 1 1 110px;
+  }
+}
+
+/* Council Right Workspace Fill V1 — fill DLV-marked dead area and restore portrait chat for one-general mode. */
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__tool {
+  min-height: 0;
+  height: 100%;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__tool {
+  align-content: stretch;
+  grid-template-rows: minmax(0, 1fr);
+  padding: 12px;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__consensus {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(64px, 1fr) auto;
+  min-height: 100%;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__command-rail {
+  order: 5;
+  border-bottom: 0;
+  border-top: 1px solid rgba(255, 210, 132, 0.14);
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__command-rail-head {
+  display: none;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__command-input textarea {
+  min-height: 34px;
+  max-height: 60px;
+  padding: 5px 0;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__command-actions button {
+  min-height: 30px;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__handoff-strip button {
+  min-height: 23px;
+}
+
+.council-chamber__advisor-dock {
+  order: 4;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  min-height: 64px;
+  overflow: hidden;
+  padding: 14px 16px 16px;
+  background:
+    radial-gradient(circle at 74% 20%, rgba(114, 224, 212, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(255, 236, 190, 0.035), rgba(0, 0, 0, 0.13));
+}
+
+.council-chamber__advisor-dock-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  color: rgba(255, 235, 192, 0.72);
+}
+
+.council-chamber__advisor-dock-head span {
+  color: rgba(255, 235, 192, 0.48);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.council-chamber__advisor-dock-head b {
+  color: rgba(255, 239, 206, 0.86);
+  font-size: 0.9rem;
+}
+
+.council-chamber__advisor-dock-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  align-content: start;
+}
+
+.council-chamber__advisor-dock-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 82px;
+  padding: 10px 10px 22px;
+  border: 1px solid color-mix(in srgb, var(--general-accent, #f6c56f) 30%, rgba(255, 224, 163, 0.14));
+  border-radius: 0;
+  color: #fff0c5;
+  text-align: start;
+  cursor: pointer;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--general-accent, #f6c56f) 10%, transparent), rgba(7, 7, 6, 0.55)),
+    rgba(255, 235, 192, 0.035);
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.council-chamber__advisor-dock-card:hover,
+.council-chamber__advisor-dock-card:focus-visible,
+.council-chamber__advisor-dock-card.is-active {
+  border-color: color-mix(in srgb, var(--general-accent, #f6c56f) 70%, #ffffff 12%);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--general-accent, #f6c56f) 18%, transparent), rgba(9, 9, 8, 0.68)),
+    rgba(255, 235, 192, 0.06);
+}
+
+.council-chamber__advisor-dock-vote {
+  position: absolute;
+  left: 7px;
+  bottom: 6px;
+  padding: 2px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(226, 232, 240, 0.86);
+  font-size: 0.64rem;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.1;
+  background: rgba(15, 23, 42, 0.76);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.council-chamber__advisor-dock-card.is-support .council-chamber__advisor-dock-vote {
+  color: #06351f;
+  background: linear-gradient(135deg, #bbf7d0, #86efac);
+}
+
+.council-chamber__advisor-dock-card.is-neutral .council-chamber__advisor-dock-vote {
+  color: #082f49;
+  background: linear-gradient(135deg, #bae6fd, #93c5fd);
+}
+
+.council-chamber__advisor-dock-card.is-against .council-chamber__advisor-dock-vote {
+  color: #3b0c08;
+  background: linear-gradient(135deg, #fecaca, #fca5a5);
+}
+
+.council-chamber__advisor-dock-card.is-abstain .council-chamber__advisor-dock-vote {
+  color: #111827;
+  background: #cbd5e1;
+}
+
+.council-chamber__advisor-dock-avatar,
+.council-chamber__general-card-avatar,
+.council-chamber__advisor-chat-portrait {
+  display: block;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--general-accent, #f6c56f) 52%, rgba(255,255,255,0.12));
+  border-radius: 50%;
+  background-color: rgba(5, 5, 4, 0.62);
+  background-repeat: no-repeat;
+  background-size: 86% auto;
+  background-position: 50% 76%;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.28), 0 0 0 3px rgba(255,255,255,0.035);
+}
+
+.council-chamber__advisor-dock-avatar {
+  width: 48px;
+  height: 48px;
+}
+
+.council-chamber__advisor-dock-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.council-chamber__advisor-dock-card b,
+.council-chamber__general-card-copy b {
+  overflow: hidden;
+  color: #fff4ce;
+  direction: ltr;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber__advisor-dock-card small,
+.council-chamber__general-card-copy small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(255, 235, 192, 0.58);
+  font-size: 0.74rem;
+  line-height: 1.25;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.council-chamber[data-council-minimal-rescue="true"] .council-chamber__general-card {
+  grid-template-columns: 32px minmax(0, 1fr);
+  justify-content: stretch;
+  text-align: start;
+}
+
+.council-chamber__general-card-avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.council-chamber__general-card-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__tool {
+  align-content: stretch;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__general-summary {
+  display: none !important;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__operator,
+.council-chamber [data-council-advisor-chat="portrait-bubbles-v1"] {
+  display: grid;
+  grid-template-rows: auto minmax(72px, 1fr) auto auto;
+  gap: 8px;
+  min-height: 0;
+  height: 100%;
+  padding: 12px;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--general-accent, #f6c56f) 11%, transparent), transparent 34%),
+    linear-gradient(180deg, rgba(13, 11, 9, 0.93), rgba(5, 5, 4, 0.9));
+  clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0 calc(100% - 16px), 0 16px);
+}
+
+.council-chamber__advisor-chat-head {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 224, 163, 0.16);
+}
+
+.council-chamber__advisor-chat-portrait {
+  width: 58px;
+  height: 58px;
+}
+
+.council-chamber__advisor-chat-head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.council-chamber__advisor-chat-head span:not(.council-chamber__advisor-chat-portrait),
+.council-chamber__advisor-composer > span {
+  color: rgba(255, 235, 192, 0.46);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.council-chamber__advisor-chat-head b {
+  color: #ffe7ad;
+  font-size: clamp(1.24rem, 1.6vw, 1.7rem);
+  line-height: 1;
+}
+
+.council-chamber__advisor-chat-head small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(255, 239, 206, 0.68);
+  line-height: 1.35;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.council-chamber__advisor-chat-log {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 2px 8px;
+  scrollbar-gutter: stable;
+}
+
+.council-chamber__advisor-chat-log .council-chamber__bubble {
+  border-radius: 18px;
+}
+
+.council-chamber__advisor-empty {
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  min-height: 180px;
+  padding: 18px;
+  border: 1px dashed rgba(255, 224, 163, 0.22);
+  color: rgba(255, 239, 206, 0.66);
+  text-align: center;
+  background: rgba(255, 235, 192, 0.035);
+}
+
+.council-chamber__advisor-empty b {
+  color: #ffe7ad;
+}
+
+.council-chamber__advisor-composer {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__advisor-composer textarea {
+  min-height: 62px;
+  max-height: 112px;
+  resize: vertical;
+  padding: 13px 15px;
+  border-radius: 14px;
+  border-color: rgba(255, 224, 163, 0.24);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__prompt-chips {
+  display: none;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__prompt-chips button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 30px;
+  overflow: hidden;
+  padding: 0 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__actions--consult {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  gap: 8px;
+  order: unset;
+}
+
+@media (max-width: 1280px) {
+  .council-chamber__advisor-dock-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .council-chamber__advisor-dock-card {
+    min-height: 72px;
+  }
+}
+
+@media (max-width: 940px) {
+  .council-chamber[data-council-minimal-rescue="true"][data-council-minimal-mode="advisor"] .council-chamber__actions--consult,
+  .council-chamber__advisor-dock-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Council Advisor Dock responsive density — compact portrait strip on short viewports, fuller dock on tall ones. */
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock {
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  padding: 8px 12px;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-head {
+  display: none;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-content: center;
+  gap: 7px;
+  overflow: hidden;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-card {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  min-height: 44px;
+  padding: 6px 7px 18px;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-copy {
+  display: none;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-card small {
+  display: none;
+}
+
+.council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-card b {
+  font-size: 0.78rem;
+}
+
+@media (min-height: 820px) {
+  .council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__consensus {
+    grid-template-rows: auto auto auto minmax(160px, 1fr) auto;
+  }
+
+  .council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+    min-height: 160px;
+    padding: 14px 16px 16px;
+  }
+
+  .council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-head {
+    display: flex;
+  }
+
+  .council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-card {
+    grid-template-columns: 48px minmax(0, 1fr);
+    justify-items: stretch;
+    min-height: 82px;
+    padding: 10px 10px 22px;
+  }
+
+  .council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-copy {
+    display: grid;
+  }
+
+  .council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-avatar {
+    width: 48px;
+    height: 48px;
+  }
+
+  .council-chamber[data-council-command-rail="v2"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-card small {
+    display: -webkit-box;
+  }
+}
+
+
+/* Council Live Vote Board V1 — visual decision flow, not transcript-only voting. */
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__live-vote-board {
+  position: absolute;
+  inset-inline: clamp(14px, 3.2vw, 30px);
+  inset-block-end: clamp(12px, 2vw, 24px);
+  z-index: 9;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  align-items: stretch;
+  min-height: 176px;
+  padding: 12px 14px;
+  border: 1px solid rgba(94, 234, 212, 0.24);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(94, 234, 212, 0.16), transparent 38%),
+    linear-gradient(135deg, rgba(2, 6, 23, 0.82), rgba(15, 23, 42, 0.68));
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__live-vote-board::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(134, 239, 172, 0.12), transparent 22%, rgba(96, 165, 250, 0.10) 58%, rgba(248, 113, 113, 0.08));
+}
+
+.council-chamber__live-vote-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.council-chamber__live-vote-head span {
+  color: rgba(204, 251, 241, 0.66);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.council-chamber__live-vote-head b {
+  overflow: hidden;
+  color: #ecfeff;
+  font-size: clamp(0.88rem, 1.15vw, 1.06rem);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber__vote-meter {
+  display: flex;
+  overflow: hidden;
+  height: 12px;
+  min-width: 0;
+  border: 1px solid rgba(226, 232, 240, 0.16);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.34);
+}
+
+.council-chamber__vote-meter i {
+  display: block;
+  min-width: 0;
+  height: 100%;
+  transition: width 320ms ease;
+}
+
+.council-chamber__vote-meter .is-support { width: var(--vote-support-pct); background: linear-gradient(90deg, #22c55e, #86efac); }
+.council-chamber__vote-meter .is-neutral { width: var(--vote-neutral-pct); background: linear-gradient(90deg, #38bdf8, #93c5fd); }
+.council-chamber__vote-meter .is-against { width: var(--vote-against-pct); background: linear-gradient(90deg, #f97316, #f87171); }
+.council-chamber__vote-meter .is-abstain { width: var(--vote-abstain-pct); background: linear-gradient(90deg, #64748b, #cbd5e1); }
+
+.council-chamber__decision-timeline {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.council-chamber__decision-timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 9px 4px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.council-chamber__decision-timeline li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -2px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #64748b;
+  transform: translateY(-50%);
+}
+
+.council-chamber__decision-timeline li.is-active {
+  border-color: rgba(94, 234, 212, 0.34);
+  background: rgba(20, 184, 166, 0.12);
+}
+
+.council-chamber__decision-timeline li.is-active::before {
+  background: #5eead4;
+  box-shadow: 0 0 16px rgba(94, 234, 212, 0.58);
+}
+
+.council-chamber__decision-timeline li.is-done::before {
+  background: #86efac;
+}
+
+.council-chamber__decision-timeline span,
+.council-chamber__decision-timeline small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber__decision-timeline span {
+  color: #e0f2fe;
+  font-size: 0.66rem;
+  font-weight: 880;
+}
+
+.council-chamber__decision-timeline small {
+  color: rgba(203, 213, 225, 0.68);
+  font-size: 0.62rem;
+}
+
+.council-chamber__vote-lanes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.council-chamber__vote-lane {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  min-height: 30px;
+  padding: 4px 6px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  color: #f8fafc;
+  background: rgba(2, 6, 23, 0.46);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.045);
+}
+
+.council-chamber__vote-lane:not(:disabled):hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--general-accent) 52%, rgba(148, 163, 184, 0.18));
+}
+
+.council-chamber__vote-lane::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: 6px;
+  width: 3px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.42);
+}
+
+.council-chamber__vote-lane.is-support::before { background: #86efac; box-shadow: 0 0 16px rgba(134, 239, 172, 0.44); }
+.council-chamber__vote-lane.is-neutral::before { background: #93c5fd; box-shadow: 0 0 16px rgba(147, 197, 253, 0.40); }
+.council-chamber__vote-lane.is-against::before { background: #fca5a5; box-shadow: 0 0 16px rgba(252, 165, 165, 0.40); }
+.council-chamber__vote-lane.is-abstain::before { background: #cbd5e1; }
+
+.council-chamber__vote-lane-avatar {
+  width: 26px;
+  height: 26px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--general-accent) 48%, rgba(255,255,255,0.18));
+  border-radius: 50%;
+  background-color: rgba(2, 6, 23, 0.64);
+  background-repeat: no-repeat;
+  background-size: 88% auto;
+  background-position: 50% 76%;
+}
+
+.council-chamber__vote-lane-copy {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.council-chamber__vote-lane-copy b,
+.council-chamber__vote-lane-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.council-chamber__vote-lane-copy b {
+  color: #f8fafc;
+  font-size: 0.72rem;
+  line-height: 1.05;
+}
+
+.council-chamber__vote-lane-copy small {
+  color: rgba(203, 213, 225, 0.66);
+  font-size: 0.66rem;
+}
+
+.council-chamber__vote-lane em {
+  padding: 2px 5px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  color: rgba(226, 232, 240, 0.78);
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 780;
+  background: rgba(15, 23, 42, 0.64);
+}
+
+.council-chamber__vote-lane.is-voted em,
+.council-chamber__vote-lane.is-queued em {
+  color: #06121f;
+  background: color-mix(in srgb, var(--general-accent) 58%, #ffffff 42%);
+}
+
+.council-chamber__vote-lane.is-thinking {
+  border-color: color-mix(in srgb, var(--general-accent) 58%, rgba(94, 234, 212, 0.24));
+  background:
+    radial-gradient(circle at 100% 50%, color-mix(in srgb, var(--general-accent) 22%, transparent), transparent 44%),
+    rgba(2, 6, 23, 0.58);
+  animation: council-live-vote-thinking 1.18s ease-in-out infinite alternate;
+}
+
+.council-chamber__vote-lane.is-thinking em {
+  color: #042f2e;
+  background: #99f6e4;
+}
+
+@keyframes council-live-vote-thinking {
+  from { box-shadow: inset 0 1px rgba(255, 255, 255, 0.05), 0 0 0 rgba(94, 234, 212, 0); }
+  to { box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 0 22px color-mix(in srgb, var(--general-accent) 32%, transparent); }
+}
+
+@media (max-width: 1280px) {
+  .council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__live-vote-board {
+    grid-template-columns: 1fr;
+  }
+
+  .council-chamber__vote-meter {
+    grid-column: auto;
+    order: initial;
+  }
+}
+
+@media (max-width: 920px) {
+  .council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__live-vote-board {
+    position: absolute;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    max-height: 190px;
+    overflow: auto;
+  }
+
+  .council-chamber__vote-lanes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-height: 760px) and (min-width: 1101px) {
+  .council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__live-vote-board {
+    inset-inline: 16px;
+    min-height: 72px;
+    padding: 9px 10px;
+  }
+
+  .council-chamber__vote-lane-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .council-chamber__vote-lane {
+    min-height: 30px;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+}
+
+
+/* Council Input First Polish V1 — DLV correction 2026-06-30.
+   Make the writing/chat surface primary, keep generals secondary, and leave only a large close button top-right. */
+.council-chamber[data-council-input-first="true"] {
+  inset: 58px 18px 58px;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__header {
+  position: relative;
+  display: block;
+  min-height: 82px;
+  padding: 18px 150px 12px 26px;
+  direction: rtl;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__header-copy {
+  text-align: right;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__header-copy h2 {
+  margin: 2px 0 3px;
+  font-size: clamp(1.5rem, 2.1vw, 2.15rem);
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__header-copy p {
+  max-width: none;
+  color: rgba(248, 237, 213, 0.55);
+  font-size: 0.85rem;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-actions {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  display: flex;
+  justify-content: flex-end;
+  z-index: 8;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__close,
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-actions .living-v3__workspace-room-switcher {
+  min-width: 108px;
+  min-height: 52px;
+  padding: 0 24px;
+  border: 1px solid rgba(124, 231, 218, 0.68);
+  border-radius: 15px;
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  background: linear-gradient(135deg, rgba(2, 43, 45, 0.96), rgba(4, 17, 20, 0.92));
+  color: #effff9;
+  font-size: 1.08rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  box-shadow: 0 0 0 1px rgba(124, 231, 218, 0.12), 0 16px 36px rgba(0, 0, 0, 0.32);
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-actions .living-v3__workspace-room-switcher {
+  min-width: 188px;
+  padding-right: 36px;
+}
+
+.council-chamber__session-menu {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  z-index: 7;
+  direction: rtl;
+  color: rgba(248, 237, 213, 0.64);
+}
+
+.council-chamber__session-menu summary {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid rgba(248, 237, 213, 0.16);
+  border-radius: 999px;
+  background: rgba(7, 8, 8, 0.46);
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.council-chamber__session-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.council-chamber__session-menu > div {
+  display: grid;
+  gap: 8px;
+  width: 190px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid rgba(124, 231, 218, 0.22);
+  border-radius: 14px;
+  background: rgba(4, 11, 13, 0.92);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+}
+
+.council-chamber__session-menu button {
+  min-height: 36px;
+  border: 1px solid rgba(124, 231, 218, 0.34);
+  border-radius: 10px;
+  background: rgba(6, 30, 32, 0.74);
+  color: #effff9;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__grid {
+  grid-template-columns: minmax(390px, 0.72fr) minmax(760px, 1.42fr);
+  gap: 16px;
+  padding: 12px 18px 16px;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__room {
+  opacity: 0.9;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__tool {
+  min-width: 0;
+  padding: 0;
+}
+
+/* Council mode: input before advisor cards. */
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__consensus {
+  grid-template-rows: auto auto auto auto minmax(70px, 1fr);
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__command-rail {
+  order: 4;
+  margin: 0;
+  padding: 16px 18px 18px;
+  border-top: 1px solid rgba(255, 224, 163, 0.22);
+  border-bottom: 1px solid rgba(255, 224, 163, 0.12);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(124, 231, 218, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(255, 224, 163, 0.07), rgba(0, 0, 0, 0.12));
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-rail-head {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-rail-head span {
+  color: #8cffd8;
+  font-size: 0.88rem;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-rail-head b {
+  color: rgba(255, 245, 215, 0.9);
+  font-size: 1rem;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-input {
+  position: relative;
+  display: grid;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-input::before {
+  content: 'כתוב כאן';
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 1;
+  color: rgba(140, 255, 216, 0.9);
+  font-size: 0.8rem;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-input textarea {
+  min-height: 104px !important;
+  max-height: 180px;
+  padding: 36px 16px 14px !important;
+  border: 1px solid rgba(140, 255, 216, 0.34) !important;
+  border-radius: 18px !important;
+  background: rgba(1, 9, 11, 0.56) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035), 0 18px 40px rgba(0, 0, 0, 0.16) !important;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-input textarea:focus {
+  border-color: rgba(140, 255, 216, 0.74) !important;
+  box-shadow: 0 0 0 3px rgba(140, 255, 216, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-actions {
+  grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: 10px;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-actions button {
+  min-height: 46px !important;
+  border-radius: 12px;
+  clip-path: none;
+  font-size: 0.92rem;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__command-actions button:first-child {
+  background: linear-gradient(135deg, #95f3b5, #e9c875);
+  color: #120d06;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock {
+  order: 5;
+  min-height: 88px;
+  max-height: 150px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid rgba(255, 224, 163, 0.12);
+  background: rgba(255, 235, 192, 0.025);
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-head {
+  display: none !important;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  overflow: hidden;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-card {
+  grid-template-columns: 34px minmax(0, 1fr);
+  min-height: 58px;
+  padding: 7px 8px 20px;
+  border-radius: 12px;
+  clip-path: none;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-avatar {
+  width: 34px;
+  height: 34px;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-copy {
+  display: grid !important;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-card small {
+  display: none;
+}
+
+/* Advisor mode: fill the right workspace, no narrow chat column / dead right margin. */
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__grid {
+  grid-template-columns: minmax(360px, 0.62fr) minmax(880px, 1.55fr);
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__tool {
+  padding: 12px;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__operator,
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] [data-council-advisor-chat="portrait-bubbles-v1"] {
+  width: 100% !important;
+  max-width: none !important;
+  justify-self: stretch !important;
+  grid-template-rows: auto minmax(260px, 1fr) auto auto;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 22px;
+  clip-path: none;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__advisor-chat-head {
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 16px;
+  padding-bottom: 14px;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__advisor-chat-portrait {
+  width: 72px;
+  height: 72px;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__advisor-chat-log {
+  min-height: 260px;
+  padding: 8px 6px 12px;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__advisor-composer {
+  position: relative;
+}
+
+.council-chamber[data-council-input-first="true"] .council-chamber__advisor-composer > span {
+  color: #8cffd8;
+  font-size: 0.86rem;
+  font-weight: 950;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__advisor-composer textarea {
+  min-height: 118px !important;
+  max-height: 220px;
+  padding: 16px 18px;
+  border: 1px solid rgba(140, 255, 216, 0.36);
+  border-radius: 18px;
+  background: rgba(1, 9, 11, 0.62);
+  font-size: 1.02rem;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__advisor-composer textarea:focus {
+  border-color: rgba(140, 255, 216, 0.78);
+  box-shadow: 0 0 0 3px rgba(140, 255, 216, 0.13);
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__actions--consult {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.95fr);
+  gap: 12px;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__actions--consult button {
+  min-height: 50px;
+  border-radius: 14px;
+  font-size: 0.95rem;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__actions--consult button:first-child {
+  border-color: rgba(149, 243, 181, 0.58);
+  background: linear-gradient(135deg, #a3e8ad, #caa35b);
+  color: #120d06;
+}
+
+@media (max-width: 1320px) {
+  .council-chamber[data-council-input-first="true"] .council-chamber__grid,
+  .council-chamber[data-council-input-first="true"][data-council-minimal-mode="advisor"] .council-chamber__grid {
+    grid-template-columns: minmax(320px, 0.76fr) minmax(620px, 1.24fr);
+  }
+
+  .council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Council Surface Polish V2 — DLV screenshot fix: no vote overlay, no alien buttons, no dead right-panel void. */
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-actions {
+  top: 16px;
+  right: 18px;
+  gap: 8px;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__close,
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-actions .living-v3__workspace-room-switcher,
+.council-chamber__session-actions button,
+.council-chamber__archive-item button {
+  min-height: 40px;
+  border: 1px solid rgba(255, 224, 163, 0.28);
+  border-radius: 14px;
+  clip-path: none;
+  background:
+    linear-gradient(180deg, rgba(58, 38, 20, 0.86), rgba(18, 13, 8, 0.82));
+  color: #ffecc1;
+  box-shadow: inset 0 1px rgba(255, 244, 214, 0.08), 0 10px 22px rgba(0, 0, 0, 0.22);
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__close {
+  min-width: 86px;
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 0.9rem;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-actions .living-v3__workspace-room-switcher {
+  min-width: 172px;
+  min-height: 40px;
+  max-width: 220px;
+  padding: 0 18px;
+  color: #ffecc1;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__tool {
+  overflow: hidden;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__consensus {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__next-step {
+  margin: 0 20px 8px;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__live-vote-board {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.36fr) minmax(0, 0.64fr);
+  grid-template-areas:
+    "head timeline"
+    "meter lanes";
+  gap: 8px 10px;
+  align-items: center;
+  min-height: 0;
+  margin: 0 20px 10px;
+  padding: 10px 12px;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(255, 224, 163, 0.22);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(247, 185, 90, 0.11), transparent 36%),
+    linear-gradient(135deg, rgba(35, 23, 12, 0.84), rgba(8, 7, 6, 0.74));
+  box-shadow: inset 0 1px rgba(255, 244, 214, 0.06);
+  backdrop-filter: none;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__live-vote-board::before {
+  background: linear-gradient(90deg, rgba(255, 224, 163, 0.08), transparent 46%, rgba(124, 231, 218, 0.06));
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__live-vote-head {
+  grid-area: head;
+  display: grid;
+  gap: 2px;
+  justify-content: stretch;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__live-vote-head span {
+  color: rgba(255, 235, 192, 0.54);
+  font-size: 0.7rem;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__live-vote-head b {
+  color: #ffe7ad;
+  font-size: 0.96rem;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__vote-meter {
+  grid-area: meter;
+  height: 9px;
+  border-color: rgba(255, 224, 163, 0.16);
+  background: rgba(0, 0, 0, 0.34);
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__decision-timeline {
+  grid-area: timeline;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__decision-timeline li {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 24px;
+  padding: 4px 8px;
+  border-color: rgba(255, 224, 163, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 235, 192, 0.045);
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__decision-timeline small {
+  display: none;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__decision-timeline span {
+  color: rgba(255, 240, 197, 0.82);
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__vote-lanes {
+  grid-area: lanes;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__vote-lane {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  min-height: 28px;
+  padding: 3px 5px;
+  border-color: color-mix(in srgb, var(--general-accent) 28%, rgba(255, 224, 163, 0.12));
+  border-radius: 12px;
+  background: rgba(255, 235, 192, 0.045);
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__vote-lane-avatar {
+  width: 22px;
+  height: 22px;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__vote-lane-copy b {
+  color: #fff4ce;
+  font-size: 0.68rem;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__vote-lane-copy small {
+  display: none;
+}
+
+.council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__vote-lane em {
+  padding: 2px 5px;
+  font-size: 0.58rem;
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-actions button,
+.council-chamber[data-council-command-rail="v2"] .council-chamber__handoff-strip button,
+.council-chamber[data-council-input-first="true"] .council-chamber__command-actions button {
+  min-height: 38px !important;
+  border: 1px solid rgba(255, 224, 163, 0.22);
+  border-radius: 14px;
+  clip-path: none;
+  background:
+    linear-gradient(180deg, rgba(55, 36, 19, 0.86), rgba(18, 13, 8, 0.84));
+  color: rgba(255, 240, 197, 0.92);
+  box-shadow: inset 0 1px rgba(255, 244, 214, 0.07);
+}
+
+.council-chamber[data-council-command-rail="v2"] .council-chamber__command-actions button:first-child,
+.council-chamber[data-council-input-first="true"] .council-chamber__command-actions button:first-child {
+  border-color: rgba(255, 224, 163, 0.48);
+  background: linear-gradient(135deg, #ffe0a0, #b9792d);
+  color: #160f08;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__command-rail {
+  padding: 12px 16px 12px;
+  border-top-color: rgba(255, 224, 163, 0.16);
+  background:
+    linear-gradient(90deg, rgba(247, 185, 90, 0.09), transparent 48%),
+    rgba(255, 236, 190, 0.026);
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__command-input textarea {
+  min-height: 82px !important;
+  padding: 32px 14px 12px !important;
+  border-color: rgba(255, 224, 163, 0.28) !important;
+  border-radius: 16px !important;
+  background: rgba(0, 0, 0, 0.26) !important;
+  box-shadow: inset 0 1px rgba(255, 244, 214, 0.05) !important;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock {
+  flex: 1 1 auto;
+  min-height: 185px;
+  max-height: none;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  padding: 12px 16px 16px;
+  overflow: hidden;
+  border-top: 1px solid rgba(255, 224, 163, 0.12);
+  background:
+    radial-gradient(circle at 12% 100%, rgba(247, 185, 90, 0.10), transparent 38%),
+    rgba(255, 235, 192, 0.022);
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(72px, 1fr);
+  align-content: stretch;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-card {
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  min-height: 72px;
+  padding: 9px 10px;
+  border-radius: 16px;
+  clip-path: none;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--general-accent, #f6c56f) 9%, transparent), rgba(12, 10, 8, 0.58)),
+    rgba(255, 235, 192, 0.036);
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-avatar {
+  width: 38px;
+  height: 38px;
+}
+
+.council-chamber[data-council-input-first="true"][data-council-minimal-mode="council"] .council-chamber__advisor-dock-vote {
+  position: static;
+  align-self: center;
+  justify-self: end;
+}
+
+@media (max-width: 1320px) {
+  .council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__live-vote-board {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "head"
+      "meter"
+      "timeline"
+      "lanes";
+  }
+
+  .council-chamber[data-council-live-decision-visual="vote-board-v1"] .council-chamber__consensus .council-chamber__vote-lanes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Header overlap fix — controls must not cover the Council title. */
+.council-chamber[data-council-close-only-header="true"] .council-chamber__header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  min-height: 78px;
+  padding: 14px 18px 10px;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__header-copy {
+  min-width: 0;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-actions {
+  position: static;
+  align-self: start;
+  justify-self: end;
+  max-width: 120px;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-actions .living-v3__workspace-room-switcher {
+  display: none;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-menu {
+  top: 16px;
+  left: 112px;
+  z-index: 8;
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__session-menu summary {
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 224, 163, 0.28);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(58, 38, 20, 0.82), rgba(18, 13, 8, 0.78));
+  color: #ffecc1;
+  box-shadow: inset 0 1px rgba(255, 244, 214, 0.08), 0 10px 22px rgba(0, 0, 0, 0.20);
+}
+
+.council-chamber[data-council-close-only-header="true"] .council-chamber__header-copy h2,
+.council-chamber[data-council-close-only-header="true"] .council-chamber__header-copy p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

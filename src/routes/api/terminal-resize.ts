@@ -40,10 +40,12 @@ export const Route = createFileRoute('/api/terminal-resize')({
         }
         const session = getTerminalSession(sessionId)
         if (!session) {
-          return new Response(JSON.stringify({ ok: false }), {
-            status: 404,
-            headers: { 'Content-Type': 'application/json' },
-          })
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Session not found' }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
         }
         session.resize(cols, rows)
         return new Response(JSON.stringify({ ok: true }), {

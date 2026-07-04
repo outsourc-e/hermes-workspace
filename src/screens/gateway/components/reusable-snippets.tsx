@@ -6,7 +6,7 @@ export type SnippetProps = {
     id: string
     title: string
     content: string
-    tags: string[]
+    tags: Array<string>
     usageCount: number
   }>
   onUseSnippet: (snippetId: string) => void

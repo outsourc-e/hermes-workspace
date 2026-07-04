@@ -130,13 +130,15 @@ export async function listSessions(
   offset = 0,
 ): Promise<Array<ClaudeSession>> {
   if (getCapabilities().dashboard.available) {
-    const resp = await listDashboardSessions(limit, offset)
-    return resp.sessions as Array<ClaudeSession>
+    const resp = await listDashboardSessions(limit, offset) as { sessions?: Array<ClaudeSession>; items?: Array<ClaudeSession>; data?: Array<ClaudeSession> } | Array<ClaudeSession>
+    if (Array.isArray(resp)) return resp
+    return (Array.isArray(resp.sessions) ? resp.sessions : Array.isArray(resp.items) ? resp.items : Array.isArray(resp.data) ? resp.data : [])
   }
-  const resp = await claudeGet<{ items: Array<ClaudeSession>; total: number }>(
+  const resp = await claudeGet<{ items?: Array<ClaudeSession>; sessions?: Array<ClaudeSession>; data?: Array<ClaudeSession>; total?: number } | Array<ClaudeSession>>(
     `/api/sessions?limit=${limit}&offset=${offset}`,
   )
-  return resp.items
+  if (Array.isArray(resp)) return resp
+  return Array.isArray(resp.items) ? resp.items : Array.isArray(resp.sessions) ? resp.sessions : Array.isArray(resp.data) ? resp.data : []
 }
 
 export async function getSession(sessionId: string): Promise<ClaudeSession> {

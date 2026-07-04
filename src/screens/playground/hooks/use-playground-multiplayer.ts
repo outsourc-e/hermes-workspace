@@ -15,9 +15,9 @@
  *   - Connection state: 'offline' | 'broadcast' | 'ws' | 'both' for HUD.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { loadAvatarConfig } from '../lib/avatar-config'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import type { AvatarConfig } from '../lib/avatar-config'
-import { loadAvatarConfig } from '../lib/avatar-config'
 
 export type RemotePlayer = {
   id: string
@@ -68,7 +68,7 @@ function getSelfId() {
     }
     _selfId = v
     if (typeof console !== 'undefined') {
-      // eslint-disable-next-line no-console
+
       console.log('[Hermes MP] selfId:', v, '(if two tabs see the same id, MP will collide)')
     }
     return v
@@ -174,7 +174,7 @@ export function usePlaygroundMultiplayer({
       (window as any).__HERMES_PLAYGROUND_WS_URL ||
       ((import.meta as any).env?.VITE_PLAYGROUND_WS_URL as string | undefined) ||
       'wss://hermes-playground-ws.myaurora-agi.workers.dev/playground'
-    // eslint-disable-next-line no-console
+
     console.log('[Hermes MP] connecting to WS:', url)
     if (!url) return
     let ws: WebSocket | null = null
@@ -230,18 +230,18 @@ export function usePlaygroundMultiplayer({
         } else if (msg.kind === 'presence' && msg.id !== selfId) {
           mergePresence(msg as RemotePlayer)
         } else if (msg.kind === 'leave' && msg.id !== selfId) {
-          // eslint-disable-next-line no-console
+
           console.log('[Hermes MP] received leave for', msg.id, '— removing remote')
           setRemotePlayers((prev) => { const { [msg.id]: _, ...rest } = prev; return rest })
         } else if (msg.kind === 'chat' && msg.id !== selfId) {
-          onChatRef.current?.(msg as ChatWire)
+          onChatRef.current?.(msg)
         }
       })
       ws.addEventListener('close', (ev) => {
         wsOpenRef.current = false
         wsRef.current = null
         setTransport((t) => (t === 'both' ? 'broadcast' : t === 'ws' ? 'offline' : t))
-        // eslint-disable-next-line no-console
+
         console.log('[Hermes MP] WS close', { code: ev.code, reason: ev.reason, wasClean: ev.wasClean })
         if (!stop) {
           retry = Math.min(8, retry + 1)
@@ -249,7 +249,7 @@ export function usePlaygroundMultiplayer({
         }
       })
       ws.addEventListener('error', (e) => {
-        // eslint-disable-next-line no-console
+
         console.warn('[Hermes MP] WS error', e)
         try { ws?.close() } catch {}
       })
@@ -402,7 +402,7 @@ export function usePlaygroundMultiplayer({
           keepalive: document.visibilityState === 'hidden', // helps survive bg throttle
         })
         if (!stop && r.ok) {
-          const data = await r.json() as { presences: any[]; chats: any[]; online: number; byWorld: Record<string, number>; peakToday: number }
+          const data = await r.json() as { presences: Array<any>; chats: Array<any>; online: number; byWorld: Record<string, number>; peakToday: number }
           // Merge presences
           for (const p of data.presences || []) {
             mergePresence(p as RemotePlayer)
@@ -427,7 +427,7 @@ export function usePlaygroundMultiplayer({
         }
       } catch (err) {
         if (!stop) {
-          // eslint-disable-next-line no-console
+
           console.warn('[Hermes MP] presence POST failed:', err)
         }
       }

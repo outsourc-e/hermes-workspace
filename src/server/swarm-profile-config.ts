@@ -14,7 +14,7 @@
  * matches, so re-running on a healthy profile is free.
  */
 
-import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import * as yaml from 'yaml'
 

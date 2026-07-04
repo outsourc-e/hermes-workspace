@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Rocket01Icon, CheckmarkCircle02Icon, AlertCircleIcon, Clock01Icon } from '@hugeicons/core-free-icons'
-import { cn } from '@/lib/utils'
+import { AlertCircleIcon, CheckmarkCircle02Icon, Clock01Icon, Rocket01Icon } from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
+import { cn } from '@/lib/utils'
 
 type WorkerResult = {
   workerId: string
@@ -20,12 +20,12 @@ type DispatchResponse = {
   completedAt: number
   prompt: string
   timeoutSeconds: number
-  results: WorkerResult[]
+  results: Array<WorkerResult>
 }
 
 type SwarmComposeProps = {
-  members: CrewMember[]
-  roomIds: string[]
+  members: Array<CrewMember>
+  roomIds: Array<string>
   className?: string
 }
 
@@ -33,7 +33,7 @@ export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps)
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [history, setHistory] = useState<DispatchResponse[]>([])
+  const [history, setHistory] = useState<Array<DispatchResponse>>([])
   const [timeoutSeconds, setTimeoutSeconds] = useState(240)
 
   const roomMembers = members.filter((member) => roomIds.includes(member.id))

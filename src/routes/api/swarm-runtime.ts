@@ -1,31 +1,32 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProfilesDir } from '../../server/claude-paths'
 import {
+
+
+
+
+
+
+
+
+
+
+
   buildSwarmDispatchMetadata,
   buildSwarmSessionMetadata,
   getSwarmTmuxSessionName,
   getSwarmWrapperPath,
   listSwarmWorkerIds,
-  readSwarmRuntimeFile,
-  type SwarmArtifactMetadata,
-  type SwarmBoundary,
-  type SwarmCheckpointStatus,
-  type SwarmDispatchMetadata,
-  type SwarmLifecycleMetadata,
-  type SwarmPreviewMetadata,
-  type SwarmRuntimeSource,
-  type SwarmSessionMetadata,
-  type SwarmTaskMetadata,
-  type SwarmTerminalKind,
-  type SwarmWorkerState,
+  readSwarmRuntimeFile
 } from '../../server/swarm-foundation'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { readSwarmMode, writeSwarmMode } from '../../server/swarm-mode'
+import type {SwarmArtifactMetadata, SwarmBoundary, SwarmCheckpointStatus, SwarmDispatchMetadata, SwarmLifecycleMetadata, SwarmPreviewMetadata, SwarmRuntimeSource, SwarmSessionMetadata, SwarmTaskMetadata, SwarmTerminalKind, SwarmWorkerState} from '../../server/swarm-foundation';
 
 type RuntimeEntry = {
   workerId: string
@@ -74,7 +75,7 @@ function titleCase(value: string): string {
     .join(' ')
 }
 
-function listWorkerIds(): string[] {
+function listWorkerIds(): Array<string> {
   return listSwarmWorkerIds()
 }
 

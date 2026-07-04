@@ -1,15 +1,12 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import {  useEffect, useState } from 'react'
 import { motion } from 'motion/react'
-import { seedAgentPresets } from './agent-presets'
 import {
   AiBrain03Icon,
-  Settings01Icon,
   PlusSignIcon,
+  Settings01Icon,
 } from '@hugeicons/core-free-icons'
-import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Button } from '@/components/ui/button'
-import { formatRelativeTime } from '@/screens/dashboard/lib/formatters'
+import { seedAgentPresets } from './agent-presets'
 import { OrchestratorCard } from './components/orchestrator-card'
 import { OperationsAgentCard } from './components/operations-agent-card'
 import { OperationsAgentDetail } from './components/operations-agent-detail'
@@ -17,6 +14,10 @@ import { OperationsNewAgentModal } from './components/operations-new-agent-modal
 import { OperationsSettingsModal } from './components/operations-settings-modal'
 import { FullOutputsView } from './components/full-outputs-view'
 import { useOperations } from './hooks/use-operations'
+import type {CSSProperties} from 'react';
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { formatRelativeTime } from '@/screens/dashboard/lib/formatters'
 
 export const THEME_STYLE: CSSProperties = {
   ['--theme-bg' as string]: 'var(--color-surface)',

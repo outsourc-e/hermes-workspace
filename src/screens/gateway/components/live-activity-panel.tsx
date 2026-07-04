@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
-import type { AgentWorkingRow, AgentWorkingStatus } from './agents-working-panel'
 import { AgentOutputPanel } from './agent-output-panel'
+import type { AgentWorkingRow, AgentWorkingStatus } from './agents-working-panel'
 import type { HubTask } from './task-board'
+import { cn } from '@/lib/utils'
 
 export type LiveActivityPanelProps = {
-  agents: AgentWorkingRow[]
+  agents: Array<AgentWorkingRow>
   selectedAgentId?: string
   sessionKeyByAgentId: Record<string, string>
-  tasksByAgentId: Record<string, HubTask[]>
+  tasksByAgentId: Record<string, Array<HubTask>>
   onViewAgent: (agentId: string) => void
   onKillAgent: (agentId: string) => void
   onRespawnAgent: (agentId: string) => void

@@ -1,7 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { createFileRoute } from '@tanstack/react-router'
+import { json } from '@tanstack/react-start'
 import * as yaml from 'yaml'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getLocalBinDir, getProfilesDir } from '../../server/claude-paths'
@@ -17,7 +17,7 @@ type WorkerHealth = {
   lastErrorMessage: string | null
 }
 
-function listSwarmIds(): string[] {
+function listSwarmIds(): Array<string> {
   const dir = getProfilesDir()
   if (!existsSync(dir)) return []
   return readdirSync(dir, { withFileTypes: true })
@@ -120,7 +120,7 @@ export const Route = createFileRoute('/api/swarm-health')({
         const swarmIds = listSwarmIds()
         const wrapperBase = getLocalBinDir()
 
-        const workers: WorkerHealth[] = swarmIds.map((id) => {
+        const workers: Array<WorkerHealth> = swarmIds.map((id) => {
           const profilePath = join(profilesBase, id)
           const wrapperPath = join(wrapperBase, id)
           const config = readWorkerConfig(profilePath)

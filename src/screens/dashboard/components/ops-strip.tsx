@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
-import { cn } from '@/lib/utils'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { cn } from '@/lib/utils'
 
 function formatPulse(iso: string | null): string {
   if (!iso) return '—'

@@ -1,8 +1,10 @@
 /**
  * Tests for ssrf-guard helpers.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { isPrivateAddress, assertNotPrivate } from './ssrf-guard'
+import { lookup } from 'node:dns/promises'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { assertNotPrivate, isPrivateAddress } from './ssrf-guard'
+
 
 // ---------------------------------------------------------------------------
 // isPrivateAddress
@@ -87,11 +89,9 @@ describe('isPrivateAddress', () => {
 vi.mock('node:dns/promises', () => ({
   lookup: vi.fn(),
 }))
-
-import { lookup } from 'node:dns/promises'
 const mockLookup = vi.mocked(lookup)
 
-function makeLookupResult(addresses: string[]): { address: string; family: number }[] {
+function makeLookupResult(addresses: Array<string>): Array<{ address: string; family: number }> {
   return addresses.map((a) => ({ address: a, family: a.includes(':') ? 6 : 4 }))
 }
 

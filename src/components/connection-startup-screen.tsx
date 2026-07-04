@@ -148,7 +148,6 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
       if (autoStartTimer) clearTimeout(autoStartTimer)
       clearTimeout(failureTimer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

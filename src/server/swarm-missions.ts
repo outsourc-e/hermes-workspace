@@ -135,10 +135,10 @@ export function getSwarmMission(missionId: string): SwarmMission | null {
   return readStore().missions.find((mission) => mission.id === missionId) ?? null
 }
 
-export function archiveStaleMissions(staleMs: number = 6 * 60 * 60 * 1000): { archivedIds: string[]; count: number } {
+export function archiveStaleMissions(staleMs: number = 6 * 60 * 60 * 1000): { archivedIds: Array<string>; count: number } {
   const store = readStore()
   const now = Date.now()
-  const archivedIds: string[] = []
+  const archivedIds: Array<string> = []
   for (const mission of store.missions) {
     if (mission.state !== 'executing' && mission.state !== 'planning') continue
     if ((now - mission.updatedAt) < staleMs) continue

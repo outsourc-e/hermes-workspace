@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { cn } from '@/lib/utils'
-import type { HubTask, TaskStatus, TaskPriority } from './task-board'
-import { useTaskStore, type Task as StoreTask, type TaskStatus as StoreTaskStatus } from '@/stores/task-store'
 import { addApproval } from '../lib/approvals-store'
+import type { HubTask, TaskPriority, TaskStatus } from './task-board'
+import type {Task as StoreTask, TaskStatus as StoreTaskStatus} from '@/stores/task-store';
+import { cn } from '@/lib/utils'
+import {   useTaskStore } from '@/stores/task-store'
 
 type AgentOption = { id: string; name: string }
 
@@ -13,14 +14,14 @@ type KanbanColumn = {
   label: string
 }
 
-const DEFAULT_COLUMNS: KanbanColumn[] = [
+const DEFAULT_COLUMNS: Array<KanbanColumn> = [
   { key: 'backlog', label: 'Backlog' },
   { key: 'in_progress', label: 'In Progress' },
   { key: 'review', label: 'Review' },
   { key: 'done', label: 'Done' },
 ]
 
-const COMPACT_COLUMNS: KanbanColumn[] = [
+const COMPACT_COLUMNS: Array<KanbanColumn> = [
   { key: 'backlog', label: 'Todo' },
   { key: 'in_progress', label: 'WIP' },
   { key: 'review', label: 'Review' },
@@ -113,10 +114,10 @@ function truncateCompactTitle(title: string): string {
 }
 
 export type KanbanBoardProps = {
-  tasks: HubTask[]
+  tasks: Array<HubTask>
   onUpdateTask: (task: HubTask) => void
   onDeleteTask: (taskId: string) => void
-  agents: AgentOption[]
+  agents: Array<AgentOption>
   missionId?: string
   onAssignAgent?: (taskId: string, agentId: string) => void
   compact?: boolean
@@ -159,7 +160,7 @@ export function KanbanBoard({
   const agentNameById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents])
 
   const tasksByColumn = useMemo(() => {
-    const grouped: Record<KanbanColumnStatus, HubTask[]> = {
+    const grouped: Record<KanbanColumnStatus, Array<HubTask>> = {
       backlog: [],
       in_progress: [],
       review: [],
@@ -171,7 +172,7 @@ export function KanbanBoard({
       grouped[key].push(task)
     })
 
-    ;(Object.keys(grouped) as KanbanColumnStatus[]).forEach((status) => {
+    ;(Object.keys(grouped) as Array<KanbanColumnStatus>).forEach((status) => {
       grouped[status].sort((left, right) => right.updatedAt - left.updatedAt)
     })
 
@@ -372,7 +373,7 @@ export function KanbanBoard({
 
           <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Change priority</label>
           <div className="mb-3 grid grid-cols-2 gap-1">
-            {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((priority) => (
+            {(Object.keys(PRIORITY_LABELS) as Array<TaskPriority>).map((priority) => (
               <button
                 key={priority}
                 type="button"

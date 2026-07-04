@@ -293,7 +293,6 @@ function _useModelSuggestionsDisabled({
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- messages.length as stable proxy
   }, [
     currentModel,
     sessionKey,

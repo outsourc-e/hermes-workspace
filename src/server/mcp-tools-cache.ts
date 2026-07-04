@@ -89,7 +89,7 @@ function readDisk(): Record<string, CachedProbe> {
     ) {
       return {}
     }
-    return (parsed as DiskSchema).probes as Record<string, CachedProbe>
+    return (parsed as DiskSchema).probes
   } catch {
     // Corrupt or unreadable — start fresh
     return {}

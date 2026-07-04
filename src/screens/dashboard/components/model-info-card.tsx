@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { CancelIcon } from '@hugeicons/core-free-icons'
-import { formatModelName } from '@/screens/dashboard/lib/formatters'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 function formatContext(n: number): string {
   if (!n || n <= 0) return '—'
@@ -58,7 +58,7 @@ export function ModelInfoCard({
   const supportsReasoning = readBoolCap(caps, 'supports_reasoning')
   const family =
     caps && typeof caps['model_family'] === 'string'
-      ? (caps['model_family'] as string)
+      ? (caps['model_family'])
       : null
 
   // Operational line: share of API calls served by this model in the

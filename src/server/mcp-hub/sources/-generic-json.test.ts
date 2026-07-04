@@ -2,7 +2,11 @@
  * Tests for generic-json source adapter — Phase 3.2.
  * Fixture-based — no live network.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { getCache, setCache, touchCache } from '../cache'
+import { assertNotPrivate } from '../lib/ssrf-guard'
+import { fetchGenericJson } from './generic-json'
 
 vi.mock('../cache', () => ({
   getCache: vi.fn(),
@@ -16,10 +20,6 @@ vi.mock('../cache', () => ({
 vi.mock('../lib/ssrf-guard', () => ({
   assertNotPrivate: vi.fn().mockResolvedValue(undefined),
 }))
-
-import { getCache, setCache, touchCache } from '../cache'
-import { assertNotPrivate } from '../lib/ssrf-guard'
-import { fetchGenericJson } from './generic-json'
 
 const mockGetCache = vi.mocked(getCache)
 const mockSetCache = vi.mocked(setCache)
@@ -43,7 +43,7 @@ function mockFetch(status: number, body: unknown, headers?: Record<string, strin
  * Build a mock Response whose body is a ReadableStream yielding `chunks`.
  * Used for response-size-cap tests.
  */
-function mockFetchWithStream(chunks: Uint8Array[]): void {
+function mockFetchWithStream(chunks: Array<Uint8Array>): void {
   let idx = 0
   const reader = {
     read: vi.fn(async () => {

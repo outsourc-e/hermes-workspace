@@ -6,6 +6,16 @@
  * Triggered from a "Sources" button in the Marketplace tab toolbar.
  */
 import { useState } from 'react'
+import {
+
+
+
+  useAddHubSource,
+  useDeleteHubSource,
+  useMcpHubSources,
+  useUpdateHubSource
+} from '../hooks/use-mcp-hub-sources'
+import type {AddSourceInput, HubSourceEntry, MutationError} from '../hooks/use-mcp-hub-sources';
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -14,15 +24,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/toast'
-import {
-  useMcpHubSources,
-  useAddHubSource,
-  useUpdateHubSource,
-  useDeleteHubSource,
-  type HubSourceEntry,
-  type AddSourceInput,
-  type MutationError,
-} from '../hooks/use-mcp-hub-sources'
 
 interface Props {
   open: boolean
@@ -45,7 +46,7 @@ const FIELD = 'h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60
 const LABEL = 'flex flex-col gap-1 text-sm text-primary-500'
 const ERROR_TEXT = 'mt-0.5 text-xs text-red-600 dark:text-red-400'
 
-function fieldError(errors: MutationError[], path: string): string | undefined {
+function fieldError(errors: Array<MutationError>, path: string): string | undefined {
   return errors.find((e) => e.path === path)?.message
 }
 
@@ -55,7 +56,7 @@ interface SourceFormProps {
   onSave: (data: AddSourceInput) => void
   onCancel: () => void
   saving: boolean
-  serverErrors: MutationError[]
+  serverErrors: Array<MutationError>
 }
 
 function SourceForm({ initial, isEdit, onSave, onCancel, saving, serverErrors }: SourceFormProps) {
@@ -271,7 +272,7 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
   const [mode, setMode] = useState<Mode>('list')
   const [editingSource, setEditingSource] = useState<HubSourceEntry | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [serverErrors, setServerErrors] = useState<MutationError[]>([])
+  const [serverErrors, setServerErrors] = useState<Array<MutationError>>([])
 
   const query = useMcpHubSources()
   const addMutation = useAddHubSource()
@@ -302,7 +303,7 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
       },
       onError: (err) => {
         setDeletingId(null)
-        const errors = (err as { errors?: MutationError[] }).errors ?? []
+        const errors = (err as { errors?: Array<MutationError> }).errors ?? []
         setServerErrors(errors)
         toast('Failed to remove source', { type: 'error' })
       },
@@ -317,7 +318,7 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
         toast('Source added', { type: 'success' })
       },
       onError: (err) => {
-        const errors = (err as { errors?: MutationError[] }).errors ?? []
+        const errors = (err as { errors?: Array<MutationError> }).errors ?? []
         setServerErrors(errors)
       },
     })
@@ -335,7 +336,7 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
           toast('Source updated', { type: 'success' })
         },
         onError: (err) => {
-          const errors = (err as { errors?: MutationError[] }).errors ?? []
+          const errors = (err as { errors?: Array<MutationError> }).errors ?? []
           setServerErrors(errors)
         },
       },

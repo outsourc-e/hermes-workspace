@@ -470,6 +470,54 @@ function isAssistantToolCallOnlyMessage(message: ChatMessage): boolean {
   return hasToolCalls && text.trim().length === 0
 }
 
+export function getTrailingToolOnlyTurnSummary(
+  displayMessages: Array<ChatMessage>,
+): { count: number; toolNames: Array<string>; hasFinalAssistantText: boolean } | null {
+  let finalAssistantTextIndex = -1
+  for (let index = displayMessages.length - 1; index >= 0; index -= 1) {
+    const message = displayMessages[index]
+    if (message.role === 'assistant' && textFromMessage(message).trim().length > 0) {
+      finalAssistantTextIndex = index
+      break
+    }
+  }
+
+  if (finalAssistantTextIndex < 0 || finalAssistantTextIndex === displayMessages.length - 1) {
+    return null
+  }
+
+  const trailingMessages = displayMessages.slice(finalAssistantTextIndex + 1)
+  const toolNames = new Set<string>()
+  let count = 0
+  for (const message of trailingMessages) {
+    if (isAssistantToolCallOnlyMessage(message)) {
+      count += 1
+      for (const toolCall of getToolCallsFromMessage(message)) {
+        if (toolCall.name) toolNames.add(toolCall.name)
+      }
+      continue
+    }
+    if (message.role === 'tool' || message.role === 'toolResult') {
+      count += 1
+      const raw = message as Record<string, unknown>
+      const toolName = raw.toolName ?? raw.name
+      if (typeof toolName === 'string' && toolName.trim()) {
+        toolNames.add(toolName.trim())
+      }
+      continue
+    }
+    return null
+  }
+
+  return count > 0
+    ? {
+        count,
+        toolNames: Array.from(toolNames),
+        hasFinalAssistantText: true,
+      }
+    : null
+}
+
 export function buildDisplayEntries(
   displayMessages: Array<ChatMessage>,
 ): Array<DisplayEntry> {
@@ -505,13 +553,6 @@ export function buildDisplayEntries(
 
     entries.push(entry)
   })
-
-  if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
-    if (previousEntry?.message.role === 'assistant') {
-      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
-    }
-  }
 
   return entries
 }
@@ -835,7 +876,7 @@ function ChatMessageListComponent({
         clearTimeout(thinkingGraceTimerRef.current)
       }
     }
-  }, [displayEntries, waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayEntries, waitingForResponse])
 
   const normalizedMessageSearch = useMemo(
     function getNormalizedMessageSearch() {
@@ -1043,7 +1084,6 @@ function ChatMessageListComponent({
       streamingTargets: new Set<string>(),
       signatureById: nextSignatures,
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayEntries, streamingCleared])
 
   const lastAssistantIndex = visibleEntries
@@ -1146,11 +1186,11 @@ function ChatMessageListComponent({
           args: tcAny.args,
           preview:
             typeof tcAny.preview === 'string'
-              ? (tcAny.preview as string)
+              ? (tcAny.preview)
               : undefined,
           result:
             typeof tcAny.result === 'string'
-              ? (tcAny.result as string)
+              ? (tcAny.result)
               : undefined,
         }
       })

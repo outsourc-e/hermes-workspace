@@ -49,6 +49,7 @@ function resolveClaudeAgentDir(env: Record<string, string>): string | null {
 /** Find the `claude` CLI binary installed by Nous's installer. */
 function resolveClaudeBinary(): string | null {
   const candidates = [
+    '/Users/mac/.hermes/hermes-agent-venv/bin/hermes',
     resolve(os.homedir(), '.claude', 'bin', 'claude'),
     resolve(os.homedir(), '.local', 'bin', 'claude'),
   ]

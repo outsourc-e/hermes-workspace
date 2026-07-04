@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit --pretty false",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },

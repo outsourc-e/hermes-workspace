@@ -408,7 +408,7 @@ function TuiActivityCardComponent({
       <div className="flex flex-col gap-1.5 px-2 py-3">
         {hasThinking ? (
           <ThinkingRow
-            thinking={thinking!}
+            thinking={thinking}
             elapsedSeconds={thinkingElapsedSeconds}
             isStreaming={isStreaming}
             expandAll={expandAll}

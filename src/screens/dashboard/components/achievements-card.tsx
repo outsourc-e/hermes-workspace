@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { CancelIcon, Award01Icon } from '@hugeicons/core-free-icons'
+import { Award01Icon, CancelIcon } from '@hugeicons/core-free-icons'
 import type {
   DashboardAchievementUnlock,
   DashboardOverview,

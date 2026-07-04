@@ -894,6 +894,8 @@ export function getEnhancedCapabilities(): EnhancedCapabilities {
     memory: capabilities.memory,
     config: capabilities.config,
     jobs: capabilities.jobs,
+    conductor: capabilities.conductor,
+    kanban: capabilities.kanban,
     mcp: capabilities.mcp,
     mcpFallback: capabilities.mcpFallback,
   }

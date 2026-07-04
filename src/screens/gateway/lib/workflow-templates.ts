@@ -4,7 +4,7 @@ export type WorkflowTemplate = {
   description: string
   icon: string
   goal: string
-  tags?: string[]
+  tags?: Array<string>
   teamConfigId?: string
   tasks: Array<{
     title: string
@@ -18,7 +18,7 @@ export type WorkflowTemplate = {
 const STORAGE_KEY = 'clawsuite:workflow-templates'
 
 // Built-in templates that ship with ClawSuite
-export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
+export const BUILT_IN_TEMPLATES: Array<WorkflowTemplate> = [
   {
     id: 'tpl-code-review',
     name: 'Code Review',
@@ -125,23 +125,23 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
   },
 ]
 
-export function loadCustomTemplates(): WorkflowTemplate[] {
+export function loadCustomTemplates(): Array<WorkflowTemplate> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
-    return JSON.parse(raw) as WorkflowTemplate[]
+    return JSON.parse(raw) as Array<WorkflowTemplate>
   } catch {
     return []
   }
 }
 
-export function saveCustomTemplates(templates: WorkflowTemplate[]): void {
+export function saveCustomTemplates(templates: Array<WorkflowTemplate>): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(templates))
   } catch { /* ignore */ }
 }
 
-export function getAllTemplates(): WorkflowTemplate[] {
+export function getAllTemplates(): Array<WorkflowTemplate> {
   return [...BUILT_IN_TEMPLATES, ...loadCustomTemplates()]
 }
 

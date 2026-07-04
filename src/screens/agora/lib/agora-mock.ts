@@ -5,7 +5,7 @@
  */
 import type { AgoraProfile, AgoraUser } from './agora-types'
 
-const MOCK_PROFILES: AgoraProfile[] = [
+const MOCK_PROFILES: Array<AgoraProfile> = [
   {
     id: 'mock-athena',
     handle: 'athena',
@@ -61,7 +61,7 @@ const MOCK_PROFILES: AgoraProfile[] = [
 export function buildMockAgoraUsers(opts: {
   worldWidth: number
   worldHeight: number
-}): AgoraUser[] {
+}): Array<AgoraUser> {
   const { worldWidth, worldHeight } = opts
   // Cluster positions roughly around the room
   const positions = [

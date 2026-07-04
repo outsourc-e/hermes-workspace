@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { readdir, readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'

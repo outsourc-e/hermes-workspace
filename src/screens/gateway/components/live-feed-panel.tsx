@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
 import {
+
+
   emitFeedEvent,
-  onFeedEvent,
-  type FeedEvent,
-  type FeedEventType,
+  onFeedEvent
 } from './feed-event-bus'
+import type {FeedEvent, FeedEventType} from './feed-event-bus';
+import { cn } from '@/lib/utils'
 
 // 'Activity' = tasks + agents (no health checks), default
 // 'Tasks'    = task events only

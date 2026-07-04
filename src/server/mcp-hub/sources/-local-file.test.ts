@@ -2,15 +2,15 @@
  * Tests for the local-file source adapter.
  * Uses vi.mock to stub mcp-presets-store so no disk I/O occurs.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-
-vi.mock('../../mcp-presets-store', () => ({
-  readPresets: vi.fn(),
-}))
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { readPresets } from '../../mcp-presets-store'
 import { fetchLocalFile } from './local-file'
 import type { ReadPresetsResult } from '../../mcp-presets-store'
+
+vi.mock('../../mcp-presets-store', () => ({
+  readPresets: vi.fn(),
+}))
 
 const mockReadPresets = vi.mocked(readPresets)
 

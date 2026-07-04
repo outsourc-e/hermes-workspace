@@ -16,9 +16,10 @@
  *   - We freeze materials and disable raycasting on geometry to avoid
  *     pointer hit cost when the parent already handles clicks.
  */
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Component,  Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useGLTF } from '@react-three/drei'
-import * as THREE from 'three'
+import type {ReactNode} from 'react';
+import type * as THREE from 'three'
 
 class GlbErrorBoundary extends Component<
   { children: ReactNode; onError?: () => void },

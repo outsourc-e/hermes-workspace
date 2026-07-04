@@ -140,7 +140,7 @@ export type SessionHistoryMessage = {
 
 export type SessionHistoryResponse = {
   ok?: boolean
-  messages?: SessionHistoryMessage[]
+  messages?: Array<SessionHistoryMessage>
   error?: string
 }
 
@@ -433,8 +433,8 @@ export type GatewayApprovalEntry = {
 
 export type GatewayApprovalsResponse = {
   ok?: boolean
-  approvals?: GatewayApprovalEntry[]
-  pending?: GatewayApprovalEntry[]
+  approvals?: Array<GatewayApprovalEntry>
+  pending?: Array<GatewayApprovalEntry>
 }
 
 export async function fetchGatewayApprovals(): Promise<GatewayApprovalsResponse> {

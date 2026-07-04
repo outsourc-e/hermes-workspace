@@ -54,6 +54,24 @@ pnpm wrangler dev            # hot-reload on http://localhost:8787
 VITE_PLAYGROUND_WS_URL=ws://localhost:8787/playground pnpm dev
 ```
 
+## Typecheck
+
+The root Hermes Workspace typecheck intentionally excludes this Cloudflare Worker
+so browser app globals are not polluted with Worker/Durable Object types. Check it
+separately from the workspace root:
+
+```bash
+pnpm run typecheck:playground-ws-worker
+# equivalent:
+pnpm --dir playground-ws-worker exec tsc --noEmit --pretty false
+```
+
+Or from this directory:
+
+```bash
+pnpm run typecheck
+```
+
 ## Protocol parity
 
 Wire format is identical to `scripts/playground-ws.mjs`. The client

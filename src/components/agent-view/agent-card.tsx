@@ -13,9 +13,9 @@ import {
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { AgentProgress } from './agent-progress'
-import type { AgentProgressStatus } from './agent-progress'
 import { KillConfirmDialog } from './kill-confirm-dialog'
 import { SteerModal } from './steer-modal'
+import type { AgentProgressStatus } from './agent-progress'
 import { Button } from '@/components/ui/button'
 import { AgentAvatar } from '@/components/agent-avatar'
 import {

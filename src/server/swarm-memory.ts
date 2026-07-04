@@ -2,8 +2,8 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renam
 import { homedir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import YAML from 'yaml'
-import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 import { SWARM_CANONICAL_REPO } from './swarm-environment'
+import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 
 export type SwarmMemoryKind = 'profile' | 'mission' | 'episodic' | 'handoff' | 'shared'
 

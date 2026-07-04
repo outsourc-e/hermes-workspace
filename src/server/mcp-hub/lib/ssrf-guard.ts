@@ -113,7 +113,7 @@ export async function assertNotPrivate(url: string): Promise<void> {
     lookup(hostname, { all: true, family: 6 }),
   ])
 
-  const addresses: string[] = []
+  const addresses: Array<string> = []
   for (const r of results) {
     if (r.status === 'fulfilled') {
       for (const entry of r.value) {

@@ -133,7 +133,7 @@ export function ChatPanel() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 bg-black/20 z-10 min-[1200px]:hidden"
+            className="fixed inset-0 bg-black/20 z-[70] min-[1200px]:hidden"
             onClick={handleClose}
             aria-hidden
           />
@@ -142,7 +142,7 @@ export function ChatPanel() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] h-[calc(100dvh-var(--titlebar-h,0px))] max-h-[calc(100dvh-var(--titlebar-h,0px))] w-[420px] max-w-[100vw] border-l overflow-hidden flex flex-col z-20 shadow-xl"
+            className="fixed right-0 bottom-0 top-[var(--titlebar-h,0px)] h-[calc(100dvh-var(--titlebar-h,0px))] max-h-[calc(100dvh-var(--titlebar-h,0px))] w-[520px] max-w-[100vw] border-l overflow-hidden flex flex-col z-[80] shadow-2xl"
             style={{
               background: 'var(--theme-bg)',
               borderColor: 'var(--theme-border)',

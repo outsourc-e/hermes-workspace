@@ -1,0 +1,45 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+describe('LivingWarRoomV3 Etsy live scout UI contract', () => {
+  it('keeps stable live scout DOM markers in the Odin workbench', () => {
+    const dir = path.dirname(fileURLToPath(import.meta.url))
+    const screenSource = readFileSync(path.join(dir, 'LivingWarRoomV3.tsx'), 'utf8')
+    const source = readFileSync(path.join(dir, 'EtsyProductPrepWorkbench.tsx'), 'utf8')
+
+    expect(screenSource).toContain('EtsyProductPrepWorkbench')
+    expect(screenSource).toContain('selectedStationUsesEtsyWorkspace')
+    expect(screenSource).toContain('const selectedStationUsesEtsyWorkspace = selectedStationIsEtsy')
+    expect(screenSource).toContain('living-v3__etsy-workspace-mode')
+    expect(screenSource).toContain('data-etsy-workspace-mode="primary"')
+    expect(screenSource).toContain('Attach Obsidian Context Packet locally')
+    expect(screenSource).toContain('data-obsidian-context-packet')
+    expect(screenSource).toContain('data-obsidian-context-source-count')
+    expect(screenSource).toContain('data-obsidian-context-local-only')
+    expect(screenSource).toContain('data-hermes-intent-event-bridge')
+    expect(screenSource).toContain('/api/war-room/obsidian-context/packet')
+    expect(source).toContain('data-product-prep-workbench="v1"')
+    expect(source).toContain('data-workbench-mode="visual-receiving-board"')
+    expect(source).toContain('data-product-search-surface="moved-to-oracle"')
+    expect(source).toContain('data-candidate-board="v1"')
+    expect(source).toContain("data-product-dossier={step.id === 'truth' ? 'v1' : undefined}")
+    expect(source).toContain("data-shotlab-prep-board={step.id === 'shotlab' ? 'v1' : undefined}")
+    expect(source).toContain("data-seo-workbench={step.id === 'seo' ? 'v1' : undefined}")
+    expect(source).toContain("data-approval-console={step.id === 'draft' ? 'v1' : undefined}")
+    expect(source).toContain("data-debug-proof-collapsed={debugOpen ? 'false' : 'true'}")
+    expect(source).toContain('data-live-actions-locked="true"')
+    expect(source).toContain('data-etsy-live-room="v1"')
+    expect(source).toContain('data-etsy-live-scout-status={liveScout.status}')
+    expect(source).toContain('data-etsy-live-candidate-id=')
+    expect(source).toContain('data-etsy-live-data-origin=')
+    expect(source).toContain('data-workspace-kernel-artifact="live-product-candidate-packet"')
+    expect(source).toContain('data-live-actions-allowed="false"')
+    expect(source).toContain('data-worker-fanout-allowed="false"')
+    expect(source).toContain('etsy-prep__visual-product-card')
+    expect(source).toContain('Proof / packets')
+    expect(source).toContain('Search in Oracle')
+    expect(source).toContain('Choose')
+  })
+})

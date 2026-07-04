@@ -1,7 +1,6 @@
 /**
  * Tests for mcp-hub-sources-store — Phase 3.2.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   mkdtempSync,
   readFileSync,
@@ -10,17 +9,18 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
-  __resetHubSourcesCacheForTests,
-  readHubSources,
-  addHubSource,
-  updateHubSource,
-  deleteHubSource,
-  validateSourceEntry,
   BUILTIN_IDS,
   BUILTIN_SOURCES,
+  __resetHubSourcesCacheForTests,
+  addHubSource,
+  deleteHubSource,
   hubSourcesFilePath,
+  readHubSources,
+  updateHubSource,
+  validateSourceEntry,
 } from './mcp-hub-sources-store'
 
 let homeDir: string

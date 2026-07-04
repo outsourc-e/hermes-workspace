@@ -1,3 +1,6 @@
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   buildSwarmDispatchMetadata,
@@ -5,11 +8,9 @@ import {
   classifySwarmPluginBoundary,
   deriveSwarmBoundary,
   normalizeSwarmRuntime,
-  parseSwarmPluginManifest,
+  parseSwarmPluginManifest, patchSwarmRuntimeFile, readSwarmRuntimeFile
 } from './swarm-foundation'
-import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
+
 
 describe('normalizeSwarmRuntime', () => {
   it('fills legacy or sparse runtime.json values with stable defaults', () => {
@@ -155,8 +156,6 @@ describe('parseSwarmPluginManifest', () => {
     }
   })
 })
-
-import { patchSwarmRuntimeFile, readSwarmRuntimeFile } from './swarm-foundation'
 
 describe('patchSwarmRuntimeFile', () => {
   it('returns ok=false when the profile path does not exist', () => {

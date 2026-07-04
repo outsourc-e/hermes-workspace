@@ -8,6 +8,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { AnimatePresence, motion } from 'motion/react'
+import type {AgentOutput, AgentOutputFilter} from '@/hooks/use-agent-outputs';
 import { Button } from '@/components/ui/button'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
@@ -15,9 +16,9 @@ import { runCronJob } from '@/lib/cron-api'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/screens/dashboard/lib/formatters'
 import {
-  useAgentOutputs,
-  type AgentOutput,
-  type AgentOutputFilter,
+
+
+  useAgentOutputs
 } from '@/hooks/use-agent-outputs'
 
 function formatDuration(durationMs?: number) {

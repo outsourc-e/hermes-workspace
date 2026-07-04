@@ -12,8 +12,8 @@ import {
 } from 'recharts'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  ChartLineData01Icon,
   CancelIcon,
+  ChartLineData01Icon,
 } from '@hugeicons/core-free-icons'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { formatModelName } from '@/screens/dashboard/lib/formatters'

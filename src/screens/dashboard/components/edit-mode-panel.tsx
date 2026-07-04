@@ -1,6 +1,7 @@
+import type {DashboardLayout} from '@/screens/dashboard/lib/use-dashboard-layout';
 import {
-  WIDGET_CATALOG,
-  type DashboardLayout,
+
+  WIDGET_CATALOG
 } from '@/screens/dashboard/lib/use-dashboard-layout'
 
 /**

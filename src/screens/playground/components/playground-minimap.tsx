@@ -1,5 +1,5 @@
-import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import { botsFor } from '../lib/playground-bots'
+import type { PlaygroundWorldId } from '../lib/playground-rpg'
 
 const NPC_POSITIONS: Record<PlaygroundWorldId, Array<{ x: number; z: number; color: string }>> = {
   training: [

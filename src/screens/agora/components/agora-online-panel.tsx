@@ -5,7 +5,7 @@ import type { AgoraUser } from '../lib/agora-types'
 
 interface AgoraOnlinePanelProps {
   self: AgoraUser
-  others: AgoraUser[]
+  others: Array<AgoraUser>
   nearbyIds: Set<string>
   onSelectUser?: (user: AgoraUser) => void
 }

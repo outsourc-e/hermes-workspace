@@ -52,7 +52,7 @@ type ProviderUsage = {
   status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
   message?: string
   plan?: string
-  lines: UsageLine[]
+  lines: Array<UsageLine>
   updatedAt: number
 }
 

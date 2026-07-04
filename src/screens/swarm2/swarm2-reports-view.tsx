@@ -501,7 +501,7 @@ export function Swarm2ReportsView({
   onRefresh?: () => Promise<void> | void
 }) {
   const [stateFilter, setStateFilter] = useState<ReportState>('all')
-  const [layout, setLayout] = useState<ReportLayout>('cards')
+  const [layout, setLayout] = useState<ReportLayout>('list')
   const [workerFilter, setWorkerFilter] = useState('all')
   const [missionFilter, setMissionFilter] = useState('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -537,6 +537,24 @@ export function Swarm2ReportsView({
     },
     { needs_review: 0, ready: 0, blocked: 0, in_progress: 0, artifact: 0 },
   )
+  const latestReadableRow = useMemo(() => {
+    const candidates = rows
+      .filter((row) => row.state === 'ready' || row.state === 'blocked' || row.state === 'needs_review')
+      .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+    return candidates[0] ?? rows[0] ?? null
+  }, [rows])
+  const latestReadableResult = latestReadableRow
+    ? cleanDetail(latestReadableRow.details.find((detail) => detail.label === 'Result')?.value) ?? latestReadableRow.summary
+    : null
+
+  async function copyText(text: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      showToast(`${label} copied`)
+    } catch {
+      showToast('Copy failed')
+    }
+  }
 
   function showToast(message: string) {
     setToastMessage(message)
@@ -733,7 +751,7 @@ export function Swarm2ReportsView({
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Outputs / Reports</div>
           <h2 className="mt-1 text-lg font-semibold text-[var(--theme-text)]">Worker reports</h2>
           <p className="mt-1 max-w-3xl text-xs text-[var(--theme-muted-2)]">
-            Board for queues, Cards for worker-level scanning, List for dense detail.
+            Start here. The newest useful worker answer is shown below. Use List for full details, Board for blockers, Cards for worker summaries.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
@@ -742,6 +760,47 @@ export function Swarm2ReportsView({
           <span className="rounded-xl border border-red-400/40 bg-red-500/10 px-2 py-1">Blocked {counts.blocked}</span>
         </div>
       </div>
+
+      <div className="mb-4 rounded-2xl border border-sky-400/30 bg-sky-500/10 p-4">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700">Where to read Swarm output</div>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[var(--theme-text)]">
+          <li>Stay on this Reports page after dispatching a mission.</li>
+          <li>Read the green Latest readable answer box when it appears.</li>
+          <li>If something is blocked, open the Blocked filter and follow the human-input instruction.</li>
+          <li>Use the List view for full worker output; click any row to expand its details.</li>
+        </ol>
+      </div>
+
+      {latestReadableRow && latestReadableResult ? (
+        <div className="mb-4 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Latest readable answer</div>
+              <h3 className="mt-1 text-base font-semibold text-[var(--theme-text)]">{latestReadableRow.workerName} · {latestReadableRow.stateLabel}</h3>
+              <p className="mt-1 text-xs text-[var(--theme-muted)]">Mission: {latestReadableRow.missionTitle ?? latestReadableRow.missionId ?? 'runtime output'} · {formatAge(latestReadableRow.updatedAt)}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setExpandedId(latestReadableRow.id)}
+                className="rounded-lg border border-emerald-400/40 bg-[var(--theme-bg)] px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-500/15"
+              >
+                Open full report below
+              </button>
+              <button
+                type="button"
+                onClick={() => void copyText(latestReadableResult, 'Latest answer')}
+                className="rounded-lg border border-emerald-400/40 bg-[var(--theme-bg)] px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-500/15"
+              >
+                Copy answer
+              </button>
+            </div>
+          </div>
+          <pre className="mt-3 max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-xl border border-emerald-400/20 bg-[var(--theme-bg)] p-3 text-sm leading-relaxed text-[var(--theme-text)]">
+            {latestReadableResult}
+          </pre>
+        </div>
+      ) : null}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {STATE_FILTERS.map((filter) => (
@@ -811,7 +870,7 @@ export function Swarm2ReportsView({
                     <div className="relative flex size-12 shrink-0 items-center justify-center">
                       <AgentProgress
                         value={card.state === 'blocked' ? 30 : card.state === 'needs_review' ? 74 : card.state === 'ready' ? 100 : 58}
-                        status={card.state === 'blocked' ? 'failed' : card.state === 'ready' ? 'done' : card.state === 'needs_review' ? 'thinking' : 'running'}
+                        status={card.state === 'blocked' ? 'failed' : card.state === 'ready' ? 'complete' : card.state === 'needs_review' ? 'thinking' : 'running'}
                         size={48}
                         strokeWidth={2.5}
                         className={card.state === 'blocked' ? 'text-red-500' : card.state === 'needs_review' ? 'text-amber-500' : card.state === 'ready' ? 'text-emerald-500' : 'text-sky-500'}
@@ -838,20 +897,10 @@ export function Swarm2ReportsView({
                     >
                       {expanded ? 'Hide reports' : `Open reports (${card.rows.length})`}
                     </button>
-                    {card.prUrl ? (
-                      <a
-                        href={card.prUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
-                      >
-                        ↗
-                      </a>
-                    ) : null}
                     {(card.state === 'needs_review' || card.state === 'blocked' || card.state === 'ready') ? (
                       <button
                         type="button"
-                        onClick={() => onRouteToReviewer?.(card)}
+                        onClick={() => onRouteToReviewer?.(latestInboxItem)}
                         className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                       >
                         Steer

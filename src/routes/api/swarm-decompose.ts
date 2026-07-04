@@ -26,11 +26,14 @@ type RouteAssignment = {
   rationale: string
 }
 
-const SYSTEM = `You are an orchestrator that decomposes a single high-level user prompt into focused sub-tasks routed to the most appropriate worker agents in a parallel Claude swarm.
+const SYSTEM = `You are an orchestrator that decomposes a single high-level user prompt into focused sub-tasks routed to the most appropriate worker agents in a parallel Hermes swarm.
 
 Rules:
 - Output ONLY valid minified JSON matching this shape: {"assignments":[{"workerId":"swarm1","task":"...","rationale":"..."}],"unassigned":["...optional reasons"]}
 - Use only the worker IDs that exist in the provided roster.
+- Never route work to disabled/unavailable agents.
+- If the prompt forbids a provider or model family, do not route work to workers using that provider/model family.
+- Treat workspace/dashboard/main UI entries as manager context, not dispatchable workers, unless they are the only available worker.
 - Each task must be a complete, self-contained instruction the worker can execute without additional context.
 - Prefer workers whose role, specialty, mission, skills, and capabilities match the task.
 - Assign implementation tasks to builder/UI/backend lanes, research to research lanes, review/quality gates to reviewer lanes, PR/issue tasks to PR lanes, and ops/runtime tasks to ops/backend lanes.
@@ -39,7 +42,51 @@ Rules:
 - Keep rationale short (one sentence).
 `
 
-async function callOrchestrator(prompt: string, workers: WorkerHint[], model: string): Promise<{ assignments: RouteAssignment[]; unassigned: string[] }>{
+function isWorkspaceManager(worker: WorkerHint): boolean {
+  const id = worker.id.toLowerCase()
+  const text = [worker.role, worker.model, worker.specialty, worker.mission, worker.notes]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return id === 'workspace' || id === 'dashboard' || text.includes('executive manager') || text.includes('main manager')
+}
+
+function promptForbidsClaude(prompt: string): boolean {
+  return /do\s+not\s+use\s+claude|claude\s+is\s+off|without\s+claude|no\s+claude/i.test(prompt)
+}
+
+function usesClaude(worker: WorkerHint): boolean {
+  return [worker.id, worker.role, worker.model, worker.specialty, worker.mission, worker.notes]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .includes('claude')
+}
+
+const APPROVED_WORKER_IDS = new Set(['chatgptheavy', 'workerkimi', 'swarm1', 'swarm6', 'swarm11', 'swarm12'])
+
+function isDisabledWorker(worker: WorkerHint): boolean {
+  const id = worker.id.toLowerCase()
+  return id === 'swarm4' || !APPROVED_WORKER_IDS.has(id)
+}
+
+function dispatchableWorkers(prompt: string, workers: Array<WorkerHint>): Array<WorkerHint> {
+  const withoutDisabled = workers.filter((worker) => !isDisabledWorker(worker))
+  const withoutForbidden = promptForbidsClaude(prompt)
+    ? withoutDisabled.filter((worker) => !usesClaude(worker))
+    : withoutDisabled
+  const withoutManagers = withoutForbidden.filter((worker) => !isWorkspaceManager(worker))
+  return withoutManagers.length ? withoutManagers : withoutForbidden
+}
+
+function safeRouterModel(requested: unknown): string {
+  if (typeof requested === 'string' && requested.trim()) return requested.trim()
+  const configured = process.env.HERMES_SWARM_ROUTER_MODEL || process.env.HERMES_DEFAULT_MODEL || process.env.OPENAI_MODEL || ''
+  if (configured && !configured.toLowerCase().includes('claude')) return configured
+  return 'gpt-5.5'
+}
+
+async function callOrchestrator(prompt: string, workers: Array<WorkerHint>, model: string): Promise<{ assignments: Array<RouteAssignment>; unassigned: Array<string> }>{
   const rosterText = workers
     .map((worker) => {
       const parts = [
@@ -102,7 +149,7 @@ async function callOrchestrator(prompt: string, workers: WorkerHint[], model: st
   const obj = parsed as { assignments?: unknown; unassigned?: unknown }
   const assignmentsRaw = Array.isArray(obj.assignments) ? obj.assignments : []
   const validIds = new Set(workers.map((worker) => worker.id))
-  const assignments: RouteAssignment[] = []
+  const assignments: Array<RouteAssignment> = []
   for (const entry of assignmentsRaw) {
     if (!entry || typeof entry !== 'object') continue
     const item = entry as Record<string, unknown>
@@ -114,7 +161,7 @@ async function callOrchestrator(prompt: string, workers: WorkerHint[], model: st
     assignments.push({ workerId, task, rationale })
   }
   const unassignedRaw = Array.isArray(obj.unassigned) ? obj.unassigned : []
-  const unassigned: string[] = []
+  const unassigned: Array<string> = []
   for (const entry of unassignedRaw) {
     if (typeof entry === 'string' && entry.trim()) unassigned.push(entry.trim())
   }
@@ -145,7 +192,7 @@ function scoreWorker(prompt: string, worker: WorkerHint): number {
   return score
 }
 
-function heuristicAssignments(prompt: string, workers: WorkerHint[]): { assignments: RouteAssignment[]; unassigned: string[] } {
+function heuristicAssignments(prompt: string, workers: Array<WorkerHint>): { assignments: Array<RouteAssignment>; unassigned: Array<string> } {
   const ranked = [...workers]
     .map((worker) => ({ worker, score: scoreWorker(prompt, worker) }))
     .sort((a, b) => b.score - a.score || a.worker.id.localeCompare(b.worker.id))
@@ -178,7 +225,7 @@ export const Route = createFileRoute('/api/swarm-decompose')({
         if (prompt.length > 16_000) return json({ error: 'prompt too long' }, { status: 400 })
 
         const workersRaw = Array.isArray(body.workers) ? body.workers : []
-        const workers: WorkerHint[] = []
+        const workers: Array<WorkerHint> = []
         for (const entry of workersRaw) {
           if (!entry || typeof entry !== 'object') continue
           const obj = entry as Record<string, unknown>
@@ -195,12 +242,13 @@ export const Route = createFileRoute('/api/swarm-decompose')({
             notes: typeof obj.notes === 'string' ? obj.notes : undefined,
           })
         }
-        if (workers.length === 0) return json({ error: 'workers[] required' }, { status: 400 })
+        const filteredWorkers = dispatchableWorkers(prompt, workers)
+        if (filteredWorkers.length === 0) return json({ error: 'workers[] required' }, { status: 400 })
 
-        const requestedModel = typeof body.model === 'string' && body.model.trim() ? body.model.trim() : (process.env.CLAUDE_DEFAULT_MODEL ?? 'claude-opus-4-7')
+        const requestedModel = safeRouterModel(body.model)
 
         try {
-          const result = await callOrchestrator(prompt, workers, requestedModel)
+          const result = await callOrchestrator(prompt, filteredWorkers, requestedModel)
           return json({
             ok: true,
             decomposedAt: Date.now(),
@@ -208,7 +256,7 @@ export const Route = createFileRoute('/api/swarm-decompose')({
             ...result,
           })
         } catch (error) {
-          const fallback = heuristicAssignments(prompt, workers)
+          const fallback = heuristicAssignments(prompt, filteredWorkers)
           return json({
             ok: true,
             fallback: true,
