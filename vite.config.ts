@@ -599,6 +599,39 @@ const config = defineConfig(({ mode, command }) => {
             res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless')
             next()
           })
+          // Content Security Policy as a real HTTP response header. Sending
+          // it here (not as a `<meta>` tag) keeps the policy authoritative
+          // when an edge proxy mutates the response body — e.g. Cloudflare's
+          // JS Challenge injecting a per-request nonce into the served HTML
+          // when a browser request trips the "impersonate browsers" WAF rule.
+          // Without this, the inline-style source expression
+          // `style-src ' 'nonce-...'; self` gets concatenated onto our meta
+          // tag and chromium rejects every script and stylesheet with a
+          // mangled-CSP error. See the parallel logic in server-entry.js
+          // for production.
+          server.middlewares.use((_req, res, next) => {
+            // KEEP IN SYNC with src/lib/csp.ts and server-entry.js
+            res.setHeader(
+              'Content-Security-Policy',
+              [
+                "default-src 'self'",
+                "base-uri 'self'",
+                "object-src 'none'",
+                "form-action 'self'",
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+                "img-src 'self' data: blob: https:",
+                "font-src 'self' data: https://fonts.gstatic.com",
+                "connect-src 'self' ws: wss: http: https:",
+                "worker-src 'self' blob:",
+                "media-src 'self' blob: data:",
+                "frame-src 'self' http: https:",
+              ].join('; '),
+            )
+            res.setHeader('X-Content-Type-Options', 'nosniff')
+            res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            next()
+          })
           server.middlewares.use(async (req, res, next) => {
             const requestPath = req.url?.split('?')[0]
             if (req.method === 'GET' && requestPath === '/api/healthcheck') {
