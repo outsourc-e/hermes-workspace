@@ -243,6 +243,23 @@ async function requestHandler(req, res) {
       if (typeof value === 'string') headers[name] = value
     }
 
+    // /api/* responses must NEVER be cacheable by intermediaries — the SPA
+    // uses /api/auth-check, /api/connection-status, etc. to decide whether
+    // to show the password form. Cloudflare's Browser Cache TTL default
+    // (7200s) is applied to any GET that doesn't say `no-store`, which
+    // caused the auth-check response to be served stale from the edge
+    // for ~2h after a fresh login, trapping the user in a password loop.
+    // Strip any Cache-Control/Pragma/Expires on API responses so the
+    // edge never reuses them. Hash-named assets keep their immutable
+    // header (set above in tryServeStatic) and are unaffected here
+    // because static assets short-circuit before this branch.
+    const reqPathname = new URL(request.url).pathname
+    if (reqPathname.startsWith('/api/')) {
+      headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+      headers['Pragma'] = 'no-cache'
+      headers['Expires'] = '0'
+    }
+
     res.writeHead(response.status, headers)
 
     if (response.body) {
