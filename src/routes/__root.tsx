@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
 import { getRootSurfaceState } from './-root-layout-state'
+import {  fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import type {AuthStatus} from '@/lib/claude-auth';
 import { SearchModal } from '@/components/search/search-modal'
 import { UsageMeter } from '@/components/usage-meter'
@@ -29,23 +30,15 @@ import {
 } from '@/components/onboarding/claude-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
-import {  fetchClaudeAuthStatus } from '@/lib/claude-auth'
 
-const APP_CSP = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "form-action 'self'",
-  // frame-ancestors is ignored in meta CSP and must be sent as an HTTP header.
-  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' ws: wss: http: https:",
-  "worker-src 'self' blob:",
-  "media-src 'self' blob: data:",
-  "frame-src 'self' http: https:",
-].join('; ')
+// Content Security Policy used to be emitted here as a `<meta http-equiv>`
+// tag. That made the workspace unusable when the Cloudflare JS Challenge
+// tripped on a request and rewrote the served HTML with its own per-request
+// `<meta name="Content-Security-Policy">` containing a nonce, producing a
+// concatenated malformed policy that chromium rejected (e.g.
+// `style-src ' 'nonce-…'; self`). The policy now lives in src/lib/csp.ts
+// and is emitted as a real HTTP response header by server-entry.js
+// (production) and vite.config.ts (dev/preview). Leave it that way.
 
 const THEME_STORAGE_KEY = 'claude-theme'
 const DEFAULT_THEME = 'claude-nous'
@@ -402,7 +395,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta httpEquiv="Content-Security-Policy" content={APP_CSP} />
+        {/* Content-Security-Policy is set as an HTTP response header in
+            server-entry.js and vite.config.ts. Don't re-emit it as a `<meta>`
+            here — see the comment in src/lib/csp.ts for why duplicating it
+            in the HTML is unsafe when an edge proxy mutates the body. */}
         <script
           dangerouslySetInnerHTML={{
             __html: wrapInlineScript(`
