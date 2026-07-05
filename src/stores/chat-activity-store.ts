@@ -137,7 +137,8 @@ export const useChatActivityStore = create<ChatActivityState>((set, get) => ({
       get().setGatewayActivity(detected)
     }
     void tick()
-    const timer = setInterval(tick, 3000)
+    // 8s (was 3s): gateway activity is a coarse indicator; throttle network polling
+    const timer = setInterval(tick, 8000)
     set({ _pollTimer: timer })
   },
 

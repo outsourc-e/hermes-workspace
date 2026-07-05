@@ -247,7 +247,12 @@ export function buildHermesTmuxLaunchCommand(input: {
   // Do not exec the Hermes process. Keeping the parent shell alive means a
   // failed worker startup leaves a readable tmux pane instead of destroying the
   // session and turning the real error into "can't find pane".
-  return `${launchPrefix} '${hermesBin}' chat --tui; status=$?; printf '\n[Hermes worker exited with status %s]\n' "$status"`
+  // NOTE: `hermes_status`, not `status` — zsh reserves `status` as a
+  // read-only alias of `$?`, and this command runs inside the pane's default
+  // shell. Also export a PATH that includes ~/.local/bin: when the workspace
+  // server is spawned by launchd its minimal PATH propagates into the tmux
+  // server, and the Hermes TUI needs `node` (symlinked in ~/.local/bin).
+  return `export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"; ${launchPrefix} '${hermesBin}' chat --tui; hermes_status=$?; printf '\n[Hermes worker exited with status %s]\n' "$hermes_status"`
 }
 
 function parseAssignments(value: unknown): Array<AssignmentRequest> {
@@ -724,7 +729,28 @@ function resolveWorkerCwd(workerId: string): string {
       /* noop */
     }
   }
-  return homedir()
+  return defaultWorkspaceRoot()
+}
+
+/**
+ * Shared workspace root for agent file output. Mirrors the Files-page
+ * fallback chain (env override, then ~/workspace) so worker output is always
+ * visible in the built-in file browser instead of scattering across $HOME.
+ */
+function defaultWorkspaceRoot(): string {
+  const env =
+    process.env.HERMES_WORKSPACE_DIR?.trim() ||
+    process.env.CLAUDE_WORKSPACE_DIR?.trim()
+  if (env && existsSync(env)) return env
+  const shared = join(homedir(), 'workspace')
+  if (!existsSync(shared)) {
+    try {
+      mkdirSync(shared, { recursive: true })
+    } catch {
+      return homedir()
+    }
+  }
+  return shared
 }
 
 async function captureTmuxPane(
@@ -1179,7 +1205,10 @@ function runWorker(
       args,
       {
         env,
-        cwd: homedir(),
+        // Run oneshot workers in the shared workspace root (not $HOME) so any
+        // files an agent writes land in the Files-page root instead of
+        // scattering project output across the home directory.
+        cwd: defaultWorkspaceRoot(),
         timeout: timeoutMs,
         maxBuffer: MAX_OUTPUT_CHARS,
         killSignal: 'SIGTERM',

@@ -1,12 +1,29 @@
+import { Suspense, lazy } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { EchoStudioScreen } from '@/screens/echo-studio/echo-studio-screen'
+
+// Lazy-loaded to keep the Echo Studio screen out of the main bundle
+const EchoStudioScreen = lazy(() =>
+  import('@/screens/echo-studio/echo-studio-screen').then((m) => ({
+    default: m.EchoStudioScreen,
+  })),
+)
 
 export const Route = createFileRoute('/echo-studio')({
   ssr: false,
   component: function EchoStudioRoute() {
     usePageTitle('Echo Studio')
-    return <EchoStudioScreen />
+    return (
+      <Suspense
+        fallback={
+          <div className="flex h-full items-center justify-center text-sm text-primary-500">
+            Loading Echo Studio...
+          </div>
+        }
+      >
+        <EchoStudioScreen />
+      </Suspense>
+    )
   },
   errorComponent: function EchoStudioError({ error }) {
     return (
@@ -15,7 +32,9 @@ export const Route = createFileRoute('/echo-studio')({
           Failed to Load Echo Studio
         </h2>
         <p className="mb-4 max-w-md text-sm text-primary-600">
-          {error instanceof Error ? error.message : 'An unexpected error occurred'}
+          {error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred'}
         </p>
         <button
           type="button"

@@ -1,12 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
-import {
-  CLAUDE_API,
-  ensureGatewayProbed,
-  getCapabilities,
-} from '../../server/gateway-capabilities'
-import { getMemory } from '../../server/claude-api'
+import { listMemoryFiles } from '../../server/memory-browser'
 
 export const Route = createFileRoute('/api/memory')({
   server: {
@@ -16,22 +11,19 @@ export const Route = createFileRoute('/api/memory')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
 
-        await ensureGatewayProbed()
-        if (!getCapabilities().memory) {
+        // Memory is sourced entirely from the local filesystem via
+        // memory-browser.ts ($HERMES_HOME/MEMORY.md + memory/ + memories/).
+        // hermes-agent has no /api/memory gateway endpoint (0.17.0 returns
+        // 404), so the old gateway proxy here was permanently broken — this
+        // route now mirrors /api/memory/list.
+        try {
+          return json({ ok: true, files: listMemoryFiles() })
+        } catch (err) {
           return json(
             {
               ok: false,
-              error: `Gateway does not support /api/memory on ${CLAUDE_API}`,
+              error: err instanceof Error ? err.message : String(err),
             },
-            { status: 503 },
-          )
-        }
-
-        try {
-          return json(await getMemory())
-        } catch (err) {
-          return json(
-            { error: err instanceof Error ? err.message : String(err) },
             { status: 500 },
           )
         }

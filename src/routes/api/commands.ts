@@ -21,6 +21,13 @@ export const Route = createFileRoute('/api/commands')({
         try {
           const res = await gatewayFetch('/v1/commands')
 
+          if (res.status === 404) {
+            // Vanilla hermes-agent (≤0.17.0) does not expose /v1/commands.
+            // Return an empty list instead of an error so the composer falls
+            // back to its built-in slash commands without console noise.
+            return json({ commands: [] })
+          }
+
           if (!res.ok) {
             return json(
               { error: `Gateway responded with status ${res.status}` },
@@ -31,10 +38,7 @@ export const Route = createFileRoute('/api/commands')({
           const body = await res.json()
           return Response.json(body)
         } catch {
-          return json(
-            { error: 'Gateway is unreachable' },
-            { status: 500 },
-          )
+          return json({ error: 'Gateway is unreachable' }, { status: 500 })
         }
       },
     },

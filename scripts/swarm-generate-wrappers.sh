@@ -19,6 +19,8 @@ SWARM_YAML="$REPO_DIR/swarm.yaml"
 BIN_DIR="$HOME/.local/bin"
 HERMES_BIN="$HOME/.local/bin/hermes"
 PROFILES_DIR="$HOME/.hermes/profiles"
+WORKSPACE_ROOT="${HERMES_WORKSPACE_DIR:-$HOME/workspace}"
+mkdir -p "$WORKSPACE_ROOT"
 
 [ -f "$SWARM_YAML" ] || { echo "swarm.yaml not found at $SWARM_YAML" >&2; exit 1; }
 mkdir -p "$BIN_DIR"
@@ -49,13 +51,18 @@ write_wrapper() {
 # So: forward "\$@" when given, default to the persistent TUI when not.
 export HERMES_HOME="$PROFILES_DIR/$worker_id"
 export HERMES_CLI_BIN="$HERMES_BIN"
-cd "$REPO_DIR" || exit 1
+# launchd-spawned callers have a minimal PATH; the Hermes TUI needs node
+# (symlinked in ~/.local/bin).
+export PATH="\$HOME/.local/bin:/opt/homebrew/bin:\$PATH"
+# Canonical agent file space — worker output must land where the Files page
+# looks. Task prompts that target a repo cd explicitly.
+cd "$WORKSPACE_ROOT" || exit 1
 if [ "\$#" -gt 0 ]; then
   exec "$HERMES_BIN" "\$@"
 fi
 "$HERMES_BIN" chat --tui
-status=\$?
-printf '\n[Hermes worker exited with status %s]\n' "\$status"
+hermes_status=\$?
+printf '\n[Hermes worker exited with status %s]\n' "\$hermes_status"
 EOF
   chmod +x "$path"
 }

@@ -1,12 +1,32 @@
+import { Suspense, lazy } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { Swarm2Screen } from '@/screens/swarm2/swarm2-screen'
+
+// Lazy-loaded to keep the Swarm screen out of the main bundle
+const Swarm2Screen = lazy(() =>
+  import('@/screens/swarm2/swarm2-screen').then((m) => ({
+    default: m.Swarm2Screen,
+  })),
+)
 
 export const Route = createFileRoute('/swarm2')({
   ssr: false,
   component: function Swarm2Route() {
     usePageTitle('Swarm')
-    return <Swarm2Screen />
+    return (
+      <Suspense
+        fallback={
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <div className="mb-3 inline-block h-8 w-8 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
+              <p className="text-sm text-primary-500">Loading Swarm...</p>
+            </div>
+          </div>
+        }
+      >
+        <Swarm2Screen />
+      </Suspense>
+    )
   },
   errorComponent: function Swarm2Error({ error }) {
     return (

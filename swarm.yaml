@@ -59,7 +59,7 @@ workers:
     name: KM Agent
     role: RAZSOC / GBrain Knowledge Steward
     specialty: RAZSOC, GBrain, Obsidian, TaskNotes, graph health, durable knowledge capture, drift audits
-    model: llama3.1:8b
+    model: deepseek-v4-flash
     mission: Keep the operating brain coherent, searchable, and source-of-record aligned without polluting durable knowledge.
     profile: km-agent
     modes:
@@ -111,7 +111,7 @@ workers:
     name: Builder
     role: Scoped Implementation Agent
     specialty: focused implementation, tests, small diffs, integration fixes
-    model: deepseek-v4-pro
+    model: qwen3-coder:480b
     mission: Ship scoped product/code slices with tests, minimal diffs, and clear verification evidence.
     profile: builder
     modes:
@@ -209,10 +209,7 @@ workers:
     name: QA
     role: Browser / Workflow / CLI Smoke Verification
     specialty: browser QA, workflow smoke tests, expected-vs-actual checks, regression reproduction
-    # qwen2.5:7b has a 32K context window — below Hermes Agent's 64K minimum, so
-    # the worker fails `agent init` and every dispatch is recorded BLOCKED.
-    # llama3.1:8b (128K) is the strongest ≥64K local model available.
-    model: llama3.1:8b
+    model: deepseek-v4-flash
     mission: Verify user-visible behavior with concrete smoke evidence and concise bug reports.
     profile: qa
     modes:
@@ -257,7 +254,7 @@ workers:
     name: Researcher
     role: Brain-first Research / Bounded Autoresearch
     specialty: GBrain-first lookup, external research, synthesis, source trails, bounded research loops
-    model: gemini-2.5-pro
+    model: qwen3.5:397b
     mission: Produce decision-grade research with brain-first context, external verification, and explicit uncertainty.
     profile: researcher
     modes:
@@ -311,7 +308,7 @@ workers:
     name: Ops Watch
     role: Local Infra / Runtime Health Watch
     specialty: gateway health, cron, MCP, workspace services, local process status, boring reliability
-    model: llama3.2:3b
+    model: ministral-3:8b
     mission: Keep Hermes, Workspace, GBrain, gateway, cron, and local services observable and healthy with quiet, low-risk checks.
     profile: ops-watch
     modes:
@@ -359,9 +356,7 @@ workers:
     name: Maintainer
     role: Upstream Dependency / Patch Hygiene
     specialty: upstream tracking, local patch hygiene, dependency updates, PR/issue follow-through
-    # mistral:7b has a 32K context window — below Hermes Agent's 64K minimum, so
-    # the worker fails `agent init` and every dispatch is recorded BLOCKED.
-    model: llama3.1:8b
+    model: deepseek-v4-flash
     mission: Keep local forks and upstream dependencies healthy without losing local patches or dirty-worktree context.
     profile: maintainer
     modes:
@@ -411,7 +406,7 @@ workers:
     name: Strategist
     role: Wedges / Bets / Kill Criteria
     specialty: operating plans, gstack-style wedges, strategy reviews, decision framing, kill criteria
-    model: deepseek-r1:8b
+    model: kimi-k2-thinking
     mission: Turn ambiguity into crisp wedges, bets, constraints, and kill criteria without over-planning.
     profile: strategist
     modes:
@@ -457,7 +452,7 @@ workers:
     name: Inbox Triage
     role: Capture / Discard / Route / Task Triage
     specialty: low-friction inbox processing, capture routing, task/research/defer decisions, durable-context filtering
-    model: llama3.2:3b
+    model: deepseek-v4-flash
     mission: Route incoming material into discard, task, research, or durable brain capture with minimal overhead and no junk accumulation.
     profile: inbox-triage
     modes:
@@ -501,3 +496,184 @@ workers:
     mcpServers:
       - gbrain
     wrapper: inbox:triage
+  - id: release-agent
+    name: Release
+    role: Merge-to-Ship Release Engineering
+    specialty: release builds, e2e gates, tagging, changelog, docker-compose sanity, rollback plans
+    model: deepseek-v4-pro
+    mission: Own the path from approved merge to shipped artifact with verifiable build, test, and rollback evidence.
+    profile: release-agent
+    modes:
+      - ship
+    tools:
+      - terminal
+      - file
+      - web
+      - gbrain
+      - session_search
+      - skills
+      - todo
+    skills:
+      - github-pr-workflow
+      - gstack-for-hermes
+      - codebase-inspection
+      - writing-plans
+    capabilities:
+      - release-builds
+      - e2e-verification
+      - tagging
+      - changelog
+      - rollback-planning
+    preferredTaskTypes:
+      - release
+      - build
+      - tag
+      - changelog
+      - ship
+    greenlightRequiredFor:
+      - publish
+      - tag-push
+      - merge
+      - destructive
+      - external-send
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: release:ship
+  - id: security-auditor
+    name: Security Auditor
+    role: Scheduled Security Sweeps / Hardening
+    specialty: dependency CVEs, secret scanning, auth header checks, credential blast-radius review
+    model: kimi-k2-thinking
+    mission: Continuously reduce attack surface with scheduled sweeps and concrete, prioritized remediations.
+    profile: security-auditor
+    modes:
+      - sweep
+    tools:
+      - terminal
+      - file
+      - web
+      - gbrain
+      - cronjob
+      - session_search
+      - skills
+    skills:
+      - codebase-inspection
+      - systematic-debugging
+      - gstack-for-hermes
+    capabilities:
+      - cve-scanning
+      - secret-scanning
+      - auth-review
+      - hardening
+      - blast-radius-analysis
+    preferredTaskTypes:
+      - security
+      - audit
+      - cve
+      - secrets
+      - hardening
+    greenlightRequiredFor:
+      - destructive
+      - credential-change
+      - external-send
+      - config-change
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: security:sweep
+  - id: quant-agent
+    name: Quant
+    role: Trading Pipeline / Market Data Steward
+    specialty: papertrader and stocktrader pipeline health, Polymarket data, P&L reconciliation, market briefs
+    model: deepseek-v4-flash
+    mission: Keep trading pipelines healthy and deliver decision-grade market briefs without ever executing trades.
+    profile: quant-agent
+    modes:
+      - brief
+    tools:
+      - terminal
+      - file
+      - web
+      - gbrain
+      - cronjob
+      - todo
+      - session_search
+      - skills
+    skills:
+      - polymarket
+      - gstack-for-hermes
+      - writing-plans
+    capabilities:
+      - pipeline-monitoring
+      - pnl-reconciliation
+      - market-briefs
+      - data-quality
+    preferredTaskTypes:
+      - market-data
+      - pipeline-health
+      - reconciliation
+      - brief
+      - monitoring
+    greenlightRequiredFor:
+      - trade-execution
+      - external-send
+      - destructive
+      - credential-change
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: quant:brief
+  - id: concierge
+    name: Concierge
+    role: Personal Assistant / Daily Digest
+    specialty: morning digests, reminders, greenlight queue summaries, cross-agent activity rollups
+    model: deepseek-v4-flash
+    mission: Give the operator one calm surface for daily digests, pending approvals, and scheduled reminders.
+    profile: concierge
+    modes:
+      - digest
+    tools:
+      - cronjob
+      - todo
+      - gbrain
+      - web
+      - file
+      - clarify
+      - session_search
+      - skills
+    skills:
+      - gstack-for-hermes
+      - inbox-triage-core
+      - writing-plans
+    capabilities:
+      - daily-digest
+      - reminders
+      - greenlight-queue
+      - activity-rollup
+    preferredTaskTypes:
+      - digest
+      - reminder
+      - summary
+      - schedule
+      - triage
+    greenlightRequiredFor:
+      - external-send
+      - destructive
+      - calendar-write
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: concierge:digest
