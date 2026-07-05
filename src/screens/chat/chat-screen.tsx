@@ -853,7 +853,11 @@ export function ChatScreen({
   }, [])
 
   const resolvePendingApproval = useCallback(
-    async (approval: ApprovalRequest, status: 'approved' | 'denied') => {
+    async (
+      approval: ApprovalRequest,
+      status: 'approved' | 'denied',
+      choice: 'once' | 'session' = 'once',
+    ) => {
       const nextApprovals = loadApprovals().map((entry) => {
         if (entry.id !== approval.id) return entry
         return {
@@ -873,7 +877,14 @@ export function ChatScreen({
           ? `/api/approvals/${approval.gatewayApprovalId}/approve`
           : `/api/approvals/${approval.gatewayApprovalId}/deny`
       try {
-        await fetch(endpoint, { method: 'POST' })
+        await fetch(endpoint, {
+          method: 'POST',
+          headers:
+            status === 'approved'
+              ? { 'Content-Type': 'application/json' }
+              : undefined,
+          body: status === 'approved' ? JSON.stringify({ choice }) : undefined,
+        })
       } catch {
         // Local resolution still succeeds when API endpoint is unavailable.
       }
@@ -2941,11 +2952,28 @@ export function ChatScreen({
                       <button
                         type="button"
                         onClick={() => {
-                          void resolvePendingApproval(approval, 'approved')
+                          void resolvePendingApproval(
+                            approval,
+                            'approved',
+                            'once',
+                          )
                         }}
                         className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
                       >
                         Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void resolvePendingApproval(
+                            approval,
+                            'approved',
+                            'session',
+                          )
+                        }}
+                        className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/10 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+                      >
+                        Session
                       </button>
                       <button
                         type="button"

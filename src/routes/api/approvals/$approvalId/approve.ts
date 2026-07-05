@@ -3,6 +3,24 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../../server/auth-middleware'
 import { submitHermesRunApproval } from '../../../../server/hermes-runs-api'
 
+type ApprovalChoice = 'once' | 'session' | 'always'
+
+async function readApprovalChoice(request: Request): Promise<ApprovalChoice> {
+  try {
+    const body = (await request.json()) as { choice?: unknown }
+    if (
+      body.choice === 'once' ||
+      body.choice === 'session' ||
+      body.choice === 'always'
+    ) {
+      return body.choice
+    }
+  } catch {
+    // Empty / non-JSON body keeps the historical one-shot approval behavior.
+  }
+  return 'once'
+}
+
 export const Route = createFileRoute('/api/approvals/$approvalId/approve')({
   server: {
     handlers: {
@@ -12,14 +30,21 @@ export const Route = createFileRoute('/api/approvals/$approvalId/approve')({
         }
         const approvalId = params.approvalId?.trim()
         if (!approvalId) {
-          return json({ ok: false, error: 'approvalId required' }, { status: 400 })
+          return json(
+            { ok: false, error: 'approvalId required' },
+            { status: 400 },
+          )
         }
         try {
-          await submitHermesRunApproval(approvalId, 'once')
+          const choice = await readApprovalChoice(request)
+          await submitHermesRunApproval(approvalId, choice)
           return json({ ok: true })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            {
+              ok: false,
+              error: err instanceof Error ? err.message : String(err),
+            },
             { status: 502 },
           )
         }

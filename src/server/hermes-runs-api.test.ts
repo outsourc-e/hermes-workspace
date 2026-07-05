@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  submitHermesRunApproval,
-  streamHermesRun,
-} from './hermes-runs-api'
+import { submitHermesRunApproval, streamHermesRun } from './hermes-runs-api'
 
 function createStreamResponse(chunks: string[]): Response {
   const encoder = new TextEncoder()
@@ -95,16 +92,18 @@ describe('streamHermesRun', () => {
 
 describe('submitHermesRunApproval', () => {
   it('posts the approval choice to the run approval endpoint', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await submitHermesRunApproval('run_123', 'deny')
+    await submitHermesRunApproval('run_123', 'session')
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:8642/v1/runs/run_123/approval',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ choice: 'deny' }),
+        body: JSON.stringify({ choice: 'session' }),
       }),
     )
   })
