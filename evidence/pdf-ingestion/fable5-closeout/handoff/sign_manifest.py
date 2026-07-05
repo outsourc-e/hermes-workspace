@@ -29,7 +29,7 @@ import sys
 
 KEY_ENV = "CAPTAIN_PDF_APPROVAL_HMAC_KEY"
 REQUIRED_FIELDS = (
-    "environment", "document_ids", "knowledge_ids", "namespace", "schema_version",
+    "manifest_id", "environment", "document_ids", "knowledge_ids", "namespace", "schema_version",
     "expires_at", "commit_sha", "payload_sha256", "max_records", "nonce",
     "idempotency_key", "approved_by", "founder_approval", "auto_promotion", "signature",
 )
@@ -57,7 +57,8 @@ def main() -> int:
     if args.payload:
         with open(args.payload, encoding="utf-8") as fh:
             payload = json.load(fh)
-        manifest["payload_sha256"] = hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+        payload_body = {k: v for k, v in payload.items() if k != "approval_payload_hash"}
+        manifest["payload_sha256"] = hashlib.sha256(canonical_json(payload_body).encode("utf-8")).hexdigest()
 
     if manifest.get("nonce") == "AUTO":
         manifest["nonce"] = secrets.token_hex(16)

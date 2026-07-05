@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "captain-pdf/canonical-knowledge-record/v1",
+  "title": "Captain PDF Canonical Knowledge Record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "registry_environment", "registry_namespace", "knowledge_id", "document_id", "source_hash", "content_hash", "page_number", "source_excerpt", "statement", "knowledge_type", "verification_status", "approval_manifest_id", "approval_payload_hash", "source_commit", "model_id", "prompt_version", "record_version", "previous_version", "status", "created_at", "created_by", "correlation_id"],
+  "properties": {
+    "schema_version": {"const": "1"},
+    "registry_environment": {"enum": ["sandbox", "production"]},
+    "registry_namespace": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "knowledge_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "document_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "source_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "content_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "page_number": {"type": "integer", "minimum": 1},
+    "source_excerpt": {"type": "string", "minLength": 1},
+    "statement": {"type": "string", "minLength": 1},
+    "knowledge_type": {"type": "string", "minLength": 1},
+    "verification_status": {"enum": ["VERIFIED", "FOUNDER_APPROVED"]},
+    "approval_manifest_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "approval_payload_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "source_commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "model_id": {"type": "string", "minLength": 1},
+    "prompt_version": {"type": "string", "minLength": 1},
+    "record_version": {"type": "integer", "minimum": 1},
+    "previous_version": {"type": ["integer", "null"], "minimum": 1},
+    "status": {"enum": ["CANDIDATE", "VERIFIED", "FOUNDER_APPROVED", "CANONICAL", "QUARANTINED", "DEPRECATED"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "created_by": {"type": "string", "minLength": 1},
+    "correlation_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"}
+  }
+}

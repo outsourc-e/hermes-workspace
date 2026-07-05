@@ -30,11 +30,15 @@ esac
 
 values=()
 names=(
-  CAPTAIN_PDF_REGISTRY_URL
-  CAPTAIN_PDF_REGISTRY_TOKEN
-  CAPTAIN_PDF_APPROVAL_HMAC_KEY
+  CAPTAIN_PDF_REGISTRY_TYPE
+  CAPTAIN_PDF_REGISTRY_SANDBOX_ROOT
+  CAPTAIN_PDF_REGISTRY_PRODUCTION_ROOT
   CAPTAIN_PDF_REGISTRY_NAMESPACE
   CAPTAIN_PDF_REGISTRY_TEST_NAMESPACE
+  CAPTAIN_PDF_CANONICAL_WRITE_ENABLED
+  CAPTAIN_PDF_DRY_RUN
+  CAPTAIN_PDF_KILL_SWITCH
+  CAPTAIN_PDF_APPROVAL_HMAC_KEY
 )
 
 for name in "${names[@]}"; do
@@ -49,10 +53,17 @@ for name in "${names[@]}"; do
   values+=("${value}")
 done
 
-if [[ "${values[3]}" == "${values[4]}" ]]; then
-  printf 'REFUSED: production and test namespaces must differ\n' >&2
-  exit 1
-fi
+[[ "${values[0]}" == filesystem ]] || { printf 'REFUSED: registry type must be filesystem\n' >&2; exit 1; }
+for index in 5 6 7; do
+  [[ "${values[$index]}" == true || "${values[$index]}" == false ]] || { printf 'REFUSED: flags must be true or false\n' >&2; exit 1; }
+done
+[[ "${values[1]}" == /* && "${values[2]}" == /* ]] || { printf 'REFUSED: registry roots must be absolute\n' >&2; exit 1; }
+values[1]="$(realpath -m -- "${values[1]}")"
+values[2]="$(realpath -m -- "${values[2]}")"
+[[ "${values[1]}" != "${values[2]}" ]] || { printf 'REFUSED: sandbox and production roots must differ\n' >&2; exit 1; }
+[[ "${values[3]}" != "${values[4]}" ]] || { printf 'REFUSED: production and test namespaces must differ\n' >&2; exit 1; }
+case "${values[1]}" in "${REPO_ROOT}"|"${REPO_ROOT}"/*) printf 'REFUSED: runtime roots must be outside the repository\n' >&2; exit 1;; esac
+case "${values[2]}" in "${REPO_ROOT}"|"${REPO_ROOT}"/*) printf 'REFUSED: runtime roots must be outside the repository\n' >&2; exit 1;; esac
 
 if [[ -L "${DEST_DIR}" ]]; then
   printf 'REFUSED: destination directory must not be a symbolic link\n' >&2
@@ -74,4 +85,4 @@ mv -f -- "${TEMP_FILE}" "${DEST}"
 TEMP_FILE=""
 chmod 0600 -- "${DEST}"
 
-printf 'Secure configuration written.\n'
+printf 'Secure filesystem registry configuration written.\n'

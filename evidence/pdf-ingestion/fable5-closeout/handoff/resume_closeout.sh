@@ -19,13 +19,10 @@ else
   echo "[1] BLOCKED: $SECRETS absent — run setup_secrets.sh first"
 fi
 
-if [[ -n "${CAPTAIN_PDF_REGISTRY_URL:-}" && -n "${CAPTAIN_PDF_REGISTRY_TOKEN:-}" && -n "${CAPTAIN_PDF_REGISTRY_TEST_NAMESPACE:-}" ]]; then
-  echo "[2] registry env present — running read-only probe"
-  python3 "$HANDOFF/verify_external_registry.py" --namespace "$CAPTAIN_PDF_REGISTRY_TEST_NAMESPACE" \
-    --out "$REPO/evidence/pdf-ingestion/fable5-closeout/gate2_registry_probe.json" \
-    | grep -E '"result"|"reason"'
+if [[ "${CAPTAIN_PDF_REGISTRY_TYPE:-}" == filesystem && -n "${CAPTAIN_PDF_REGISTRY_SANDBOX_ROOT:-}" && -n "${CAPTAIN_PDF_REGISTRY_PRODUCTION_ROOT:-}" && -n "${CAPTAIN_PDF_REGISTRY_NAMESPACE:-}" && -n "${CAPTAIN_PDF_REGISTRY_TEST_NAMESPACE:-}" && -n "${CAPTAIN_PDF_CANONICAL_WRITE_ENABLED:-}" && -n "${CAPTAIN_PDF_DRY_RUN:-}" && -n "${CAPTAIN_PDF_KILL_SWITCH:-}" ]]; then
+  echo "[2] filesystem registry configuration present (local validation only)"
 else
-  echo "[2] BLOCKED: registry URL, token, or test namespace unset"
+  echo "[2] BLOCKED: filesystem registry configuration incomplete"
 fi
 
 if [[ -f "$HOME/.captain-pdf/approval_manifest.json" && -n "${CAPTAIN_PDF_APPROVAL_HMAC_KEY:-}" ]]; then

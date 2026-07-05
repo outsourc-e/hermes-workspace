@@ -11,7 +11,7 @@ trap 'rm -rf -- "${TMP}"' EXIT
 pass=0
 check() { printf 'PASS: %s\n' "$1"; pass=$((pass + 1)); }
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
-inputs() { printf '%s\n' 'https://registry.invalid' 'token-value-9x' 'hmac-value-4y' 'captain-pdf-prod' 'captain-pdf-test'; }
+inputs() { printf '%s\n' filesystem '/tmp/captain-pdf-sandbox-test' '/tmp/captain-pdf-production-test' 'captain-pdf-prod' 'captain-pdf-test' false true true 'hmac-value-4y'; }
 run_setup() { inputs | HOME="$1" CAPTAIN_PDF_SECRET_DIR="$1/.captain-pdf" bash "$SETUP"; }
 
 bash -n "$SETUP" "$RESUME" && check 'Bash syntax'
@@ -19,16 +19,16 @@ bash -n "$SETUP" "$RESUME" && check 'Bash syntax'
 trace_home="${TMP}/trace-home"
 mkdir -p "$trace_home"
 trace_output="$(inputs | HOME="$trace_home" CAPTAIN_PDF_SECRET_DIR="$trace_home/.captain-pdf" bash -x "$SETUP" 2>&1)"
-[[ "$trace_output" != *'token-value-9x'* && "$trace_output" != *'hmac-value-4y'* ]] || fail 'xtrace disclosed input'
+[[ "$trace_output" != *'hmac-value-4y'* ]] || fail 'xtrace disclosed input'
 check 'xtrace disabled before input'
 
 missing_home="${TMP}/missing-home"; mkdir -p "$missing_home"
-if printf '%s\n' a b c d '' | HOME="$missing_home" CAPTAIN_PDF_SECRET_DIR="$missing_home/.captain-pdf" bash "$SETUP" >/dev/null 2>&1; then fail 'missing value accepted'; fi
+if printf '%s\n' filesystem /tmp/s /tmp/p prod test false true true '' | HOME="$missing_home" CAPTAIN_PDF_SECRET_DIR="$missing_home/.captain-pdf" bash "$SETUP" >/dev/null 2>&1; then fail 'missing value accepted'; fi
 [[ ! -e "$missing_home/.captain-pdf/secrets.env" ]] || fail 'missing value wrote file'
 check 'missing value rejected'
 
 collision_home="${TMP}/collision-home"; mkdir -p "$collision_home"
-if printf '%s\n' a b c same same | HOME="$collision_home" CAPTAIN_PDF_SECRET_DIR="$collision_home/.captain-pdf" bash "$SETUP" >/dev/null 2>&1; then fail 'namespace collision accepted'; fi
+if printf '%s\n' filesystem /tmp/s /tmp/p same same false true true key | HOME="$collision_home" CAPTAIN_PDF_SECRET_DIR="$collision_home/.captain-pdf" bash "$SETUP" >/dev/null 2>&1; then fail 'namespace collision accepted'; fi
 check 'namespace collision rejected'
 
 mode_home="${TMP}/mode-home"; mkdir -p "$mode_home"
@@ -38,7 +38,7 @@ check 'directory mode 0700'
 [[ "$(stat -c %a "$mode_home/.captain-pdf/secrets.env")" == 600 ]] || fail 'secret file mode'
 [[ "$(stat -c %u "$mode_home/.captain-pdf/secrets.env")" == "$(id -u)" ]] || fail 'secret file owner'
 check 'secret file mode 0600 and current owner'
-[[ "$output" != *'token-value-9x'* && "$output" != *'hmac-value-4y'* && "$output" != *'captain-pdf-prod'* ]] || fail 'secret disclosed in output'
+[[ "$output" != *'hmac-value-4y'* && "$output" != *'captain-pdf-prod'* ]] || fail 'secret disclosed in output'
 check 'no secret in stdout/stderr'
 
 old_inode="$(stat -c %i "$mode_home/.captain-pdf/secrets.env")"
@@ -88,7 +88,7 @@ resume_status=$?
 [[ "$resume_status" -eq 0 ]] || fail 'resume result was not deterministic'
 [[ "$resume_output" == *'GITHUB_AUTH_ACTION_REQUIRED'* ]] || fail 'missing github auth action result'
 [[ "$resume_output" != *'Username:'* && "$resume_output" != *'Password:'* ]] || fail 'credential prompt leaked'
-[[ "$resume_output" == *'registry URL, token, or test namespace unset'* ]] || fail 'missing registry secrets did not fail closed'
+[[ "$resume_output" == *'filesystem registry configuration incomplete'* ]] || fail 'missing registry secrets did not fail closed'
 check 'github auth missing is noninteractive, bounded, and deterministic'
 check 'registry secrets missing remains fail closed'
 
