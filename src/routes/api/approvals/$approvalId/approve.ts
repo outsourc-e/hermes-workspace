@@ -2,6 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../../server/auth-middleware'
 import { submitHermesRunApproval } from '../../../../server/hermes-runs-api'
+import {
+  clearPendingSessionApproval,
+  rememberSessionApprovalForRun,
+} from '../../../../server/session-approval-store'
 
 type ApprovalChoice = 'once' | 'session' | 'always'
 
@@ -38,6 +42,11 @@ export const Route = createFileRoute('/api/approvals/$approvalId/approve')({
         try {
           const choice = await readApprovalChoice(request)
           await submitHermesRunApproval(approvalId, choice)
+          if (choice === 'session') {
+            await rememberSessionApprovalForRun(approvalId)
+          } else {
+            await clearPendingSessionApproval(approvalId)
+          }
           return json({ ok: true })
         } catch (err) {
           return json(

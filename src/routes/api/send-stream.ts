@@ -12,6 +12,7 @@ import {
 import {
   appendRunText,
   createPersistedRun,
+  addRunLifecycleEvent,
   markRunStatus,
   setRunThinking,
   upsertRunToolCall,
@@ -31,7 +32,14 @@ import { openaiChat } from '../../server/openai-compat-api'
 import {
   HermesRunStartError,
   streamHermesRun,
+  submitHermesRunApproval,
 } from '../../server/hermes-runs-api'
+import {
+  clearPendingSessionApproval,
+  markSessionApprovalRuleUsed,
+  registerPendingSessionApproval,
+  shouldAutoApproveSessionApproval,
+} from '../../server/session-approval-store'
 import { streamResponses } from '../../server/responses-api'
 import { selectPortableConversationHistory } from '../../server/portable-history'
 import {
@@ -785,6 +793,46 @@ export const Route = createFileRoute('/api/send-stream')({
                           continue
                         }
                         if (ev.kind === 'approval.request') {
+                          await registerPendingSessionApproval({
+                            runId,
+                            sessionKey: portableSessionKey,
+                            approval: ev.approval,
+                          })
+                          if (
+                            await shouldAutoApproveSessionApproval({
+                              sessionKey: portableSessionKey,
+                              approval: ev.approval,
+                            })
+                          ) {
+                            try {
+                              await submitHermesRunApproval(runId, 'once')
+                              await clearPendingSessionApproval(runId)
+                              await markSessionApprovalRuleUsed({
+                                sessionKey: portableSessionKey,
+                                approval: ev.approval,
+                              })
+                              persistActiveRun((runSessionKey, activeId) =>
+                                addRunLifecycleEvent(runSessionKey, activeId, {
+                                  text: 'Session approval auto-approved',
+                                  emoji: '🔓',
+                                  timestamp: Date.now(),
+                                  isError: false,
+                                }),
+                              )
+                              sendEvent('tool', {
+                                phase: 'complete',
+                                name: 'approval',
+                                result: 'Session approval auto-approved',
+                                sessionKey: portableSessionKey,
+                                runId,
+                              })
+                              lastActivity = 'Session approval auto-approved; resuming...'
+                              continue
+                            } catch {
+                              lastActivity =
+                                'Session auto-approval failed; waiting for approval...'
+                            }
+                          }
                           sendEvent('approval', {
                             ...ev.approval,
                             sessionKey: portableSessionKey,
