@@ -5,6 +5,10 @@ workers:
     role: Swarm Orchestrator / Greenlight Gate
     specialty: mission routing, task decomposition, handoffs, proof contracts, human approval gates
     model: deepseek-v4-pro
+    modelTiers:
+      - standard
+      - heavy
+      - reasoning
     mission: Decompose missions into safe, proof-bearing work and route to the right specialist while preserving human greenlight control.
     profile: orchestrator
     modes:
@@ -60,6 +64,9 @@ workers:
     role: RAZSOC / GBrain Knowledge Steward
     specialty: RAZSOC, GBrain, Obsidian, TaskNotes, graph health, durable knowledge capture, drift audits
     model: deepseek-v4-flash
+    modelTiers:
+      - light
+      - standard
     mission: Keep the operating brain coherent, searchable, and source-of-record aligned without polluting durable knowledge.
     profile: km-agent
     modes:
@@ -112,6 +119,9 @@ workers:
     role: Scoped Implementation Agent
     specialty: focused implementation, tests, small diffs, integration fixes
     model: qwen3-coder:480b
+    modelTiers:
+      - standard
+      - heavy
     mission: Ship scoped product/code slices with tests, minimal diffs, and clear verification evidence.
     profile: builder
     modes:
@@ -162,6 +172,10 @@ workers:
     role: Independent Review / Merge Gate
     specialty: security review, logic review, regression detection, quality gates
     model: deepseek-v4-pro
+    modelTiers:
+      - standard
+      - heavy
+      - reasoning
     mission: Independently review changes and block unsafe, untested, or logically broken work before it lands.
     profile: reviewer
     modes:
@@ -210,6 +224,9 @@ workers:
     role: Browser / Workflow / CLI Smoke Verification
     specialty: browser QA, workflow smoke tests, expected-vs-actual checks, regression reproduction
     model: deepseek-v4-flash
+    modelTiers:
+      - light
+      - standard
     mission: Verify user-visible behavior with concrete smoke evidence and concise bug reports.
     profile: qa
     modes:
@@ -255,6 +272,9 @@ workers:
     role: Brain-first Research / Bounded Autoresearch
     specialty: GBrain-first lookup, external research, synthesis, source trails, bounded research loops
     model: qwen3.5:397b
+    modelTiers:
+      - standard
+      - heavy
     mission: Produce decision-grade research with brain-first context, external verification, and explicit uncertainty.
     profile: researcher
     modes:
@@ -309,6 +329,9 @@ workers:
     role: Local Infra / Runtime Health Watch
     specialty: gateway health, cron, MCP, workspace services, local process status, boring reliability
     model: ministral-3:8b
+    modelTiers:
+      - light
+      - standard
     mission: Keep Hermes, Workspace, GBrain, gateway, cron, and local services observable and healthy with quiet, low-risk checks.
     profile: ops-watch
     modes:
@@ -357,6 +380,10 @@ workers:
     role: Upstream Dependency / Patch Hygiene
     specialty: upstream tracking, local patch hygiene, dependency updates, PR/issue follow-through
     model: deepseek-v4-flash
+    modelTiers:
+      - light
+      - standard
+      - heavy
     mission: Keep local forks and upstream dependencies healthy without losing local patches or dirty-worktree context.
     profile: maintainer
     modes:
@@ -407,6 +434,9 @@ workers:
     role: Wedges / Bets / Kill Criteria
     specialty: operating plans, gstack-style wedges, strategy reviews, decision framing, kill criteria
     model: kimi-k2-thinking
+    modelTiers:
+      - standard
+      - reasoning
     mission: Turn ambiguity into crisp wedges, bets, constraints, and kill criteria without over-planning.
     profile: strategist
     modes:
@@ -453,6 +483,9 @@ workers:
     role: Capture / Discard / Route / Task Triage
     specialty: low-friction inbox processing, capture routing, task/research/defer decisions, durable-context filtering
     model: deepseek-v4-flash
+    modelTiers:
+      - light
+      - standard
     mission: Route incoming material into discard, task, research, or durable brain capture with minimal overhead and no junk accumulation.
     profile: inbox-triage
     modes:
@@ -501,6 +534,9 @@ workers:
     role: Merge-to-Ship Release Engineering
     specialty: release builds, e2e gates, tagging, changelog, docker-compose sanity, rollback plans
     model: deepseek-v4-pro
+    modelTiers:
+      - standard
+      - heavy
     mission: Own the path from approved merge to shipped artifact with verifiable build, test, and rollback evidence.
     profile: release-agent
     modes:
@@ -548,6 +584,9 @@ workers:
     role: Scheduled Security Sweeps / Hardening
     specialty: dependency CVEs, secret scanning, auth header checks, credential blast-radius review
     model: kimi-k2-thinking
+    modelTiers:
+      - standard
+      - reasoning
     mission: Continuously reduce attack surface with scheduled sweeps and concrete, prioritized remediations.
     profile: security-auditor
     modes:
@@ -593,6 +632,10 @@ workers:
     role: Trading Pipeline / Market Data Steward
     specialty: papertrader and stocktrader pipeline health, Polymarket data, P&L reconciliation, market briefs
     model: deepseek-v4-flash
+    modelTiers:
+      - light
+      - standard
+      - heavy
     mission: Keep trading pipelines healthy and deliver decision-grade market briefs without ever executing trades.
     profile: quant-agent
     modes:
@@ -638,6 +681,9 @@ workers:
     role: Personal Assistant / Daily Digest
     specialty: morning digests, reminders, greenlight queue summaries, cross-agent activity rollups
     model: deepseek-v4-flash
+    modelTiers:
+      - light
+      - standard
     mission: Give the operator one calm surface for daily digests, pending approvals, and scheduled reminders.
     profile: concierge
     modes:

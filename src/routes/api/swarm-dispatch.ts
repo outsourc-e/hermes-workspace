@@ -28,6 +28,11 @@ import {
 } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import {
+  TIER_MODELS,
+  escalateTier,
+  routeTaskModel,
+} from '../../server/swarm-model-router'
 
 const HERMES_BIN_CANDIDATES = [
   process.env.HERMES_CLI_BIN,
@@ -891,6 +896,7 @@ async function ensureLiveTmuxSession(
 async function sendPromptToLiveSession(
   workerId: string,
   prompt: string,
+  routedModel?: string | null,
 ): Promise<WorkerResult | null> {
   const startedAt = Date.now()
   const ensured = await ensureLiveTmuxSession(workerId)
@@ -898,6 +904,24 @@ async function sendPromptToLiveSession(
 
   const { tmuxBin, sessionName } = ensured
   const normalizedPrompt = prompt.replace(/\r\n/g, '\n')
+
+  // Model router: switch the live TUI to the tier-appropriate model before
+  // delivering the prompt. `/model <id>` is a plain single-line TUI command;
+  // send-keys -l is safe here (no multiline concerns). Best-effort: if the
+  // TUI rejects the model the command just echoes an error and the prompt
+  // still executes on the session's current model.
+  if (routedModel) {
+    await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-u'])
+    await execFileAsync(tmuxBin, [
+      'send-keys',
+      '-l',
+      '-t',
+      sessionName,
+      `/model ${routedModel}`,
+    ])
+    await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'Enter'])
+    await sleep(700)
+  }
 
   // Use tmux paste-buffer instead of send-keys -l line-by-line. This is more
   // reliable for live TUI delivery because it preserves multiline content and
@@ -1014,21 +1038,48 @@ async function sendPromptToLiveSession(
   }
 }
 
-export function buildHermesChatQueryArgs(prompt: string): string[] {
+export function buildHermesChatQueryArgs(
+  prompt: string,
+  opts?: { model?: string | null; bypassApprovals?: boolean },
+): string[] {
   // `hermes chat -q` requires the query as the *immediate* next argv item.
   // Keeping the prompt adjacent to -q prevents argparse from interpreting
   // following flags (for example -Q) as a missing query and failing with:
   // "argument -q/--query: expected one argument".
-  return [
+  const args = [
     'chat',
     '-q',
     prompt,
     '-Q',
-    '--yolo',
     '--ignore-rules',
     '--source',
     'swarm-dispatch',
   ]
+  // Honor the worker's permission mode: only bypass Hermes approvals when the
+  // profile is in auto/yolo mode (default true preserves prior behavior for
+  // profiles with no approvals config).
+  if (opts?.bypassApprovals !== false) args.push('--yolo')
+  if (opts?.model) args.push('-m', opts.model)
+  return args
+}
+
+/**
+ * Read a worker profile's `approvals.mode`. Only explicit 'ask' keeps Hermes'
+ * approval prompts on dispatched work (operator wants to gate every action).
+ * 'smart'/'auto'/'yolo'/missing all bypass: an unattended oneshot has no UI
+ * attached, so a pending approval prompt would just hang until timeout.
+ * Persistent TUI sessions still honor the profile's own mode natively.
+ */
+export function workerBypassesApprovals(profilePath: string): boolean {
+  try {
+    const raw = readFileSync(join(profilePath, 'config.yaml'), 'utf8')
+    const m = raw.match(
+      /^approvals:\s*\n(?:[ \t]+[^\n]*\n)*?[ \t]+mode:[ \t]*(\S+)/m,
+    )
+    return m?.[1]?.toLowerCase() !== 'ask'
+  } catch {
+    return true
+  }
 }
 
 function runWorker(
@@ -1091,8 +1142,20 @@ function runWorker(
     const startedAt = Date.now()
     const wrapperPath = getWrapperPath(workerId)
 
+    // Model router: pick a tier-appropriate model for this task instead of
+    // always paying the worker's roster-default price. Applied to both the
+    // live TUI path (/model command) and the oneshot fallback (-m flag).
+    const routed = routeTaskModel({
+      task: assignment.task,
+      allowedTiers: roster?.modelTiers,
+    })
+
     // Prefer the persistent live agent session when available/startable.
-    const liveResult = await sendPromptToLiveSession(workerId, prompt)
+    const liveResult = await sendPromptToLiveSession(
+      workerId,
+      prompt,
+      routed?.model ?? null,
+    )
     if (liveResult) {
       markDispatchResult(workerId, liveResult)
       if (options?.waitForCheckpoint && liveResult.ok) {
@@ -1189,7 +1252,10 @@ function runWorker(
 
     const useWrapper = existsSync(wrapperPath)
     const cmd = useWrapper ? wrapperPath : resolveHermesBin()
-    const args = buildHermesChatQueryArgs(prompt)
+    // One automatic escalation to the next tier if the first attempt errors.
+    let currentTier = routed?.tier ?? null
+    let escalationLeft = routed ? 1 : 0
+    const bypassApprovals = workerBypassesApprovals(profilePath)
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       HERMES_HOME: profilePath,
@@ -1200,9 +1266,13 @@ function runWorker(
       env.GITHUB_TOKEN = ghToken
     }
 
+    const launchOneshot = (modelArg: string | null): void => {
     const proc = execFile(
       cmd,
-      args,
+      buildHermesChatQueryArgs(prompt, {
+        model: modelArg,
+        bypassApprovals,
+      }),
       {
         env,
         // Run oneshot workers in the shared workspace root (not $HOME) so any
@@ -1223,6 +1293,18 @@ function runWorker(
             : stdoutStr
 
         if (error) {
+          // Router escalation: one retry on the next tier up before
+          // surfacing the failure (light task that turned out hard, model
+          // refused/context blown, transient provider error).
+          if (escalationLeft > 0 && currentTier) {
+            const nextTier = escalateTier(currentTier)
+            if (nextTier) {
+              escalationLeft -= 1
+              currentTier = nextTier
+              launchOneshot(TIER_MODELS[nextTier])
+              return
+            }
+          }
           const code = (error as { code?: number | null }).code ?? null
           const result: WorkerResult = {
             workerId,
@@ -1315,6 +1397,8 @@ function runWorker(
       recordDispatchBlock(workerId, assignment, result, options)
       resolve(result)
     })
+    }
+    launchOneshot(routed?.model ?? null)
   })
 }
 
