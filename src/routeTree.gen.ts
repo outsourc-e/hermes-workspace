@@ -168,6 +168,8 @@ import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
 import { Route as ApiHermesworldReservationsConfirmRouteImport } from './routes/api/hermesworld/reservations/confirm'
+import { Route as ApiApprovalsApprovalIdDenyRouteImport } from './routes/api/approvals/$approvalId/deny'
+import { Route as ApiApprovalsApprovalIdApproveRouteImport } from './routes/api/approvals/$approvalId/approve'
 import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
 
 const WorldRoute = WorldRouteImport.update({
@@ -972,6 +974,18 @@ const ApiHermesworldReservationsConfirmRoute =
     path: '/confirm',
     getParentRoute: () => ApiHermesworldReservationsRoute,
   } as any)
+const ApiApprovalsApprovalIdDenyRoute =
+  ApiApprovalsApprovalIdDenyRouteImport.update({
+    id: '/api/approvals/$approvalId/deny',
+    path: '/api/approvals/$approvalId/deny',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiApprovalsApprovalIdApproveRoute =
+  ApiApprovalsApprovalIdApproveRouteImport.update({
+    id: '/api/approvals/$approvalId/approve',
+    path: '/api/approvals/$approvalId/approve',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiRunsSessionKeyRunIdAbandonRoute =
   ApiRunsSessionKeyRunIdAbandonRouteImport.update({
     id: '/api/runs/$sessionKey/$runId/abandon',
@@ -1134,6 +1148,8 @@ export interface FileRoutesByFullPath {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/approvals/$approvalId/approve': typeof ApiApprovalsApprovalIdApproveRoute
+  '/api/approvals/$approvalId/deny': typeof ApiApprovalsApprovalIdDenyRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
@@ -1295,6 +1311,8 @@ export interface FileRoutesByTo {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/approvals/$approvalId/approve': typeof ApiApprovalsApprovalIdApproveRoute
+  '/api/approvals/$approvalId/deny': typeof ApiApprovalsApprovalIdDenyRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
@@ -1458,6 +1476,8 @@ export interface FileRoutesById {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/approvals/$approvalId/approve': typeof ApiApprovalsApprovalIdApproveRoute
+  '/api/approvals/$approvalId/deny': typeof ApiApprovalsApprovalIdDenyRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
@@ -1622,6 +1642,8 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/approvals/$approvalId/approve'
+    | '/api/approvals/$approvalId/deny'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
@@ -1783,6 +1805,8 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/approvals/$approvalId/approve'
+    | '/api/approvals/$approvalId/deny'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
@@ -1945,6 +1969,8 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/approvals/$approvalId/approve'
+    | '/api/approvals/$approvalId/deny'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
@@ -2082,6 +2108,8 @@ export interface RootRouteChildren {
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
   ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
+  ApiApprovalsApprovalIdApproveRoute: typeof ApiApprovalsApprovalIdApproveRoute
+  ApiApprovalsApprovalIdDenyRoute: typeof ApiApprovalsApprovalIdDenyRoute
   ApiRunsSessionKeyRunIdAbandonRoute: typeof ApiRunsSessionKeyRunIdAbandonRoute
 }
 
@@ -3200,6 +3228,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesworldReservationsConfirmRouteImport
       parentRoute: typeof ApiHermesworldReservationsRoute
     }
+    '/api/approvals/$approvalId/deny': {
+      id: '/api/approvals/$approvalId/deny'
+      path: '/api/approvals/$approvalId/deny'
+      fullPath: '/api/approvals/$approvalId/deny'
+      preLoaderRoute: typeof ApiApprovalsApprovalIdDenyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/approvals/$approvalId/approve': {
+      id: '/api/approvals/$approvalId/approve'
+      path: '/api/approvals/$approvalId/approve'
+      fullPath: '/api/approvals/$approvalId/approve'
+      preLoaderRoute: typeof ApiApprovalsApprovalIdApproveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/runs/$sessionKey/$runId/abandon': {
       id: '/api/runs/$sessionKey/$runId/abandon'
       path: '/api/runs/$sessionKey/$runId/abandon'
@@ -3551,6 +3593,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,
   ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,
+  ApiApprovalsApprovalIdApproveRoute: ApiApprovalsApprovalIdApproveRoute,
+  ApiApprovalsApprovalIdDenyRoute: ApiApprovalsApprovalIdDenyRoute,
   ApiRunsSessionKeyRunIdAbandonRoute: ApiRunsSessionKeyRunIdAbandonRoute,
 }
 export const routeTree = rootRouteImport

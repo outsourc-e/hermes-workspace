@@ -20,6 +20,10 @@ import { getChatMode } from '../../server/gateway-capabilities'
 import { appendLocalMessage, ensureLocalSession, getLocalMessages, touchLocalSession } from '../../server/local-session-store'
 import { getDiscoveredModels, getLocalProviderDef } from '../../server/local-provider-discovery'
 import { openaiChat } from '../../server/openai-compat-api'
+import {
+  HermesRunStartError,
+  streamHermesRun,
+} from '../../server/hermes-runs-api'
 import { streamResponses } from '../../server/responses-api'
 import { selectPortableConversationHistory } from '../../server/portable-history'
 import {
@@ -605,6 +609,157 @@ export const Route = createFileRoute('/api/send-stream')({
                   // openaiChat path.
                   const useResponsesApi =
                     process.env.HERMES_USE_RESPONSES === '1' && !localBaseUrl
+                  const useRunsApi =
+                    process.env.HERMES_USE_RUNS !== '0' && !localBaseUrl
+                  if (useRunsApi) {
+                    try {
+                      const runStream = streamHermesRun({
+                        input: scopedMessage,
+                        conversationHistory: effectiveHistory,
+                        model:
+                          typeof body.model === 'string' ? body.model : undefined,
+                        sessionId: portableSessionKey,
+                        signal: abortController.signal,
+                      })
+                      for await (const ev of runStream) {
+                        if (ev.kind === 'started') {
+                          // Workspace already emitted and persisted its own
+                          // UI runId above. Keep Hermes' run_id only inside
+                          // approval payloads so store writes keep targeting
+                          // the active Workspace run.
+                          continue
+                        }
+                        if (ev.kind === 'text.delta') {
+                          accumulated += ev.delta
+                          persistActiveRun((runSessionKey, activeId) =>
+                            appendRunText(runSessionKey, activeId, accumulated, {
+                              replace: true,
+                            }),
+                          )
+                          sendEvent('chunk', {
+                            text: accumulated,
+                            fullReplace: true,
+                            sessionKey: portableSessionKey,
+                            runId,
+                          })
+                          continue
+                        }
+                        if (ev.kind === 'reasoning') {
+                          persistActiveRun((runSessionKey, activeId) =>
+                            setRunThinking(runSessionKey, activeId, ev.text),
+                          )
+                          sendEvent('thinking', {
+                            text: ev.text,
+                            sessionKey: portableSessionKey,
+                            runId,
+                          })
+                          continue
+                        }
+                        if (ev.kind === 'tool.started') {
+                          persistActiveRun((runSessionKey, activeId) =>
+                            upsertRunToolCall(runSessionKey, activeId, {
+                              id: ev.callId,
+                              name: ev.name,
+                              phase: 'calling',
+                              preview: ev.preview,
+                            }),
+                          )
+                          sendEvent('tool', {
+                            phase: 'calling',
+                            name: ev.name,
+                            toolCallId: ev.callId,
+                            preview: ev.preview,
+                            sessionKey: portableSessionKey,
+                            runId,
+                          })
+                          lastActivity = `Running: ${ev.name.replace(/_/g, ' ')}`
+                          continue
+                        }
+                        if (ev.kind === 'tool.completed') {
+                          persistActiveRun((runSessionKey, activeId) =>
+                            upsertRunToolCall(runSessionKey, activeId, {
+                              id: ev.callId,
+                              name: ev.name,
+                              phase: ev.error ? 'error' : 'complete',
+                            }),
+                          )
+                          sendEvent('tool', {
+                            phase: ev.error ? 'error' : 'complete',
+                            name: ev.name,
+                            toolCallId: ev.callId,
+                            sessionKey: portableSessionKey,
+                            runId,
+                          })
+                          lastActivity = `Completed: ${ev.name.replace(/_/g, ' ')}`
+                          continue
+                        }
+                        if (ev.kind === 'approval.request') {
+                          sendEvent('approval', {
+                            ...ev.approval,
+                            sessionKey: portableSessionKey,
+                            source: 'agent',
+                          })
+                          lastActivity = 'Waiting for approval...'
+                          continue
+                        }
+                        if (ev.kind === 'approval.responded') {
+                          lastActivity = 'Approval received; resuming...'
+                          continue
+                        }
+                        if (ev.kind === 'completed') {
+                          if (!accumulated && ev.output) {
+                            accumulated = ev.output
+                            persistActiveRun((runSessionKey, activeId) =>
+                              appendRunText(runSessionKey, activeId, accumulated, {
+                                replace: true,
+                              }),
+                            )
+                            sendEvent('chunk', {
+                              text: accumulated,
+                              fullReplace: true,
+                              sessionKey: portableSessionKey,
+                              runId,
+                            })
+                          }
+                          break
+                        }
+                        if (ev.kind === 'failed') {
+                          throw new Error(ev.error)
+                        }
+                      }
+                      appendLocalMessage(portableSessionKey, {
+                        id: crypto.randomUUID(),
+                        role: 'assistant',
+                        content: accumulated,
+                        timestamp: Date.now(),
+                      })
+                      touchLocalSession(portableSessionKey)
+                      persistActiveRun((runSessionKey, activeId) =>
+                        markRunStatus(runSessionKey, activeId, 'complete'),
+                      )
+                      sendEvent('done', {
+                        state: 'complete',
+                        sessionKey: portableSessionKey,
+                        runId,
+                        message: {
+                          role: 'assistant',
+                          content: [{ type: 'text', text: accumulated }],
+                        },
+                      })
+                      closeStream()
+                      return
+                    } catch (err) {
+                      if (!(err instanceof HermesRunStartError)) {
+                        throw err
+                      }
+                      console.warn(
+                        '[send-stream] /v1/runs path unavailable, falling back:',
+                        err,
+                      )
+                      accumulated = ''
+                    }
+                  }
+
                   if (useResponsesApi) {
                     const thinking = ''
                     // Track tool calls by callId so a `tool.completed`

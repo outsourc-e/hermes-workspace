@@ -1177,6 +1177,68 @@ export function ChatScreen({
       },
       [queryClient],
     ),
+    onApprovalRequest: useCallback((payload: Record<string, unknown>) => {
+      const approvalId =
+        typeof payload.id === 'string'
+          ? payload.id
+          : typeof payload.approvalId === 'string'
+            ? payload.approvalId
+            : typeof payload.runId === 'string'
+              ? payload.runId
+              : ''
+
+      const currentApprovals = loadApprovals()
+      if (
+        approvalId &&
+        currentApprovals.some((entry) => {
+          return entry.status === 'pending' && entry.gatewayApprovalId === approvalId
+        })
+      ) {
+        setPendingApprovals(
+          currentApprovals.filter((entry) => entry.status === 'pending'),
+        )
+        return
+      }
+
+      const actionValue = payload.action ?? payload.tool ?? payload.command
+      const action =
+        typeof actionValue === 'string'
+          ? actionValue
+          : actionValue
+            ? JSON.stringify(actionValue)
+            : 'Tool call requires approval'
+      const contextValue = payload.context ?? payload.input ?? payload.args ?? payload.description
+      const context =
+        typeof contextValue === 'string'
+          ? contextValue
+          : contextValue
+            ? JSON.stringify(contextValue)
+            : ''
+      const agentNameValue =
+        payload.agentName ?? payload.agent ?? payload.source
+      const agentName =
+        typeof agentNameValue === 'string' && agentNameValue.trim().length > 0
+          ? agentNameValue
+          : 'Agent'
+      const agentIdValue =
+        payload.agentId ?? payload.sessionKey ?? payload.source
+      const agentId =
+        typeof agentIdValue === 'string' && agentIdValue.trim().length > 0
+          ? agentIdValue
+          : 'claude'
+
+      addApproval({
+        agentId,
+        agentName,
+        action,
+        context,
+        source: 'agent',
+        gatewayApprovalId: approvalId || undefined,
+      })
+      setPendingApprovals(
+        loadApprovals().filter((entry) => entry.status === 'pending'),
+      )
+    }, []),
     onComplete: useCallback((message: ChatMessage) => {
       const activeSend = activeSendRef.current
       if (activeSend?.clientId) {
