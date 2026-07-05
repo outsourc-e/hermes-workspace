@@ -1,0 +1,24 @@
+{
+  "receipt_id": "sample-done-verified",
+  "schema_version": "agent-work-receipt/v1",
+  "issue_links": [{ "system": "Linear", "id": "VEN-111", "url": "https://linear.app/ventures-above/issue/VEN-111/synthetic-verified" }],
+  "system_links": [{ "system": "Git", "id": "synthetic-commit", "path_or_url": "git://synthetic/hermes-workspace/abcdef0" }],
+  "venture": "AI OS",
+  "company": "Ventures Above",
+  "builder": { "name": "Codex", "runtime": "local CLI", "model": "synthetic-sample" },
+  "repo": { "name": "hermes-workspace", "branch": "feat/synthetic-verified", "path": "/home/tom/hermes-workspace", "commit": "abcdef0" },
+  "status": "verified",
+  "classification": "sample",
+  "timestamps": { "started_at": "2026-07-04T06:00:00.000Z", "updated_at": "2026-07-04T08:30:00.000Z", "completed_at": "2026-07-04T08:30:00.000Z" },
+  "current_activity": "Receipt writer helper completed and verified against fixtures",
+  "changed_files": [{ "path": "scripts/ops/write-receipt.mjs", "change_type": "added" }],
+  "diff_summary": "Adds local helper to write sanitized receipt files from builder metadata.",
+  "verification_evidence": [
+    { "command": "pnpm vitest src/lib/ops/write-receipt.test.ts", "outcome": "4 tests passed", "passed": true },
+    { "command": "node scripts/ops/write-receipt.mjs --dry-run", "outcome": "dry run emitted valid JSON", "passed": true }
+  ],
+  "blockers": [],
+  "tom_needed": false,
+  "next_action": "Ship or reuse the helper in the next builder wrapper slice.",
+  "sample": true
+}

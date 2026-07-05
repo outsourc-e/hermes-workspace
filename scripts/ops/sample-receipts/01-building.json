@@ -1,0 +1,21 @@
+{
+  "receipt_id": "sample-building-ven-88",
+  "schema_version": "agent-work-receipt/v1",
+  "issue_links": [{ "system": "Linear", "id": "VEN-88", "url": "https://linear.app/ventures-above/issue/VEN-88/build-agent-work-receipts-daily-ops-review-mvp" }],
+  "system_links": [{ "system": "Paperclip", "id": "VEN-172", "path_or_url": "paperclip://c90302fd-c555-48e7-a8ca-a28fc7d53a1c" }],
+  "venture": "AI OS",
+  "company": "Ventures Above",
+  "builder": { "name": "Codex builder", "runtime": "Hermes subagent", "model": "synthetic-sample" },
+  "repo": { "name": "hermes-workspace", "branch": "feat/ven-88-agent-work-receipts", "path": "/home/tom/hermes-workspace" },
+  "status": "building",
+  "classification": "sample",
+  "timestamps": { "started_at": "2026-07-04T09:00:00.000Z", "updated_at": "2026-07-04T10:05:00.000Z" },
+  "current_activity": "Implementing receipt parser and normalized ops-state sections",
+  "changed_files": [{ "path": "src/lib/ops/agent-work-receipts.ts", "change_type": "added" }],
+  "diff_summary": "Adds schema and deterministic section aggregation for agent work receipts.",
+  "verification_evidence": [{ "command": "pnpm vitest src/lib/ops/agent-work-receipts.test.ts", "outcome": "not run yet in sample", "passed": false }],
+  "blockers": [],
+  "tom_needed": false,
+  "next_action": "Finish implementation and run local verification commands.",
+  "sample": true
+}

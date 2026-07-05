@@ -1,0 +1,21 @@
+{
+  "receipt_id": "sample-needs-tom-packaging",
+  "schema_version": "agent-work-receipt/v1",
+  "issue_links": [{ "system": "Paperclip", "id": "PKG-44", "url": "https://paperclip.example.invalid/synthetic/pkg-44" }],
+  "system_links": [{ "system": "Drive", "id": "packaging-options", "path_or_url": "gdrive://synthetic/packaging-options" }],
+  "venture": "Retail Packaging",
+  "company": "Pepper Pong",
+  "builder": { "name": "Hermes", "runtime": "workspace-dispatch", "model": "synthetic-sample" },
+  "repo": { "name": "retail-presence", "branch": "plan/shelf-options", "path": "/tmp/synthetic/retail-presence" },
+  "status": "needs_tom",
+  "classification": "sample",
+  "timestamps": { "started_at": "2026-07-04T07:30:00.000Z", "updated_at": "2026-07-04T10:15:00.000Z" },
+  "current_activity": "Three packaging direction options are ready for owner selection",
+  "changed_files": [{ "path": "docs/packaging/options.md", "change_type": "added" }],
+  "diff_summary": "Synthesized three packaging paths with estimated cost and retail tradeoffs.",
+  "verification_evidence": [{ "command": "python scripts/validate_options.py", "outcome": "3 options include cost, MOQ, and decision criteria", "passed": true }],
+  "blockers": [{ "description": "Owner direction needed before supplier outreach.", "owner": "Tom", "tom_needed": true }],
+  "tom_needed": true,
+  "next_action": "Tom chooses one packaging direction or asks for a narrowed comparison.",
+  "sample": true
+}

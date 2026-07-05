@@ -1,0 +1,21 @@
+{
+  "receipt_id": "sample-blocked-ads-access",
+  "schema_version": "agent-work-receipt/v1",
+  "issue_links": [{ "system": "Linear", "id": "VEN-120", "url": "https://linear.app/ventures-above/issue/VEN-120/synthetic-ads-access" }],
+  "system_links": [{ "system": "Vault", "id": "ads-access-note", "path_or_url": "/mnt/c/Users/tom/Vault/_shared/synthetic/ads-access.md" }],
+  "venture": "Paid Growth",
+  "company": "Pepper Pong",
+  "builder": { "name": "Claude Code", "runtime": "local CLI", "model": "synthetic-sample" },
+  "repo": { "name": "pp-growth", "branch": "feat/ads-readonly", "path": "/tmp/synthetic/pp-growth" },
+  "status": "blocked",
+  "classification": "sample",
+  "timestamps": { "started_at": "2026-07-04T08:10:00.000Z", "updated_at": "2026-07-04T09:45:00.000Z" },
+  "current_activity": "Waiting on read-only ads account invitation before importer can be verified",
+  "changed_files": [{ "path": "docs/access/ads-readonly.md", "change_type": "added" }],
+  "diff_summary": "Documented required read-only access path; no production API calls made.",
+  "verification_evidence": [{ "command": "node scripts/check-ads-env.mjs", "outcome": "missing synthetic ADS_ACCOUNT_ID", "passed": false }],
+  "blockers": [{ "description": "Read-only ads account invite is not available in this synthetic sample.", "owner": "Tom", "tom_needed": true }],
+  "tom_needed": true,
+  "next_action": "Tom decides whether to grant read-only ads access or defer the importer.",
+  "sample": true
+}

@@ -1,0 +1,21 @@
+{
+  "receipt_id": "sample-stale-self-reported",
+  "schema_version": "agent-work-receipt/v1",
+  "issue_links": [{ "system": "Paperclip", "id": "OPS-9", "url": "https://paperclip.example.invalid/synthetic/ops-9" }],
+  "system_links": [{ "system": "Hermes session", "id": "synthetic-session", "path_or_url": "@session:default/synthetic" }],
+  "venture": "Ops Hygiene",
+  "company": "Ventures Above",
+  "builder": { "name": "Remote builder", "runtime": "self-report", "model": "synthetic-sample" },
+  "repo": { "name": "ops-hygiene", "branch": "fix/session-cleanup", "path": "/tmp/synthetic/ops-hygiene" },
+  "status": "stale",
+  "classification": "self_reported",
+  "timestamps": { "started_at": "2026-07-03T09:00:00.000Z", "updated_at": "2026-07-03T10:00:00.000Z" },
+  "current_activity": "Builder claimed cleanup started, but no fresh Git or test evidence exists",
+  "changed_files": [],
+  "diff_summary": "No verified diff available; this is intentionally stale self-reported sample data.",
+  "verification_evidence": [],
+  "blockers": [{ "description": "Needs independent verification before counting as real progress.", "owner": "Flip", "tom_needed": false }],
+  "tom_needed": false,
+  "next_action": "Ask a verifier to inspect the repo or mark the lane abandoned.",
+  "sample": true
+}
