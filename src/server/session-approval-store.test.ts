@@ -74,4 +74,30 @@ describe('session approval store', () => {
       }),
     ).resolves.toBe(true)
   })
+
+  it('lists recent pending approvals by session', async () => {
+    const store = await import('./session-approval-store')
+
+    await store.registerPendingSessionApproval({
+      runId: 'run_visible',
+      sessionKey: 'main',
+      approval: { tool: 'execute_code' },
+    })
+    await store.registerPendingSessionApproval({
+      runId: 'run_other',
+      sessionKey: 'other',
+      approval: { tool: 'execute_code' },
+    })
+
+    await expect(
+      store
+        .listPendingSessionApprovals({ sessionKeys: ['main'] })
+        .then((rows) => rows.map((row) => row.runId)),
+    ).resolves.toEqual(['run_visible'])
+    await expect(
+      store
+        .listPendingSessionApprovals()
+        .then((rows) => rows.map((row) => row.runId).sort()),
+    ).resolves.toEqual(['run_other', 'run_visible'])
+  })
 })

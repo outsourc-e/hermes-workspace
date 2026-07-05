@@ -133,6 +133,63 @@ function readApprovalSubmitId(payload: Record<string, unknown>): string {
   )
 }
 
+type ServerPendingApproval = {
+  runId?: unknown
+  sessionKey?: unknown
+  actionLabel?: unknown
+  requestedAt?: unknown
+}
+
+function mergePendingApprovals(
+  localApprovals: Array<ApprovalRequest>,
+  serverApprovals: Array<ApprovalRequest>,
+): Array<ApprovalRequest> {
+  const merged = new Map<string, ApprovalRequest>()
+  for (const approval of localApprovals) {
+    merged.set(approval.gatewayApprovalId || approval.id, approval)
+  }
+  for (const approval of serverApprovals) {
+    merged.set(approval.gatewayApprovalId || approval.id, approval)
+  }
+  return [...merged.values()].sort((a, b) => b.requestedAt - a.requestedAt)
+}
+
+async function fetchServerPendingApprovals(): Promise<Array<ApprovalRequest>> {
+  const response = await fetch('/api/approvals/pending')
+  if (!response.ok) return []
+  const payload = (await response.json()) as {
+    pending?: Array<ServerPendingApproval>
+  }
+  return (payload.pending ?? []).flatMap((entry) => {
+    if (typeof entry.runId !== 'string' || !entry.runId.trim()) return []
+    const sessionKey =
+      typeof entry.sessionKey === 'string' && entry.sessionKey.trim()
+        ? entry.sessionKey.trim()
+        : 'Agent'
+    const action =
+      typeof entry.actionLabel === 'string' && entry.actionLabel.trim()
+        ? entry.actionLabel.trim()
+        : 'Tool call requires approval'
+    const requestedAt =
+      typeof entry.requestedAt === 'number' && Number.isFinite(entry.requestedAt)
+        ? entry.requestedAt
+        : Date.now()
+    return [
+      {
+        id: `server-${entry.runId}`,
+        agentId: sessionKey,
+        agentName: 'Agent',
+        action,
+        context: '',
+        requestedAt,
+        status: 'pending' as const,
+        source: 'agent' as const,
+        gatewayApprovalId: entry.runId,
+      },
+    ]
+  })
+}
+
 type ChatScreenProps = {
   activeFriendlyId: string
   isNewChat?: boolean
@@ -852,13 +909,27 @@ export function ChatScreen({
   }, [clearCompletedStreaming, waitingForResponse])
 
   useEffect(() => {
-    function checkApprovals() {
-      const all = loadApprovals()
-      setPendingApprovals(all.filter((entry) => entry.status === 'pending'))
+    let cancelled = false
+
+    async function checkApprovals() {
+      const localPending = loadApprovals().filter(
+        (entry) => entry.status === 'pending',
+      )
+      let serverPending: Array<ApprovalRequest> = []
+      try {
+        serverPending = await fetchServerPendingApprovals()
+      } catch {
+        serverPending = []
+      }
+      if (cancelled) return
+      setPendingApprovals(mergePendingApprovals(localPending, serverPending))
     }
-    checkApprovals()
-    const id = window.setInterval(checkApprovals, 2000)
-    return () => window.clearInterval(id)
+    void checkApprovals()
+    const id = window.setInterval(() => void checkApprovals(), 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
   }, [])
 
   const resolvePendingApproval = useCallback(

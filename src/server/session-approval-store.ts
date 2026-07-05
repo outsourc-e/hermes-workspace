@@ -181,6 +181,28 @@ export async function clearPendingSessionApproval(runId: string): Promise<void> 
   })
 }
 
+export async function listPendingSessionApprovals(options?: {
+  sessionKeys?: Array<string>
+  maxAgeMs?: number
+}): Promise<Array<PendingApproval>> {
+  const store = await readStore()
+  const now = Date.now()
+  const maxAgeMs = options?.maxAgeMs ?? 10 * 60 * 1000
+  const sessionKeys = new Set(
+    (options?.sessionKeys ?? [])
+      .map((sessionKey) => normalizeSessionKey(sessionKey))
+      .filter(Boolean),
+  )
+  const merged = new Map<string, PendingApproval>()
+  for (const row of store.pending) merged.set(row.runId, row)
+  for (const row of pendingApprovals.values()) merged.set(row.runId, row)
+
+  return [...merged.values()]
+    .filter((row) => now - row.requestedAt <= maxAgeMs)
+    .filter((row) => sessionKeys.size === 0 || sessionKeys.has(row.sessionKey))
+    .sort((a, b) => b.requestedAt - a.requestedAt)
+}
+
 export async function markSessionApprovalRuleUsed(input: {
   sessionKey: string
   approval: Record<string, unknown>
