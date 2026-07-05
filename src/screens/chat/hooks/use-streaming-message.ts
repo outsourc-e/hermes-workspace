@@ -677,6 +677,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             text: 'Waiting for approval',
           })
           onApprovalRequest?.(payload)
+          lifecyclePhaseRef.current = 'handoff'
+          schedulePostAcceptanceTimeout('handoff')
           break
         }
         case 'artifact': {
@@ -842,6 +844,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       processStoreEvent,
       pushTargetText,
       registerSendStreamRun,
+      schedulePostAcceptanceTimeout,
       transitionToHandoff,
     ],
   )

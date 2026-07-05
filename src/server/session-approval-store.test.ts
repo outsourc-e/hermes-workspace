@@ -50,4 +50,28 @@ describe('session approval store', () => {
       }),
     ).resolves.toBe(false)
   })
+
+  it('matches command approvals at tool level', async () => {
+    const store = await import('./session-approval-store')
+
+    await store.registerPendingSessionApproval({
+      runId: 'run_456',
+      sessionKey: 'main',
+      approval: {
+        command:
+          "execute_code <<'PY'\nprint('first script')\nPY",
+      },
+    })
+    await store.rememberSessionApprovalForRun('run_456')
+
+    await expect(
+      store.shouldAutoApproveSessionApproval({
+        sessionKey: 'main',
+        approval: {
+          command:
+            "execute_code <<'PY'\nprint('different script')\nPY",
+        },
+      }),
+    ).resolves.toBe(true)
+  })
 })

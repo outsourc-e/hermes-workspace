@@ -46,12 +46,13 @@ function readRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function approvalActionLabel(approval: Record<string, unknown>): string {
+  const command = readString(approval.command)
   const direct =
     readString(approval.tool) ||
     readString(approval.name) ||
-    readString(approval.action) ||
-    readString(approval.command)
+    readString(approval.action)
   if (direct) return direct
+  if (command) return command.split(/\s+/, 1)[0] || command
 
   const input = readRecord(approval.input) ?? readRecord(approval.args)
   return (
