@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
 import { getRootSurfaceState } from './-root-layout-state'
-import type {AuthStatus} from '@/lib/claude-auth';
+import type { AuthStatus } from '@/lib/claude-auth'
 import { SearchModal } from '@/components/search/search-modal'
 import { UsageMeter } from '@/components/usage-meter'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
@@ -20,7 +20,11 @@ import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { UpdateCenterNotifier } from '@/components/update-center-notifier'
-import { applyInterfacePreferences, initializeSettingsAppearance, useSettings } from '@/hooks/use-settings'
+import {
+  applyInterfacePreferences,
+  initializeSettingsAppearance,
+  useSettings,
+} from '@/hooks/use-settings'
 import { useApplyChatWidth } from '@/hooks/use-chat-settings'
 import {
   ClaudeOnboarding,
@@ -29,7 +33,7 @@ import {
 } from '@/components/onboarding/claude-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
-import {  fetchClaudeAuthStatus } from '@/lib/claude-auth'
+import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 
 const APP_CSP = [
   "default-src 'self'",
@@ -216,7 +220,20 @@ export const Route = createRootRoute({
   },
 })
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Serve cached data instantly on revisit instead of refetching on every
+      // mount (React Query defaults to staleTime 0). Pages like Memory /
+      // Knowledge previously re-flashed a loading state each visit even though
+      // their APIs respond in <3ms — the round-trip + re-render was the lag.
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+})
 
 export function getRootLayoutMode(
   onboardingComplete: string | null,
@@ -229,7 +246,10 @@ export function wrapInlineScript(source: string): string {
 }
 
 type ServiceWorkerLike = {
-  register: (scriptURL: string, options?: RegistrationOptions) => Promise<unknown>
+  register: (
+    scriptURL: string,
+    options?: RegistrationOptions,
+  ) => Promise<unknown>
 }
 
 type CachesLike = {
@@ -260,13 +280,18 @@ export async function registerAppServiceWorker({
 
 function RootLayout() {
   const { settings } = useSettings()
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   const isHermesWorldLandingRoute =
     pathname === '/hermes-world' ||
     pathname.startsWith('/hermes-world/') ||
     pathname === '/world' ||
     pathname.startsWith('/world/')
-  const isGameSurfaceRoute = isHermesWorldLandingRoute || pathname === '/playground' || pathname.startsWith('/playground/')
+  const isGameSurfaceRoute =
+    isHermesWorldLandingRoute ||
+    pathname === '/playground' ||
+    pathname.startsWith('/playground/')
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null,
   )
@@ -383,10 +408,13 @@ function RootLayout() {
           </WorkspaceShell>
           {!isHermesWorldLandingRoute ? <SearchModal /> : null}
           {/* Keep UsageMeter mounted so search-modal OPEN_USAGE still works even when the pill is hidden by default. */}
-          {!isGameSurfaceRoute ? <UsageMeter visible={settings.showUsageMeter} /> : null}
+          {!isGameSurfaceRoute ? (
+            <UsageMeter visible={settings.showUsageMeter} />
+          ) : null}
           {!isHermesWorldLandingRoute ? <KeyboardShortcutsModal /> : null}
           {!isHermesWorldLandingRoute ? <UpdateCenterNotifier /> : null}
-          {rootSurfaceState.showPostOnboardingOverlays && !isGameSurfaceRoute ? (
+          {rootSurfaceState.showPostOnboardingOverlays &&
+          !isGameSurfaceRoute ? (
             <>
               <MobilePromptTrigger />
               <OnboardingTour />

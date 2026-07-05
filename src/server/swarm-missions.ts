@@ -586,6 +586,45 @@ export function unblockMissionAssignment({
   return { mission, assignment, changed: true }
 }
 
+/**
+ * Flag a blocked/needs-input assignment as escalated to the human operator.
+ * Marks reviewedBy without changing work state, so the UI can show
+ * "handed off" and it stops reading as an actionable blocker.
+ */
+export function markMissionAssignmentReady({
+  missionId,
+  assignmentId,
+}: {
+  missionId: string
+  assignmentId: string
+}): {
+  mission: SwarmMission
+  assignment: SwarmMissionAssignment
+  changed: boolean
+} | null {
+  const store = readStore()
+  const mission = store.missions.find((item) => item.id === missionId)
+  if (!mission) return null
+  const assignment = mission.assignments.find(
+    (item) => item.id === assignmentId,
+  )
+  if (!assignment) return null
+
+  const at = now()
+  assignment.reviewedAt = at
+  assignment.reviewedBy = 'ready-for-eric'
+  mission.events.push(
+    event('review', `Escalated ${assignment.id} to operator`, {
+      workerId: assignment.workerId,
+      assignmentId: assignment.id,
+      data: { readyForEric: true },
+    }),
+  )
+  mission.updatedAt = at
+  writeStore(store)
+  return { mission, assignment, changed: true }
+}
+
 export function clearAllBlocked({
   missionId,
 }: { missionId?: string } = {}): {

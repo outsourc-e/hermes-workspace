@@ -40,3 +40,16 @@ response=$(curl -sS -X POST \
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 printf '{"at":"%s","response":%s}\n' "$ts" "$response" >> "$LOG_FILE"
 echo "$response"
+
+# Housekeeping: reap orphaned Hermes Desktop profile-backend dashboards.
+# The Desktop app spawns `hermes --profile X dashboard --no-open --port 0` per
+# profile and orphans them when force-quit (upstream bug in hermes-agent's
+# electron main.cjs — no process-group kill). They idle at ~150MB each. Kill
+# any that have been running >30min AND have no live Hermes.app parent.
+if [ "${SWARM_SWEEP_DESKTOP_ORPHANS:-1}" = "1" ]; then
+  desktop_running=$(pgrep -f 'Hermes.app/Contents/MacOS/Hermes' || true)
+  if [ -z "$desktop_running" ]; then
+    reaped=$(pkill -f 'dashboard --no-open --host 127.0.0.1 --port 0' && echo yes || true)
+    [ -n "$reaped" ] && echo '{"desktop_orphans_reaped":true}'
+  fi
+fi

@@ -25,6 +25,8 @@ get_line() {
   grep -E "^$1=" "$MASTER" | tail -n 1 || true
 }
 
+VAULT_PATH="${HERMES_KNOWLEDGE_VAULT:-$HOME/workspace/vault}"
+
 keys_for_profile() {
   local profile="$1"
   local keys="OLLAMA_API_KEY"
@@ -52,6 +54,13 @@ for dir in "$PROFILES_DIR"/*/; do
         printf '%s\n' "$line"
       fi
     done
+    # Knowledge-stewardship profiles get the Obsidian vault path (non-secret).
+    case "$profile" in
+      km-agent|concierge)
+        printf 'OBSIDIAN_VAULT_PATH=%s\n' "$VAULT_PATH"
+        printf 'HERMES_KNOWLEDGE_VAULT=%s\n' "$VAULT_PATH"
+        ;;
+    esac
   } > "$tmp"
   chmod 600 "$tmp"
   mv "$tmp" "$envfile"

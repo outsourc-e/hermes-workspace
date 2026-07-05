@@ -42,12 +42,13 @@ export const Route = createFileRoute('/api/sessions/$sessionKey/status')({
             ...result,
           })
         } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          // A missing/unknown session is a 404, not a server error — the
+          // dashboard's "Session not found" was being surfaced as a 500.
+          const notFound = /not found|no such session|404/i.test(message)
           return json(
-            {
-              ok: false,
-              error: err instanceof Error ? err.message : String(err),
-            },
-            { status: 500 },
+            { ok: false, error: message },
+            { status: notFound ? 404 : 500 },
           )
         }
       },

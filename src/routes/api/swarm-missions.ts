@@ -9,6 +9,7 @@ import {
   getSwarmMission,
   listSwarmMissions,
   listSwarmReports,
+  markMissionAssignmentReady,
   unblockMissionAssignment,
 } from '../../server/swarm-missions'
 import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
@@ -100,6 +101,31 @@ export const Route = createFileRoute('/api/swarm-missions')({
                     task: result.assignment.task,
                   }
                 : null,
+          })
+        }
+        if (action === 'mark_ready_for_eric') {
+          const missionId = cleanString(body.missionId)
+          const assignmentId = cleanString(body.assignmentId)
+          if (!missionId || !assignmentId)
+            return json(
+              { ok: false, error: 'missionId and assignmentId required' },
+              { status: 400 },
+            )
+          const result = markMissionAssignmentReady({
+            missionId,
+            assignmentId,
+          })
+          if (!result)
+            return json(
+              { ok: false, error: 'Mission or assignment not found' },
+              { status: 404 },
+            )
+          return json({
+            ok: true,
+            action,
+            changed: result.changed,
+            mission: result.mission,
+            assignment: result.assignment,
           })
         }
         if (action === 'clear-blocked') {
