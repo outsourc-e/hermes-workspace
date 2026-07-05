@@ -38,11 +38,19 @@ function broadcast(event: string, data: Record<string, unknown>): void {
   }
 }
 
+function getEventRunId(data: Record<string, unknown>): string | undefined {
+  return typeof data.runId === 'string'
+    ? data.runId
+    : typeof data.run_id === 'string'
+      ? data.run_id
+      : undefined
+}
+
 export function publishChatEvent(
   event: string,
   data: Record<string, unknown>,
 ): void {
-  const runId = typeof data.runId === 'string' ? data.runId : undefined
+  const runId = getEventRunId(data)
   if (hasActiveSendRun(runId)) return
   broadcast(event, data)
 }
@@ -64,14 +72,12 @@ export function subscribeToChatEvents(
     ? (event) => {
         const eventSessionKey = event.data.sessionKey as string | undefined
         if (eventSessionKey && eventSessionKey !== sessionKeyFilter) return
-        const runId =
-          typeof event.data.runId === 'string' ? event.data.runId : undefined
+        const runId = getEventRunId(event.data)
         if (hasActiveSendRun(runId)) return
         subscriber(event)
       }
     : (event) => {
-        const runId =
-          typeof event.data.runId === 'string' ? event.data.runId : undefined
+        const runId = getEventRunId(event.data)
         if (hasActiveSendRun(runId)) return
         subscriber(event)
       }

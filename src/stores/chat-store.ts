@@ -838,7 +838,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (
             normalizedMessage.role === 'assistant' &&
             newPlainText.length > 20 &&
-            newPlainText === extractMessageText(existing)
+            assistantTextsMatch(newPlainText, extractMessageText(existing))
           ) {
             return true
           }
@@ -915,8 +915,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ) {
             const prevEmptyIdx = sessionMessages.findLastIndex(
               (m) =>
-                m.role === 'assistant' &&
-                extractMessageText(m).length === 0,
+                m.role === 'assistant' && extractMessageText(m).length === 0,
             )
             if (prevEmptyIdx >= 0) {
               sessionMessages[prevEmptyIdx] = incomingMessage
@@ -1125,7 +1124,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const existingId = getMessageId(existing)
             if (completeId && existingId && completeId === existingId)
               return true
-            if (completeText && completeText === extractMessageText(existing))
+            if (
+              completeText &&
+              assistantTextsMatch(completeText, extractMessageText(existing))
+            )
               return true
             return false
           })
@@ -1145,7 +1147,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
               const existingId = getMessageId(existing)
               if (completeId && existingId && completeId === existingId)
                 return true
-              if (completeText && completeText === extractMessageText(existing))
+              if (
+                completeText &&
+                assistantTextsMatch(completeText, extractMessageText(existing))
+              )
                 return true
               return false
             })
@@ -1243,13 +1248,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       if (histMsg.role === rtMsg.role && rtText) {
         const histText = extractMessageText(histMsg)
-        if (histText === rtText) return true
-        // Streaming realtime text is a prefix of the final server text.
-        // Match either direction to prevent duplicates when the server
-        // returns the complete message after the realtime buffer had a
-        // partial version.
-        if (rtText.length > 0 && histText.length > 0) {
-          if (histText.startsWith(rtText) || rtText.startsWith(histText)) return true
+        if (histMsg.role === 'assistant') {
+          // Streaming realtime text is a prefix of the final server text.
+          // Match either direction to prevent duplicates when the server
+          // returns the complete message after the realtime buffer had a
+          // partial version. Some Hermes Agent history payloads can also lose
+          // whitespace while the realtime payload keeps it, so compare a
+          // whitespace-insensitive signature for substantial assistant output.
+          if (assistantTextsMatch(histText, rtText, { allowPrefix: true })) {
+            return true
+          }
+        } else {
+          if (histText === rtText) return true
+          if (rtText.length > 0 && histText.length > 0) {
+            if (histText.startsWith(rtText) || rtText.startsWith(histText))
+              return true
+          }
         }
       }
 
@@ -1366,6 +1380,34 @@ function extractMessageText(msg: ChatMessage | null | undefined): string {
       return stripFinalTags(val.trim())
   }
   return ''
+}
+
+function compactAssistantTextSignature(text: string): string {
+  return stripFinalTags(text).replace(/\s+/g, '')
+}
+
+function assistantTextsMatch(
+  left: string,
+  right: string,
+  options: { allowPrefix?: boolean } = {},
+): boolean {
+  if (!left || !right) return false
+  if (left === right) return true
+  if (options.allowPrefix && (left.startsWith(right) || right.startsWith(left)))
+    return true
+
+  const compactLeft = compactAssistantTextSignature(left)
+  const compactRight = compactAssistantTextSignature(right)
+
+  // Only use whitespace-insensitive matching for substantial assistant output.
+  // Short strings can collide too easily when all whitespace is removed.
+  if (compactLeft.length < 80 || compactRight.length < 80) return false
+  if (compactLeft === compactRight) return true
+  return Boolean(
+    options.allowPrefix &&
+    (compactLeft.startsWith(compactRight) ||
+      compactRight.startsWith(compactLeft)),
+  )
 }
 
 function ensureAssistantTextContent(msg: ChatMessage): ChatMessage {

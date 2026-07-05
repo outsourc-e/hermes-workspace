@@ -18,6 +18,71 @@ function textMessage(
 }
 
 describe('chat-store history merge ordering', () => {
+  it('deduplicates assistant realtime messages that only differ by whitespace', () => {
+    const sessionKey = 'assistant-whitespace-realtime-session'
+    const readableText = [
+      'Checked. Short status:',
+      '',
+      'Configuration',
+      'Hermes Config: /Users/example/.hermes/config.yaml',
+      'Active model: gpt-5.5',
+      'Gateway: running via launchd',
+      'Telegram: configured',
+      '',
+      'Jobs',
+      'Seven active scheduled jobs are configured and all are active.',
+    ].join('\n')
+    const compactText = readableText.replace(/\s+/g, '')
+    const store = useChatStore.getState()
+
+    store.clearSession(sessionKey)
+    store.processEvent({
+      type: 'message',
+      sessionKey,
+      message: textMessage('readable', 'assistant', readableText, 0),
+    })
+    store.processEvent({
+      type: 'message',
+      sessionKey,
+      message: textMessage('compact', 'assistant', compactText, 1),
+    })
+
+    expect(
+      store.getRealtimeMessages(sessionKey).map((message) => message.id),
+    ).toEqual(['readable'])
+  })
+
+  it('deduplicates history and realtime assistant messages that only differ by whitespace', () => {
+    const sessionKey = 'assistant-whitespace-history-session'
+    const readableText = [
+      'Checked. Short status:',
+      '',
+      'Configuration',
+      'Hermes Config: /Users/example/.hermes/config.yaml',
+      'Active model: gpt-5.5',
+      'Gateway: running via launchd',
+      'Telegram: configured',
+      '',
+      'Jobs',
+      'Seven active scheduled jobs are configured and all are active.',
+    ].join('\n')
+    const compactText = readableText.replace(/\s+/g, '')
+    const store = useChatStore.getState()
+
+    store.clearSession(sessionKey)
+    store.processEvent({
+      type: 'message',
+      sessionKey,
+      message: textMessage('compact', 'assistant', compactText, 1),
+    })
+
+    const merged = store.mergeHistoryMessages(sessionKey, [
+      textMessage('readable', 'assistant', readableText, 0),
+    ])
+
+    expect(merged.map((message) => message.id)).toEqual(['readable'])
+  })
+
   it('preserves persisted history order when messages share a timestamp', () => {
     const messages: Array<ChatMessage> = [
       textMessage('m1', 'user', 'first question', 0),

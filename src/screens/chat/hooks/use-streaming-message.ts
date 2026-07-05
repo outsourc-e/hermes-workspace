@@ -125,6 +125,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const finishedRef = useRef(false)
   const thinkingRef = useRef<string>('')
   const activeRunIdRef = useRef<string | null>(null)
+  const activeRunAliasIdsRef = useRef<Set<string>>(new Set())
   const delayedUnregisterTimerRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null)
@@ -175,6 +176,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       unregisterSendStreamRun(activeRunIdRef.current)
       activeRunIdRef.current = null
     }
+    for (const runId of activeRunAliasIdsRef.current) {
+      unregisterSendStreamRun(runId)
+    }
+    activeRunAliasIdsRef.current.clear()
   }, [unregisterSendStreamRun])
 
   const resetActiveStreamState = useCallback(
@@ -399,12 +404,16 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         clearTimeout(delayedUnregisterTimerRef.current)
         delayedUnregisterTimerRef.current = null
       }
-      const completedRunId = activeRunIdRef.current
-      if (completedRunId) {
+      const completedRunIds = new Set(activeRunAliasIdsRef.current)
+      if (activeRunIdRef.current) completedRunIds.add(activeRunIdRef.current)
+      activeRunAliasIdsRef.current.clear()
+      if (completedRunIds.size > 0) {
         activeRunIdRef.current = null
         delayedUnregisterTimerRef.current = setTimeout(() => {
           delayedUnregisterTimerRef.current = null
-          unregisterSendStreamRun(completedRunId)
+          for (const completedRunId of completedRunIds) {
+            unregisterSendStreamRun(completedRunId)
+          }
         }, 5000)
       }
 
@@ -448,7 +457,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         typeof window !== 'undefined' &&
         window.localStorage?.getItem('hermes:debug:sse') === '1'
       ) {
-         
         console.log(
           '[hermes-sse]',
           event,
@@ -460,7 +468,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       // hb_signal/keepalive events from server: just mark activity, never let them
       // surface as user-visible thinking or tool rows.
-      if (event === 'hb_signal' || event === 'heartbeat' || event === 'keepalive' || event === 'ping') {
+      if (
+        event === 'hb_signal' ||
+        event === 'heartbeat' ||
+        event === 'keepalive' ||
+        event === 'ping'
+      ) {
         markActivity()
         return
       }
@@ -498,6 +511,16 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             activeRunIdRef.current = runId
             registerSendStreamRun(runId)
           }
+          const runIds = Array.isArray(payload.runIds)
+            ? payload.runIds.filter(
+                (value): value is string =>
+                  typeof value === 'string' && value.trim().length > 0,
+              )
+            : []
+          for (const aliasRunId of runIds) {
+            activeRunAliasIdsRef.current.add(aliasRunId)
+            registerSendStreamRun(aliasRunId)
+          }
           markActivity()
           pushActivity({
             type: 'assistant_start',
@@ -512,6 +535,24 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             transport: 'send-stream',
           })
           onStarted?.({ runId: runId ?? null })
+          break
+        }
+        case 'run_ids': {
+          const runIds = Array.isArray(payload.runIds)
+            ? payload.runIds.filter(
+                (value): value is string =>
+                  typeof value === 'string' && value.trim().length > 0,
+              )
+            : []
+          const runId =
+            typeof payload.runId === 'string' && payload.runId.trim()
+              ? payload.runId.trim()
+              : undefined
+          if (runId) runIds.push(runId)
+          for (const aliasRunId of runIds) {
+            activeRunAliasIdsRef.current.add(aliasRunId)
+            registerSendStreamRun(aliasRunId)
+          }
           break
         }
         case 'assistant': {
@@ -768,7 +809,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
         case 'heartbeat': {
           markActivity()
-          const activity = (payload as { activity?: string | null }).activity ?? null
+          const activity =
+            (payload as { activity?: string | null }).activity ?? null
           useChatStore.getState().setHeartbeatActivity(activity)
           break
         }
