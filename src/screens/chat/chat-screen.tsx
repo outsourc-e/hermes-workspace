@@ -117,6 +117,22 @@ export function setLocalModelOverride(model: string) {
   _localModelOverride = model
 }
 
+function readStringPayload(value: unknown): string {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : ''
+}
+
+function readApprovalSubmitId(payload: Record<string, unknown>): string {
+  return (
+    readStringPayload(payload.runId) ||
+    readStringPayload(payload.run_id) ||
+    readStringPayload(payload.approvalRunId) ||
+    readStringPayload(payload.approvalId) ||
+    readStringPayload(payload.id)
+  )
+}
+
 type ChatScreenProps = {
   activeFriendlyId: string
   isNewChat?: boolean
@@ -722,14 +738,7 @@ export function ChatScreen({
       setPendingGeneration(true)
     }, []),
     onApprovalRequest: useCallback((payload: Record<string, unknown>) => {
-      const approvalId =
-        typeof payload.id === 'string'
-          ? payload.id
-          : typeof payload.approvalId === 'string'
-            ? payload.approvalId
-            : typeof payload.approvalId === 'string'
-              ? payload.approvalId
-              : ''
+      const approvalId = readApprovalSubmitId(payload)
 
       const currentApprovals = loadApprovals()
       if (
@@ -858,6 +867,35 @@ export function ChatScreen({
       status: 'approved' | 'denied',
       choice: 'once' | 'session' = 'once',
     ) => {
+      if (approval.gatewayApprovalId) {
+        const endpoint =
+          status === 'approved'
+            ? `/api/approvals/${approval.gatewayApprovalId}/approve`
+            : `/api/approvals/${approval.gatewayApprovalId}/deny`
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers:
+              status === 'approved'
+                ? { 'Content-Type': 'application/json' }
+                : undefined,
+            body:
+              status === 'approved' ? JSON.stringify({ choice }) : undefined,
+          })
+          if (!response.ok) {
+            const text = await response.text().catch(() => '')
+            throw new Error(text || `Approval failed with ${response.status}`)
+          }
+        } catch (error) {
+          showErrorToast(
+            error instanceof Error
+              ? error.message
+              : 'Approval konnte nicht gesendet werden.',
+          )
+          return
+        }
+      }
+
       const nextApprovals = loadApprovals().map((entry) => {
         if (entry.id !== approval.id) return entry
         return {
@@ -870,24 +908,6 @@ export function ChatScreen({
       setPendingApprovals(
         nextApprovals.filter((entry) => entry.status === 'pending'),
       )
-      if (!approval.gatewayApprovalId) return
-
-      const endpoint =
-        status === 'approved'
-          ? `/api/approvals/${approval.gatewayApprovalId}/approve`
-          : `/api/approvals/${approval.gatewayApprovalId}/deny`
-      try {
-        await fetch(endpoint, {
-          method: 'POST',
-          headers:
-            status === 'approved'
-              ? { 'Content-Type': 'application/json' }
-              : undefined,
-          body: status === 'approved' ? JSON.stringify({ choice }) : undefined,
-        })
-      } catch {
-        // Local resolution still succeeds when API endpoint is unavailable.
-      }
     },
     [],
   )
@@ -1218,14 +1238,7 @@ export function ChatScreen({
       [queryClient],
     ),
     onApprovalRequest: useCallback((payload: Record<string, unknown>) => {
-      const approvalId =
-        typeof payload.id === 'string'
-          ? payload.id
-          : typeof payload.approvalId === 'string'
-            ? payload.approvalId
-            : typeof payload.runId === 'string'
-              ? payload.runId
-              : ''
+      const approvalId = readApprovalSubmitId(payload)
 
       const currentApprovals = loadApprovals()
       if (

@@ -41,7 +41,7 @@ describe('streamHermesRun', () => {
       .mockResolvedValueOnce(
         createStreamResponse([
           'data: {"event":"message.delta","run_id":"run_123","delta":"Hello"}\n\n',
-          'data: {"event":"approval.request","run_id":"run_123","command":"rm -rf /tmp/demo","description":"destructive command"}\n\n',
+          'data: {"event":"approval.request","run_id":"run_123","id":"approval_456","command":"rm -rf /tmp/demo","description":"destructive command"}\n\n',
           'data: {"event":"approval.responded","run_id":"run_123","choice":"once"}\n\n',
           'data: {"event":"run.completed","run_id":"run_123","output":"Hello"}\n\n',
         ]),
@@ -80,8 +80,10 @@ describe('streamHermesRun', () => {
       kind: 'approval.request',
       runId: 'run_123',
       approval: expect.objectContaining({
-        id: 'run_123',
+        id: 'approval_456',
         approvalId: 'run_123',
+        approvalRunId: 'run_123',
+        requestApprovalId: 'approval_456',
         runId: 'run_123',
         command: 'rm -rf /tmp/demo',
         description: 'destructive command',

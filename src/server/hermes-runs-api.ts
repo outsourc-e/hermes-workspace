@@ -107,13 +107,19 @@ function normalizeRunEvent(event: Record<string, unknown>): HermesRunEvent | nul
     return text ? { kind: 'reasoning', runId, text } : null
   }
   if (eventName === 'approval.request') {
+    const requestApprovalId =
+      readString(event.approval_id) ||
+      readString(event.approvalId) ||
+      readString(event.id)
     return {
       kind: 'approval.request',
       runId,
       approval: {
         ...event,
-        id: readString(event.id) || runId,
-        approvalId: readString(event.approval_id) || readString(event.approvalId) || runId,
+        id: requestApprovalId || runId,
+        approvalId: runId,
+        approvalRunId: runId,
+        requestApprovalId: requestApprovalId || undefined,
         runId,
       },
     }
