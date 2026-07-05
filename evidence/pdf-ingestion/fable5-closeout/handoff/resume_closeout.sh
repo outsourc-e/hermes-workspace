@@ -34,10 +34,12 @@ else
   echo "[3] BLOCKED: founder-signed manifest and/or HMAC key absent"
 fi
 
-if git -C "$REPO" push --dry-run origin feat/pdf-ingestion-phase1_6 >/dev/null 2>&1; then
-  echo "[4] github auth OK — fast-forward push is possible"
+if timeout "${GITHUB_AUTH_TIMEOUT_SECONDS:-10}s" env \
+  GIT_TERMINAL_PROMPT=0 GH_PROMPT_DISABLED=1 \
+  gh auth status >/dev/null 2>&1; then
+  echo "[4] github auth configured (read-only check)"
 else
-  echo "[4] BLOCKED: github push auth still failing"
+  echo "[4] GITHUB_AUTH_ACTION_REQUIRED"
 fi
 
 echo "== done — hand results back to the orchestration agent to continue the mission =="

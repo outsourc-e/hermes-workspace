@@ -69,4 +69,30 @@ check 'signer not executed by resume'
 ! rg -n 'canonical_write[^[:space:]]*[[:space:]]*(true|1|enabled)' "$SETUP" "$RESUME" >/dev/null || fail 'canonical write enabled'
 check 'canonical write remains disabled'
 
+github_home="${TMP}/github-home"; mkdir -p "$github_home/bin"
+cat > "$github_home/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+[[ "${GIT_TERMINAL_PROMPT:-}" == 0 ]] || exit 91
+[[ "${GH_PROMPT_DISABLED:-}" == 1 ]] || exit 92
+printf ok > "$GITHUB_AUTH_TEST_MARKER"
+printf 'Username: ' >&2
+sleep 30
+EOF
+/usr/bin/chmod +x "$github_home/bin/gh"
+SECONDS=0
+auth_marker="$github_home/auth-env-ok"
+resume_output="$(PATH="$github_home/bin:$PATH" HOME="$github_home" GITHUB_AUTH_TEST_MARKER="$auth_marker" GITHUB_AUTH_TIMEOUT_SECONDS=1 bash "$RESUME" 2>&1)"
+resume_status=$?
+[[ "$SECONDS" -lt 4 ]] || fail 'github auth check hung'
+[[ -e "$auth_marker" ]] || fail 'noninteractive auth environment missing'
+[[ "$resume_status" -eq 0 ]] || fail 'resume result was not deterministic'
+[[ "$resume_output" == *'GITHUB_AUTH_ACTION_REQUIRED'* ]] || fail 'missing github auth action result'
+[[ "$resume_output" != *'Username:'* && "$resume_output" != *'Password:'* ]] || fail 'credential prompt leaked'
+[[ "$resume_output" == *'registry URL, token, or test namespace unset'* ]] || fail 'missing registry secrets did not fail closed'
+check 'github auth missing is noninteractive, bounded, and deterministic'
+check 'registry secrets missing remains fail closed'
+
+! rg -n 'git[^\n]*push|remote[[:space:]]+set-url' "$RESUME" >/dev/null || fail 'resume can push or change remote'
+check 'github check is read-only'
+
 printf 'Targeted secure handoff tests passed: %d\n' "$pass"
