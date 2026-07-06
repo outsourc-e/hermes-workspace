@@ -6,6 +6,9 @@
   "license": "MIT",
   "private": true,
   "type": "module",
+  "bin": {
+    "telegram-message-preview": "./bin/telegram-message-preview"
+  },
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite dev",

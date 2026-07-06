@@ -1,0 +1,127 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`human-readable Telegram message formatting > formats approval as a short six-part phone message 1`] = `
+"Approval needed
+
+What happened: Request 90abcdef is ready for learn_from.
+Recommendation: Approve only if the scope looks right.
+If you approve: I will do only the approved next step.
+What will NOT happen: No GitHub writes, clone/fork/install, code edits, or durable mutation.
+Details saved in report.
+Reply: Approve: /approve 90abcdef
+Reject: /reject 90abcdef"
+`;
+
+exports[`human-readable Telegram message formatting > formats approval-recorded as a short six-part phone message 1`] = `
+"Approval recorded
+
+What happened: approved recorded for 90abcdef.
+Recommendation: Next worker may proceed only within the approved scope.
+If you approve: Already recorded. No extra reply needed.
+What will NOT happen: Recording the reply did not run executor, edit code, call GitHub, or mutate durable store.
+Reply: No reply needed."
+`;
+
+exports[`human-readable Telegram message formatting > formats blocked-error as a short six-part phone message 1`] = `
+"Blocked
+
+What happened: Exact edit scope is missing.
+Recommendation: Fix the blocker or send a narrower approval.
+If you approve: Approval alone may not continue until the blocker is fixed.
+What will NOT happen: No retry, code edit, GitHub call/write, audit append, durable mutation, or Obsidian/Kanban write.
+Reply: Reply with corrected scope or say stop."
+`;
+
+exports[`human-readable Telegram message formatting > formats code-edit-approval as a short six-part phone message 1`] = `
+"Code edit approval needed
+
+What happened: Edit packet edit1 is ready. Files: scripts/telegram-message-format.mjs, bin/telegram-message-preview.
+Recommendation: Approve only if these exact files are right.
+If you approve: Reply /approve edit1 to allow edits to the exact listed files.
+What will NOT happen: No extra files, staging, commit, GitHub call/write, audit append, or durable mutation.
+Details saved in report.
+Reply: Approve: /approve edit1
+Reject: /reject edit1"
+`;
+
+exports[`human-readable Telegram message formatting > formats completion as a short six-part phone message 1`] = `
+"Execution completed
+
+What happened: Completed for done1.
+Recommendation: Review the result before approving any stage/commit/send step.
+If you approve: Reply /approve done1 only if a follow-up approval request asks for it.
+What will NOT happen: No staging, commit, push, PR, GitHub write, audit append, or durable mutation happened here.
+Details saved in report.
+Reply: Reply with the next exact instruction if you want follow-up work."
+`;
+
+exports[`human-readable Telegram message formatting > formats discovery as a short six-part phone message 1`] = `
+"Discovery ready
+
+What happened: Found owner/repo for Cleaner Telegram approval UX.
+Recommendation: learn_from
+If you approve: Reply /approve 90abcdef to allow the next read-only step.
+What will NOT happen: No clone, fork, GitHub write, code edit, audit append, or Obsidian/Kanban write.
+Details saved in report.
+Reply: Approve: /approve 90abcdef
+Reject: /reject 90abcdef"
+`;
+
+exports[`human-readable Telegram message formatting > formats implementation-proposal-approval as a short six-part phone message 1`] = `
+"Implementation proposal ready
+
+What happened: Proposal aaaabbbb is ready for review.
+Recommendation: Approve only if you want a later build plan; this is not code approval.
+If you approve: Reply /approve aaaabbbb to allow a build plan.
+What will NOT happen: No code edits, commands, installs, GitHub writes, audit append, or durable mutation.
+Details saved in report.
+Reply: Approve: /approve aaaabbbb
+Reject: /reject aaaabbbb"
+`;
+
+exports[`human-readable Telegram message formatting > telegram-message-preview --type approval --json works without side effects 1`] = `
+"Approval needed
+
+What happened: Request 90abcdef is ready for learn_from.
+Recommendation: Approve only if the scope looks right.
+If you approve: I will do only the approved next step.
+What will NOT happen: No GitHub writes, clone/fork/install, code edits, or durable mutation.
+Details saved in report.
+Reply: Approve: /approve 90abcdef
+Reject: /reject 90abcdef"
+`;
+
+exports[`human-readable Telegram message formatting > telegram-message-preview --type code-edit-approval --json works without side effects 1`] = `
+"Code edit approval needed
+
+What happened: Edit packet edit1 is ready. Files: scripts/telegram-message-format.mjs, bin/telegram-message-preview.
+Recommendation: Approve only if these exact files are right.
+If you approve: Reply /approve edit1 to allow edits to the exact listed files.
+What will NOT happen: No extra files, staging, commit, GitHub call/write, audit append, or durable mutation.
+Details saved in report.
+Reply: Approve: /approve edit1
+Reject: /reject edit1"
+`;
+
+exports[`human-readable Telegram message formatting > telegram-message-preview --type completion --json works without side effects 1`] = `
+"Execution completed
+
+What happened: Completed for done1.
+Recommendation: Review the result before approving any stage/commit/send step.
+If you approve: Reply /approve done1 only if a follow-up approval request asks for it.
+What will NOT happen: No staging, commit, push, PR, GitHub write, audit append, or durable mutation happened here.
+Details saved in report.
+Reply: Reply with the next exact instruction if you want follow-up work."
+`;
+
+exports[`human-readable Telegram message formatting > telegram-message-preview --type discovery --json works without side effects 1`] = `
+"Discovery ready
+
+What happened: Found owner/repo for Cleaner Telegram approval UX.
+Recommendation: learn_from
+If you approve: Reply /approve 90abcdef to allow the next read-only step.
+What will NOT happen: No clone, fork, GitHub write, code edit, audit append, or Obsidian/Kanban write.
+Details saved in report.
+Reply: Approve: /approve 90abcdef
+Reject: /reject 90abcdef"
+`;

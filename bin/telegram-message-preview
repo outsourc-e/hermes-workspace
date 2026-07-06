@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+import { runTelegramMessagePreviewCli } from '../scripts/telegram-message-format.mjs'
+
+runTelegramMessagePreviewCli().catch((error) => {
+  process.stdout.write(`${JSON.stringify({ ok: false, blocked: true, error: String(error?.message || error), sent: false }, null, 2)}\n`)
+  process.exitCode = 1
+})
