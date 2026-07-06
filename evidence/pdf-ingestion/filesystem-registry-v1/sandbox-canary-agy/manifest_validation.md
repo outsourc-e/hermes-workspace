@@ -1,0 +1,16 @@
+# Manifest Validation
+
+- Signature Verification: Valid signature matching HMAC key (PASS)
+- Environment Target: `sandbox` (PASS)
+- Namespace Target: `captain-pdf-sandbox` (PASS)
+- Max Records Constraint: `1` (PASS)
+- Auto-Promotion Policy: `false` (PASS)
+- Founder Approval: `true` (PASS)
+- Expiry Time: `2026-07-05T20:09:04.561567+00:00` (Not expired at execution) (PASS)
+- Nonce Presence: `c1275d98b45a6aad66dc2ca1e806d8941e3367f6eebd7de9` (PASS)
+- Idempotency Key Presence: `canary-idempotency-b0be8f9265beae605452e32fd35ba99a` (PASS)
+- Document ID Link: `canary-document-5a5672d5cd76e12e01fa3611` (matches payload) (PASS)
+- Knowledge ID Link: `canary-knowledge-6f9278c4468f96a3cb835ad7` (matches payload) (PASS)
+- Payload SHA-256 Link: `fc2f898f2e9447fcdfc5ea5ea6d7b99686e757d8f163fd8f2ce31cb2ecdc6d35` (matches payload) (PASS)
+- Commit SHA Verification: `69d5ee3fcded33090daf74691b4bd73ef5c4deb5` (matches worktree HEAD) (PASS)
+- Secret Disclosure: None (PASS)

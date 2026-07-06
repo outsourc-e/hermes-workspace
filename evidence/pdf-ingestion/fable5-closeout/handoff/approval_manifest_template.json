@@ -1,0 +1,18 @@
+{
+  "manifest_id": "FILL: unique manifest ID",
+  "environment": "sandbox",
+  "document_ids": ["FILL: exact document_id(s) of the canary payload"],
+  "knowledge_ids": ["FILL: exact knowledge_id(s) of the canary payload"],
+  "namespace": "FILL: approved sandbox namespace",
+  "schema_version": "1",
+  "expires_at": "FILL: timezone-aware ISO-8601, e.g. 2026-07-08T00:00:00+00:00",
+  "commit_sha": "244621d0a-FILL-full-40-char-sha-of-runtime-commit",
+  "payload_sha256": "FILL: sha256 of canonical payload JSON (sign_manifest.py --payload computes it)",
+  "max_records": 1,
+  "nonce": "AUTO",
+  "idempotency_key": "AUTO",
+  "approved_by": "FILL: founder name/handle",
+  "founder_approval": true,
+  "auto_promotion": false,
+  "signature": "COMPUTED by sign_manifest.py — do not fill by hand"
+}

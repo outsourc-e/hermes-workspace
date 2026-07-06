@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "captain-pdf/filesystem-registry-config/v1",
+  "title": "Captain PDF Filesystem Registry Config v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["registry_type", "sandbox_root", "production_root", "production_namespace", "sandbox_namespace", "canonical_write_enabled", "dry_run", "kill_switch"],
+  "properties": {
+    "registry_type": {"const": "filesystem"},
+    "sandbox_root": {"type": "string", "minLength": 1},
+    "production_root": {"type": "string", "minLength": 1},
+    "production_namespace": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "sandbox_namespace": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "canonical_write_enabled": {"type": "boolean"},
+    "dry_run": {"type": "boolean"},
+    "kill_switch": {"type": "boolean"}
+  }
+}

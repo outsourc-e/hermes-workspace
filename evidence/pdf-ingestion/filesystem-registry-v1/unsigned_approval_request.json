@@ -1,0 +1,18 @@
+{
+  "manifest_id": "FILL: unique manifest ID",
+  "environment": "sandbox",
+  "document_ids": ["FILL: generated test document ID"],
+  "knowledge_ids": ["FILL: generated test knowledge ID"],
+  "namespace": "FILL: approved sandbox namespace",
+  "schema_version": "1",
+  "expires_at": "FILL: timezone-aware ISO-8601",
+  "commit_sha": "FILL: exact 40-character runtime commit",
+  "payload_sha256": "FILL: canonical record payload hash",
+  "max_records": 1,
+  "nonce": "FILL: founder-generated unique nonce",
+  "idempotency_key": "FILL: founder-approved unique idempotency key",
+  "approved_by": "FILL: founder identity",
+  "founder_approval": true,
+  "auto_promotion": false,
+  "signature": ""
+}
