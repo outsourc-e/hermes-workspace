@@ -12,9 +12,11 @@ import {
   dashboardFetch,
   ensureGatewayProbed,
   getCapabilities,
+  markDashboardUnauthenticated,
   probeGateway,
 } from './gateway-capabilities'
 import {
+  DashboardAuthError,
   createSession as createDashboardSession,
   deleteSession as deleteDashboardSession,
   forkSession as forkDashboardSession,
@@ -125,33 +127,89 @@ export async function checkHealth(): Promise<{ status: string }> {
 
 // ── Sessions ─────────────────────────────────────────────────────
 
+/**
+ * Route to the dashboard only when its auth-gated APIs are actually usable.
+ * `available` alone means "process reachable" (public /api/status) — on
+ * remote/Tailscale deployments the dashboard is typically reachable but
+ * cookie-gated, and dashboard calls would 401 (no_cookie). See #261-family
+ * Sessions-tab failures.
+ */
+function dashboardSessionsUsable(): boolean {
+  const d = getCapabilities().dashboard
+  return d.available && d.authenticated
+}
+
+/**
+ * Try the dashboard variant of a session call; on auth rejection, degrade
+ * the capability and fall back to the gateway variant. DashboardAuthError
+ * never reaches callers — on cookie-gated deployments the gateway is the
+ * source of truth for sessions. Non-auth errors are rethrown so real
+ * dashboard outages stay visible.
+ */
+async function sessionCall<T>(
+  viaDashboard: () => Promise<T>,
+  viaGateway: () => Promise<T>,
+): Promise<T> {
+  if (dashboardSessionsUsable()) {
+    try {
+      return await viaDashboard()
+    } catch (err) {
+      if (!(err instanceof DashboardAuthError)) throw err
+      markDashboardUnauthenticated()
+    }
+  }
+  return viaGateway()
+}
+
+/**
+ * Return the first array found under the given keys, else []. Callers
+ * .map/.slice/.length over these results — undefined must never escape.
+ */
+function asArray<T>(
+  resp: unknown,
+  keys: ReadonlyArray<string>,
+): Array<T> {
+  const r = resp as Record<string, unknown> | null | undefined
+  for (const k of keys) {
+    const v = r?.[k]
+    if (Array.isArray(v)) return v as Array<T>
+  }
+  return []
+}
+
 export async function listSessions(
   limit = 50,
   offset = 0,
 ): Promise<Array<ClaudeSession>> {
-  if (getCapabilities().dashboard.available) {
-    const resp = await listDashboardSessions(limit, offset)
-    return resp.sessions as Array<ClaudeSession>
-  }
-  const resp = await claudeGet<{
-    items?: Array<ClaudeSession>
-    data?: Array<ClaudeSession>
-    total?: number
-  }>(`/api/sessions?limit=${limit}&offset=${offset}`)
-  // The gateway (OpenAI-compat) returns { object: 'list', data: [...] }, while the
-  // dashboard / older gateway shape uses { items: [...] }. Accept either, and never
-  // return undefined (callers .map over this).
-  return resp.items ?? resp.data ?? []
+  return sessionCall(
+    async () =>
+      asArray<ClaudeSession>(await listDashboardSessions(limit, offset), [
+        'sessions',
+        'items',
+        'data',
+      ]),
+    async () =>
+      asArray<ClaudeSession>(
+        await claudeGet(`/api/sessions?limit=${limit}&offset=${offset}`),
+        // Gateway (OpenAI-compat) returns { object: 'list', data: [...] };
+        // dashboard / older gateway shape uses { items: [...] }.
+        ['items', 'data', 'sessions'],
+      ),
+  )
 }
 
 export async function getSession(sessionId: string): Promise<ClaudeSession> {
-  if (getCapabilities().dashboard.available) {
-    return getDashboardSession(sessionId) as Promise<ClaudeSession>
-  }
-  const resp = await claudeGet<{ session: ClaudeSession }>(
-    `/api/sessions/${sessionId}`,
+  return sessionCall(
+    async () => (await getDashboardSession(sessionId)) as ClaudeSession,
+    async () => {
+      const resp = await claudeGet<{ session?: ClaudeSession }>(
+        `/api/sessions/${sessionId}`,
+      )
+      // Gateway wraps in { session: {...} }; be liberal if a backend returns
+      // the bare session object.
+      return (resp.session ?? (resp as unknown)) as ClaudeSession
+    },
   )
-  return resp.session
 }
 
 export async function createSession(opts?: {
@@ -159,81 +217,98 @@ export async function createSession(opts?: {
   title?: string
   model?: string
 }): Promise<ClaudeSession> {
-  if (getCapabilities().dashboard.available) {
-    const resp = await createDashboardSession(opts || {})
-    return resp.session as ClaudeSession
-  }
-  const resp = await claudePost<{ session: ClaudeSession }>(
-    '/api/sessions',
-    opts || {},
+  return sessionCall(
+    async () =>
+      (await createDashboardSession(opts || {})).session as ClaudeSession,
+    async () => {
+      const resp = await claudePost<{ session: ClaudeSession }>(
+        '/api/sessions',
+        opts || {},
+      )
+      return resp.session
+    },
   )
-  return resp.session
 }
 
 export async function updateSession(
   sessionId: string,
   updates: { title?: string },
 ): Promise<ClaudeSession> {
-  if (getCapabilities().dashboard.available) {
-    const resp = await updateDashboardSession(sessionId, updates)
-    return resp.session as ClaudeSession
-  }
-  const resp = await claudePatch<{ session: ClaudeSession }>(
-    `/api/sessions/${sessionId}`,
-    updates,
+  return sessionCall(
+    async () =>
+      (await updateDashboardSession(sessionId, updates))
+        .session as ClaudeSession,
+    async () => {
+      const resp = await claudePatch<{ session: ClaudeSession }>(
+        `/api/sessions/${sessionId}`,
+        updates,
+      )
+      return resp.session
+    },
   )
-  return resp.session
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  if (getCapabilities().dashboard.available) {
-    await deleteDashboardSession(sessionId)
-    return
-  }
-  return claudeDeleteReq(`/api/sessions/${sessionId}`)
+  return sessionCall(
+    async () => {
+      await deleteDashboardSession(sessionId)
+    },
+    async () => claudeDeleteReq(`/api/sessions/${sessionId}`),
+  )
 }
 
 export async function getMessages(
   sessionId: string,
 ): Promise<Array<ClaudeMessage>> {
-  if (getCapabilities().dashboard.available) {
-    const resp = await getDashboardSessionMessages(sessionId)
-    return resp.messages as Array<ClaudeMessage>
-  }
-  const resp = await claudeGet<{
-    items?: Array<ClaudeMessage>
-    data?: Array<ClaudeMessage>
-    messages?: Array<ClaudeMessage>
-    total?: number
-  }>(`/api/sessions/${sessionId}/messages`)
-  // Gateway (OpenAI-compat) returns { object: 'list', data: [...] }; dashboard / older
-  // shape uses { items: [...] }; some message endpoints use { messages: [...] }.
-  // Accept any, and never return undefined (callers read .length / .map / .slice).
-  return resp.items ?? resp.data ?? resp.messages ?? []
+  return sessionCall(
+    async () =>
+      asArray<ClaudeMessage>(await getDashboardSessionMessages(sessionId), [
+        'messages',
+        'items',
+        'data',
+      ]),
+    async () =>
+      asArray<ClaudeMessage>(
+        await claudeGet(`/api/sessions/${sessionId}/messages`),
+        // Gateway (OpenAI-compat) returns { object: 'list', data: [...] };
+        // dashboard / older shape uses { items: [...] }; some message
+        // endpoints use { messages: [...] }.
+        ['items', 'data', 'messages'],
+      ),
+  )
 }
 
 export async function searchSessions(
   query: string,
   limit = 20,
 ): Promise<{ query?: string; count?: number; results: Array<unknown> }> {
-  if (getCapabilities().dashboard.available) {
-    return searchDashboardSessions(query)
-  }
-  return claudeGet(
-    `/api/sessions/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+  const normalize = (resp: {
+    query?: string
+    count?: number
+    results?: Array<unknown>
+  }) => ({ ...resp, results: resp.results ?? [] })
+  return sessionCall(
+    async () => normalize(await searchDashboardSessions(query)),
+    async () =>
+      normalize(
+        await claudeGet(
+          `/api/sessions/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+        ),
+      ),
   )
 }
 
 export async function forkSession(
   sessionId: string,
 ): Promise<{ session: ClaudeSession; forked_from: string }> {
-  if (getCapabilities().dashboard.available) {
-    return forkDashboardSession(sessionId) as Promise<{
-      session: ClaudeSession
-      forked_from: string
-    }>
-  }
-  return claudePost(`/api/sessions/${sessionId}/fork`)
+  return sessionCall(
+    async () =>
+      (await forkDashboardSession(sessionId)) as {
+        session: ClaudeSession
+        forked_from: string
+      },
+    async () => claudePost(`/api/sessions/${sessionId}/fork`),
+  )
 }
 
 // ── Conversion helpers (Claude → Chat format) ─────────────────
