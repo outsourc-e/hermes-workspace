@@ -7,7 +7,9 @@
   "private": true,
   "type": "module",
   "bin": {
-    "telegram-message-preview": "./bin/telegram-message-preview"
+    "telegram-message-preview": "./bin/telegram-message-preview",
+    "public-github-discovery-timer-plan": "./bin/public-github-discovery-timer-plan",
+    "public-github-discovery-timer-install": "./bin/public-github-discovery-timer-install"
   },
   "main": "electron/main.cjs",
   "scripts": {
