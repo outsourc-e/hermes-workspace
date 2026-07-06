@@ -9,7 +9,8 @@
   "bin": {
     "telegram-message-preview": "./bin/telegram-message-preview",
     "public-github-discovery-timer-plan": "./bin/public-github-discovery-timer-plan",
-    "public-github-discovery-timer-install": "./bin/public-github-discovery-timer-install"
+    "public-github-discovery-timer-install": "./bin/public-github-discovery-timer-install",
+    "obsidian-idea-intake": "./bin/obsidian-idea-intake"
   },
   "main": "electron/main.cjs",
   "scripts": {
