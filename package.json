@@ -14,7 +14,10 @@
     "telegram-discovery-notification-preview": "./bin/telegram-discovery-notification-preview",
     "telegram-discovery-notification-send": "./bin/telegram-discovery-notification-send",
     "telegram-discovery-approval-preview": "./bin/telegram-discovery-approval-preview",
-    "telegram-discovery-approval-send": "./bin/telegram-discovery-approval-send"
+    "telegram-discovery-approval-send": "./bin/telegram-discovery-approval-send",
+    "telegram-register-chat": "./bin/telegram-register-chat",
+    "telegram-notification-credentials-status": "./bin/telegram-notification-credentials-status",
+    "telegram-approval-poll": "./bin/telegram-approval-poll"
   },
   "main": "electron/main.cjs",
   "scripts": {
