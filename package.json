@@ -10,7 +10,11 @@
     "telegram-message-preview": "./bin/telegram-message-preview",
     "public-github-discovery-timer-plan": "./bin/public-github-discovery-timer-plan",
     "public-github-discovery-timer-install": "./bin/public-github-discovery-timer-install",
-    "obsidian-idea-intake": "./bin/obsidian-idea-intake"
+    "obsidian-idea-intake": "./bin/obsidian-idea-intake",
+    "telegram-discovery-notification-preview": "./bin/telegram-discovery-notification-preview",
+    "telegram-discovery-notification-send": "./bin/telegram-discovery-notification-send",
+    "telegram-discovery-approval-preview": "./bin/telegram-discovery-approval-preview",
+    "telegram-discovery-approval-send": "./bin/telegram-discovery-approval-send"
   },
   "main": "electron/main.cjs",
   "scripts": {
