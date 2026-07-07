@@ -613,14 +613,17 @@ function markDispatchResult(workerId: string, result: WorkerResult): void {
 export function dispatchBlockReason(
   result: Pick<WorkerResult, 'ok' | 'error' | 'output' | 'checkpointStatus'>,
 ): string | null {
+  // Only a genuine failure blocks. A successful dispatch that simply didn't
+  // emit a structured checkpoint is NOT a block — previously any checkpoint
+  // poll timeout marked the assignment "blocked / session timed out" even
+  // though the worker ran the task to completion (process exited 0, files
+  // written). That produced false blocks on successful work.
   if (!result.ok)
     return (
       result.error?.trim() ||
       result.output?.trim() ||
       'Dispatch failed before a worker checkpoint was recorded.'
     )
-  if (result.checkpointStatus === 'timeout')
-    return 'No fresh checkpoint before poll timeout.'
   return null
 }
 
@@ -1222,9 +1225,15 @@ function runWorker(
           liveResult.checkpointStatus = 'checkpointed'
           liveResult.output = `${liveResult.output}\nCheckpoint ${checkpoint.stateLabel}: ${checkpoint.result ?? 'no result'}`
         } else {
+          // Prompt was delivered to the live TUI session (ok) but no terminal
+          // checkpoint arrived within the poll window. The agent is very
+          // likely still working async in the pane — this is NOT a failure or
+          // a block. Leave it as a soft timeout; the lifecycle sweep / next
+          // dispatch will pick up the eventual checkpoint. dispatchBlockReason
+          // no longer blocks on a successful-but-uncheckpointed result.
           liveResult.checkpoint = null
           liveResult.checkpointStatus = 'timeout'
-          liveResult.output = `${liveResult.output}\nNo fresh checkpoint before poll timeout.`
+          liveResult.output = `${liveResult.output}\nDelivered; worker still running (no checkpoint yet).`
         }
       } else {
         liveResult.checkpointStatus = 'not-requested'
@@ -1371,8 +1380,36 @@ function runWorker(
             result.checkpoint = checkpoint
             result.checkpointStatus = 'checkpointed'
           } else {
-            result.checkpoint = null
-            result.checkpointStatus = 'timeout'
+            // A oneshot that exited 0 ran to completion — the agent just
+            // didn't emit the structured checkpoint block. Synthesize a DONE
+            // checkpoint from its output so the assignment is recorded as
+            // completed instead of hanging as a false timeout/block.
+            const synthetic: ParsedSwarmCheckpoint = {
+              stateLabel: 'DONE',
+              runtimeState: 'idle',
+              checkpointStatus: 'done',
+              filesChanged: null,
+              commandsRun: null,
+              result:
+                out.trim().slice(-500) || 'Completed (no structured checkpoint).',
+              blocker: null,
+              nextAction: null,
+              raw: out.trim().slice(-2000),
+            }
+            markCheckpointResult(
+              workerId,
+              synthetic,
+              options?.notifySessionKey ?? 'main',
+            )
+            recordMissionCheckpoint({
+              missionId: options?.missionId,
+              assignmentId: assignment.assignmentId ?? null,
+              workerId,
+              checkpoint: synthetic,
+              source: 'swarm-dispatch',
+            })
+            result.checkpoint = synthetic
+            result.checkpointStatus = 'checkpointed'
           }
         } else {
           result.checkpointStatus = 'not-requested'
