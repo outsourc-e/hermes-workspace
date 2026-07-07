@@ -1,14 +1,20 @@
 /* Nova Mission Control theme.
-   Warm cyber: deep navy-black surfaces, amber memory light, no light mode. */
+   Blue galaxy room: deep navy-black surfaces, amber memory light, no light mode. */
 
 @theme {
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', monospace;
 
-  --color-nova-black: #0d0e18;
-  --color-nova-void: #16172a;
-  --color-nova-velvet: #221e33;
-  --color-nova-panel: #2b2b42;
+  --color-nova-black: #050b16;
+  --color-nova-void: #071426;
+  --color-nova-velvet: #0a1b33;
+  --color-nova-panel: #10284a;
+  --color-nova-blue: #153a66;
+  --color-nova-cyan: #63c7ff;
   --color-nova-brown: #4a2a10;
   --color-nova-copper: #7a441e;
   --color-nova-bronze: #8a5b3a;
@@ -17,17 +23,17 @@
   --color-nova-gold: #ffb347;
   --color-nova-star: #ffd27a;
 
-  --color-surface: #0d0e18;
-  --color-surface-deep: #090a12;
+  --color-surface: #050b16;
+  --color-surface-deep: #020712;
   --color-ink: #ffd27a;
-  --color-primary-50: #0d0e18;
-  --color-primary-100: #16172a;
-  --color-primary-200: #221e33;
-  --color-primary-300: #2b2b42;
-  --color-primary-400: #8a5b3a;
-  --color-primary-500: #d4a276;
-  --color-primary-600: #ff8c1a;
-  --color-primary-700: #ffb347;
+  --color-primary-50: #050b16;
+  --color-primary-100: #071426;
+  --color-primary-200: #0a1b33;
+  --color-primary-300: #10284a;
+  --color-primary-400: #153a66;
+  --color-primary-500: #2f6fa3;
+  --color-primary-600: #63c7ff;
+  --color-primary-700: #9ddcff;
   --color-primary-800: #ffd27a;
   --color-primary-900: #ffe4a6;
   --color-primary-950: #fff1cc;
@@ -40,59 +46,66 @@
 [data-theme='scifi-light'] {
   color-scheme: dark !important;
 
-  --theme-bg: #0d0e18;
-  --theme-sidebar: #111322;
-  --theme-panel: #16172a;
-  --theme-card: #1b1a2d;
-  --theme-card2: #221e33;
-  --theme-elevated: #2b2b42;
-  --theme-border: rgba(255, 179, 71, 0.28);
-  --theme-border-subtle: rgba(212, 162, 118, 0.16);
-  --theme-border-strong: rgba(255, 140, 26, 0.58);
+  --theme-bg: #050b16;
+  --theme-sidebar: #071426;
+  --theme-panel: #0a1b33;
+  --theme-card: #0d203b;
+  --theme-card2: #10284a;
+  --theme-elevated: #153a66;
+  --theme-border: rgba(99, 199, 255, 0.24);
+  --theme-border-subtle: rgba(157, 220, 255, 0.12);
+  --theme-border-strong: rgba(255, 140, 26, 0.52);
   --theme-text: #ffd27a;
   --theme-text-strong: #fff1cc;
   --theme-text-soft: #d4a276;
-  --theme-muted: rgba(212, 162, 118, 0.68);
-  --theme-muted-2: rgba(212, 162, 118, 0.48);
+  --theme-muted: rgba(157, 220, 255, 0.66);
+  --theme-muted-2: rgba(157, 220, 255, 0.44);
   --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
-  --theme-shadow-2: 0 8px 24px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(255, 179, 71, 0.08);
-  --theme-shadow-3: 0 18px 54px rgba(0, 0, 0, 0.62), 0 0 30px rgba(255, 140, 26, 0.12);
-  --theme-glass: rgba(13, 14, 24, 0.88);
+  --theme-shadow-2:
+    0 8px 24px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(99, 199, 255, 0.08);
+  --theme-shadow-3:
+    0 18px 54px rgba(0, 0, 0, 0.62), 0 0 36px rgba(99, 199, 255, 0.12);
+  --theme-glass: rgba(5, 11, 22, 0.88);
   --theme-focus: #ffd27a;
   --theme-accent: #ff8c1a;
   --theme-accent-secondary: #ffb347;
   --theme-accent-soft: #ffd27a;
+  --theme-blue: #63c7ff;
+  --theme-blue-secondary: #9ddcff;
+  --theme-blue-deep: #153a66;
+  --theme-blue-subtle: rgba(99, 199, 255, 0.1);
+  --theme-blue-border: rgba(99, 199, 255, 0.28);
   --theme-accent-subtle: rgba(255, 140, 26, 0.1);
   --theme-accent-border: rgba(255, 140, 26, 0.42);
   --theme-glow-low: 0 0 10px rgba(255, 140, 26, 0.18);
   --theme-glow-medium: 0 0 18px rgba(255, 140, 26, 0.28);
   --theme-glow-high: 0 0 30px rgba(255, 179, 71, 0.38);
   --theme-active: #ff8c1a;
-  --theme-link: #ffb347;
-  --theme-success: #d4a276;
+  --theme-link: #9ddcff;
+  --theme-success: #63c7ff;
   --theme-warning: #ffb347;
   --theme-danger: #ff8c1a;
-  --theme-stripe: rgba(255, 179, 71, 0.055);
-  --theme-header-bg: rgba(13, 14, 24, 0.94);
-  --theme-header-border: rgba(255, 179, 71, 0.22);
-  --theme-input: #111322;
-  --theme-hover: rgba(255, 140, 26, 0.1);
+  --theme-stripe: rgba(99, 199, 255, 0.055);
+  --theme-header-bg: rgba(5, 11, 22, 0.94);
+  --theme-header-border: rgba(99, 199, 255, 0.18);
+  --theme-input: #071426;
+  --theme-hover: rgba(99, 199, 255, 0.1);
 
-  --chat-user-bg: #221e33;
+  --chat-user-bg: #10284a;
   --chat-user-border: rgba(255, 140, 26, 0.36);
   --chat-user-foreground: #fff1cc;
-  --chat-assistant-bg: #16172a;
-  --chat-assistant-border: rgba(212, 162, 118, 0.16);
+  --chat-assistant-bg: #0a1b33;
+  --chat-assistant-border: rgba(157, 220, 255, 0.14);
   --chat-assistant-foreground: #ffd27a;
-  --composer-bg: #111322;
-  --composer-border: rgba(255, 179, 71, 0.28);
-  --composer-placeholder: rgba(212, 162, 118, 0.5);
-  --tool-card-bg: #16172a;
-  --tool-card-border: rgba(212, 162, 118, 0.16);
+  --composer-bg: #071426;
+  --composer-border: rgba(99, 199, 255, 0.26);
+  --composer-placeholder: rgba(157, 220, 255, 0.48);
+  --tool-card-bg: #0a1b33;
+  --tool-card-border: rgba(157, 220, 255, 0.14);
   --tool-card-title: #fff1cc;
-  --tool-card-muted: rgba(212, 162, 118, 0.62);
-  --code-bg: #090a12;
-  --code-border: rgba(212, 162, 118, 0.16);
+  --tool-card-muted: rgba(157, 220, 255, 0.58);
+  --code-bg: #020712;
+  --code-border: rgba(157, 220, 255, 0.14);
   --code-foreground: #ffb347;
 
   --color-primary-50: var(--theme-bg) !important;
@@ -107,7 +120,7 @@
   --color-primary-900: var(--theme-text-strong) !important;
   --color-primary-950: var(--theme-text-strong) !important;
   --color-surface: var(--theme-bg) !important;
-  --color-surface-deep: #090a12 !important;
+  --color-surface-deep: #020712 !important;
   --color-ink: var(--theme-text) !important;
   --color-accent-400: var(--theme-accent-secondary) !important;
   --color-accent-500: var(--theme-accent) !important;
@@ -137,15 +150,54 @@
   pointer-events: none;
   opacity: 0.16;
   background-image:
-    linear-gradient(rgba(255, 179, 71, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 179, 71, 0.035) 1px, transparent 1px),
-    radial-gradient(circle at 72% 18%, rgba(255, 140, 26, 0.08), transparent 26rem);
-  background-size: 32px 32px, 32px 32px, auto;
+    radial-gradient(
+      circle at 14% 18%,
+      rgba(99, 199, 255, 0.14),
+      transparent 19rem
+    ),
+    radial-gradient(
+      circle at 76% 8%,
+      rgba(255, 179, 71, 0.08),
+      transparent 22rem
+    ),
+    linear-gradient(rgba(99, 199, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 199, 255, 0.035) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    36px 36px,
+    36px 36px;
+}
+
+[data-theme='scifi'] body::after,
+[data-theme='scifi-light'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.42;
+  background-image:
+    radial-gradient(circle, rgba(157, 220, 255, 0.46) 0 1px, transparent 1.4px),
+    radial-gradient(circle, rgba(255, 210, 122, 0.34) 0 1px, transparent 1.3px),
+    radial-gradient(
+      circle at 50% 115%,
+      rgba(99, 199, 255, 0.12),
+      transparent 34rem
+    );
+  background-position:
+    7px 11px,
+    83px 47px,
+    center;
+  background-size:
+    113px 113px,
+    157px 157px,
+    auto;
 }
 
 [data-theme='scifi'] *,
 [data-theme='scifi-light'] * {
-  scrollbar-color: rgba(255, 179, 71, 0.26) transparent;
+  scrollbar-color: rgba(99, 199, 255, 0.28) transparent;
 }
 
 [data-theme='scifi'] ::selection,
@@ -217,16 +269,16 @@
   --color-neutral-400: rgba(212, 162, 118, 0.68) !important;
   --color-neutral-500: rgba(212, 162, 118, 0.56) !important;
   --color-neutral-600: rgba(212, 162, 118, 0.44) !important;
-  --color-neutral-700: #2b2b42 !important;
-  --color-neutral-800: #221e33 !important;
-  --color-neutral-900: #16172a !important;
-  --color-neutral-950: #0d0e18 !important;
+  --color-neutral-700: #153a66 !important;
+  --color-neutral-800: #10284a !important;
+  --color-neutral-900: #071426 !important;
+  --color-neutral-950: #050b16 !important;
 
-  --color-violet-500: var(--theme-accent) !important;
-  --color-violet-600: var(--theme-accent) !important;
-  --color-sky-500: var(--theme-accent-secondary) !important;
-  --color-indigo-500: var(--theme-accent) !important;
-  --color-indigo-600: var(--theme-accent) !important;
+  --color-violet-500: var(--theme-blue) !important;
+  --color-violet-600: var(--theme-blue) !important;
+  --color-sky-500: var(--theme-blue) !important;
+  --color-indigo-500: var(--theme-blue) !important;
+  --color-indigo-600: var(--theme-blue) !important;
 }
 
 [data-theme='scifi'] .bg-white,
@@ -301,6 +353,123 @@
   color: var(--theme-text-strong);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+.nova-galaxy-card {
+  background:
+    radial-gradient(
+      circle at 16% 10%,
+      rgba(255, 140, 26, 0.1),
+      transparent 18rem
+    ),
+    radial-gradient(
+      circle at 88% 18%,
+      rgba(212, 162, 118, 0.08),
+      transparent 16rem
+    ),
+    linear-gradient(135deg, rgba(22, 23, 42, 0.96), rgba(13, 14, 24, 0.92));
+  border-color: var(--theme-border) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 210, 122, 0.07),
+    0 16px 44px rgba(0, 0, 0, 0.38),
+    0 0 24px rgba(255, 140, 26, 0.06);
+}
+
+.nova-galaxy-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.24;
+  background-image:
+    radial-gradient(circle, rgba(255, 210, 122, 0.45) 0 1px, transparent 1.4px),
+    radial-gradient(circle, rgba(212, 162, 118, 0.28) 0 1px, transparent 1.3px);
+  background-position:
+    12px 18px,
+    74px 41px;
+  background-size:
+    96px 96px,
+    143px 143px;
+}
+
+.nova-galaxy-field {
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 140, 26, 0.09),
+      transparent 11rem
+    ),
+    radial-gradient(
+      ellipse at 48% 54%,
+      rgba(74, 42, 16, 0.28),
+      transparent 24rem
+    ),
+    linear-gradient(135deg, rgba(9, 10, 18, 0.98), rgba(22, 23, 42, 0.88));
+  box-shadow:
+    inset 0 0 42px rgba(255, 179, 71, 0.06),
+    inset 0 0 96px rgba(0, 0, 0, 0.38);
+}
+
+.nova-galaxy-field::before,
+.nova-galaxy-field::after {
+  content: '';
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+}
+
+.nova-galaxy-field::before {
+  opacity: 0.32;
+  background-image:
+    radial-gradient(
+      circle,
+      rgba(255, 241, 204, 0.42) 0 0.7px,
+      transparent 1.3px
+    ),
+    radial-gradient(
+      circle,
+      rgba(255, 210, 122, 0.34) 0 0.8px,
+      transparent 1.4px
+    );
+  background-position:
+    11px 17px,
+    79px 43px;
+  background-size:
+    73px 73px,
+    131px 131px;
+}
+
+.nova-galaxy-field::after {
+  opacity: 0.26;
+  background: conic-gradient(
+    from 22deg at 50% 52%,
+    transparent 0 12%,
+    rgba(74, 42, 16, 0.12) 17%,
+    transparent 28%,
+    rgba(122, 68, 30, 0.1) 40%,
+    transparent 52%,
+    rgba(255, 179, 71, 0.07) 64%,
+    transparent 76%,
+    rgba(74, 42, 16, 0.1) 88%,
+    transparent 100%
+  );
+  filter: blur(18px);
+}
+
+.nova-galaxy-canvas {
+  display: block;
+  background: transparent;
+}
+@keyframes nova-galaxy-drift {
+  to {
+    transform: translate3d(-73px, -37px, 0);
+  }
+}
+
+@keyframes nova-nebula-turn {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes nova-emblem-breathe {
