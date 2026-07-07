@@ -433,6 +433,9 @@ const config = defineConfig(({ mode, command }) => {
   }
 
   return {
+    // NOTE: rollupOptions.output.manualChunks crashes rollup here (TanStack
+    // Start multi-environment build hits getVariableForExportNameRecursive) —
+    // do not re-add vendor chunk splitting without testing `vite build`.
     test: {
       exclude: [
         '**/node_modules/**',

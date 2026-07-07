@@ -1,3 +1,26 @@
+## 2026-07-07 — Tier E+G: right-sizing, gzip, pipelines, iCloud backup, weekly report
+
+- **Model right-sizing** (`tierCanDemote`/`demoteTier`): dispatch demotes one
+  tier when the worker's record at the lower tier is deep and strong (>=5
+  attempts, >=80% success in last 15). Escalation always wins; reasoning
+  tasks never demote.
+- **Gzip static serving** (`server-entry.js`): compressible assets gzip with
+  an in-memory cache for hashed assets — main chunk 2.26 MB → 684 KB on the
+  wire. [GOTCHA] `rollupOptions.output.manualChunks` CRASHES rollup under the
+  TanStack Start multi-env build (getVariableForExportNameRecursive) — don't
+  re-add vendor splitting without testing `vite build`.
+- **Pipelines** (`src/server/swarm-pipeline.ts`, `/api/swarm-pipeline`):
+  POST {title, stages:[{label, assignments:[{workerId,task}]}]} — up to 5
+  stages × 4 parallel assignments; each stage's checkpoint results are
+  appended to next-stage tasks as "## Previous stage results". Fire-and-
+  forget; state in `.runtime/swarm-pipelines.json`; a stage with zero
+  successes fails the run.
+- **Off-site backup**: `hermes-backup.sh` now copies each archive to iCloud
+  Drive `HermesBackups/` (keep 7, `HERMES_ICLOUD_BACKUP=0` to disable).
+- **Weekly self-report**: `hermes-weekly-report.sh` — Sundays 18:00
+  (`com.hermes.weekly-report`), writes `vault/reports/<ISO-week>-swarm-report.md`
+  (per-worker/per-tier success, failure reasons, tokens) + Discord summary.
+
 ## 2026-07-07 — Tier D+F: RAG memory, task queue, briefing, palette, drop zone
 
 - **RAG memory** (`src/server/rag-index.ts`, `/api/rag`): local semantic index

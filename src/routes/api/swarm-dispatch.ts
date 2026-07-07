@@ -37,6 +37,7 @@ import { getSwarmUsage } from '../../server/swarm-usage'
 import {
   TIER_MODELS,
   clampTier,
+  demoteTier,
   escalateTier,
   routeTaskModel,
 } from '../../server/swarm-model-router'
@@ -44,6 +45,7 @@ import type { SwarmModelTier } from '../../server/swarm-model-router'
 import {
   lessonsForWorker,
   recordSwarmOutcome,
+  tierCanDemote,
   tierNeedsEscalation,
 } from '../../server/swarm-outcomes'
 import {
@@ -1358,6 +1360,17 @@ function runWorker(
       const bumped = escalateTier(routed.tier)
       if (bumped) {
         const clamped = clampTier(bumped, roster?.modelTiers)
+        if (clamped !== routed.tier) {
+          routed = { tier: clamped, model: TIER_MODELS[clamped] }
+        }
+      }
+    } else if (routed) {
+      // Cost right-sizing: when this worker's record at the tier below is
+      // deep and strong, demote one tier. Escalation always wins; reasoning
+      // tasks never demote (see demoteTier).
+      const lower = demoteTier(routed.tier)
+      if (lower && tierCanDemote(workerId, lower)) {
+        const clamped = clampTier(lower, roster?.modelTiers)
         if (clamped !== routed.tier) {
           routed = { tier: clamped, model: TIER_MODELS[clamped] }
         }

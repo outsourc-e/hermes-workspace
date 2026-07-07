@@ -45,3 +45,27 @@ echo "backup: $ARCHIVE ($SIZE, ${#SOURCES[@]} sources)"
 ls -1t "$BACKUP_DIR"/hermes-backup-*.tar.gz 2>/dev/null | tail -n +"$((KEEP + 1))" | while read -r old; do
   rm -f "$old" && echo "pruned $old"
 done
+
+# ---- off-site copy → iCloud Drive ---------------------------------------------
+# Second copy in ~/Library/Mobile Documents/com~apple~CloudDocs/HermesBackups
+# so a dead disk doesn't take the backups with it. iCloud syncs the folder up
+# automatically. Keeps fewer copies than local (iCloud space is shared).
+# env: HERMES_ICLOUD_KEEP (default 7), HERMES_ICLOUD_BACKUP=0 to disable.
+if [ "${HERMES_ICLOUD_BACKUP:-1}" != "0" ]; then
+  ICLOUD_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+  ICLOUD_KEEP="${HERMES_ICLOUD_KEEP:-7}"
+  if [ -d "$ICLOUD_ROOT" ]; then
+    ICLOUD_DIR="$ICLOUD_ROOT/HermesBackups"
+    mkdir -p "$ICLOUD_DIR"
+    if cp "$ARCHIVE" "$ICLOUD_DIR/"; then
+      echo "icloud copy: $ICLOUD_DIR/$(basename "$ARCHIVE")"
+      ls -1t "$ICLOUD_DIR"/hermes-backup-*.tar.gz 2>/dev/null | tail -n +"$((ICLOUD_KEEP + 1))" | while read -r old; do
+        rm -f "$old" && echo "icloud pruned $old"
+      done
+    else
+      echo "icloud copy FAILED (disk full or iCloud unavailable)" >&2
+    fi
+  else
+    echo "icloud drive not found — skipping off-site copy" >&2
+  fi
+fi

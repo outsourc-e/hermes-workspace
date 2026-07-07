@@ -79,3 +79,32 @@ describe('tierNeedsEscalationFrom', () => {
     expect(tierNeedsEscalationFrom(records, 'swarm5', 'standard')).toBe(false)
   })
 })
+
+describe('tierCanDemoteFrom', () => {
+  const rec = (tier: string, ok: boolean) =>
+    ({
+      at: Date.now(),
+      workerId: 'qa',
+      task: 't',
+      mode: 'oneshot',
+      tier,
+      model: 'm',
+      ok,
+      blocked: false,
+      blockReason: null,
+      durationMs: 1000,
+    }) as never
+
+  it('demotes only with a deep strong record at the lower tier', async () => {
+    const { tierCanDemoteFrom } = await import('./swarm-outcomes')
+    const strong = Array.from({ length: 6 }, () => rec('light', true))
+    expect(tierCanDemoteFrom(strong, 'qa', 'light')).toBe(true)
+    const thin = Array.from({ length: 4 }, () => rec('light', true))
+    expect(tierCanDemoteFrom(thin, 'qa', 'light')).toBe(false)
+    const weak = [
+      ...Array.from({ length: 4 }, () => rec('light', true)),
+      ...Array.from({ length: 3 }, () => rec('light', false)),
+    ]
+    expect(tierCanDemoteFrom(weak, 'qa', 'light')).toBe(false)
+  })
+})

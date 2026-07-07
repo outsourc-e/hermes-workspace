@@ -98,6 +98,18 @@ export function escalateTier(tier: SwarmModelTier): SwarmModelTier | null {
   return TIER_ORDER[idx + 1]
 }
 
+/**
+ * Next tier down, for cost right-sizing when the worker's record proves the
+ * cheaper model handles its workload. Reasoning tasks are never demoted —
+ * design/audit quality is not worth trading for speed.
+ */
+export function demoteTier(tier: SwarmModelTier): SwarmModelTier | null {
+  if (tier === 'reasoning') return null
+  const idx = TIER_ORDER.indexOf(tier)
+  if (idx <= 0) return null
+  return TIER_ORDER[idx - 1]
+}
+
 export type RoutedModel = {
   tier: SwarmModelTier
   model: string

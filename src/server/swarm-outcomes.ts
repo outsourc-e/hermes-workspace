@@ -260,6 +260,34 @@ export function tierNeedsEscalation(
 }
 
 /**
+ * Router learning, cost direction: can this worker's routed tier be demoted
+ * one step? True when the worker's recent record at the LOWER tier is both
+ * deep and strong (>=5 attempts in the window, >=80% success) — proof the
+ * cheaper/faster model already handles this worker's workload. Pure form for
+ * tests; dispatch uses tierCanDemote().
+ */
+export function tierCanDemoteFrom(
+  records: Array<SwarmOutcomeRecord>,
+  workerId: string,
+  lowerTier: SwarmModelTier,
+  window: number = 15,
+): boolean {
+  const recent = records
+    .filter((r) => r.workerId === workerId && r.tier === lowerTier)
+    .slice(-window)
+  if (recent.length < 5) return false
+  const ok = recent.filter((r) => r.ok && !r.blocked).length
+  return ok / recent.length >= 0.8
+}
+
+export function tierCanDemote(
+  workerId: string,
+  lowerTier: SwarmModelTier,
+): boolean {
+  return tierCanDemoteFrom(readSwarmOutcomes(500), workerId, lowerTier)
+}
+
+/**
  * Lessons: short bullets distilled from this worker's recent failures,
  * injected into the next dispatch prompt. Deduped by block reason so one
  * recurring failure yields one lesson, not five.

@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { gzipSync } from 'node:zlib'
 import { readFile, stat } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { join, extname } from 'node:path'
@@ -136,6 +137,13 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json',
 }
 
+const COMPRESSIBLE_EXTS = new Set([
+  '.js', '.mjs', '.css', '.html', '.json', '.svg', '.txt', '.xml',
+  '.webmanifest', '.map',
+])
+const gzipCache = new Map()
+const GZIP_CACHE_MAX = 200
+
 async function tryServeStatic(req, res) {
   const url = new URL(
     req.url || '/',
@@ -179,7 +187,7 @@ async function tryServeStatic(req, res) {
 
     const ext = extname(filePath).toLowerCase()
     const contentType = MIME_TYPES[ext] || 'application/octet-stream'
-    const data = await readFile(filePath)
+    let data = await readFile(filePath)
 
     const headers = {
       'Content-Type': contentType,
@@ -189,6 +197,26 @@ async function tryServeStatic(req, res) {
     // Cache hashed assets aggressively (they have content hashes in filenames)
     if (pathname.startsWith('/assets/')) {
       headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    }
+
+    // Gzip compressible assets. Hashed asset content never changes, so the
+    // compressed buffer is cached in memory after the first request — the
+    // 2.2 MB main chunk goes over the wire as ~650 KB instead.
+    const compressible = COMPRESSIBLE_EXTS.has(ext) && data.length > 1024
+    const acceptsGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '')
+    if (compressible && acceptsGzip) {
+      let gz = pathname.startsWith('/assets/') ? gzipCache.get(pathname) : null
+      if (!gz) {
+        gz = gzipSync(data)
+        if (pathname.startsWith('/assets/')) {
+          if (gzipCache.size >= GZIP_CACHE_MAX) gzipCache.clear()
+          gzipCache.set(pathname, gz)
+        }
+      }
+      data = gz
+      headers['Content-Encoding'] = 'gzip'
+      headers['Content-Length'] = gz.length
+      headers['Vary'] = 'Accept-Encoding'
     }
 
     res.writeHead(200, headers)
