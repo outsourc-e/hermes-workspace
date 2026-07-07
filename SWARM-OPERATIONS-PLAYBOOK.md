@@ -211,6 +211,15 @@ npx tsc --noEmit -p tsconfig.json 2>&1 | grep -c "error TS"   # baseline: 98 (di
 
 Update this when you land a fix that future sessions must know about.
 
+- `17537bd4` **[RECURS-class] cold-TUI + clear-race fixed — do not regress**:
+  (a) never deliver a prompt to a swarm TUI pane until it shows the ready
+  prompt — cold boots spend 30-60s installing deps; a fixed sleep loses the
+  prompt and fakes a "session timed out" (ensureLiveTmuxSession now polls up
+  to 90s). (b) never clear worker state.db before the hermes process is DEAD —
+  tmux kill-session returns early and hermes recreates state.db on shutdown
+  flush (cancel-all now kills tmux + oneshots, waits via pgrep with SIGKILL
+  escalation, then clears). Both verified over 3 use→clear→use cycles.
+
 - (pending) **Phase 2**: (a) daily backups — `scripts/hermes-backup.sh` +
   `com.hermes.backup` launchd (03:00) tar the .runtime, vault, and memory to
   `~/hermes-backups` (keep 14). (b) health strip now warns on provider drift /
