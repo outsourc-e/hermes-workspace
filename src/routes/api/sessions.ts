@@ -21,6 +21,22 @@ import {
   updateLocalSessionTitle,
 } from '../../server/local-session-store'
 
+function toLocalSessionSummary(ls: ReturnType<typeof listLocalSessions>[number]) {
+  return {
+    key: ls.id,
+    id: ls.id,
+    friendlyId: ls.id,
+    title: ls.title || 'Local Chat',
+    label: ls.title || 'Local Chat',
+    derivedTitle: ls.title || 'Local Chat',
+    startedAt: ls.createdAt,
+    updatedAt: ls.updatedAt,
+    message_count: ls.messageCount,
+    model: ls.model,
+    source: 'local',
+  } as any
+}
+
 export const Route = createFileRoute('/api/sessions')({
   server: {
     handlers: {
@@ -29,12 +45,13 @@ export const Route = createFileRoute('/api/sessions')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const localSessions = listLocalSessions().map(toLocalSessionSummary)
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.sessions) {
           return json({
             ok: true,
-            sessions: [],
-            source: 'unavailable',
+            sessions: localSessions,
+            source: localSessions.length > 0 ? 'local-fallback' : 'unavailable',
             message: SESSIONS_API_UNAVAILABLE_MESSAGE,
           })
         }
@@ -44,23 +61,10 @@ export const Route = createFileRoute('/api/sessions')({
           const gatewaySessions = sessions.map(toSessionSummary)
 
           // Merge local portable sessions (Ollama, Atomic Chat, etc.)
-          const localSessions = listLocalSessions()
           const gatewayIds = new Set(gatewaySessions.map((s: any) => s.key || s.id))
           for (const ls of localSessions) {
-            if (!gatewayIds.has(ls.id)) {
-              gatewaySessions.push({
-                key: ls.id,
-                id: ls.id,
-                friendlyId: ls.id,
-                title: ls.title || 'Local Chat',
-                label: ls.title || 'Local Chat',
-                derivedTitle: ls.title || 'Local Chat',
-                startedAt: ls.createdAt,
-                updatedAt: ls.updatedAt,
-                message_count: ls.messageCount,
-                model: ls.model,
-                source: 'local',
-              } as any)
+            if (!gatewayIds.has(ls.id) && !gatewayIds.has(ls.key)) {
+              gatewaySessions.push(ls)
             }
           }
 

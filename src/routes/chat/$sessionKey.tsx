@@ -5,6 +5,7 @@ import {
   moveHistoryMessages,
   reconcileSessionDraft,
 } from '../../screens/chat/chat-queries'
+import { setRecentSession } from '../../screens/chat/pending-send'
 import { ErrorBoundary } from '@/components/error-boundary'
 
 const ChatScreen = lazy(async () => {
@@ -74,6 +75,15 @@ function ChatRoute() {
       ? forcedSession.sessionKey
       : undefined
 
+  useEffect(() => {
+    if (isNewChat || activeFriendlyId === 'main') return
+    try {
+      localStorage.setItem('hermes:last_session_id', activeFriendlyId)
+      localStorage.setItem('claude-last-session', activeFriendlyId)
+      setRecentSession(activeFriendlyId)
+    } catch {}
+  }, [activeFriendlyId, isNewChat])
+
   // Clear history cache when navigating to new chat
   useEffect(() => {
     if (isNewChat) {
@@ -109,6 +119,7 @@ function ChatRoute() {
       })
       // Persist last session for refresh recovery
       try {
+        localStorage.setItem('hermes:last_session_id', payload.friendlyId)
         localStorage.setItem('claude-last-session', payload.friendlyId)
       } catch {}
       navigate({

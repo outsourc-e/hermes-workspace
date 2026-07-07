@@ -85,7 +85,7 @@ export function useChatSessions({
       (session) => session.friendlyId === activeFriendlyId,
     )
 
-    if (!activeAlreadyPresent && (forcedSessionKey || isRecentSession(activeFriendlyId))) {
+    if (!activeAlreadyPresent && !isNewChat) {
       const synthetic = buildSyntheticActiveSession(
         activeFriendlyId,
         forcedSessionKey,
@@ -115,6 +115,7 @@ export function useChatSessions({
     if (isNewChat) return true
     if (forcedSessionKey) return true
     if (isRecentSession(activeFriendlyId)) return true
+    if (activeFriendlyId) return true
     return sessions.some((session) => session.friendlyId === activeFriendlyId)
   }, [activeFriendlyId, forcedSessionKey, isNewChat, sessions])
   const activeSessionKey = activeSession?.key ?? ''

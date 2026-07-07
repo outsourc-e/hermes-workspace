@@ -6,6 +6,7 @@
   "license": "MIT",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@9.15.9",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite dev",
