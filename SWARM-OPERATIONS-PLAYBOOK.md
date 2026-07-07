@@ -211,6 +211,26 @@ npx tsc --noEmit -p tsconfig.json 2>&1 | grep -c "error TS"   # baseline: 98 (di
 
 Update this when you land a fix that future sessions must know about.
 
+- (Tier 1 learning loops) **Outcome memory + scoreboard + self-improvement**:
+  every dispatch appends to `.runtime/swarm-outcomes.jsonl`
+  (`src/server/swarm-outcomes.ts`, wired via `finalizeDispatch` in
+  swarm-dispatch.ts). Feeds: `/api/swarm-scoreboard` + dashboard card;
+  router learning (3+ recent failures at a tier <40% ok → pre-escalate one
+  tier, clamped to the worker's band); per-worker failure "lessons" injected
+  into the next prompt. DONE checkpoints with evidence are harvested into
+  `~/workspace/vault/skills/*.md` (`src/server/swarm-skills.ts`) and matching
+  skills are injected into future prompts by keyword overlap. Nightly
+  `com.hermes.swarm.self-improve` (01:00, `scripts/swarm-self-improve.sh`)
+  gathers tsc/test/health/scoreboard evidence and dispatches the maintainer
+  to stage ONE reviewable fix — never pushes/merges; review lands in the
+  morning digest. Outcome writes are best-effort: never let them fail a
+  dispatch.
+
+- `260e9e90` **Security: auth-gated** /api/swarm-kanban, /api/events (SSE),
+  /api/playground-npc, /api/playground-admin (Host-header check was
+  spoofable → requireLocalOrAuth). Audit found no shell-injection or
+  traversal issues elsewhere.
+
 - `17537bd4` **[RECURS-class] cold-TUI + clear-race fixed — do not regress**:
   (a) never deliver a prompt to a swarm TUI pane until it shows the ready
   prompt — cold boots spend 30-60s installing deps; a fixed sleep loses the

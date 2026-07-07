@@ -56,4 +56,39 @@ EOF
   echo "installed $label ($worker @ ${hour}:$(printf '%02d' "$minute"))"
 done
 
+# Nightly self-improvement loop (01:00) — gathers evidence and dispatches the
+# maintainer to stage one reviewable fix. Different arg shape, so own block.
+SI_LABEL="com.hermes.swarm.self-improve"
+SI_PLIST="$LA_DIR/$SI_LABEL.plist"
+cat > "$SI_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$SI_LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>$REPO_DIR/scripts/swarm-self-improve.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>$HOME/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <key>HOME</key><string>$HOME</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>1</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key><string>$LOG_DIR/$SI_LABEL.log</string>
+  <key>StandardErrorPath</key><string>$LOG_DIR/$SI_LABEL.err</string>
+</dict>
+</plist>
+EOF
+chmod +x "$REPO_DIR/scripts/swarm-self-improve.sh"
+launchctl unload "$SI_PLIST" 2>/dev/null || true
+launchctl load "$SI_PLIST"
+echo "installed $SI_LABEL (maintainer @ 1:00)"
+
 echo "Scheduled agents installed. List: launchctl list | grep com.hermes.swarm"

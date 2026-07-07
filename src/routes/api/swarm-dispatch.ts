@@ -35,9 +35,20 @@ import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
 import { getSwarmUsage } from '../../server/swarm-usage'
 import {
   TIER_MODELS,
+  clampTier,
   escalateTier,
   routeTaskModel,
 } from '../../server/swarm-model-router'
+import type { SwarmModelTier } from '../../server/swarm-model-router'
+import {
+  lessonsForWorker,
+  recordSwarmOutcome,
+  tierNeedsEscalation,
+} from '../../server/swarm-outcomes'
+import {
+  harvestSkillFromCheckpoint,
+  matchSkillsForTask,
+} from '../../server/swarm-skills'
 
 const HERMES_BIN_CANDIDATES = [
   process.env.HERMES_CLI_BIN,
@@ -501,6 +512,8 @@ export function buildWorkerPrompt(input: {
   raw?: boolean
   missionId?: string | null
   taskTitle?: string | null
+  lessons?: Array<string>
+  skillHints?: Array<{ title: string; snippet: string }>
 }): string {
   if (input.direct && input.raw) return input.task
   const roster = input.roster
@@ -546,6 +559,19 @@ export function buildWorkerPrompt(input: {
   if (snapshotSection) {
     lines.push(snapshotSection)
     lines.push('')
+  }
+  if (input.lessons?.length) {
+    lines.push('## Lessons From Your Recent Failures')
+    for (const lesson of input.lessons) lines.push(`- ${lesson}`)
+    lines.push('')
+  }
+  if (input.skillHints?.length) {
+    lines.push(
+      '## Relevant Skills (harvested from previously successful tasks)',
+    )
+    for (const hint of input.skillHints) {
+      lines.push(`### ${hint.title}`, hint.snippet, '')
+    }
   }
   lines.push(
     '## Assigned Task',
@@ -630,6 +656,56 @@ export function dispatchBlockReason(
       'Dispatch failed before a worker checkpoint was recorded.'
     )
   return null
+}
+
+type DispatchOutcomeMeta = {
+  tier: SwarmModelTier | null
+  model: string | null
+  mode: 'tmux' | 'oneshot'
+}
+
+/**
+ * Terminal bookkeeping for every dispatch: append the outcome record
+ * (feeds the scoreboard, router learning and prompt lessons), harvest a
+ * vault skill from a DONE checkpoint with evidence, then apply the
+ * existing block handling. All best-effort — never affects the result.
+ */
+function finalizeDispatch(
+  workerId: string,
+  assignment: AssignmentRequest,
+  result: WorkerResult,
+  meta: DispatchOutcomeMeta,
+  options?: { missionId?: string | null },
+): void {
+  const blockReason = dispatchBlockReason(result)
+  try {
+    recordSwarmOutcome({
+      workerId,
+      task: assignment.task,
+      tier: meta.tier,
+      model: meta.model,
+      mode: meta.mode,
+      ok: result.ok,
+      blocked: blockReason !== null,
+      blockReason,
+      checkpointStatus: result.checkpointStatus ?? null,
+      durationMs: result.durationMs,
+    })
+  } catch {
+    /* outcome memory is best-effort */
+  }
+  if (result.checkpoint) {
+    try {
+      harvestSkillFromCheckpoint({
+        workerId,
+        task: assignment.task,
+        checkpoint: result.checkpoint,
+      })
+    } catch {
+      /* skill harvest is best-effort */
+    }
+  }
+  recordDispatchBlock(workerId, assignment, result, options)
 }
 
 function recordDispatchBlock(
@@ -1182,6 +1258,20 @@ function runWorker(
 ): Promise<WorkerResult> {
   return new Promise(async (resolve) => {
     const workerId = assignment.workerId
+    // Outcome memory: recent failure lessons + harvested skills matching
+    // this task are injected into the prompt so the worker doesn't repeat
+    // known failure modes and reuses approaches that already worked.
+    let lessons: Array<string> = []
+    let skillHints: Array<{ title: string; snippet: string }> = []
+    try {
+      lessons = lessonsForWorker(workerId)
+      skillHints = matchSkillsForTask(assignment.task).map((m) => ({
+        title: m.title,
+        snippet: m.snippet,
+      }))
+    } catch {
+      /* best-effort */
+    }
     const prompt = buildWorkerPrompt({
       workerId,
       task: assignment.task,
@@ -1190,6 +1280,8 @@ function runWorker(
       direct: assignment.direct,
       missionId: options?.missionId ?? null,
       taskTitle: assignment.task.slice(0, 120),
+      lessons,
+      skillHints,
     })
     const profilePath = getProfilePath(workerId)
     // Self-heal recurring provider drift: hermes-agent's CLI rewrites a
@@ -1244,10 +1336,22 @@ function runWorker(
     // Model router: pick a tier-appropriate model for this task instead of
     // always paying the worker's roster-default price. Applied to both the
     // live TUI path (/model command) and the oneshot fallback (-m flag).
-    const routed = routeTaskModel({
+    let routed = routeTaskModel({
       task: assignment.task,
       allowedTiers: roster?.modelTiers,
     })
+    // Router learning: if this worker has been failing repeatedly at the
+    // chosen tier recently, escalate one tier up-front (still clamped to
+    // the worker's allowed band) instead of paying for a doomed attempt.
+    if (routed && tierNeedsEscalation(workerId, routed.tier)) {
+      const bumped = escalateTier(routed.tier)
+      if (bumped) {
+        const clamped = clampTier(bumped, roster?.modelTiers)
+        if (clamped !== routed.tier) {
+          routed = { tier: clamped, model: TIER_MODELS[clamped] }
+        }
+      }
+    }
 
     // Prefer the persistent live agent session when available/startable.
     const liveResult = await sendPromptToLiveSession(
@@ -1364,7 +1468,13 @@ function runWorker(
       } else {
         liveResult.checkpointStatus = 'not-requested'
       }
-      recordDispatchBlock(workerId, assignment, liveResult, options)
+      finalizeDispatch(
+        workerId,
+        assignment,
+        liveResult,
+        { tier: routed?.tier ?? null, model: routed?.model ?? null, mode: 'tmux' },
+        options,
+      )
       resolve(liveResult)
       return
     }
@@ -1380,7 +1490,13 @@ function runWorker(
         delivery: 'oneshot',
       }
       markDispatchResult(workerId, result)
-      recordDispatchBlock(workerId, assignment, result, options)
+      finalizeDispatch(
+        workerId,
+        assignment,
+        result,
+        { tier: routed?.tier ?? null, model: routed?.model ?? null, mode: 'oneshot' },
+        options,
+      )
       resolve(result)
       return
     }
@@ -1451,7 +1567,7 @@ function runWorker(
             delivery: 'oneshot',
           }
           markDispatchResult(workerId, result)
-          recordDispatchBlock(workerId, assignment, result, options)
+          finalizeDispatch(workerId, assignment, result, { tier: currentTier, model: currentTier ? TIER_MODELS[currentTier] : null, mode: 'oneshot' }, options)
           resolve(result)
           return
         }
@@ -1541,7 +1657,7 @@ function runWorker(
           result.checkpointStatus = 'not-requested'
         }
         markDispatchResult(workerId, result)
-        recordDispatchBlock(workerId, assignment, result, options)
+        finalizeDispatch(workerId, assignment, result, { tier: currentTier, model: currentTier ? TIER_MODELS[currentTier] : null, mode: 'oneshot' }, options)
         resolve(result)
       },
     )
@@ -1557,7 +1673,7 @@ function runWorker(
         delivery: 'oneshot',
       }
       markDispatchResult(workerId, result)
-      recordDispatchBlock(workerId, assignment, result, options)
+      finalizeDispatch(workerId, assignment, result, { tier: currentTier, model: currentTier ? TIER_MODELS[currentTier] : null, mode: 'oneshot' }, options)
       resolve(result)
     })
     }
