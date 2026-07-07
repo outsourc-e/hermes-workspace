@@ -18,6 +18,36 @@ export type ResolvedSwarmModel = {
 }
 
 /**
+ * ollama-cloud catalog models used by the current all-cloud fleet. Any roster
+ * model in this set must resolve to provider `ollama-cloud` — the model label
+ * alone (e.g. "deepseek-v4-flash") otherwise lets hermes-agent's CLI infer
+ * provider `deepseek` + api.deepseek.com (no key present) and silently fall
+ * back. Keep in sync with swarm.yaml. Lowercased for comparison.
+ */
+const OLLAMA_CLOUD_MODELS = new Set(
+  [
+    'deepseek-v4-pro',
+    'deepseek-v4-flash',
+    'deepseek-v3.2',
+    'qwen3-coder:480b',
+    'qwen3-coder-next',
+    'qwen3.5:397b',
+    'qwen3-next:80b',
+    'kimi-k2-thinking',
+    'kimi-k2.7-code',
+    'kimi-k2.5',
+    'ministral-3:8b',
+    'ministral-3:14b',
+    'ministral-3:3b',
+    'glm-5',
+    'glm-5.1',
+    'glm-5.2',
+    'gpt-oss:20b',
+    'gpt-oss:120b',
+  ].map((m) => m.toLowerCase()),
+)
+
+/**
  * Map a roster `model:` label to a Hermes Agent provider+model. The label
  * comparison is case-insensitive and ignores extra whitespace. Returns
  * `null` when the label is empty, blank, or unrecognised.
@@ -28,6 +58,11 @@ export function resolveSwarmModelLabel(
   if (!label) return null
   const normalized = label.trim().toLowerCase().replace(/\s+/g, ' ')
   if (!normalized || normalized === 'worker') return null
+
+  // ollama-cloud catalog — re-assert the correct provider so drift self-heals.
+  if (OLLAMA_CLOUD_MODELS.has(normalized)) {
+    return { provider: 'ollama-cloud', default: label.trim() }
+  }
 
   // Anthropic Claude family
   if (/^opus\s*4\.7$|^claude\s*opus\s*4\.7$/.test(normalized)) {

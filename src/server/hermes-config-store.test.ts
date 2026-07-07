@@ -126,7 +126,10 @@ describe('applyHermesConfigPatch', () => {
       { name: 'gw', base_url: 'https://b.test/v1' },
     ])
 
-    applyHermesConfigPatch(paths, { action: 'remove-custom-provider', name: 'gw' })
+    applyHermesConfigPatch(paths, {
+      action: 'remove-custom-provider',
+      name: 'gw',
+    })
     parsed = YAML.parse(
       fs.readFileSync(path.join(tmpHome, 'config.yaml'), 'utf-8'),
     )

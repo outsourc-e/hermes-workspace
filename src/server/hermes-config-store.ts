@@ -37,12 +37,18 @@ export type RemoveCustomProviderPatch = {
   name: string
 }
 
+export type RemoveProviderPatch = {
+  action: 'remove-provider'
+  provider: string
+}
+
 export type HermesConfigPatch =
   | SetDefaultModelPatch
   | SetApiKeyPatch
   | RemoveApiKeyPatch
   | SetCustomProviderPatch
   | RemoveCustomProviderPatch
+  | RemoveProviderPatch
 
 export type HermesConfigPatchResult = {
   ok: boolean
@@ -104,9 +110,11 @@ function quoteEnvValue(value: string): string {
 }
 
 export function stringifyEnv(env: Record<string, string>): string {
-  return Object.entries(env)
-    .map(([k, v]) => `${k}=${quoteEnvValue(v)}`)
-    .join('\n') + '\n'
+  return (
+    Object.entries(env)
+      .map(([k, v]) => `${k}=${quoteEnvValue(v)}`)
+      .join('\n') + '\n'
+  )
 }
 
 function readYamlConfig(configPath: string): Record<string, unknown> {
@@ -121,7 +129,10 @@ function readYamlConfig(configPath: string): Record<string, unknown> {
   }
 }
 
-function writeYamlConfig(configPath: string, config: Record<string, unknown>): void {
+function writeYamlConfig(
+  configPath: string,
+  config: Record<string, unknown>,
+): void {
   fs.mkdirSync(path.dirname(configPath), { recursive: true })
   fs.writeFileSync(configPath, YAML.stringify(config), 'utf-8')
 }
@@ -139,6 +150,18 @@ function writeEnv(envPath: string, env: Record<string, string>): void {
   fs.writeFileSync(envPath, stringifyEnv(env), 'utf-8')
 }
 
+function writeAuthProfiles(
+  authProfilesPath: string,
+  profiles: Record<string, unknown>,
+): void {
+  fs.mkdirSync(path.dirname(authProfilesPath), { recursive: true })
+  fs.writeFileSync(
+    authProfilesPath,
+    `${JSON.stringify(profiles, null, 2)}\n`,
+    'utf-8',
+  )
+}
+
 function readAuthProfiles(authProfilesPath: string): Record<string, unknown> {
   try {
     const raw = fs.readFileSync(authProfilesPath, 'utf-8')
@@ -151,7 +174,9 @@ function readAuthProfiles(authProfilesPath: string): Record<string, unknown> {
   }
 }
 
-export function readHermesConfigFiles(paths: HermesConfigPaths): HermesConfigFiles {
+export function readHermesConfigFiles(
+  paths: HermesConfigPaths,
+): HermesConfigFiles {
   return {
     config: readYamlConfig(paths.configPath),
     env: readEnv(paths.envPath),
@@ -159,11 +184,15 @@ export function readHermesConfigFiles(paths: HermesConfigPaths): HermesConfigFil
   }
 }
 
-function readCustomProvidersList(config: Record<string, unknown>): Array<Record<string, unknown>> {
+function readCustomProvidersList(
+  config: Record<string, unknown>,
+): Array<Record<string, unknown>> {
   const entries = config.custom_providers
   return Array.isArray(entries)
     ? entries.filter((entry): entry is Record<string, unknown> => {
-        return Boolean(entry && typeof entry === 'object' && !Array.isArray(entry))
+        return Boolean(
+          entry && typeof entry === 'object' && !Array.isArray(entry),
+        )
       })
     : []
 }
@@ -244,11 +273,48 @@ function applyRemoveCustomProvider(
   return { ok: true }
 }
 
+function applyRemoveProvider(
+  paths: HermesConfigPaths,
+  patch: RemoveProviderPatch,
+): HermesConfigPatchResult {
+  const id = patch.provider.trim().toLowerCase()
+  if (!id) return { ok: false, message: 'Provider id is required.' }
+
+  // Drop any matching custom-provider entry (matched by name/id).
+  const config = readYamlConfig(paths.configPath)
+  const list = readCustomProvidersList(config)
+  const nextList = list.filter((entry) => {
+    const name = typeof entry.name === 'string' ? entry.name.toLowerCase() : ''
+    return name !== id
+  })
+  if (nextList.length !== list.length) {
+    if (nextList.length === 0) delete config.custom_providers
+    else config.custom_providers = nextList
+    writeYamlConfig(paths.configPath, config)
+  }
+
+  // Drop auth profiles keyed to this provider (e.g. "openai:default").
+  const profiles = readAuthProfiles(paths.authProfilesPath)
+  let profilesChanged = false
+  for (const key of Object.keys(profiles)) {
+    const providerPart = key.split(':')[0]?.toLowerCase() ?? ''
+    if (providerPart === id) {
+      delete profiles[key]
+      profilesChanged = true
+    }
+  }
+  if (profilesChanged) writeAuthProfiles(paths.authProfilesPath, profiles)
+
+  return { ok: true }
+}
+
 export function applyHermesConfigPatch(
   paths: HermesConfigPaths,
   patch: HermesConfigPatch,
 ): HermesConfigPatchResult {
   switch (patch.action) {
+    case 'remove-provider':
+      return applyRemoveProvider(paths, patch)
     case 'set-default-model':
       return applySetDefaultModel(paths, patch)
     case 'set-api-key':

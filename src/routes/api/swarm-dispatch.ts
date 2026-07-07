@@ -27,7 +27,11 @@ import {
   type SwarmRosterWorker,
 } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
-import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import {
+  ensureSwarmProfileConfig,
+  syncSwarmProfileModel,
+} from '../../server/swarm-profile-config'
+import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
 import {
   TIER_MODELS,
   escalateTier,
@@ -1108,6 +1112,18 @@ function runWorker(
       taskTitle: assignment.task.slice(0, 120),
     })
     const profilePath = getProfilePath(workerId)
+    // Self-heal recurring provider drift: hermes-agent's CLI rewrites a
+    // worker's config.yaml to `provider: deepseek` + api.deepseek.com (no key)
+    // based on the model name, which then silently falls back. Re-assert the
+    // roster model's canonical provider (ollama-cloud) on every dispatch.
+    const resolvedModel = resolveSwarmModelLabel(roster?.model ?? null)
+    if (resolvedModel) {
+      try {
+        syncSwarmProfileModel(profilePath, resolvedModel)
+      } catch {
+        /* best-effort — never wedge a dispatch on a config heal */
+      }
+    }
     const runtimeBeforeDispatch = readRuntimeCheckpointSnapshot(profilePath)
     const previousRaw = runtimeBeforeDispatch.checkpointRaw
     const baselineRuntimeSignature = runtimeCheckpointSignature(

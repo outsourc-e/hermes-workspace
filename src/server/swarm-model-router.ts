@@ -18,11 +18,16 @@
 
 export type SwarmModelTier = 'light' | 'standard' | 'heavy' | 'reasoning'
 
+// Provider-qualified (`ollama-cloud/<model>`) so hermes-agent does NOT
+// re-guess the provider from a bare model name. A bare `-m deepseek-v4-flash`
+// or `/model deepseek-v4-flash` makes the CLI infer provider `deepseek` /
+// `openrouter` (no key) and rewrite the profile config, breaking the worker.
+// Qualifying pins it to the keyed ollama-cloud provider.
 export const TIER_MODELS: Record<SwarmModelTier, string> = {
-  light: 'ministral-3:8b',
-  standard: 'deepseek-v4-flash',
-  heavy: 'qwen3-coder:480b',
-  reasoning: 'kimi-k2-thinking',
+  light: 'ollama-cloud/ministral-3:8b',
+  standard: 'ollama-cloud/deepseek-v4-flash',
+  heavy: 'ollama-cloud/qwen3-coder:480b',
+  reasoning: 'ollama-cloud/kimi-k2-thinking',
 }
 
 const TIER_ORDER: Array<SwarmModelTier> = [
