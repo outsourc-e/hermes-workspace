@@ -28,6 +28,7 @@ import { Route as HermesWorldRouteImport } from './routes/hermes-world'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as EchoStudioRouteImport } from './routes/echo-studio'
 import { Route as EarlyAccessRouteImport } from './routes/early-access'
+import { Route as DstnyDocumentsRouteImport } from './routes/dstny-documents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as AgoraRouteImport } from './routes/agora'
@@ -268,6 +269,11 @@ const EchoStudioRoute = EchoStudioRouteImport.update({
 const EarlyAccessRoute = EarlyAccessRouteImport.update({
   id: '/early-access',
   path: '/early-access',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DstnyDocumentsRoute = DstnyDocumentsRouteImport.update({
+  id: '/dstny-documents',
+  path: '/dstny-documents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -1016,6 +1022,7 @@ export interface FileRoutesByFullPath {
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/dstny-documents': typeof DstnyDocumentsRoute
   '/early-access': typeof EarlyAccessRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
@@ -1183,6 +1190,7 @@ export interface FileRoutesByTo {
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/dstny-documents': typeof DstnyDocumentsRoute
   '/early-access': typeof EarlyAccessRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
@@ -1350,6 +1358,7 @@ export interface FileRoutesById {
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/dstny-documents': typeof DstnyDocumentsRoute
   '/early-access': typeof EarlyAccessRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
@@ -1519,6 +1528,7 @@ export interface FileRouteTypes {
     | '/agora'
     | '/conductor'
     | '/dashboard'
+    | '/dstny-documents'
     | '/early-access'
     | '/echo-studio'
     | '/files'
@@ -1686,6 +1696,7 @@ export interface FileRouteTypes {
     | '/agora'
     | '/conductor'
     | '/dashboard'
+    | '/dstny-documents'
     | '/early-access'
     | '/echo-studio'
     | '/files'
@@ -1852,6 +1863,7 @@ export interface FileRouteTypes {
     | '/agora'
     | '/conductor'
     | '/dashboard'
+    | '/dstny-documents'
     | '/early-access'
     | '/echo-studio'
     | '/files'
@@ -2020,6 +2032,7 @@ export interface RootRouteChildren {
   AgoraRoute: typeof AgoraRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
+  DstnyDocumentsRoute: typeof DstnyDocumentsRoute
   EarlyAccessRoute: typeof EarlyAccessRoute
   EchoStudioRoute: typeof EchoStudioRoute
   FilesRoute: typeof FilesRoute
@@ -2284,6 +2297,13 @@ declare module '@tanstack/react-router' {
       path: '/early-access'
       fullPath: '/early-access'
       preLoaderRoute: typeof EarlyAccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dstny-documents': {
+      id: '/dstny-documents'
+      path: '/dstny-documents'
+      fullPath: '/dstny-documents'
+      preLoaderRoute: typeof DstnyDocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -3529,6 +3549,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgoraRoute: AgoraRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
+  DstnyDocumentsRoute: DstnyDocumentsRoute,
   EarlyAccessRoute: EarlyAccessRoute,
   EchoStudioRoute: EchoStudioRoute,
   FilesRoute: FilesRoute,

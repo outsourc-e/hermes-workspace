@@ -583,6 +583,7 @@ function ChatSidebarComponent({
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
+  const isDstnyDocumentsActive = pathname === '/dstny-documents'
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
@@ -591,7 +592,7 @@ function ChatSidebarComponent({
     (state) => state.settings.experimentalEchoStudio,
   )
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
-  const knowledgeRoutes = ['/memory', '/skills']
+  const knowledgeRoutes = ['/memory', '/dstny-documents', '/skills']
   const systemRoutes = ['/settings', '/logs']
 
   useEffect(() => {
@@ -869,6 +870,13 @@ function ChatSidebarComponent({
       icon: BrainIcon,
       label: t('nav.memory'),
       active: isMemoryActive,
+    },
+    {
+      kind: 'link',
+      to: '/dstny-documents',
+      icon: File01Icon,
+      label: 'Documents Dstny',
+      active: isDstnyDocumentsActive,
     },
     {
       kind: 'link',
