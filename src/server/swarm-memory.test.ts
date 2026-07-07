@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 let tempHome: string
+let originalHermesHome: string | undefined
+let originalClaudeHome: string | undefined
 
 async function loadModule() {
   vi.resetModules()
@@ -17,11 +19,19 @@ async function loadModule() {
 describe('swarm-memory module', () => {
   beforeEach(() => {
     tempHome = mkdtempSync(join(tmpdir(), 'swarm-memory-test-'))
+    originalHermesHome = process.env.HERMES_HOME
+    originalClaudeHome = process.env.CLAUDE_HOME
+    process.env.HERMES_HOME = join(tempHome, '.hermes')
+    delete process.env.CLAUDE_HOME
   })
 
   afterEach(() => {
     vi.resetModules()
     vi.doUnmock('node:os')
+    if (originalHermesHome === undefined) delete process.env.HERMES_HOME
+    else process.env.HERMES_HOME = originalHermesHome
+    if (originalClaudeHome === undefined) delete process.env.CLAUDE_HOME
+    else process.env.CLAUDE_HOME = originalClaudeHome
     try { rmSync(tempHome, { recursive: true, force: true }) } catch { /* ignore */ }
   })
 
@@ -30,7 +40,7 @@ describe('swarm-memory module', () => {
     mod.ensureWorkerMemoryScaffold({ workerId: 'swarmtest1', name: 'Swarm Test 1', role: 'Builder', specialty: 'tests', model: 'GPT-5' })
     const root = mod.swarmWorkerMemoryRoot('swarmtest1')
     expect(root.endsWith('profiles/swarmtest1/memory')).toBe(true)
-    expect(root.startsWith(tempHome)).toBe(true)
+    expect(root.startsWith(join(tempHome, '.hermes'))).toBe(true)
     expect(readFileSync(join(root, 'IDENTITY.md'), 'utf8')).toMatch(/Worker ID: swarmtest1/)
     expect(readFileSync(join(root, 'MEMORY.md'), 'utf8')).toMatch(/swarmtest1/)
     expect(readFileSync(join(root, 'SOUL.md'), 'utf8')).toMatch(/swarmtest1/)
@@ -60,7 +70,7 @@ describe('swarm-memory module', () => {
     mod.ensureWorkerMemoryScaffold({ workerId: 'swarmtest1' })
     const result = mod.writeSwarmHandoff({ workerId: 'swarmtest1', missionId: 'mission-test-1', content: 'Handoff body', mirrorShared: false })
     expect(result.localPath.endsWith('handoffs/mission-test-1.md')).toBe(true)
-    expect(result.localPath.startsWith(tempHome)).toBe(true)
+    expect(result.localPath.startsWith(join(tempHome, '.hermes'))).toBe(true)
     expect(readFileSync(result.localPath, 'utf8')).toMatch(/Handoff body/)
     expect(result.sharedPath).toBeUndefined()
   })

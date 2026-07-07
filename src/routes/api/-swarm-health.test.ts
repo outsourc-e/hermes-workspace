@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseModelAuthEventsFromText, resolveWorkerWrapperName, summarizeSwarmHealth } from './swarm-health'
+import { parseModelAuthEventsFromText, parseRecentModelAuthEventsFromText, resolveWorkerWrapperName, summarizeSwarmHealth } from './swarm-health'
 
 describe('swarm-health model/auth readiness', () => {
   it('uses roster wrapper aliases when resolving semantic worker wrappers', () => {
@@ -28,6 +28,17 @@ describe('swarm-health model/auth readiness', () => {
     expect(events.authErrorCount).toBe(1)
     expect(events.modelAuthStatus).toBe('primary-auth-failed')
     expect(events.primaryAuthOk).toBe(false)
+  })
+
+  it('ignores auth failures older than the recent health window', () => {
+    const events = parseRecentModelAuthEventsFromText(`
+2026-05-04 18:38:04,950 WARNING cli: Copilot token validation failed: Token from \`gh auth token\` is a classic PAT.
+2026-07-07 09:15:00,000 WARNING provider: resolve_provider_client: openai-codex requested but no Codex OAuth token found
+`, Date.parse('2026-07-07T10:00:00Z'))
+
+    expect(events.authErrorCount).toBe(1)
+    expect(events.lastAuthErrorAt).toBe('2026-07-07 09:15:00')
+    expect(events.modelAuthStatus).toBe('primary-auth-failed')
   })
 
   it('marks summary degraded when any worker is falling back', () => {

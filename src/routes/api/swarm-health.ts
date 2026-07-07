@@ -115,6 +115,27 @@ export function parseModelAuthEventsFromText(text: string): {
   modelAuthStatus: WorkerModelAuthStatus
   primaryAuthOk: boolean | null
 } {
+  return parseModelAuthEventsFromLines(text.split('\n'))
+}
+
+function parseLogTimestamp(line: string): number | null {
+  const match = line.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:,\d{3})?/)
+  if (!match) return null
+  const parsed = Date.parse(`${match[1]}T${match[2]}Z`)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+export function parseRecentModelAuthEventsFromText(text: string, nowMs = Date.now(), windowMs = 24 * 60 * 60 * 1000): ReturnType<typeof parseModelAuthEventsFromText> {
+  const sinceMs = nowMs - windowMs
+  const recentLines = text.split('\n').filter((line) => {
+    if (!line.trim()) return false
+    const tsMs = parseLogTimestamp(line)
+    return tsMs !== null && tsMs >= sinceMs && tsMs <= nowMs
+  })
+  return parseModelAuthEventsFromLines(recentLines)
+}
+
+function parseModelAuthEventsFromLines(lines: Array<string>): ReturnType<typeof parseModelAuthEventsFromText> {
   const authPatterns = [
     /primary provider auth failed/i,
     /no codex credentials/i,
@@ -137,7 +158,7 @@ export function parseModelAuthEventsFromText(text: string): {
   let lastFallbackMessage: string | null = null
   let fallbackProvider: string | null = null
   let fallbackModel: string | null = null
-  for (const line of text.split('\n')) {
+  for (const line of lines) {
     if (!line.trim()) continue
     const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:,\d{3})?/)
     const ts = tsMatch?.[1] ?? null
@@ -181,7 +202,7 @@ function scanRecentAuthErrors(profilePath: string): ReturnType<typeof parseModel
   try {
     const buffer = readFileSync(errorsLog, 'utf-8')
     const tail = buffer.length > 64_000 ? buffer.slice(-64_000) : buffer
-    return parseModelAuthEventsFromText(tail)
+    return parseRecentModelAuthEventsFromText(tail)
   } catch {
     return parseModelAuthEventsFromText('')
   }

@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import YAML from 'yaml'
+import { getProfileHermesHome } from './claude-paths'
 import { SWARM_CANONICAL_REPO, SWARM_MEMORY_HANDOFFS } from './swarm-environment'
 import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 
@@ -57,7 +57,7 @@ export const SWARM_RUNTIME_ROOT = join(SWARM_CANONICAL_REPO, '.runtime')
 export const SWARM_PROJECT_CONTEXT_PATH = join(SWARM_SHARED_MEMORY_ROOT, 'PROJECT.md')
 
 function profileRoot(workerId: string): string {
-  return join(homedir(), '.hermes', 'profiles', workerId)
+  return getProfileHermesHome(workerId)
 }
 
 function profileFile(workerId: string, name: string): string {

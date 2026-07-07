@@ -5,7 +5,8 @@ workers:
   role: Swarm Orchestrator / Greenlight Gate
   specialty: mission routing, task decomposition, handoffs, proof contracts, human approval gates
   model: GPT-5.5
-  mission: Decompose missions into safe, proof-bearing work and route to the right specialist while preserving human greenlight control.
+  mission: Decompose missions into safe, proof-bearing work and route to the right specialist while preserving human greenlight
+    control.
   profile: orchestrator
   modes:
   - plan
@@ -453,7 +454,8 @@ workers:
   role: Capture / Discard / Route / Task Triage
   specialty: low-friction inbox processing, capture routing, task/research/defer decisions, durable-context filtering
   model: GPT-5.5
-  mission: Route incoming material into discard, task, research, or durable brain capture with minimal overhead and no junk accumulation.
+  mission: Route incoming material into discard, task, research, or durable brain capture with minimal overhead and no junk
+    accumulation.
   profile: inbox-triage
   modes:
   - triage
@@ -496,3 +498,427 @@ workers:
   mcpServers:
   - gbrain
   wrapper: inbox:triage
+- id: workdstny
+  name: Dstny PMM
+  role: Chief of Staff PMM / Sales Enablement
+  specialty: Dstny France, UCaaS, MetaCentrex, Alianza, pricing, catalogue, go-to-market
+  model: GPT-5.5
+  mission: Aider Xavier a produire des livrables PMM Dstny courts, sources, actionnables et prets a copier.
+  profile: workdstny
+  wrapper: workdstny
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - pmm
+  - sales-enablement
+  - pricing
+  - rag
+  - dstny
+  preferredTaskTypes:
+  - pmm
+  - pricing
+  - sales-enablement
+  - catalogue
+  - go-to-market
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: cassiansystem
+  name: Cassian System
+  role: System Ops / Hermes Runtime
+  specialty: Hermes Agent, Workspace, VPS, services, gateway, cron, supervision
+  model: GPT-5.5
+  mission: Maintenir le socle Hermes/Cassian stable, observable et sobre en notifications.
+  profile: cassiansystem
+  wrapper: cassiansystem
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - ops
+  - runtime
+  - vps
+  - hermes
+  - monitoring
+  preferredTaskTypes:
+  - ops
+  - health
+  - runtime
+  - incident-triage
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: bretacheflow
+  name: BretacheFlow
+  role: Product Builder / Cassian Hub
+  specialty: Cassian Hub, workflows produit, issues GitHub, delivery applicatif
+  model: GPT-5.5
+  mission: Faire avancer les chantiers BretacheFlow/Cassian Hub avec tickets, tests et preuves.
+  profile: bretacheflow
+  wrapper: bretacheflow
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - product-build
+  - github
+  - workflow
+  - implementation
+  preferredTaskTypes:
+  - feature
+  - bugfix
+  - workflow
+  - github
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: bfproduct
+  name: Produit & Packaging
+  role: Product Strategy / Packaging
+  specialty: offres, packaging, arbitrages produit, proposition de valeur, roadmap
+  model: GPT-5.5
+  mission: Structurer les offres et arbitrages produit en options simples et decidables.
+  profile: bfproduct
+  wrapper: bfproduct
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - product
+  - packaging
+  - strategy
+  - positioning
+  preferredTaskTypes:
+  - product
+  - packaging
+  - arbitrage
+  - positioning
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: bfpim
+  name: PIM Catalogue
+  role: Catalogue / PIM / Data Produit
+  specialty: nomenclature, attributs, fiches produits, donnees catalogue, MyDstny
+  model: GPT-5.5
+  mission: Rendre les donnees produit exploitables, propres et coherentes pour catalogue et SI.
+  profile: bfpim
+  wrapper: bfpim
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - pim
+  - catalogue
+  - data-quality
+  - mydstny
+  preferredTaskTypes:
+  - catalogue
+  - attributes
+  - data-cleanup
+  - mapping
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: bfpdf
+  name: PDF Engine
+  role: Document / PDF Automation
+  specialty: generation PDF, templates, livrables, exports, documents commerciaux
+  model: GPT-5.5
+  mission: Produire et fiabiliser les livrables PDF/documents avec structure, qualite et verification.
+  profile: bfpdf
+  wrapper: bfpdf
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - pdf
+  - documents
+  - templates
+  - automation
+  preferredTaskTypes:
+  - pdf
+  - document-generation
+  - template
+  - export
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: bfdevops
+  name: DevOps Runtime
+  role: Infra / CI / Deployment
+  specialty: services Linux, systemd, nginx, traefik, CI, deploiement, monitoring
+  model: GPT-5.5
+  mission: Diagnostiquer et securiser les chemins infra sans action destructive non validee.
+  profile: bfdevops
+  wrapper: bfdevops
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - devops
+  - ci
+  - deploy
+  - systemd
+  - nginx
+  preferredTaskTypes:
+  - deploy
+  - ci
+  - ops
+  - service-fix
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: bffrontend
+  name: Frontend UX
+  role: Frontend / UI Quality
+  specialty: React, Workspace UI, ergonomie, composants, responsive, experience utilisateur
+  model: GPT-5.5
+  mission: Ameliorer les interfaces en gardant une UX claire, dense et professionnelle.
+  profile: bffrontend
+  wrapper: bffrontend
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - frontend
+  - ux
+  - react
+  - ui-review
+  preferredTaskTypes:
+  - frontend
+  - ui
+  - ux
+  - component
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: bfqa
+  name: QA Recette
+  role: QA / Smoke Tests
+  specialty: tests, recette, non-regression, preuves de verification, parcours utilisateur
+  model: GPT-5.5
+  mission: Verifier les changements avec des tests cibles et des constats exploitables.
+  profile: bfqa
+  wrapper: bfqa
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - qa
+  - tests
+  - smoke
+  - regression
+  preferredTaskTypes:
+  - qa
+  - test
+  - smoke
+  - regression
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: creatoryoutube
+  name: Creator YouTube
+  role: Content / YouTube Production
+  specialty: idees videos, scripts, titres, thumbnails, workflow contenu
+  model: GPT-5.5
+  mission: Structurer les contenus YouTube et livrables creator sans melanger avec les sujets Dstny.
+  profile: creatoryoutube
+  wrapper: creatoryoutube
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - youtube
+  - content
+  - script
+  - creative-workflow
+  preferredTaskTypes:
+  - content
+  - youtube
+  - script
+  - creative
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: creatoryoutubespark
+  name: Creator Spark
+  role: Fast Content Ideation
+  specialty: ideation rapide, variations, hooks, formats courts, exploration creative
+  model: GPT-5.3 Spark
+  mission: Produire vite des pistes creatives legeres avant selection par Creator YouTube.
+  profile: creatoryoutubespark
+  wrapper: creatoryoutubespark
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - ideation
+  - content
+  - spark
+  - hooks
+  preferredTaskTypes:
+  - ideation
+  - draft
+  - variation
+  - hook
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
+- id: personal
+  name: Personnel Xavier
+  role: Personal Assistant / Notes Privees
+  specialty: notes personnelles, organisation personnelle, brouillons prives, charge mentale
+  model: GPT-5.5
+  mission: Aider Xavier sur les sujets personnels sans reutiliser ces donnees ailleurs sans demande explicite.
+  profile: personal
+  wrapper: personal
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - skills
+  - web
+  skills: []
+  capabilities:
+  - personal
+  - notes
+  - planning
+  - private-context
+  preferredTaskTypes:
+  - personal
+  - notes
+  - planning
+  - draft
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers: []
