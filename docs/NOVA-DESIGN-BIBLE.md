@@ -128,38 +128,42 @@ This block is the target contract for `src/scifi-theme.css`.
 
 ```css
 @theme {
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', monospace;
 
-  --color-nova-black: #0D0E18;
-  --color-nova-void: #16172A;
-  --color-nova-velvet: #221E33;
-  --color-nova-panel: #2B2B42;
-  --color-nova-brown: #4A2A10;
-  --color-nova-copper: #7A441E;
-  --color-nova-bronze: #8A5B3A;
-  --color-nova-tan: #D4A276;
-  --color-nova-amber: #FF8C1A;
-  --color-nova-gold: #FFB347;
-  --color-nova-star: #FFD27A;
+  --color-nova-black: #0d0e18;
+  --color-nova-void: #16172a;
+  --color-nova-velvet: #221e33;
+  --color-nova-panel: #2b2b42;
+  --color-nova-brown: #4a2a10;
+  --color-nova-copper: #7a441e;
+  --color-nova-bronze: #8a5b3a;
+  --color-nova-tan: #d4a276;
+  --color-nova-amber: #ff8c1a;
+  --color-nova-gold: #ffb347;
+  --color-nova-star: #ffd27a;
 
-  --color-surface: #0D0E18;
-  --color-surface-deep: #090A12;
-  --color-ink: #FFD27A;
-  --color-primary-50: #0D0E18;
-  --color-primary-100: #16172A;
-  --color-primary-200: #221E33;
-  --color-primary-300: #2B2B42;
-  --color-primary-400: #8A5B3A;
-  --color-primary-500: #D4A276;
-  --color-primary-600: #FF8C1A;
-  --color-primary-700: #FFB347;
-  --color-primary-800: #FFD27A;
-  --color-primary-900: #FFE4A6;
-  --color-primary-950: #FFF1CC;
-  --color-accent-400: #FFB347;
-  --color-accent-500: #FF8C1A;
-  --color-accent-600: #D87310;
+  --color-surface: #0d0e18;
+  --color-surface-deep: #090a12;
+  --color-ink: #ffd27a;
+  --color-primary-50: #0d0e18;
+  --color-primary-100: #16172a;
+  --color-primary-200: #221e33;
+  --color-primary-300: #2b2b42;
+  --color-primary-400: #8a5b3a;
+  --color-primary-500: #d4a276;
+  --color-primary-600: #ff8c1a;
+  --color-primary-700: #ffb347;
+  --color-primary-800: #ffd27a;
+  --color-primary-900: #ffe4a6;
+  --color-primary-950: #fff1cc;
+  --color-accent-400: #ffb347;
+  --color-accent-500: #ff8c1a;
+  --color-accent-600: #d87310;
 }
 ```
 
@@ -180,42 +184,44 @@ The following variables are required.
 ```css
 [data-theme='scifi'] {
   color-scheme: dark !important;
-  --theme-bg: #0D0E18;
+  --theme-bg: #0d0e18;
   --theme-sidebar: #111322;
-  --theme-panel: #16172A;
-  --theme-card: #1B1A2D;
-  --theme-card2: #221E33;
-  --theme-elevated: #2B2B42;
+  --theme-panel: #16172a;
+  --theme-card: #1b1a2d;
+  --theme-card2: #221e33;
+  --theme-elevated: #2b2b42;
   --theme-border: rgba(255, 179, 71, 0.28);
   --theme-border-subtle: rgba(212, 162, 118, 0.16);
   --theme-border-strong: rgba(255, 140, 26, 0.58);
-  --theme-text: #FFD27A;
-  --theme-text-strong: #FFF1CC;
-  --theme-text-soft: #D4A276;
+  --theme-text: #ffd27a;
+  --theme-text-strong: #fff1cc;
+  --theme-text-soft: #d4a276;
   --theme-muted: rgba(212, 162, 118, 0.68);
   --theme-muted-2: rgba(212, 162, 118, 0.48);
-  --theme-accent: #FF8C1A;
-  --theme-accent-secondary: #FFB347;
-  --theme-accent-soft: #FFD27A;
-  --theme-accent-subtle: rgba(255, 140, 26, 0.10);
+  --theme-accent: #ff8c1a;
+  --theme-accent-secondary: #ffb347;
+  --theme-accent-soft: #ffd27a;
+  --theme-accent-subtle: rgba(255, 140, 26, 0.1);
   --theme-accent-border: rgba(255, 140, 26, 0.42);
   --theme-glow-low: 0 0 10px rgba(255, 140, 26, 0.18);
   --theme-glow-medium: 0 0 18px rgba(255, 140, 26, 0.28);
   --theme-glow-high: 0 0 30px rgba(255, 179, 71, 0.38);
   --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
-  --theme-shadow-2: 0 8px 24px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(255, 179, 71, 0.08);
-  --theme-shadow-3: 0 18px 54px rgba(0, 0, 0, 0.62), 0 0 30px rgba(255, 140, 26, 0.12);
-  --theme-focus: #FFD27A;
-  --theme-link: #FFB347;
-  --theme-active: #FF8C1A;
-  --theme-success: #D4A276;
-  --theme-warning: #FFB347;
-  --theme-danger: #FF8C1A;
+  --theme-shadow-2:
+    0 8px 24px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(255, 179, 71, 0.08);
+  --theme-shadow-3:
+    0 18px 54px rgba(0, 0, 0, 0.62), 0 0 30px rgba(255, 140, 26, 0.12);
+  --theme-focus: #ffd27a;
+  --theme-link: #ffb347;
+  --theme-active: #ff8c1a;
+  --theme-success: #d4a276;
+  --theme-warning: #ffb347;
+  --theme-danger: #ff8c1a;
   --theme-stripe: rgba(255, 179, 71, 0.055);
   --theme-header-bg: rgba(13, 14, 24, 0.94);
   --theme-header-border: rgba(255, 179, 71, 0.22);
   --theme-input: #111322;
-  --theme-hover: rgba(255, 140, 26, 0.10);
+  --theme-hover: rgba(255, 140, 26, 0.1);
   --theme-glass: rgba(13, 14, 24, 0.88);
 }
 ```
@@ -255,17 +261,17 @@ The Nova theme must override:
 ```css
 [data-theme='scifi'] {
   --color-white: var(--theme-card);
-  --color-neutral-50: #FFF1CC;
-  --color-neutral-100: #FFD27A;
-  --color-neutral-200: #D4A276;
-  --color-neutral-300: #8A5B3A;
+  --color-neutral-50: #fff1cc;
+  --color-neutral-100: #ffd27a;
+  --color-neutral-200: #d4a276;
+  --color-neutral-300: #8a5b3a;
   --color-neutral-400: rgba(212, 162, 118, 0.68);
   --color-neutral-500: rgba(212, 162, 118, 0.56);
   --color-neutral-600: rgba(212, 162, 118, 0.44);
-  --color-neutral-700: #2B2B42;
-  --color-neutral-800: #221E33;
-  --color-neutral-900: #16172A;
-  --color-neutral-950: #0D0E18;
+  --color-neutral-700: #2b2b42;
+  --color-neutral-800: #221e33;
+  --color-neutral-900: #16172a;
+  --color-neutral-950: #0d0e18;
 }
 ```
 
@@ -522,7 +528,7 @@ Allowed texture:
 
 ```css
 [data-theme='scifi'] body::before {
-  content: "";
+  content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -531,8 +537,15 @@ Allowed texture:
   background-image:
     linear-gradient(rgba(255, 179, 71, 0.045) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 179, 71, 0.035) 1px, transparent 1px),
-    radial-gradient(circle at 70% 20%, rgba(255, 140, 26, 0.08), transparent 26rem);
-  background-size: 32px 32px, 32px 32px, auto;
+    radial-gradient(
+      circle at 70% 20%,
+      rgba(255, 140, 26, 0.08),
+      transparent 26rem
+    );
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
 }
 ```
 
@@ -862,55 +875,75 @@ Do not use decorative card piles.
 
 Implementation target: `src/screens/dashboard/components/mind-graph-card.tsx`, `src/screens/dashboard/components/nova-galaxy-model.ts`, and the live graph data served through `src/server/knowledge-browser.ts`.
 
-The Obsidian galaxy is a navigable knowledge map, not a particle effect.
+The Obsidian galaxy is a 3D navigable knowledge space, not a flat chart and not a particle effect.
 
-Every markdown note in `C:\Users\taylo\Documents\unified-vault` becomes a celestial body derived from the wikilink graph.
+The reference feel is marfin's 3D Hermes/Unity knowledge map: the camera floats inside a quiet inhabited region of space with ringed planets, floating note tags, dotted constellation links, depth haze, and slow drift.
 
-`Planet` means the highest-degree note in a detected topic community.
+Every markdown note in `C:\Users\taylo\Documents\unified-vault` becomes either a major planet, a minor text tag, or a comet.
 
-`Moon` means another note in that planet community, orbiting the planet on a slow elliptical path.
+`Planet` means a high-link topic hub or community anchor. Planet size scales by link count in about five tiers.
+
+Major notes render as actual textured spheres with subtle procedural marble/cloud texture, soft ring-glow atmosphere, and a title label that always faces the camera.
+
+Planet titles use clean sans at roughly 13-16px. They may remain visible because they anchor the space.
+
+`Text tag` means a low-link note near its planet. It renders as a small dim mono text chip, about 11px, camera-facing, drifting slowly near the related planet.
+
+Minor notes do not render as orbiting dots. They are readable idea tags like `white rabbit` or `dodo` in the reference.
 
 `Comet` means an orphan note with zero wikilinks, shown sparsely with a faint warm dust tail.
 
-`Galactic core` means the single most-linked note in the vault and must be the warmest body on screen.
+`Galactic core` means the single most-linked note in the vault. It is the biggest, warmest planet, with pure amber ring and gentle breathing glow.
 
-`Spiral arms` mean top-level vault folders such as `agents/claude`, `agents/gpt`, `agents/kimi`, `knowledge`, and `inbox`; tiny folders merge into `field stars`.
+Layout is stable 3D force placement, not spiral arms. Seed by top-level folder so categories form loose sky neighborhoods, then settle with link attraction and body repulsion.
 
-The macro-shape should reveal vault structure: systems sit along folder arms like organic beads, with jitter and depth, never an even particle cloud.
+Positions must be stable across sessions, derived from note paths and deterministic hashes, so Taylor can build a mental map of where ideas live.
 
-Ambient mode is quiet astronomy: imperceptible whole-galaxy rotation, slow moon orbits, rare comets, and no labels except the core.
+New notes ease into place near their links when sync updates the graph.
 
-Touched mode wakes the map: hover brightens one system, fades in amber orbit rings, shows 11-12px mono labels, and dims the rest slightly.
+Constellation lines are thin dotted links between related bodies, ambient at about 15% opacity, brightening along hover/search/focus paths.
 
-Clicking a planet zooms smoothly into its system and updates the `Focused star` panel.
+Do not draw every edge. Cap visible constellation links to the strongest two or three links per body so the sky stays readable.
 
-Clicking a moon or comet updates `Focused star` and exposes an `Open in Obsidian` action using `obsidian://`.
+Camera behavior: ambient mode drifts slowly through the starfield; mouse drag orbits; wheel zooms; movement uses damped inertia.
 
-Clicking empty space or pressing Escape returns to the full galaxy.
+Clicking empty space or pressing Escape returns to the home camera.
+
+`prefers-reduced-motion` freezes camera drift and note drift while keeping hover, click, search, and focus useful.
 
 The right rail label is `Planetary systems`, never `Gravity wells`.
 
-Filter chips represent arms/folders and dim disabled arms to about 15% opacity; they do not remove bodies from the layout.
+Clicking a planet zooms smoothly toward that system and updates the `Focused star` panel.
 
-Search dims non-matches and may draw thin warm locator lines to matching titles.
+Clicking a text tag or comet updates `Focused star` and exposes an `Open in Obsidian` action using `obsidian://`.
+
+Filter chips represent folders/categories and dim disabled regions to about 15% opacity; they do not remove bodies from the layout.
+
+Search dims non-matches and may brighten matching labels and related dotted links.
 
 Recency is warmth: modified within 48h breathes warm amber, last week stays warm, older notes cool toward pale dim points.
 
 Sync diffs are subtle: new note equals a brief warm birth flare, edited note equals one soft pulse, never an explosion.
 
-Background is a static three-layer parallax starfield with tiny cool-white and pale-amber points.
+Background is a dense three-depth starfield with distance haze and a soft warm nebula wash in one region of the sky.
 
-Nebula or arm dust, if used, must be ultra-subtle amber/brown only.
+Nebula and fog must remain amber/brown only.
 
-No cyan, purple, pink, blue comet tails, or generic AI gradients are allowed in the galaxy.
+Category color is allowed on rings only. Planet surfaces stay warm/neutral.
 
-Glow marks life only: recency, hover focus, and the core. Ambient bodies are crisp discs or points, not lens flares.
+Ring tints are muted, restrained saturation: gold for `agents/claude`, copper for `agents/gpt`, rose for `agents/kimi`, brass for `knowledge`, slate-blue for `inbox`, sage for everything else.
+
+No neon rings. Ring color is categorical orientation, not decoration.
+
+No cyan, purple, pink, blue comet tails, or generic AI gradients are allowed in the galaxy environment.
+
+Glow marks life only: recency, hover focus, and the core. Ambient bodies are crisp, dimensional planets/tags, not lens flares.
 
 The canvas must not display `Nova hourly state marker` or any operational ticker text; that belongs in the activity feed.
 
-Performance target: canvas or WebGL, 60fps at 500+ bodies, graceful at 1500, damped camera movement, and `prefers-reduced-motion` freezes orbit/rotation while keeping hover/click useful.
+Performance target: Three.js/WebGL, 60fps at 500+ bodies, graceful at 1500, instanced or batched stars/tags where needed, and stable camera movement.
 
-Acceptance by eye: left alone for five minutes, it should look like a live astronomy photograph of a warm spiral galaxy that happens to be a mind, not a screensaver, fireworks, or Tron.
+Acceptance by eye: paused for five minutes, it should feel like drifting through Nova's mind: ringed planets with names, small ideas floating as text beside them, and dotted constellations between related thoughts.
 
 ### Gateway/Swarm Law
 
@@ -1269,9 +1302,10 @@ No full-panel glow spam.
 
 ```css
 @keyframes nova-emblem-breathe {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.72;
-    box-shadow: 0 0 10px rgba(255, 140, 26, 0.20);
+    box-shadow: 0 0 10px rgba(255, 140, 26, 0.2);
   }
   50% {
     opacity: 1;
@@ -1753,9 +1787,15 @@ function MemoryActivityItem() {
   return (
     <li className="nova-feed-new rounded-lg border border-[var(--theme-border-subtle)] px-3 py-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-mono text-[11px] text-[var(--theme-muted)]">09:42</span>
-        <span className="flex-1 truncate text-sm text-[var(--theme-text)]">query -&gt; PROMISES.LOG -&gt; 84ms</span>
-        <span className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[10px] text-[var(--theme-accent-secondary)]">recall</span>
+        <span className="font-mono text-[11px] text-[var(--theme-muted)]">
+          09:42
+        </span>
+        <span className="flex-1 truncate text-sm text-[var(--theme-text)]">
+          query -&gt; PROMISES.LOG -&gt; 84ms
+        </span>
+        <span className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[10px] text-[var(--theme-accent-secondary)]">
+          recall
+        </span>
       </div>
     </li>
   )
@@ -1782,17 +1822,26 @@ function DailyCheckCard() {
   return (
     <section className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
       <header className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-[var(--theme-text-strong)]">Daily check</h2>
-        <span className="font-mono text-[10px] text-[var(--theme-muted)]">BREATHE.</span>
+        <h2 className="text-sm font-semibold text-[var(--theme-text-strong)]">
+          Daily check
+        </h2>
+        <span className="font-mono text-[10px] text-[var(--theme-muted)]">
+          BREATHE.
+        </span>
       </header>
       <div className="mt-3 grid grid-cols-5 gap-2">
         {items.map((item) => (
-          <button key={item} className="rounded-lg border border-[var(--theme-border-subtle)] bg-[var(--theme-card)] px-2 py-2 text-xs text-[var(--theme-text-soft)]">
+          <button
+            key={item}
+            className="rounded-lg border border-[var(--theme-border-subtle)] bg-[var(--theme-card)] px-2 py-2 text-xs text-[var(--theme-text-soft)]"
+          >
             {item}
           </button>
         ))}
       </div>
-      <p className="mt-3 text-sm text-[var(--theme-muted)]">You don't have to solve the whole board in one breath.</p>
+      <p className="mt-3 text-sm text-[var(--theme-muted)]">
+        You don't have to solve the whole board in one breath.
+      </p>
     </section>
   )
 }
@@ -1870,17 +1919,17 @@ Are errors translated into useful degraded states?
 
 Is glow reserved for life?
 
-Does the Obsidian galaxy read as solar systems in a warm spiral galaxy, not as particles or fireworks?
+Does the Obsidian galaxy read as a true 3D Hermes-style knowledge space, not a flat chart or particle field?
 
 Does the galaxy show `Planetary systems`, not `Gravity wells`?
 
-Does ambient galaxy mode hide labels except the core?
+Does ambient galaxy mode show major planet names while keeping minor tags restrained by depth and focus?
 
-Do hover, search, and click reveal graph structure without cluttering idle space?
+Do hover, search, drag, wheel zoom, and click reveal graph structure without cluttering idle space?
 
-Are comet tails sparse, faint, and dust-amber only?
+Are comet tails sparse, faint, and dust-amber only, with category color limited to muted rings?
 
-Is the starfield decorrelated so no diagonal rail or streak artifact appears?
+Does the starfield have depth, haze, and no diagonal rail or streak artifact?
 
 Is `Nova hourly state marker` absent from the canvas?
 
@@ -1903,4 +1952,3 @@ The room does not perform enterprise confidence.
 The room does not sell itself.
 
 The room quietly says: connection secure, memory alive, keep going.
-
