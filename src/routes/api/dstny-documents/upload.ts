@@ -28,6 +28,27 @@ function requiredFormString(form: FormData, key: string): string {
   return value
 }
 
+function titleFromFileName(originalName: string): string {
+  const parsed = path.parse(originalName)
+  const base = parsed.name || originalName || 'Document'
+  return base
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function inferredTitle(form: FormData, originalName: string): string {
+  const explicitTitle = formString(form, 'title')
+  if (explicitTitle) return explicitTitle
+
+  const baseTitle = titleFromFileName(originalName)
+  const product = formString(form, 'product')
+  const version = formString(form, 'version')
+  const documentDate = formString(form, 'documentDate')
+  const suffix = [product, version, documentDate].filter(Boolean).join(' - ')
+  return suffix ? `${baseTitle} - ${suffix}` : baseTitle
+}
+
 function storedFileName(originalName: string): string {
   const parsed = path.parse(sanitizeDstnyFileName(originalName))
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
@@ -84,10 +105,11 @@ export const Route = createFileRoute('/api/dstny-documents/upload')({
           const buffer = Buffer.from(await file.arrayBuffer())
           await fs.writeFile(destination, buffer)
 
+          const originalName = file.name || storedName
           const input: CreateDstnyDocumentInput = {
-            title: requiredFormString(form, 'title'),
+            title: inferredTitle(form, originalName),
             filePath: destination,
-            originalName: file.name || storedName,
+            originalName,
             storedName,
             mimeType: file.type || 'application/octet-stream',
             collection: requiredFormString(form, 'collection') as CreateDstnyDocumentInput['collection'],

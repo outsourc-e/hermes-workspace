@@ -146,6 +146,26 @@ function optionLabel(value: string): string {
   return COLLECTION_LABELS[value] || CHANNEL_LABELS[value] || value.replace(/_/g, ' ')
 }
 
+function titleFromFileName(fileName: string): string {
+  const withoutExtension = fileName.replace(/\.[^.]+$/, '')
+  return withoutExtension
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function inferDocumentTitle(file: File | null, form: UploadFormState): string {
+  const explicitTitle = form.title.trim()
+  if (explicitTitle) return explicitTitle
+  if (!file) return ''
+  const baseTitle = titleFromFileName(file.name) || 'Document'
+  const suffix = [form.product, form.version, form.documentDate]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(' - ')
+  return suffix ? `${baseTitle} - ${suffix}` : baseTitle
+}
+
 function statusTone(status: string): string {
   if (status === 'indexed') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
   if (status === 'ingesting') return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
@@ -213,6 +233,7 @@ export function DstnyDocumentsScreen() {
 
   const documents = documentsQuery.data?.documents || []
   const options = documentsQuery.data?.options
+  const inferredTitle = useMemo(() => inferDocumentTitle(file, form), [file, form])
   const selected =
     documents.find((document) => document.id === selectedId) || documents[0] || null
 
@@ -226,11 +247,6 @@ export function DstnyDocumentsScreen() {
       toast('Sélectionne un fichier à charger.', { type: 'warning' })
       return
     }
-    if (!form.title.trim()) {
-      toast('Le titre est obligatoire.', { type: 'warning' })
-      return
-    }
-
     setUploading(true)
     try {
       const data = new FormData()
@@ -372,20 +388,35 @@ export function DstnyDocumentsScreen() {
               <Input
                 type="file"
                 nativeInput
-                onChange={(event) => setFile(event.target.files?.[0] || null)}
+                onChange={(event) => {
+                  const nextFile = event.target.files?.[0] || null
+                  setFile(nextFile)
+                  setPrompt('')
+                }}
                 className="rounded-lg"
               />
+              {file ? (
+                <div className="rounded-lg border border-primary-200 bg-primary-50/60 px-2.5 py-2 text-xs text-primary-700 dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-300">
+                  <div className="truncate font-medium">{file.name}</div>
+                  <div className="mt-0.5 text-primary-500">
+                    {formatBytes(file.size)} · titre auto : {inferredTitle || 'à déterminer'}
+                  </div>
+                </div>
+              ) : null}
             </div>
             <div className="space-y-1.5">
-              <FieldLabel>Titre</FieldLabel>
+              <FieldLabel>Titre affiché optionnel</FieldLabel>
               <Input
                 value={form.title}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, title: event.target.value }))
                 }
-                placeholder="Ex. Catalogue MetaCentrex 2026"
+                placeholder={inferredTitle || 'Déduit automatiquement depuis le fichier'}
                 nativeInput
               />
+              <p className="text-xs text-primary-500 dark:text-neutral-500">
+                Laisse vide pour utiliser le nom du fichier enrichi par produit, version et date.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
