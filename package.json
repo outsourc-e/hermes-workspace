@@ -17,7 +17,8 @@
     "telegram-discovery-approval-send": "./bin/telegram-discovery-approval-send",
     "telegram-register-chat": "./bin/telegram-register-chat",
     "telegram-notification-credentials-status": "./bin/telegram-notification-credentials-status",
-    "telegram-approval-poll": "./bin/telegram-approval-poll"
+    "telegram-approval-poll": "./bin/telegram-approval-poll",
+    "telegram-approved-discovery-research": "./bin/telegram-approved-discovery-research"
   },
   "main": "electron/main.cjs",
   "scripts": {
