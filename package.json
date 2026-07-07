@@ -20,7 +20,9 @@
     "telegram-approval-poll": "./bin/telegram-approval-poll",
     "telegram-approved-discovery-executor": "./bin/telegram-approved-discovery-executor",
     "telegram-approved-discovery-research": "./bin/telegram-approved-discovery-research",
-    "telegram-research-implementation-proposal": "./bin/telegram-research-implementation-proposal"
+    "telegram-research-implementation-proposal": "./bin/telegram-research-implementation-proposal",
+    "telegram-approved-implementation-build-plan": "./bin/telegram-approved-implementation-build-plan",
+    "telegram-code-edit-approval-packet": "./bin/telegram-code-edit-approval-packet"
   },
   "main": "electron/main.cjs",
   "scripts": {
