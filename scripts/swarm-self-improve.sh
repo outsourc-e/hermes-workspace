@@ -47,6 +47,16 @@ print('; '.join(f\"{w['workerId']}: {round(w['successRate']*100)}% ok over {w['a
 " 2>/dev/null || echo "")
 fi
 
+# Pre-create the isolated worktree so the maintainer never has a reason to
+# run git branch commands in the live repo. Idempotent per night.
+WT_DIR="$HOME/workspace/nightly-fixes/$(date +%Y%m%d)"
+WT_BRANCH="nightly/self-improve-$(date +%Y%m%d)"
+if [ ! -d "$WT_DIR" ]; then
+  git -C "$REPO_DIR" worktree add "$WT_DIR" -b "$WT_BRANCH" 2>/dev/null \
+    || git -C "$REPO_DIR" worktree add "$WT_DIR" "$WT_BRANCH" 2>/dev/null \
+    || true
+fi
+
 TASK="Nightly self-improvement pass on the hermes-workspace repo at $REPO_DIR.
 
 Tonight's evidence:
@@ -56,7 +66,7 @@ Tonight's evidence:
 - Underperforming workers (scoreboard): ${SCOREBOARD:-none}
 
 Do the following, in order:
-1. If tests fail or tsc rose above baseline, diagnose the top failure and prepare a minimal fix in an ISOLATED WORKTREE: run 'git -C $REPO_DIR worktree add ~/workspace/nightly-fixes/$(date +%Y%m%d) -b nightly/self-improve-$(date +%Y%m%d)' and do ALL work inside that worktree directory. NEVER run git checkout/switch inside $REPO_DIR itself — it is the live workspace. Do NOT push, do NOT merge.
+1. If tests fail or tsc rose above baseline, diagnose the top failure and prepare a minimal fix inside the ALREADY-CREATED worktree at $WT_DIR (branch $WT_BRANCH). Do ALL file edits, git adds and commits inside $WT_DIR only. You are FORBIDDEN from running any git command that changes state in $REPO_DIR itself (no checkout, switch, reset, branch, rebase there — read-only git like log/diff is fine). Do NOT push, do NOT merge.
 2. Otherwise pick ONE small, concrete improvement grounded in the evidence above (a health warning, a recurring block reason, flaky area). Prepare the fix the same way.
 3. Run the relevant tests to prove the fix.
 4. Checkpoint with STATE: DONE, exact FILES_CHANGED, COMMANDS_RUN, and in NEXT_ACTION say exactly what the operator should review and greenlight.

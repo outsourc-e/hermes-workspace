@@ -579,6 +579,7 @@ export function buildWorkerPrompt(input: {
     '',
     '## Operating Rules',
     '- Work in your persistent Hermes worker session and preserve your profile context.',
+    '- NEVER run git checkout, switch, reset, rebase, or branch -f inside the live workspace repo (~/hermes-workspace). It serves the running app and the operator works there. If a task needs a branch, create an isolated worktree first: git -C ~/hermes-workspace worktree add ~/workspace/worker-trees/<task> -b <branch>, and do all work inside that worktree.',
     `- The Worker Startup Memory Snapshot above is your authoritative starting context. If you have filesystem tools, also read \`~/.\u0068\u0065\u0072\u006d\u0065\u0073/profiles/${input.workerId}/MEMORY.md\`, \`SOUL.md\`, \`USER.md\`, and \`memory/IDENTITY.md\` for full detail.`,
     `- Search your own memory before starting if relevant: GET /api/swarm-memory/search?workerId=${input.workerId}&q=<term>.`,
     '- Do not blame a generic sandbox for missing access. Assume repo/filesystem/network are available unless a command proves otherwise. If auth or tools fail, report the exact failing command and exact missing token/tool/env.',

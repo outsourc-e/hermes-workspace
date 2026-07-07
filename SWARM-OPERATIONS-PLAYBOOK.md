@@ -226,7 +226,16 @@ Update this when you land a fix that future sessions must know about.
   morning digest. [RECURS-risk] Workers doing git work MUST use an isolated
   worktree (~/workspace/nightly-fixes/) — a bare `git checkout -b` in the
   live repo switches the operator's branch under running sessions (happened
-  on the first live run). Outcome writes are best-effort: never let them fail a
+  on the first live run — and again on a second run before the rule shipped).
+  Defense is now three layers: (1) every worker prompt forbids
+  checkout/switch/reset in the live repo and mandates worktrees under
+  ~/workspace/worker-trees/; (2) swarm-self-improve.sh pre-creates the
+  night's worktree so the maintainer never runs branch commands itself;
+  (3) the 10-minute lifecycle sweep has a branch guard — live repo branch
+  != .runtime/expected-branch → auto `checkout -m` back when the found
+  branch matches nightly/* or worker/* (worker-made), Discord alert either
+  way. Operator switching branches on purpose: update
+  .runtime/expected-branch to the new name. Outcome writes are best-effort: never let them fail a
   dispatch.
 
 - `260e9e90` **Security: auth-gated** /api/swarm-kanban, /api/events (SSE),
