@@ -923,18 +923,35 @@ async function ensureLiveTmuxSession(
     return { ok: false, error: launched.error }
   }
 
-  // Give the agent a moment to render its prompt before sending keys. If Hermes
-  // exits immediately, the shell stays alive and prints a sentinel that lets us
-  // surface the real startup failure instead of a later tmux "can't find pane".
-  await sleep(1200)
-  if (!(await tmuxHasSession(tmuxBin, sessionName))) {
-    return {
-      ok: false,
-      error: `Hermes worker tmux session ${sessionName} exited during startup`,
+  // Wait until the TUI is actually READY before anyone pastes a prompt into
+  // the pane. A cold TUI start can spend 30-60s+ on "Installing TUI
+  // dependencies…" — the old fixed 1.2s wait returned ok while the pane was
+  // still booting, the pasted prompt vanished into the installer, no
+  // checkpoint ever arrived, and the dispatch surfaced as "session timed out"
+  // (classic right after Clear All kills every warm session). Poll for the
+  // ready prompt line or the exit sentinel, up to 90s.
+  const READY_PATTERN = /(?:^|\n)\s*[─-].*\bready\b\s*│|❯/
+  const exitedPatternEarly = /(?:^|\n)\[Hermes worker exited with status/
+  let startupOutput = ''
+  const startupDeadline = Date.now() + 90_000
+  for (;;) {
+    await sleep(1500)
+    if (!(await tmuxHasSession(tmuxBin, sessionName))) {
+      return {
+        ok: false,
+        error: `Hermes worker tmux session ${sessionName} exited during startup`,
+      }
+    }
+    startupOutput = await captureTmuxPane(tmuxBin, sessionName)
+    if (exitedPatternEarly.test(startupOutput)) break // handled below
+    if (READY_PATTERN.test(startupOutput)) break
+    if (Date.now() > startupDeadline) {
+      return {
+        ok: false,
+        error: `Hermes worker TUI in ${sessionName} did not become ready within 90s (still starting up). Falling back to oneshot.`,
+      }
     }
   }
-
-  const startupOutput = await captureTmuxPane(tmuxBin, sessionName)
   // Match only at the start of a line so the echoed shell command's printf
   // format string doesn't trigger a false positive startup-failure sentinel.
   const exitedPattern = /(?:^|\n)\[Hermes worker exited with status/

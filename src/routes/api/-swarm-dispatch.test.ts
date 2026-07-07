@@ -192,6 +192,7 @@ describe('buildWorkerPrompt', () => {
     maxConcurrentTasks: 1,
     acceptsBroadcast: true,
     reviewRequired: false,
+    modelTiers: [],
   }
 
   it('uses Name — Role as the human-facing label while preserving swarmN as machine ID', () => {

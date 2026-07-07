@@ -64,10 +64,13 @@ function clearWorkerChatHistory(workerId: string): void {
     try {
       if (existsSync(bak)) rmSync(bak, { force: true })
       renameSync(db, bak)
-      // SQLite WAL/SHM sidecars would otherwise re-attach to a stale db.
-      for (const side of ['-wal', '-shm']) {
-        const p = `${db}${side}`
-        if (existsSync(p)) rmSync(p, { force: true })
+      // SQLite WAL/SHM sidecars would otherwise re-attach to a stale db —
+      // for both the live path and the backup.
+      for (const base of [db, bak]) {
+        for (const side of ['-wal', '-shm']) {
+          const p = `${base}${side}`
+          if (existsSync(p)) rmSync(p, { force: true })
+        }
       }
     } catch {
       /* best-effort */
@@ -120,7 +123,7 @@ function killSwarmTmuxSession(workerId: string): Promise<void> {
 
 /**
  * Kill in-flight oneshot dispatch processes. Every swarm oneshot runs
- * `hermes chat -q … --source swarm-dispatch`, so pkill on that marker stops
+ * `hermes chat --source swarm-dispatch …`, so pkill on that marker stops
  * any task still executing without touching unrelated hermes processes (the
  * gateway, TUI sessions already killed via tmux, the user's own chats).
  * pkill is macOS/Linux; no-ops elsewhere.
@@ -129,6 +132,54 @@ function killInflightDispatches(): Promise<void> {
   return new Promise((resolve) => {
     execFile('pkill', ['-f', '--source swarm-dispatch'], () => resolve())
   })
+}
+
+function pgrepCount(pattern: string): Promise<number> {
+  return new Promise((resolve) => {
+    execFile('pgrep', ['-f', pattern], (err, stdout) => {
+      if (err) return resolve(0)
+      resolve(stdout.split('\n').filter(Boolean).length)
+    })
+  })
+}
+
+/**
+ * Wait for swarm worker processes to actually DIE before touching their state
+ * files. `tmux kill-session` returns as soon as tmux accepts the command — the
+ * hermes python process inside can take several seconds to exit, and on
+ * shutdown it FLUSHES/RECREATES state.db. Clearing before it dies loses the
+ * clear (the dying process rewrites the store), which is exactly the
+ * "Clear All worked once, then chats came back" bug. Poll until gone
+ * (escalating to SIGKILL), max ~8s.
+ */
+async function waitForWorkerProcessDeath(): Promise<void> {
+  // First, politely kill any TUI processes still running under a profile.
+  await new Promise<void>((resolve) => {
+    execFile('pkill', ['-f', 'venv/bin/hermes chat --tui'], () => resolve())
+  })
+  const deadline = Date.now() + 8_000
+  for (;;) {
+    const alive =
+      (await pgrepCount('venv/bin/hermes chat --tui')) +
+      (await pgrepCount('--source swarm-dispatch'))
+    if (alive === 0) return
+    if (Date.now() > deadline) {
+      // Escalate — a hung worker must not block the clear.
+      await new Promise<void>((resolve) => {
+        execFile('pkill', ['-9', '-f', 'venv/bin/hermes chat --tui'], () =>
+          resolve(),
+        )
+      })
+      await new Promise<void>((resolve) => {
+        execFile('pkill', ['-9', '-f', '--source swarm-dispatch'], () =>
+          resolve(),
+        )
+      })
+      await new Promise((r) => setTimeout(r, 500))
+      return
+    }
+    await new Promise((r) => setTimeout(r, 400))
+  }
 }
 
 type CancelPostBody = {
@@ -281,16 +332,18 @@ export const Route = createFileRoute('/api/swarm-missions')({
             }
             await killSwarmTmuxSession(id)
           }
-          // Kill any in-flight oneshot dispatch processes — a running
-          // `hermes chat -q ... --source swarm-dispatch` child keeps executing
-          // after the mission is cancelled unless it's killed. This is what
-          // left "tasks still running" after Clear All.
-          await killInflightDispatches()
-          // Fresh session: kill sessions + clear chat history + logs for EVERY
-          // worker profile on disk, not just those with active tasks.
+          // Order matters: kill EVERYTHING first (tmux sessions + in-flight
+          // oneshots), then wait for the processes to actually die, and only
+          // then clear state. A dying hermes process flushes/recreates
+          // state.db on shutdown — clearing before death silently undoes the
+          // clear (the "chats came back after Clear All" bug).
           const allWorkerIds = listWorkerProfileIds()
           for (const id of allWorkerIds) {
             await killSwarmTmuxSession(id)
+          }
+          await killInflightDispatches()
+          await waitForWorkerProcessDeath()
+          for (const id of allWorkerIds) {
             clearWorkerChatHistory(id)
           }
           return json({
