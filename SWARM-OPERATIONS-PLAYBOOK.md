@@ -211,6 +211,17 @@ npx tsc --noEmit -p tsconfig.json 2>&1 | grep -c "error TS"   # baseline: 98 (di
 
 Update this when you land a fix that future sessions must know about.
 
+- (pending) **Tier-1 completeness**: (a) live-TUI dispatches now self-complete —
+  on checkpoint-poll timeout the pane is read; if the TUI is idle-ready a DONE
+  checkpoint is synthesized from the reply (`readIdleTuiReply` in
+  swarm-dispatch). (b) **Spend cap**: set `HERMES_SWARM_DAILY_TOKEN_CAP` (in the
+  `com.hermes.workspace` plist env) to a positive number — dispatch returns 429
+  once the day's total tokens cross it; status is on `/api/swarm-usage`
+  (`spendCap`). (c) **Scheduled agents**: `scripts/swarm-install-schedules.sh`
+  installs launchd timers (security-auditor 02:00, quant-agent 07:00,
+  concierge 08:00) that dispatch recurring missions via
+  `scripts/swarm-scheduled-mission.sh`.
+
 - (pending) **provider-drift self-heal**: hermes-agent's TUI rewrites a
   worker's `model.provider` from the bare model name (deepseek/custom/
   openrouter — none keyed) → silent llama fallback. Fixed three ways: (1)

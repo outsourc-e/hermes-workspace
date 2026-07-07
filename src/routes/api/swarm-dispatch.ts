@@ -32,6 +32,7 @@ import {
   syncSwarmProfileModel,
 } from '../../server/swarm-profile-config'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
+import { getSwarmUsage } from '../../server/swarm-usage'
 import {
   TIER_MODELS,
   escalateTier,
@@ -777,6 +778,63 @@ async function captureTmuxPane(
   return captured.ok ? captured.stdout.trim() : ''
 }
 
+/**
+ * Best-effort completion detection for the live-TUI path. When a dispatch's
+ * checkpoint poll times out, the agent may either still be working OR have
+ * finished silently (no structured checkpoint emitted). Read the pane: if the
+ * TUI is back at an idle `ready` status line with no active-work markers, the
+ * task finished — return a short reply summary so the caller can synthesize a
+ * DONE checkpoint. Return null when the agent still looks busy (leave the
+ * assignment `executing`).
+ */
+async function readIdleTuiReply(
+  tmuxBin: string,
+  sessionName: string,
+): Promise<string | null> {
+  const pane = await captureTmuxPane(tmuxBin, sessionName)
+  if (!pane) return null
+  // Active-work markers → still running; do not mark done.
+  if (
+    /esc to interrupt|thinking…|thinking\b|running…|working…|generating…|▐|▌|◐|◓|◑|◒/i.test(
+      pane,
+    )
+  ) {
+    return null
+  }
+  // Require an idle `ready │ …` status line (the TUI footer when not working).
+  if (!/(?:^|\n)\s*[─-].*\bready\b\s*│/i.test(pane)) return null
+
+  // Pull the last few non-empty content lines above the status footer as a
+  // rough reply summary. The exact text isn't critical — the point is to move
+  // the assignment out of the `executing` limbo into DONE.
+  const lines = pane
+    .split('\n')
+    .map((l) => l.replace(/[│┃╰╭╮╯─┊•]/g, '').trim())
+    .filter(
+      (l) =>
+        l &&
+        !/\bready\b\s*│/i.test(l) &&
+        !/^❯|❯$/.test(l) &&
+        !/Try ["“]/.test(l) &&
+        !/\/help for commands/i.test(l),
+    )
+  const summary = lines.slice(-6).join(' ').slice(-500).trim()
+  return summary || 'Completed (live session returned to idle).'
+}
+
+/** workerId-based wrapper: resolve tmux bin + session and read idle reply. */
+async function readIdleTuiSummary(workerId: string): Promise<string | null> {
+  const tmuxBin = resolveTmuxBin()
+  if (!tmuxBin) return null
+  const sessionName = sessionNameFor(workerId)
+  if (!(await tmuxHasSession(tmuxBin, sessionName))) return null
+  try {
+    return await readIdleTuiReply(tmuxBin, sessionName)
+  } catch {
+    return null
+  }
+}
+
 // A tmux session can outlive its agent: when `hermes chat --tui` exits, the
 // wrapper's parent shell stays up (bare zsh/bash) with an exit sentinel in the
 // scrollback. Treat the pane as alive only when the foreground process is the
@@ -1241,15 +1299,45 @@ function runWorker(
           liveResult.checkpointStatus = 'checkpointed'
           liveResult.output = `${liveResult.output}\nCheckpoint ${checkpoint.stateLabel}: ${checkpoint.result ?? 'no result'}`
         } else {
-          // Prompt was delivered to the live TUI session (ok) but no terminal
-          // checkpoint arrived within the poll window. The agent is very
-          // likely still working async in the pane — this is NOT a failure or
-          // a block. Leave it as a soft timeout; the lifecycle sweep / next
-          // dispatch will pick up the eventual checkpoint. dispatchBlockReason
-          // no longer blocks on a successful-but-uncheckpointed result.
-          liveResult.checkpoint = null
-          liveResult.checkpointStatus = 'timeout'
-          liveResult.output = `${liveResult.output}\nDelivered; worker still running (no checkpoint yet).`
+          // No structured checkpoint in the poll window. Peek at the pane: if
+          // the TUI is back at idle-ready the task actually finished (agent
+          // just didn't emit a checkpoint) → synthesize DONE so the assignment
+          // leaves `executing`. If still busy, keep the soft timeout.
+          const idleReply = await readIdleTuiSummary(workerId)
+          if (idleReply) {
+            const synthetic: ParsedSwarmCheckpoint = {
+              stateLabel: 'DONE',
+              runtimeState: 'idle',
+              checkpointStatus: 'done',
+              filesChanged: null,
+              commandsRun: null,
+              result: idleReply,
+              blocker: null,
+              nextAction: null,
+              raw: idleReply,
+            }
+            markCheckpointResult(
+              workerId,
+              synthetic,
+              options?.notifySessionKey ?? 'main',
+            )
+            recordMissionCheckpoint({
+              missionId: options?.missionId,
+              assignmentId: assignment.assignmentId ?? null,
+              workerId,
+              checkpoint: synthetic,
+              source: 'swarm-dispatch',
+            })
+            liveResult.checkpoint = synthetic
+            liveResult.checkpointStatus = 'checkpointed'
+            liveResult.output = `${liveResult.output}\nCompleted (idle): ${idleReply}`
+          } else {
+            // Still working async in the pane — NOT a failure or block. The
+            // lifecycle sweep / next dispatch picks up the eventual checkpoint.
+            liveResult.checkpoint = null
+            liveResult.checkpointStatus = 'timeout'
+            liveResult.output = `${liveResult.output}\nDelivered; worker still running (no checkpoint yet).`
+          }
         }
       } else {
         liveResult.checkpointStatus = 'not-requested'
@@ -1455,6 +1543,55 @@ function runWorker(
   })
 }
 
+export type SpendCapStatus = {
+  enabled: boolean
+  capTokens: number
+  spentTokens: number
+  remainingTokens: number
+  exceeded: boolean
+}
+
+/**
+ * Evaluate the daily token spend cap. Disabled (never exceeded) unless
+ * HERMES_SWARM_DAILY_TOKEN_CAP is a positive number. Spend = sum of today's
+ * total tokens across all workers (from the usage aggregator). Best-effort:
+ * a usage read failure never blocks dispatch.
+ */
+export async function evaluateSpendCap(): Promise<SpendCapStatus> {
+  const capRaw = Number(process.env.HERMES_SWARM_DAILY_TOKEN_CAP ?? '')
+  const capTokens = Number.isFinite(capRaw) && capRaw > 0 ? capRaw : 0
+  if (capTokens === 0) {
+    return {
+      enabled: false,
+      capTokens: 0,
+      spentTokens: 0,
+      remainingTokens: Infinity,
+      exceeded: false,
+    }
+  }
+  let spentTokens = 0
+  try {
+    const usage = await getSwarmUsage()
+    spentTokens = usage.workers.reduce((sum, w) => sum + (w.today.total || 0), 0)
+  } catch {
+    // Can't read usage → fail open (don't wedge the swarm on a stats error).
+    return {
+      enabled: true,
+      capTokens,
+      spentTokens: 0,
+      remainingTokens: capTokens,
+      exceeded: false,
+    }
+  }
+  return {
+    enabled: true,
+    capTokens,
+    spentTokens,
+    remainingTokens: Math.max(0, capTokens - spentTokens),
+    exceeded: spentTokens >= capTokens,
+  }
+}
+
 export class SwarmDispatchError extends Error {
   status: number
 
@@ -1614,6 +1751,19 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
           body = (await request.json()) as DispatchRequest
         } catch {
           return json({ error: 'Invalid JSON body' }, { status: 400 })
+        }
+
+        // Spend cap: refuse new dispatches once the day's token spend crosses
+        // the configured ceiling, so a runaway loop can't rack up cloud cost.
+        const cap = await evaluateSpendCap()
+        if (cap.exceeded) {
+          return json(
+            {
+              error: `Daily swarm token cap reached (${cap.spentTokens.toLocaleString()} / ${cap.capTokens.toLocaleString()}). Dispatch paused until tomorrow or raise HERMES_SWARM_DAILY_TOKEN_CAP.`,
+              spendCap: cap,
+            },
+            { status: 429 },
+          )
         }
 
         try {
