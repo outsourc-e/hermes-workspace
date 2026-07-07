@@ -43,7 +43,7 @@ type CommandPaletteProps = {
 
 type CommandAction = {
   id: string
-  group: 'Screens' | 'Recent Sessions' | 'Slash Commands'
+  group: 'Screens' | 'Swarm' | 'Search Results' | 'Recent Sessions' | 'Slash Commands'
   label: string
   keywords: string
   shortcut?: string
@@ -59,6 +59,8 @@ type ScoredAction = CommandAction & {
 
 const SCREEN_GROUP_ORDER = [
   'Screens',
+  'Swarm',
+  'Search Results',
   'Recent Sessions',
   'Slash Commands',
 ] as const
@@ -222,6 +224,33 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
         onSelect: () => void navigate({ to: '/mcp' }),
       },
       {
+        id: 'screen-swarm',
+        group: 'Screens',
+        label: 'Swarm',
+        keywords: 'agents workers missions board swarm2 timeline scoreboard queue',
+        shortcut: 'Go',
+        icon: CommandLineIcon,
+        onSelect: () => void navigate({ to: '/swarm2' }),
+      },
+      {
+        id: 'screen-dashboard',
+        group: 'Screens',
+        label: 'Dashboard',
+        keywords: 'overview stats health usage',
+        shortcut: 'Go',
+        icon: Settings01Icon,
+        onSelect: () => void navigate({ to: '/dashboard' }),
+      },
+      {
+        id: 'screen-tasks',
+        group: 'Screens',
+        label: 'Tasks',
+        keywords: 'kanban board todo',
+        shortcut: 'Go',
+        icon: File01Icon,
+        onSelect: () => void navigate({ to: '/tasks' }),
+      },
+      {
         id: 'screen-settings',
         group: 'Screens',
         label: 'Settings',
@@ -324,9 +353,103 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
     [pathname],
   )
 
+  const swarmActions = useMemo<Array<CommandAction>>(() => {
+    const trimmed = query.trim()
+    return [
+      {
+        id: 'swarm-queue-task',
+        group: 'Swarm',
+        label: trimmed
+          ? `Queue task: “${trimmed.slice(0, 60)}”`
+          : 'Queue a swarm task…',
+        keywords: 'queue task swarm dispatch add work',
+        shortcut: 'Queue',
+        icon: CommandLineIcon,
+        onSelect: () => {
+          const task =
+            trimmed || window.prompt('Task for the next idle worker:') || ''
+          if (!task.trim()) return
+          void fetch('/api/swarm-queue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task: task.trim(), priority: 2 }),
+          })
+        },
+      },
+      {
+        id: 'swarm-reindex-memory',
+        group: 'Swarm',
+        label: 'Reindex semantic memory (RAG)',
+        keywords: 'rag reindex embeddings memory vault refresh',
+        shortcut: 'Run',
+        icon: BrainIcon,
+        onSelect: () => {
+          void fetch('/api/rag', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'reindex' }),
+          })
+        },
+      },
+    ]
+  }, [query])
+
+  // Live semantic search across vault/playbook/outcomes once the query has
+  // some substance. Debounced by react-query keying on the trimmed query.
+  const searchQuery = query.trim()
+  const [searchHits, setSearchHits] = useState<Array<CommandAction>>([])
+  useEffect(() => {
+    if (!open || searchQuery.length < 4) {
+      setSearchHits([])
+      return
+    }
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      fetch(`/api/rag?q=${encodeURIComponent(searchQuery)}&k=4`, {
+        signal: controller.signal,
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then(
+          (data: {
+            hits?: Array<{ source: string; path: string; snippet: string }>
+          } | null) => {
+            if (!data?.hits) return
+            setSearchHits(
+              data.hits.map((hit, index) => ({
+                id: `rag-${index}-${hit.path}`,
+                group: 'Search Results' as const,
+                label: `${hit.snippet.slice(0, 90).replace(/\s+/g, ' ')}`,
+                keywords: searchQuery,
+                shortcut: hit.source,
+                icon: BrainIcon,
+                onSelect: () => void navigate({ to: '/memory' }),
+              })),
+            )
+          },
+        )
+        .catch(() => {})
+    }, 250)
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+    }
+  }, [open, searchQuery, navigate])
+
   const actions = useMemo(
-    () => [...screenActions, ...recentSessionActions, ...slashCommandActions],
-    [recentSessionActions, screenActions, slashCommandActions],
+    () => [
+      ...screenActions,
+      ...swarmActions,
+      ...searchHits,
+      ...recentSessionActions,
+      ...slashCommandActions,
+    ],
+    [
+      recentSessionActions,
+      screenActions,
+      searchHits,
+      slashCommandActions,
+      swarmActions,
+    ],
   )
 
   const filteredActions = useMemo<Array<ScoredAction>>(() => {

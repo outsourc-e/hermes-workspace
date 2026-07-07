@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { ragSearchSafe } from '../../server/rag-index'
 import {
   newestCheckpointFromMessages,
   parseSwarmCheckpoint,
@@ -1270,6 +1271,15 @@ function runWorker(
         title: m.title,
         snippet: m.snippet,
       }))
+      // Semantic memory: bounded RAG lookup over vault/playbook/outcomes.
+      // Skip sources already covered by keyword skill matches above.
+      const seen = new Set(skillHints.map((h) => h.title))
+      for (const hit of await ragSearchSafe(assignment.task, 2)) {
+        const title = `Memory (${hit.source}): ${hit.path.split('/').pop()}`
+        if (seen.has(title)) continue
+        skillHints.push({ title, snippet: hit.snippet })
+        if (skillHints.length >= 4) break
+      }
     } catch {
       /* best-effort */
     }

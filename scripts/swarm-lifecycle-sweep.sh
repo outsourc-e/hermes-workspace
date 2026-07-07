@@ -96,3 +96,18 @@ if [ -n "$CURRENT_BRANCH" ]; then
     fi
   fi
 fi
+
+# ---- queue drain --------------------------------------------------------------
+# Hand queued tasks to idle workers (max 2 per sweep). Local call passes
+# requireLocalOrAuth without a cookie. Best-effort.
+DRAIN=$(curl -sS -m 30 -X POST -H 'Content-Type: application/json' \
+  -d '{"action":"drain","max":2}' \
+  "http://127.0.0.1:3000/api/swarm-queue" 2>/dev/null || echo '')
+if [ -n "$DRAIN" ]; then
+  DISPATCHED=$(printf '%s' "$DRAIN" | python3 -c 'import json,sys
+try: print(json.load(sys.stdin).get("dispatched",0))
+except Exception: print(0)' 2>/dev/null || echo 0)
+  if [ "$DISPATCHED" != "0" ]; then
+    echo "{\"at\":$(date +%s)000,\"queue_drain\":$DRAIN}" >> "$LOG_FILE"
+  fi
+fi

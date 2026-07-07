@@ -194,10 +194,48 @@ async function cmdClearBlocked() {
   await say(res.ok ? 'Blocked board cleared ✅' : `Failed: ${String(res.error || '').slice(0, 200)}`)
 }
 
+async function cmdQueueAdd(rest) {
+  // Optional flags: p1/p2/p3 priority, @worker target. Rest = task text.
+  let priority = 2
+  let worker = null
+  const words = []
+  for (const w of rest) {
+    if (/^p[123]$/i.test(w)) priority = Number(w.slice(1))
+    else if (w.startsWith('@') && w.length > 1) worker = w.slice(1)
+    else words.push(w)
+  }
+  const task = words.join(' ')
+  if (!task) return say('Usage: `!queue [p1|p2|p3] [@worker] <task…>`')
+  const res = await workspace('/api/swarm-queue', {
+    method: 'POST',
+    body: JSON.stringify({ task, priority, worker }),
+  })
+  await say(
+    res.ok
+      ? `Queued \`${res.item.id}\` (p${res.item.priority}${worker ? `, ${worker}` : ', auto-assign'}) ✅`
+      : `Queue failed: ${String(res.error || 'unknown').slice(0, 200)}`,
+  )
+}
+
+async function cmdQueueList() {
+  const res = await workspace('/api/swarm-queue')
+  const open = (res.items || []).filter((i) => ['queued', 'dispatched'].includes(i.status))
+  if (!open.length) return say('Queue empty. 🎉')
+  const rows = open
+    .slice(0, 15)
+    .map(
+      (i) =>
+        `• \`${i.id}\` p${i.priority} [${i.status}${i.worker ? ` → ${i.worker}` : ''}] ${i.task.slice(0, 80)}`,
+    )
+  await say(`**Task queue** (${open.length} open)\n${rows.join('\n')}`)
+}
+
 const HELP = [
   '**Hermes swarm bot**',
   '`!status` — missions + health',
   '`!blocked` — blocked assignments',
+  '`!queue [p1|p2|p3] [@worker] <task…>` — add to queue (operator only)',
+  '`!queuelist` — show queue',
   '`!dispatch <worker> <task…>` — send work (operator only)',
   '`!retry <missionId> <assignmentId>` — retry blocked (operator only)',
   '`!dismiss <missionId> <assignmentId>` — dismiss blocked (operator only)',
@@ -210,7 +248,7 @@ async function handle(msg) {
   const [cmd, ...rest] = text.split(/\s+/)
   const isOperator = OPERATOR_ID && msg.author?.id === OPERATOR_ID
 
-  const mutating = ['!dispatch', '!retry', '!dismiss', '!clearblocked'].includes(cmd)
+  const mutating = ['!dispatch', '!retry', '!dismiss', '!clearblocked', '!queue'].includes(cmd)
   if (mutating && !isOperator) {
     await say(
       OPERATOR_ID
@@ -235,6 +273,8 @@ async function handle(msg) {
         return say(`Usage: \`${cmd} <missionId> <assignmentId>\``)
       await cmdUnblock(missionId, assignmentId, cmd === '!retry' ? 'retry' : 'dismiss')
     } else if (cmd === '!clearblocked') await cmdClearBlocked()
+    else if (cmd === '!queue') await cmdQueueAdd(rest)
+    else if (cmd === '!queuelist') await cmdQueueList()
   } catch (err) {
     await say(`Command failed: ${String(err?.message || err).slice(0, 200)}`).catch(() => {})
   }
