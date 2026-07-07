@@ -60,7 +60,13 @@ services:
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
       HERMES_UID: '10010'
       HERMES_DASHBOARD: '1'
-      HERMES_DASHBOARD_HOST: 0.0.0.0
+      # Loopback bind: hermes-agent (June 2026 hardening) fail-closes on any
+      # non-loopback dashboard bind unless an auth provider is configured, and
+      # the workspace can only fetch the dashboard session token from an
+      # ungated root page. The workspace container shares this service's
+      # network namespace (see network_mode below), so 127.0.0.1:9119 is
+      # reachable from it while staying invisible to the LAN.
+      HERMES_DASHBOARD_HOST: 127.0.0.1
       HERMES_DASHBOARD_PORT: '9119'
       # Authentication for the gateway when exposing off-loopback.
       # In the default compose setup the gateway is reachable from the
@@ -84,12 +90,20 @@ services:
       start_period: 30s
     ports:
       - '127.0.0.1:8642:8642'
+      # Workspace UI — published here because the workspace container joins
+      # this service's network namespace and cannot publish ports itself.
+      - '127.0.0.1:3000:3000'
 
   # The Hermes Workspace Web UI
   # Connects to hermes-agent at http://hermes-agent:8642
   hermes-workspace:
     image: ghcr.io/outsourc-e/hermes-workspace:latest
     restart: unless-stopped
+    # Share the agent's network namespace so the dashboard can stay on
+    # 127.0.0.1 (hermes-agent refuses non-loopback dashboard binds without an
+    # auth provider, and the workspace can't authenticate through that gate).
+    # Port 3000 is published on the hermes-agent service instead.
+    network_mode: 'service:hermes-agent'
     depends_on:
       hermes-agent:
         condition: service_healthy
@@ -98,9 +112,9 @@ services:
     environment:
       HERMES_HOME: /home/workspace/.hermes
       HERMES_WORKSPACE_DIR: /workspace
-      # Internal Docker network URL (not localhost!)
-      HERMES_API_URL: http://hermes-agent:8642
-      HERMES_DASHBOARD_URL: http://hermes-agent:9119
+      # Shared network namespace with hermes-agent — loopback reaches it.
+      HERMES_API_URL: http://127.0.0.1:8642
+      HERMES_DASHBOARD_URL: http://127.0.0.1:9119
       # Must match API_SERVER_KEY on the hermes-agent side when that is set
       HERMES_API_TOKEN: ${API_SERVER_KEY:-}
       # Workspace session password. REQUIRED when HOST is non-loopback (the
@@ -120,8 +134,6 @@ services:
     volumes:
       - hermes-agent-data:/home/workspace/.hermes
       - hermes-workspace-files:/workspace
-    ports:
-      - '127.0.0.1:3000:3000'
 
 volumes:
   hermes-agent-data:
