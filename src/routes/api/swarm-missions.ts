@@ -15,9 +15,57 @@ import {
 } from '../../server/swarm-missions'
 import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 import { execFile } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync, renameSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+
+function swarmProfilesDir(): string {
+  const base = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME
+  if (base) {
+    const parts = base.split('/').filter(Boolean)
+    if (parts.length >= 2 && parts.at(-2) === 'profiles') {
+      return base.split('/').slice(0, -1).join('/')
+    }
+    return join(base, 'profiles')
+  }
+  return join(homedir(), '.hermes', 'profiles')
+}
+
+/** All worker profile ids present on disk. */
+function listWorkerProfileIds(): Array<string> {
+  try {
+    return readdirSync(swarmProfilesDir(), { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .filter((n) => /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(n))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Clear a worker's chat/session history for a truly fresh start. Moves its
+ * SQLite session store aside (single recoverable `.cleared.bak`, overwriting
+ * any prior backup) — hermes recreates an empty state.db on next launch. This
+ * avoids FTS5 corruption from a partial in-place delete. Best-effort.
+ */
+function clearWorkerChatHistory(workerId: string): void {
+  if (!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(workerId)) return
+  const db = join(swarmProfilesDir(), workerId, 'state.db')
+  if (!existsSync(db)) return
+  const bak = `${db}.cleared.bak`
+  try {
+    if (existsSync(bak)) rmSync(bak, { force: true })
+    renameSync(db, bak)
+    // SQLite WAL/SHM sidecars would otherwise re-attach to a stale db.
+    for (const side of ['-wal', '-shm']) {
+      const p = `${db}${side}`
+      if (existsSync(p)) rmSync(p, { force: true })
+    }
+  } catch {
+    /* best-effort */
+  }
+}
 
 function resolveTmuxBin(): string {
   const override = process.env.HERMES_TMUX_BIN || process.env.CLAUDE_TMUX_BIN
@@ -195,6 +243,13 @@ export const Route = createFileRoute('/api/swarm-missions')({
             }
             await killSwarmTmuxSession(id)
           }
+          // Fresh session: kill sessions + clear chat history for EVERY worker
+          // profile on disk, not just those with active tasks.
+          const allWorkerIds = listWorkerProfileIds()
+          for (const id of allWorkerIds) {
+            await killSwarmTmuxSession(id)
+            clearWorkerChatHistory(id)
+          }
           return json({
             ok: true,
             action,
@@ -202,6 +257,7 @@ export const Route = createFileRoute('/api/swarm-missions')({
             assignmentsCancelled: cancelled.assignmentsCancelled,
             blockedCleared: cleared.cleared,
             workersReset: [...affected],
+            chatsCleared: allWorkerIds,
           })
         }
         if (action !== 'cancel')
