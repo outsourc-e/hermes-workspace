@@ -1,12 +1,7 @@
 ﻿import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  buildGalaxyModel,
-  clamp,
-  hashString,
-  obsidianUri,
-  shortTitle,
-} from './nova-galaxy-model'
+import * as THREE from 'three'
+import { clamp, obsidianUri, seededUnit, shortTitle } from './nova-galaxy-model'
 import type {
   CelestialBody,
   GalaxyArm,
@@ -15,48 +10,67 @@ import type {
   PlanetarySystem,
 } from './nova-galaxy-model'
 
-type ScreenBody = {
+type LabelKind = 'planet' | 'tag'
+type ProjectedLabel = {
+  id: string
+  kind: LabelKind
   body: CelestialBody
   x: number
   y: number
-  radius: number
-  opacity: number
-}
-
-type CameraState = {
-  x: number
-  y: number
   scale: number
+  opacity: number
+  active: boolean
 }
-
-type GalaxyCanvasProps = {
+type Galaxy3DProps = {
   model: GalaxyModel
   selectedBody: CelestialBody | null
   hoveredBody: CelestialBody | null
   disabledArms: Set<string>
   searchTerm: string
-  reducedLabels: boolean
   isLoading: boolean
   onHover: (body: CelestialBody | null) => void
   onSelect: (body: CelestialBody | null) => void
 }
+type CameraState = {
+  yaw: number
+  pitch: number
+  distance: number
+  target: THREE.Vector3
+}
+type PlanetObject = {
+  body: CelestialBody
+  system: PlanetarySystem
+  mesh: THREE.Mesh
+  ring: THREE.Mesh
+  atmosphere: THREE.Mesh
+  material: THREE.MeshStandardMaterial
+  ringMaterial: THREE.MeshBasicMaterial
+  atmosphereMaterial: THREE.MeshBasicMaterial
+}
+type CometObject = {
+  body: CelestialBody
+  group: THREE.Group
+  material: THREE.MeshBasicMaterial
+  tailMaterial: THREE.LineBasicMaterial
+}
+type LineObject = {
+  source: string
+  target: string
+  material: THREE.LineDashedMaterial
+}
 
-const SPACE = '#0D0E18'
-const SPACE_DEEP = '#090A12'
-const PANEL = '#16172A'
-const WARM_BROWN = '#4A2A10'
-const COPPER = '#7A441E'
-const TAN = '#D4A276'
+const SPACE = '#090A12'
+const SPACE_SOFT = '#0D0E18'
 const AMBER = '#FF8C1A'
 const GOLD = '#FFB347'
-const STAR = '#FFD27A'
-const STRONG = '#FFF1CC'
+const TAN = '#D4A276'
+const COPPER = '#7A441E'
+const TAG_LIMIT_IDLE = 42
+const TAG_LIMIT_ACTIVE = 140
 
 async function readKnowledgeGraph(): Promise<KnowledgeGraphResponse> {
   const response = await fetch('/api/knowledge/graph')
-  if (!response.ok) {
-    throw new Error(`knowledge graph ${response.status}`)
-  }
+  if (!response.ok) throw new Error(`knowledge graph ${response.status}`)
   return (await response.json()) as KnowledgeGraphResponse
 }
 
@@ -75,7 +89,7 @@ function formatModified(value?: string): string {
 function bodyLabel(body: CelestialBody): string {
   if (body.kind === 'core') return 'Galactic core'
   if (body.kind === 'planet') return 'Planet'
-  if (body.kind === 'moon') return 'Moon'
+  if (body.kind === 'tag') return 'Text tag'
   return 'Comet'
 }
 
@@ -85,71 +99,6 @@ function systemForBody(
 ): PlanetarySystem | null {
   if (!body) return null
   return model.systemByBodyId.get(body.id) ?? null
-}
-
-function warmth(body: CelestialBody): number {
-  if (body.kind === 'core') return 1
-  if (body.recencyTier === 'hot') return 0.92
-  if (body.recencyTier === 'warm') return 0.68
-  return 0.34
-}
-
-function worldToScreen(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  camera: CameraState,
-  rotation: number,
-): { x: number; y: number } {
-  const nx = x - 50
-  const ny = (y - 50) / 0.62
-  const cos = Math.cos(rotation)
-  const sin = Math.sin(rotation)
-  const rx = nx * cos - ny * sin
-  const ry = nx * sin + ny * cos
-  return {
-    x: width / 2 + (rx - camera.x) * (width / 100) * camera.scale,
-    y: height / 2 + (ry * 0.62 - camera.y) * (height / 100) * camera.scale,
-  }
-}
-
-function systemPosition(system: PlanetarySystem): { x: number; y: number } {
-  return { x: system.baseX, y: system.baseY }
-}
-
-function drawDisc(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number,
-  fill: string,
-  alpha: number,
-): void {
-  context.globalAlpha = alpha
-  context.fillStyle = fill
-  context.beginPath()
-  context.arc(x, y, radius, 0, Math.PI * 2)
-  context.fill()
-  context.globalAlpha = 1
-}
-
-function drawGlow(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number,
-  color: string,
-  alpha: number,
-): void {
-  const gradient = context.createRadialGradient(x, y, 0, x, y, radius)
-  gradient.addColorStop(0, color.replace('ALPHA', `${alpha}`))
-  gradient.addColorStop(0.44, color.replace('ALPHA', `${alpha * 0.24}`))
-  gradient.addColorStop(1, color.replace('ALPHA', '0'))
-  context.fillStyle = gradient
-  context.beginPath()
-  context.arc(x, y, radius, 0, Math.PI * 2)
-  context.fill()
 }
 
 function activeSystemIds(
@@ -175,180 +124,73 @@ function matchesSearch(body: CelestialBody, searchTerm: string): boolean {
   )
 }
 
-function bodyRadius(body: CelestialBody, system?: PlanetarySystem): number {
-  if (body.kind === 'core') return 12 + body.sizeTier * 1.8
-  if (body.kind === 'planet')
-    return 7.8 + (system?.sizeTier ?? body.sizeTier) * 1.55
-  if (body.kind === 'comet') return 1.3
-  return 2 + body.sizeTier * 0.56
+function warmth(body: CelestialBody): number {
+  if (body.kind === 'core') return 1
+  if (body.recencyTier === 'hot') return 0.92
+  if (body.recencyTier === 'warm') return 0.68
+  return 0.34
 }
 
-function drawOrb(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number,
-  body: CelestialBody,
-  alpha: number,
-): void {
-  const hot = warmth(body) > 0.65 || body.kind === 'core'
-  const rim = body.kind === 'core' ? AMBER : hot ? GOLD : TAN
-  const gradient = context.createRadialGradient(
-    x - radius * 0.34,
-    y - radius * 0.42,
-    Math.max(1, radius * 0.08),
-    x,
-    y,
-    radius,
-  )
-  gradient.addColorStop(0, `rgba(255, 241, 204, ${0.95 * alpha})`)
-  gradient.addColorStop(0.18, `rgba(255, 179, 71, ${0.82 * alpha})`)
-  gradient.addColorStop(0.56, `rgba(122, 68, 30, ${0.72 * alpha})`)
-  gradient.addColorStop(1, `rgba(13, 14, 24, ${0.96 * alpha})`)
-  context.fillStyle = gradient
-  context.beginPath()
-  context.arc(x, y, radius, 0, Math.PI * 2)
-  context.fill()
+function bodyPosition(body: CelestialBody): THREE.Vector3 {
+  return new THREE.Vector3(body.baseX, body.baseY, body.baseZ)
+}
 
-  context.strokeStyle = hot
-    ? `rgba(255, 179, 71, ${0.62 * alpha})`
-    : `rgba(212, 162, 118, ${0.36 * alpha})`
-  context.lineWidth = Math.max(0.8, radius * 0.08)
-  context.beginPath()
-  context.arc(x, y, radius, 0, Math.PI * 2)
-  context.stroke()
+function planetRadius(body: CelestialBody, system?: PlanetarySystem): number {
+  if (body.kind === 'core') return 2.2 + body.sizeTier * 0.42
+  return 1.28 + (system?.sizeTier ?? body.sizeTier) * 0.34
+}
 
-  if (body.kind === 'core' || body.kind === 'planet') {
-    context.save()
-    context.translate(x, y)
-    context.rotate(body.orbitTilt)
-    context.strokeStyle = `rgba(255, 179, 71, ${0.2 * alpha})`
-    context.lineWidth = Math.max(0.7, radius * 0.045)
+function createPlanetTexture(body: CelestialBody): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const context = canvas.getContext('2d')!
+  const base = context.createRadialGradient(40, 34, 4, 64, 64, 72)
+  base.addColorStop(0, '#FFF1CC')
+  base.addColorStop(0.2, body.kind === 'core' ? '#FFB347' : '#D4A276')
+  base.addColorStop(0.56, '#7A441E')
+  base.addColorStop(1, '#0D0E18')
+  context.fillStyle = base
+  context.fillRect(0, 0, 128, 128)
+  for (let i = 0; i < 28; i += 1) {
+    const seed = `${body.id}:texture:${i}`
+    context.globalAlpha = 0.08 + seededUnit(`${seed}:a`) * 0.11
+    context.strokeStyle =
+      seededUnit(`${seed}:warm`) > 0.5 ? '#FFB347' : '#4A2A10'
+    context.lineWidth = 2 + seededUnit(`${seed}:w`) * 7
     context.beginPath()
-    context.ellipse(0, 0, radius * 1.3, radius * 0.42, 0, 0, Math.PI * 2)
+    const y = seededUnit(`${seed}:y`) * 128
+    context.moveTo(-24, y)
+    context.bezierCurveTo(
+      28,
+      y + (seededUnit(`${seed}:c1`) - 0.5) * 46,
+      82,
+      y + (seededUnit(`${seed}:c2`) - 0.5) * 52,
+      152,
+      y + (seededUnit(`${seed}:c3`) - 0.5) * 32,
+    )
     context.stroke()
-    context.restore()
   }
-
-  context.fillStyle = rim
-  context.globalAlpha = 0.22 * alpha
-  context.beginPath()
-  context.arc(
-    x + radius * 0.18,
-    y + radius * 0.16,
-    radius * 0.58,
-    0,
-    Math.PI * 2,
-  )
-  context.fill()
   context.globalAlpha = 1
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
 }
 
-function drawGalaxyLinks(
-  context: CanvasRenderingContext2D,
-  model: GalaxyModel,
-  points: Map<string, ScreenBody>,
-  activeSystem: PlanetarySystem | null,
-  searchTerm: string,
-  searchActive: boolean,
-): void {
-  context.save()
-  context.globalCompositeOperation = 'destination-over'
-  for (const link of model.links) {
-    const source = points.get(link.source)
-    const target = points.get(link.target)
-    if (!source || !target) continue
-    if (source.opacity < 0.1 || target.opacity < 0.1) continue
-    const active =
-      activeSystem &&
-      (source.body.systemId === activeSystem.id ||
-        target.body.systemId === activeSystem.id)
-    const searched =
-      searchActive &&
-      (matchesSearch(source.body, searchTerm) ||
-        matchesSearch(target.body, searchTerm))
-    const distance = Math.hypot(source.x - target.x, source.y - target.y)
-    if (!active && !searched) continue
-    if (!active && searched && distance > 460) continue
-    const opacity = active ? 0.28 : 0.16
-    const midX = (source.x + target.x) / 2
-    const midY = (source.y + target.y) / 2
-    const bend = Math.min(42, distance * 0.08)
-    context.strokeStyle = active
-      ? `rgba(255, 179, 71, ${opacity})`
-      : `rgba(122, 68, 30, ${opacity})`
-    context.lineWidth = active ? 1.1 : 0.65
-    context.beginPath()
-    context.moveTo(source.x, source.y)
-    context.quadraticCurveTo(midX, midY - bend, target.x, target.y)
-    context.stroke()
-    context.shadowBlur = 0
-  }
-  context.restore()
-}
-function drawBackground(
-  context: CanvasRenderingContext2D,
-  model: GalaxyModel,
-  width: number,
-  height: number,
-  camera: CameraState,
-  rotation: number,
-): void {
-  const bg = context.createRadialGradient(
-    width * 0.5,
-    height * 0.5,
-    0,
-    width * 0.5,
-    height * 0.5,
-    Math.max(width, height) * 0.72,
-  )
-  bg.addColorStop(0, PANEL)
-  bg.addColorStop(0.42, SPACE)
-  bg.addColorStop(1, SPACE_DEEP)
-  context.fillStyle = bg
-  context.fillRect(0, 0, width, height)
-
-  for (const star of model.starfield) {
-    const drift = (star.layer - 1) * 3
-    const x = ((star.x / 100) * width + camera.x * drift + width) % width
-    const y = ((star.y / 100) * height + camera.y * drift + height) % height
-    context.fillStyle = star.warm
-      ? `rgba(255, 210, 122, ${star.alpha * 0.68})`
-      : `rgba(255, 241, 204, ${star.alpha * 0.5})`
-    context.beginPath()
-    context.arc(x, y, star.r, 0, Math.PI * 2)
-    context.fill()
-  }
-
-  context.save()
-  context.globalCompositeOperation = 'lighter'
-  for (const arm of model.arms) {
-    const center = worldToScreen(50, 50, width, height, camera, rotation)
-    const dust = context.createRadialGradient(
-      center.x + Math.cos(arm.angle) * width * 0.12,
-      center.y + Math.sin(arm.angle) * height * 0.08,
-      0,
-      center.x + Math.cos(arm.angle) * width * 0.12,
-      center.y + Math.sin(arm.angle) * height * 0.08,
-      Math.max(width, height) * 0.34,
-    )
-    dust.addColorStop(0, 'rgba(122, 68, 30, 0.045)')
-    dust.addColorStop(0.46, 'rgba(74, 42, 16, 0.018)')
-    dust.addColorStop(1, 'rgba(74, 42, 16, 0)')
-    context.fillStyle = dust
-    context.beginPath()
-    context.ellipse(
-      center.x + Math.cos(arm.angle) * width * 0.12,
-      center.y + Math.sin(arm.angle) * height * 0.08,
-      width * 0.34,
-      height * 0.14,
-      arm.angle + 0.55,
-      0,
-      Math.PI * 2,
-    )
-    context.fill()
-  }
-  context.restore()
+function createStarTexture(): THREE.Texture {
+  const canvas = document.createElement('canvas')
+  canvas.width = 32
+  canvas.height = 32
+  const context = canvas.getContext('2d')!
+  const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16)
+  gradient.addColorStop(0, 'rgba(255, 241, 204, 1)')
+  gradient.addColorStop(0.34, 'rgba(255, 210, 122, 0.42)')
+  gradient.addColorStop(1, 'rgba(255, 210, 122, 0)')
+  context.fillStyle = gradient
+  context.fillRect(0, 0, 32, 32)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
 }
 
 function useEscape(handler: () => void): void {
@@ -361,392 +203,564 @@ function useEscape(handler: () => void): void {
   }, [handler])
 }
 
-function GalaxyCanvas({
+function createFogNebula(): THREE.Sprite {
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 512
+  const context = canvas.getContext('2d')!
+  const glow = context.createRadialGradient(256, 256, 0, 256, 256, 256)
+  glow.addColorStop(0, 'rgba(255, 140, 26, 0.18)')
+  glow.addColorStop(0.32, 'rgba(122, 68, 30, 0.10)')
+  glow.addColorStop(0.7, 'rgba(74, 42, 16, 0.045)')
+  glow.addColorStop(1, 'rgba(9, 10, 18, 0)')
+  context.fillStyle = glow
+  context.fillRect(0, 0, 512, 512)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+    opacity: 0.84,
+    blending: THREE.AdditiveBlending,
+  })
+  const sprite = new THREE.Sprite(material)
+  sprite.position.set(10, -5, -34)
+  sprite.scale.set(62, 38, 1)
+  return sprite
+}
+function Galaxy3D({
   model,
   selectedBody,
   hoveredBody,
   disabledArms,
   searchTerm,
-  reducedLabels,
   isLoading,
   onHover,
   onSelect,
-}: GalaxyCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const screenBodiesRef = useRef<Array<ScreenBody>>([])
-  const cameraRef = useRef<CameraState>({ x: 0, y: 0, scale: 1 })
-  const selectedSystem = systemForBody(model, selectedBody)
-  const activeIds = useMemo(
-    () => activeSystemIds(model, selectedBody, hoveredBody),
-    [hoveredBody, model, selectedBody],
-  )
-  const searchActive = searchTerm.trim().length > 0
+}: Galaxy3DProps) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  const [labels, setLabels] = useState<Array<ProjectedLabel>>([])
+  const selectedRef = useRef<CelestialBody | null>(selectedBody)
+  const hoveredRef = useRef<CelestialBody | null>(hoveredBody)
+  const disabledRef = useRef<Set<string>>(disabledArms)
+  const searchRef = useRef(searchTerm)
+  const reducedMotionRef = useRef(false)
+  const cameraStateRef = useRef<CameraState>({
+    yaw: -0.42,
+    pitch: 0.16,
+    distance: 76,
+    target: new THREE.Vector3(0, 0, 0),
+  })
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const context = canvas.getContext('2d')
-    if (!context) return
+    selectedRef.current = selectedBody
+    hoveredRef.current = hoveredBody
+    disabledRef.current = disabledArms
+    searchRef.current = searchTerm
+  }, [disabledArms, hoveredBody, searchTerm, selectedBody])
 
-    let width = 0
-    let height = 0
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(SPACE)
+    scene.fog = new THREE.FogExp2(SPACE_SOFT, 0.012)
+    const camera = new THREE.PerspectiveCamera(54, 1, 0.1, 420)
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    renderer.setClearColor(SPACE, 1)
+    renderer.domElement.className =
+      'nova-galaxy-canvas absolute inset-0 size-full'
+    renderer.domElement.setAttribute(
+      'aria-label',
+      '3D Obsidian knowledge galaxy',
+    )
+    host.appendChild(renderer.domElement)
+
+    const ambient = new THREE.AmbientLight('#D4A276', 0.42)
+    const key = new THREE.PointLight('#FFB347', 2.6, 120)
+    key.position.set(0, 14, 28)
+    const fill = new THREE.PointLight('#7A441E', 1.8, 150)
+    fill.position.set(-34, -18, -12)
+    scene.add(ambient, key, fill, createFogNebula())
+
+    const starPositions = new Float32Array(model.starfield.length * 3)
+    const starColors = new Float32Array(model.starfield.length * 3)
+    model.starfield.forEach((star, index) => {
+      starPositions[index * 3] = star.x
+      starPositions[index * 3 + 1] = star.y
+      starPositions[index * 3 + 2] = star.z
+      const color = new THREE.Color(star.warm ? '#FFD27A' : '#FFF1CC')
+      color.multiplyScalar(star.alpha)
+      starColors[index * 3] = color.r
+      starColors[index * 3 + 1] = color.g
+      starColors[index * 3 + 2] = color.b
+    })
+    const starGeometry = new THREE.BufferGeometry()
+    starGeometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(starPositions, 3),
+    )
+    starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
+    const stars = new THREE.Points(
+      starGeometry,
+      new THREE.PointsMaterial({
+        map: createStarTexture(),
+        size: 0.34,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.76,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    )
+    scene.add(stars)
+
+    const planetObjects = new Map<string, PlanetObject>()
+    const hitObjects: Array<THREE.Object3D> = []
+    const bodyPositions = new Map<string, THREE.Vector3>()
+
+    for (const system of model.systems) {
+      const body = system.planet
+      const radius = planetRadius(body, system)
+      const texture = createPlanetTexture(body)
+      const material = new THREE.MeshStandardMaterial({
+        color: body.kind === 'core' ? '#FFB347' : '#D4A276',
+        map: texture,
+        roughness: 0.72,
+        metalness: 0.08,
+        transparent: true,
+        opacity: 0.96,
+      })
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 48, 32),
+        material,
+      )
+      mesh.position.copy(bodyPosition(body))
+      mesh.userData.bodyId = body.id
+      bodyPositions.set(body.id, mesh.position.clone())
+      hitObjects.push(mesh)
+
+      const armTint =
+        model.arms.find((arm) => arm.id === system.planet.armId)?.tint ?? GOLD
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color: body.kind === 'core' ? AMBER : armTint,
+        transparent: true,
+        opacity: body.kind === 'core' ? 0.68 : 0.44,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(
+          radius * 1.48,
+          Math.max(0.025, radius * 0.025),
+          8,
+          96,
+        ),
+        ringMaterial,
+      )
+      ring.position.copy(mesh.position)
+      ring.rotation.set(body.orbitTilt, 0.42, 0.12)
+
+      const atmosphereMaterial = new THREE.MeshBasicMaterial({
+        color: body.kind === 'core' ? AMBER : GOLD,
+        transparent: true,
+        opacity: body.kind === 'core' ? 0.24 : 0.1,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+      const atmosphere = new THREE.Mesh(
+        new THREE.SphereGeometry(
+          radius * (body.kind === 'core' ? 1.92 : 1.58),
+          32,
+          20,
+        ),
+        atmosphereMaterial,
+      )
+      atmosphere.position.copy(mesh.position)
+      scene.add(atmosphere, mesh, ring)
+      planetObjects.set(body.id, {
+        body,
+        system,
+        mesh,
+        ring,
+        atmosphere,
+        material,
+        ringMaterial,
+        atmosphereMaterial,
+      })
+      for (const tag of system.tags)
+        bodyPositions.set(tag.id, bodyPosition(tag))
+    }
+
+    const cometObjects: Array<CometObject> = []
+    model.comets.slice(0, 8).forEach((body) => {
+      const group = new THREE.Group()
+      group.position.copy(bodyPosition(body))
+      const material = new THREE.MeshBasicMaterial({
+        color: TAN,
+        transparent: true,
+        opacity: 0.5,
+      })
+      const comet = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 12, 8),
+        material,
+      )
+      const tailMaterial = new THREE.LineBasicMaterial({
+        color: COPPER,
+        transparent: true,
+        opacity: 0.18,
+      })
+      const tail = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-1.8, 0.22, 0),
+          new THREE.Vector3(-0.18, 0, 0),
+        ]),
+        tailMaterial,
+      )
+      group.add(tail, comet)
+      scene.add(group)
+      bodyPositions.set(body.id, group.position.clone())
+      cometObjects.push({ body, group, material, tailMaterial })
+    })
+
+    const lineObjects: Array<LineObject> = []
+    for (const link of model.links) {
+      const source = bodyPositions.get(link.source)
+      const target = bodyPositions.get(link.target)
+      if (!source || !target) continue
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        source,
+        target,
+      ])
+      const material = new THREE.LineDashedMaterial({
+        color: GOLD,
+        transparent: true,
+        opacity: 0.15,
+        dashSize: 0.22,
+        gapSize: 0.32,
+        depthWrite: false,
+      })
+      const line = new THREE.LineSegments(geometry, material)
+      line.computeLineDistances()
+      scene.add(line)
+      lineObjects.push({ source: link.source, target: link.target, material })
+    }
+
+    const raycaster = new THREE.Raycaster()
+    const pointer = new THREE.Vector2()
+    let width = 1
+    let height = 1
     let frame = 0
-    let reducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches
+    let lastLabelUpdate = 0
+    let isDragging = false
+    let lastPointer = { x: 0, y: 0 }
+    let pointerMoved = false
 
     const resize = () => {
-      const rect = canvas.getBoundingClientRect()
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      width = Math.max(1, rect.width)
-      height = Math.max(1, rect.height)
-      canvas.width = Math.floor(width * dpr)
-      canvas.height = Math.floor(height * dpr)
-      context.setTransform(dpr, 0, 0, dpr, 0, 0)
+      const bounds = host.getBoundingClientRect()
+      width = Math.max(1, bounds.width)
+      height = Math.max(1, bounds.height)
+      renderer.setSize(width, height, false)
+      camera.aspect = width / height
+      camera.updateProjectionMatrix()
+    }
+
+    const updateCamera = (now: number) => {
+      const state = cameraStateRef.current
+      const selected = selectedRef.current
+      const selectedPosition = selected ? bodyPositions.get(selected.id) : null
+      const desiredTarget = selectedPosition ?? new THREE.Vector3(0, 0, 0)
+      const desiredDistance = selectedPosition ? 20 : 76
+      state.target.lerp(desiredTarget, reducedMotionRef.current ? 1 : 0.065)
+      state.distance +=
+        (desiredDistance - state.distance) *
+        (reducedMotionRef.current ? 1 : 0.055)
+      if (!selected && !isDragging && !reducedMotionRef.current) {
+        state.yaw += Math.sin(now / 12000) * 0.00022 + 0.00018
+        state.pitch +=
+          (0.16 + Math.sin(now / 19000) * 0.035 - state.pitch) * 0.012
+      }
+      state.pitch = clamp(state.pitch, -0.72, 0.72)
+      state.distance = clamp(state.distance, 12, 118)
+      const cosPitch = Math.cos(state.pitch)
+      camera.position.set(
+        state.target.x + Math.sin(state.yaw) * cosPitch * state.distance,
+        state.target.y + Math.sin(state.pitch) * state.distance,
+        state.target.z + Math.cos(state.yaw) * cosPitch * state.distance,
+      )
+      camera.lookAt(state.target)
+    }
+
+    const bodyVisibleOpacity = (
+      body: CelestialBody,
+      activeIds: Set<string>,
+      query: string,
+    ) => {
+      const disabled = disabledRef.current.has(body.armId)
+      let opacity = disabled ? 0.15 : 1
+      if (activeIds.size > 0 && body.systemId && !activeIds.has(body.systemId))
+        opacity *= 0.34
+      if (query && !matchesSearch(body, query)) opacity *= 0.16
+      return opacity
+    }
+    const updateVisualState = (now: number) => {
+      const selected = selectedRef.current
+      const hovered = hoveredRef.current
+      const query = searchRef.current.trim()
+      const activeIds = activeSystemIds(model, selected, hovered)
+      const activeBodyId = selected?.id ?? hovered?.id
+      for (const planet of planetObjects.values()) {
+        const opacity = bodyVisibleOpacity(planet.body, activeIds, query)
+        const active =
+          activeIds.has(planet.system.id) || planet.body.id === activeBodyId
+        const warm = warmth(planet.body)
+        const pulse =
+          planet.body.recencyTier === 'hot' && !reducedMotionRef.current
+            ? 1 + Math.sin(now / 720 + planet.body.orbitPhase) * 0.07
+            : 1
+        planet.mesh.scale.setScalar(pulse)
+        planet.mesh.rotation.y += reducedMotionRef.current
+          ? 0
+          : 0.0018 + planet.body.sizeTier * 0.0003
+        planet.material.opacity = opacity * (active ? 1 : 0.9)
+        planet.ringMaterial.opacity =
+          opacity * (planet.body.kind === 'core' ? 0.72 : active ? 0.64 : 0.34)
+        planet.atmosphereMaterial.opacity =
+          opacity *
+          (planet.body.kind === 'core'
+            ? 0.32
+            : active || warm > 0.65
+              ? 0.18
+              : 0.07)
+      }
+      for (const comet of cometObjects) {
+        const drift = reducedMotionRef.current
+          ? 0
+          : now / comet.body.orbitPeriod / 28
+        comet.group.position.x =
+          comet.body.baseX + Math.sin(drift + comet.body.orbitPhase) * 8
+        comet.group.position.y =
+          comet.body.baseY + Math.cos(drift * 0.7 + comet.body.orbitPhase) * 2
+        comet.group.position.z =
+          comet.body.baseZ + Math.cos(drift + comet.body.orbitPhase) * 8
+        const opacity = bodyVisibleOpacity(comet.body, activeIds, query)
+        comet.material.opacity = opacity * 0.48
+        comet.tailMaterial.opacity = opacity * 0.16
+      }
+      for (const link of lineObjects) {
+        const source = model.bodyById.get(link.source)
+        const target = model.bodyById.get(link.target)
+        const active =
+          (source?.systemId && activeIds.has(source.systemId)) ||
+          (target?.systemId && activeIds.has(target.systemId)) ||
+          source?.id === activeBodyId ||
+          target?.id === activeBodyId
+        const searched = Boolean(
+          query &&
+          ((source && matchesSearch(source, query)) ||
+            (target && matchesSearch(target, query))),
+        )
+        link.material.opacity = active ? 0.48 : searched ? 0.34 : 0.15
+      }
+    }
+
+    const projectLabels = () => {
+      const selected = selectedRef.current
+      const hovered = hoveredRef.current
+      const query = searchRef.current.trim()
+      const activeIds = activeSystemIds(model, selected, hovered)
+      const projected: Array<ProjectedLabel> = []
+      const vector = new THREE.Vector3()
+      const pushLabel = (
+        body: CelestialBody,
+        kind: LabelKind,
+        force = false,
+      ) => {
+        const point = bodyPosition(body)
+        vector.copy(point).project(camera)
+        if (vector.z < -1 || vector.z > 1) return
+        const distance = camera.position.distanceTo(point)
+        const active =
+          Boolean(body.systemId && activeIds.has(body.systemId)) ||
+          body.id === hovered?.id ||
+          body.id === selected?.id
+        const searched = Boolean(query && matchesSearch(body, query))
+        if (!force && kind === 'tag' && !active && !searched && distance > 62)
+          return
+        let opacity = bodyVisibleOpacity(body, activeIds, query)
+        if (kind === 'tag' && !active && !searched) opacity *= 0.55
+        projected.push({
+          id: body.id,
+          kind,
+          body,
+          x: (vector.x * 0.5 + 0.5) * width,
+          y: (-vector.y * 0.5 + 0.5) * height,
+          scale: clamp(1.25 - distance / 130, 0.62, 1.08),
+          opacity,
+          active: active || searched,
+        })
+      }
+      const visibleSystems = model.systems.slice(
+        0,
+        selected || hovered || query ? TAG_LIMIT_ACTIVE : TAG_LIMIT_IDLE,
+      )
+      for (const system of visibleSystems) {
+        pushLabel(system.planet, 'planet', true)
+        const tagLimit = activeIds.has(system.id) || query ? 28 : 5
+        for (const tag of system.tags.slice(0, tagLimit)) pushLabel(tag, 'tag')
+      }
+      setLabels(projected)
+    }
+
+    const animate = (now: number) => {
+      updateCamera(now)
+      updateVisualState(now)
+      renderer.render(scene, camera)
+      if (now - lastLabelUpdate > 90) {
+        projectLabels()
+        lastLabelUpdate = now
+      }
+      frame = window.requestAnimationFrame(animate)
+    }
+
+    const motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)')
+    reducedMotionRef.current = motionMedia.matches
+    const onMotionChange = () => {
+      reducedMotionRef.current = motionMedia.matches
+    }
+    const normalizedPointer = (event: PointerEvent) => {
+      const bounds = renderer.domElement.getBoundingClientRect()
+      pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1
+      pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1
+    }
+    const pickPlanet = (event: PointerEvent): CelestialBody | null => {
+      normalizedPointer(event)
+      raycaster.setFromCamera(pointer, camera)
+      const hit = raycaster.intersectObjects(hitObjects, false)[0]
+      return hit
+        ? (model.bodyById.get(String(hit.object.userData.bodyId)) ?? null)
+        : null
+    }
+    const onPointerMove = (event: PointerEvent) => {
+      if (isDragging) {
+        const dx = event.clientX - lastPointer.x
+        const dy = event.clientY - lastPointer.y
+        if (Math.abs(dx) + Math.abs(dy) > 2) pointerMoved = true
+        cameraStateRef.current.yaw -= dx * 0.0045
+        cameraStateRef.current.pitch -= dy * 0.0038
+        lastPointer = { x: event.clientX, y: event.clientY }
+        return
+      }
+      const body = pickPlanet(event)
+      renderer.domElement.style.cursor = body ? 'pointer' : 'grab'
+      onHover(body)
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      isDragging = true
+      pointerMoved = false
+      lastPointer = { x: event.clientX, y: event.clientY }
+      renderer.domElement.setPointerCapture(event.pointerId)
+    }
+    const onPointerUp = (event: PointerEvent) => {
+      isDragging = false
+      renderer.domElement.releasePointerCapture(event.pointerId)
+      const body = pickPlanet(event)
+      if (!pointerMoved) onSelect(body)
+    }
+    const onPointerLeave = () => {
+      if (!isDragging) onHover(null)
+    }
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      cameraStateRef.current.distance += event.deltaY * 0.035
+      cameraStateRef.current.distance = clamp(
+        cameraStateRef.current.distance,
+        12,
+        118,
+      )
     }
 
     const resizeObserver = new ResizeObserver(resize)
-    resizeObserver.observe(canvas)
+    resizeObserver.observe(host)
     resize()
-
-    const draw = (now: number) => {
-      const time = reducedMotion ? 0 : now / 1000
-      const target: CameraState = selectedSystem
-        ? {
-            x: selectedSystem.baseX - 50,
-            y: selectedSystem.baseY - 50,
-            scale: 1.82,
-          }
-        : { x: 0, y: 0, scale: 1 }
-      const camera = cameraRef.current
-      const damping = reducedMotion ? 1 : 0.075
-      camera.x += (target.x - camera.x) * damping
-      camera.y += (target.y - camera.y) * damping
-      camera.scale += (target.scale - camera.scale) * damping
-
-      const rotation = reducedMotion ? 0 : time * ((Math.PI * 2) / 520)
-      context.clearRect(0, 0, width, height)
-      context.globalAlpha = 1
-      context.globalCompositeOperation = 'source-over'
-      drawBackground(context, model, width, height, camera, rotation)
-
-      const points = new Map<string, ScreenBody>()
-      const activeSystem = selectedSystem ?? systemForBody(model, hoveredBody)
-
-      for (const system of model.systems) {
-        const position = systemPosition(system)
-        const planetPoint = worldToScreen(
-          position.x,
-          position.y,
-          width,
-          height,
-          camera,
-          rotation,
-        )
-        const systemActive = activeIds.has(system.id)
-        const armDisabled = disabledArms.has(system.armId)
-        const systemDimmed = activeIds.size > 0 && !systemActive
-
-        if (systemActive) {
-          context.save()
-          context.globalAlpha = 0.72
-          context.strokeStyle = 'rgba(255, 179, 71, 0.34)'
-          context.lineWidth = 1
-          for (const moon of system.moons) {
-            context.beginPath()
-            context.ellipse(
-              planetPoint.x,
-              planetPoint.y,
-              moon.orbitRadius * camera.scale,
-              moon.orbitRadius * 0.46 * camera.scale,
-              moon.orbitTilt,
-              0,
-              Math.PI * 2,
-            )
-            context.stroke()
-          }
-          context.restore()
-        }
-
-        const planetRadius = bodyRadius(system.planet, system) * camera.scale
-        let planetOpacity = armDisabled ? 0.15 : 0.86
-        if (systemDimmed) planetOpacity *= 0.28
-        if (searchActive && !matchesSearch(system.planet, searchTerm))
-          planetOpacity *= 0.18
-        const planetWarmth = warmth(system.planet)
-        const pulse =
-          system.planet.recencyTier === 'hot' && !reducedMotion
-            ? 1 + Math.sin(time * 1.95 + system.planet.orbitPhase) * 0.12
-            : 1
-
-        if (system.planet.kind === 'core' || systemActive) {
-          drawGlow(
-            context,
-            planetPoint.x,
-            planetPoint.y,
-            planetRadius * (system.planet.kind === 'core' ? 9 : 4.2),
-            'rgba(255, 140, 26, ALPHA)',
-            (system.planet.kind === 'core' ? 0.34 : 0.18) * planetOpacity,
-          )
-        }
-        drawOrb(
-          context,
-          planetPoint.x,
-          planetPoint.y,
-          planetRadius * pulse,
-          system.planet,
-          planetOpacity,
-        )
-        points.set(system.planet.id, {
-          body: system.planet,
-          x: planetPoint.x,
-          y: planetPoint.y,
-          radius: planetRadius,
-          opacity: planetOpacity,
-        })
-
-        for (const moon of system.moons) {
-          const orbit = reducedMotion
-            ? moon.orbitPhase
-            : time / moon.orbitPeriod + moon.orbitPhase
-          const moonX =
-            planetPoint.x +
-            Math.cos(orbit * Math.PI * 2) * moon.orbitRadius * camera.scale
-          const moonY =
-            planetPoint.y +
-            Math.sin(orbit * Math.PI * 2) *
-              moon.orbitRadius *
-              0.46 *
-              camera.scale
-          let opacity = armDisabled ? 0.15 : 0.54
-          if (systemDimmed) opacity *= 0.28
-          if (searchActive && !matchesSearch(moon, searchTerm)) opacity *= 0.14
-          if (systemActive) opacity = Math.max(opacity, 0.86)
-          const moonPulse =
-            moon.recencyTier === 'hot' && !reducedMotion
-              ? 1 + Math.sin(time * 1.7 + moon.orbitPhase) * 0.1
-              : 1
-          const radius =
-            bodyRadius(moon) * camera.scale * (systemActive ? 1.25 : 1)
-          if (moon.recencyTier === 'hot' || systemActive) {
-            drawGlow(
-              context,
-              moonX,
-              moonY,
-              radius * (systemActive ? 4.8 : 3.2),
-              'rgba(255, 179, 71, ALPHA)',
-              (systemActive ? 0.15 : 0.09) * opacity,
-            )
-          }
-          drawOrb(context, moonX, moonY, radius * moonPulse, moon, opacity)
-          points.set(moon.id, {
-            body: moon,
-            x: moonX,
-            y: moonY,
-            radius,
-            opacity,
-          })
-        }
-      }
-
-      const visibleComets = model.comets.slice(0, 5)
-      visibleComets.forEach((comet, index) => {
-        const drift = reducedMotion
-          ? 0
-          : (time / comet.orbitPeriod + index * 0.11) % 1
-        const base = worldToScreen(
-          comet.baseX,
-          comet.baseY,
-          width,
-          height,
-          camera,
-          rotation * 0.35,
-        )
-        const lane = (drift - 0.5) * width * 0.38
-        const x = base.x + lane
-        const y =
-          base.y +
-          Math.sin(drift * Math.PI * 2 + comet.orbitPhase) * height * 0.06
-        let opacity = disabledArms.has(comet.armId) ? 0.12 : 0.34
-        if (activeIds.size > 0) opacity *= 0.55
-        if (searchActive && !matchesSearch(comet, searchTerm)) opacity *= 0.16
-        context.strokeStyle = `rgba(122, 68, 30, ${opacity * 0.34})`
-        context.lineWidth = 1
-        context.beginPath()
-        context.moveTo(x - 16 * camera.scale, y + 3 * camera.scale)
-        context.lineTo(x - 5 * camera.scale, y + 1 * camera.scale)
-        context.stroke()
-        drawDisc(context, x, y, 1.4 * camera.scale, TAN, opacity)
-        points.set(comet.id, { body: comet, x, y, radius: 5, opacity })
-      })
-
-      drawGalaxyLinks(
-        context,
-        model,
-        points,
-        activeSystem,
-        searchTerm,
-        searchActive,
-      )
-
-      if (searchActive) {
-        context.save()
-        context.strokeStyle = 'rgba(255, 179, 71, 0.28)'
-        context.lineWidth = 0.7
-        for (const point of points.values()) {
-          if (!matchesSearch(point.body, searchTerm)) continue
-          context.beginPath()
-          context.moveTo(width * 0.5, 28)
-          context.lineTo(point.x, point.y)
-          context.stroke()
-          drawGlow(
-            context,
-            point.x,
-            point.y,
-            point.radius * 5,
-            'rgba(255, 179, 71, ALPHA)',
-            0.18,
-          )
-        }
-        context.restore()
-      }
-
-      const labels: Array<ScreenBody> = []
-      const corePoint = model.core ? points.get(model.core.id) : undefined
-      if (corePoint) labels.push(corePoint)
-      if (reducedLabels) {
-        for (const system of model.systems.slice(0, 5)) {
-          const point = points.get(system.planet.id)
-          if (point && point.body.kind !== 'core') labels.push(point)
-        }
-      }
-      if (!reducedLabels && activeSystem) {
-        for (const body of [
-          activeSystem.planet,
-          ...activeSystem.moons.slice(0, 18),
-        ]) {
-          const point = points.get(body.id)
-          if (point) labels.push(point)
-        }
-      }
-      drawGalaxyLinks(
-        context,
-        model,
-        points,
-        activeSystem,
-        searchTerm,
-        searchActive,
-      )
-
-      if (searchActive) {
-        for (const point of points.values()) {
-          if (matchesSearch(point.body, searchTerm)) labels.push(point)
-        }
-      }
-      context.font = '11px JetBrains Mono, ui-monospace, monospace'
-      context.textAlign = 'center'
-      context.textBaseline = 'top'
-      for (const point of labels) {
-        if (point.opacity < 0.18) continue
-        context.shadowColor = 'rgba(9, 10, 18, 0.9)'
-        context.shadowBlur = 8
-        context.fillStyle = point.body.kind === 'core' ? STRONG : STAR
-        context.globalAlpha = point.body.kind === 'core' ? 0.9 : 0.76
-        context.fillText(
-          shortTitle(point.body.title).slice(
-            0,
-            point.body.kind === 'core' ? 34 : 24,
-          ),
-          point.x,
-          point.y + point.radius + 7,
-        )
-      }
-      context.shadowBlur = 0
-      context.globalAlpha = 1
-      screenBodiesRef.current = Array.from(points.values())
-
-      if (isLoading) {
-        context.fillStyle = STAR
-        context.font = '12px JetBrains Mono, ui-monospace, monospace'
-        context.fillText('mapping vault', width / 2, height / 2 + 32)
-      }
-
-      frame = window.requestAnimationFrame(draw)
-    }
-
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const handleMotionChange = () => {
-      reducedMotion = media.matches
-    }
-    media.addEventListener('change', handleMotionChange)
-    frame = window.requestAnimationFrame(draw)
-
-    const nearestBody = (event: MouseEvent): CelestialBody | null => {
-      const rect = canvas.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
-      let nearest: ScreenBody | null = null
-      for (const point of screenBodiesRef.current) {
-        if (point.opacity < 0.12) continue
-        const distance = Math.hypot(point.x - x, point.y - y)
-        if (
-          distance <= Math.max(9, point.radius + 6) &&
-          (!nearest || distance < Math.hypot(nearest.x - x, nearest.y - y))
-        ) {
-          nearest = point
-        }
-      }
-      return nearest?.body ?? null
-    }
-
-    const onMouseMove = (event: MouseEvent) => {
-      const body = nearestBody(event)
-      canvas.style.cursor = body ? 'pointer' : 'crosshair'
-      onHover(body)
-    }
-    const onMouseLeave = () => {
-      canvas.style.cursor = 'crosshair'
-      onHover(null)
-    }
-    const onClick = (event: MouseEvent) => onSelect(nearestBody(event))
-
-    canvas.addEventListener('mousemove', onMouseMove)
-    canvas.addEventListener('mouseleave', onMouseLeave)
-    canvas.addEventListener('click', onClick)
+    motionMedia.addEventListener('change', onMotionChange)
+    renderer.domElement.addEventListener('pointermove', onPointerMove)
+    renderer.domElement.addEventListener('pointerdown', onPointerDown)
+    renderer.domElement.addEventListener('pointerup', onPointerUp)
+    renderer.domElement.addEventListener('pointerleave', onPointerLeave)
+    renderer.domElement.addEventListener('wheel', onWheel, { passive: false })
+    frame = window.requestAnimationFrame(animate)
 
     return () => {
       window.cancelAnimationFrame(frame)
       resizeObserver.disconnect()
-      media.removeEventListener('change', handleMotionChange)
-      canvas.removeEventListener('mousemove', onMouseMove)
-      canvas.removeEventListener('mouseleave', onMouseLeave)
-      canvas.removeEventListener('click', onClick)
+      motionMedia.removeEventListener('change', onMotionChange)
+      renderer.domElement.removeEventListener('pointermove', onPointerMove)
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown)
+      renderer.domElement.removeEventListener('pointerup', onPointerUp)
+      renderer.domElement.removeEventListener('pointerleave', onPointerLeave)
+      renderer.domElement.removeEventListener('wheel', onWheel)
+      setLabels([])
+      scene.traverse((object) => {
+        if (
+          'geometry' in object &&
+          object.geometry instanceof THREE.BufferGeometry
+        ) {
+          object.geometry.dispose()
+        }
+        if ('material' in object) {
+          const material = object.material
+          if (Array.isArray(material))
+            material.forEach((item) => item.dispose())
+          else if (material instanceof THREE.Material) material.dispose()
+        }
+      })
+      renderer.dispose()
+      host.removeChild(renderer.domElement)
     }
-  }, [
-    activeIds,
-    disabledArms,
-    hoveredBody,
-    isLoading,
-    model,
-    onHover,
-    onSelect,
-    reducedLabels,
-    searchActive,
-    searchTerm,
-    selectedBody,
-    selectedSystem,
-  ])
+  }, [model, onHover, onSelect])
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="nova-galaxy-canvas absolute inset-0 size-full"
-      aria-label="Solar-system spiral galaxy map of the Obsidian vault"
-      role="img"
-    />
+    <div ref={hostRef} className="absolute inset-0 overflow-hidden">
+      {isLoading ? (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 font-mono text-xs uppercase tracking-[0.18em] text-[var(--theme-accent-secondary)]">
+          mapping vault
+        </div>
+      ) : null}
+      <div className="pointer-events-none absolute inset-0 z-10">
+        {labels.map((label) => (
+          <button
+            type="button"
+            key={`${label.kind}:${label.id}`}
+            onClick={() => onSelect(label.body)}
+            onMouseEnter={() => onHover(label.body)}
+            onMouseLeave={() => onHover(null)}
+            className={`pointer-events-auto absolute max-w-[210px] -translate-x-1/2 -translate-y-1/2 truncate border backdrop-blur-sm transition-colors ${
+              label.kind === 'planet'
+                ? 'rounded-md border-transparent bg-transparent px-1 text-[14px] font-semibold text-[var(--theme-text-strong)] shadow-[0_0_12px_rgba(9,10,18,0.92)]'
+                : 'rounded border-[rgba(255,179,71,0.16)] bg-[rgba(9,10,18,0.48)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--theme-text-soft)]'
+            } ${label.active ? 'text-[var(--theme-accent-secondary)]' : ''}`}
+            style={{
+              left: label.x,
+              top: label.y,
+              opacity: label.opacity,
+              transform: `translate(-50%, -50%) scale(${label.scale})`,
+            }}
+            title={label.body.title}
+          >
+            {shortTitle(label.body.title).slice(
+              0,
+              label.kind === 'planet' ? 42 : 28,
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
-
 export function MindGraphCard() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -768,21 +782,19 @@ export function MindGraphCard() {
     : null
   const hoveredBody = hoveredId ? (model.bodyById.get(hoveredId) ?? null) : null
   const focusedBody = selectedBody ?? hoveredBody ?? model.core
-  const focusedSystem = systemForBody(model, focusedBody)
   const largestSystems = model.systems.slice(0, 6)
   const visibleComets = model.comets.slice(0, 3)
 
   const clearSelection = useCallback(() => setSelectedId(null), [])
   useEscape(clearSelection)
-
-  const handleHover = useCallback((body: CelestialBody | null) => {
-    setHoveredId(body?.id ?? null)
-  }, [])
-
-  const handleSelect = useCallback((body: CelestialBody | null) => {
-    setSelectedId(body?.id ?? null)
-  }, [])
-
+  const handleHover = useCallback(
+    (body: CelestialBody | null) => setHoveredId(body?.id ?? null),
+    [],
+  )
+  const handleSelect = useCallback(
+    (body: CelestialBody | null) => setSelectedId(body?.id ?? null),
+    [],
+  )
   const toggleArm = (arm: GalaxyArm) => {
     setDisabledArms((current) => {
       const next = new Set(current)
@@ -810,8 +822,9 @@ export function MindGraphCard() {
                 Obsidian galaxy
               </h2>
               <p className="mt-1 max-w-2xl text-sm text-[var(--theme-muted)]">
-                Notes become planets, moons, and comets. Recent work warms the
-                sky; touch a system and it wakes.
+                Fly through Nova's vault: ringed planets for major notes,
+                drifting text tags for ideas, and dotted constellations for
+                links.
               </p>
             </div>
             <div className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--theme-accent-secondary)]">
@@ -821,15 +834,12 @@ export function MindGraphCard() {
           </div>
 
           <div className="nova-galaxy-field relative mt-3 min-h-[430px] flex-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] sm:h-[560px] lg:h-[650px]">
-            <GalaxyCanvas
+            <Galaxy3D
               model={model}
               selectedBody={selectedBody}
               hoveredBody={hoveredBody}
               disabledArms={disabledArms}
               searchTerm={searchTerm}
-              reducedLabels={
-                !selectedBody && !hoveredBody && !searchTerm.trim()
-              }
               isLoading={graphQuery.isLoading}
               onHover={handleHover}
               onSelect={handleSelect}
@@ -845,11 +855,7 @@ export function MindGraphCard() {
                     type="button"
                     key={arm.id}
                     onClick={() => toggleArm(arm)}
-                    className={`rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                      disabled
-                        ? 'border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.58)] text-[var(--theme-muted-2)]'
-                        : 'border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] text-[var(--theme-accent-secondary)]'
-                    }`}
+                    className={`rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${disabled ? 'border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.58)] text-[var(--theme-muted-2)]' : 'border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] text-[var(--theme-accent-secondary)]'}`}
                     aria-pressed={!disabled}
                   >
                     {arm.name}
@@ -954,7 +960,7 @@ export function MindGraphCard() {
                   <p className="line-clamp-4 text-xs leading-relaxed text-[var(--theme-text-soft)]">
                     {focusedBody.excerpt || 'No preview text yet.'}
                   </p>
-                  {focusedBody.kind === 'moon' ||
+                  {focusedBody.kind === 'tag' ||
                   focusedBody.kind === 'comet' ? (
                     <a
                       href={obsidianUri(focusedBody)}
