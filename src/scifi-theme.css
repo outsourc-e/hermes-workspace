@@ -1,4 +1,4 @@
-/* Nova Mission Control theme.
+﻿/* Nova Mission Control theme.
    Blue galaxy room: deep navy-black surfaces, amber memory light, no light mode. */
 
 @theme {
@@ -415,11 +415,12 @@
   content: '';
   position: absolute;
   inset: -12%;
+  z-index: 0;
   pointer-events: none;
 }
 
 .nova-galaxy-field::before {
-  opacity: 0.32;
+  opacity: 0.16;
   background-image:
     radial-gradient(
       circle,
@@ -440,7 +441,8 @@
 }
 
 .nova-galaxy-field::after {
-  opacity: 0.26;
+  display: none;
+  opacity: 0;
   background: conic-gradient(
     from 22deg at 50% 52%,
     transparent 0 12%,
@@ -457,6 +459,7 @@
 }
 
 .nova-galaxy-canvas {
+  z-index: 1;
   display: block;
   background: transparent;
 }

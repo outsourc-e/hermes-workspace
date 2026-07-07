@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+﻿import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   buildGalaxyModel,
@@ -176,13 +176,116 @@ function matchesSearch(body: CelestialBody, searchTerm: string): boolean {
 }
 
 function bodyRadius(body: CelestialBody, system?: PlanetarySystem): number {
-  if (body.kind === 'core') return 7.5 + body.sizeTier * 1.4
+  if (body.kind === 'core') return 12 + body.sizeTier * 1.8
   if (body.kind === 'planet')
-    return 4.4 + (system?.sizeTier ?? body.sizeTier) * 1.2
-  if (body.kind === 'comet') return 1.4
-  return 1.4 + body.sizeTier * 0.42
+    return 7.8 + (system?.sizeTier ?? body.sizeTier) * 1.55
+  if (body.kind === 'comet') return 1.3
+  return 2 + body.sizeTier * 0.56
 }
 
+function drawOrb(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  body: CelestialBody,
+  alpha: number,
+): void {
+  const hot = warmth(body) > 0.65 || body.kind === 'core'
+  const rim = body.kind === 'core' ? AMBER : hot ? GOLD : TAN
+  const gradient = context.createRadialGradient(
+    x - radius * 0.34,
+    y - radius * 0.42,
+    Math.max(1, radius * 0.08),
+    x,
+    y,
+    radius,
+  )
+  gradient.addColorStop(0, `rgba(255, 241, 204, ${0.95 * alpha})`)
+  gradient.addColorStop(0.18, `rgba(255, 179, 71, ${0.82 * alpha})`)
+  gradient.addColorStop(0.56, `rgba(122, 68, 30, ${0.72 * alpha})`)
+  gradient.addColorStop(1, `rgba(13, 14, 24, ${0.96 * alpha})`)
+  context.fillStyle = gradient
+  context.beginPath()
+  context.arc(x, y, radius, 0, Math.PI * 2)
+  context.fill()
+
+  context.strokeStyle = hot
+    ? `rgba(255, 179, 71, ${0.62 * alpha})`
+    : `rgba(212, 162, 118, ${0.36 * alpha})`
+  context.lineWidth = Math.max(0.8, radius * 0.08)
+  context.beginPath()
+  context.arc(x, y, radius, 0, Math.PI * 2)
+  context.stroke()
+
+  if (body.kind === 'core' || body.kind === 'planet') {
+    context.save()
+    context.translate(x, y)
+    context.rotate(body.orbitTilt)
+    context.strokeStyle = `rgba(255, 179, 71, ${0.2 * alpha})`
+    context.lineWidth = Math.max(0.7, radius * 0.045)
+    context.beginPath()
+    context.ellipse(0, 0, radius * 1.3, radius * 0.42, 0, 0, Math.PI * 2)
+    context.stroke()
+    context.restore()
+  }
+
+  context.fillStyle = rim
+  context.globalAlpha = 0.22 * alpha
+  context.beginPath()
+  context.arc(
+    x + radius * 0.18,
+    y + radius * 0.16,
+    radius * 0.58,
+    0,
+    Math.PI * 2,
+  )
+  context.fill()
+  context.globalAlpha = 1
+}
+
+function drawGalaxyLinks(
+  context: CanvasRenderingContext2D,
+  model: GalaxyModel,
+  points: Map<string, ScreenBody>,
+  activeSystem: PlanetarySystem | null,
+  searchTerm: string,
+  searchActive: boolean,
+): void {
+  context.save()
+  context.globalCompositeOperation = 'destination-over'
+  for (const link of model.links) {
+    const source = points.get(link.source)
+    const target = points.get(link.target)
+    if (!source || !target) continue
+    if (source.opacity < 0.1 || target.opacity < 0.1) continue
+    const active =
+      activeSystem &&
+      (source.body.systemId === activeSystem.id ||
+        target.body.systemId === activeSystem.id)
+    const searched =
+      searchActive &&
+      (matchesSearch(source.body, searchTerm) ||
+        matchesSearch(target.body, searchTerm))
+    const distance = Math.hypot(source.x - target.x, source.y - target.y)
+    if (!active && !searched) continue
+    if (!active && searched && distance > 460) continue
+    const opacity = active ? 0.28 : 0.16
+    const midX = (source.x + target.x) / 2
+    const midY = (source.y + target.y) / 2
+    const bend = Math.min(42, distance * 0.08)
+    context.strokeStyle = active
+      ? `rgba(255, 179, 71, ${opacity})`
+      : `rgba(122, 68, 30, ${opacity})`
+    context.lineWidth = active ? 1.1 : 0.65
+    context.beginPath()
+    context.moveTo(source.x, source.y)
+    context.quadraticCurveTo(midX, midY - bend, target.x, target.y)
+    context.stroke()
+    context.shadowBlur = 0
+  }
+  context.restore()
+}
 function drawBackground(
   context: CanvasRenderingContext2D,
   model: GalaxyModel,
@@ -220,27 +323,30 @@ function drawBackground(
   context.save()
   context.globalCompositeOperation = 'lighter'
   for (const arm of model.arms) {
-    context.strokeStyle = 'rgba(122, 68, 30, 0.075)'
-    context.lineWidth = Math.max(12, width * 0.018)
+    const center = worldToScreen(50, 50, width, height, camera, rotation)
+    const dust = context.createRadialGradient(
+      center.x + Math.cos(arm.angle) * width * 0.12,
+      center.y + Math.sin(arm.angle) * height * 0.08,
+      0,
+      center.x + Math.cos(arm.angle) * width * 0.12,
+      center.y + Math.sin(arm.angle) * height * 0.08,
+      Math.max(width, height) * 0.34,
+    )
+    dust.addColorStop(0, 'rgba(122, 68, 30, 0.045)')
+    dust.addColorStop(0.46, 'rgba(74, 42, 16, 0.018)')
+    dust.addColorStop(1, 'rgba(74, 42, 16, 0)')
+    context.fillStyle = dust
     context.beginPath()
-    for (let index = 0; index <= 80; index += 1) {
-      const t = index / 80
-      const radius = 8 + t * 42
-      const theta = arm.angle + t * 2.55
-      const worldX = 50 + Math.cos(theta) * radius
-      const worldY = 50 + Math.sin(theta) * radius * 0.58
-      const point = worldToScreen(
-        worldX,
-        worldY,
-        width,
-        height,
-        camera,
-        rotation,
-      )
-      if (index === 0) context.moveTo(point.x, point.y)
-      else context.lineTo(point.x, point.y)
-    }
-    context.stroke()
+    context.ellipse(
+      center.x + Math.cos(arm.angle) * width * 0.12,
+      center.y + Math.sin(arm.angle) * height * 0.08,
+      width * 0.34,
+      height * 0.14,
+      arm.angle + 0.55,
+      0,
+      Math.PI * 2,
+    )
+    context.fill()
   }
   context.restore()
 }
@@ -383,21 +489,13 @@ function GalaxyCanvas({
             (system.planet.kind === 'core' ? 0.34 : 0.18) * planetOpacity,
           )
         }
-        drawDisc(
+        drawOrb(
           context,
           planetPoint.x,
           planetPoint.y,
           planetRadius * pulse,
-          planetWarmth > 0.7 ? STAR : GOLD,
+          system.planet,
           planetOpacity,
-        )
-        drawDisc(
-          context,
-          planetPoint.x - planetRadius * 0.24,
-          planetPoint.y - planetRadius * 0.22,
-          Math.max(1, planetRadius * 0.28),
-          STRONG,
-          planetOpacity * 0.45,
         )
         points.set(system.planet.id, {
           body: system.planet,
@@ -440,14 +538,7 @@ function GalaxyCanvas({
               (systemActive ? 0.15 : 0.09) * opacity,
             )
           }
-          drawDisc(
-            context,
-            moonX,
-            moonY,
-            radius * moonPulse,
-            moon.recencyTier === 'cool' ? TAN : GOLD,
-            opacity,
-          )
+          drawOrb(context, moonX, moonY, radius * moonPulse, moon, opacity)
           points.set(moon.id, {
             body: moon,
             x: moonX,
@@ -458,7 +549,7 @@ function GalaxyCanvas({
         }
       }
 
-      const visibleComets = model.comets.slice(0, 9)
+      const visibleComets = model.comets.slice(0, 5)
       visibleComets.forEach((comet, index) => {
         const drift = reducedMotion
           ? 0
@@ -479,15 +570,24 @@ function GalaxyCanvas({
         let opacity = disabledArms.has(comet.armId) ? 0.12 : 0.34
         if (activeIds.size > 0) opacity *= 0.55
         if (searchActive && !matchesSearch(comet, searchTerm)) opacity *= 0.16
-        context.strokeStyle = `rgba(122, 68, 30, ${opacity * 0.7})`
+        context.strokeStyle = `rgba(122, 68, 30, ${opacity * 0.34})`
         context.lineWidth = 1
         context.beginPath()
-        context.moveTo(x - 28 * camera.scale, y + 4 * camera.scale)
+        context.moveTo(x - 16 * camera.scale, y + 3 * camera.scale)
         context.lineTo(x - 5 * camera.scale, y + 1 * camera.scale)
         context.stroke()
         drawDisc(context, x, y, 1.4 * camera.scale, TAN, opacity)
         points.set(comet.id, { body: comet, x, y, radius: 5, opacity })
       })
+
+      drawGalaxyLinks(
+        context,
+        model,
+        points,
+        activeSystem,
+        searchTerm,
+        searchActive,
+      )
 
       if (searchActive) {
         context.save()
@@ -514,6 +614,12 @@ function GalaxyCanvas({
       const labels: Array<ScreenBody> = []
       const corePoint = model.core ? points.get(model.core.id) : undefined
       if (corePoint) labels.push(corePoint)
+      if (reducedLabels) {
+        for (const system of model.systems.slice(0, 5)) {
+          const point = points.get(system.planet.id)
+          if (point && point.body.kind !== 'core') labels.push(point)
+        }
+      }
       if (!reducedLabels && activeSystem) {
         for (const body of [
           activeSystem.planet,
@@ -523,6 +629,15 @@ function GalaxyCanvas({
           if (point) labels.push(point)
         }
       }
+      drawGalaxyLinks(
+        context,
+        model,
+        points,
+        activeSystem,
+        searchTerm,
+        searchActive,
+      )
+
       if (searchActive) {
         for (const point of points.values()) {
           if (matchesSearch(point.body, searchTerm)) labels.push(point)
@@ -533,8 +648,10 @@ function GalaxyCanvas({
       context.textBaseline = 'top'
       for (const point of labels) {
         if (point.opacity < 0.18) continue
+        context.shadowColor = 'rgba(9, 10, 18, 0.9)'
+        context.shadowBlur = 8
         context.fillStyle = point.body.kind === 'core' ? STRONG : STAR
-        context.globalAlpha = point.body.kind === 'core' ? 0.86 : 0.72
+        context.globalAlpha = point.body.kind === 'core' ? 0.9 : 0.76
         context.fillText(
           shortTitle(point.body.title).slice(
             0,
@@ -544,6 +661,7 @@ function GalaxyCanvas({
           point.y + point.radius + 7,
         )
       }
+      context.shadowBlur = 0
       context.globalAlpha = 1
       screenBodiesRef.current = Array.from(points.values())
 
@@ -680,7 +798,7 @@ export function MindGraphCard() {
       aria-labelledby="nova-mind-graph-title"
       className="nova-galaxy-card relative overflow-hidden rounded-xl border p-3 sm:p-4"
     >
-      <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-stretch">
+      <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-start">
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -702,7 +820,7 @@ export function MindGraphCard() {
             </div>
           </div>
 
-          <div className="nova-galaxy-field relative mt-3 min-h-[430px] flex-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] sm:min-h-[560px]">
+          <div className="nova-galaxy-field relative mt-3 min-h-[430px] flex-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] sm:h-[560px] lg:h-[650px]">
             <GalaxyCanvas
               model={model}
               selectedBody={selectedBody}

@@ -2,10 +2,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
-import {
-  readKnowledgeBaseConfig,
-  type KnowledgeBaseSource,
-} from './knowledge-config'
+import { readKnowledgeBaseConfig } from './knowledge-config'
+import type { KnowledgeBaseSource } from './knowledge-config'
 
 export type WikiPageMeta = {
   path: string
@@ -343,7 +341,7 @@ export async function syncKnowledgeSource(): Promise<{
 // Path helpers
 
 function normalizeRelativeKnowledgePath(input: string): string {
-  const normalized = input.replace(/\\\\/g, '/').trim()
+  const normalized = input.replace(/\\/g, '/').trim()
   if (!normalized) throw new Error('Path is required')
   if (normalized.startsWith('/'))
     throw new Error('Absolute paths are not allowed')
@@ -447,7 +445,7 @@ function walkKnowledgeDir(
 
     const relativePath = path
       .relative(knowledgeRoot, fullPath)
-      .replace(/\\\\/g, '/')
+      .replace(/\\/g, '/')
     if (
       !relativePath ||
       relativePath.startsWith('..') ||
@@ -498,7 +496,7 @@ function createWikilinkResolver(
     if (!cleaned) return null
 
     const normalized = cleaned
-      .replace(/\\\\/g, '/')
+      .replace(/\\/g, '/')
       .trim()
       .replace(/\.md$/i, '')
       .toLowerCase()
@@ -557,7 +555,7 @@ function firstContentLines(content: string): string {
 }
 
 function folderForKnowledgePath(relativePath: string): string {
-  const parts = relativePath.split('/').filter(Boolean)
+  const parts = relativePath.replace(/\\/g, '/').split('/').filter(Boolean)
   if (parts.length >= 2 && parts[0] === 'agents')
     return `${parts[0]}/${parts[1]}`
   return parts[0] || 'vault'

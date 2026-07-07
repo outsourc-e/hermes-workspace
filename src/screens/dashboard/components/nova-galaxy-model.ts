@@ -1,4 +1,4 @@
-export type KnowledgeGraphNode = {
+﻿export type KnowledgeGraphNode = {
   id: string
   title: string
   path?: string
@@ -91,6 +91,7 @@ export type GalaxyModel = {
   systemById: Map<string, PlanetarySystem>
   systemByBodyId: Map<string, PlanetarySystem>
   starfield: Array<StarfieldPoint>
+  links: Array<KnowledgeGraphEdge>
   totals: {
     bodies: number
     links: number
@@ -149,7 +150,10 @@ function normalizeNode(node: KnowledgeGraphNode): SeedNode {
     id: node.id,
     title: node.title || shortTitle(path),
     path,
-    folder: node.folder || fallbackFolder(path),
+    folder:
+      node.folder && !/[\\\\/]/.test(node.folder)
+        ? node.folder
+        : fallbackFolder(path),
     degree: 0,
     excerpt: node.excerpt || node.summary || '',
   }
@@ -312,17 +316,24 @@ function createBody(input: {
   }
 }
 
+function seededUnit(seed: string): number {
+  let value = hashString(seed) + 0x6d2b79f5
+  value = Math.imul(value ^ (value >>> 15), value | 1)
+  value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
+  return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296
+}
+
 function createStarfield(): Array<StarfieldPoint> {
   return Array.from({ length: 360 }, (_, index) => {
     const seed = `star:${index}`
     const layer = index % 3
     return {
-      x: (hashString(`${seed}:x`) % 10000) / 100,
-      y: (hashString(`${seed}:y`) % 10000) / 100,
-      r: 0.32 + layer * 0.16 + (hashString(`${seed}:r`) % 35) / 100,
+      x: seededUnit(`${seed}:x`) * 100,
+      y: seededUnit(`${seed}:y`) * 100,
+      r: 0.28 + layer * 0.16 + seededUnit(`${seed}:r`) * 0.42,
       layer,
-      alpha: 0.2 + (hashString(`${seed}:a`) % 45) / 100,
-      warm: hashString(`${seed}:warm`) % 5 === 0,
+      alpha: 0.18 + seededUnit(`${seed}:a`) * 0.45,
+      warm: seededUnit(`${seed}:warm`) > 0.78,
     }
   })
 }
@@ -384,7 +395,8 @@ export function buildGalaxyModel(
     nodesByArm.set(arm.id, bucket)
     if (arm.id === FIELD_ARM_ID) fieldArm.bodyCount += 1
   }
-  if (fieldArm.bodyCount > 0) arms.push(fieldArm)
+  if (fieldArm.bodyCount > 0 && !arms.some((arm) => arm.id === FIELD_ARM_ID))
+    arms.push(fieldArm)
 
   const maxDegree = Math.max(1, ...nodes.map((node) => node.degree))
   const coreSeed =
@@ -495,6 +507,9 @@ export function buildGalaxyModel(
     systemById,
     systemByBodyId,
     starfield: createStarfield(),
+    links: edges.filter(
+      (edge) => bodyById.has(edge.source) && bodyById.has(edge.target),
+    ),
     totals: {
       bodies: nodes.length,
       links: edges.length,
