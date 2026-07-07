@@ -223,7 +223,10 @@ Update this when you land a fix that future sessions must know about.
   `com.hermes.swarm.self-improve` (01:00, `scripts/swarm-self-improve.sh`)
   gathers tsc/test/health/scoreboard evidence and dispatches the maintainer
   to stage ONE reviewable fix — never pushes/merges; review lands in the
-  morning digest. Outcome writes are best-effort: never let them fail a
+  morning digest. [RECURS-risk] Workers doing git work MUST use an isolated
+  worktree (~/workspace/nightly-fixes/) — a bare `git checkout -b` in the
+  live repo switches the operator's branch under running sessions (happened
+  on the first live run). Outcome writes are best-effort: never let them fail a
   dispatch.
 
 - `260e9e90` **Security: auth-gated** /api/swarm-kanban, /api/events (SSE),
