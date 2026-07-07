@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec node "$(dirname "$0")/../scripts/telegram-research-implementation-proposal.mjs" "$@"

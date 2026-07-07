@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { runTelegramApprovedDiscoveryExecutorCli } from '../scripts/telegram-approved-discovery-executor.mjs';
+
+runTelegramApprovedDiscoveryExecutorCli();

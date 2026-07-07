@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+import { runTelegramDiscoveryNotificationCli } from '../scripts/telegram-discovery-notification.mjs';
+
+runTelegramDiscoveryNotificationCli().catch((error) => {
+  process.stdout.write(`${JSON.stringify({ ok: false, sent: false, error: error.message.replace(/bot\d+:[A-Za-z0-9_-]+/g, 'bot[REDACTED]'), githubCalls: false, githubWrites: false, cloneForkRunInstallCreateRepoPushPrMergeDelete: false, auditAppend: false, durableMutation: false, obsidianKanbanWrites: false, note: 'No action taken.' }, null, 2)}\n`);
+  process.exitCode = 1;
+});

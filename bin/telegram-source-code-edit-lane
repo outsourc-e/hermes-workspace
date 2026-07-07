@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+import { runTelegramSourceCodeEditLaneCli } from '../scripts/telegram-source-code-edit-lane.mjs'
+
+runTelegramSourceCodeEditLaneCli().catch((error) => {
+  process.stderr.write(`${error.stack || error.message}\n`)
+  process.exitCode = 1
+})

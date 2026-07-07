@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+import { runTelegramApprovalPollCli } from '../scripts/telegram-approval-poll.mjs';
+
+runTelegramApprovalPollCli().catch((error) => {
+  process.stdout.write(`${JSON.stringify({ ok: false, error: String(error?.message || error).replace(/bot\d+:[A-Za-z0-9_-]+/g, 'bot[REDACTED]'), offsetUpdated: false, decisionsAppended: 0, decision_rows: [], executor: false, clone: false, fork: false, runCode: false, installDependencies: false, createRepo: false, push: false, prOpen: false, merge: false, delete: false, githubWrites: false, auditAppend: false, durableMutation: false, obsidianKanbanWrites: false, note: 'No executor ran. No approval decision recorded after this error.' }, null, 2)}\n`);
+  process.exitCode = 1;
+});

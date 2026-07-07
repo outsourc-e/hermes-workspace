@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+import { runObsidianIdeaIntakeCli } from '../scripts/obsidian-idea-intake.mjs';
+
+runObsidianIdeaIntakeCli().catch((error) => {
+  process.stdout.write(`${JSON.stringify({ ok: false, error: error?.message || String(error), sideEffects: { obsidianWrites: false, kanbanWrites: false, githubCalls: false, githubWrites: false, telegramSends: false, serviceTimerChanges: false, dispatcherSwarm: false, liveCapturedIdeasAppend: false, tempCapturedIdeasAppend: false } }, null, 2)}\n`);
+  process.exitCode = 1;
+});
