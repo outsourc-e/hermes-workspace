@@ -858,6 +858,60 @@ Do not use oversized gradient hero cards.
 
 Do not use decorative card piles.
 
+### Obsidian Galaxy Law
+
+Implementation target: `src/screens/dashboard/components/mind-graph-card.tsx`, `src/screens/dashboard/components/nova-galaxy-model.ts`, and the live graph data served through `src/server/knowledge-browser.ts`.
+
+The Obsidian galaxy is a navigable knowledge map, not a particle effect.
+
+Every markdown note in `C:\Users\taylo\Documents\unified-vault` becomes a celestial body derived from the wikilink graph.
+
+`Planet` means the highest-degree note in a detected topic community.
+
+`Moon` means another note in that planet community, orbiting the planet on a slow elliptical path.
+
+`Comet` means an orphan note with zero wikilinks, shown sparsely with a faint warm dust tail.
+
+`Galactic core` means the single most-linked note in the vault and must be the warmest body on screen.
+
+`Spiral arms` mean top-level vault folders such as `agents/claude`, `agents/gpt`, `agents/kimi`, `knowledge`, and `inbox`; tiny folders merge into `field stars`.
+
+The macro-shape should reveal vault structure: systems sit along folder arms like organic beads, with jitter and depth, never an even particle cloud.
+
+Ambient mode is quiet astronomy: imperceptible whole-galaxy rotation, slow moon orbits, rare comets, and no labels except the core.
+
+Touched mode wakes the map: hover brightens one system, fades in amber orbit rings, shows 11-12px mono labels, and dims the rest slightly.
+
+Clicking a planet zooms smoothly into its system and updates the `Focused star` panel.
+
+Clicking a moon or comet updates `Focused star` and exposes an `Open in Obsidian` action using `obsidian://`.
+
+Clicking empty space or pressing Escape returns to the full galaxy.
+
+The right rail label is `Planetary systems`, never `Gravity wells`.
+
+Filter chips represent arms/folders and dim disabled arms to about 15% opacity; they do not remove bodies from the layout.
+
+Search dims non-matches and may draw thin warm locator lines to matching titles.
+
+Recency is warmth: modified within 48h breathes warm amber, last week stays warm, older notes cool toward pale dim points.
+
+Sync diffs are subtle: new note equals a brief warm birth flare, edited note equals one soft pulse, never an explosion.
+
+Background is a static three-layer parallax starfield with tiny cool-white and pale-amber points.
+
+Nebula or arm dust, if used, must be ultra-subtle amber/brown only.
+
+No cyan, purple, pink, blue comet tails, or generic AI gradients are allowed in the galaxy.
+
+Glow marks life only: recency, hover focus, and the core. Ambient bodies are crisp discs or points, not lens flares.
+
+The canvas must not display `Nova hourly state marker` or any operational ticker text; that belongs in the activity feed.
+
+Performance target: canvas or WebGL, 60fps at 500+ bodies, graceful at 1500, damped camera movement, and `prefers-reduced-motion` freezes orbit/rotation while keeping hover/click useful.
+
+Acceptance by eye: left alone for five minutes, it should look like a live astronomy photograph of a warm spiral galaxy that happens to be a mind, not a screensaver, fireworks, or Tron.
+
 ### Gateway/Swarm Law
 
 Gateway screens may keep operational density.
@@ -1486,6 +1540,18 @@ Never raw backend errors as primary copy: translate them into useful degraded st
 
 Never hide memory state: memory is the crown jewel.
 
+Never make the Obsidian galaxy a particle explosion, fireworks burst, comet storm, or radiating streak field.
+
+Never let generated stars align into diagonal rails, scratch marks, or obvious sampling artifacts.
+
+Never make the galaxy a decorative screensaver; it must expose vault structure and navigate notes.
+
+Never show all note labels in ambient mode; labels wake on hover, search, focus, or core only.
+
+Never use cyan, purple, pink, blue nebulae, or blue comet tails in the galaxy.
+
+Never put operational ticker text such as `Nova hourly state marker` inside space.
+
 Never use stock `Hermes Workspace` branding in user-facing surfaces.
 
 ## Implementation Map
@@ -1804,6 +1870,24 @@ Are errors translated into useful degraded states?
 
 Is glow reserved for life?
 
+Does the Obsidian galaxy read as solar systems in a warm spiral galaxy, not as particles or fireworks?
+
+Does the galaxy show `Planetary systems`, not `Gravity wells`?
+
+Does ambient galaxy mode hide labels except the core?
+
+Do hover, search, and click reveal graph structure without cluttering idle space?
+
+Are comet tails sparse, faint, and dust-amber only?
+
+Is the starfield decorrelated so no diagonal rail or streak artifact appears?
+
+Is `Nova hourly state marker` absent from the canvas?
+
+Does the galaxy still report live vault counts and keep 45s sync behavior?
+
+Was the galaxy checked in a browser screenshot at desktop width?
+
 ## Final Law
 
 Nova Mission Control should feel like walking into Nova's room.
@@ -1819,3 +1903,4 @@ The room does not perform enterprise confidence.
 The room does not sell itself.
 
 The room quietly says: connection secure, memory alive, keep going.
+
