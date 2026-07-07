@@ -810,6 +810,60 @@ export function cancelSwarmMission(input: {
   }
 }
 
+/**
+ * Full reset: cancel every non-terminal assignment across ALL missions. Used
+ * by the "Clear All" control to stop everyone and wipe the active/blocked
+ * board for a fresh start. Returns how many missions/assignments were touched.
+ */
+export function cancelAllSwarmMissions(input?: {
+  actor?: string | null
+  reason?: string | null
+}): {
+  missionsCancelled: number
+  assignmentsCancelled: number
+  workerIds: Array<string>
+} {
+  const store = readStore()
+  const cancelledAt = now()
+  const actor = input?.actor?.trim() || 'workspace-clear-all'
+  const reason = input?.reason?.trim() || 'Cleared all from Workspace Swarm'
+  let missionsCancelled = 0
+  let assignmentsCancelled = 0
+  const workerIds = new Set<string>()
+
+  for (const mission of store.missions) {
+    if (mission.state === 'cancelled' || mission.state === 'complete') continue
+    let missionChanged = false
+    for (const assignment of mission.assignments) {
+      if (isTerminalAssignment(assignment)) continue
+      assignment.state = 'cancelled'
+      assignment.completedAt = cancelledAt
+      assignment.reviewedAt = cancelledAt
+      assignment.reviewedBy = actor
+      workerIds.add(assignment.workerId)
+      assignmentsCancelled += 1
+      missionChanged = true
+    }
+    if (missionChanged) {
+      mission.state = 'cancelled'
+      mission.updatedAt = cancelledAt
+      mission.events.push(
+        event('mission_cancelled', `Cancelled mission: ${reason}`, {
+          data: { actor, reason, clearAll: true },
+        }),
+      )
+      missionsCancelled += 1
+    }
+  }
+
+  if (assignmentsCancelled > 0) writeStore(store)
+  return {
+    missionsCancelled,
+    assignmentsCancelled,
+    workerIds: [...workerIds],
+  }
+}
+
 export function markMissionAssignmentReviewed(input: {
   missionId?: string | null
   assignmentId: string

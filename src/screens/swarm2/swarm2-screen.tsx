@@ -830,6 +830,7 @@ type ControlPlaneStageProps = {
   onViewModeChange: (mode: ViewMode) => void
   onOpenRouter: () => void
   onRouterResults: () => void
+  onClearAll: () => void
   onSelect: (workerId: string) => void
   onToggleRoom: (workerId: string) => void
   onOpenTui: (workerId: string) => void
@@ -871,6 +872,7 @@ function ControlPlaneStage({
   onViewModeChange,
   onOpenRouter,
   onRouterResults,
+  onClearAll,
   onSelect,
   onToggleRoom,
   onOpenTui,
@@ -983,6 +985,7 @@ function ControlPlaneStage({
           onRouterResults={() => {
             void onRouterResults()
           }}
+          onClearAll={onClearAll}
           onAnchorRef={setAnchor}
           className="w-full max-w-5xl"
         />
@@ -2083,6 +2086,24 @@ export function Swarm2Screen() {
             onRouterResults={() => {
               void runtimeQuery.refetch()
               void missionsQuery.refetch()
+            }}
+            onClearAll={async () => {
+              if (
+                !window.confirm(
+                  'Stop ALL workers, cancel ALL running tasks, and clear the blocked board for a fresh start? This cannot be undone.',
+                )
+              )
+                return
+              try {
+                await fetch('/api/swarm-missions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'cancel-all' }),
+                })
+              } finally {
+                void runtimeQuery.refetch()
+                void missionsQuery.refetch()
+              }
             }}
             onSelect={(workerId) => setSelectedId(workerId)}
             onToggleRoom={(workerId) => toggleRoom(workerId)}

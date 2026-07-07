@@ -5,6 +5,7 @@ import {
   SWARM_MISSIONS_PATH,
   cancelSwarmAssignment,
   cancelSwarmMission,
+  cancelAllSwarmMissions,
   clearAllBlocked,
   getSwarmMission,
   listSwarmMissions,
@@ -13,6 +14,36 @@ import {
   unblockMissionAssignment,
 } from '../../server/swarm-missions'
 import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
+import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+
+function resolveTmuxBin(): string {
+  const override = process.env.HERMES_TMUX_BIN || process.env.CLAUDE_TMUX_BIN
+  if (override) return override
+  for (const c of [
+    '/opt/homebrew/bin/tmux',
+    '/usr/local/bin/tmux',
+    '/usr/bin/tmux',
+    join(homedir(), '.local', 'bin', 'tmux'),
+  ]) {
+    if (existsSync(c)) return c
+  }
+  return 'tmux'
+}
+
+/** Kill a worker's persistent tmux session, if any. Best-effort. */
+function killSwarmTmuxSession(workerId: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(workerId)) return resolve()
+    execFile(
+      resolveTmuxBin(),
+      ['kill-session', '-t', `swarm-${workerId}`],
+      () => resolve(),
+    )
+  })
+}
 
 type CancelPostBody = {
   action?: unknown
@@ -138,6 +169,39 @@ export const Route = createFileRoute('/api/swarm-missions')({
             action,
             cleared: result.cleared,
             assignmentIds: result.assignmentIds,
+          })
+        }
+        if (action === 'cancel-all') {
+          const actor = cleanString(body.actor) ?? 'workspace-clear-all'
+          const reason =
+            cleanString(body.reason) ?? 'Cleared all from Workspace Swarm'
+          // 1. Cancel every active assignment across all missions.
+          const cancelled = cancelAllSwarmMissions({ actor, reason })
+          // 2. Wipe the blocked/needs-input board.
+          const cleared = clearAllBlocked()
+          // 3. Stop each worker: reset its runtime state and kill its live
+          //    tmux session so nothing keeps executing.
+          const affected = new Set<string>([
+            ...cancelled.workerIds,
+            ...listSwarmMissions(100).flatMap((m) =>
+              m.assignments.map((a) => a.workerId),
+            ),
+          ])
+          for (const id of affected) {
+            try {
+              resetSwarmWorkerRuntime(id, { actor, reason })
+            } catch {
+              /* best-effort */
+            }
+            await killSwarmTmuxSession(id)
+          }
+          return json({
+            ok: true,
+            action,
+            missionsCancelled: cancelled.missionsCancelled,
+            assignmentsCancelled: cancelled.assignmentsCancelled,
+            blockedCleared: cleared.cleared,
+            workersReset: [...affected],
           })
         }
         if (action !== 'cancel')
