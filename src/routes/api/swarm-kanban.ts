@@ -1,7 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
-import { createKanbanCard, getKanbanBackendMeta, listKanbanCards, updateKanbanCard } from '../../server/kanban-backend'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  createKanbanCard,
+  getKanbanBackendMeta,
+  listKanbanCards,
+  updateKanbanCard,
+} from '../../server/kanban-backend'
 
 const AcceptanceCriteriaSchema = z.preprocess(
   (value) => {
@@ -37,7 +43,10 @@ const CreateCardSchema = z.object({
   acceptanceCriteria: AcceptanceCriteriaSchema,
   assignedWorker: z.string().trim().max(120).optional().nullable(),
   reviewer: z.string().trim().max(120).optional().nullable(),
-  status: z.enum(['backlog', 'todo', 'ready', 'running', 'review', 'blocked', 'done']).optional().default('backlog'),
+  status: z
+    .enum(['backlog', 'todo', 'ready', 'running', 'review', 'blocked', 'done'])
+    .optional()
+    .default('backlog'),
   missionId: z.string().trim().max(200).optional().nullable(),
   reportPath: z.string().trim().max(500).optional().nullable(),
   createdBy: z.string().trim().max(120).optional().default('aurora'),
@@ -53,7 +62,10 @@ const UpdateCardSchema = CreateCardSchema.partial().extend({
 export const Route = createFileRoute('/api/swarm-kanban')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         return json({
           ok: true,
           cards: await listKanbanCards(),
@@ -61,6 +73,9 @@ export const Route = createFileRoute('/api/swarm-kanban')({
         })
       },
       POST: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         let body: unknown
         try {
           body = await request.json()
@@ -69,7 +84,15 @@ export const Route = createFileRoute('/api/swarm-kanban')({
         }
         const parsed = CreateCardSchema.safeParse(body)
         if (!parsed.success) {
-          return json({ ok: false, error: parsed.error.issues.map((issue) => issue.message).join('; ') }, { status: 400 })
+          return json(
+            {
+              ok: false,
+              error: parsed.error.issues
+                .map((issue) => issue.message)
+                .join('; '),
+            },
+            { status: 400 },
+          )
         }
         const data = parsed.data
         const card = await createKanbanCard({
@@ -89,6 +112,9 @@ export const Route = createFileRoute('/api/swarm-kanban')({
         return json({ ok: true, card, backend: getKanbanBackendMeta() })
       },
       PATCH: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         let body: unknown
         try {
           body = await request.json()
@@ -97,11 +123,20 @@ export const Route = createFileRoute('/api/swarm-kanban')({
         }
         const parsed = UpdateCardSchema.safeParse(body)
         if (!parsed.success) {
-          return json({ ok: false, error: parsed.error.issues.map((issue) => issue.message).join('; ') }, { status: 400 })
+          return json(
+            {
+              ok: false,
+              error: parsed.error.issues
+                .map((issue) => issue.message)
+                .join('; '),
+            },
+            { status: 400 },
+          )
         }
         const { id, ...updates } = parsed.data
         const card = await updateKanbanCard(id, updates)
-        if (!card) return json({ ok: false, error: 'Card not found' }, { status: 404 })
+        if (!card)
+          return json({ ok: false, error: 'Card not found' }, { status: 404 })
         return json({ ok: true, card, backend: getKanbanBackendMeta() })
       },
     },
