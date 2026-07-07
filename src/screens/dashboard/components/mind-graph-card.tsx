@@ -1,7 +1,13 @@
 ﻿import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { clamp, obsidianUri, seededUnit, shortTitle } from './nova-galaxy-model'
+import {
+  buildGalaxyModel,
+  clamp,
+  obsidianUri,
+  seededUnit,
+  shortTitle,
+} from './nova-galaxy-model'
 import type {
   CelestialBody,
   GalaxyArm,
@@ -426,6 +432,21 @@ function Galaxy3D({
       cometObjects.push({ body, group, material, tailMaterial })
     })
 
+    const homeTarget = (() => {
+      const corePosition = model.core ? bodyPositions.get(model.core.id) : null
+      if (corePosition) return corePosition.clone()
+      if (model.systems.length === 0) return new THREE.Vector3(0, 0, 0)
+      const target = new THREE.Vector3()
+      let count = 0
+      for (const system of model.systems) {
+        const position = bodyPositions.get(system.planet.id)
+        if (!position) continue
+        target.add(position)
+        count += 1
+      }
+      return count > 0 ? target.divideScalar(count) : new THREE.Vector3(0, 0, 0)
+    })()
+    if (!selectedRef.current) cameraStateRef.current.target.copy(homeTarget)
     const lineObjects: Array<LineObject> = []
     for (const link of model.links) {
       const source = bodyPositions.get(link.source)
@@ -472,7 +493,7 @@ function Galaxy3D({
       const state = cameraStateRef.current
       const selected = selectedRef.current
       const selectedPosition = selected ? bodyPositions.get(selected.id) : null
-      const desiredTarget = selectedPosition ?? new THREE.Vector3(0, 0, 0)
+      const desiredTarget = selectedPosition ?? homeTarget
       const desiredDistance = selectedPosition ? 20 : 76
       state.target.lerp(desiredTarget, reducedMotionRef.current ? 1 : 0.065)
       state.distance +=
@@ -609,7 +630,7 @@ function Galaxy3D({
       )
       for (const system of visibleSystems) {
         pushLabel(system.planet, 'planet', true)
-        const tagLimit = activeIds.has(system.id) || query ? 28 : 5
+        const tagLimit = activeIds.has(system.id) || query ? 28 : 1
         for (const tag of system.tags.slice(0, tagLimit)) pushLabel(tag, 'tag')
       }
       setLabels(projected)
