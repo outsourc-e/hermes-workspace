@@ -23,6 +23,10 @@ import { openaiChat } from '../../server/openai-compat-api'
 import { streamResponses } from '../../server/responses-api'
 import { selectPortableConversationHistory } from '../../server/portable-history'
 import {
+  appendDstnyRagContextToMessage,
+  retrieveDstnyRagContext,
+} from '../../server/dstny-rag'
+import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   createSession,
   ensureGatewayProbed,
@@ -375,6 +379,13 @@ export const Route = createFileRoute('/api/send-stream')({
           getChatMessage(message, attachments),
           workspaceScope,
         )
+        const ragContext = await retrieveDstnyRagContext(
+          getChatMessage(message, attachments),
+        ).catch(() => null)
+        const ragScopedMessage = appendDstnyRagContextToMessage(
+          scopedMessage,
+          ragContext,
+        )
 
         // Create streaming response using the SHARED server connection
         const encoder = new TextEncoder()
@@ -468,6 +479,14 @@ export const Route = createFileRoute('/api/send-stream')({
               enqueueRaw(payload)
             }
 
+            if (ragContext?.sources.length) {
+              sendEvent('sources', {
+                status: ragContext.status,
+                elapsedMs: ragContext.elapsedMs,
+                sources: ragContext.sources,
+              })
+            }
+
             // Cloudflare Tunnel/Access can otherwise leave small SSE streams idle
             // long enough that the browser-side fetch is canceled before visible
             // assistant chunks arrive. Send an initial padding comment and a
@@ -554,7 +573,7 @@ export const Route = createFileRoute('/api/send-stream')({
 
                 try {
                   const userContent = buildMultimodalContent(
-                    scopedMessage,
+                    ragScopedMessage,
                     attachments,
                   )
                   // Inject locale preference so the agent responds in the user's language
@@ -619,7 +638,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     >()
                     try {
                       const responsesStream = streamResponses({
-                        input: scopedMessage,
+                        input: ragScopedMessage,
                         conversationHistory: effectiveHistory,
                         model:
                           typeof body.model === 'string' ? body.model : undefined,
@@ -1009,7 +1028,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 await streamChat(
                 sessionKey,
                 {
-                  message: scopedMessage,
+                  message: ragScopedMessage,
                   model:
                     typeof body.model === 'string' ? body.model : undefined,
                   system_message: thinking,
