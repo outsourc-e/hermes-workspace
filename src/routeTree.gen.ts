@@ -158,6 +158,11 @@ import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-ta
 import { Route as ApiExternalMemorySearchRouteImport } from './routes/api/external-memory/search'
 import { Route as ApiExternalMemoryProvidersRouteImport } from './routes/api/external-memory/providers'
 import { Route as ApiExternalMemoryCandidatesRouteImport } from './routes/api/external-memory/candidates'
+import { Route as ApiDstnyDocumentsUploadRouteImport } from './routes/api/dstny-documents/upload'
+import { Route as ApiDstnyDocumentsUpdateRouteImport } from './routes/api/dstny-documents/update'
+import { Route as ApiDstnyDocumentsListRouteImport } from './routes/api/dstny-documents/list'
+import { Route as ApiDstnyDocumentsIngestRouteImport } from './routes/api/dstny-documents/ingest'
+import { Route as ApiDstnyDocumentsAnalyzePromptRouteImport } from './routes/api/dstny-documents/analyze-prompt'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
@@ -919,6 +924,32 @@ const ApiExternalMemoryCandidatesRoute =
     path: '/api/external-memory/candidates',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiDstnyDocumentsUploadRoute = ApiDstnyDocumentsUploadRouteImport.update({
+  id: '/api/dstny-documents/upload',
+  path: '/api/dstny-documents/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDstnyDocumentsUpdateRoute = ApiDstnyDocumentsUpdateRouteImport.update({
+  id: '/api/dstny-documents/update',
+  path: '/api/dstny-documents/update',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDstnyDocumentsListRoute = ApiDstnyDocumentsListRouteImport.update({
+  id: '/api/dstny-documents/list',
+  path: '/api/dstny-documents/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDstnyDocumentsIngestRoute = ApiDstnyDocumentsIngestRouteImport.update({
+  id: '/api/dstny-documents/ingest',
+  path: '/api/dstny-documents/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDstnyDocumentsAnalyzePromptRoute =
+  ApiDstnyDocumentsAnalyzePromptRouteImport.update({
+    id: '/api/dstny-documents/analyze-prompt',
+    path: '/api/dstny-documents/analyze-prompt',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
   id: '/api/dashboard/overview',
   path: '/api/dashboard/overview',
@@ -1088,6 +1119,11 @@ export interface FileRoutesByFullPath {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/dstny-documents/analyze-prompt': typeof ApiDstnyDocumentsAnalyzePromptRoute
+  '/api/dstny-documents/ingest': typeof ApiDstnyDocumentsIngestRoute
+  '/api/dstny-documents/list': typeof ApiDstnyDocumentsListRoute
+  '/api/dstny-documents/update': typeof ApiDstnyDocumentsUpdateRoute
+  '/api/dstny-documents/upload': typeof ApiDstnyDocumentsUploadRoute
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1249,6 +1285,11 @@ export interface FileRoutesByTo {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/dstny-documents/analyze-prompt': typeof ApiDstnyDocumentsAnalyzePromptRoute
+  '/api/dstny-documents/ingest': typeof ApiDstnyDocumentsIngestRoute
+  '/api/dstny-documents/list': typeof ApiDstnyDocumentsListRoute
+  '/api/dstny-documents/update': typeof ApiDstnyDocumentsUpdateRoute
+  '/api/dstny-documents/upload': typeof ApiDstnyDocumentsUploadRoute
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1412,6 +1453,11 @@ export interface FileRoutesById {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/dstny-documents/analyze-prompt': typeof ApiDstnyDocumentsAnalyzePromptRoute
+  '/api/dstny-documents/ingest': typeof ApiDstnyDocumentsIngestRoute
+  '/api/dstny-documents/list': typeof ApiDstnyDocumentsListRoute
+  '/api/dstny-documents/update': typeof ApiDstnyDocumentsUpdateRoute
+  '/api/dstny-documents/upload': typeof ApiDstnyDocumentsUploadRoute
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1576,6 +1622,11 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/dstny-documents/analyze-prompt'
+    | '/api/dstny-documents/ingest'
+    | '/api/dstny-documents/list'
+    | '/api/dstny-documents/update'
+    | '/api/dstny-documents/upload'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -1737,6 +1788,11 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/dstny-documents/analyze-prompt'
+    | '/api/dstny-documents/ingest'
+    | '/api/dstny-documents/list'
+    | '/api/dstny-documents/update'
+    | '/api/dstny-documents/upload'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -1899,6 +1955,11 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/dstny-documents/analyze-prompt'
+    | '/api/dstny-documents/ingest'
+    | '/api/dstny-documents/list'
+    | '/api/dstny-documents/update'
+    | '/api/dstny-documents/upload'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -2056,6 +2117,11 @@ export interface RootRouteChildren {
   ChatIndexRoute: typeof ChatIndexRoute
   ApiClaudeProxySplatRoute: typeof ApiClaudeProxySplatRoute
   ApiDashboardOverviewRoute: typeof ApiDashboardOverviewRoute
+  ApiDstnyDocumentsAnalyzePromptRoute: typeof ApiDstnyDocumentsAnalyzePromptRoute
+  ApiDstnyDocumentsIngestRoute: typeof ApiDstnyDocumentsIngestRoute
+  ApiDstnyDocumentsListRoute: typeof ApiDstnyDocumentsListRoute
+  ApiDstnyDocumentsUpdateRoute: typeof ApiDstnyDocumentsUpdateRoute
+  ApiDstnyDocumentsUploadRoute: typeof ApiDstnyDocumentsUploadRoute
   ApiExternalMemoryCandidatesRoute: typeof ApiExternalMemoryCandidatesRoute
   ApiExternalMemoryProvidersRoute: typeof ApiExternalMemoryProvidersRoute
   ApiExternalMemorySearchRoute: typeof ApiExternalMemorySearchRoute
@@ -3130,6 +3196,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExternalMemoryCandidatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dstny-documents/upload': {
+      id: '/api/dstny-documents/upload'
+      path: '/api/dstny-documents/upload'
+      fullPath: '/api/dstny-documents/upload'
+      preLoaderRoute: typeof ApiDstnyDocumentsUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dstny-documents/update': {
+      id: '/api/dstny-documents/update'
+      path: '/api/dstny-documents/update'
+      fullPath: '/api/dstny-documents/update'
+      preLoaderRoute: typeof ApiDstnyDocumentsUpdateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dstny-documents/list': {
+      id: '/api/dstny-documents/list'
+      path: '/api/dstny-documents/list'
+      fullPath: '/api/dstny-documents/list'
+      preLoaderRoute: typeof ApiDstnyDocumentsListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dstny-documents/ingest': {
+      id: '/api/dstny-documents/ingest'
+      path: '/api/dstny-documents/ingest'
+      fullPath: '/api/dstny-documents/ingest'
+      preLoaderRoute: typeof ApiDstnyDocumentsIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dstny-documents/analyze-prompt': {
+      id: '/api/dstny-documents/analyze-prompt'
+      path: '/api/dstny-documents/analyze-prompt'
+      fullPath: '/api/dstny-documents/analyze-prompt'
+      preLoaderRoute: typeof ApiDstnyDocumentsAnalyzePromptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dashboard/overview': {
       id: '/api/dashboard/overview'
       path: '/api/dashboard/overview'
@@ -3525,6 +3626,11 @@ const rootRouteChildren: RootRouteChildren = {
   ChatIndexRoute: ChatIndexRoute,
   ApiClaudeProxySplatRoute: ApiClaudeProxySplatRoute,
   ApiDashboardOverviewRoute: ApiDashboardOverviewRoute,
+  ApiDstnyDocumentsAnalyzePromptRoute: ApiDstnyDocumentsAnalyzePromptRoute,
+  ApiDstnyDocumentsIngestRoute: ApiDstnyDocumentsIngestRoute,
+  ApiDstnyDocumentsListRoute: ApiDstnyDocumentsListRoute,
+  ApiDstnyDocumentsUpdateRoute: ApiDstnyDocumentsUpdateRoute,
+  ApiDstnyDocumentsUploadRoute: ApiDstnyDocumentsUploadRoute,
   ApiExternalMemoryCandidatesRoute: ApiExternalMemoryCandidatesRoute,
   ApiExternalMemoryProvidersRoute: ApiExternalMemoryProvidersRoute,
   ApiExternalMemorySearchRoute: ApiExternalMemorySearchRoute,
