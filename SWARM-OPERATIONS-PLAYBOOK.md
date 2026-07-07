@@ -211,6 +211,15 @@ npx tsc --noEmit -p tsconfig.json 2>&1 | grep -c "error TS"   # baseline: 98 (di
 
 Update this when you land a fix that future sessions must know about.
 
+- (pending) **Phase 2**: (a) daily backups — `scripts/hermes-backup.sh` +
+  `com.hermes.backup` launchd (03:00) tar the .runtime, vault, and memory to
+  `~/hermes-backups` (keep 14). (b) health strip now warns on provider drift /
+  missing wrappers / missing profiles (`swarm-health.ts` summary.warnings).
+  (c) Discord digest — `scripts/hermes-discord-digest.sh` +
+  `com.hermes.discord-digest` (08:05) posts active/blocked/greenlight-queue +
+  health warnings + token spend to Discord via the hermes bot (token from
+  `~/.hermes/.env`; channel auto-discovers if `DISCORD_HOME_CHANNEL` is stale).
+
 - (pending) **Tier-1 completeness**: (a) live-TUI dispatches now self-complete —
   on checkpoint-poll timeout the pane is read; if the TUI is idle-ready a DONE
   checkpoint is synthesized from the reply (`readIdleTuiReply` in
