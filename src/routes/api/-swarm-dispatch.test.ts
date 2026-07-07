@@ -159,16 +159,16 @@ describe('buildHermesTmuxLaunchCommand', () => {
 })
 
 describe('buildHermesChatQueryArgs', () => {
-  it('passes the prompt immediately after -q so flags are not parsed as the query', () => {
+  it('keeps the prompt immediately after -q, with the dispatch marker early', () => {
     const prompt = 'STATE: DONE\nRESULT: ok'
     const args = buildHermesChatQueryArgs(prompt)
 
-    expect(args.slice(0, 3)).toEqual(['chat', '-q', prompt])
+    // Marker first (within pkill's command-line window), then -q + prompt.
+    expect(args.slice(0, 3)).toEqual(['chat', '--source', 'swarm-dispatch'])
+    const qIdx = args.indexOf('-q')
+    expect(qIdx).toBeGreaterThan(-1)
+    expect(args[qIdx + 1]).toBe(prompt)
     expect(args).toContain('-Q')
-    expect(args).toContain('--source')
-    expect(args[1]).toBe('-q')
-    expect(args[2]).toBe(prompt)
-    expect(args[3]).toBe('-Q')
   })
 })
 

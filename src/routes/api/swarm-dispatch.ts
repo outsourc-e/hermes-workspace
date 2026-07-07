@@ -1111,14 +1111,19 @@ export function buildHermesChatQueryArgs(
   // Keeping the prompt adjacent to -q prevents argparse from interpreting
   // following flags (for example -Q) as a missing query and failing with:
   // "argument -q/--query: expected one argument".
+  //
+  // `--source swarm-dispatch` goes FIRST (before the huge -q prompt) so it
+  // stays inside macOS pkill's ~4KB command-line window — Clear All kills
+  // in-flight dispatches by matching that marker, which was invisible when it
+  // trailed a multi-thousand-char prompt.
   const args = [
     'chat',
+    '--source',
+    'swarm-dispatch',
     '-q',
     prompt,
     '-Q',
     '--ignore-rules',
-    '--source',
-    'swarm-dispatch',
   ]
   // Honor the worker's permission mode: only bypass Hermes approvals when the
   // profile is in auto/yolo mode (default true preserves prior behavior for

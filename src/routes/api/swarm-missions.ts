@@ -15,7 +15,13 @@ import {
 } from '../../server/swarm-missions'
 import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 import { execFile } from 'node:child_process'
-import { existsSync, readdirSync, renameSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -51,19 +57,38 @@ function listWorkerProfileIds(): Array<string> {
  */
 function clearWorkerChatHistory(workerId: string): void {
   if (!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(workerId)) return
-  const db = join(swarmProfilesDir(), workerId, 'state.db')
-  if (!existsSync(db)) return
-  const bak = `${db}.cleared.bak`
-  try {
-    if (existsSync(bak)) rmSync(bak, { force: true })
-    renameSync(db, bak)
-    // SQLite WAL/SHM sidecars would otherwise re-attach to a stale db.
-    for (const side of ['-wal', '-shm']) {
-      const p = `${db}${side}`
-      if (existsSync(p)) rmSync(p, { force: true })
+  const dir = join(swarmProfilesDir(), workerId)
+  const db = join(dir, 'state.db')
+  if (existsSync(db)) {
+    const bak = `${db}.cleared.bak`
+    try {
+      if (existsSync(bak)) rmSync(bak, { force: true })
+      renameSync(db, bak)
+      // SQLite WAL/SHM sidecars would otherwise re-attach to a stale db.
+      for (const side of ['-wal', '-shm']) {
+        const p = `${db}${side}`
+        if (existsSync(p)) rmSync(p, { force: true })
+      }
+    } catch {
+      /* best-effort */
     }
-  } catch {
-    /* best-effort */
+  }
+  // The log files are the "agent logs" surfaced in the TUI/runtime view
+  // (swarm-runtime reads logs/agent.log). Clearing state.db alone leaves the
+  // visible chat log intact — truncate the log files too for a real fresh start.
+  const logsDir = join(dir, 'logs')
+  for (const name of [
+    'agent.log',
+    'errors.log',
+    'tui_gateway_crash.log',
+    'swarm-dispatch-startup.log',
+  ]) {
+    const p = join(logsDir, name)
+    try {
+      if (existsSync(p)) writeFileSync(p, '')
+    } catch {
+      /* best-effort */
+    }
   }
 }
 
@@ -90,6 +115,19 @@ function killSwarmTmuxSession(workerId: string): Promise<void> {
       ['kill-session', '-t', `swarm-${workerId}`],
       () => resolve(),
     )
+  })
+}
+
+/**
+ * Kill in-flight oneshot dispatch processes. Every swarm oneshot runs
+ * `hermes chat -q … --source swarm-dispatch`, so pkill on that marker stops
+ * any task still executing without touching unrelated hermes processes (the
+ * gateway, TUI sessions already killed via tmux, the user's own chats).
+ * pkill is macOS/Linux; no-ops elsewhere.
+ */
+function killInflightDispatches(): Promise<void> {
+  return new Promise((resolve) => {
+    execFile('pkill', ['-f', '--source swarm-dispatch'], () => resolve())
   })
 }
 
@@ -243,8 +281,13 @@ export const Route = createFileRoute('/api/swarm-missions')({
             }
             await killSwarmTmuxSession(id)
           }
-          // Fresh session: kill sessions + clear chat history for EVERY worker
-          // profile on disk, not just those with active tasks.
+          // Kill any in-flight oneshot dispatch processes — a running
+          // `hermes chat -q ... --source swarm-dispatch` child keeps executing
+          // after the mission is cancelled unless it's killed. This is what
+          // left "tasks still running" after Clear All.
+          await killInflightDispatches()
+          // Fresh session: kill sessions + clear chat history + logs for EVERY
+          // worker profile on disk, not just those with active tasks.
           const allWorkerIds = listWorkerProfileIds()
           for (const id of allWorkerIds) {
             await killSwarmTmuxSession(id)
