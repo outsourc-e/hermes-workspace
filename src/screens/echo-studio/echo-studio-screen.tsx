@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 type Tab = 'create' | 'manage' | 'theme'
@@ -12,31 +12,115 @@ const QUICK_TEMPLATES = [
 const DEFAULT_PROMPT =
   "Describe the UI you want: charts, tables, KPIs, filters, real-time updates... Example: 'A dashboard with a line graph showing tool usage over time, a period selector (week/month), top 3 KPI cards for most used tools, a live counter for active calls, and a detailed table below with project, tool name, count, date, and status columns.'"
 
+type EchoPage = {
+  id: string
+  title: string
+  prompt: string
+  status: 'draft' | 'building' | 'ready' | 'failed'
+  createdAt: number
+  missionId: string | null
+  note: string | null
+}
+
 export function EchoStudioScreen() {
   const [tab, setTab] = useState<Tab>('create')
   const [pageId, setPageId] = useState('')
   const [pageTitle, setPageTitle] = useState('')
   const [prompt, setPrompt] = useState('')
   const [creating, setCreating] = useState(false)
-  const [screensCreated, setScreensCreated] = useState(0)
-  const [widgetsActive, setWidgetsActive] = useState(0)
-  const [apiEndpoints, setApiEndpoints] = useState(0)
+  const [pages, setPages] = useState<Array<EchoPage>>([])
+
+  const screensCreated = pages.length
+  const widgetsActive = pages.filter((p) => p.status === 'ready').length
+  const apiEndpoints = pages.filter((p) => p.missionId).length
+
+  const loadPages = async () => {
+    try {
+      const res = await fetch('/api/echo-pages')
+      if (!res.ok) return
+      const data = (await res.json()) as { pages?: Array<EchoPage> }
+      setPages(data.pages ?? [])
+    } catch {
+      /* offline — keep current */
+    }
+  }
+
+  useEffect(() => {
+    void loadPages()
+  }, [])
 
   const handleCreate = async () => {
-    if (!pageId.trim() || !pageTitle.trim() || !prompt.trim()) return
+    if (!pageTitle.trim() || !prompt.trim()) return
     setCreating(true)
-    // Simulate creation — in production this would call the backend
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setScreensCreated((c) => c + 1)
-    setApiEndpoints((c) => c + 1)
-    setPageId('')
-    setPageTitle('')
-    setPrompt('')
-    setCreating(false)
+    try {
+      // 1. Persist the page spec.
+      const res = await fetch('/api/echo-pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          id: pageId.trim() || undefined,
+          title: pageTitle.trim(),
+          prompt: prompt.trim(),
+        }),
+      })
+      const data = (await res.json()) as {
+        ok?: boolean
+        page?: EchoPage
+        dispatch?: { workerId: string; task: string }
+      }
+      // 2. Dispatch the build to the swarm builder, then mark it building.
+      if (data.ok && data.page && data.dispatch) {
+        try {
+          const dispatchRes = await fetch('/api/swarm-dispatch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              assignments: [data.dispatch],
+              waitForCheckpoint: false,
+            }),
+          })
+          const dispatchData = (await dispatchRes.json()) as {
+            missionId?: string
+          }
+          await fetch('/api/echo-pages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update',
+              id: data.page.id,
+              status: 'building',
+              missionId: dispatchData.missionId ?? '',
+            }),
+          })
+        } catch {
+          /* dispatch failed — spec still saved as draft */
+        }
+      }
+      setPageId('')
+      setPageTitle('')
+      setPrompt('')
+      setTab('manage')
+      await loadPages()
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleDeletePage = async (id: string) => {
+    await fetch('/api/echo-pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id }),
+    })
+    await loadPages()
   }
 
   const handleTemplate = (id: string) => {
-    const templates: Record<string, { id: string; title: string; prompt: string }> = {
+    const templates: Record<
+      string,
+      { id: string; title: string; prompt: string }
+    > = {
       analytics: {
         id: 'tool-analytics',
         title: 'Tool Analytics',
@@ -146,10 +230,10 @@ export function EchoStudioScreen() {
                   <button
                     type="button"
                     onClick={handleCreate}
-                    disabled={!pageId.trim() || !pageTitle.trim() || !prompt.trim() || creating}
+                    disabled={!pageTitle.trim() || !prompt.trim() || creating}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all',
-                      creating || !pageId.trim() || !pageTitle.trim() || !prompt.trim()
+                      creating || !pageTitle.trim() || !prompt.trim()
                         ? 'cursor-not-allowed bg-primary-300 opacity-60'
                         : 'bg-accent-500 hover:bg-accent-600 active:scale-[0.98]',
                     )}
@@ -200,21 +284,67 @@ export function EchoStudioScreen() {
         )}
 
         {/* Manage Tab */}
-        {tab === 'manage' && (
-          <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-8 text-center">
-            <p className="text-lg text-primary-500">No screens created yet.</p>
-            <p className="mt-1 text-sm text-primary-400">
-              Use the Create tab to build your first dashboard.
-            </p>
-          </div>
-        )}
+        {tab === 'manage' &&
+          (pages.length === 0 ? (
+            <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-8 text-center">
+              <p className="text-lg text-primary-500">No pages created yet.</p>
+              <p className="mt-1 text-sm text-primary-400">
+                Use the Create tab to describe a tool — the swarm builds it.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pages.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-start justify-between gap-4 rounded-2xl border border-primary-200 bg-white p-4 dark:bg-neutral-900"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-ink">{p.title}</span>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                          p.status === 'ready'
+                            ? 'bg-green-100 text-green-700'
+                            : p.status === 'building'
+                              ? 'bg-amber-100 text-amber-700'
+                              : p.status === 'failed'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-primary-100 text-primary-600',
+                        )}
+                      >
+                        {p.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-sm text-primary-500">
+                      {p.prompt}
+                    </p>
+                    <p className="mt-1 font-mono text-[11px] text-primary-400">
+                      {p.id}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeletePage(p.id)}
+                    className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          ))}
 
         {/* Theme Tab */}
         {tab === 'theme' && (
           <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-8 text-center">
-            <p className="text-lg text-primary-500">Theme customization coming soon.</p>
+            <p className="text-lg text-primary-500">
+              Theme customization coming soon.
+            </p>
             <p className="mt-1 text-sm text-primary-400">
-              Choose from light, dark, and custom color schemes for your dashboards.
+              Choose from light, dark, and custom color schemes for your
+              dashboards.
             </p>
           </div>
         )}
@@ -229,7 +359,9 @@ function StatCard({ label, value }: { label: string; value: number }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
         {label}
       </p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-ink">{value}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight text-ink">
+        {value}
+      </p>
     </div>
   )
 }
