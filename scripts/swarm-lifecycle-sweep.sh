@@ -77,7 +77,7 @@ if [ -n "$CURRENT_BRANCH" ]; then
         fi
         ;;
     esac
-    echo "{\"branch_guard\":{\"expected\":\"$EXPECTED_BRANCH\",\"found\":\"$CURRENT_BRANCH\",\"restored\":\"$restored\"}}" >> "$LOG_FILE"
+    echo "{\"at\":$(date +%s)000,\"branch_guard\":{\"expected\":\"$EXPECTED_BRANCH\",\"found\":\"$CURRENT_BRANCH\",\"restored\":\"$restored\"}}" >> "$LOG_FILE"
     # Discord alert (best-effort, secrets stay in env file).
     ENV_FILE="$HOME/.hermes/.env"
     BOT_TOKEN="$(grep -E '^DISCORD_BOT_TOKEN=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-)"

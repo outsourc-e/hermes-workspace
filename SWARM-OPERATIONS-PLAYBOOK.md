@@ -211,6 +211,16 @@ npx tsc --noEmit -p tsconfig.json 2>&1 | grep -c "error TS"   # baseline: 98 (di
 
 Update this when you land a fix that future sessions must know about.
 
+- (Tier C partial) **Watchdog + unified timeline**: `com.hermes.watchdog`
+  (5 min, scripts/hermes-watchdog.sh) probes workspace/gateway/dashboard
+  HTTP + discord-bot process, auto `launchctl kickstart`s them once, alerts
+  #hermes-workspace via bot token, escalates if still down next cycle; also
+  low-disk (<10 GB) and wedged-worker (executing >2h silent) alerts. State
+  in ~/.hermes/logs/watchdog-state.json. Timeline: /api/swarm-timeline
+  (src/server/swarm-timeline.ts) merges mission events + outcomes jsonl +
+  scheduled-run logs + sweep/branch-guard rows, newest-first; panel on the
+  swarm cards view. Multi-machine workers deliberately deferred.
+
 - (Tier 1 learning loops) **Outcome memory + scoreboard + self-improvement**:
   every dispatch appends to `.runtime/swarm-outcomes.jsonl`
   (`src/server/swarm-outcomes.ts`, wired via `finalizeDispatch` in

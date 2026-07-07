@@ -27,6 +27,7 @@ import { Swarm2Wires } from './swarm2-wires'
 import { Swarm2ActivityFeed } from './swarm2-activity-feed'
 import { Swarm2UsagePanel } from './swarm2-usage-panel'
 import { Swarm2ScoreboardPanel } from './swarm2-scoreboard-panel'
+import { Swarm2TimelinePanel } from './swarm2-timeline-panel'
 import { Swarm2KanbanBoard } from './swarm2-kanban-board'
 import {
   Swarm2ReportsView,
@@ -2156,6 +2157,9 @@ export function Swarm2Screen() {
         {viewMode === 'cards' ? <Swarm2UsagePanel className="mt-3" /> : null}
         {viewMode === 'cards' ? (
           <Swarm2ScoreboardPanel className="mt-3" />
+        ) : null}
+        {viewMode === 'cards' ? (
+          <Swarm2TimelinePanel className="mt-3" />
         ) : null}
       </div>
 
