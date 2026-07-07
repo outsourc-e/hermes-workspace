@@ -12,8 +12,17 @@ import {
   type AgoraStatus,
 } from '../lib/agora-types'
 
-const FUNNY_ANIMALS = [
-  'Owl', 'Fox', 'Wolf', 'Otter', 'Hawk', 'Lynx', 'Crow', 'Stag', 'Heron',
+// The Greek pantheon — new arrivals spawn as a random little god.
+const AGORA_GODS: Array<{ id: AgoraAvatarId; name: string }> = [
+  { id: 'hermes', name: 'Hermes' },
+  { id: 'athena', name: 'Athena' },
+  { id: 'apollo', name: 'Apollo' },
+  { id: 'artemis', name: 'Artemis' },
+  { id: 'iris', name: 'Iris' },
+  { id: 'nike', name: 'Nike' },
+  { id: 'eros', name: 'Eros' },
+  { id: 'pan', name: 'Pan' },
+  { id: 'chronos', name: 'Chronos' },
 ]
 
 function generateInitialProfile(): AgoraProfile {
@@ -21,14 +30,13 @@ function generateInitialProfile(): AgoraProfile {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `agora-${Math.random().toString(36).slice(2, 10)}`
-  const animal = FUNNY_ANIMALS[Math.floor(Math.random() * FUNNY_ANIMALS.length)]
-  const num = Math.floor(Math.random() * 9000) + 1000
-  const handle = `${animal.toLowerCase()}${num}`
+  const god = AGORA_GODS[Math.floor(Math.random() * AGORA_GODS.length)]
+  const num = Math.floor(Math.random() * 900) + 100
   return {
     id,
-    handle,
-    displayName: `Builder ${animal}`,
-    avatarId: 'hermes',
+    handle: `${god.id}${num}`,
+    displayName: `${god.name} ${num}`,
+    avatarId: god.id,
     bio: '',
     status: 'online',
   }
@@ -40,11 +48,19 @@ function loadProfile(): AgoraProfile {
     const raw = window.localStorage.getItem(AGORA_PROFILE_STORAGE_KEY)
     if (!raw) {
       const initial = generateInitialProfile()
-      window.localStorage.setItem(AGORA_PROFILE_STORAGE_KEY, JSON.stringify(initial))
+      window.localStorage.setItem(
+        AGORA_PROFILE_STORAGE_KEY,
+        JSON.stringify(initial),
+      )
       return initial
     }
     const parsed = JSON.parse(raw) as AgoraProfile
-    if (!parsed.id || !parsed.handle || !parsed.displayName || !parsed.avatarId) {
+    if (
+      !parsed.id ||
+      !parsed.handle ||
+      !parsed.displayName ||
+      !parsed.avatarId
+    ) {
       return generateInitialProfile()
     }
     return parsed
@@ -58,7 +74,10 @@ export function useAgoraProfile() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(AGORA_PROFILE_STORAGE_KEY, JSON.stringify(profile))
+      window.localStorage.setItem(
+        AGORA_PROFILE_STORAGE_KEY,
+        JSON.stringify(profile),
+      )
     } catch {
       // ignore quota / private mode
     }

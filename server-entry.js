@@ -1,8 +1,40 @@
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { join, extname } from 'node:path'
+import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import server from './dist/server/server.js'
+import { attachAgoraPresence } from './agora-presence-server.mjs'
+
+// Auth check for the Agora WS upgrade — mirrors src/server/auth-middleware.ts:
+// password protection is only on when HERMES_PASSWORD/CLAUDE_PASSWORD is set;
+// otherwise all requests pass. When on, require a valid claude-auth cookie
+// token from the session store.
+function agoraIsAuthed(cookieHeader) {
+  const passwordOn = Boolean(
+    (process.env.HERMES_PASSWORD && process.env.HERMES_PASSWORD.length) ||
+      (process.env.CLAUDE_PASSWORD && process.env.CLAUDE_PASSWORD.length),
+  )
+  if (!passwordOn) return true
+  if (!cookieHeader) return false
+  const m = /(?:^|;\s*)claude-auth=([^;]+)/.exec(cookieHeader)
+  const token = m && m[1]
+  if (!token) return false
+  try {
+    const base =
+      process.env.HERMES_HOME ||
+      process.env.CLAUDE_HOME ||
+      join(homedir(), '.hermes')
+    const store = JSON.parse(
+      readFileSync(join(base, 'workspace-sessions.json'), 'utf8'),
+    )
+    const expiry = store && store.tokens && store.tokens[token]
+    return typeof expiry === 'number' && expiry > Date.now()
+  } catch {
+    return false
+  }
+}
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLIENT_DIR = join(__dirname, 'dist', 'client')
@@ -128,7 +160,8 @@ async function tryServeStatic(req, res) {
     } catch {
       res.writeHead(404, {
         'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control':
+          'no-store, no-cache, must-revalidate, proxy-revalidate',
       })
       res.end('Asset not found')
       return true
@@ -235,6 +268,12 @@ async function requestHandler(req, res) {
 
 function listenOn(bindHost) {
   const httpServer = createServer(requestHandler)
+  // Real-presence WebSocket room for the Agora lobby.
+  try {
+    attachAgoraPresence(httpServer, agoraIsAuthed)
+  } catch (err) {
+    console.error('Agora presence init failed:', err)
+  }
   httpServer.listen(port, bindHost, () => {
     console.log(`Hermes Workspace running at http://${bindHost}:${port}`)
   })
