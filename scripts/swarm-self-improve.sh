@@ -56,7 +56,7 @@ Tonight's evidence:
 - Underperforming workers (scoreboard): ${SCOREBOARD:-none}
 
 Do the following, in order:
-1. If tests fail or tsc rose above baseline, diagnose the top failure and prepare a minimal fix on a branch named nightly/self-improve-$(date +%Y%m%d). Do NOT push, do NOT merge.
+1. If tests fail or tsc rose above baseline, diagnose the top failure and prepare a minimal fix in an ISOLATED WORKTREE: run 'git -C $REPO_DIR worktree add ~/workspace/nightly-fixes/$(date +%Y%m%d) -b nightly/self-improve-$(date +%Y%m%d)' and do ALL work inside that worktree directory. NEVER run git checkout/switch inside $REPO_DIR itself — it is the live workspace. Do NOT push, do NOT merge.
 2. Otherwise pick ONE small, concrete improvement grounded in the evidence above (a health warning, a recurring block reason, flaky area). Prepare the fix the same way.
 3. Run the relevant tests to prove the fix.
 4. Checkpoint with STATE: DONE, exact FILES_CHANGED, COMMANDS_RUN, and in NEXT_ACTION say exactly what the operator should review and greenlight.
