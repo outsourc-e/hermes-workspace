@@ -21,7 +21,8 @@ import {
   useState,
 } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
+import type { AuthStatus } from '@/lib/claude-auth'
+import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
@@ -52,6 +53,7 @@ const TerminalWorkspace = lazy(() =>
 
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
   'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
+const COMPACT_SHELL_MEDIA_QUERY = '(max-width: 1023px)'
 
 type WorkspaceShellProps = {
   children?: React.ReactNode
@@ -72,10 +74,14 @@ function NovaTopBar() {
     hour: '2-digit',
     minute: '2-digit',
   }).format(now)
+  const compactClock = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(now)
 
   return (
     <div
-      className="absolute inset-x-0 top-0 z-20 flex h-11 items-center justify-between gap-3 border-b px-4 backdrop-blur-md"
+      className="absolute inset-x-0 top-0 z-20 flex h-11 items-center justify-between gap-2 border-b px-2.5 backdrop-blur-md sm:gap-3 sm:px-4"
       style={{
         background: 'var(--theme-header-bg)',
         borderColor: 'var(--theme-header-border)',
@@ -83,8 +89,11 @@ function NovaTopBar() {
       }}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <span className="font-mono text-[11px] text-[var(--theme-muted)] tabular-nums">
+        <span className="hidden font-mono text-[11px] text-[var(--theme-muted)] tabular-nums sm:inline">
           {clock}
+        </span>
+        <span className="font-mono text-[10px] text-[var(--theme-muted)] tabular-nums sm:hidden">
+          {compactClock}
         </span>
         <span className="hidden h-4 w-px bg-[var(--theme-border-subtle)] sm:block" />
         <span className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] px-2.5 py-1 font-mono text-[11px] text-[var(--theme-accent-secondary)]">
@@ -99,7 +108,7 @@ function NovaTopBar() {
       <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
-          className="rounded-full border border-[var(--theme-border)] bg-transparent px-3 py-1 text-xs font-medium text-[var(--theme-accent-secondary)] transition-colors hover:bg-[var(--theme-accent-subtle)]"
+          className="rounded-full border border-[var(--theme-border)] bg-transparent px-2 py-1 text-[11px] font-medium text-[var(--theme-accent-secondary)] transition-colors hover:bg-[var(--theme-accent-subtle)] sm:px-3 sm:text-xs"
         >
           Pause
         </button>
@@ -138,7 +147,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [creatingSession, setCreatingSession] = useState(false)
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false
-    return window.matchMedia('(max-width: 767px)').matches
+    return window.matchMedia(COMPACT_SHELL_MEDIA_QUERY).matches
   })
 
   // Slide transition direction tracking (mobile only)
@@ -205,7 +214,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           chatReady?: boolean
           modelConfigured?: boolean
         }
-        if (data?.ok || (data?.chatReady && data?.modelConfigured)) {
+        if (data.ok || (data.chatReady && data.modelConfigured)) {
           setAuthStatus({ authenticated: true, authRequired: false })
           setConnectionVerified(true)
         }
@@ -243,10 +252,18 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
-  const isOnPlaygroundRoute = pathname === '/playground' || pathname.startsWith('/playground/')
-  const isOnHermesWorldLandingRoute = pathname === '/hermes-world' || pathname.startsWith('/hermes-world/') || pathname === '/world' || pathname.startsWith('/world/')
+  const isOnPlaygroundRoute =
+    pathname === '/playground' || pathname.startsWith('/playground/')
+  const isOnHermesWorldLandingRoute =
+    pathname === '/hermes-world' ||
+    pathname.startsWith('/hermes-world/') ||
+    pathname === '/world' ||
+    pathname.startsWith('/world/')
+  const routeSearch = search as Record<string, unknown>
   const isEmbeddedSurface =
-    search?.embed === '1' || search?.embed === 'true' || search?.mode === 'embed'
+    routeSearch.embed === '1' ||
+    routeSearch.embed === 'true' ||
+    routeSearch.mode === 'embed'
   const isChromeFreeSurface = isEmbeddedSurface || isOnHermesWorldLandingRoute
   const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
@@ -277,7 +294,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   const handleSelectSession = useCallback(() => {
     // On mobile, collapse sidebar after selecting
-    if (window.innerWidth < 768) {
+    if (window.matchMedia(COMPACT_SHELL_MEDIA_QUERY).matches) {
       setSidebarCollapsed(true)
     }
   }, [setSidebarCollapsed])
@@ -287,7 +304,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, [navigate])
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)')
+    const media = window.matchMedia(COMPACT_SHELL_MEDIA_QUERY)
     const update = () => setIsMobile(media.matches)
     update()
     media.addEventListener('change', update)
@@ -398,12 +415,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         <div
           className={cn(
             'grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden',
-            hideChatSidebar || isChromeFreeSurface ? 'md:grid-cols-1' : 'md:grid-cols-[auto_1fr]',
+            hideChatSidebar ? 'lg:grid-cols-1' : 'lg:grid-cols-[auto_1fr]',
           )}
         >
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
-          {!isChromeFreeSurface && !isMobile && !hideChatSidebar && (
+          {!isMobile && !hideChatSidebar && (
             <div className="relative z-30">
               <ChatSidebar
                 sessions={sessions}
@@ -432,22 +449,19 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
               isMobile && !isOnChatRoute
                 ? 'pb-[calc(var(--tabbar-h,80px)+0.5rem)]'
-                : !isMobile &&
-                    !isChromeFreeSurface &&
-                    !isOnChatRoute &&
-                    settings.showSystemMetricsFooter
+                : !isMobile && !isOnChatRoute && settings.showSystemMetricsFooter
                   ? 'pb-7'
                   : '',
             ].join(' ')}
             data-tour="chat-area"
           >
-            {!isChromeFreeSurface ? <NovaTopBar /> : null}
+            <NovaTopBar />
             {/* Persistent terminal — stays mounted to preserve session across navigation */}
             <div
               className="flex flex-col"
               style={{
                 position: 'absolute',
-                inset: isChromeFreeSurface ? 0 : '44px 0 0 0',
+                inset: '44px 0 0 0',
                 visibility: isOnTerminalRoute ? 'visible' : 'hidden',
                 pointerEvents: isOnTerminalRoute ? 'auto' : 'none',
                 zIndex: isOnTerminalRoute ? 1 : -1,
@@ -473,8 +487,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             <div
               className={[
                 'page-transition flex flex-col',
-                isChromeFreeSurface ? 'min-h-full' : 'h-full',
-                !isChromeFreeSurface ? 'pt-11' : '',
+                'h-full',
+                'pt-11',
                 slideClass,
                 isOnTerminalRoute ? 'hidden' : '',
               ]
@@ -482,7 +496,6 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 .join(' ')}
             >
               {isMobile &&
-                !isChromeFreeSurface &&
                 !isOnChatRoute &&
                 !isOnTerminalRoute &&
                 mobilePageTitle && <MobilePageHeader title={mobilePageTitle} />}
@@ -491,11 +504,13 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           </main>
 
           {/* Chat panel — visible on non-chat routes (but not in HermesWorld, which has its own in-game chat) */}
-          {!isOnChatRoute && !isOnPlaygroundRoute && !isChromeFreeSurface && !isMobile && <ChatPanel />}
+          {!isOnChatRoute && !isOnPlaygroundRoute && !isMobile && <ChatPanel />}
         </div>
 
         {/* Floating chat toggle — visible on non-chat routes (but not in HermesWorld) */}
-        {!isChromeFreeSurface && !isOnChatRoute && !isOnPlaygroundRoute && !isMobile && <ChatPanelToggle />}
+        {!isOnChatRoute && !isOnPlaygroundRoute && !isMobile && (
+          <ChatPanelToggle />
+        )}
 
         {showDesktopSidebarBackdrop ? (
           <button
@@ -511,12 +526,14 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         ) : null}
       </div>
 
-      {!isChromeFreeSurface ? <MobileHamburgerMenu /> : null}
-      {!isChromeFreeSurface ? <MobileTabBar /> : null}
-      {!isChromeFreeSurface && !isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
+      <MobileHamburgerMenu />
+      <MobileTabBar />
+      {!isMobile &&
+      !isOnChatRoute &&
+      settings.showSystemMetricsFooter ? (
         <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
       ) : null}
-      {!isChromeFreeSurface ? <CommandPalette pathname={pathname} sessions={sessions} /> : null}
+      <CommandPalette pathname={pathname} sessions={sessions} />
     </>
   )
 }

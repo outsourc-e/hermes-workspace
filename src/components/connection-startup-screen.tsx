@@ -32,7 +32,7 @@ function getSetupSteps(
       title: 'Optional: install Nova gateway locally',
       command:
         'curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash',
-      note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically â€” no fork required',
+      note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically - no fork required',
     },
     {
       title: 'Set up your agent',
@@ -113,7 +113,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           setServerLog([
             String(
               data.message ||
-                'Auto-started Nova gateway gateway â€” reconnectingâ€¦',
+                'Auto-started Nova gateway - reconnecting...',
             ),
           ])
         }
@@ -131,7 +131,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         if (isDone.current) return
         isDone.current = true
         clearTimeout(failureTimer)
-        if (autoStartTimer) clearTimeout(autoStartTimer)
+        clearTimeout(autoStartTimer)
         if (pollTimer) clearTimeout(pollTimer)
         onConnectedRef.current(status)
       } catch {
@@ -145,10 +145,9 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
     return () => {
       isDone.current = true
       if (pollTimer) clearTimeout(pollTimer)
-      if (autoStartTimer) clearTimeout(autoStartTimer)
+      clearTimeout(autoStartTimer)
       clearTimeout(failureTimer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -187,7 +186,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
       const data = (await res.json()) as Record<string, unknown>
       if (res.ok && data.ok) {
         setServerLog([
-          String(data.message || 'Started â€” waiting for connection...'),
+          String(data.message || 'Started - waiting for connection...'),
         ])
         setServerStarting(false)
         return
@@ -212,9 +211,9 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-6 py-10 text-white"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-6 py-10 text-[#F7E8C6]"
       style={{
-        backgroundColor: '#0A0E1A',
+        backgroundColor: '#050A12',
         fontFamily: 'Inter, system-ui, sans-serif',
       }}
     >
@@ -225,23 +224,23 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           className="mb-5 h-24 w-24 rounded-2xl object-cover shadow-[0_12px_40px_rgba(255,140,26,0.28)]"
         />
 
-        <h1 className="text-[2rem] font-semibold tracking-tight text-[var(--theme-text-strong)]">
+        <h1 className="text-[2rem] font-semibold tracking-tight text-[#F7E8C6]">
           Nova Mission Control
         </h1>
 
         {/* Connecting spinner */}
         <div
           className={[
-            'mt-4 flex items-center gap-3 text-sm text-white/72 transition-opacity duration-300',
+            'mt-4 flex items-center gap-3 text-sm text-[#C8D8EA] transition-opacity duration-300',
             showFailureState ? 'opacity-0 h-0' : 'opacity-100',
           ].join(' ')}
           aria-hidden={showFailureState}
         >
-          <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+          <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#36506C] border-t-[#FFB347]" />
           <span>Connection: checking</span>
         </div>
 
-        {/* Failure state â€” setup guide */}
+        {/* Failure state - setup guide */}
         <div
           className={[
             'w-full overflow-hidden transition-all duration-500 ease-out',
@@ -250,11 +249,11 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
               : 'max-h-0 translate-y-2 opacity-0',
           ].join(' ')}
         >
-          <div className="w-full rounded-3xl border border-white/10 bg-white/5 p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-            <p className="text-base font-medium text-white">
+          <div className="w-full rounded-3xl border border-[#29476A] bg-[#0E1A2A] p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-sm">
+            <p className="text-base font-semibold text-[#F7E8C6]">
               Jack in to your backend
             </p>
-            <p className="mt-2 text-sm leading-6 text-white/60">
+            <p className="mt-2 text-sm leading-6 text-[#B8C7D8]">
               Nova can work with any OpenAI-compatible backend. The local
               gateway unlocks richer workspace features when it is available.
             </p>
@@ -268,8 +267,8 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                 className={[
                   'w-full rounded-xl px-5 py-3 text-sm font-semibold transition',
                   serverStarting
-                    ? 'cursor-not-allowed bg-indigo-900/70 text-indigo-200'
-                    : 'bg-indigo-500 text-white hover:bg-indigo-400',
+                    ? 'cursor-not-allowed bg-[#4B321E] text-[#FFD49A]'
+                    : 'bg-[#FF9D2E] text-[#08111D] hover:bg-[#FFB347]',
                 ].join(' ')}
               >
                 {serverStarting ? (
@@ -288,11 +287,11 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                   className={[
                     'mt-3 rounded-xl border p-3',
                     serverError
-                      ? 'border-red-500/20 bg-red-950/30'
-                      : 'border-emerald-500/20 bg-emerald-950/30',
+                      ? 'border-[#E07B39] bg-[#2B170F]'
+                      : 'border-[#7AA36F] bg-[#102317]',
                   ].join(' ')}
                 >
-                  <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-white/70">
+                  <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-[#FFE6BD]">
                     {serverLog.join('\n')}
                   </pre>
                 </div>
@@ -301,15 +300,15 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
             {/* Divider */}
             <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10" />
+              <div className="h-px flex-1 bg-[#29476A]" />
               <button
                 type="button"
                 onClick={() => setShowManual(!showManual)}
-                className="text-xs font-medium text-white/50 transition hover:text-white/70"
+                className="text-xs font-medium text-[#8FB2D8] transition hover:text-[#F7E8C6]"
               >
                 {showManual ? 'Hide' : 'Show'} manual setup
               </button>
-              <div className="h-px flex-1 bg-white/10" />
+              <div className="h-px flex-1 bg-[#29476A]" />
             </div>
 
             {/* Manual setup steps */}
@@ -323,45 +322,45 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                 {steps.map((step, idx) => (
                   <div
                     key={idx}
-                    className="rounded-xl border border-white/8 bg-black/20 p-4"
+                    className="rounded-xl border border-[#24405F] bg-[#07111F] p-4"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-300">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FF9D2E] text-xs font-bold text-[#08111D]">
                           {idx + 1}
                         </span>
-                        <span className="text-sm font-medium text-white/90">
+                        <span className="text-sm font-semibold text-[#E8F1FF]">
                           {step.title}
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleCopy(step.command, idx)}
-                        className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white/80"
+                        className="shrink-0 rounded-lg border border-[#385A7A] bg-[#10243A] px-2.5 py-1 text-xs font-medium text-[#CFE5FF] transition hover:bg-[#193653] hover:text-white"
                       >
-                        {copiedIdx === idx ? 'âœ“ Copied' : 'Copy'}
+                        {copiedIdx === idx ? 'Copied' : 'Copy'}
                       </button>
                     </div>
-                    <pre className="mt-2 overflow-x-auto rounded-lg bg-black/40 p-3 font-mono text-xs leading-5 text-white/80">
+                    <pre className="mt-2 overflow-x-auto rounded-lg bg-[#020711] p-3 font-mono text-xs leading-5 text-[#FFD49A]">
                       <code>{step.command}</code>
                     </pre>
                     {step.note ? (
-                      <p className="mt-2 text-xs text-white/40">{step.note}</p>
+                      <p className="mt-2 text-xs leading-5 text-[#9FB3C7]">{step.note}</p>
                     ) : null}
                   </div>
                 ))}
               </div>
 
               {/* Env var hint */}
-              <div className="mt-4 rounded-xl border border-white/6 bg-white/3 p-3">
-                <p className="text-xs font-medium text-white/50">
+              <div className="mt-4 rounded-xl border border-[#24405F] bg-[#07111F] p-3">
+                <p className="text-xs font-medium text-[#AFC5DC]">
                   Point{' '}
-                  <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/70">
+                  <code className="rounded bg-[#10243A] px-1.5 py-0.5 font-mono text-[#FFD49A]">
                     HERMES_API_URL
                   </code>{' '}
                   at any OpenAI-compatible backend:
                 </p>
-                <pre className="mt-2 overflow-x-auto font-mono text-xs text-white/60">
+                <pre className="mt-2 overflow-x-auto font-mono text-xs text-[#CFE5FF]">
                   HERMES_API_URL=http://your-server:8642 pnpm dev
                 </pre>
               </div>
@@ -370,7 +369,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         </div>
 
         {!showFailureState ? (
-          <p className="mt-6 text-xs text-white/45">
+          <p className="mt-6 text-xs text-[#8FA7BF]">
             This page auto-refreshes when a compatible backend is detected
           </p>
         ) : null}

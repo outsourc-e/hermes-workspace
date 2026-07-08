@@ -254,7 +254,7 @@ export function MobileTabBar() {
         ref={navRef}
         className={cn(
           // Pill: fixed bottom center, shrink to content width
-          'fixed bottom-0 left-0 right-0 mx-auto w-fit z-[80] md:hidden',
+          'fixed bottom-0 left-2 right-2 mx-auto z-[80] w-auto max-w-[calc(100vw-1rem)] overflow-x-auto [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden',
           // Vertical position: above home indicator
           'mb-[max(env(safe-area-inset-bottom,8px),16px)]',
           // Keep the pill visually isolated from page and error-state backgrounds
@@ -275,7 +275,7 @@ export function MobileTabBar() {
         onTouchMove={handlePillTouchMove}
         onTouchEnd={handlePillTouchEnd}
       >
-        <div className="flex items-center gap-1">
+        <div className="flex w-max items-center gap-1">
           {MOBILE_NAV_TABS.map((tab, idx) => {
             const isActive = tab.match(pathname)
             const isCenter = tab.id === 'chat'

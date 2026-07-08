@@ -181,7 +181,7 @@ export function MobileHamburgerMenu() {
       {/* Push-style layout wrapper — sidebar pushes content right */}
       <div
         className={cn(
-          'fixed inset-0 z-[95] md:hidden',
+          'fixed inset-0 z-[95] lg:hidden',
           'transition-transform duration-300 ease-in-out',
           open ? 'translate-x-0' : 'pointer-events-none',
         )}
@@ -202,7 +202,7 @@ export function MobileHamburgerMenu() {
       {/* Slide-over drawer */}
       <div
         className={cn(
-          'fixed top-0 left-0 bottom-0 z-[96] w-72 md:hidden',
+          'fixed top-0 left-0 bottom-0 z-[96] w-72 lg:hidden',
           'shadow-2xl',
           'flex flex-col pt-[max(env(safe-area-inset-top,20px),20px)] pb-[max(env(safe-area-inset-bottom,20px),20px)]',
           'transition-transform duration-300 ease-in-out',

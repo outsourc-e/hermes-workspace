@@ -64,6 +64,7 @@ import {
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 
 type WorkspaceStats = Record<string, unknown>
+const COMPACT_SIDEBAR_MEDIA_QUERY = '(max-width: 1023px)'
 
 function ThemeToggleMini() {
   const _theme = useSettingsStore((state) => state.settings.theme)
@@ -161,7 +162,7 @@ export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
   }
 }
 
-export async function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
+export function fetchWorkspaceProjectShortcuts(): Array<never> {
   return []
 }
 
@@ -207,9 +208,24 @@ function NovaVisualLinkFrame() {
 }
 
 const NOVA_AGENT_ROSTER = [
-  { name: 'Nova', activity: 'Memory keeper', model: 'grok-4.3', tokens: '18.2k' },
-  { name: 'Astra', activity: 'Planning orbit', model: 'grok-4.3', tokens: '7.4k' },
-  { name: 'Claude', activity: 'Code support', model: 'kimi-k2.6 fallback', tokens: '42.1k' },
+  {
+    name: 'Nova',
+    activity: 'Memory keeper',
+    model: 'ChatGPT OAuth',
+    tokens: '18.2k',
+  },
+  {
+    name: 'Claude',
+    activity: 'Architecture review',
+    model: 'Anthropic',
+    tokens: '42.1k',
+  },
+  {
+    name: 'Codex',
+    activity: 'Implementation lane',
+    model: 'OpenAI Pro',
+    tokens: '7.4k',
+  },
 ] as const
 
 function NovaAgentRoster() {
@@ -298,7 +314,8 @@ function NavItem({
               style={
                 item.badge === 'NEW'
                   ? {
-                      background: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
+                      background:
+                        'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
                       color: '#0b1320',
                       boxShadow: '0 0 8px rgba(250,204,21,0.4)',
                       letterSpacing: '0.08em',
@@ -620,7 +637,9 @@ function ChatSidebarComponent({
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
       const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
-      handleOpenSettings(detail.section === 'appearance' ? 'appearance' : 'claude')
+      handleOpenSettings(
+        detail.section === 'appearance' ? 'appearance' : 'claude',
+      )
     }
 
     window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)
@@ -755,7 +774,7 @@ function ChatSidebarComponent({
   }
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)')
+    const media = window.matchMedia(COMPACT_SIDEBAR_MEDIA_QUERY)
     const update = () => setIsMobile(media.matches)
     update()
     media.addEventListener('change', update)
@@ -931,7 +950,6 @@ function ChatSidebarComponent({
           },
         ]
       : []),
-
   ]
 
   const knowledgeItems: Array<NavItemDef> = [
