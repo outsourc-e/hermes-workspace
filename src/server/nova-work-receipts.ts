@@ -2,10 +2,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import {
-  appendNovaFabricEvent,
-  type NovaFabricEventInput,
-  type NovaFabricEventRecord,
+  
+  
+  appendNovaFabricEvent
 } from './nova-fabric-store'
+import type {NovaFabricEventInput, NovaFabricEventRecord} from './nova-fabric-store';
 
 /**
  * Server-side work receipts.
@@ -38,7 +39,7 @@ export type WorkStateMarker = {
 }
 
 export type WorkReceiptPlan = {
-  receipts: NovaFabricEventInput[]
+  receipts: Array<NovaFabricEventInput>
   nextMarker: WorkStateMarker
 }
 
@@ -80,7 +81,7 @@ export function planWorkReceipts(
     return { receipts: [], nextMarker }
   }
 
-  const receipts: NovaFabricEventInput[] = []
+  const receipts: Array<NovaFabricEventInput> = []
 
   if (observed.git && observed.git.headHash !== prior.headHash) {
     receipts.push({
@@ -153,8 +154,9 @@ export function planWorkReceipts(
 function readMarker(): WorkStateMarker | null {
   try {
     const raw = fs.readFileSync(markerFilePath(), 'utf8')
-    const parsed = JSON.parse(raw) as Partial<WorkStateMarker>
-    if (typeof parsed !== 'object' || parsed === null) return null
+    const value: unknown = JSON.parse(raw)
+    if (typeof value !== 'object' || value === null) return null
+    const parsed = value as Partial<WorkStateMarker>
     return {
       headHash: typeof parsed.headHash === 'string' ? parsed.headHash : null,
       prUrl: typeof parsed.prUrl === 'string' ? parsed.prUrl : null,
@@ -180,7 +182,7 @@ function writeMarker(marker: WorkStateMarker): void {
   fs.renameSync(temp, file)
 }
 
-function readGit(args: string[]): string | null {
+function readGit(args: Array<string>): string | null {
   try {
     return execFileSync('git', args, {
       cwd: process.cwd(),
@@ -239,7 +241,7 @@ export function gatherWorkObservation(): WorkObservation {
 }
 
 export function scanAndRecordWorkReceipts(observation?: WorkObservation): {
-  written: NovaFabricEventRecord[]
+  written: Array<NovaFabricEventRecord>
   marker: WorkStateMarker
 } {
   const observed = observation ?? gatherWorkObservation()

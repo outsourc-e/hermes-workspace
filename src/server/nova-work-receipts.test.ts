@@ -3,16 +3,17 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
-  getNovaFabricSnapshot,
   createNovaFabricReviewProposal,
+  getNovaFabricSnapshot,
 } from './nova-fabric-store'
 import {
+  
+  
   planWorkReceipts,
   recordBlockedExternalAction,
-  scanAndRecordWorkReceipts,
-  type WorkObservation,
-  type WorkStateMarker,
+  scanAndRecordWorkReceipts
 } from './nova-work-receipts'
+import type {WorkObservation, WorkStateMarker} from './nova-work-receipts';
 
 let tempDir = ''
 let originalFabricFile: string | undefined

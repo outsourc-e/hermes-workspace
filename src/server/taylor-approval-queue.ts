@@ -1,12 +1,14 @@
 import {
-  getNovaFabricSnapshot,
-  type NovaFabric,
-  type NovaFabricConsolidationReviewRecord,
-  type NovaFabricEventRecord,
-  type NovaFabricLink,
-  type NovaFabricRiskLevel,
+  
+  
+  
+  
+  
+  getNovaFabricSnapshot
 } from './nova-fabric-store'
-import { getNovaWantsSnapshot, type NovaWantCard } from './nova-wants-store'
+import {  getNovaWantsSnapshot } from './nova-wants-store'
+import type {NovaFabric, NovaFabricConsolidationReviewRecord, NovaFabricEventRecord, NovaFabricLink, NovaFabricRiskLevel} from './nova-fabric-store';
+import type {NovaWantCard} from './nova-wants-store';
 
 /**
  * Unified "needs Taylor" queue.
@@ -33,7 +35,7 @@ export type TaylorApprovalItem = {
   createdAt: string
   reviewId: string | null
   actionable: boolean
-  links: NovaFabricLink[]
+  links: Array<NovaFabricLink>
 }
 
 export type TaylorApprovalQueue = {
@@ -44,12 +46,12 @@ export type TaylorApprovalQueue = {
     actionable: number
     byRisk: Record<NovaFabricRiskLevel, number>
   }
-  items: TaylorApprovalItem[]
+  items: Array<TaylorApprovalItem>
 }
 
 export type TaylorApprovalQueueInput = {
   fabric: Pick<NovaFabric, 'reviewQueue' | 'events'> | null
-  wants: NovaWantCard[] | null
+  wants: Array<NovaWantCard> | null
   now?: string
 }
 
@@ -123,7 +125,7 @@ export function buildTaylorApprovalQueue(
 ): TaylorApprovalQueue {
   const now = input.now ?? new Date().toISOString()
   const nowMs = Date.parse(now)
-  const items: TaylorApprovalItem[] = []
+  const items: Array<TaylorApprovalItem> = []
 
   const pendingReviews =
     input.fabric?.reviewQueue.filter((review) => review.status === 'pending') ??
