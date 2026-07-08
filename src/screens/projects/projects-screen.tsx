@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils'
 
 type ProjectStatus = 'brouillon' | 'a_valider' | 'valide' | 'obsolete' | 'archive'
 type ProjectEnvironment = 'sandbox' | 'staging' | 'live' | 'archived'
+type ProjectTemplate = 'fiche_produit_pdf' | 'go_to_market' | 'analyse_pricing' | 'outil_web' | 'libre'
+type ProjectChannel = 'Tous' | 'Direct' | 'Ambassadeur' | 'Opérateur' | 'Interne'
 
 type ProjectSource = {
   id: string
@@ -115,8 +117,92 @@ function optionLabel(value: string): string {
     presentation: 'Présentation',
     decision: 'Décision',
     markdown: 'Markdown',
+    fiche_produit_pdf: 'Fiche produit PDF',
+    go_to_market: 'Go-to-market',
+    analyse_pricing: 'Analyse pricing',
+    outil_web: 'Outil web',
+    libre: 'Projet libre',
   }
   return labels[value] || value.replace(/_/g, ' ')
+}
+
+const PROJECT_TEMPLATES: Array<ProjectTemplate> = [
+  'fiche_produit_pdf',
+  'go_to_market',
+  'analyse_pricing',
+  'outil_web',
+  'libre',
+]
+
+const PROJECT_CHANNELS: Array<ProjectChannel> = [
+  'Tous',
+  'Direct',
+  'Ambassadeur',
+  'Opérateur',
+  'Interne',
+]
+
+function buildGuidedProject(form: {
+  template: ProjectTemplate
+  product: string
+  channel: ProjectChannel
+  need: string
+}) {
+  const product = form.product.trim()
+  const need = form.need.trim()
+  const channel = form.channel
+  const baseTags = [form.template, product.toLowerCase().replace(/\s+/g, '-'), `canal:${channel.toLowerCase()}`]
+
+  if (form.template === 'fiche_produit_pdf') {
+    return {
+      title: `Fiche produit PDF - ${product}`,
+      objective:
+        need ||
+        `Produire une fiche produit PDF claire, sourcée et exploitable commercialement pour ${product}. Le livrable doit identifier la cible, le canal ${channel}, les bénéfices client, les objections, les informations pricing à valider, les sources utilisées et les variantes nécessaires.`,
+      tags: [...baseTags, 'livrable-pdf', 'fiche-produit', 'rag', 'pricing'],
+      nextAction: `Rattacher les sources produit et pricing de ${product}, puis demander à Hermes une première fiche produit structurée.`,
+    }
+  }
+
+  if (form.template === 'go_to_market') {
+    return {
+      title: `Go-to-market - ${product}`,
+      objective:
+        need ||
+        `Cadrer le lancement go-to-market de ${product} pour le canal ${channel}: cible, proposition de valeur, messages, supports commerciaux, objections, dépendances et plan d'activation.`,
+      tags: [...baseTags, 'gtm', 'sales-enablement'],
+      nextAction: `Identifier les sources produit, pricing et canal pour préparer le plan go-to-market de ${product}.`,
+    }
+  }
+
+  if (form.template === 'analyse_pricing') {
+    return {
+      title: `Analyse pricing - ${product}`,
+      objective:
+        need ||
+        `Analyser le modèle tarifaire de ${product} pour le canal ${channel}, en distinguant prix public, prix partenaire, hypothèses, marge et points à valider.`,
+      tags: [...baseTags, 'pricing', 'marge', 'arbitrage'],
+      nextAction: `Rattacher les catalogues tarifaires et hypothèses de prix pour ${product}.`,
+    }
+  }
+
+  if (form.template === 'outil_web') {
+    return {
+      title: `Outil web - ${product}`,
+      objective:
+        need ||
+        `Cadrer un outil web opérationnel autour de ${product}: utilisateurs, workflow, données nécessaires, sorties attendues, prototype et critères d'acceptation.`,
+      tags: [...baseTags, 'outil-web', 'prototype', 'sandbox'],
+      nextAction: `Décrire le workflow utilisateur attendu et les données nécessaires pour ${product}.`,
+    }
+  }
+
+  return {
+    title: product,
+    objective: need || `Cadrer le projet ${product} pour le canal ${channel}.`,
+    tags: baseTags,
+    nextAction: 'Préciser les sources, livrables et décisions attendues.',
+  }
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -186,9 +272,10 @@ export function ProjectsScreen() {
   const [savingDetails, setSavingDetails] = useState(false)
   const [brief, setBrief] = useState('')
   const [projectForm, setProjectForm] = useState({
-    title: '',
-    objective: '',
-    tags: '',
+    template: 'fiche_produit_pdf' as ProjectTemplate,
+    product: '',
+    channel: 'Tous' as ProjectChannel,
+    need: '',
   })
   const [sourceForm, setSourceForm] = useState({
     type: 'url',
@@ -249,15 +336,95 @@ export function ProjectsScreen() {
     event.preventDefault()
     setCreating(true)
     try {
+      const guidedProject = buildGuidedProject(projectForm)
       const result = await readJson<{ project: Project }>('/api/projects/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(projectForm),
+        body: JSON.stringify(guidedProject),
       })
+
+      if (projectForm.template === 'fiche_produit_pdf') {
+        await Promise.all([
+          readJson('/api/projects/add-source', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: result.project.id,
+              type: 'rag_document',
+              title: `Source produit - ${projectForm.product}`,
+              link: 'Document produit à rattacher depuis Documents Dstny',
+              confidence: 'moyen',
+              status: 'a_valider',
+            }),
+          }),
+          readJson('/api/projects/add-source', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: result.project.id,
+              type: 'rag_document',
+              title: `Source pricing - ${projectForm.product}`,
+              link: 'Catalogue tarifaire ou grille prix à rattacher',
+              confidence: 'moyen',
+              status: 'a_valider',
+            }),
+          }),
+          readJson('/api/projects/add-artifact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: result.project.id,
+              type: 'markdown',
+              title: 'Fiche produit source - v0.1',
+              pathOrUrl: 'À produire par Hermes avant export PDF',
+              version: 'v0.1',
+              producedBy: 'Hermes',
+            }),
+          }),
+          readJson('/api/projects/add-artifact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: result.project.id,
+              type: 'pdf',
+              title: 'Fiche produit PDF - v0.1',
+              pathOrUrl: 'À générer via PDF Engine',
+              version: 'v0.1',
+              producedBy: 'PDF Engine',
+            }),
+          }),
+          readJson('/api/projects/add-decision', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: result.project.id,
+              topic: 'Canal et cible',
+              decision: `La fiche doit être cadrée pour le canal ${projectForm.channel}. Prévoir une variante si les messages Direct / Ambassadeur / Opérateur divergent.`,
+              status: 'a_valider',
+            }),
+          }),
+          readJson('/api/projects/add-decision', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: result.project.id,
+              topic: 'Pricing',
+              decision: 'Ne publier aucun prix tant que la source tarifaire active et le canal ne sont pas confirmés.',
+              status: 'a_valider',
+            }),
+          }),
+        ])
+      }
+
       setSelectedId(result.project.id)
-      setProjectForm({ title: '', objective: '', tags: '' })
+      setProjectForm({
+        template: 'fiche_produit_pdf',
+        product: '',
+        channel: 'Tous',
+        need: '',
+      })
       await refreshProjects()
-      toast('Projet créé.', { type: 'success' })
+      toast('Projet cadré.', { type: 'success' })
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Création impossible.', { type: 'error' })
     } finally {
@@ -415,38 +582,48 @@ export function ProjectsScreen() {
           <form onSubmit={createProject} className="space-y-3 border-b border-primary-200 p-4 dark:border-neutral-800">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.7} />
-              Nouveau projet
+              Nouveau projet guidé
             </div>
             <div className="space-y-1.5">
-              <FieldLabel>Titre</FieldLabel>
+              <FieldLabel>Type de projet</FieldLabel>
+              <SelectField
+                value={projectForm.template}
+                options={PROJECT_TEMPLATES}
+                onChange={(value) => setProjectForm((current) => ({ ...current, template: value as ProjectTemplate }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <FieldLabel>Produit / offre</FieldLabel>
               <Input
-                value={projectForm.title}
-                onChange={(event) => setProjectForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Ex. Simulateur devis Trunk SIP"
+                value={projectForm.product}
+                onChange={(event) => setProjectForm((current) => ({ ...current, product: event.target.value }))}
+                placeholder="Ex. Connectivité FTTO"
                 className="h-8"
               />
             </div>
             <div className="space-y-1.5">
-              <FieldLabel>Objectif</FieldLabel>
+              <FieldLabel>Canal principal</FieldLabel>
+              <SelectField
+                value={projectForm.channel}
+                options={PROJECT_CHANNELS}
+                onChange={(value) => setProjectForm((current) => ({ ...current, channel: value as ProjectChannel }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <FieldLabel>Demande simple</FieldLabel>
               <textarea
-                value={projectForm.objective}
-                onChange={(event) => setProjectForm((current) => ({ ...current, objective: event.target.value }))}
-                placeholder="Ce que le projet doit permettre d'obtenir"
+                value={projectForm.need}
+                onChange={(event) => setProjectForm((current) => ({ ...current, need: event.target.value }))}
+                placeholder="Optionnel : ex. Je veux une fiche claire pour aider les commerciaux à vendre cette offre."
                 className="min-h-20 w-full resize-none rounded-lg border border-primary-200 bg-surface px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-neutral-800 dark:bg-neutral-950"
               />
             </div>
-            <div className="space-y-1.5">
-              <FieldLabel>Tags</FieldLabel>
-              <Input
-                value={projectForm.tags}
-                onChange={(event) => setProjectForm((current) => ({ ...current, tags: event.target.value }))}
-                placeholder="metacentrex, pricing"
-                className="h-8"
-              />
+            <div className="rounded-lg border border-primary-200 bg-primary-50/60 p-3 text-xs leading-5 text-primary-600 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
+              Hermes créera le cadrage initial, les sources à rattacher, les premiers artefacts et les décisions à valider.
             </div>
-            <Button type="submit" disabled={creating || !projectForm.title.trim()} className="w-full">
+            <Button type="submit" disabled={creating || !projectForm.product.trim()} className="w-full">
               <HugeiconsIcon icon={Rocket01Icon} size={15} strokeWidth={1.7} />
-              Créer le projet
+              Cadrer le projet
             </Button>
           </form>
 
