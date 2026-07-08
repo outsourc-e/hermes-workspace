@@ -13,7 +13,8 @@ import {
   markMissionAssignmentReady,
   unblockMissionAssignment,
 } from '../../server/swarm-missions'
-import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
+import {
+  pauseAutomatedDispatch, resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 import { execFile } from 'node:child_process'
 import {
   existsSync,
@@ -298,9 +299,7 @@ export const Route = createFileRoute('/api/swarm-missions')({
         }
         if (action === 'clear-blocked') {
           const missionId = cleanString(body.missionId)
-          const result = clearAllBlocked(
-            missionId ? { missionId } : undefined,
-          )
+          const result = clearAllBlocked(missionId ? { missionId } : undefined)
           return json({
             ok: true,
             action,
@@ -312,6 +311,9 @@ export const Route = createFileRoute('/api/swarm-missions')({
           const actor = cleanString(body.actor) ?? 'workspace-clear-all'
           const reason =
             cleanString(body.reason) ?? 'Cleared all from Workspace Swarm'
+          // 0. Pause automated dispatchers (queue drain, scheduled missions)
+          //    so the freshly cleared board doesn't refill immediately.
+          pauseAutomatedDispatch(10)
           // 1. Cancel every active assignment across all missions.
           const cancelled = cancelAllSwarmMissions({ actor, reason })
           // 2. Wipe the blocked/needs-input board.

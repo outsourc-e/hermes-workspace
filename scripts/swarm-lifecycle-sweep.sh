@@ -111,3 +111,20 @@ except Exception: print(0)' 2>/dev/null || echo 0)
     echo "{\"at\":$(date +%s)000,\"queue_drain\":$DRAIN}" >> "$LOG_FILE"
   fi
 fi
+
+# ---- zombie reaper -------------------------------------------------------------
+# Reset workers stuck in a busy state with no live tmux session and no output
+# for 30+ min (process died without a terminal checkpoint).
+REAP=$(curl -sS -m 30 -X POST -H 'Content-Type: application/json' \
+  -d '{"action":"reap"}' \
+  "http://127.0.0.1:3000/api/swarm-runtime/reset" 2>/dev/null || echo '')
+if [ -n "$REAP" ]; then
+  REAPED=$(printf '%s' "$REAP" | python3 -c 'import json,sys
+try:
+  r=json.load(sys.stdin).get("reaped",[])
+  print(",".join(r))
+except Exception: print("")' 2>/dev/null || echo '')
+  if [ -n "$REAPED" ]; then
+    echo "{\"at\":$(date +%s)000,\"zombie_reaped\":\"$REAPED\"}" >> "$LOG_FILE"
+  fi
+fi

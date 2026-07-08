@@ -20,6 +20,7 @@ import { dirname, join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
 import { SWARM_CANONICAL_REPO } from './swarm-environment'
 import { readSwarmRoster } from './swarm-roster'
+import { automatedDispatchPausedUntil } from './swarm-runtime-reset'
 
 export type QueuePriority = 1 | 2 | 3 // 1 = highest
 
@@ -204,6 +205,8 @@ export type DrainPlan = {
  * caller flips items to 'dispatched' only after dispatch actually succeeds.
  */
 export function planQueueDrain(maxDispatches = 2): Array<DrainPlan> {
+  // Respect the post-Clear-All pause: operator just wiped the board.
+  if (automatedDispatchPausedUntil()) return []
   reconcileDispatched()
   const queued = listQueue().filter((i) => i.status === 'queued')
   if (!queued.length) return []

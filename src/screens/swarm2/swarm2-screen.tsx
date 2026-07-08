@@ -429,7 +429,12 @@ async function fetchMissions(): Promise<Array<SwarmMissionSummary>> {
   return Array.isArray(data.missions) ? data.missions : []
 }
 
-type SwarmModeData = { ok: boolean; mode: 'auto' | 'manual'; updatedAt: string; sync?: { workersUpdated: number; workersTotal: number; errors: string[] } }
+type SwarmModeData = {
+  ok: boolean
+  mode: 'auto' | 'manual'
+  updatedAt: string
+  sync?: { workersUpdated: number; workersTotal: number; errors: string[] }
+}
 
 async function fetchSwarmMode(): Promise<SwarmModeData> {
   const res = await fetch('/api/swarm-mode')
@@ -834,6 +839,7 @@ type ControlPlaneStageProps = {
   onOpenRouter: () => void
   onRouterResults: () => void
   onClearAll: () => void
+  onStopAgent?: (workerId: string) => void
   onSelect: (workerId: string) => void
   onToggleRoom: (workerId: string) => void
   onOpenTui: (workerId: string) => void
@@ -876,6 +882,7 @@ function ControlPlaneStage({
   onOpenRouter,
   onRouterResults,
   onClearAll,
+  onStopAgent,
   onSelect,
   onToggleRoom,
   onOpenTui,
@@ -989,6 +996,7 @@ function ControlPlaneStage({
             void onRouterResults()
           }}
           onClearAll={onClearAll}
+          onStopAgent={onStopAgent}
           onAnchorRef={setAnchor}
           className="w-full max-w-5xl"
         />
@@ -1354,7 +1362,10 @@ export function Swarm2Screen() {
     mutationFn: setSwarmMode,
     onMutate: async (newMode) => {
       await queryClient.cancelQueries({ queryKey: ['swarm2', 'mode'] })
-      const previous = queryClient.getQueryData<SwarmModeData>(['swarm2', 'mode'])
+      const previous = queryClient.getQueryData<SwarmModeData>([
+        'swarm2',
+        'mode',
+      ])
       queryClient.setQueryData<SwarmModeData>(['swarm2', 'mode'], {
         ok: true,
         mode: newMode,
@@ -1926,7 +1937,9 @@ export function Swarm2Screen() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => swarmModeMutation.mutate(isAutoMode ? 'manual' : 'auto')}
+                  onClick={() =>
+                    swarmModeMutation.mutate(isAutoMode ? 'manual' : 'auto')
+                  }
                   disabled={swarmModeMutation.isPending}
                   className={cn(
                     'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200',
@@ -1945,13 +1958,17 @@ export function Swarm2Screen() {
                 <span
                   className={cn(
                     'text-[10px] font-semibold uppercase tracking-[0.12em]',
-                    isAutoMode ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-muted-2)]',
+                    isAutoMode
+                      ? 'text-[var(--theme-accent)]'
+                      : 'text-[var(--theme-muted-2)]',
                   )}
                 >
                   {isAutoMode ? 'Auto' : 'Smart'}
                 </span>
                 {swarmModeMutation.isPending ? (
-                  <span className="text-[10px] text-[var(--theme-muted)] animate-pulse">…</span>
+                  <span className="text-[10px] text-[var(--theme-muted)] animate-pulse">
+                    …
+                  </span>
                 ) : null}
               </div>
             </div>
@@ -2090,6 +2107,28 @@ export function Swarm2Screen() {
               void runtimeQuery.refetch()
               void missionsQuery.refetch()
             }}
+            onStopAgent={async (workerId) => {
+              if (
+                !window.confirm(
+                  `Stop ${workerId}? Kills its live session and resets it to idle.`,
+                )
+              )
+                return
+              try {
+                await fetch('/api/swarm-runtime/reset', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    workerIds: [workerId],
+                    actor: 'workspace-stop-one',
+                    reason: 'Stopped from the swarm board',
+                  }),
+                })
+              } finally {
+                void runtimeQuery.refetch()
+                void missionsQuery.refetch()
+              }
+            }}
             onClearAll={async () => {
               if (
                 !window.confirm(
@@ -2160,9 +2199,7 @@ export function Swarm2Screen() {
           <Swarm2ScoreboardPanel className="mt-3" />
         ) : null}
         {viewMode === 'cards' ? <Swarm2QueuePanel className="mt-3" /> : null}
-        {viewMode === 'cards' ? (
-          <Swarm2TimelinePanel className="mt-3" />
-        ) : null}
+        {viewMode === 'cards' ? <Swarm2TimelinePanel className="mt-3" /> : null}
       </div>
 
       {addSwarmOpen ? (

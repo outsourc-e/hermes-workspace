@@ -83,6 +83,7 @@ export type Swarm2OrchestratorCardProps = {
   onRouterResults?: (response: DispatchResponse) => void
   /** Stop all workers, cancel all tasks, and clear the blocked board. */
   onClearAll?: () => void
+  onStopAgent?: (workerId: string) => void
   /**
    * Bubble the bottom-center anchor of this card up to the parent so that
    * the wires SVG can originate from a real DOM rect.
@@ -117,6 +118,7 @@ export function Swarm2OrchestratorCard({
   onOpenRouter,
   onRouterResults,
   onClearAll,
+  onStopAgent,
   onAnchorRef,
   className,
 }: Swarm2OrchestratorCardProps) {
@@ -506,8 +508,25 @@ export function Swarm2OrchestratorCard({
                             <div className="truncate text-[11px] font-semibold text-[var(--theme-text)]">
                               {agent.workerName}
                             </div>
-                            <div className="shrink-0 text-[9px] text-[var(--theme-muted)]">
-                              {agent.age}
+                            <div className="flex shrink-0 items-center gap-1">
+                              <span className="text-[9px] text-[var(--theme-muted)]">
+                                {agent.age}
+                              </span>
+                              {onStopAgent ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onStopAgent(agent.workerId)}
+                                  className="rounded p-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-danger,#e5484d)]"
+                                  aria-label={`Stop ${agent.workerName}`}
+                                  title={`Stop ${agent.workerName} — kill its session and reset to idle`}
+                                >
+                                  <HugeiconsIcon
+                                    icon={Cancel01Icon}
+                                    size={12}
+                                    strokeWidth={2}
+                                  />
+                                </button>
+                              ) : null}
                             </div>
                           </div>
                           <div className="mt-0.5 truncate text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">

@@ -1,3 +1,24 @@
+## 2026-07-07 — Clear All actually clears: zombie reaper, kill-first reset, dispatch pause, per-worker Stop **[RECURS — do not regress]**
+
+Operator report: worker stuck "reviewing" 5h; Clear All appeared dead. Three
+real causes, three fixes:
+1. **Zombie states**: a tmux worker dying without a terminal checkpoint left
+   runtime.json busy forever. Fix: `reapZombieSwarmRuntimes()` — busy state +
+   no tmux session + no output 30 min → reset to idle. Sweep calls
+   `POST /api/swarm-runtime/reset {"action":"reap"}` every 10 min and logs
+   `zombie_reaped`.
+2. **Reset undone by live session**: per-worker reset didn't kill tmux, so
+   the TUI monitor rewrote runtime back to executing. Fix: reset route kills
+   `swarm-<id>` tmux sessions BEFORE writing runtime (kill-first order also
+   documented for cancel-all/chat-clear).
+3. **Board refill after Clear All**: automation (queue drain / scheduled
+   missions) re-dispatched within minutes. Fix: cancel-all writes
+   `.runtime/dispatch-pause-until` (+10 min); queue drain and
+   swarm-scheduled-mission.sh honor it. Manual dispatches unaffected.
+Plus: per-worker ✕ Stop button on each active-agent card (swarm board) →
+`POST /api/swarm-runtime/reset {workerIds:[id]}` — kill + reset one worker
+without nuking the board.
+
 ## 2026-07-07 — Tier E+G: right-sizing, gzip, pipelines, iCloud backup, weekly report
 
 - **Model right-sizing** (`tierCanDemote`/`demoteTier`): dispatch demotes one
@@ -117,6 +138,7 @@ done
 
 **Correct state:** `provider: ollama-cloud` (or `gemini` for researcher),
 `base_url: ''`. Two failure modes seen repeatedly:
+
 - `provider: deepseek` + `base_url: https://api.deepseek.com/v1` → **no API key
   for that endpoint** → silent fallback to `llama3.1:8b` (or timeout). Fix:
   set provider `ollama-cloud`, blank base_url.
@@ -127,10 +149,11 @@ Only cloud creds present: **ollama-cloud** (`OLLAMA_API_KEY`) serves the whole
 fleet, plus `GOOGLE_API_KEY` (gemini). NO anthropic/openai/deepseek-direct keys.
 Model catalog: `~/.hermes/provider_models_cache.json` (ollama-cloud has
 qwen3-coder:480b, kimi-k2-thinking, deepseek-v4-pro/flash, ministral-3:8b,
-qwen3.5:397b, glm-*, etc). Context floor: **Hermes rejects <64K-context models
+qwen3.5:397b, glm-\*, etc). Context floor: **Hermes rejects <64K-context models
 at agent init** → the worker BLOCKS forever. Never assign a sub-64K model.
 
 Verify a model actually stuck (no silent fallback) after a dispatch:
+
 ```bash
 python3 -c "import sqlite3;c=sqlite3.connect('$HOME/.hermes/profiles/qa/state.db');c.row_factory=sqlite3.Row;print(c.execute('select model from sessions order by started_at desc limit 1').fetchone()['model'])"
 ```
@@ -177,12 +200,13 @@ bug. Open follow-up: read pane result → synthesize done for TUI path too.
 
 All agent output must land in `~/workspace` (the Files-page root), not scattered
 across `$HOME`. Enforced by:
+
 - `terminal.cwd: /Users/estejim03/workspace` (absolute) in main `~/.hermes/config.yaml`
   and every profile config.
 - `defaultWorkspaceRoot()` in swarm-dispatch (oneshot cwd) + wrappers `cd`.
 - Files page root: `~/.hermes/webui_state/workspaces.json` +
   `last_workspace.txt`.
-If projects appear in `~/Polymarket` etc again, a config lost its absolute cwd.
+  If projects appear in `~/Polymarket` etc again, a config lost its absolute cwd.
 
 ---
 
@@ -235,6 +259,7 @@ deepseek-v4-pro) — that's not a bug. Disable: `HERMES_SWARM_MODEL_ROUTER=0`.
 npx vitest run                       # baseline: 755 passing, 0 fail
 npx tsc --noEmit -p tsconfig.json 2>&1 | grep -c "error TS"   # baseline: 98 (dirty tree; don't exceed)
 ```
+
 - The working tree is intentionally **very dirty** (large uncommitted docs +
   in-progress churn). Don't try to "clean" it. Stage only files you changed.
 - `e2e/` specs run via Playwright, not vitest (excluded in vite.config).
@@ -295,7 +320,7 @@ Update this when you land a fix that future sessions must know about.
   night's worktree so the maintainer never runs branch commands itself;
   (3) the 10-minute lifecycle sweep has a branch guard — live repo branch
   != .runtime/expected-branch → auto `checkout -m` back when the found
-  branch matches nightly/* or worker/* (worker-made), Discord alert either
+  branch matches nightly/_ or worker/_ (worker-made), Discord alert either
   way. Operator switching branches on purpose: update
   .runtime/expected-branch to the new name. Outcome writes are best-effort: never let them fail a
   dispatch.

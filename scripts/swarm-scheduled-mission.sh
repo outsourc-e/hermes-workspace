@@ -9,6 +9,18 @@
 #        SWARM_AUTH_TOKEN (overrides cookie lookup)
 set -euo pipefail
 
+# Honor post-Clear-All dispatch pause (operator wiped the board on purpose).
+PAUSE_FILE="$(cd "$(dirname "$0")/.." && pwd)/.runtime/dispatch-pause-until"
+if [ -f "$PAUSE_FILE" ]; then
+  PAUSE_UNTIL=$(cat "$PAUSE_FILE" 2>/dev/null || echo 0)
+  NOW_MS=$(($(date +%s) * 1000))
+  if [ "$NOW_MS" -lt "${PAUSE_UNTIL:-0}" ] 2>/dev/null; then
+    echo "dispatch paused until $PAUSE_UNTIL (Clear All cooldown) — skipping"
+    exit 0
+  fi
+fi
+
+
 WORKER="${1:?worker id required}"
 TASK="${2:?task text required}"
 BASE_URL="${SWARM_BASE_URL:-http://localhost:3000}"
