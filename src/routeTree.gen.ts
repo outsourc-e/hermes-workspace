@@ -18,6 +18,7 @@ import { Route as SwarmRouteImport } from './routes/swarm'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReserveRouteImport } from './routes/reserve'
+import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as ProfilesRouteImport } from './routes/profiles'
 import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as OperationsRouteImport } from './routes/operations'
@@ -125,6 +126,13 @@ import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
 import { Route as ApiSessionsSearchRouteImport } from './routes/api/sessions/search'
 import { Route as ApiRunsActiveRouteImport } from './routes/api/runs/active'
+import { Route as ApiProjectsUpdateRouteImport } from './routes/api/projects/update'
+import { Route as ApiProjectsListRouteImport } from './routes/api/projects/list'
+import { Route as ApiProjectsCreateRouteImport } from './routes/api/projects/create'
+import { Route as ApiProjectsBriefRouteImport } from './routes/api/projects/brief'
+import { Route as ApiProjectsAddSourceRouteImport } from './routes/api/projects/add-source'
+import { Route as ApiProjectsAddDecisionRouteImport } from './routes/api/projects/add-decision'
+import { Route as ApiProjectsAddArtifactRouteImport } from './routes/api/projects/add-artifact'
 import { Route as ApiProfilesUpdateRouteImport } from './routes/api/profiles/update'
 import { Route as ApiProfilesToggleSkillRouteImport } from './routes/api/profiles/toggle-skill'
 import { Route as ApiProfilesSkillsRouteImport } from './routes/api/profiles/skills'
@@ -219,6 +227,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ReserveRoute = ReserveRouteImport.update({
   id: '/reserve',
   path: '/reserve',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfilesRoute = ProfilesRouteImport.update({
@@ -757,6 +770,41 @@ const ApiRunsActiveRoute = ApiRunsActiveRouteImport.update({
   path: '/api/runs/active',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProjectsUpdateRoute = ApiProjectsUpdateRouteImport.update({
+  id: '/api/projects/update',
+  path: '/api/projects/update',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsListRoute = ApiProjectsListRouteImport.update({
+  id: '/api/projects/list',
+  path: '/api/projects/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsCreateRoute = ApiProjectsCreateRouteImport.update({
+  id: '/api/projects/create',
+  path: '/api/projects/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsBriefRoute = ApiProjectsBriefRouteImport.update({
+  id: '/api/projects/brief',
+  path: '/api/projects/brief',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsAddSourceRoute = ApiProjectsAddSourceRouteImport.update({
+  id: '/api/projects/add-source',
+  path: '/api/projects/add-source',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsAddDecisionRoute = ApiProjectsAddDecisionRouteImport.update({
+  id: '/api/projects/add-decision',
+  path: '/api/projects/add-decision',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsAddArtifactRoute = ApiProjectsAddArtifactRouteImport.update({
+  id: '/api/projects/add-artifact',
+  path: '/api/projects/add-artifact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiProfilesUpdateRoute = ApiProfilesUpdateRouteImport.update({
   id: '/api/profiles/update',
   path: '/api/profiles/update',
@@ -1033,6 +1081,7 @@ export interface FileRoutesByFullPath {
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
+  '/projects': typeof ProjectsRoute
   '/reserve': typeof ReserveRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1165,6 +1214,13 @@ export interface FileRoutesByFullPath {
   '/api/profiles/skills': typeof ApiProfilesSkillsRoute
   '/api/profiles/toggle-skill': typeof ApiProfilesToggleSkillRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/projects/add-artifact': typeof ApiProjectsAddArtifactRoute
+  '/api/projects/add-decision': typeof ApiProjectsAddDecisionRoute
+  '/api/projects/add-source': typeof ApiProjectsAddSourceRoute
+  '/api/projects/brief': typeof ApiProjectsBriefRoute
+  '/api/projects/create': typeof ApiProjectsCreateRoute
+  '/api/projects/list': typeof ApiProjectsListRoute
+  '/api/projects/update': typeof ApiProjectsUpdateRoute
   '/api/runs/active': typeof ApiRunsActiveRoute
   '/api/sessions/search': typeof ApiSessionsSearchRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
@@ -1201,6 +1257,7 @@ export interface FileRoutesByTo {
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
+  '/projects': typeof ProjectsRoute
   '/reserve': typeof ReserveRouteWithChildren
   '/skills': typeof SkillsRoute
   '/swarm': typeof SwarmRoute
@@ -1332,6 +1389,13 @@ export interface FileRoutesByTo {
   '/api/profiles/skills': typeof ApiProfilesSkillsRoute
   '/api/profiles/toggle-skill': typeof ApiProfilesToggleSkillRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/projects/add-artifact': typeof ApiProjectsAddArtifactRoute
+  '/api/projects/add-decision': typeof ApiProjectsAddDecisionRoute
+  '/api/projects/add-source': typeof ApiProjectsAddSourceRoute
+  '/api/projects/brief': typeof ApiProjectsBriefRoute
+  '/api/projects/create': typeof ApiProjectsCreateRoute
+  '/api/projects/list': typeof ApiProjectsListRoute
+  '/api/projects/update': typeof ApiProjectsUpdateRoute
   '/api/runs/active': typeof ApiRunsActiveRoute
   '/api/sessions/search': typeof ApiSessionsSearchRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
@@ -1369,6 +1433,7 @@ export interface FileRoutesById {
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
+  '/projects': typeof ProjectsRoute
   '/reserve': typeof ReserveRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1501,6 +1566,13 @@ export interface FileRoutesById {
   '/api/profiles/skills': typeof ApiProfilesSkillsRoute
   '/api/profiles/toggle-skill': typeof ApiProfilesToggleSkillRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/projects/add-artifact': typeof ApiProjectsAddArtifactRoute
+  '/api/projects/add-decision': typeof ApiProjectsAddDecisionRoute
+  '/api/projects/add-source': typeof ApiProjectsAddSourceRoute
+  '/api/projects/brief': typeof ApiProjectsBriefRoute
+  '/api/projects/create': typeof ApiProjectsCreateRoute
+  '/api/projects/list': typeof ApiProjectsListRoute
+  '/api/projects/update': typeof ApiProjectsUpdateRoute
   '/api/runs/active': typeof ApiRunsActiveRoute
   '/api/sessions/search': typeof ApiSessionsSearchRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
@@ -1539,6 +1611,7 @@ export interface FileRouteTypes {
     | '/operations'
     | '/playground'
     | '/profiles'
+    | '/projects'
     | '/reserve'
     | '/settings'
     | '/skills'
@@ -1671,6 +1744,13 @@ export interface FileRouteTypes {
     | '/api/profiles/skills'
     | '/api/profiles/toggle-skill'
     | '/api/profiles/update'
+    | '/api/projects/add-artifact'
+    | '/api/projects/add-decision'
+    | '/api/projects/add-source'
+    | '/api/projects/brief'
+    | '/api/projects/create'
+    | '/api/projects/list'
+    | '/api/projects/update'
     | '/api/runs/active'
     | '/api/sessions/search'
     | '/api/sessions/send'
@@ -1707,6 +1787,7 @@ export interface FileRouteTypes {
     | '/operations'
     | '/playground'
     | '/profiles'
+    | '/projects'
     | '/reserve'
     | '/skills'
     | '/swarm'
@@ -1838,6 +1919,13 @@ export interface FileRouteTypes {
     | '/api/profiles/skills'
     | '/api/profiles/toggle-skill'
     | '/api/profiles/update'
+    | '/api/projects/add-artifact'
+    | '/api/projects/add-decision'
+    | '/api/projects/add-source'
+    | '/api/projects/brief'
+    | '/api/projects/create'
+    | '/api/projects/list'
+    | '/api/projects/update'
     | '/api/runs/active'
     | '/api/sessions/search'
     | '/api/sessions/send'
@@ -1874,6 +1962,7 @@ export interface FileRouteTypes {
     | '/operations'
     | '/playground'
     | '/profiles'
+    | '/projects'
     | '/reserve'
     | '/settings'
     | '/skills'
@@ -2006,6 +2095,13 @@ export interface FileRouteTypes {
     | '/api/profiles/skills'
     | '/api/profiles/toggle-skill'
     | '/api/profiles/update'
+    | '/api/projects/add-artifact'
+    | '/api/projects/add-decision'
+    | '/api/projects/add-source'
+    | '/api/projects/brief'
+    | '/api/projects/create'
+    | '/api/projects/list'
+    | '/api/projects/update'
     | '/api/runs/active'
     | '/api/sessions/search'
     | '/api/sessions/send'
@@ -2043,6 +2139,7 @@ export interface RootRouteChildren {
   OperationsRoute: typeof OperationsRoute
   PlaygroundRoute: typeof PlaygroundRoute
   ProfilesRoute: typeof ProfilesRoute
+  ProjectsRoute: typeof ProjectsRoute
   ReserveRoute: typeof ReserveRouteWithChildren
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -2157,6 +2254,13 @@ export interface RootRouteChildren {
   ApiProfilesSkillsRoute: typeof ApiProfilesSkillsRoute
   ApiProfilesToggleSkillRoute: typeof ApiProfilesToggleSkillRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
+  ApiProjectsAddArtifactRoute: typeof ApiProjectsAddArtifactRoute
+  ApiProjectsAddDecisionRoute: typeof ApiProjectsAddDecisionRoute
+  ApiProjectsAddSourceRoute: typeof ApiProjectsAddSourceRoute
+  ApiProjectsBriefRoute: typeof ApiProjectsBriefRoute
+  ApiProjectsCreateRoute: typeof ApiProjectsCreateRoute
+  ApiProjectsListRoute: typeof ApiProjectsListRoute
+  ApiProjectsUpdateRoute: typeof ApiProjectsUpdateRoute
   ApiRunsActiveRoute: typeof ApiRunsActiveRoute
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
@@ -2227,6 +2331,13 @@ declare module '@tanstack/react-router' {
       path: '/reserve'
       fullPath: '/reserve'
       preLoaderRoute: typeof ReserveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profiles': {
@@ -2978,6 +3089,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRunsActiveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/projects/update': {
+      id: '/api/projects/update'
+      path: '/api/projects/update'
+      fullPath: '/api/projects/update'
+      preLoaderRoute: typeof ApiProjectsUpdateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects/list': {
+      id: '/api/projects/list'
+      path: '/api/projects/list'
+      fullPath: '/api/projects/list'
+      preLoaderRoute: typeof ApiProjectsListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects/create': {
+      id: '/api/projects/create'
+      path: '/api/projects/create'
+      fullPath: '/api/projects/create'
+      preLoaderRoute: typeof ApiProjectsCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects/brief': {
+      id: '/api/projects/brief'
+      path: '/api/projects/brief'
+      fullPath: '/api/projects/brief'
+      preLoaderRoute: typeof ApiProjectsBriefRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects/add-source': {
+      id: '/api/projects/add-source'
+      path: '/api/projects/add-source'
+      fullPath: '/api/projects/add-source'
+      preLoaderRoute: typeof ApiProjectsAddSourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects/add-decision': {
+      id: '/api/projects/add-decision'
+      path: '/api/projects/add-decision'
+      fullPath: '/api/projects/add-decision'
+      preLoaderRoute: typeof ApiProjectsAddDecisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects/add-artifact': {
+      id: '/api/projects/add-artifact'
+      path: '/api/projects/add-artifact'
+      fullPath: '/api/projects/add-artifact'
+      preLoaderRoute: typeof ApiProjectsAddArtifactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/profiles/update': {
       id: '/api/profiles/update'
       path: '/api/profiles/update'
@@ -3560,6 +3720,7 @@ const rootRouteChildren: RootRouteChildren = {
   OperationsRoute: OperationsRoute,
   PlaygroundRoute: PlaygroundRoute,
   ProfilesRoute: ProfilesRoute,
+  ProjectsRoute: ProjectsRoute,
   ReserveRoute: ReserveRouteWithChildren,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
@@ -3674,6 +3835,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesSkillsRoute: ApiProfilesSkillsRoute,
   ApiProfilesToggleSkillRoute: ApiProfilesToggleSkillRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
+  ApiProjectsAddArtifactRoute: ApiProjectsAddArtifactRoute,
+  ApiProjectsAddDecisionRoute: ApiProjectsAddDecisionRoute,
+  ApiProjectsAddSourceRoute: ApiProjectsAddSourceRoute,
+  ApiProjectsBriefRoute: ApiProjectsBriefRoute,
+  ApiProjectsCreateRoute: ApiProjectsCreateRoute,
+  ApiProjectsListRoute: ApiProjectsListRoute,
+  ApiProjectsUpdateRoute: ApiProjectsUpdateRoute,
   ApiRunsActiveRoute: ApiRunsActiveRoute,
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,

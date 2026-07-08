@@ -12,6 +12,7 @@ import {
   ComputerTerminal01Icon,
   DashboardSquare01Icon,
   File01Icon,
+  Folder01Icon,
   McpServerIcon,
   MessageMultiple01Icon,
   Moon02Icon,
@@ -578,6 +579,7 @@ function ChatSidebarComponent({
   const isSkillsActive = pathname === '/skills'
   const isMcpActive = pathname === '/mcp'
   const isFilesActive = pathname === '/files'
+  const isProjectsActive = pathname === '/projects'
   const isPlaygroundActive = pathname === '/playground'
   const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
@@ -591,7 +593,7 @@ function ChatSidebarComponent({
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
   )
-  const mainRoutes = ['/chat', '/new', '/files', '/terminal']
+  const mainRoutes = ['/chat', '/new', '/projects', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/dstny-documents', '/skills']
   const systemRoutes = ['/settings', '/logs']
 
@@ -799,7 +801,13 @@ function ChatSidebarComponent({
       label: t('nav.chat'),
       active: isChatActive,
     },
-
+    {
+      kind: 'link',
+      to: '/projects',
+      icon: Folder01Icon,
+      label: 'Projets',
+      active: isProjectsActive,
+    },
     {
       kind: 'link',
       to: '/files',
