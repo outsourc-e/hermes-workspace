@@ -570,7 +570,11 @@ describe('buildDashboardOverview', () => {
     expect(systems.get('tools-skills')?.status).toBe('online')
     expect(systems.get('cron-background')?.status).toBe('degraded')
     expect(systems.get('google-workspace')?.status).toBe('online')
-    expect(systems.get('github-agent-work')?.status).toBe('not-wired')
+    const gitWorkSystem = systems.get('github-agent-work')
+    expect(['online', 'not-wired']).toContain(gitWorkSystem?.status)
+    if (gitWorkSystem?.status === 'online') {
+      expect(gitWorkSystem.detail).toContain('receipts via /api/nova-work-scan')
+    }
     expect(overview.liveSystems.summary.total).toBe(
       overview.liveSystems.systems.length,
     )

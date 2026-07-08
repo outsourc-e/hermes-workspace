@@ -1728,12 +1728,67 @@ function buildTrustLedger(
   }
 }
 
+export type TaylorKanbanSummary = {
+  items: number
+  open: number
+  stale: number
+  blockers: number
+  topTitles: Array<string>
+}
+
+export function summarizeTaylorKanban(
+  raw: unknown,
+  now: string,
+): TaylorKanbanSummary | null {
+  if (!Array.isArray(raw)) return null
+  const nowMs = Date.parse(now)
+  const summary: TaylorKanbanSummary = {
+    items: raw.length,
+    open: 0,
+    stale: 0,
+    blockers: 0,
+    topTitles: [],
+  }
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) continue
+    const item = entry as Record<string, unknown>
+    const title =
+      (typeof item.title === 'string' && item.title) ||
+      (typeof item.name === 'string' && item.name) ||
+      (typeof item.text === 'string' && item.text) ||
+      ''
+    const status = String(item.status ?? item.state ?? '').toLowerCase()
+    const done = /done|complete|closed|finished/.test(status)
+    const blocked = /block|stuck|wait|hold/.test(status)
+    if (!done) summary.open += 1
+    if (blocked) summary.blockers += 1
+    const updatedRaw =
+      item.updatedAt ?? item.updated ?? item.modified ?? item.timestamp
+    const updatedMs =
+      typeof updatedRaw === 'string' || typeof updatedRaw === 'number'
+        ? Date.parse(String(updatedRaw))
+        : Number.NaN
+    if (
+      !done &&
+      Number.isFinite(updatedMs) &&
+      nowMs - updatedMs > 7 * 24 * 60 * 60 * 1000
+    ) {
+      summary.stale += 1
+    }
+    if (!done && title && summary.topTitles.length < 5) {
+      summary.topTitles.push(title.slice(0, 60))
+    }
+  }
+  return summary
+}
+
 type JobBoardReadModel = {
   online: boolean
   version: string | null
   stateKeys: number
   events: number
   taylorKanbanItems: number
+  taylorKanban: TaylorKanbanSummary | null
 }
 
 async function readJobBoardModel(): Promise<JobBoardReadModel> {
@@ -1760,11 +1815,15 @@ async function readJobBoardModel(): Promise<JobBoardReadModel> {
         String((versionRaw as Record<string, unknown>).id ?? ''))
       : null
   let taylorKanbanItems = 0
+  let taylorKanban: TaylorKanbanSummary | null = null
   const taylorRaw = state?.['nm-taylor-kanban']
   if (typeof taylorRaw === 'string') {
     try {
       const parsed = JSON.parse(taylorRaw) as unknown
-      if (Array.isArray(parsed)) taylorKanbanItems = parsed.length
+      if (Array.isArray(parsed)) {
+        taylorKanbanItems = parsed.length
+        taylorKanban = summarizeTaylorKanban(parsed, new Date().toISOString())
+      }
     } catch {
       taylorKanbanItems = 0
     }
@@ -1778,6 +1837,7 @@ async function readJobBoardModel(): Promise<JobBoardReadModel> {
       Boolean(eventsRaw),
     version: version && version.length > 0 ? version : null,
     stateKeys: state ? Object.keys(state).length : 0,
+    taylorKanban,
     events: Array.isArray(eventsRaw) ? eventsRaw.length : 0,
     taylorKanbanItems,
   }
@@ -1966,6 +2026,31 @@ function readGitWorkSection(): DashboardGitWorkSection {
   })
 }
 
+export function buildRouteCostAnomalies(
+  analytics: DashboardAnalyticsSection | null,
+  expectedModels?: Array<string>,
+): Array<string> {
+  if (!analytics) return []
+  const expected = (
+    expectedModels ??
+    (process.env.NOVA_EXPECTED_MODELS ?? 'gpt-5.5,kimi-k2.6,gpt-oss-120b')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  ).map((entry) => entry.toLowerCase())
+  const anomalies: Array<string> = []
+  for (const model of analytics.topModels) {
+    const id = model.id.toLowerCase()
+    const isExpected = expected.some((candidate) => id.includes(candidate))
+    if (!isExpected && model.cost > 0.05) {
+      anomalies.push(
+        `Route leak: $${model.cost.toFixed(2)} on unexpected model ${model.id}`,
+      )
+    }
+  }
+  return anomalies
+}
+
 type LiveSystemsBuildInput = {
   status: DashboardStatusSection | null
   platforms: Array<DashboardPlatformEntry>
@@ -1976,6 +2061,7 @@ type LiveSystemsBuildInput = {
   skillsRaw: unknown
   oauthProvidersRaw: unknown
   jobBoard: JobBoardReadModel
+  gitWork?: DashboardGitWorkSection | null
 }
 
 function liveSystem(
@@ -2115,13 +2201,18 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
     liveSystem(
       'cost-route-watch',
       'Cost/route watch',
-      input.analytics ? 'online' : 'not-wired',
       input.analytics
-        ? `${input.analytics.totalTokens} tokens; ${
+        ? buildRouteCostAnomalies(input.analytics).length > 0
+          ? 'degraded'
+          : 'online'
+        : 'not-wired',
+      input.analytics
+        ? (buildRouteCostAnomalies(input.analytics)[0] ??
+          `${input.analytics.totalTokens} tokens; ${
             input.analytics.estimatedCostUsd === null
               ? input.analytics.costLabel
               : `$${input.analytics.estimatedCostUsd.toFixed(2)}`
-          } cost signal in ${input.analytics.windowDays}d`
+          } cost signal in ${input.analytics.windowDays}d`)
         : 'Analytics usage endpoint unavailable',
       '/api/analytics/usage',
       '/dashboard',
@@ -2130,11 +2221,17 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
     liveSystem(
       'github-agent-work',
       'GitHub/agent work',
-      'not-wired',
-      'Local PR/branch and agent handoff receipts are not connected to the overview yet',
-      'pending GitHub + handoff connector',
+      input.gitWork ? 'online' : 'not-wired',
+      input.gitWork
+        ? `${input.gitWork.branch ?? 'unknown branch'} @ ${input.gitWork.latestCommit?.hash ?? '?'} · ${
+            input.gitWork.clean
+              ? 'clean'
+              : `${input.gitWork.changedFiles} changed`
+          } · PR ${input.gitWork.prUrl ? 'linked' : 'not set'} · receipts via /api/nova-work-scan`
+        : 'Local git unreadable; work receipts unavailable',
+      'local git + /api/nova-work-scan',
       null,
-      null,
+      input.gitWork ? generatedAt : null,
     ),
   ]
 
@@ -2644,6 +2741,7 @@ export async function buildDashboardOverview(
     oauthProvidersRaw,
     jobBoard,
   })
+  const gitWork = readGitWorkSection()
   const liveSystems = buildLiveSystems({
     status,
     platforms,
@@ -2654,9 +2752,9 @@ export async function buildDashboardOverview(
     skillsRaw,
     oauthProvidersRaw,
     jobBoard,
+    gitWork,
   })
   const agentWorkforce = buildAgentWorkforceSection(swarmMissions)
-  const gitWork = readGitWorkSection()
 
   return {
     status,
