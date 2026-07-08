@@ -487,3 +487,15 @@ Update this when you land a fix that future sessions must know about.
   --headless=new on 9223 far more stable than headed for sweeps; second
   injected EventSource on swarm2 never opens (test artifact — the app's
   own hook receives events fine, verified via Network.eventSourceMessageReceived).
+
+### Shakedown addendum (2026-07-08 late)
+
+- Third find: pipeline runs orphaned by server restart stuck 'running'
+  forever → reapOrphanedPipelineRuns in listPipelineRuns (>2h → failed).
+  Rule: never `launchctl kickstart` the workspace while a pipeline runs.
+- Clean rerun with oneshot stages: fresh audit content, no tmux session
+  spawned, completed properly.
+- QUALITY FLAG: reviewer on light tier (kimi-k2-thinking via router)
+  emitted a pseudo-tool-call string as its entire output ("write_file(...
+  swarm-outcomes.jsonl...)") — NOT executed, outcomes verified intact.
+  Consider pinning reviewer modelTiers to standard+ if it recurs.
