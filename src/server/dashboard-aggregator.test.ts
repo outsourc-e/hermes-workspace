@@ -512,4 +512,69 @@ describe('buildDashboardOverview', () => {
     expect(overview.modelInfo).toBeNull()
     expect(overview.analytics).toBeNull()
   })
+
+  it('builds a live systems wiring map from real overview sources', async () => {
+    const fetcher = makeFetcher({
+      '/api/status': {
+        gateway_state: 'running',
+        active_agents: 3,
+        updated_at: '2026-07-08T15:00:00Z',
+        platforms: {
+          api_server: { state: 'connected', updated_at: '2026-07-08T15:00:00Z' },
+          telegram: { state: 'error', error_message: 'token expired' },
+        },
+      },
+      '/api/model/info': {
+        provider: 'openai-codex',
+        model: 'gpt-5.5',
+      },
+      '/api/cron/jobs': {
+        jobs: [
+          { id: 'ok', state: 'scheduled', next_run_at: '2026-07-09T12:00:00Z' },
+          { id: 'bad', state: 'scheduled', last_status: 'failed', last_error: 'boom' },
+        ],
+      },
+      '/api/plugins/kanban/board': {
+        columns: [{ id: 'done' }],
+        cards: [{ id: 'a', columnId: 'done', title: 'done card' }],
+      },
+      '/api/analytics/usage': {
+        period_days: 30,
+        totals: {
+          total_input: 100,
+          total_output: 50,
+          total_sessions: 1,
+          total_api_calls: 2,
+          estimated_cost: 0.12,
+        },
+        daily: [],
+      },
+      '/api/skills': {
+        skills: [{ name: 'morning-command-center' }],
+      },
+      '/api/providers/oauth': {
+        providers: [
+          { name: 'google-gmail', status: 'connected', connected: true },
+          { name: 'google-calendar', status: 'connected', connected: true },
+        ],
+      },
+    })
+
+    const overview = await buildDashboardOverview({ fetcher })
+    const systems = new Map(
+      overview.liveSystems.systems.map((system) => [system.id, system]),
+    )
+
+    expect(systems.get('hermes-gateway')?.status).toBe('degraded')
+    expect(systems.get('model-route')?.detail).toContain('gpt-5.5')
+    expect(systems.get('tools-skills')?.status).toBe('online')
+    expect(systems.get('cron-background')?.status).toBe('degraded')
+    expect(systems.get('google-workspace')?.status).toBe('online')
+    expect(systems.get('github-agent-work')?.status).toBe('not-wired')
+    expect(overview.liveSystems.summary.total).toBe(
+      overview.liveSystems.systems.length,
+    )
+    expect(overview.liveSystems.blockers.length).toBeGreaterThan(0)
+  })
+
 })

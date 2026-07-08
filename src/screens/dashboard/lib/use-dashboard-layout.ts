@@ -22,6 +22,7 @@ export type WidgetId =
   | 'operator_tip'
   | 'nova_wants'
   | 'nova_fabric'
+  | 'live_systems'
   | 'control_loops'
   | 'trust_ledger'
   | 'notebook_bridge'
@@ -120,6 +121,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Nova Fabric',
     description:
       'Source-linked continuity layer for events, self-state, source map, and consolidation review.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'live_systems',
+    label: 'Live systems',
+    description:
+      'Real source wiring map for Hermes, Google, vault, job board, GitHub, and route health.',
     column: 'main',
     hideable: true,
   },

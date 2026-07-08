@@ -32,6 +32,7 @@ import { DailyCheckCard } from './components/daily-check-card'
 import { EditModePanel } from './components/edit-mode-panel'
 import { HeroMetrics } from './components/hero-metrics'
 import { HomeModeCard } from './components/home-mode-card'
+import { LiveSystemsCard } from './components/live-systems-card'
 import { LogsTailCard } from './components/logs-tail-card'
 import { MindGraphCard } from './components/mind-graph-card'
 import { NovaFabricCard } from './components/nova-fabric-card'
@@ -1222,6 +1223,10 @@ export function DashboardScreen() {
 
         <WidgetShell id="nova_fabric" layout={layout}>
           <NovaFabricCard />
+        </WidgetShell>
+
+        <WidgetShell id="live_systems" layout={layout}>
+          <LiveSystemsCard liveSystems={overview?.liveSystems ?? null} />
         </WidgetShell>
 
         {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}

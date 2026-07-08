@@ -40,9 +40,36 @@ export type DashboardOverview = {
   controlLoops: DashboardControlLoopsSection | null
   /** Manual NotebookLM synthesis bridge, when Obsidian data is available. */
   notebookBridge: DashboardNotebookBridgeSection | null
+  /** Live source-of-truth status for wiring Nova into Mission Control. */
+  liveSystems: DashboardLiveSystemsSection
 }
 
 export type ControlLoopStatus = 'ready' | 'partial' | 'not-wired'
+
+export type LiveSystemStatus = 'online' | 'degraded' | 'offline' | 'not-wired'
+
+export type DashboardLiveSystem = {
+  id: string
+  label: string
+  status: LiveSystemStatus
+  detail: string
+  href: string | null
+  lastSeenAt: string | null
+  source: string
+}
+
+export type DashboardLiveSystemsSection = {
+  generatedAt: string
+  summary: {
+    total: number
+    online: number
+    degraded: number
+    offline: number
+    notWired: number
+  }
+  blockers: Array<string>
+  systems: Array<DashboardLiveSystem>
+}
 
 export type ControlLoopSourceStatus =
   | 'connected'
@@ -1683,6 +1710,194 @@ async function readJobBoardModel(): Promise<JobBoardReadModel> {
   }
 }
 
+type LiveSystemsBuildInput = {
+  status: DashboardStatusSection | null
+  platforms: Array<DashboardPlatformEntry>
+  cron: DashboardCronSection | null
+  kanban: DashboardKanbanSection | null
+  modelInfo: DashboardModelInfoSection | null
+  analytics: DashboardAnalyticsSection | null
+  skillsRaw: unknown
+  oauthProvidersRaw: unknown
+  jobBoard: JobBoardReadModel
+}
+
+function liveSystem(
+  id: string,
+  label: string,
+  status: LiveSystemStatus,
+  detail: string,
+  sourceLabel: string,
+  href: string | null = null,
+  lastSeenAt: string | null = null,
+): DashboardLiveSystem {
+  return { id, label, status, detail, href, lastSeenAt, source: sourceLabel }
+}
+
+function platformLooksOnline(entry: DashboardPlatformEntry): boolean {
+  return /connected|running|ready|ok|active/i.test(entry.state)
+}
+
+function platformLooksBad(entry: DashboardPlatformEntry): boolean {
+  return /error|failed|missing|disconnected|offline|revoked/i.test(entry.state)
+}
+
+function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSection {
+  const generatedAt = new Date().toISOString()
+  const oauthSignals = collectOauthSignals(input.oauthProvidersRaw)
+  const googleSignals = oauthSignals.filter((entry) => /google|gmail|calendar/.test(entry.text))
+  const gmailConnected = googleSignals.some((entry) => entry.connected && /gmail|mail|google/.test(entry.text))
+  const calendarConnected = googleSignals.some((entry) => entry.connected && /calendar|gcal|google/.test(entry.text))
+  const skillsCount = countPayloadItems(input.skillsRaw, ['skills', 'items', 'installed', 'total'])
+  const memoryFiles = safeLocal(() => listMemoryFiles(), [])
+  const vaultReachable = safeLocal(() => knowledgeRootExists(), false)
+  const knowledge = safeLocal(() => (vaultReachable ? buildKnowledgeGraph() : null), null)
+  const platformErrors = input.platforms.filter((entry) => platformLooksBad(entry))
+  const platformOnline = input.platforms.filter((entry) => platformLooksOnline(entry)).length
+
+  const systems: Array<DashboardLiveSystem> = [
+    liveSystem(
+      'hermes-gateway',
+      'Hermes gateway',
+      input.status ? (platformErrors.length > 0 ? 'degraded' : 'online') : 'offline',
+      input.status
+        ? `${input.status.gatewayState || 'unknown'}; ${input.status.activeAgents} active agent${input.status.activeAgents === 1 ? '' : 's'}`
+        : 'Gateway status endpoint unavailable',
+      '/api/status + /health/detailed',
+      '/settings',
+      input.status?.lastHeartbeatAt ?? input.status?.updatedAt ?? null,
+    ),
+    liveSystem(
+      'model-route',
+      'Model route',
+      input.modelInfo ? 'online' : 'not-wired',
+      input.modelInfo
+        ? `${input.modelInfo.provider || 'unknown'} / ${input.modelInfo.model || 'unknown model'}`
+        : 'Model info endpoint unavailable',
+      '/api/model/info',
+      '/settings',
+      generatedAt,
+    ),
+    liveSystem(
+      'tools-skills',
+      'Skills/tools',
+      skillsCount > 0 ? 'online' : 'not-wired',
+      skillsCount > 0 ? `${skillsCount} installed skill${skillsCount === 1 ? '' : 's'} returned` : 'Skills endpoint did not return installed skills',
+      '/api/skills',
+      '/skills',
+      generatedAt,
+    ),
+    liveSystem(
+      'cron-background',
+      'Cron/background',
+      input.cron
+        ? input.cron.failed > 0
+          ? 'degraded'
+          : input.cron.total > 0
+            ? 'online'
+            : 'not-wired'
+        : 'not-wired',
+      input.cron
+        ? `${input.cron.total} job${input.cron.total === 1 ? '' : 's'}; ${input.cron.failed} failed; ${input.cron.paused} paused`
+        : 'Cron endpoint unavailable',
+      '/api/cron/jobs',
+      '/jobs',
+      input.cron?.nextRunAt ?? generatedAt,
+    ),
+    liveSystem(
+      'google-workspace',
+      'Google Workspace',
+      gmailConnected && calendarConnected
+        ? 'online'
+        : googleSignals.length > 0
+          ? 'degraded'
+          : 'not-wired',
+      googleSignals.length > 0
+        ? `${gmailConnected ? 'Gmail' : 'Gmail not proven'}; ${calendarConnected ? 'Calendar' : 'Calendar not proven'}`
+        : 'No Google/Gmail/Calendar OAuth signal returned',
+      '/api/providers/oauth',
+      '/settings',
+      generatedAt,
+    ),
+    liveSystem(
+      'obsidian-vault',
+      'Obsidian vault',
+      vaultReachable ? ((knowledge?.nodes.length ?? 0) > 0 ? 'online' : 'degraded') : 'not-wired',
+      vaultReachable
+        ? `${knowledge?.nodes.length ?? 0} graph node${(knowledge?.nodes.length ?? 0) === 1 ? '' : 's'}; ${memoryFiles.length} memory file${memoryFiles.length === 1 ? '' : 's'}`
+        : 'Knowledge root/vault not reachable',
+      'unified-vault + memory files',
+      '/memory',
+      newestIso([...(knowledge?.nodes.map((node) => node.modified) ?? []), ...memoryFiles.map((file) => file.modified)]),
+    ),
+    liveSystem(
+      'neon-moon-job-board',
+      'Neon Moon job board',
+      input.jobBoard.online ? 'online' : 'not-wired',
+      input.jobBoard.online
+        ? `v${input.jobBoard.version ?? 'unknown'}; ${input.jobBoard.taylorKanbanItems} Taylor kanban item${input.jobBoard.taylorKanbanItems === 1 ? '' : 's'}`
+        : 'Job board HTTP endpoints unavailable',
+      'job board HTTP endpoints',
+      '/swarm2',
+      generatedAt,
+    ),
+    liveSystem(
+      'kanban-board',
+      'Kanban board',
+      input.kanban
+        ? input.kanban.blocked > 0
+          ? 'degraded'
+          : 'online'
+        : 'not-wired',
+      input.kanban
+        ? `${input.kanban.total} card${input.kanban.total === 1 ? '' : 's'}; ${input.kanban.blocked} blocked`
+        : 'Kanban plugin endpoint unavailable',
+      '/api/plugins/kanban/board',
+      '/swarm2',
+      generatedAt,
+    ),
+    liveSystem(
+      'cost-route-watch',
+      'Cost/route watch',
+      input.analytics ? 'online' : 'not-wired',
+      input.analytics
+        ? `${input.analytics.totalTokens} tokens; ${
+            input.analytics.estimatedCostUsd === null
+              ? input.analytics.costLabel
+              : `$${input.analytics.estimatedCostUsd.toFixed(2)}`
+          } cost signal in ${input.analytics.windowDays}d`
+        : 'Analytics usage endpoint unavailable',
+      '/api/analytics/usage',
+      '/dashboard',
+      generatedAt,
+    ),
+    liveSystem(
+      'github-agent-work',
+      'GitHub/agent work',
+      'not-wired',
+      'Local PR/branch and agent handoff receipts are not connected to the overview yet',
+      'pending GitHub + handoff connector',
+      null,
+      null,
+    ),
+  ]
+
+  const summary = {
+    total: systems.length,
+    online: systems.filter((item) => item.status === 'online').length,
+    degraded: systems.filter((item) => item.status === 'degraded').length,
+    offline: systems.filter((item) => item.status === 'offline').length,
+    notWired: systems.filter((item) => item.status === 'not-wired').length,
+  }
+
+  const blockers = systems
+    .filter((item) => item.status === 'offline' || item.status === 'degraded' || item.status === 'not-wired')
+    .slice(0, 4)
+    .map((item) => `${item.label}: ${item.detail}`)
+
+  return { generatedAt, summary, blockers, systems }
+}
+
 type ControlLoopBuildInput = {
   status: DashboardStatusSection | null
   cron: DashboardCronSection | null
@@ -2143,6 +2358,7 @@ export async function buildDashboardOverview(
   const analytics = normalizeAnalytics(analyticsRaw, analyticsWindowDays)
   const kanban = normalizeKanban(kanbanRaw)
   const logs = normalizeLogs(logsRaw, logsLimit)
+  const modelInfo = normalizeModelInfo(modelInfoRaw)
   const skillsUsage = normalizeSkillsUsage(analyticsRaw)
   const insights = computeInsights(analytics, cron, status, skillsUsage, kanban)
   const incidents = computeIncidents(status, platforms, cron, logs, kanban)
@@ -2170,6 +2386,17 @@ export async function buildDashboardOverview(
     oauthProvidersRaw,
     jobBoard,
   })
+  const liveSystems = buildLiveSystems({
+    status,
+    platforms,
+    cron,
+    kanban,
+    modelInfo,
+    analytics,
+    skillsRaw,
+    oauthProvidersRaw,
+    jobBoard,
+  })
 
   return {
     status,
@@ -2177,7 +2404,7 @@ export async function buildDashboardOverview(
     cron,
     kanban,
     achievements,
-    modelInfo: normalizeModelInfo(modelInfoRaw),
+    modelInfo,
     analytics,
     logs,
     skillsUsage,
@@ -2186,5 +2413,6 @@ export async function buildDashboardOverview(
     trustLedger,
     controlLoops,
     notebookBridge: buildNotebookBridge(),
+    liveSystems,
   }
 }
