@@ -414,7 +414,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       setState((prev) => ({
         ...prev,
         isStreaming: false,
-        streamingText: finalText,
+        streamingMessageId: null,
+        streamingText: '',
       }))
 
       const message: ChatMessage = {
