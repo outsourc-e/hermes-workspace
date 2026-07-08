@@ -227,8 +227,8 @@ export function planQueueDrain(maxDispatches = 2): Array<DrainPlan> {
         busy.add(item.worker)
         continue
       }
-      // Target busy → try an idle clone (spawning one if caps allow).
-      const clone = resolveWorkerForRole(item.worker)
+      // Target busy (or claimed this drain) → idle clone, spawning if caps allow.
+      const clone = resolveWorkerForRole(item.worker, busy)
       if (clone && !busy.has(clone)) {
         plans.push({ item, workerId: clone })
         busy.add(clone)

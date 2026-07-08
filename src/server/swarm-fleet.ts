@@ -163,17 +163,21 @@ export function ensureCloneProfile(baseId: string, cloneId: string): boolean {
  * Pick an idle worker for a role, cloning when everyone is busy and caps
  * allow. Returns null when the role is saturated.
  */
-export function resolveWorkerForRole(baseId: string): string | null {
-  if (fleetWorkerIsIdle(baseId)) return baseId
+export function resolveWorkerForRole(
+  baseId: string,
+  exclude: ReadonlySet<string> = new Set(),
+): string | null {
+  if (!exclude.has(baseId) && fleetWorkerIsIdle(baseId)) return baseId
   if (!CLONEABLE_ROLES.has(baseId)) return null
   for (let n = 2; n <= maxClonesPerRole(); n += 1) {
     const cloneId = `${baseId}-${n}`
+    if (exclude.has(cloneId)) continue
     if (existsSync(join(profilesDir(), cloneId))) {
       if (fleetWorkerIsIdle(cloneId)) return cloneId
       continue
     }
     // Room in the role cap and the global cap → create a new clone.
-    if (busyWorkerCount() >= maxParallel()) return null
+    if (busyWorkerCount() + exclude.size >= maxParallel()) return null
     return ensureCloneProfile(baseId, cloneId) ? cloneId : null
   }
   return null

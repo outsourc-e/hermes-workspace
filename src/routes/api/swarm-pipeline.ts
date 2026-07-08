@@ -20,7 +20,11 @@ export async function dispatchStage(
   assignments: Array<{ workerId: string; task: string }>,
 ) {
   const res = (await dispatchSwarmAssignments({
-    assignments,
+    // oneshot: live TUI sessions can return a STALE checkpoint file from a
+    // previous task instantly, making a stage look done with old results
+    // (found in shakedown: reviewer verdict from an earlier run). A fresh
+    // CLI run per stage assignment always produces a fresh answer.
+    assignments: assignments.map((a) => ({ ...a, oneshot: true })),
     waitForCheckpoint: true,
     timeoutSeconds: 900,
   })) as {
@@ -35,7 +39,7 @@ export async function dispatchStage(
   return (res.results ?? []).map((r) => ({
     workerId: r.workerId,
     ok: r.ok,
-    summary: (r.checkpoint?.result || r.error || r.output || '').slice(0, 1000),
+    summary: (r.output || r.checkpoint?.result || r.error || '').slice(0, 1000),
   }))
 }
 
