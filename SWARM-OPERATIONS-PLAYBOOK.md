@@ -461,3 +461,29 @@ Update this when you land a fix that future sessions must know about.
   (/api/swarm-selftune anomaly-check in sweep; fail-rate 2x+40% or volume 4x
   → one phone push/day); weekly self-benchmark (3 fixed oneshot tasks in
   hermes-weekly-report.sh, score in report + Discord).
+
+## 2026-07-08 — Tier R + full shakedown
+
+- **Tier R**: HMAC hash-chained audit log (~/.hermes/logs/audit.jsonl, key
+  ~/.hermes/audit.key 600) appended by all mutating routes; verify via
+  /api/audit-log?verify=1 (tamper → brokenAt index). Weekly
+  hermes-security-scan.sh (Mon 08:00): secret perms auto-fix, unexpected
+  0.0.0.0 listeners (ignores ControlCe/rapportd/sharingd), repo+log token
+  grep, chain verify, Tailscale Funnel check. Route auth sweep: all API
+  routes authed or intentionally public (oauth/auth, hermesworld
+  reservations rate-limited).
+- **Shakedown finds (both fixed)**:
+  1. Same-drain clone allocation — second task for a busy role was skipped;
+     resolveWorkerForRole now takes exclude set. Proven: builder +
+     builder-2 in parallel tmux sessions.
+  2. STALE PIPELINE CHECKPOINTS [RECURS-CLASS] — live-TUI stage dispatch
+     returned a previous task's checkpoint instantly (reviewer verdict from
+     an old run in a fresh audit). Pipelines now dispatch stages
+     oneshot + prefer r.output. Same disease as the H2 goals fix — any NEW
+     waitForCheckpoint consumer must use oneshot or tolerate stale files.
+- Shakedown verified: 13 routes render zero console errors; 13 APIs 200;
+  queue add/cancel buttons work (optimistic); SSE chain measured:
+  mutation → event 320ms → refetch immediate. CDP note: headless
+  --headless=new on 9223 far more stable than headed for sweeps; second
+  injected EventSource on swarm2 never opens (test artifact — the app's
+  own hook receives events fine, verified via Network.eventSourceMessageReceived).
