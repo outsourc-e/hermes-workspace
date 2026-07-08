@@ -155,3 +155,15 @@ fi
 # New unread → Discord; Gmail-IMPORTANT/starred → phone push. No-op until
 # ~/.hermes/google-token.json exists (hermes-gmail-auth.mjs one-time consent).
 node "$(dirname "$0")/hermes-gmail-watch.mjs" >/dev/null 2>&1 || true
+
+# ---- anomaly detection --------------------------------------------------------
+# Failure-rate regressions / volume spikes vs the trailing week → one phone
+# push per day max (server keeps the state).
+ANOM=$(curl -sS -m 30 -X POST -H 'Content-Type: application/json' \
+  -d '{"action":"anomaly-check"}' "http://127.0.0.1:3000/api/swarm-selftune" 2>/dev/null || echo '')
+if [ -n "$ANOM" ]; then
+  ALERTS=$(printf '%s' "$ANOM" | python3 -c 'import json,sys
+try: print("; ".join(json.load(sys.stdin)["report"]["alerts"]))
+except Exception: print("")' 2>/dev/null || echo '')
+  [ -n "$ALERTS" ] && echo "{\"at\":$(date +%s)000,\"anomaly\":\"$ALERTS\"}" >> "$LOG_FILE"
+fi

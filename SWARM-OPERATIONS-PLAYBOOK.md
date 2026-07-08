@@ -430,3 +430,34 @@ Update this when you land a fix that future sessions must know about.
 - Consent app in Testing mode: refresh token may expire after 7 days — if
   watcher goes quiet, re-run auth script or publish consent screen to
   Production.
+
+## 2026-07-08 — Tiers J-O shipped
+
+- **J**: session replay (.runtime/swarm-replays.jsonl via finalizeDispatch;
+  /replay screen + /api/swarm-replay incl. ?daily=1 activity chart);
+  scripts/hermes-install.sh one-command bootstrap/repair.
+- **K**: /api/swarm-events SSE (1s mtime watcher over runtime/queue/goals/
+  pipelines/missions/outcomes) + useSwarmEvents hook → board updates ~1s;
+  optimistic queue approve/cancel.
+- **L**: worker clones (src/server/swarm-fleet.ts) — busy cloneable roles
+  (builder/researcher/qa/maintainer/km-agent) spawn <role>-2/-3 during queue
+  drain; profile copied minus caches/sessions/state.db, roster wrapper/profile
+  point at base. Caps: HERMES_MAX_CLONES (3), HERMES_MAX_PARALLEL (4).
+  Verify-exemption resolves clone ids via baseOf().
+- **M**: new agents scribe (notes→vault+actions), data-analyst (Sun 17:30
+  weekly analytics), archivist (nightly 02:30 vault gardening, max 20
+  changes), scout (daily 07:00 web briefing). Profiles cloned from
+  km-agent/researcher; plists com.hermes.swarm.{archivist-nightly,
+  data-analyst-weekly,scout-morning}. GOTCHA: plist task text is XML — no
+  angle brackets or shell $() (gets frozen at creation).
+- **N**: /api/nl-command (heuristics + strategist-classify → queue/goal/
+  dispatch/answer; fallback queue-verbatim); workflow templates
+  (.runtime/swarm-templates.json, {{input}} substitution; seeds ship-feature/
+  security-audit/deep-research; /api/swarm-templates); palette Do:/templates;
+  bot !do !templates !template. Discord buttons NOT possible (bot is REST
+  polling, no interactions endpoint).
+- **O**: failure autopsies (goal cap-hit or failed pipeline → researcher
+  writes vault/autopsies/ note, deduped); daily anomaly detector
+  (/api/swarm-selftune anomaly-check in sweep; fail-rate 2x+40% or volume 4x
+  → one phone push/day); weekly self-benchmark (3 fixed oneshot tasks in
+  hermes-weekly-report.sh, score in report + Discord).

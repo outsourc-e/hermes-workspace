@@ -125,3 +125,33 @@ if [ -n "$BOT_TOKEN" ] && [ -n "$CHANNEL" ] && [ -n "$summary" ]; then
     -d "$body" \
     "https://discord.com/api/v10/channels/$CHANNEL/messages" >/dev/null 2>&1 || true
 fi
+
+# ---- self-benchmark -----------------------------------------------------------
+# Fixed micro-suite through the real dispatch path; a score drop week-over-week
+# means worker quality regressed even if nothing "failed" in production.
+BENCH_PASS=0; BENCH_TOTAL=3
+bench() {
+  local WORKER="$1" TASK="$2" EXPECT="$3"
+  local OUT
+  OUT=$(curl -sS -m 300 -X POST -H 'Content-Type: application/json' \
+    -d "{\"assignments\":[{\"workerId\":\"$WORKER\",\"task\":\"$TASK\",\"oneshot\":true}],\"waitForCheckpoint\":true,\"timeoutSeconds\":240}" \
+    "http://127.0.0.1:3000/api/swarm-dispatch" 2>/dev/null | \
+    python3 -c 'import json,sys
+try:
+  r=(json.load(sys.stdin).get("results") or [{}])[0]
+  print(r.get("output") or (r.get("checkpoint") or {}).get("result") or "")
+except Exception: print("")')
+  printf '%s' "$OUT" | grep -q "$EXPECT" && BENCH_PASS=$((BENCH_PASS+1))
+}
+bench qa "Compute 17*23 and reply with exactly: BENCH_MATH_<answer> (replace <answer> with the number)" "BENCH_MATH_391"
+bench researcher "Reply with exactly: BENCH_ECHO_OK" "BENCH_ECHO_OK"
+bench builder "What does 'set -euo pipefail' do in bash? End your reply with exactly: BENCH_EXPLAIN_OK" "BENCH_EXPLAIN_OK"
+echo "" >> "$REPORT_PATH"
+echo "## Self-benchmark" >> "$REPORT_PATH"
+echo "- Score: $BENCH_PASS/$BENCH_TOTAL (qa math, researcher echo, builder explain)" >> "$REPORT_PATH"
+echo "self-benchmark: $BENCH_PASS/$BENCH_TOTAL"
+if [ -n "$BOT_TOKEN" ] && [ -n "$CHANNEL" ]; then
+  body=$(python3 -c "import json;print(json.dumps({'content':'🧪 Self-benchmark: $BENCH_PASS/$BENCH_TOTAL'}))")
+  curl -sS -m 10 -X POST -H "Authorization: Bot $BOT_TOKEN" -H 'Content-Type: application/json' \
+    -d "$body" "https://discord.com/api/v10/channels/$CHANNEL/messages" >/dev/null 2>&1 || true
+fi

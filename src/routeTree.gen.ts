@@ -54,6 +54,7 @@ import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-s
 import { Route as ApiSwarmTmuxScrollRouteImport } from './routes/api/swarm-tmux-scroll'
 import { Route as ApiSwarmTimelineRouteImport } from './routes/api/swarm-timeline'
 import { Route as ApiSwarmTemplatesRouteImport } from './routes/api/swarm-templates'
+import { Route as ApiSwarmSelftuneRouteImport } from './routes/api/swarm-selftune'
 import { Route as ApiSwarmScoreboardRouteImport } from './routes/api/swarm-scoreboard'
 import { Route as ApiSwarmRuntimeRouteImport } from './routes/api/swarm-runtime'
 import { Route as ApiSwarmRosterRouteImport } from './routes/api/swarm-roster'
@@ -409,6 +410,11 @@ const ApiSwarmTimelineRoute = ApiSwarmTimelineRouteImport.update({
 const ApiSwarmTemplatesRoute = ApiSwarmTemplatesRouteImport.update({
   id: '/api/swarm-templates',
   path: '/api/swarm-templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmSelftuneRoute = ApiSwarmSelftuneRouteImport.update({
+  id: '/api/swarm-selftune',
+  path: '/api/swarm-selftune',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmScoreboardRoute = ApiSwarmScoreboardRouteImport.update({
@@ -1175,6 +1181,7 @@ export interface FileRoutesByFullPath {
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
   '/api/swarm-scoreboard': typeof ApiSwarmScoreboardRoute
+  '/api/swarm-selftune': typeof ApiSwarmSelftuneRoute
   '/api/swarm-templates': typeof ApiSwarmTemplatesRoute
   '/api/swarm-timeline': typeof ApiSwarmTimelineRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
@@ -1352,6 +1359,7 @@ export interface FileRoutesByTo {
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
   '/api/swarm-scoreboard': typeof ApiSwarmScoreboardRoute
+  '/api/swarm-selftune': typeof ApiSwarmSelftuneRoute
   '/api/swarm-templates': typeof ApiSwarmTemplatesRoute
   '/api/swarm-timeline': typeof ApiSwarmTimelineRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
@@ -1531,6 +1539,7 @@ export interface FileRoutesById {
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
   '/api/swarm-scoreboard': typeof ApiSwarmScoreboardRoute
+  '/api/swarm-selftune': typeof ApiSwarmSelftuneRoute
   '/api/swarm-templates': typeof ApiSwarmTemplatesRoute
   '/api/swarm-timeline': typeof ApiSwarmTimelineRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
@@ -1711,6 +1720,7 @@ export interface FileRouteTypes {
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
     | '/api/swarm-scoreboard'
+    | '/api/swarm-selftune'
     | '/api/swarm-templates'
     | '/api/swarm-timeline'
     | '/api/swarm-tmux-scroll'
@@ -1888,6 +1898,7 @@ export interface FileRouteTypes {
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
     | '/api/swarm-scoreboard'
+    | '/api/swarm-selftune'
     | '/api/swarm-templates'
     | '/api/swarm-timeline'
     | '/api/swarm-tmux-scroll'
@@ -2066,6 +2077,7 @@ export interface FileRouteTypes {
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
     | '/api/swarm-scoreboard'
+    | '/api/swarm-selftune'
     | '/api/swarm-templates'
     | '/api/swarm-timeline'
     | '/api/swarm-tmux-scroll'
@@ -2245,6 +2257,7 @@ export interface RootRouteChildren {
   ApiSwarmRosterRoute: typeof ApiSwarmRosterRoute
   ApiSwarmRuntimeRoute: typeof ApiSwarmRuntimeRouteWithChildren
   ApiSwarmScoreboardRoute: typeof ApiSwarmScoreboardRoute
+  ApiSwarmSelftuneRoute: typeof ApiSwarmSelftuneRoute
   ApiSwarmTemplatesRoute: typeof ApiSwarmTemplatesRoute
   ApiSwarmTimelineRoute: typeof ApiSwarmTimelineRoute
   ApiSwarmTmuxScrollRoute: typeof ApiSwarmTmuxScrollRoute
@@ -2608,6 +2621,13 @@ declare module '@tanstack/react-router' {
       path: '/api/swarm-templates'
       fullPath: '/api/swarm-templates'
       preLoaderRoute: typeof ApiSwarmTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-selftune': {
+      id: '/api/swarm-selftune'
+      path: '/api/swarm-selftune'
+      fullPath: '/api/swarm-selftune'
+      preLoaderRoute: typeof ApiSwarmSelftuneRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/swarm-scoreboard': {
@@ -3842,6 +3862,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmRosterRoute: ApiSwarmRosterRoute,
   ApiSwarmRuntimeRoute: ApiSwarmRuntimeRouteWithChildren,
   ApiSwarmScoreboardRoute: ApiSwarmScoreboardRoute,
+  ApiSwarmSelftuneRoute: ApiSwarmSelftuneRoute,
   ApiSwarmTemplatesRoute: ApiSwarmTemplatesRoute,
   ApiSwarmTimelineRoute: ApiSwarmTimelineRoute,
   ApiSwarmTmuxScrollRoute: ApiSwarmTmuxScrollRoute,

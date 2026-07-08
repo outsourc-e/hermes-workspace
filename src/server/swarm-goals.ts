@@ -22,6 +22,7 @@ import {
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { notifyPhone } from './notify'
+import { enqueueAutopsy } from './swarm-selftune'
 import { SWARM_CANONICAL_REPO } from './swarm-environment'
 import {
   listPipelineRuns,
@@ -210,6 +211,13 @@ export async function stepGoals(deps: {
     goal.currentPipelineId = null
     note(goal, `pipeline ${run.id} finished (${run.state}) — assessing`)
     saveGoals(file)
+    if (run.state === 'failed') {
+      enqueueAutopsy({
+        kind: 'pipeline',
+        subject: `Goal pipeline ${run.id}: ${goal.goal.slice(0, 120)}`,
+        context: context.slice(0, 2500),
+      })
+    }
     const reply = await deps.dispatch(assessPrompt(goal, context.slice(0, 6000)))
     const verdict = extractJson(reply) as {
       done?: boolean
@@ -245,6 +253,11 @@ export async function stepGoals(deps: {
         message: `Iteration cap hit: ${g.goal.slice(0, 100)}\n${verdict.summary ?? ''}`,
         priority: 4,
         tags: ['dart', 'warning'],
+      })
+      enqueueAutopsy({
+        kind: 'goal',
+        subject: g.goal,
+        context: g.notes.slice(-10).join('\n'),
       })
       return 'iteration cap hit'
     }
