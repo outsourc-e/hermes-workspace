@@ -27,6 +27,23 @@ export type SessionTitleInfo = {
 
 const STORAGE_KEY = 'claude.sessionTitles.v1'
 
+const WORKSPACE_CONTEXT_TITLE_REGEX =
+  /^\s*<workspace_context\s+active="true"\s+name="[^"]*"\s+path="[^"]*"\s*\/?>\s*/i
+
+function cleanStoredTitleCandidate(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+
+  if (trimmed.includes('<workspace_context')) {
+    const cleaned = trimmed.replace(WORKSPACE_CONTEXT_TITLE_REGEX, '').trim()
+    if (cleaned && !cleaned.includes('<workspace_context')) return cleaned
+    return undefined
+  }
+
+  return trimmed
+}
+
 let persistedTitles: Record<string, PersistedTitle> = {}
 const runtimeStates = new Map<string, RuntimeState>()
 const listeners = new Set<() => void>()
@@ -49,11 +66,9 @@ function ensureLoaded() {
               const normalized: PersistedTitle = {}
               // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
               if (value && typeof value === 'object') {
-                if (
-                  typeof value.title === 'string' &&
-                  value.title.trim().length > 0
-                ) {
-                  normalized.title = value.title.trim()
+                const cleanTitle = cleanStoredTitleCandidate(value.title)
+                if (cleanTitle) {
+                  normalized.title = cleanTitle
                 }
                 if (value.source === 'auto' || value.source === 'manual') {
                   normalized.source = value.source
@@ -167,7 +182,7 @@ export function updateSessionTitleState(
   const nextRuntime: RuntimeState = { ...prevRuntime }
 
   if ('title' in patch) {
-    const nextTitle = patch.title?.trim() ?? ''
+    const nextTitle = cleanStoredTitleCandidate(patch.title) ?? ''
     if (nextTitle.length > 0) {
       nextPersisted = {
         ...nextPersisted,
