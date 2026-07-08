@@ -244,8 +244,28 @@ function cleanString(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null
 }
 
+function cleanMultilineString(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return normalized ? normalized : null
+}
+
 function limitString(value: string | null | undefined, field: string, max: number): string | null {
   const cleaned = cleanString(value)
+  if (!cleaned) return null
+  if (cleaned.length > max) throw new Error(`${field} must be ${max} characters or less`)
+  return cleaned
+}
+
+function limitMultilineString(value: string | null | undefined, field: string, max: number): string | null {
+  const cleaned = cleanMultilineString(value)
   if (!cleaned) return null
   if (cleaned.length > max) throw new Error(`${field} must be ${max} characters or less`)
   return cleaned
@@ -455,7 +475,7 @@ function normalizeContentFields(value: Record<string, string> | null | undefined
   for (const [key, rawValue] of Object.entries(value)) {
     const cleanKey = limitString(key, 'field', FIELD_LIMITS.tag)
     if (!cleanKey) continue
-    fields[cleanKey] = limitString(rawValue, cleanKey, FIELD_LIMITS.contentField) || ''
+    fields[cleanKey] = limitMultilineString(rawValue, cleanKey, FIELD_LIMITS.contentField) || ''
   }
   return fields
 }
@@ -547,7 +567,7 @@ export function saveProjectContentDraft(input: SaveProjectContentDraftInput): Pr
     projectId: project.id,
     templateId: limitString(input.templateId ?? project.templateId, 'templateId', FIELD_LIMITS.templateId),
     fields: normalizeContentFields(input.fields),
-    markdown: limitString(input.markdown, 'markdown', FIELD_LIMITS.markdown),
+    markdown: limitMultilineString(input.markdown, 'markdown', FIELD_LIMITS.markdown),
     status: assertOneOf(input.status, PROJECT_STATUSES, 'status', 'brouillon'),
     version: limitString(input.version, 'version', FIELD_LIMITS.tag) || current?.version || 'v0.1',
     createdAt: current?.createdAt || now,
@@ -571,7 +591,7 @@ export function buildMarkdownFromContent(input: {
   ]
 
   for (const [sectionId, rawValue] of Object.entries(input.fields)) {
-    const value = cleanString(rawValue)
+    const value = cleanMultilineString(rawValue)
     if (!value) continue
     lines.push(`## ${input.sectionTitles[sectionId] || sectionId}`)
     lines.push('')
@@ -579,10 +599,12 @@ export function buildMarkdownFromContent(input: {
     lines.push('')
   }
 
-  lines.push('## Sources et limites')
-  lines.push('')
-  lines.push('- Source : a completer ou a confirmer.')
-  lines.push('- Statut : brouillon non publiable sans validation.')
+  if (!('sources' in input.fields)) {
+    lines.push('## Sources et limites')
+    lines.push('')
+    lines.push('- Source : a completer ou a confirmer.')
+    lines.push('- Statut : brouillon non publiable sans validation.')
+  }
   return lines.join('\n').trim()
 }
 
@@ -792,11 +814,20 @@ export function buildStarterContentFields(input: {
         'Si aucune source pricing fiable n’est disponible, masquer les prix et lister les points à valider.',
       ].join('\n')
     } else if (section.id === 'objections') {
-      fields[section.id] = [
-        '- “Pourquoi cette offre plutôt qu’un accès moins cher ?” → Répondre par le niveau de service, les usages critiques, l’accompagnement et la cohérence avec les services Dstny.',
-        '- “Est-ce adapté à tous les sites ?” → Qualifier le besoin : criticité, débit, usages voix/cloud, backup, budget et contraintes d’éligibilité.',
-        '- “Quels prix appliquer ?” → Répondre uniquement avec le catalogue actif du canal concerné.',
-      ].join('\n')
+      if (family === 'mobile') {
+        fields[section.id] = [
+          '- “Quelle couverture réseau et quelles garanties ?” → Répondre uniquement avec la source opérateur/produit validée, et signaler les zones ou conditions à vérifier.',
+          '- “Quelles options data, roaming, multi-SIM ou eSIM ?” → Présenter les options seulement si elles sont documentées dans le catalogue actif.',
+          '- “Comment gérer portabilité, flotte, support et engagements ?” → Rattacher les procédures et conditions contractuelles avant publication.',
+          '- “Quels prix appliquer ?” → Répondre uniquement avec le catalogue actif du canal concerné.',
+        ].join('\n')
+      } else {
+        fields[section.id] = [
+          '- “Pourquoi cette offre plutôt qu’un accès moins cher ?” → Répondre par le niveau de service, les usages critiques, l’accompagnement et la cohérence avec les services Dstny.',
+          '- “Est-ce adapté à tous les sites ?” → Qualifier le besoin : criticité, débit, usages voix/cloud, backup, budget et contraintes d’éligibilité.',
+          '- “Quels prix appliquer ?” → Répondre uniquement avec le catalogue actif du canal concerné.',
+        ].join('\n')
+      }
     } else if (section.id === 'sources') {
       fields[section.id] = [
         'Sources à rattacher avant publication :',

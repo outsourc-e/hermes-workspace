@@ -153,6 +153,38 @@ describe('project cockpit registry', () => {
     expect(draft.markdown).toContain('## Promesse')
     expect(bundle?.contentDraft?.fields.promise).toContain('connectivite fiable')
     expect(bundle?.contentDraft?.markdown).toContain('Statut : brouillon')
+    expect(bundle?.contentDraft?.markdown).toContain('\n## Promesse\n')
+  })
+
+  it('preserves markdown line breaks and does not duplicate sources section', async () => {
+    const project = createProject({
+      title: 'Fiche produit PDF - Mobile',
+      templateId: 'template_fiche_produit_pdf_tous',
+    })
+    const markdown = buildMarkdownFromContent({
+      project,
+      templateName: 'Fiche produit PDF - Tous canaux',
+      sectionTitles: {
+        benefits: 'Bénéfices',
+        sources: 'Sources et limites',
+      },
+      fields: {
+        benefits: '- Bénéfice 1\n- Bénéfice 2',
+        sources: '- Source produit à rattacher\n- Statut : brouillon',
+      },
+    })
+    const draft = saveProjectContentDraft({
+      projectId: project.id,
+      fields: {
+        benefits: '- Bénéfice 1\n- Bénéfice 2',
+        sources: '- Source produit à rattacher\n- Statut : brouillon',
+      },
+      markdown,
+    })
+
+    expect(draft.fields.benefits).toContain('\n- Bénéfice 2')
+    expect(draft.markdown).toContain('\n- Bénéfice 2')
+    expect((draft.markdown?.match(/## Sources et limites/g) || [])).toHaveLength(1)
   })
 
   it('suggests business starter content by product family and channel', async () => {
@@ -206,5 +238,28 @@ describe('project cockpit registry', () => {
     expect(buildStarterContentFields({ project: mobile, template: { id: 't', name: 't', channel: 'ambassadeur', sections } }).promise).toContain('brique utile')
     expect(buildStarterContentFields({ project: sip, template: { id: 't', name: 't', channel: 'direct', sections } }).promise).toContain('raccorder la téléphonie')
     expect(buildStarterContentFields({ project: teams, template: { id: 't', name: 't', channel: 'operateur', sections } }).promise).toContain('Microsoft Teams')
+  })
+
+  it('uses mobile-specific objections for mobile product sheets', async () => {
+    const project = createProject({
+      title: 'Fiche produit PDF - Mobile',
+      tags: 'mobile, canal:tous',
+    })
+    const fields = buildStarterContentFields({
+      project,
+      template: {
+        id: 'template_fiche_produit_pdf_tous',
+        name: 'Fiche produit PDF - Tous canaux',
+        channel: 'tous',
+        sections: [
+          { id: 'objections', title: 'Objections et réponses', purpose: '', required: true },
+        ],
+      },
+    })
+
+    expect(fields.objections).toContain('couverture réseau')
+    expect(fields.objections).toContain('roaming')
+    expect(fields.objections).not.toContain('accès moins cher')
+    expect(fields.objections).not.toContain('débit')
   })
 })
