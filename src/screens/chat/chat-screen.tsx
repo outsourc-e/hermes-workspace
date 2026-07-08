@@ -1295,7 +1295,19 @@ export function ChatScreen({
       return
     }
     if (navCancelKeyRef.current !== navKey) {
+      const activeSend = activeSendRef.current
+      const isResolvingActiveSend =
+        Boolean(activeSend) &&
+        !isNewChat &&
+        (activeSend?.sessionKey === activeCanonicalKey ||
+          activeSend?.friendlyId === activeFriendlyId)
+
       navCancelKeyRef.current = navKey
+
+      if (isResolvingActiveSend) {
+        return
+      }
+
       cancelStreaming()
     }
   }, [activeCanonicalKey, activeFriendlyId, isNewChat, cancelStreaming])
