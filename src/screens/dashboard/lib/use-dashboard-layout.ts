@@ -23,6 +23,7 @@ export type WidgetId =
   | 'nova_wants'
   | 'nova_fabric'
   | 'live_systems'
+  | 'agent_workforce'
   | 'control_loops'
   | 'trust_ledger'
   | 'notebook_bridge'
@@ -129,6 +130,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Live systems',
     description:
       'Real source wiring map for Hermes, Google, vault, job board, GitHub, and route health.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'agent_workforce',
+    label: 'Agent workforce',
+    description:
+      'Read-only status of swarm missions, workers, blockers, and review queues.',
     column: 'main',
     hideable: true,
   },

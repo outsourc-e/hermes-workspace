@@ -23,6 +23,7 @@ import {
 } from 'recharts'
 import { AchievementsCard } from './components/achievements-card'
 import { ActiveModelKpi } from './components/active-model-kpi'
+import { AgentWorkforceCard } from './components/agent-workforce-card'
 import { AnalyticsChartCard } from './components/analytics-chart-card'
 import { AttentionMarquee } from './components/attention-marquee'
 import { CacheEfficiencyCard } from './components/cache-efficiency-card'
@@ -1227,6 +1228,10 @@ export function DashboardScreen() {
 
         <WidgetShell id="live_systems" layout={layout}>
           <LiveSystemsCard liveSystems={overview?.liveSystems ?? null} />
+        </WidgetShell>
+
+        <WidgetShell id="agent_workforce" layout={layout}>
+          <AgentWorkforceCard workforce={overview?.agentWorkforce ?? null} />
         </WidgetShell>
 
         {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}

@@ -1,5 +1,7 @@
 ﻿import { buildKnowledgeGraph, knowledgeRootExists } from './knowledge-browser'
 import { listMemoryFiles } from './memory-browser'
+import { listSwarmMissions } from './swarm-missions'
+import type { SwarmMission, SwarmMissionAssignment } from './swarm-missions'
 
 /**
  * Aggregator for the Workspace dashboard overview.
@@ -42,11 +44,57 @@ export type DashboardOverview = {
   notebookBridge: DashboardNotebookBridgeSection | null
   /** Live source-of-truth status for wiring Nova into Mission Control. */
   liveSystems: DashboardLiveSystemsSection
+  /** Read-only agent workforce status derived from swarm mission receipts. */
+  agentWorkforce: DashboardAgentWorkforceSection
 }
 
 export type ControlLoopStatus = 'ready' | 'partial' | 'not-wired'
 
 export type LiveSystemStatus = 'online' | 'degraded' | 'offline' | 'not-wired'
+
+export type AgentWorkerStatus =
+  | 'idle'
+  | 'queued'
+  | 'running'
+  | 'blocked'
+  | 'reviewing'
+  | 'done'
+
+export type DashboardAgentWorker = {
+  workerId: string
+  status: AgentWorkerStatus
+  activeAssignments: number
+  completedAssignments: number
+  blockedAssignments: number
+  reviewAssignments: number
+  currentTask: string | null
+  missionId: string | null
+  lastSeenAt: string | null
+}
+
+export type DashboardAgentWorkforceMission = {
+  id: string
+  title: string
+  state: string
+  updatedAt: string
+  assignments: number
+  blocked: number
+  reviewing: number
+}
+
+export type DashboardAgentWorkforceSection = {
+  generatedAt: string
+  summary: {
+    missions: number
+    workers: number
+    active: number
+    blocked: number
+    reviewing: number
+    done: number
+  }
+  workers: Array<DashboardAgentWorker>
+  recentMissions: Array<DashboardAgentWorkforceMission>
+}
 
 export type DashboardLiveSystem = {
   id: string
@@ -1710,6 +1758,103 @@ async function readJobBoardModel(): Promise<JobBoardReadModel> {
   }
 }
 
+function assignmentStatus(assignment: SwarmMissionAssignment): AgentWorkerStatus {
+  if (assignment.state === 'blocked' || assignment.state === 'needs_input') return 'blocked'
+  if (assignment.state === 'reviewing') return 'reviewing'
+  if (assignment.state === 'checkpointed' && assignment.reviewRequired) return 'reviewing'
+  if (assignment.state === 'dispatched' || assignment.state === 'checkpointed') return 'running'
+  if (assignment.state === 'queued') return 'queued'
+  if (assignment.state === 'done') return 'done'
+  return 'done'
+}
+
+function workerStatusRank(status: AgentWorkerStatus): number {
+  return {
+    blocked: 6,
+    reviewing: 5,
+    running: 4,
+    queued: 3,
+    done: 2,
+    idle: 1,
+  }[status]
+}
+
+function assignmentLastSeen(mission: SwarmMission, assignment: SwarmMissionAssignment): number {
+  return assignment.reviewedAt ?? assignment.completedAt ?? assignment.dispatchedAt ?? mission.updatedAt
+}
+
+function isoFromMs(value: number | null): string | null {
+  if (!value || !Number.isFinite(value)) return null
+  return new Date(value).toISOString()
+}
+
+export function buildAgentWorkforceSection(
+  missions: Array<SwarmMission>,
+): DashboardAgentWorkforceSection {
+  const generatedAt = new Date().toISOString()
+  const workerMap = new Map<string, DashboardAgentWorker>()
+
+  for (const mission of missions) {
+    for (const assignment of mission.assignments) {
+      const status = assignmentStatus(assignment)
+      const seenAt = assignmentLastSeen(mission, assignment)
+      const existing = workerMap.get(assignment.workerId) ?? {
+        workerId: assignment.workerId,
+        status: 'idle' as AgentWorkerStatus,
+        activeAssignments: 0,
+        completedAssignments: 0,
+        blockedAssignments: 0,
+        reviewAssignments: 0,
+        currentTask: null,
+        missionId: null,
+        lastSeenAt: null,
+      }
+
+      if (status !== 'done' && status !== 'idle') existing.activeAssignments += 1
+      if (status === 'done') existing.completedAssignments += 1
+      if (status === 'blocked') existing.blockedAssignments += 1
+      if (status === 'reviewing') existing.reviewAssignments += 1
+      if (workerStatusRank(status) > workerStatusRank(existing.status)) {
+        existing.status = status
+        existing.currentTask = assignment.task
+        existing.missionId = mission.id
+      }
+      const currentLastSeen = existing.lastSeenAt ? Date.parse(existing.lastSeenAt) : 0
+      if (seenAt > currentLastSeen) existing.lastSeenAt = isoFromMs(seenAt)
+      workerMap.set(assignment.workerId, existing)
+    }
+  }
+
+  const workers = Array.from(workerMap.values()).sort((a, b) => {
+    const statusDelta = workerStatusRank(b.status) - workerStatusRank(a.status)
+    if (statusDelta !== 0) return statusDelta
+    return Date.parse(b.lastSeenAt ?? '') - Date.parse(a.lastSeenAt ?? '')
+  })
+  const recentMissions = missions.slice(0, 5).map((mission) => ({
+    id: mission.id,
+    title: mission.title,
+    state: mission.state,
+    updatedAt: new Date(mission.updatedAt).toISOString(),
+    assignments: mission.assignments.length,
+    blocked: mission.assignments.filter((item) => assignmentStatus(item) === 'blocked').length,
+    reviewing: mission.assignments.filter((item) => assignmentStatus(item) === 'reviewing').length,
+  }))
+
+  return {
+    generatedAt,
+    summary: {
+      missions: missions.length,
+      workers: workers.length,
+      active: workers.filter((item) => ['queued', 'running', 'blocked', 'reviewing'].includes(item.status)).length,
+      blocked: workers.filter((item) => item.status === 'blocked').length,
+      reviewing: workers.filter((item) => item.status === 'reviewing').length,
+      done: workers.filter((item) => item.status === 'done').length,
+    },
+    workers,
+    recentMissions,
+  }
+}
+
 type LiveSystemsBuildInput = {
   status: DashboardStatusSection | null
   platforms: Array<DashboardPlatformEntry>
@@ -2325,6 +2470,7 @@ export async function buildDashboardOverview(
     skillsRaw,
     oauthProvidersRaw,
     jobBoard,
+    swarmMissions,
   ] = await Promise.all([
     safeJson<unknown>(fetcher, '/api/status'),
     options.gatewayFetcher
@@ -2350,6 +2496,7 @@ export async function buildDashboardOverview(
     ),
     safeJson<unknown>(fetcher, '/api/providers/oauth'),
     readJobBoardModel(),
+    Promise.resolve(safeLocal(() => listSwarmMissions(20), [])),
   ])
 
   const status = normalizeStatus(statusRaw, healthRaw)
@@ -2397,6 +2544,7 @@ export async function buildDashboardOverview(
     oauthProvidersRaw,
     jobBoard,
   })
+  const agentWorkforce = buildAgentWorkforceSection(swarmMissions)
 
   return {
     status,
@@ -2414,5 +2562,6 @@ export async function buildDashboardOverview(
     controlLoops,
     notebookBridge: buildNotebookBridge(),
     liveSystems,
+    agentWorkforce,
   }
 }

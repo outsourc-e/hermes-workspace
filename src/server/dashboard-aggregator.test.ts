@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDashboardOverview } from './dashboard-aggregator'
+import { buildAgentWorkforceSection, buildDashboardOverview } from './dashboard-aggregator'
 import type { DashboardFetcher } from './dashboard-aggregator'
 
 function jsonResponse(payload: unknown, status = 200): Response {
@@ -575,6 +575,84 @@ describe('buildDashboardOverview', () => {
       overview.liveSystems.systems.length,
     )
     expect(overview.liveSystems.blockers.length).toBeGreaterThan(0)
+  })
+
+
+  it('builds read-only agent workforce status from swarm missions', () => {
+    const workforce = buildAgentWorkforceSection([
+      {
+        id: 'mission-1',
+        title: 'Wire Mission Control',
+        state: 'executing',
+        createdAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_010_000,
+        events: [],
+        assignments: [
+          {
+            id: 'a1',
+            workerId: 'builder',
+            task: 'Implement Live Systems',
+            rationale: null,
+            dependsOn: [],
+            reviewRequired: false,
+            state: 'dispatched',
+            dispatchedAt: 1_700_000_005_000,
+            completedAt: null,
+            reviewedAt: null,
+            reviewedBy: null,
+            checkpoint: null,
+          },
+          {
+            id: 'a2',
+            workerId: 'reviewer',
+            task: 'Review Fabric receipts',
+            rationale: null,
+            dependsOn: [],
+            reviewRequired: true,
+            state: 'checkpointed',
+            dispatchedAt: 1_700_000_003_000,
+            completedAt: 1_700_000_009_000,
+            reviewedAt: null,
+            reviewedBy: null,
+            checkpoint: null,
+          },
+          {
+            id: 'a3',
+            workerId: 'ops-watch',
+            task: 'Check blockers',
+            rationale: null,
+            dependsOn: [],
+            reviewRequired: false,
+            state: 'blocked',
+            dispatchedAt: 1_700_000_002_000,
+            completedAt: 1_700_000_004_000,
+            reviewedAt: null,
+            reviewedBy: null,
+            checkpoint: null,
+          },
+        ],
+      },
+    ])
+
+    expect(workforce.summary).toMatchObject({
+      missions: 1,
+      workers: 3,
+      active: 3,
+      blocked: 1,
+      reviewing: 1,
+    })
+    expect(workforce.workers[0]).toMatchObject({
+      workerId: 'ops-watch',
+      status: 'blocked',
+      currentTask: 'Check blockers',
+      missionId: 'mission-1',
+    })
+    expect(workforce.recentMissions[0]).toMatchObject({
+      id: 'mission-1',
+      assignments: 3,
+      blocked: 1,
+      reviewing: 1,
+    })
   })
 
 })
