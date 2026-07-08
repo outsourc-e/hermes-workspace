@@ -22,6 +22,7 @@ export type WidgetId =
   | 'operator_tip'
   | 'nova_wants'
   | 'nova_fabric'
+  | 'taylor_approvals'
   | 'live_systems'
   | 'agent_workforce'
   | 'git_work'
@@ -115,6 +116,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Nova Wants',
     description:
       'Protected operational board for Nova requests, needs, approvals, and self-state proposals.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'taylor_approvals',
+    label: 'Taylor approval queue',
+    description:
+      'Unified queue of everything waiting on Taylor: fabric reviews, protected wants, self-state proposals, and blocked external actions.',
     column: 'main',
     hideable: true,
   },
