@@ -27,6 +27,7 @@ describe('project cockpit registry', () => {
     const project = createProject({
       title: 'GTM licences MetaCentrex',
       objective: 'Construire le go-to-market',
+      templateId: 'template_fiche_produit_pdf_tous',
       tags: 'metacentrex, pricing',
     })
 
@@ -52,6 +53,7 @@ describe('project cockpit registry', () => {
     expect(bundle).toMatchObject({
       id: project.id,
       title: 'GTM licences MetaCentrex',
+      templateId: 'template_fiche_produit_pdf_tous',
       environment: 'sandbox',
     })
     expect(bundle.sources).toHaveLength(1)
@@ -89,6 +91,7 @@ describe('project cockpit registry', () => {
     const bundle = getProjectBundle(project.id)
     const brief = buildProjectBrief(bundle)
     expect(brief).toContain('Projet actif : Simulateur devis Trunk SIP')
+    expect(brief).toContain('Template livrable : non defini')
     expect(brief).toContain('Prototype sandbox')
     expect(brief).toContain('chef de projet IA')
     expect(brief).toContain('<project_context>')
@@ -107,10 +110,12 @@ describe('project cockpit registry', () => {
   it('normalizes control characters in user provided fields', async () => {
     const project = createProject({
       title: 'Projet\u0000\tConnectivite',
+      templateId: 'template\u0000_fiche',
       tags: 'pricing\u0000, canal:direct',
     })
 
     expect(project.title).toBe('Projet Connectivite')
+    expect(project.templateId).toBe('template _fiche')
     expect(project.tags).toEqual(['pricing', 'canal:direct'])
   })
 })

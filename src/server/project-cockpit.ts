@@ -56,6 +56,7 @@ export type ProjectRecord = {
   id: string
   title: string
   objective: string
+  templateId: string | null
   status: ProjectStatus
   environment: ProjectEnvironment
   tags: Array<string>
@@ -107,6 +108,7 @@ export type ProjectDecisionRecord = {
 export type CreateProjectInput = {
   title: string
   objective?: string | null
+  templateId?: string | null
   status?: string | null
   environment?: string | null
   tags?: Array<string> | string | null
@@ -192,6 +194,7 @@ function ensureProjectDir(): void {
 const FIELD_LIMITS = {
   title: 180,
   objective: 5000,
+  templateId: 160,
   owner: 120,
   nextAction: 500,
   sourceTitle: 240,
@@ -316,6 +319,7 @@ export function createProject(input: CreateProjectInput): ProjectRecord {
     id: `project_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
     title: requireLimitedString(input.title, 'title', FIELD_LIMITS.title),
     objective: limitString(input.objective, 'objective', FIELD_LIMITS.objective) || '',
+    templateId: limitString(input.templateId, 'templateId', FIELD_LIMITS.templateId),
     status: assertOneOf(input.status, PROJECT_STATUSES, 'status', 'brouillon'),
     environment: assertOneOf(input.environment, PROJECT_ENVIRONMENTS, 'environment', 'sandbox'),
     tags: normalizeTags(input.tags),
@@ -335,6 +339,7 @@ export function updateProject(id: string, updates: UpdateProjectInput): ProjectR
     id: current.id,
     title: requireLimitedString(updates.title ?? current.title, 'title', FIELD_LIMITS.title),
     objective: limitString(updates.objective ?? current.objective, 'objective', FIELD_LIMITS.objective) || '',
+    templateId: limitString(updates.templateId ?? current.templateId, 'templateId', FIELD_LIMITS.templateId),
     status: assertOneOf(updates.status ?? current.status, PROJECT_STATUSES, 'status'),
     environment: assertOneOf(
       updates.environment ?? current.environment,
@@ -482,6 +487,7 @@ export function buildProjectBrief(project: ProjectBundle): string {
     `Projet actif : ${project.title}`,
     '',
     `Objectif : ${project.objective || 'a cadrer'}`,
+    `Template livrable : ${project.templateId || 'non defini'}`,
     `Statut : ${project.status}`,
     `Environnement : ${project.environment}`,
     `Prochaine action : ${project.nextAction || 'a definir'}`,

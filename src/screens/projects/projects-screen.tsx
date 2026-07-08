@@ -62,6 +62,7 @@ type Project = {
   id: string
   title: string
   objective: string
+  templateId: string | null
   status: ProjectStatus
   environment: ProjectEnvironment
   tags: Array<string>
@@ -86,6 +87,28 @@ type ProjectsResponse = {
   error?: string
 }
 
+type DeliverableTemplate = {
+  id: string
+  name: string
+  type: string
+  channel: string
+  status: string
+  version: string
+  description: string
+  requiredSources: Array<string>
+  qualityRules: Array<{
+    id: string
+    label: string
+    severity: 'info' | 'warning' | 'blocking'
+  }>
+}
+
+type TemplatesResponse = {
+  ok?: boolean
+  templates?: Array<DeliverableTemplate>
+  error?: string
+}
+
 async function readJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
   const payload = await response.json().catch(() => null)
@@ -101,6 +124,7 @@ async function readJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 function optionLabel(value: string): string {
   const labels: Record<string, string> = {
+    '': 'Aucun template',
     a_valider: 'À valider',
     valide: 'Validé',
     obsolete: 'Obsolète',
@@ -122,6 +146,15 @@ function optionLabel(value: string): string {
     analyse_pricing: 'Analyse pricing',
     outil_web: 'Outil web',
     libre: 'Projet libre',
+    template_fiche_produit_pdf_tous: 'Fiche produit PDF - Tous canaux',
+    template_fiche_produit_pdf_direct: 'Fiche produit PDF - Direct',
+    template_fiche_produit_pdf_ambassadeur: 'Fiche produit PDF - Ambassadeur',
+    template_fiche_produit_pdf_operateur: 'Fiche produit PDF - Opérateur',
+    produit: 'produit',
+    pricing: 'pricing',
+    commercial: 'commerciale',
+    technique: 'technique',
+    legal: 'juridique',
   }
   return labels[value] || value.replace(/_/g, ' ')
 }
@@ -142,6 +175,17 @@ const PROJECT_CHANNELS: Array<ProjectChannel> = [
   'Interne',
 ]
 
+function templateIdForProject(form: {
+  template: ProjectTemplate
+  channel: ProjectChannel
+}): string | null {
+  if (form.template !== 'fiche_produit_pdf') return null
+  if (form.channel === 'Direct') return 'template_fiche_produit_pdf_direct'
+  if (form.channel === 'Ambassadeur') return 'template_fiche_produit_pdf_ambassadeur'
+  if (form.channel === 'Opérateur') return 'template_fiche_produit_pdf_operateur'
+  return 'template_fiche_produit_pdf_tous'
+}
+
 function buildGuidedProject(form: {
   template: ProjectTemplate
   product: string
@@ -152,10 +196,12 @@ function buildGuidedProject(form: {
   const need = form.need.trim()
   const channel = form.channel
   const baseTags = [form.template, product.toLowerCase().replace(/\s+/g, '-'), `canal:${channel.toLowerCase()}`]
+  const templateId = templateIdForProject(form)
 
   if (form.template === 'fiche_produit_pdf') {
     return {
       title: `Fiche produit PDF - ${product}`,
+      templateId,
       objective:
         need ||
         `Produire une fiche produit PDF claire, sourcée et exploitable commercialement pour ${product}. Le livrable doit identifier la cible, le canal ${channel}, les bénéfices client, les objections, les informations pricing à valider, les sources utilisées et les variantes nécessaires.`,
@@ -167,6 +213,7 @@ function buildGuidedProject(form: {
   if (form.template === 'go_to_market') {
     return {
       title: `Go-to-market - ${product}`,
+      templateId,
       objective:
         need ||
         `Cadrer le lancement go-to-market de ${product} pour le canal ${channel}: cible, proposition de valeur, messages, supports commerciaux, objections, dépendances et plan d'activation.`,
@@ -178,6 +225,7 @@ function buildGuidedProject(form: {
   if (form.template === 'analyse_pricing') {
     return {
       title: `Analyse pricing - ${product}`,
+      templateId,
       objective:
         need ||
         `Analyser le modèle tarifaire de ${product} pour le canal ${channel}, en distinguant prix public, prix partenaire, hypothèses, marge et points à valider.`,
@@ -189,6 +237,7 @@ function buildGuidedProject(form: {
   if (form.template === 'outil_web') {
     return {
       title: `Outil web - ${product}`,
+      templateId,
       objective:
         need ||
         `Cadrer un outil web opérationnel autour de ${product}: utilisateurs, workflow, données nécessaires, sorties attendues, prototype et critères d'acceptation.`,
@@ -199,6 +248,7 @@ function buildGuidedProject(form: {
 
   return {
     title: product,
+    templateId,
     objective: need || `Cadrer le projet ${product} pour le canal ${channel}.`,
     tags: baseTags,
     nextAction: 'Préciser les sources, livrables et décisions attendues.',
@@ -317,6 +367,45 @@ function getAiPlan(project: Project) {
   return { roles, stages, checklist, missing }
 }
 
+function sourceMatchesRequirement(source: ProjectSource, requirement: string): boolean {
+  const text = `${source.title} ${source.link || ''} ${source.sourceId || ''}`.toLowerCase()
+  if (requirement === 'produit') return text.includes('produit') || text.includes('catalogue') || text.includes('fiche')
+  if (requirement === 'pricing') return text.includes('pricing') || text.includes('prix') || text.includes('tarif')
+  if (requirement === 'commercial') return text.includes('commercial') || text.includes('pitch') || text.includes('sales')
+  if (requirement === 'technique') return text.includes('technique') || text.includes('architecture') || text.includes('guide')
+  if (requirement === 'legal') return text.includes('contrat') || text.includes('legal') || text.includes('juridique')
+  return text.includes(requirement)
+}
+
+function getTemplatePreflight(project: Project, template: DeliverableTemplate | null) {
+  if (!template) {
+    return {
+      ready: false,
+      missing: ['Template livrable non rattaché'],
+      sourceChecks: [] as Array<[string, boolean]>,
+      blockingRules: [] as Array<string>,
+    }
+  }
+
+  const sourceChecks = template.requiredSources.map((source) => [
+    source,
+    project.sources.some((projectSource) => sourceMatchesRequirement(projectSource, source)),
+  ] as [string, boolean])
+  const missing = sourceChecks
+    .filter(([, done]) => !done)
+    .map(([source]) => `Source ${optionLabel(source)} manquante`)
+  const blockingRules = template.qualityRules
+    .filter((rule) => rule.severity === 'blocking')
+    .map((rule) => rule.label)
+
+  return {
+    ready: missing.length === 0,
+    missing,
+    sourceChecks,
+    blockingRules,
+  }
+}
+
 function Badge({ children, tone }: { children: React.ReactNode; tone?: string }) {
   return (
     <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium', tone)}>
@@ -388,6 +477,7 @@ export function ProjectsScreen() {
   const [editForm, setEditForm] = useState({
     title: '',
     objective: '',
+    templateId: '',
     tags: '',
     nextAction: '',
   })
@@ -404,20 +494,31 @@ export function ProjectsScreen() {
     queryFn: () => readJson<ProjectsResponse>(listUrl),
   })
 
+  const templatesQuery = useQuery({
+    queryKey: ['dstny-templates'],
+    queryFn: () => readJson<TemplatesResponse>('/api/dstny-templates/list'),
+  })
+
   const projects = projectsQuery.data?.projects || []
   const options = projectsQuery.data?.options
+  const templates = templatesQuery.data?.templates || []
   const selected = projects.find((project) => project.id === selectedId) || projects[0] || null
   const aiPlan = selected ? getAiPlan(selected) : null
+  const selectedTemplate = selected?.templateId
+    ? templates.find((template) => template.id === selected.templateId) || null
+    : null
+  const templatePreflight = selected ? getTemplatePreflight(selected, selectedTemplate) : null
 
   useEffect(() => {
     if (!selected) {
-      setEditForm({ title: '', objective: '', tags: '', nextAction: '' })
+      setEditForm({ title: '', objective: '', templateId: '', tags: '', nextAction: '' })
       return
     }
 
     setEditForm({
       title: selected.title,
       objective: selected.objective || '',
+      templateId: selected.templateId || '',
       tags: selected.tags.join(', '),
       nextAction: selected.nextAction || '',
     })
@@ -554,6 +655,7 @@ export function ProjectsScreen() {
           patch: {
             title: editForm.title,
             objective: editForm.objective,
+            templateId: editForm.templateId || null,
             tags: editForm.tags
               .split(',')
               .map((tag) => tag.trim())
@@ -819,6 +921,14 @@ export function ProjectsScreen() {
                           />
                         </div>
                         <div className="space-y-1.5">
+                          <FieldLabel>Template livrable</FieldLabel>
+                          <SelectField
+                            value={editForm.templateId}
+                            options={['', ...templates.map((template) => template.id)]}
+                            onChange={(value) => setEditForm((current) => ({ ...current, templateId: value }))}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
                           <FieldLabel>Tags</FieldLabel>
                           <Input
                             value={editForm.tags}
@@ -887,6 +997,45 @@ export function ProjectsScreen() {
                           : `${aiPlan.missing.length} points à cadrer`}
                       </Badge>
                     </div>
+
+                    {templatePreflight ? (
+                      <div className="mt-4 rounded-lg border border-primary-200 p-3 dark:border-neutral-800">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <div className="text-sm font-semibold">
+                              Template actif : {selectedTemplate?.name || 'Aucun template rattaché'}
+                            </div>
+                            <div className="mt-1 text-xs leading-5 text-primary-600 dark:text-neutral-400">
+                              Le pré-vol compare le projet avec les sources et règles exigées par le template.
+                            </div>
+                          </div>
+                          <Badge tone={templatePreflight.ready ? toneForStatus('valide') : toneForStatus('a_valider')}>
+                            {templatePreflight.ready ? 'Sources template OK' : 'Sources template à compléter'}
+                          </Badge>
+                        </div>
+                        {templatePreflight.sourceChecks.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {templatePreflight.sourceChecks.map(([source, done]) => (
+                              <Badge
+                                key={source}
+                                tone={done ? toneForStatus('valide') : toneForStatus('a_valider')}
+                              >
+                                {done ? 'OK' : 'Manque'} · source {optionLabel(source)}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                        {templatePreflight.blockingRules.length > 0 ? (
+                          <div className="mt-3 space-y-1">
+                            {templatePreflight.blockingRules.slice(0, 3).map((rule) => (
+                              <div key={rule} className="text-xs leading-5 text-primary-600 dark:text-neutral-400">
+                                Règle bloquante : {rule}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     {aiPlan.missing.length > 0 ? (
                       <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-700 dark:text-amber-300">
