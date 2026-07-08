@@ -7,6 +7,7 @@
  * POST /api/swarm-goals {action:'step'}          — advance one goal one step
  *      (called by the lifecycle sweep; also fine to call manually)
  */
+import { actorFromRequest, appendAudit } from '../../server/audit-log'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
@@ -58,6 +59,13 @@ export const Route = createFileRoute('/api/swarm-goals')({
         }
 
         const action = typeof body.action === 'string' ? body.action : null
+        if (action !== 'step') {
+          appendAudit({
+            actor: actorFromRequest(request),
+            action: `goal:${action ?? 'create'}`,
+            detail: JSON.stringify(body).slice(0, 400),
+          })
+        }
 
         if (action === 'step') {
           const outcome = await stepGoals({

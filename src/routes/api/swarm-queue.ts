@@ -7,6 +7,7 @@
  *        queued items to idle workers (called by the lifecycle sweep)
  * POST   /api/swarm-queue {action:'cancel', id}                  — cancel item
  */
+import { actorFromRequest, appendAudit } from '../../server/audit-log'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
@@ -38,6 +39,12 @@ export const Route = createFileRoute('/api/swarm-queue')({
         } catch {
           return json({ ok: false, error: 'Invalid JSON' }, { status: 400 })
         }
+
+        appendAudit({
+          actor: actorFromRequest(request),
+          action: `queue:${typeof body.action === 'string' ? body.action : 'enqueue'}`,
+          detail: JSON.stringify(body).slice(0, 400),
+        })
 
         if (body.action === 'propose') {
           // Run the proactive scanners (called by the lifecycle sweep).

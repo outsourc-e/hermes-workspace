@@ -3,6 +3,7 @@
  * direct dispatch, or a strategist answer. Used by the ⌘K palette ("Do:")
  * and the Discord bot's !do command.
  */
+import { actorFromRequest, appendAudit } from '../../server/audit-log'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
@@ -48,6 +49,11 @@ export const Route = createFileRoute('/api/nl-command')({
           return json({ ok: false, error: 'text required' }, { status: 400 })
         }
 
+        appendAudit({
+          actor: actorFromRequest(request),
+          action: 'nl-command',
+          detail: text.slice(0, 300),
+        })
         let plan = heuristicPlan(text)
         let directAnswer: string | null = null
         if (!plan) {

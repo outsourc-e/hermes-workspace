@@ -127,6 +127,7 @@ import { Route as ApiClaudeConfigRouteImport } from './routes/api/claude-config'
 import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
+import { Route as ApiAuditLogRouteImport } from './routes/api/audit-log'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
 import { Route as ApiAgentBusRouteImport } from './routes/api/agent-bus'
 import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
@@ -778,6 +779,11 @@ const ApiAuthRoute = ApiAuthRouteImport.update({
   path: '/api/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuditLogRoute = ApiAuditLogRouteImport.update({
+  id: '/api/audit-log',
+  path: '/api/audit-log',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   id: '/api/artifacts',
   path: '/api/artifacts',
@@ -1109,6 +1115,7 @@ export interface FileRoutesByFullPath {
   '/world': typeof WorldRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
+  '/api/audit-log': typeof ApiAuditLogRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/chat-events': typeof ApiChatEventsRoute
@@ -1287,6 +1294,7 @@ export interface FileRoutesByTo {
   '/world': typeof WorldRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
+  '/api/audit-log': typeof ApiAuditLogRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/chat-events': typeof ApiChatEventsRoute
@@ -1467,6 +1475,7 @@ export interface FileRoutesById {
   '/world': typeof WorldRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
+  '/api/audit-log': typeof ApiAuditLogRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/chat-events': typeof ApiChatEventsRoute
@@ -1648,6 +1657,7 @@ export interface FileRouteTypes {
     | '/world'
     | '/api/agent-bus'
     | '/api/artifacts'
+    | '/api/audit-log'
     | '/api/auth'
     | '/api/auth-check'
     | '/api/chat-events'
@@ -1826,6 +1836,7 @@ export interface FileRouteTypes {
     | '/world'
     | '/api/agent-bus'
     | '/api/artifacts'
+    | '/api/audit-log'
     | '/api/auth'
     | '/api/auth-check'
     | '/api/chat-events'
@@ -2005,6 +2016,7 @@ export interface FileRouteTypes {
     | '/world'
     | '/api/agent-bus'
     | '/api/artifacts'
+    | '/api/audit-log'
     | '/api/auth'
     | '/api/auth-check'
     | '/api/chat-events'
@@ -2185,6 +2197,7 @@ export interface RootRouteChildren {
   WorldRoute: typeof WorldRoute
   ApiAgentBusRoute: typeof ApiAgentBusRoute
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
+  ApiAuditLogRoute: typeof ApiAuditLogRoute
   ApiAuthRoute: typeof ApiAuthRoute
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
   ApiChatEventsRoute: typeof ApiChatEventsRoute
@@ -3134,6 +3147,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/audit-log': {
+      id: '/api/audit-log'
+      path: '/api/audit-log'
+      fullPath: '/api/audit-log'
+      preLoaderRoute: typeof ApiAuditLogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/artifacts': {
       id: '/api/artifacts'
       path: '/api/artifacts'
@@ -3790,6 +3810,7 @@ const rootRouteChildren: RootRouteChildren = {
   WorldRoute: WorldRoute,
   ApiAgentBusRoute: ApiAgentBusRoute,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
+  ApiAuditLogRoute: ApiAuditLogRoute,
   ApiAuthRoute: ApiAuthRoute,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
   ApiChatEventsRoute: ApiChatEventsRoute,

@@ -1,3 +1,4 @@
+import { actorFromRequest, appendAudit } from '../../server/audit-log'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
@@ -2000,6 +2001,18 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         } catch {
           return json({ error: 'Invalid JSON body' }, { status: 400 })
         }
+
+        appendAudit({
+          actor: actorFromRequest(request),
+          action: 'dispatch',
+          detail: (Array.isArray(body.assignments) ? body.assignments : [])
+            .map(
+              (a: { workerId?: string; task?: string }) =>
+                `${a.workerId ?? '?'}: ${String(a.task ?? '').slice(0, 80)}`,
+            )
+            .join(' | ')
+            .slice(0, 400),
+        })
 
         // Spend cap: refuse new dispatches once the day's token spend crosses
         // the configured ceiling, so a runaway loop can't rack up cloud cost.

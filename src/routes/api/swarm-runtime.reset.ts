@@ -1,3 +1,4 @@
+import { actorFromRequest, appendAudit } from '../../server/audit-log'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -39,6 +40,12 @@ export const Route = createFileRoute('/api/swarm-runtime/reset')({
             { status: 400 },
           )
         }
+
+        appendAudit({
+          actor: actorFromRequest(request),
+          action: `runtime-reset:${body.action ?? 'reset'}`,
+          detail: JSON.stringify(body).slice(0, 400),
+        })
 
         // Zombie reap: reset workers stuck in a busy state with no live
         // tmux session and no recent output (sweep calls this every cycle).

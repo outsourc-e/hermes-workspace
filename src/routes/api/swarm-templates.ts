@@ -4,6 +4,7 @@
  * GET  /api/swarm-templates                      — list templates
  * POST /api/swarm-templates {id, input}          — run a template as a pipeline
  */
+import { actorFromRequest, appendAudit } from '../../server/audit-log'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
@@ -44,6 +45,11 @@ export const Route = createFileRoute('/api/swarm-templates')({
         if (!body.input?.trim()) {
           return json({ ok: false, error: 'input required' }, { status: 400 })
         }
+        appendAudit({
+          actor: actorFromRequest(request),
+          action: 'template-run',
+          detail: `${body.id}: ${(body.input ?? '').slice(0, 200)}`,
+        })
         const pending = runPipeline({
           title: rendered.title,
           stages: rendered.stages,
