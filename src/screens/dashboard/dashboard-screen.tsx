@@ -31,6 +31,7 @@ import { ControlLoopsCard } from './components/control-loops-card'
 import { CostLedgerCard } from './components/cost-ledger-card'
 import { DailyCheckCard } from './components/daily-check-card'
 import { EditModePanel } from './components/edit-mode-panel'
+import { GitWorkCard } from './components/git-work-card'
 import { HeroMetrics } from './components/hero-metrics'
 import { HomeModeCard } from './components/home-mode-card'
 import { LiveSystemsCard } from './components/live-systems-card'
@@ -1232,6 +1233,10 @@ export function DashboardScreen() {
 
         <WidgetShell id="agent_workforce" layout={layout}>
           <AgentWorkforceCard workforce={overview?.agentWorkforce ?? null} />
+        </WidgetShell>
+
+        <WidgetShell id="git_work" layout={layout}>
+          <GitWorkCard gitWork={overview?.gitWork ?? null} />
         </WidgetShell>
 
         {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}

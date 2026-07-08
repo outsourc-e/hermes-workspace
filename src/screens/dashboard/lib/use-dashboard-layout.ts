@@ -24,6 +24,7 @@ export type WidgetId =
   | 'nova_fabric'
   | 'live_systems'
   | 'agent_workforce'
+  | 'git_work'
   | 'control_loops'
   | 'trust_ledger'
   | 'notebook_bridge'
@@ -138,6 +139,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Agent workforce',
     description:
       'Read-only status of swarm missions, workers, blockers, and review queues.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'git_work',
+    label: 'GitHub / PR work',
+    description:
+      'Read-only local branch, remote, cleanliness, and linked PR status.',
     column: 'main',
     hideable: true,
   },

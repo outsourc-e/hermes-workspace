@@ -1,4 +1,5 @@
-﻿import { buildKnowledgeGraph, knowledgeRootExists } from './knowledge-browser'
+﻿import { execFileSync } from 'node:child_process'
+import { buildKnowledgeGraph, knowledgeRootExists } from './knowledge-browser'
 import { listMemoryFiles } from './memory-browser'
 import { listSwarmMissions } from './swarm-missions'
 import type { SwarmMission, SwarmMissionAssignment } from './swarm-missions'
@@ -46,6 +47,8 @@ export type DashboardOverview = {
   liveSystems: DashboardLiveSystemsSection
   /** Read-only agent workforce status derived from swarm mission receipts. */
   agentWorkforce: DashboardAgentWorkforceSection
+  /** Read-only local Git/GitHub branch status for the current workspace. */
+  gitWork: DashboardGitWorkSection
 }
 
 export type ControlLoopStatus = 'ready' | 'partial' | 'not-wired'
@@ -94,6 +97,28 @@ export type DashboardAgentWorkforceSection = {
   }
   workers: Array<DashboardAgentWorker>
   recentMissions: Array<DashboardAgentWorkforceMission>
+}
+
+export type DashboardGitRemote = {
+  name: string
+  fetchUrl: string | null
+  pushUrl: string | null
+}
+
+export type DashboardGitWorkSection = {
+  branch: string | null
+  clean: boolean
+  ahead: number
+  behind: number
+  changedFiles: number
+  upstream: string | null
+  latestCommit: {
+    hash: string
+    subject: string
+  } | null
+  remotes: Array<DashboardGitRemote>
+  prUrl: string | null
+  warning: string | null
 }
 
 export type DashboardLiveSystem = {
@@ -1855,6 +1880,92 @@ export function buildAgentWorkforceSection(
   }
 }
 
+type GitWorkInput = {
+  statusPorcelain: string | null
+  remotes: string | null
+  latestCommit: string | null
+  upstream: string | null
+  prUrl?: string | null
+  warning?: string | null
+}
+
+function parseBranchLine(line: string | undefined): {
+  branch: string | null
+  ahead: number
+  behind: number
+} {
+  if (!line?.startsWith('## ')) return { branch: null, ahead: 0, behind: 0 }
+  const body = line.slice(3).trim()
+  const [branchPart, metaPart = ''] = body.split('...')
+  const branch = branchPart.trim() || null
+  const ahead = Number(/ahead (\d+)/.exec(metaPart)?.[1] ?? 0)
+  const behind = Number(/behind (\d+)/.exec(metaPart)?.[1] ?? 0)
+  return { branch, ahead, behind }
+}
+
+function parseGitRemotes(raw: string | null): Array<DashboardGitRemote> {
+  if (!raw) return []
+  const remotes = new Map<string, DashboardGitRemote>()
+  for (const line of raw.split(/\r?\n/)) {
+    const match = /^(\S+)\s+(\S+)\s+\((fetch|push)\)$/.exec(line.trim())
+    if (!match) continue
+    const [, name, url, direction] = match
+    const remote = remotes.get(name) ?? { name, fetchUrl: null, pushUrl: null }
+    if (direction === 'fetch') remote.fetchUrl = url
+    if (direction === 'push') remote.pushUrl = url
+    remotes.set(name, remote)
+  }
+  return Array.from(remotes.values())
+}
+
+export function buildGitWorkSection(input: GitWorkInput): DashboardGitWorkSection {
+  const lines = input.statusPorcelain?.split(/\r?\n/).filter(Boolean) ?? []
+  const branchInfo = parseBranchLine(lines[0])
+  const changedFiles = lines.filter((line) => !line.startsWith('## ')).length
+  const latestParts = input.latestCommit?.split('\t') ?? []
+  const latestCommit = latestParts[0]
+    ? { hash: latestParts[0], subject: latestParts.slice(1).join('\t') || 'No subject' }
+    : null
+
+  return {
+    branch: branchInfo.branch,
+    clean: changedFiles === 0,
+    ahead: branchInfo.ahead,
+    behind: branchInfo.behind,
+    changedFiles,
+    upstream: input.upstream?.trim() || null,
+    latestCommit,
+    remotes: parseGitRemotes(input.remotes),
+    prUrl: input.prUrl?.trim() || null,
+    warning: input.warning?.trim() || null,
+  }
+}
+
+function readGitOutput(args: Array<string>): string | null {
+  return safeLocal(
+    () => execFileSync('git', args, { cwd: process.cwd(), encoding: 'utf-8' }).trim(),
+    null,
+  )
+}
+
+function readGitWorkSection(): DashboardGitWorkSection {
+  const statusPorcelain = readGitOutput(['status', '--porcelain=v1', '-b'])
+  const remotes = readGitOutput(['remote', '-v'])
+  const latestCommit = readGitOutput(['log', '-1', '--pretty=%h%x09%s'])
+  const branch = parseBranchLine(statusPorcelain?.split(/\r?\n/)[0]).branch
+  const upstream = branch
+    ? readGitOutput(['rev-parse', '--abbrev-ref', `${branch}@{upstream}`])
+    : null
+  return buildGitWorkSection({
+    statusPorcelain,
+    remotes,
+    latestCommit,
+    upstream,
+    prUrl: process.env.NOVA_GITHUB_PR_URL ?? null,
+    warning: statusPorcelain ? null : 'Git status unavailable for this workspace.',
+  })
+}
+
 type LiveSystemsBuildInput = {
   status: DashboardStatusSection | null
   platforms: Array<DashboardPlatformEntry>
@@ -2545,6 +2656,7 @@ export async function buildDashboardOverview(
     jobBoard,
   })
   const agentWorkforce = buildAgentWorkforceSection(swarmMissions)
+  const gitWork = readGitWorkSection()
 
   return {
     status,
@@ -2563,5 +2675,6 @@ export async function buildDashboardOverview(
     notebookBridge: buildNotebookBridge(),
     liveSystems,
     agentWorkforce,
+    gitWork,
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildAgentWorkforceSection, buildDashboardOverview } from './dashboard-aggregator'
+import { buildAgentWorkforceSection, buildDashboardOverview, buildGitWorkSection } from './dashboard-aggregator'
 import type { DashboardFetcher } from './dashboard-aggregator'
 
 function jsonResponse(payload: unknown, status = 200): Response {
@@ -652,6 +652,37 @@ describe('buildDashboardOverview', () => {
       assignments: 3,
       blocked: 1,
       reviewing: 1,
+    })
+  })
+
+
+  it('builds read-only git work status from local git output', () => {
+    const gitWork = buildGitWorkSection({
+      statusPorcelain: '## feature/nova-skin...fork/feature/nova-skin [ahead 2, behind 1]\n M src/server/dashboard-aggregator.ts\n?? src/screens/dashboard/components/github-work-card.tsx',
+      remotes:
+        'origin\thttps://github.com/outsourc-e/hermes-workspace (fetch)\norigin\thttps://github.com/outsourc-e/hermes-workspace (push)\nfork\thttps://github.com/goodmorningmrj/hermes-workspace (fetch)\nfork\thttps://github.com/goodmorningmrj/hermes-workspace (push)',
+      latestCommit: '8992e63\tfeat(nova): add read-only agent workforce panel',
+      upstream: 'fork/feature/nova-skin',
+      prUrl: 'https://github.com/outsourc-e/hermes-workspace/pull/709',
+    })
+
+    expect(gitWork).toMatchObject({
+      branch: 'feature/nova-skin',
+      clean: false,
+      ahead: 2,
+      behind: 1,
+      changedFiles: 2,
+      upstream: 'fork/feature/nova-skin',
+      prUrl: 'https://github.com/outsourc-e/hermes-workspace/pull/709',
+    })
+    expect(gitWork.latestCommit).toMatchObject({
+      hash: '8992e63',
+      subject: 'feat(nova): add read-only agent workforce panel',
+    })
+    expect(gitWork.remotes).toHaveLength(2)
+    expect(gitWork.remotes[1]).toMatchObject({
+      name: 'fork',
+      pushUrl: 'https://github.com/goodmorningmrj/hermes-workspace',
     })
   })
 
