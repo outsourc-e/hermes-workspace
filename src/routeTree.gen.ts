@@ -18,6 +18,7 @@ import { Route as SwarmRouteImport } from './routes/swarm'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReserveRouteImport } from './routes/reserve'
+import { Route as ReplayRouteImport } from './routes/replay'
 import { Route as ProfilesRouteImport } from './routes/profiles'
 import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as OperationsRouteImport } from './routes/operations'
@@ -40,6 +41,7 @@ import { Route as ReserveConfirmRouteImport } from './routes/reserve/confirm'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiVtCapitalRouteImport } from './routes/api/vt-capital'
+import { Route as ApiVaultIngestRouteImport } from './routes/api/vault-ingest'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
@@ -50,10 +52,15 @@ import { Route as ApiSwarmUsageRouteImport } from './routes/api/swarm-usage'
 import { Route as ApiSwarmTmuxStopRouteImport } from './routes/api/swarm-tmux-stop'
 import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-start'
 import { Route as ApiSwarmTmuxScrollRouteImport } from './routes/api/swarm-tmux-scroll'
+import { Route as ApiSwarmTimelineRouteImport } from './routes/api/swarm-timeline'
+import { Route as ApiSwarmScoreboardRouteImport } from './routes/api/swarm-scoreboard'
 import { Route as ApiSwarmRuntimeRouteImport } from './routes/api/swarm-runtime'
 import { Route as ApiSwarmRosterRouteImport } from './routes/api/swarm-roster'
 import { Route as ApiSwarmReportsRouteImport } from './routes/api/swarm-reports'
+import { Route as ApiSwarmReplayRouteImport } from './routes/api/swarm-replay'
+import { Route as ApiSwarmQueueRouteImport } from './routes/api/swarm-queue'
 import { Route as ApiSwarmProjectRouteImport } from './routes/api/swarm-project'
+import { Route as ApiSwarmPipelineRouteImport } from './routes/api/swarm-pipeline'
 import { Route as ApiSwarmPermissionsRouteImport } from './routes/api/swarm-permissions'
 import { Route as ApiSwarmOrchestratorLoopRouteImport } from './routes/api/swarm-orchestrator-loop'
 import { Route as ApiSwarmModeRouteImport } from './routes/api/swarm-mode'
@@ -62,6 +69,7 @@ import { Route as ApiSwarmMemoryRouteImport } from './routes/api/swarm-memory'
 import { Route as ApiSwarmLifecycleRouteImport } from './routes/api/swarm-lifecycle'
 import { Route as ApiSwarmKanbanRouteImport } from './routes/api/swarm-kanban'
 import { Route as ApiSwarmHealthRouteImport } from './routes/api/swarm-health'
+import { Route as ApiSwarmGoalsRouteImport } from './routes/api/swarm-goals'
 import { Route as ApiSwarmEnvironmentRouteImport } from './routes/api/swarm-environment'
 import { Route as ApiSwarmDispatchRouteImport } from './routes/api/swarm-dispatch'
 import { Route as ApiSwarmDirectChatRouteImport } from './routes/api/swarm-direct-chat'
@@ -77,6 +85,7 @@ import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
+import { Route as ApiRagRouteImport } from './routes/api/rag'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
@@ -219,6 +228,11 @@ const ReserveRoute = ReserveRouteImport.update({
   path: '/reserve',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReplayRoute = ReplayRouteImport.update({
+  id: '/replay',
+  path: '/replay',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfilesRoute = ProfilesRouteImport.update({
   id: '/profiles',
   path: '/profiles',
@@ -329,6 +343,11 @@ const ApiVtCapitalRoute = ApiVtCapitalRouteImport.update({
   path: '/api/vt-capital',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVaultIngestRoute = ApiVaultIngestRouteImport.update({
+  id: '/api/vault-ingest',
+  path: '/api/vault-ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   id: '/api/transcribe',
   path: '/api/transcribe',
@@ -379,6 +398,16 @@ const ApiSwarmTmuxScrollRoute = ApiSwarmTmuxScrollRouteImport.update({
   path: '/api/swarm-tmux-scroll',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSwarmTimelineRoute = ApiSwarmTimelineRouteImport.update({
+  id: '/api/swarm-timeline',
+  path: '/api/swarm-timeline',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmScoreboardRoute = ApiSwarmScoreboardRouteImport.update({
+  id: '/api/swarm-scoreboard',
+  path: '/api/swarm-scoreboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSwarmRuntimeRoute = ApiSwarmRuntimeRouteImport.update({
   id: '/api/swarm-runtime',
   path: '/api/swarm-runtime',
@@ -394,9 +423,24 @@ const ApiSwarmReportsRoute = ApiSwarmReportsRouteImport.update({
   path: '/api/swarm-reports',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSwarmReplayRoute = ApiSwarmReplayRouteImport.update({
+  id: '/api/swarm-replay',
+  path: '/api/swarm-replay',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmQueueRoute = ApiSwarmQueueRouteImport.update({
+  id: '/api/swarm-queue',
+  path: '/api/swarm-queue',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSwarmProjectRoute = ApiSwarmProjectRouteImport.update({
   id: '/api/swarm-project',
   path: '/api/swarm-project',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmPipelineRoute = ApiSwarmPipelineRouteImport.update({
+  id: '/api/swarm-pipeline',
+  path: '/api/swarm-pipeline',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmPermissionsRoute = ApiSwarmPermissionsRouteImport.update({
@@ -438,6 +482,11 @@ const ApiSwarmKanbanRoute = ApiSwarmKanbanRouteImport.update({
 const ApiSwarmHealthRoute = ApiSwarmHealthRouteImport.update({
   id: '/api/swarm-health',
   path: '/api/swarm-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmGoalsRoute = ApiSwarmGoalsRouteImport.update({
+  id: '/api/swarm-goals',
+  path: '/api/swarm-goals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmEnvironmentRoute = ApiSwarmEnvironmentRouteImport.update({
@@ -513,6 +562,11 @@ const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
 const ApiSendRoute = ApiSendRouteImport.update({
   id: '/api/send',
   path: '/api/send',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRagRoute = ApiRagRouteImport.update({
+  id: '/api/rag',
+  path: '/api/rag',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
@@ -1019,6 +1073,7 @@ export interface FileRoutesByFullPath {
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
+  '/replay': typeof ReplayRoute
   '/reserve': typeof ReserveRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1067,6 +1122,7 @@ export interface FileRoutesByFullPath {
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/rag': typeof ApiRagRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1082,6 +1138,7 @@ export interface FileRoutesByFullPath {
   '/api/swarm-direct-chat': typeof ApiSwarmDirectChatRoute
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
+  '/api/swarm-goals': typeof ApiSwarmGoalsRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/swarm-lifecycle': typeof ApiSwarmLifecycleRoute
@@ -1090,10 +1147,15 @@ export interface FileRoutesByFullPath {
   '/api/swarm-mode': typeof ApiSwarmModeRoute
   '/api/swarm-orchestrator-loop': typeof ApiSwarmOrchestratorLoopRoute
   '/api/swarm-permissions': typeof ApiSwarmPermissionsRoute
+  '/api/swarm-pipeline': typeof ApiSwarmPipelineRoute
   '/api/swarm-project': typeof ApiSwarmProjectRoute
+  '/api/swarm-queue': typeof ApiSwarmQueueRoute
+  '/api/swarm-replay': typeof ApiSwarmReplayRoute
   '/api/swarm-reports': typeof ApiSwarmReportsRoute
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
+  '/api/swarm-scoreboard': typeof ApiSwarmScoreboardRoute
+  '/api/swarm-timeline': typeof ApiSwarmTimelineRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
@@ -1104,6 +1166,7 @@ export interface FileRoutesByFullPath {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/vault-ingest': typeof ApiVaultIngestRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -1185,6 +1248,7 @@ export interface FileRoutesByTo {
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
+  '/replay': typeof ReplayRoute
   '/reserve': typeof ReserveRouteWithChildren
   '/skills': typeof SkillsRoute
   '/swarm': typeof SwarmRoute
@@ -1232,6 +1296,7 @@ export interface FileRoutesByTo {
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/rag': typeof ApiRagRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1247,6 +1312,7 @@ export interface FileRoutesByTo {
   '/api/swarm-direct-chat': typeof ApiSwarmDirectChatRoute
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
+  '/api/swarm-goals': typeof ApiSwarmGoalsRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/swarm-lifecycle': typeof ApiSwarmLifecycleRoute
@@ -1255,10 +1321,15 @@ export interface FileRoutesByTo {
   '/api/swarm-mode': typeof ApiSwarmModeRoute
   '/api/swarm-orchestrator-loop': typeof ApiSwarmOrchestratorLoopRoute
   '/api/swarm-permissions': typeof ApiSwarmPermissionsRoute
+  '/api/swarm-pipeline': typeof ApiSwarmPipelineRoute
   '/api/swarm-project': typeof ApiSwarmProjectRoute
+  '/api/swarm-queue': typeof ApiSwarmQueueRoute
+  '/api/swarm-replay': typeof ApiSwarmReplayRoute
   '/api/swarm-reports': typeof ApiSwarmReportsRoute
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
+  '/api/swarm-scoreboard': typeof ApiSwarmScoreboardRoute
+  '/api/swarm-timeline': typeof ApiSwarmTimelineRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
@@ -1269,6 +1340,7 @@ export interface FileRoutesByTo {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/vault-ingest': typeof ApiVaultIngestRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -1351,6 +1423,7 @@ export interface FileRoutesById {
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
+  '/replay': typeof ReplayRoute
   '/reserve': typeof ReserveRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1399,6 +1472,7 @@ export interface FileRoutesById {
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/rag': typeof ApiRagRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1414,6 +1488,7 @@ export interface FileRoutesById {
   '/api/swarm-direct-chat': typeof ApiSwarmDirectChatRoute
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
+  '/api/swarm-goals': typeof ApiSwarmGoalsRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/swarm-lifecycle': typeof ApiSwarmLifecycleRoute
@@ -1422,10 +1497,15 @@ export interface FileRoutesById {
   '/api/swarm-mode': typeof ApiSwarmModeRoute
   '/api/swarm-orchestrator-loop': typeof ApiSwarmOrchestratorLoopRoute
   '/api/swarm-permissions': typeof ApiSwarmPermissionsRoute
+  '/api/swarm-pipeline': typeof ApiSwarmPipelineRoute
   '/api/swarm-project': typeof ApiSwarmProjectRoute
+  '/api/swarm-queue': typeof ApiSwarmQueueRoute
+  '/api/swarm-replay': typeof ApiSwarmReplayRoute
   '/api/swarm-reports': typeof ApiSwarmReportsRoute
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
+  '/api/swarm-scoreboard': typeof ApiSwarmScoreboardRoute
+  '/api/swarm-timeline': typeof ApiSwarmTimelineRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
@@ -1436,6 +1516,7 @@ export interface FileRoutesById {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/vault-ingest': typeof ApiVaultIngestRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -1519,6 +1600,7 @@ export interface FileRouteTypes {
     | '/operations'
     | '/playground'
     | '/profiles'
+    | '/replay'
     | '/reserve'
     | '/settings'
     | '/skills'
@@ -1567,6 +1649,7 @@ export interface FileRouteTypes {
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/provider-usage'
+    | '/api/rag'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1582,6 +1665,7 @@ export interface FileRouteTypes {
     | '/api/swarm-direct-chat'
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
+    | '/api/swarm-goals'
     | '/api/swarm-health'
     | '/api/swarm-kanban'
     | '/api/swarm-lifecycle'
@@ -1590,10 +1674,15 @@ export interface FileRouteTypes {
     | '/api/swarm-mode'
     | '/api/swarm-orchestrator-loop'
     | '/api/swarm-permissions'
+    | '/api/swarm-pipeline'
     | '/api/swarm-project'
+    | '/api/swarm-queue'
+    | '/api/swarm-replay'
     | '/api/swarm-reports'
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
+    | '/api/swarm-scoreboard'
+    | '/api/swarm-timeline'
     | '/api/swarm-tmux-scroll'
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
@@ -1604,6 +1693,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/transcribe'
+    | '/api/vault-ingest'
     | '/api/vt-capital'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -1685,6 +1775,7 @@ export interface FileRouteTypes {
     | '/operations'
     | '/playground'
     | '/profiles'
+    | '/replay'
     | '/reserve'
     | '/skills'
     | '/swarm'
@@ -1732,6 +1823,7 @@ export interface FileRouteTypes {
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/provider-usage'
+    | '/api/rag'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1747,6 +1839,7 @@ export interface FileRouteTypes {
     | '/api/swarm-direct-chat'
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
+    | '/api/swarm-goals'
     | '/api/swarm-health'
     | '/api/swarm-kanban'
     | '/api/swarm-lifecycle'
@@ -1755,10 +1848,15 @@ export interface FileRouteTypes {
     | '/api/swarm-mode'
     | '/api/swarm-orchestrator-loop'
     | '/api/swarm-permissions'
+    | '/api/swarm-pipeline'
     | '/api/swarm-project'
+    | '/api/swarm-queue'
+    | '/api/swarm-replay'
     | '/api/swarm-reports'
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
+    | '/api/swarm-scoreboard'
+    | '/api/swarm-timeline'
     | '/api/swarm-tmux-scroll'
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
@@ -1769,6 +1867,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/transcribe'
+    | '/api/vault-ingest'
     | '/api/vt-capital'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -1850,6 +1949,7 @@ export interface FileRouteTypes {
     | '/operations'
     | '/playground'
     | '/profiles'
+    | '/replay'
     | '/reserve'
     | '/settings'
     | '/skills'
@@ -1898,6 +1998,7 @@ export interface FileRouteTypes {
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/provider-usage'
+    | '/api/rag'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1913,6 +2014,7 @@ export interface FileRouteTypes {
     | '/api/swarm-direct-chat'
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
+    | '/api/swarm-goals'
     | '/api/swarm-health'
     | '/api/swarm-kanban'
     | '/api/swarm-lifecycle'
@@ -1921,10 +2023,15 @@ export interface FileRouteTypes {
     | '/api/swarm-mode'
     | '/api/swarm-orchestrator-loop'
     | '/api/swarm-permissions'
+    | '/api/swarm-pipeline'
     | '/api/swarm-project'
+    | '/api/swarm-queue'
+    | '/api/swarm-replay'
     | '/api/swarm-reports'
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
+    | '/api/swarm-scoreboard'
+    | '/api/swarm-timeline'
     | '/api/swarm-tmux-scroll'
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
@@ -1935,6 +2042,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/transcribe'
+    | '/api/vault-ingest'
     | '/api/vt-capital'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -2017,6 +2125,7 @@ export interface RootRouteChildren {
   OperationsRoute: typeof OperationsRoute
   PlaygroundRoute: typeof PlaygroundRoute
   ProfilesRoute: typeof ProfilesRoute
+  ReplayRoute: typeof ReplayRoute
   ReserveRoute: typeof ReserveRouteWithChildren
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -2065,6 +2174,7 @@ export interface RootRouteChildren {
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
+  ApiRagRoute: typeof ApiRagRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
@@ -2080,6 +2190,7 @@ export interface RootRouteChildren {
   ApiSwarmDirectChatRoute: typeof ApiSwarmDirectChatRoute
   ApiSwarmDispatchRoute: typeof ApiSwarmDispatchRoute
   ApiSwarmEnvironmentRoute: typeof ApiSwarmEnvironmentRoute
+  ApiSwarmGoalsRoute: typeof ApiSwarmGoalsRoute
   ApiSwarmHealthRoute: typeof ApiSwarmHealthRoute
   ApiSwarmKanbanRoute: typeof ApiSwarmKanbanRoute
   ApiSwarmLifecycleRoute: typeof ApiSwarmLifecycleRoute
@@ -2088,10 +2199,15 @@ export interface RootRouteChildren {
   ApiSwarmModeRoute: typeof ApiSwarmModeRoute
   ApiSwarmOrchestratorLoopRoute: typeof ApiSwarmOrchestratorLoopRoute
   ApiSwarmPermissionsRoute: typeof ApiSwarmPermissionsRoute
+  ApiSwarmPipelineRoute: typeof ApiSwarmPipelineRoute
   ApiSwarmProjectRoute: typeof ApiSwarmProjectRoute
+  ApiSwarmQueueRoute: typeof ApiSwarmQueueRoute
+  ApiSwarmReplayRoute: typeof ApiSwarmReplayRoute
   ApiSwarmReportsRoute: typeof ApiSwarmReportsRoute
   ApiSwarmRosterRoute: typeof ApiSwarmRosterRoute
   ApiSwarmRuntimeRoute: typeof ApiSwarmRuntimeRouteWithChildren
+  ApiSwarmScoreboardRoute: typeof ApiSwarmScoreboardRoute
+  ApiSwarmTimelineRoute: typeof ApiSwarmTimelineRoute
   ApiSwarmTmuxScrollRoute: typeof ApiSwarmTmuxScrollRoute
   ApiSwarmTmuxStartRoute: typeof ApiSwarmTmuxStartRoute
   ApiSwarmTmuxStopRoute: typeof ApiSwarmTmuxStopRoute
@@ -2102,6 +2218,7 @@ export interface RootRouteChildren {
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
+  ApiVaultIngestRoute: typeof ApiVaultIngestRoute
   ApiVtCapitalRoute: typeof ApiVtCapitalRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
@@ -2200,6 +2317,13 @@ declare module '@tanstack/react-router' {
       path: '/reserve'
       fullPath: '/reserve'
       preLoaderRoute: typeof ReserveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/replay': {
+      id: '/replay'
+      path: '/replay'
+      fullPath: '/replay'
+      preLoaderRoute: typeof ReplayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profiles': {
@@ -2356,6 +2480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiVtCapitalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/vault-ingest': {
+      id: '/api/vault-ingest'
+      path: '/api/vault-ingest'
+      fullPath: '/api/vault-ingest'
+      preLoaderRoute: typeof ApiVaultIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/transcribe': {
       id: '/api/transcribe'
       path: '/api/transcribe'
@@ -2426,6 +2557,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSwarmTmuxScrollRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/swarm-timeline': {
+      id: '/api/swarm-timeline'
+      path: '/api/swarm-timeline'
+      fullPath: '/api/swarm-timeline'
+      preLoaderRoute: typeof ApiSwarmTimelineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-scoreboard': {
+      id: '/api/swarm-scoreboard'
+      path: '/api/swarm-scoreboard'
+      fullPath: '/api/swarm-scoreboard'
+      preLoaderRoute: typeof ApiSwarmScoreboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/swarm-runtime': {
       id: '/api/swarm-runtime'
       path: '/api/swarm-runtime'
@@ -2447,11 +2592,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSwarmReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/swarm-replay': {
+      id: '/api/swarm-replay'
+      path: '/api/swarm-replay'
+      fullPath: '/api/swarm-replay'
+      preLoaderRoute: typeof ApiSwarmReplayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-queue': {
+      id: '/api/swarm-queue'
+      path: '/api/swarm-queue'
+      fullPath: '/api/swarm-queue'
+      preLoaderRoute: typeof ApiSwarmQueueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/swarm-project': {
       id: '/api/swarm-project'
       path: '/api/swarm-project'
       fullPath: '/api/swarm-project'
       preLoaderRoute: typeof ApiSwarmProjectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-pipeline': {
+      id: '/api/swarm-pipeline'
+      path: '/api/swarm-pipeline'
+      fullPath: '/api/swarm-pipeline'
+      preLoaderRoute: typeof ApiSwarmPipelineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/swarm-permissions': {
@@ -2508,6 +2674,13 @@ declare module '@tanstack/react-router' {
       path: '/api/swarm-health'
       fullPath: '/api/swarm-health'
       preLoaderRoute: typeof ApiSwarmHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-goals': {
+      id: '/api/swarm-goals'
+      path: '/api/swarm-goals'
+      fullPath: '/api/swarm-goals'
+      preLoaderRoute: typeof ApiSwarmGoalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/swarm-environment': {
@@ -2613,6 +2786,13 @@ declare module '@tanstack/react-router' {
       path: '/api/send'
       fullPath: '/api/send'
       preLoaderRoute: typeof ApiSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rag': {
+      id: '/api/rag'
+      path: '/api/rag'
+      fullPath: '/api/rag'
+      preLoaderRoute: typeof ApiRagRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/provider-usage': {
@@ -3518,6 +3698,7 @@ const rootRouteChildren: RootRouteChildren = {
   OperationsRoute: OperationsRoute,
   PlaygroundRoute: PlaygroundRoute,
   ProfilesRoute: ProfilesRoute,
+  ReplayRoute: ReplayRoute,
   ReserveRoute: ReserveRouteWithChildren,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
@@ -3566,6 +3747,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
+  ApiRagRoute: ApiRagRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,
@@ -3581,6 +3763,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmDirectChatRoute: ApiSwarmDirectChatRoute,
   ApiSwarmDispatchRoute: ApiSwarmDispatchRoute,
   ApiSwarmEnvironmentRoute: ApiSwarmEnvironmentRoute,
+  ApiSwarmGoalsRoute: ApiSwarmGoalsRoute,
   ApiSwarmHealthRoute: ApiSwarmHealthRoute,
   ApiSwarmKanbanRoute: ApiSwarmKanbanRoute,
   ApiSwarmLifecycleRoute: ApiSwarmLifecycleRoute,
@@ -3589,10 +3772,15 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmModeRoute: ApiSwarmModeRoute,
   ApiSwarmOrchestratorLoopRoute: ApiSwarmOrchestratorLoopRoute,
   ApiSwarmPermissionsRoute: ApiSwarmPermissionsRoute,
+  ApiSwarmPipelineRoute: ApiSwarmPipelineRoute,
   ApiSwarmProjectRoute: ApiSwarmProjectRoute,
+  ApiSwarmQueueRoute: ApiSwarmQueueRoute,
+  ApiSwarmReplayRoute: ApiSwarmReplayRoute,
   ApiSwarmReportsRoute: ApiSwarmReportsRoute,
   ApiSwarmRosterRoute: ApiSwarmRosterRoute,
   ApiSwarmRuntimeRoute: ApiSwarmRuntimeRouteWithChildren,
+  ApiSwarmScoreboardRoute: ApiSwarmScoreboardRoute,
+  ApiSwarmTimelineRoute: ApiSwarmTimelineRoute,
   ApiSwarmTmuxScrollRoute: ApiSwarmTmuxScrollRoute,
   ApiSwarmTmuxStartRoute: ApiSwarmTmuxStartRoute,
   ApiSwarmTmuxStopRoute: ApiSwarmTmuxStopRoute,
@@ -3603,6 +3791,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
+  ApiVaultIngestRoute: ApiVaultIngestRoute,
   ApiVtCapitalRoute: ApiVtCapitalRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,

@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { ragSearchSafe } from '../../server/rag-index'
 import { notifyPhone } from '../../server/notify'
+import { saveReplay } from '../../server/swarm-replay'
 import { processVerification } from '../../server/swarm-verify'
 import {
   newestCheckpointFromMessages,
@@ -702,6 +703,20 @@ function finalizeDispatch(
 ): void {
   const blockReason = dispatchBlockReason(result)
   if (blockReason) notifyBlockedThrottled(workerId, blockReason)
+  try {
+    saveReplay({
+      workerId,
+      task: assignment.task,
+      ok: result.ok,
+      durationMs: result.durationMs,
+      mode: result.delivery ?? meta.mode,
+      output: result.output,
+      checkpointState: result.checkpoint?.stateLabel ?? null,
+      checkpointResult: result.checkpoint?.result ?? null,
+    })
+  } catch {
+    /* replay is best-effort */
+  }
   try {
     recordSwarmOutcome({
       workerId,
