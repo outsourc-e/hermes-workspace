@@ -130,6 +130,7 @@ import { Route as ApiRunsActiveRouteImport } from './routes/api/runs/active'
 import { Route as ApiProjectsUpdateRouteImport } from './routes/api/projects/update'
 import { Route as ApiProjectsListRouteImport } from './routes/api/projects/list'
 import { Route as ApiProjectsCreateRouteImport } from './routes/api/projects/create'
+import { Route as ApiProjectsContentRouteImport } from './routes/api/projects/content'
 import { Route as ApiProjectsBriefRouteImport } from './routes/api/projects/brief'
 import { Route as ApiProjectsAddSourceRouteImport } from './routes/api/projects/add-source'
 import { Route as ApiProjectsAddDecisionRouteImport } from './routes/api/projects/add-decision'
@@ -792,6 +793,11 @@ const ApiProjectsCreateRoute = ApiProjectsCreateRouteImport.update({
   path: '/api/projects/create',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProjectsContentRoute = ApiProjectsContentRouteImport.update({
+  id: '/api/projects/content',
+  path: '/api/projects/content',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiProjectsBriefRoute = ApiProjectsBriefRouteImport.update({
   id: '/api/projects/brief',
   path: '/api/projects/brief',
@@ -1232,6 +1238,7 @@ export interface FileRoutesByFullPath {
   '/api/projects/add-decision': typeof ApiProjectsAddDecisionRoute
   '/api/projects/add-source': typeof ApiProjectsAddSourceRoute
   '/api/projects/brief': typeof ApiProjectsBriefRoute
+  '/api/projects/content': typeof ApiProjectsContentRoute
   '/api/projects/create': typeof ApiProjectsCreateRoute
   '/api/projects/list': typeof ApiProjectsListRoute
   '/api/projects/update': typeof ApiProjectsUpdateRoute
@@ -1409,6 +1416,7 @@ export interface FileRoutesByTo {
   '/api/projects/add-decision': typeof ApiProjectsAddDecisionRoute
   '/api/projects/add-source': typeof ApiProjectsAddSourceRoute
   '/api/projects/brief': typeof ApiProjectsBriefRoute
+  '/api/projects/content': typeof ApiProjectsContentRoute
   '/api/projects/create': typeof ApiProjectsCreateRoute
   '/api/projects/list': typeof ApiProjectsListRoute
   '/api/projects/update': typeof ApiProjectsUpdateRoute
@@ -1588,6 +1596,7 @@ export interface FileRoutesById {
   '/api/projects/add-decision': typeof ApiProjectsAddDecisionRoute
   '/api/projects/add-source': typeof ApiProjectsAddSourceRoute
   '/api/projects/brief': typeof ApiProjectsBriefRoute
+  '/api/projects/content': typeof ApiProjectsContentRoute
   '/api/projects/create': typeof ApiProjectsCreateRoute
   '/api/projects/list': typeof ApiProjectsListRoute
   '/api/projects/update': typeof ApiProjectsUpdateRoute
@@ -1768,6 +1777,7 @@ export interface FileRouteTypes {
     | '/api/projects/add-decision'
     | '/api/projects/add-source'
     | '/api/projects/brief'
+    | '/api/projects/content'
     | '/api/projects/create'
     | '/api/projects/list'
     | '/api/projects/update'
@@ -1945,6 +1955,7 @@ export interface FileRouteTypes {
     | '/api/projects/add-decision'
     | '/api/projects/add-source'
     | '/api/projects/brief'
+    | '/api/projects/content'
     | '/api/projects/create'
     | '/api/projects/list'
     | '/api/projects/update'
@@ -2123,6 +2134,7 @@ export interface FileRouteTypes {
     | '/api/projects/add-decision'
     | '/api/projects/add-source'
     | '/api/projects/brief'
+    | '/api/projects/content'
     | '/api/projects/create'
     | '/api/projects/list'
     | '/api/projects/update'
@@ -2284,6 +2296,7 @@ export interface RootRouteChildren {
   ApiProjectsAddDecisionRoute: typeof ApiProjectsAddDecisionRoute
   ApiProjectsAddSourceRoute: typeof ApiProjectsAddSourceRoute
   ApiProjectsBriefRoute: typeof ApiProjectsBriefRoute
+  ApiProjectsContentRoute: typeof ApiProjectsContentRoute
   ApiProjectsCreateRoute: typeof ApiProjectsCreateRoute
   ApiProjectsListRoute: typeof ApiProjectsListRoute
   ApiProjectsUpdateRoute: typeof ApiProjectsUpdateRoute
@@ -3143,6 +3156,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProjectsCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/projects/content': {
+      id: '/api/projects/content'
+      path: '/api/projects/content'
+      fullPath: '/api/projects/content'
+      preLoaderRoute: typeof ApiProjectsContentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/projects/brief': {
       id: '/api/projects/brief'
       path: '/api/projects/brief'
@@ -3881,6 +3901,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProjectsAddDecisionRoute: ApiProjectsAddDecisionRoute,
   ApiProjectsAddSourceRoute: ApiProjectsAddSourceRoute,
   ApiProjectsBriefRoute: ApiProjectsBriefRoute,
+  ApiProjectsContentRoute: ApiProjectsContentRoute,
   ApiProjectsCreateRoute: ApiProjectsCreateRoute,
   ApiProjectsListRoute: ApiProjectsListRoute,
   ApiProjectsUpdateRoute: ApiProjectsUpdateRoute,

@@ -7,9 +7,11 @@ import {
   addProjectDecision,
   addProjectSource,
   buildProjectBrief,
+  buildMarkdownFromContent,
   createProject,
   getProject,
   getProjectBundle,
+  saveProjectContentDraft,
   listProjects,
   updateProject,
 } from './project-cockpit'
@@ -59,6 +61,7 @@ describe('project cockpit registry', () => {
     expect(bundle.sources).toHaveLength(1)
     expect(bundle.artifacts).toHaveLength(1)
     expect(bundle.decisions).toHaveLength(1)
+    expect(bundle.contentDraft).toBeNull()
   })
 
   it('updates projects through append-only latest state', async () => {
@@ -117,5 +120,37 @@ describe('project cockpit registry', () => {
     expect(project.title).toBe('Projet Connectivite')
     expect(project.templateId).toBe('template _fiche')
     expect(project.tags).toEqual(['pricing', 'canal:direct'])
+  })
+
+  it('stores structured content drafts and renders markdown', async () => {
+    const project = createProject({
+      title: 'Fiche produit PDF - Connectivite',
+      templateId: 'template_fiche_produit_pdf_tous',
+    })
+    const markdown = buildMarkdownFromContent({
+      project,
+      templateName: 'Fiche produit PDF - Tous canaux',
+      sectionTitles: {
+        promise: 'Promesse',
+        target: 'Cible',
+      },
+      fields: {
+        promise: 'Une connectivite fiable pour les sites critiques.',
+        target: 'PME multi-sites.',
+      },
+    })
+    const draft = saveProjectContentDraft({
+      projectId: project.id,
+      fields: {
+        promise: 'Une connectivite fiable pour les sites critiques.',
+        target: 'PME multi-sites.',
+      },
+      markdown,
+    })
+
+    const bundle = getProjectBundle(project.id)
+    expect(draft.markdown).toContain('## Promesse')
+    expect(bundle?.contentDraft?.fields.promise).toContain('connectivite fiable')
+    expect(bundle?.contentDraft?.markdown).toContain('Statut : brouillon')
   })
 })

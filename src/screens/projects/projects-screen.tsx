@@ -58,6 +58,18 @@ type ProjectDecision = {
   updatedAt: string
 }
 
+type ProjectContentDraft = {
+  id: string
+  projectId: string
+  templateId: string | null
+  fields: Record<string, string>
+  markdown: string | null
+  status: string
+  version: string
+  createdAt: string
+  updatedAt: string
+}
+
 type Project = {
   id: string
   title: string
@@ -73,6 +85,7 @@ type Project = {
   sources: Array<ProjectSource>
   artifacts: Array<ProjectArtifact>
   decisions: Array<ProjectDecision>
+  contentDraft: ProjectContentDraft | null
 }
 
 type ProjectsResponse = {
@@ -96,6 +109,12 @@ type DeliverableTemplate = {
   version: string
   description: string
   requiredSources: Array<string>
+  sections: Array<{
+    id: string
+    title: string
+    purpose: string
+    required: boolean
+  }>
   qualityRules: Array<{
     id: string
     label: string
@@ -453,7 +472,10 @@ export function ProjectsScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [savingDetails, setSavingDetails] = useState(false)
+  const [savingContent, setSavingContent] = useState(false)
   const [brief, setBrief] = useState('')
+  const [contentFields, setContentFields] = useState<Record<string, string>>({})
+  const [contentMarkdown, setContentMarkdown] = useState('')
   const [projectForm, setProjectForm] = useState({
     template: 'fiche_produit_pdf' as ProjectTemplate,
     product: '',
@@ -523,6 +545,21 @@ export function ProjectsScreen() {
       nextAction: selected.nextAction || '',
     })
   }, [selected?.id])
+
+  useEffect(() => {
+    if (!selected) {
+      setContentFields({})
+      setContentMarkdown('')
+      return
+    }
+
+    const draftFields = selected.contentDraft?.fields || {}
+    const templateFields = Object.fromEntries(
+      (selectedTemplate?.sections || []).map((section) => [section.id, draftFields[section.id] || '']),
+    )
+    setContentFields({ ...draftFields, ...templateFields })
+    setContentMarkdown(selected.contentDraft?.markdown || '')
+  }, [selected?.id, selectedTemplate?.id])
 
   async function refreshProjects() {
     await queryClient.invalidateQueries({ queryKey: ['project-cockpit'] })
@@ -735,6 +772,34 @@ export function ProjectsScreen() {
       toast('Brief projet prêt et copié.', { type: 'success' })
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Brief impossible.', { type: 'error' })
+    }
+  }
+
+  async function saveContentDraft(action: 'save' | 'generate_markdown') {
+    if (!selected) return
+    setSavingContent(true)
+    try {
+      const result = await readJson<{
+        draft: ProjectContentDraft
+      }>('/api/projects/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: selected.id,
+          templateId: selected.templateId,
+          fields: contentFields,
+          markdown: contentMarkdown,
+          action,
+          createArtifact: action === 'generate_markdown',
+        }),
+      })
+      setContentMarkdown(result.draft.markdown || '')
+      await refreshProjects()
+      toast(action === 'generate_markdown' ? 'Markdown généré.' : 'Brouillon enregistré.', { type: 'success' })
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Studio contenu indisponible.', { type: 'error' })
+    } finally {
+      setSavingContent(false)
     }
   }
 
@@ -1103,6 +1168,81 @@ export function ProjectsScreen() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                ) : null}
+
+                {selectedTemplate ? (
+                  <div className="rounded-lg border border-primary-200 p-4 dark:border-neutral-800">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold">Studio contenu</h3>
+                        <p className="mt-1 text-xs leading-5 text-primary-600 dark:text-neutral-400">
+                          Remplis les sections du template avec tes notes, une dictée, un copier-coller ou plus tard des extraits RAG. Le PDF viendra après validation du contenu.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={savingContent}
+                          onClick={() => void saveContentDraft('save')}
+                        >
+                          Enregistrer
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={savingContent}
+                          onClick={() => void saveContentDraft('generate_markdown')}
+                        >
+                          Générer Markdown
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                      {selectedTemplate.sections.map((section) => (
+                        <div key={section.id} className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <FieldLabel>{section.title}</FieldLabel>
+                            {section.required ? (
+                              <Badge tone={toneForStatus('a_valider')}>attendu</Badge>
+                            ) : null}
+                          </div>
+                          <textarea
+                            value={contentFields[section.id] || ''}
+                            onChange={(event) => setContentFields((current) => ({
+                              ...current,
+                              [section.id]: event.target.value,
+                            }))}
+                            placeholder={section.purpose}
+                            className="min-h-28 w-full resize-y rounded-lg border border-primary-200 bg-surface px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-neutral-800 dark:bg-neutral-950"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {contentMarkdown ? (
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs font-semibold uppercase text-primary-500 dark:text-neutral-400">
+                            Markdown généré
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              void navigator.clipboard?.writeText(contentMarkdown)
+                              toast('Markdown copié.', { type: 'success' })
+                            }}
+                          >
+                            Copier
+                          </Button>
+                        </div>
+                        <pre className="max-h-72 overflow-auto rounded-lg border border-primary-200 bg-primary-50 p-3 text-xs leading-5 text-primary-800 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
+                          {contentMarkdown}
+                        </pre>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 

@@ -105,6 +105,18 @@ export type ProjectDecisionRecord = {
   updatedAt: string
 }
 
+export type ProjectContentDraftRecord = {
+  id: string
+  projectId: string
+  templateId: string | null
+  fields: Record<string, string>
+  markdown: string | null
+  status: ProjectStatus
+  version: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type CreateProjectInput = {
   title: string
   objective?: string | null
@@ -151,10 +163,20 @@ export type CreateProjectDecisionInput = {
   sourceRefs?: Array<string> | string | null
 }
 
+export type SaveProjectContentDraftInput = {
+  projectId: string
+  templateId?: string | null
+  fields?: Record<string, string> | null
+  markdown?: string | null
+  status?: string | null
+  version?: string | null
+}
+
 export type ProjectBundle = ProjectRecord & {
   sources: Array<ProjectSourceRecord>
   artifacts: Array<ProjectArtifactRecord>
   decisions: Array<ProjectDecisionRecord>
+  contentDraft: ProjectContentDraftRecord | null
 }
 
 export type ProjectFilters = {
@@ -204,6 +226,8 @@ const FIELD_LIMITS = {
   decisionTopic: 240,
   decisionText: 3000,
   rationale: 3000,
+  contentField: 8000,
+  markdown: 30000,
   tag: 80,
 }
 
@@ -364,6 +388,7 @@ export function listProjects(filters: ProjectFilters = {}): Array<ProjectBundle>
   const sourcesByProject = groupByProject(readRegistry<ProjectSourceRecord>('sources'))
   const artifactsByProject = groupByProject(readRegistry<ProjectArtifactRecord>('artifacts'))
   const decisionsByProject = groupByProject(readRegistry<ProjectDecisionRecord>('decisions'))
+  const contentDraftsByProject = latestContentDraftsByProject()
   let projects = Array.from(projectsById.values())
   if (!filters.includeArchived) {
     projects = projects.filter(
@@ -390,6 +415,7 @@ export function listProjects(filters: ProjectFilters = {}): Array<ProjectBundle>
       sources: sortUpdatedDesc(sourcesByProject.get(project.id) || []),
       artifacts: sortUpdatedDesc(artifactsByProject.get(project.id) || []),
       decisions: sortUpdatedDesc(decisionsByProject.get(project.id) || []),
+      contentDraft: contentDraftsByProject.get(project.id) || null,
     }))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.title.localeCompare(b.title))
 }
@@ -406,6 +432,25 @@ function groupByProject<T extends { projectId: string }>(rows: Array<T>): Map<st
 
 function sortUpdatedDesc<T extends { updatedAt: string }>(rows: Array<T>): Array<T> {
   return [...rows].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
+function latestContentDraftsByProject(): Map<string, ProjectContentDraftRecord> {
+  const drafts = new Map<string, ProjectContentDraftRecord>()
+  for (const row of readRegistry<ProjectContentDraftRecord>('content-drafts')) {
+    if (row?.projectId) drafts.set(row.projectId, row)
+  }
+  return drafts
+}
+
+function normalizeContentFields(value: Record<string, string> | null | undefined): Record<string, string> {
+  const fields: Record<string, string> = {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return fields
+  for (const [key, rawValue] of Object.entries(value)) {
+    const cleanKey = limitString(key, 'field', FIELD_LIMITS.tag)
+    if (!cleanKey) continue
+    fields[cleanKey] = limitString(rawValue, cleanKey, FIELD_LIMITS.contentField) || ''
+  }
+  return fields
 }
 
 export function addProjectSource(input: CreateProjectSourceInput): ProjectSourceRecord {
@@ -471,7 +516,67 @@ export function getProjectBundle(id: string): ProjectBundle | null {
   const decisions = readRegistry<ProjectDecisionRecord>('decisions')
     .filter((decision) => decision.projectId === id)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  return { ...project, sources, artifacts, decisions }
+  return {
+    ...project,
+    sources,
+    artifacts,
+    decisions,
+    contentDraft: latestContentDraftsByProject().get(id) || null,
+  }
+}
+
+export function getProjectContentDraft(projectId: string): ProjectContentDraftRecord | null {
+  if (!getProject(projectId)) return null
+  return latestContentDraftsByProject().get(projectId) || null
+}
+
+export function saveProjectContentDraft(input: SaveProjectContentDraftInput): ProjectContentDraftRecord {
+  const project = getProject(input.projectId)
+  if (!project) throw new Error('Project not found')
+  const current = getProjectContentDraft(project.id)
+  const now = new Date().toISOString()
+  return appendRecord('content-drafts', {
+    id: current?.id || `draft_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
+    projectId: project.id,
+    templateId: limitString(input.templateId ?? project.templateId, 'templateId', FIELD_LIMITS.templateId),
+    fields: normalizeContentFields(input.fields),
+    markdown: limitString(input.markdown, 'markdown', FIELD_LIMITS.markdown),
+    status: assertOneOf(input.status, PROJECT_STATUSES, 'status', 'brouillon'),
+    version: limitString(input.version, 'version', FIELD_LIMITS.tag) || current?.version || 'v0.1',
+    createdAt: current?.createdAt || now,
+    updatedAt: now,
+  } satisfies ProjectContentDraftRecord)
+}
+
+export function buildMarkdownFromContent(input: {
+  project: ProjectRecord
+  templateName?: string | null
+  sectionTitles: Record<string, string>
+  fields: Record<string, string>
+}): string {
+  const lines = [
+    `# ${input.project.title}`,
+    '',
+    `Statut : brouillon`,
+    `Template : ${input.templateName || input.project.templateId || 'non defini'}`,
+    `Projet : ${input.project.id}`,
+    '',
+  ]
+
+  for (const [sectionId, rawValue] of Object.entries(input.fields)) {
+    const value = cleanString(rawValue)
+    if (!value) continue
+    lines.push(`## ${input.sectionTitles[sectionId] || sectionId}`)
+    lines.push('')
+    lines.push(value)
+    lines.push('')
+  }
+
+  lines.push('## Sources et limites')
+  lines.push('')
+  lines.push('- Source : a completer ou a confirmer.')
+  lines.push('- Statut : brouillon non publiable sans validation.')
+  return lines.join('\n').trim()
 }
 
 export function buildProjectBrief(project: ProjectBundle): string {
@@ -506,6 +611,11 @@ export function buildProjectBrief(project: ProjectBundle): string {
     safeDecisions.length
       ? safeDecisions.map((decision) => `- ${decision.topic}: ${decision.decision} (${decision.status})`).join('\n')
       : '- aucune decision enregistree',
+    '',
+    'Brouillon contenu :',
+    project.contentDraft
+      ? `- ${Object.keys(project.contentDraft.fields).length} sections renseignees (${project.contentDraft.status}, ${project.contentDraft.version})`
+      : '- aucun brouillon structure',
     '</project_context>',
     '',
     'Instruction Hermes : reprends ce projet comme chef de projet IA. Cadre la demande, distingue faits/hypotheses/recommandations, propose les lots, les sources utiles, les artefacts a produire et la prochaine action. Reste en francais France et applique le filtre PMM solo.',
