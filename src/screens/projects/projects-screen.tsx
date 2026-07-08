@@ -180,6 +180,7 @@ function SelectField({
 export function ProjectsScreen() {
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
+  const [includeArchived, setIncludeArchived] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [savingDetails, setSavingDetails] = useState(false)
@@ -213,8 +214,9 @@ export function ProjectsScreen() {
   const listUrl = useMemo(() => {
     const params = new URLSearchParams()
     if (query.trim()) params.set('q', query.trim())
+    if (includeArchived) params.set('includeArchived', 'true')
     return `/api/projects/list?${params.toString()}`
-  }, [query])
+  }, [includeArchived, query])
 
   const projectsQuery = useQuery({
     queryKey: ['project-cockpit', listUrl],
@@ -372,6 +374,14 @@ export function ProjectsScreen() {
     }
   }
 
+  async function reactivateProject() {
+    if (!selected) return
+    await updateSelected({ status: 'brouillon', environment: 'sandbox' })
+  }
+
+  const selectedIsArchived =
+    selected?.status === 'archive' || selected?.environment === 'archived'
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--theme-bg)] text-primary-900 dark:text-neutral-100">
       <header className="border-b border-primary-200 px-4 py-3 dark:border-neutral-800">
@@ -388,6 +398,15 @@ export function ProjectsScreen() {
             placeholder="Rechercher"
             className="h-8 w-full lg:w-72"
           />
+          <label className="flex items-center gap-2 text-xs text-primary-600 dark:text-neutral-400">
+            <input
+              type="checkbox"
+              checked={includeArchived}
+              onChange={(event) => setIncludeArchived(event.target.checked)}
+              className="size-4 rounded border-primary-300"
+            />
+            Inclure les archivés
+          </label>
         </div>
       </header>
 
@@ -495,6 +514,11 @@ export function ProjectsScreen() {
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
+                      {selectedIsArchived ? (
+                        <Button size="sm" variant="outline" onClick={() => void reactivateProject()}>
+                          Réactiver
+                        </Button>
+                      ) : null}
                       <Button size="sm" onClick={generateBrief}>
                         <HugeiconsIcon icon={Rocket01Icon} size={15} strokeWidth={1.7} />
                         Travailler avec Hermes
