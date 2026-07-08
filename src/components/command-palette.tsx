@@ -43,7 +43,12 @@ type CommandPaletteProps = {
 
 type CommandAction = {
   id: string
-  group: 'Screens' | 'Swarm' | 'Search Results' | 'Recent Sessions' | 'Slash Commands'
+  group:
+    | 'Screens'
+    | 'Swarm'
+    | 'Search Results'
+    | 'Recent Sessions'
+    | 'Slash Commands'
   label: string
   keywords: string
   shortcut?: string
@@ -227,7 +232,8 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
         id: 'screen-swarm',
         group: 'Screens',
         label: 'Swarm',
-        keywords: 'agents workers missions board swarm2 timeline scoreboard queue',
+        keywords:
+          'agents workers missions board swarm2 timeline scoreboard queue',
         shortcut: 'Go',
         icon: CommandLineIcon,
         onSelect: () => void navigate({ to: '/swarm2' }),
@@ -377,6 +383,66 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
         },
       },
       {
+        id: 'swarm-nl-do',
+        group: 'Swarm',
+        label: trimmed
+          ? `Do: “${trimmed.slice(0, 60)}” (smart route)`
+          : 'Do… (plain English → queue/goal/dispatch)',
+        keywords: 'do nl natural language command smart route ask',
+        shortcut: 'Do',
+        icon: CommandLineIcon,
+        onSelect: () => {
+          const text =
+            trimmed || window.prompt('What should the swarm do?') || ''
+          if (!text.trim()) return
+          void fetch('/api/nl-command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text.trim() }),
+          })
+        },
+      },
+      {
+        id: 'swarm-template-ship',
+        group: 'Swarm',
+        label: trimmed
+          ? `Ship feature: “${trimmed.slice(0, 50)}”`
+          : 'Template: ship a feature…',
+        keywords: 'template ship feature pipeline recipe build',
+        shortcut: 'Run',
+        icon: CommandLineIcon,
+        onSelect: () => {
+          const input =
+            trimmed || window.prompt('Feature to ship (one line):') || ''
+          if (!input.trim()) return
+          void fetch('/api/swarm-templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: 'ship-feature', input: input.trim() }),
+          })
+        },
+      },
+      {
+        id: 'swarm-template-research',
+        group: 'Swarm',
+        label: trimmed
+          ? `Deep research: “${trimmed.slice(0, 50)}”`
+          : 'Template: deep research…',
+        keywords: 'template research deep parallel synthesis',
+        shortcut: 'Run',
+        icon: BrainIcon,
+        onSelect: () => {
+          const input =
+            trimmed || window.prompt('Research question:') || ''
+          if (!input.trim()) return
+          void fetch('/api/swarm-templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: 'deep-research', input: input.trim() }),
+          })
+        },
+      },
+      {
         id: 'swarm-reindex-memory',
         group: 'Swarm',
         label: 'Reindex semantic memory (RAG)',
@@ -410,9 +476,11 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
       })
         .then((res) => (res.ok ? res.json() : null))
         .then(
-          (data: {
-            hits?: Array<{ source: string; path: string; snippet: string }>
-          } | null) => {
+          (
+            data: {
+              hits?: Array<{ source: string; path: string; snippet: string }>
+            } | null,
+          ) => {
             if (!data?.hits) return
             setSearchHits(
               data.hits.map((hit, index) => ({

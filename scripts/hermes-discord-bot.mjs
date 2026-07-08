@@ -289,6 +289,36 @@ async function cmdGoalAdd(rest) {
   await say(res.ok ? `Goal \`${res.goal.id}\` active — swarm plans first pipeline within 10 min ✅` : `Failed: ${String(res.error || '').slice(0, 200)}`)
 }
 
+async function cmdDo(rest) {
+  const text = rest.join(' ')
+  if (!text) return say('Usage: `!do <plain English request…>`')
+  await say('Routing…')
+  const res = await workspace('/api/nl-command', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) return say(`Failed: ${String(res.error || '').slice(0, 200)}`)
+  const r = res.result || {}
+  await say(`**${r.action}**${r.id ? ` \`${r.id}\`` : ''} — ${String(r.detail || '').slice(0, 1500)}`)
+}
+
+async function cmdTemplates() {
+  const res = await workspace('/api/swarm-templates')
+  const rows = (res.templates || []).map((t) => `• \`${t.id}\` — ${t.name}: ${t.description}`)
+  await say(`**Templates** (run: \`!template <id> <input…>\`)\n${rows.join('\n')}`)
+}
+
+async function cmdTemplateRun(rest) {
+  const id = rest.shift()
+  const input = rest.join(' ')
+  if (!id || !input) return say('Usage: `!template <id> <input…>`')
+  const res = await workspace('/api/swarm-templates', {
+    method: 'POST',
+    body: JSON.stringify({ id, input }),
+  })
+  await say(res.ok ? `Pipeline \`${res.runId}\` started: ${res.title} ✅` : `Failed: ${String(res.error || '').slice(0, 200)}`)
+}
+
 async function cmdGoals() {
   const res = await workspace('/api/swarm-goals')
   const goals = (res.goals || []).slice(0, 8)
@@ -307,6 +337,7 @@ const HELP = [
   '`!queuelist` — show queue',
   '`!proposals` — swarm-suggested tasks · `!approve <id>` (operator only)',
   '`!goal <text…>` — add standing goal (operator only) · `!goals` — list',
+  '`!do <anything…>` — plain English, smart-routed · `!templates` / `!template <id> <input…>` — recipes',
   '`!dispatch <worker> <task…>` — send work (operator only)',
   '`!retry <missionId> <assignmentId>` — retry blocked (operator only)',
   '`!dismiss <missionId> <assignmentId>` — dismiss blocked (operator only)',
@@ -325,7 +356,7 @@ async function handle(msg) {
     '!dismiss',
     '!clearblocked',
     '!queue',
-  , '!approve', '!goal'].includes(cmd)
+  , '!approve', '!goal', '!do', '!template'].includes(cmd)
   if (mutating && !isOperator) {
     await say(
       OPERATOR_ID
@@ -360,6 +391,9 @@ async function handle(msg) {
     else if (cmd === '!approve') await cmdApprove(rest[0])
     else if (cmd === '!goal') await cmdGoalAdd(rest)
     else if (cmd === '!goals') await cmdGoals()
+    else if (cmd === '!do') await cmdDo(rest)
+    else if (cmd === '!templates') await cmdTemplates()
+    else if (cmd === '!template') await cmdTemplateRun(rest)
   } catch (err) {
     await say(
       `Command failed: ${String(err?.message || err).slice(0, 200)}`,

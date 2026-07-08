@@ -53,6 +53,7 @@ import { Route as ApiSwarmTmuxStopRouteImport } from './routes/api/swarm-tmux-st
 import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-start'
 import { Route as ApiSwarmTmuxScrollRouteImport } from './routes/api/swarm-tmux-scroll'
 import { Route as ApiSwarmTimelineRouteImport } from './routes/api/swarm-timeline'
+import { Route as ApiSwarmTemplatesRouteImport } from './routes/api/swarm-templates'
 import { Route as ApiSwarmScoreboardRouteImport } from './routes/api/swarm-scoreboard'
 import { Route as ApiSwarmRuntimeRouteImport } from './routes/api/swarm-runtime'
 import { Route as ApiSwarmRosterRouteImport } from './routes/api/swarm-roster'
@@ -94,6 +95,7 @@ import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-np
 import { Route as ApiPlaygroundAdminRouteImport } from './routes/api/playground-admin'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiNlCommandRouteImport } from './routes/api/nl-command'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiMediaRouteImport } from './routes/api/media'
@@ -404,6 +406,11 @@ const ApiSwarmTimelineRoute = ApiSwarmTimelineRouteImport.update({
   path: '/api/swarm-timeline',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSwarmTemplatesRoute = ApiSwarmTemplatesRouteImport.update({
+  id: '/api/swarm-templates',
+  path: '/api/swarm-templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSwarmScoreboardRoute = ApiSwarmScoreboardRouteImport.update({
   id: '/api/swarm-scoreboard',
   path: '/api/swarm-scoreboard',
@@ -608,6 +615,11 @@ const ApiPingRoute = ApiPingRouteImport.update({
 const ApiPathsRoute = ApiPathsRouteImport.update({
   id: '/api/paths',
   path: '/api/paths',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNlCommandRoute = ApiNlCommandRouteImport.update({
+  id: '/api/nl-command',
+  path: '/api/nl-command',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
@@ -1121,6 +1133,7 @@ export interface FileRoutesByFullPath {
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/nl-command': typeof ApiNlCommandRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1162,6 +1175,7 @@ export interface FileRoutesByFullPath {
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
   '/api/swarm-scoreboard': typeof ApiSwarmScoreboardRoute
+  '/api/swarm-templates': typeof ApiSwarmTemplatesRoute
   '/api/swarm-timeline': typeof ApiSwarmTimelineRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
@@ -1296,6 +1310,7 @@ export interface FileRoutesByTo {
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/nl-command': typeof ApiNlCommandRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1337,6 +1352,7 @@ export interface FileRoutesByTo {
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
   '/api/swarm-scoreboard': typeof ApiSwarmScoreboardRoute
+  '/api/swarm-templates': typeof ApiSwarmTemplatesRoute
   '/api/swarm-timeline': typeof ApiSwarmTimelineRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
@@ -1473,6 +1489,7 @@ export interface FileRoutesById {
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/nl-command': typeof ApiNlCommandRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1514,6 +1531,7 @@ export interface FileRoutesById {
   '/api/swarm-roster': typeof ApiSwarmRosterRoute
   '/api/swarm-runtime': typeof ApiSwarmRuntimeRouteWithChildren
   '/api/swarm-scoreboard': typeof ApiSwarmScoreboardRoute
+  '/api/swarm-templates': typeof ApiSwarmTemplatesRoute
   '/api/swarm-timeline': typeof ApiSwarmTimelineRoute
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
@@ -1651,6 +1669,7 @@ export interface FileRouteTypes {
     | '/api/media'
     | '/api/memory'
     | '/api/models'
+    | '/api/nl-command'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1692,6 +1711,7 @@ export interface FileRouteTypes {
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
     | '/api/swarm-scoreboard'
+    | '/api/swarm-templates'
     | '/api/swarm-timeline'
     | '/api/swarm-tmux-scroll'
     | '/api/swarm-tmux-start'
@@ -1826,6 +1846,7 @@ export interface FileRouteTypes {
     | '/api/media'
     | '/api/memory'
     | '/api/models'
+    | '/api/nl-command'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1867,6 +1888,7 @@ export interface FileRouteTypes {
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
     | '/api/swarm-scoreboard'
+    | '/api/swarm-templates'
     | '/api/swarm-timeline'
     | '/api/swarm-tmux-scroll'
     | '/api/swarm-tmux-start'
@@ -2002,6 +2024,7 @@ export interface FileRouteTypes {
     | '/api/media'
     | '/api/memory'
     | '/api/models'
+    | '/api/nl-command'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -2043,6 +2066,7 @@ export interface FileRouteTypes {
     | '/api/swarm-roster'
     | '/api/swarm-runtime'
     | '/api/swarm-scoreboard'
+    | '/api/swarm-templates'
     | '/api/swarm-timeline'
     | '/api/swarm-tmux-scroll'
     | '/api/swarm-tmux-start'
@@ -2179,6 +2203,7 @@ export interface RootRouteChildren {
   ApiMediaRoute: typeof ApiMediaRoute
   ApiMemoryRoute: typeof ApiMemoryRouteWithChildren
   ApiModelsRoute: typeof ApiModelsRoute
+  ApiNlCommandRoute: typeof ApiNlCommandRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiPlaygroundAdminRoute: typeof ApiPlaygroundAdminRoute
@@ -2220,6 +2245,7 @@ export interface RootRouteChildren {
   ApiSwarmRosterRoute: typeof ApiSwarmRosterRoute
   ApiSwarmRuntimeRoute: typeof ApiSwarmRuntimeRouteWithChildren
   ApiSwarmScoreboardRoute: typeof ApiSwarmScoreboardRoute
+  ApiSwarmTemplatesRoute: typeof ApiSwarmTemplatesRoute
   ApiSwarmTimelineRoute: typeof ApiSwarmTimelineRoute
   ApiSwarmTmuxScrollRoute: typeof ApiSwarmTmuxScrollRoute
   ApiSwarmTmuxStartRoute: typeof ApiSwarmTmuxStartRoute
@@ -2577,6 +2603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSwarmTimelineRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/swarm-templates': {
+      id: '/api/swarm-templates'
+      path: '/api/swarm-templates'
+      fullPath: '/api/swarm-templates'
+      preLoaderRoute: typeof ApiSwarmTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/swarm-scoreboard': {
       id: '/api/swarm-scoreboard'
       path: '/api/swarm-scoreboard'
@@ -2862,6 +2895,13 @@ declare module '@tanstack/react-router' {
       path: '/api/paths'
       fullPath: '/api/paths'
       preLoaderRoute: typeof ApiPathsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nl-command': {
+      id: '/api/nl-command'
+      path: '/api/nl-command'
+      fullPath: '/api/nl-command'
+      preLoaderRoute: typeof ApiNlCommandRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/models': {
@@ -3760,6 +3800,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMediaRoute: ApiMediaRoute,
   ApiMemoryRoute: ApiMemoryRouteWithChildren,
   ApiModelsRoute: ApiModelsRoute,
+  ApiNlCommandRoute: ApiNlCommandRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiPlaygroundAdminRoute: ApiPlaygroundAdminRoute,
@@ -3801,6 +3842,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmRosterRoute: ApiSwarmRosterRoute,
   ApiSwarmRuntimeRoute: ApiSwarmRuntimeRouteWithChildren,
   ApiSwarmScoreboardRoute: ApiSwarmScoreboardRoute,
+  ApiSwarmTemplatesRoute: ApiSwarmTemplatesRoute,
   ApiSwarmTimelineRoute: ApiSwarmTimelineRoute,
   ApiSwarmTmuxScrollRoute: ApiSwarmTmuxScrollRoute,
   ApiSwarmTmuxStartRoute: ApiSwarmTmuxStartRoute,
