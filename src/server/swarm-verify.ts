@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { notifyPhone } from './notify'
+import { baseOf } from './swarm-fleet'
 import { enqueueTask, listQueue } from './swarm-queue'
 import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 
@@ -36,7 +37,7 @@ export function shouldVerify(input: {
   if (!input.ok) return false
   if (!input.checkpoint || input.checkpoint.stateLabel !== 'DONE') return false
   if (isVerificationTask(input.task)) return false
-  if (EXEMPT_WORKERS.has(input.workerId)) return false
+  if (EXEMPT_WORKERS.has(baseOf(input.workerId))) return false
   if (input.task.trim().length < MIN_TASK_CHARS) return false
   return true
 }

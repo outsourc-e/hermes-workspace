@@ -20,6 +20,11 @@ import { dirname, join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
 import { SWARM_CANONICAL_REPO } from './swarm-environment'
 import { readSwarmRoster } from './swarm-roster'
+import {
+  busyWorkerCount,
+  maxParallel,
+  resolveWorkerForRole,
+} from './swarm-fleet'
 import { automatedDispatchPausedUntil } from './swarm-runtime-reset'
 
 export type QueuePriority = 1 | 2 | 3 // 1 = highest
@@ -211,12 +216,22 @@ export function planQueueDrain(maxDispatches = 2): Array<DrainPlan> {
   if (!queued.length) return []
   const busy = new Set<string>()
   const plans: Array<DrainPlan> = []
+  // Global concurrency cap: never plan past HERMES_MAX_PARALLEL busy workers.
+  const capacity = Math.max(0, maxParallel() - busyWorkerCount())
+  const limit = Math.min(maxDispatches, capacity)
   for (const item of queued) {
-    if (plans.length >= maxDispatches) break
+    if (plans.length >= limit) break
     if (item.worker) {
       if (!busy.has(item.worker) && workerIsIdle(item.worker)) {
         plans.push({ item, workerId: item.worker })
         busy.add(item.worker)
+        continue
+      }
+      // Target busy → try an idle clone (spawning one if caps allow).
+      const clone = resolveWorkerForRole(item.worker)
+      if (clone && !busy.has(clone)) {
+        plans.push({ item, workerId: clone })
+        busy.add(clone)
       }
       continue
     }
