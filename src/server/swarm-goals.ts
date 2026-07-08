@@ -21,6 +21,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { notifyPhone } from './notify'
 import { SWARM_CANONICAL_REPO } from './swarm-environment'
 import {
   listPipelineRuns,
@@ -227,12 +228,24 @@ export async function stepGoals(deps: {
       g.state = 'done'
       note(g, `DONE: ${verdict.summary ?? ''}`)
       saveGoals(fresh)
+      notifyPhone({
+        title: 'Goal achieved',
+        message: `${g.goal.slice(0, 100)}\n${verdict.summary ?? ''}`,
+        priority: 4,
+        tags: ['dart', 'white_check_mark'],
+      })
       return `goal done: ${verdict.summary ?? ''}`
     }
     if (g.iterations >= g.maxIterations) {
       g.state = 'failed'
       note(g, `iteration cap hit — needs operator: ${verdict.summary ?? ''}`)
       saveGoals(fresh)
+      notifyPhone({
+        title: 'Goal needs you',
+        message: `Iteration cap hit: ${g.goal.slice(0, 100)}\n${verdict.summary ?? ''}`,
+        priority: 4,
+        tags: ['dart', 'warning'],
+      })
       return 'iteration cap hit'
     }
     if (verdict.stages) {

@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { ragSearchSafe } from '../../server/rag-index'
+import { notifyPhone } from '../../server/notify'
 import { processVerification } from '../../server/swarm-verify'
 import {
   newestCheckpointFromMessages,
@@ -672,6 +673,20 @@ type DispatchOutcomeMeta = {
   mode: 'tmux' | 'oneshot'
 }
 
+// Blocked workers are important but can cluster; at most one push per 10 min.
+let lastBlockedPushAt = 0
+function notifyBlockedThrottled(workerId: string, reason: string): void {
+  const now = Date.now()
+  if (now - lastBlockedPushAt < 10 * 60 * 1000) return
+  lastBlockedPushAt = now
+  notifyPhone({
+    title: `Worker blocked: ${workerId}`,
+    message: reason.slice(0, 300),
+    priority: 4,
+    tags: ['no_entry'],
+  })
+}
+
 /**
  * Terminal bookkeeping for every dispatch: append the outcome record
  * (feeds the scoreboard, router learning and prompt lessons), harvest a
@@ -686,6 +701,7 @@ function finalizeDispatch(
   options?: { missionId?: string | null },
 ): void {
   const blockReason = dispatchBlockReason(result)
+  if (blockReason) notifyBlockedThrottled(workerId, blockReason)
   try {
     recordSwarmOutcome({
       workerId,

@@ -401,3 +401,20 @@ Update this when you land a fix that future sessions must know about.
 - `f1d6c892` unified file space, all-cloud fleet, 12 lazy routes, prod build,
   4 new agents (release/security/quant/concierge).
 - `53ed7822` dead-session rebuild, launcher wrappers, raise sub-64K models.
+
+## 2026-07-07 — Tier I (partial): phone push + GitHub reach
+
+- **Phone push (ntfy)**: `src/server/notify.ts` — `notifyPhone()`, fire-and-forget.
+  Config in `~/.hermes/.env`: `HERMES_NTFY_TOPIC` (unset = disabled),
+  `HERMES_NTFY_SERVER` (default https://ntfy.sh), `HERMES_NTFY_TOKEN` (optional).
+  Important events ONLY: refuted verification (P5), goal done/failed (P4),
+  blocked worker (P4, throttled 1/10min per process), watchdog alerts (P5,
+  shell-side in `hermes-watchdog.sh`).
+- **GitHub watcher**: `scripts/hermes-github-watch.sh`, called from lifecycle
+  sweep. Polls notifications API with the keychain token
+  (`security find-generic-password -s "GitHub - https://api.github.com" -w`).
+  All new → Discord; reasons review_requested/mention/security_alert/assign →
+  phone push. State: `~/.hermes/logs/github-watch-state.json`.
+  Disable: `HERMES_GITHUB_WATCH=0`.
+- Gmail integration BLOCKED on Google OAuth credential (user to provide).
+  Multi-machine parked (PC unavailable).

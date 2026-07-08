@@ -13,6 +13,7 @@
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { notifyPhone } from './notify'
 import { enqueueTask, listQueue } from './swarm-queue'
 import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 
@@ -142,6 +143,12 @@ export function processVerification(input: {
         notifyDiscord(
           `🚨 **Verification FAILED** — reviewer refuted a DONE claim:\n${refuted}\n> ${input.task.split('\n')[2]?.slice(0, 150) ?? ''}`,
         )
+        notifyPhone({
+          title: 'Verification FAILED',
+          message: refuted,
+          priority: 5,
+          tags: ['rotating_light'],
+        })
       }
       return
     }

@@ -145,3 +145,8 @@ except Exception: print("")' 2>/dev/null || echo '')
     *) echo "{\"at\":$(date +%s)000,\"goal_step\":\"$OUTCOME\"}" >> "$LOG_FILE" ;;
   esac
 fi
+
+# ---- GitHub watcher ---------------------------------------------------------
+# New GitHub notifications → Discord; review requests / mentions / security
+# alerts / assignments → phone push. Dedupes via its own state file.
+"$(dirname "$0")/hermes-github-watch.sh" >/dev/null 2>&1 || true

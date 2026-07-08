@@ -41,6 +41,16 @@ flush_alerts() {
     -H 'Content-Type: application/json' \
     -d "$body" \
     "https://discord.com/api/v10/channels/$CHANNEL/messages" >/dev/null 2>&1 || true
+  # Phone push (ntfy) — watchdog alerts are always important.
+  local NTFY_TOPIC NTFY_SERVER
+  NTFY_TOPIC="$(getenv HERMES_NTFY_TOPIC)"
+  NTFY_SERVER="$(getenv HERMES_NTFY_SERVER)"
+  [ -z "$NTFY_SERVER" ] && NTFY_SERVER="https://ntfy.sh"
+  if [ -n "$NTFY_TOPIC" ]; then
+    printf '%s\n' "${ALERTS[@]}" | head -c 3800 | curl -sS -m 10 -X POST \
+      -H 'Title: Hermes watchdog' -H 'Priority: 5' -H 'Tags: dog,rotating_light' \
+      --data-binary @- "$NTFY_SERVER/$NTFY_TOPIC" >/dev/null 2>&1 || true
+  fi
 }
 
 # ---- state (tracks consecutive failures per check) ---------------------------
