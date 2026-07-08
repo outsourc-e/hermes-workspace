@@ -181,4 +181,30 @@ describe('project cockpit registry', () => {
     expect(fields.benefits).toContain('catalogue')
     expect(fields.pricing).toContain('source tarifaire active')
   })
+
+  it('suggests starter content for mobile, sip trunk and teams families', async () => {
+    const sections = [
+      { id: 'promise', title: 'Promesse', purpose: '', required: true },
+      { id: 'target', title: 'Cible', purpose: '', required: true },
+      { id: 'benefits', title: 'Bénéfices', purpose: '', required: true },
+      { id: 'offer', title: 'Offre', purpose: '', required: true },
+    ]
+
+    const mobile = createProject({
+      title: 'Fiche produit PDF - Mobile Pro',
+      tags: 'mobile, canal:ambassadeur',
+    })
+    const sip = createProject({
+      title: 'Fiche produit PDF - SIP Trunk',
+      tags: 'siptrunk, canal:direct',
+    })
+    const teams = createProject({
+      title: 'Fiche produit PDF - Call2Teams',
+      tags: 'teams, canal:operateur',
+    })
+
+    expect(buildStarterContentFields({ project: mobile, template: { id: 't', name: 't', channel: 'ambassadeur', sections } }).promise).toContain('brique utile')
+    expect(buildStarterContentFields({ project: sip, template: { id: 't', name: 't', channel: 'direct', sections } }).promise).toContain('raccorder la téléphonie')
+    expect(buildStarterContentFields({ project: teams, template: { id: 't', name: 't', channel: 'operateur', sections } }).promise).toContain('Microsoft Teams')
+  })
 })

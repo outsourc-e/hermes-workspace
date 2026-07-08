@@ -601,8 +601,9 @@ function inferProductFamily(project: ProjectRecord): string {
     return 'connectivite'
   }
   if (/(mobile|sim|data|forfait|4g|5g)/i.test(text)) return 'mobile'
-  if (/(metacentrex|centrex|ucaas|telephonie|voip|pbx|sip|trunk)/i.test(text)) return 'ucaas'
+  if (/(sip trunk|trunk sip|trunking|trunk)/i.test(text)) return 'sip_trunk'
   if (/(teams|call2teams)/i.test(text)) return 'teams'
+  if (/(metacentrex|centrex|ucaas|telephonie|voip|pbx)/i.test(text)) return 'ucaas'
   return 'generique'
 }
 
@@ -684,6 +685,81 @@ function familyMessages(family: string, product: string, channel: string) {
         'Aide à protéger la valeur du parc installé en ajoutant les bons usages plutôt qu’en remplaçant tout.',
       ],
       offer: `Décrire ici le socle, les licences, les options, les terminaux, les dépendances techniques et les règles canal de ${product}.`,
+    }
+  }
+
+  if (family === 'mobile') {
+    return {
+      promise: `${product} permet d’accompagner les nouveaux usages mobiles des clients sans remettre en cause les offres voix existantes : l’objectif est d’ajouter une brique utile, pas de remplacer le socle en place.`,
+      target: channel.includes('opérateur')
+        ? 'Opérateurs ou partenaires qui veulent intégrer une brique mobile professionnelle dans leur catalogue pour protéger la relation client et capter les usages mobilité.'
+        : channel.includes('ambassadeur')
+          ? 'Ambassadeurs qui veulent ouvrir la discussion mobilité avec leurs clients, notamment quand les usages fixes baissent ou que Teams/télétravail/mobile progressent.'
+          : 'Entreprises qui cherchent à mieux couvrir les usages mobiles, le télétravail, les collaborateurs nomades ou les besoins data/SIM professionnels.',
+      problems: [
+        'Les usages clients sortent progressivement du fixe vers le mobile, Teams ou d’autres acteurs.',
+        'Le partenaire peut manquer d’angle pédagogique pour introduire le mobile sans donner l’impression de pousser un produit en plus.',
+        'Le discours doit clarifier la complémentarité avec la téléphonie existante et les offres collaboratives.',
+      ],
+      benefits: [
+        'Protège la valeur client en gardant les usages mobilité dans le périmètre Dstny/partenaire.',
+        'Ouvre un échange commercial naturel sur mobilité, télétravail, Teams et évolution des usages.',
+        'Permet de proposer une brique complémentaire sans remettre en cause le socle téléphonie existant.',
+        channel.includes('ambassadeur')
+          ? 'Donne au partenaire un discours simple : conseiller, diagnostiquer les usages, puis activer la bonne brique si le besoin est réel.'
+          : 'Facilite la construction d’un catalogue plus complet autour des communications professionnelles.',
+      ],
+      offer: `Décrire ici les forfaits, SIM, data, options, conditions d’activation, périmètre support, règles canal et limites de ${product}. Les prix et conditions doivent être confirmés par source tarifaire active.`,
+    }
+  }
+
+  if (family === 'sip_trunk') {
+    return {
+      promise: `${product} permet de raccorder la téléphonie d’entreprise au réseau opérateur avec une approche plus souple, scalable et adaptée aux environnements PBX, IPBX ou plateformes voix existantes.`,
+      target: channel.includes('opérateur')
+        ? 'Opérateurs, intégrateurs ou partenaires marque blanche qui veulent proposer une brique voix opérateur intégrable à leurs propres offres ou infrastructures.'
+        : channel.includes('ambassadeur')
+          ? 'Ambassadeurs adressant des clients équipés PBX/IPBX ou ayant besoin de moderniser leur raccordement voix sans changer tout l’environnement téléphonique.'
+          : 'Entreprises équipées PBX/IPBX, sites multi-lignes ou organisations qui veulent optimiser leur raccordement voix et préparer une évolution progressive.',
+      problems: [
+        'Les clients ont parfois un existant téléphonique qu’ils ne veulent pas remplacer immédiatement.',
+        'Le discours doit distinguer raccordement voix, usages, numéros, portabilité, capacité d’appels et dépendances techniques.',
+        'Les commerciaux ont besoin d’un cadre simple pour éviter de survendre ou de sous-qualifier les prérequis.',
+      ],
+      benefits: [
+        'Permet une modernisation progressive sans imposer un remplacement complet de la téléphonie.',
+        'Clarifie le lien entre capacité voix, continuité de service, numéros et environnement client existant.',
+        'Facilite les projets de migration ou d’optimisation télécom avec un discours orienté besoin réel.',
+        channel.includes('opérateur')
+          ? 'Donne au partenaire une brique opérateur réutilisable dans une logique d’intégration, volume et marge.'
+          : 'Aide les équipes commerciales à qualifier rapidement les sites, le nombre de canaux, les numéros et les dépendances.',
+      ],
+      offer: `Décrire ici canaux simultanés, numéros, portabilité, prérequis réseau, compatibilité PBX/IPBX, options, sécurité, supervision, délais et limites de ${product}. Les prix doivent être séparés par canal et source active.`,
+    }
+  }
+
+  if (family === 'teams') {
+    return {
+      promise: `${product} permet d’étendre ou de raccorder les usages voix autour de Microsoft Teams sans perdre la maîtrise opérateur, le conseil télécom et l’accompagnement client.`,
+      target: channel.includes('opérateur')
+        ? 'Partenaires ou opérateurs qui veulent adresser les clients déjà engagés dans Teams tout en conservant une proposition voix maîtrisée et intégrable.'
+        : channel.includes('ambassadeur')
+          ? 'Ambassadeurs dont les clients utilisent déjà Teams ou questionnent la convergence entre téléphonie, collaboration et télétravail.'
+          : 'Entreprises utilisant Teams qui veulent clarifier comment intégrer les appels, les usages voix et les contraintes télécom dans leur environnement collaboratif.',
+      problems: [
+        'Les demandes Teams peuvent faire sortir le client du circuit télécom habituel si elles ne sont pas cadrées.',
+        'Les clients mélangent souvent collaboration, téléphonie, licences Microsoft, opérateur, numéros et support.',
+        'Le discours doit éviter de promettre une substitution simple sans analyser les usages voix réels.',
+      ],
+      benefits: [
+        'Permet de reprendre la main sur les discussions Teams avec un angle télécom concret.',
+        'Clarifie les usages : collaboration, appels, mobilité, standard, numéros, support et limites.',
+        'Protège la relation client face aux intégrateurs ou acteurs purement Microsoft.',
+        channel.includes('ambassadeur')
+          ? 'Aide le partenaire à poser les bonnes questions de découverte avant de recommander une brique Teams/voix.'
+          : 'Donne un cadre commercial pour relier Teams aux offres voix, mobilité et téléphonie hébergée.',
+      ],
+      offer: `Décrire ici le mode de raccordement, les prérequis Microsoft, les numéros, les scénarios d’usage, les limites, le support et les dépendances de ${product}. Les licences et prix doivent être validés par source dédiée.`,
     }
   }
 
