@@ -150,3 +150,8 @@ fi
 # New GitHub notifications → Discord; review requests / mentions / security
 # alerts / assignments → phone push. Dedupes via its own state file.
 "$(dirname "$0")/hermes-github-watch.sh" >/dev/null 2>&1 || true
+
+# ---- Gmail watcher ----------------------------------------------------------
+# New unread → Discord; Gmail-IMPORTANT/starred → phone push. No-op until
+# ~/.hermes/google-token.json exists (hermes-gmail-auth.mjs one-time consent).
+node "$(dirname "$0")/hermes-gmail-watch.mjs" >/dev/null 2>&1 || true

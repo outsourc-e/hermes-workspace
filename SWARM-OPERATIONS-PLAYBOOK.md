@@ -418,3 +418,15 @@ Update this when you land a fix that future sessions must know about.
   Disable: `HERMES_GITHUB_WATCH=0`.
 - Gmail integration BLOCKED on Google OAuth credential (user to provide).
   Multi-machine parked (PC unavailable).
+
+## 2026-07-07 — Tier I: Gmail integration live
+
+- One-time OAuth: `scripts/hermes-gmail-auth.mjs` (fixed port 8765 — web-type
+  client needs registered redirect URI `http://127.0.0.1:8765/`; user added as
+  test user on consent screen). Token: `~/.hermes/google-token.json` (600).
+- Watcher: `scripts/hermes-gmail-watch.mjs` in lifecycle sweep. Unread INBOX →
+  Discord digest; Gmail IMPORTANT/starred → phone push. State:
+  `~/.hermes/logs/gmail-watch-state.json`. Disable: `HERMES_GMAIL_WATCH=0`.
+- Consent app in Testing mode: refresh token may expire after 7 days — if
+  watcher goes quiet, re-run auth script or publish consent screen to
+  Production.
