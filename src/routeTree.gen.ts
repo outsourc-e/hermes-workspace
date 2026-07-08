@@ -81,6 +81,8 @@ import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-np
 import { Route as ApiPlaygroundAdminRouteImport } from './routes/api/playground-admin'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiNovaWantsRouteImport } from './routes/api/nova-wants'
+import { Route as ApiNovaFabricRouteImport } from './routes/api/nova-fabric'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiMediaRouteImport } from './routes/api/media'
@@ -529,6 +531,16 @@ const ApiPingRoute = ApiPingRouteImport.update({
 const ApiPathsRoute = ApiPathsRouteImport.update({
   id: '/api/paths',
   path: '/api/paths',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNovaWantsRoute = ApiNovaWantsRouteImport.update({
+  id: '/api/nova-wants',
+  path: '/api/nova-wants',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNovaFabricRoute = ApiNovaFabricRouteImport.update({
+  id: '/api/nova-fabric',
+  path: '/api/nova-fabric',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
@@ -1035,6 +1047,8 @@ export interface FileRoutesByFullPath {
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/nova-fabric': typeof ApiNovaFabricRoute
+  '/api/nova-wants': typeof ApiNovaWantsRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1196,6 +1210,8 @@ export interface FileRoutesByTo {
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/nova-fabric': typeof ApiNovaFabricRoute
+  '/api/nova-wants': typeof ApiNovaWantsRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1359,6 +1375,8 @@ export interface FileRoutesById {
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/nova-fabric': typeof ApiNovaFabricRoute
+  '/api/nova-wants': typeof ApiNovaWantsRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1523,6 +1541,8 @@ export interface FileRouteTypes {
     | '/api/media'
     | '/api/memory'
     | '/api/models'
+    | '/api/nova-fabric'
+    | '/api/nova-wants'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1684,6 +1704,8 @@ export interface FileRouteTypes {
     | '/api/media'
     | '/api/memory'
     | '/api/models'
+    | '/api/nova-fabric'
+    | '/api/nova-wants'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1846,6 +1868,8 @@ export interface FileRouteTypes {
     | '/api/media'
     | '/api/memory'
     | '/api/models'
+    | '/api/nova-fabric'
+    | '/api/nova-wants'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -2009,6 +2033,8 @@ export interface RootRouteChildren {
   ApiMediaRoute: typeof ApiMediaRoute
   ApiMemoryRoute: typeof ApiMemoryRouteWithChildren
   ApiModelsRoute: typeof ApiModelsRoute
+  ApiNovaFabricRoute: typeof ApiNovaFabricRoute
+  ApiNovaWantsRoute: typeof ApiNovaWantsRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiPlaygroundAdminRoute: typeof ApiPlaygroundAdminRoute
@@ -2589,6 +2615,20 @@ declare module '@tanstack/react-router' {
       path: '/api/paths'
       fullPath: '/api/paths'
       preLoaderRoute: typeof ApiPathsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nova-wants': {
+      id: '/api/nova-wants'
+      path: '/api/nova-wants'
+      fullPath: '/api/nova-wants'
+      preLoaderRoute: typeof ApiNovaWantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nova-fabric': {
+      id: '/api/nova-fabric'
+      path: '/api/nova-fabric'
+      fullPath: '/api/nova-fabric'
+      preLoaderRoute: typeof ApiNovaFabricRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/models': {
@@ -3478,6 +3518,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMediaRoute: ApiMediaRoute,
   ApiMemoryRoute: ApiMemoryRouteWithChildren,
   ApiModelsRoute: ApiModelsRoute,
+  ApiNovaFabricRoute: ApiNovaFabricRoute,
+  ApiNovaWantsRoute: ApiNovaWantsRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiPlaygroundAdminRoute: ApiPlaygroundAdminRoute,
