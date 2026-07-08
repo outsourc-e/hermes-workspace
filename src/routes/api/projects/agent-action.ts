@@ -7,11 +7,18 @@ import {
 } from '../../../server/dstny-agent-actions'
 import { requireJsonContentType } from '../../../server/rate-limit'
 
+function isInternalAgentActionRequest(request: Request): boolean {
+  const expected = process.env.DSTNY_AGENT_ACTION_TOKEN?.trim()
+  if (!expected) return false
+  const actual = request.headers.get('x-dstny-agent-action-token')?.trim()
+  return actual === expected
+}
+
 export const Route = createFileRoute('/api/projects/agent-action')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
+        if (!isAuthenticated(request) && !isInternalAgentActionRequest(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         const csrfCheck = requireJsonContentType(request)
