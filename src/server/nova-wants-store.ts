@@ -32,6 +32,13 @@ export type NovaWantsColumn = (typeof NOVA_WANTS_COLUMNS)[number]
 export type NovaWantsCategory = (typeof NOVA_WANTS_CATEGORIES)[number]
 export type NovaWantsApprovalLevel = (typeof NOVA_WANTS_APPROVAL_LEVELS)[number]
 
+// Higher rank = more protection. Browser updates may raise but never lower it.
+const APPROVAL_RANK: Record<NovaWantsApprovalLevel, number> = {
+  safe: 0,
+  'needs-taylor-review': 1,
+  'explicit-approval': 2,
+}
+
 export type NovaWantCard = {
   id: string
   title: string
@@ -696,6 +703,17 @@ export function updateNovaWantCard(
   const index = board.cards.findIndex((card) => card.id === id)
   if (index === -1) return null
   const current = board.cards[index]
+  // Protection is a ratchet: an untrusted (browser) update may RAISE the
+  // approval level but never LOWER it. Downgrading a protected card to 'safe'
+  // is itself a protected change and must go through a Fabric review, not a
+  // plain PATCH — otherwise a client could self-approve by relabeling.
+  const requestedApproval = isApprovalLevel(input.approvalLevel)
+    ? input.approvalLevel
+    : current.approvalLevel
+  const nextApproval =
+    APPROVAL_RANK[requestedApproval] >= APPROVAL_RANK[current.approvalLevel]
+      ? requestedApproval
+      : current.approvalLevel
   const nextDraft = {
     ...current,
     ...input,
@@ -703,9 +721,7 @@ export function updateNovaWantCard(
     createdAt: current.createdAt,
     title: typeof input.title === 'string' ? input.title : current.title,
     category: isCategory(input.category) ? input.category : current.category,
-    approvalLevel: isApprovalLevel(input.approvalLevel)
-      ? input.approvalLevel
-      : current.approvalLevel,
+    approvalLevel: nextApproval,
     updatedAt: new Date().toISOString(),
   }
   const next = normalizeCard({
