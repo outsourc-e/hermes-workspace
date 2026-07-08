@@ -168,6 +168,7 @@ import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-ta
 import { Route as ApiExternalMemorySearchRouteImport } from './routes/api/external-memory/search'
 import { Route as ApiExternalMemoryProvidersRouteImport } from './routes/api/external-memory/providers'
 import { Route as ApiExternalMemoryCandidatesRouteImport } from './routes/api/external-memory/candidates'
+import { Route as ApiDstnyTemplatesListRouteImport } from './routes/api/dstny-templates/list'
 import { Route as ApiDstnyDocumentsUploadRouteImport } from './routes/api/dstny-documents/upload'
 import { Route as ApiDstnyDocumentsUpdateRouteImport } from './routes/api/dstny-documents/update'
 import { Route as ApiDstnyDocumentsListRouteImport } from './routes/api/dstny-documents/list'
@@ -984,6 +985,11 @@ const ApiExternalMemoryCandidatesRoute =
     path: '/api/external-memory/candidates',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiDstnyTemplatesListRoute = ApiDstnyTemplatesListRouteImport.update({
+  id: '/api/dstny-templates/list',
+  path: '/api/dstny-templates/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDstnyDocumentsUploadRoute = ApiDstnyDocumentsUploadRouteImport.update({
   id: '/api/dstny-documents/upload',
   path: '/api/dstny-documents/upload',
@@ -1187,6 +1193,7 @@ export interface FileRoutesByFullPath {
   '/api/dstny-documents/list': typeof ApiDstnyDocumentsListRoute
   '/api/dstny-documents/update': typeof ApiDstnyDocumentsUpdateRoute
   '/api/dstny-documents/upload': typeof ApiDstnyDocumentsUploadRoute
+  '/api/dstny-templates/list': typeof ApiDstnyTemplatesListRoute
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1363,6 +1370,7 @@ export interface FileRoutesByTo {
   '/api/dstny-documents/list': typeof ApiDstnyDocumentsListRoute
   '/api/dstny-documents/update': typeof ApiDstnyDocumentsUpdateRoute
   '/api/dstny-documents/upload': typeof ApiDstnyDocumentsUploadRoute
+  '/api/dstny-templates/list': typeof ApiDstnyTemplatesListRoute
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1541,6 +1549,7 @@ export interface FileRoutesById {
   '/api/dstny-documents/list': typeof ApiDstnyDocumentsListRoute
   '/api/dstny-documents/update': typeof ApiDstnyDocumentsUpdateRoute
   '/api/dstny-documents/upload': typeof ApiDstnyDocumentsUploadRoute
+  '/api/dstny-templates/list': typeof ApiDstnyTemplatesListRoute
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1720,6 +1729,7 @@ export interface FileRouteTypes {
     | '/api/dstny-documents/list'
     | '/api/dstny-documents/update'
     | '/api/dstny-documents/upload'
+    | '/api/dstny-templates/list'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -1896,6 +1906,7 @@ export interface FileRouteTypes {
     | '/api/dstny-documents/list'
     | '/api/dstny-documents/update'
     | '/api/dstny-documents/upload'
+    | '/api/dstny-templates/list'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -2073,6 +2084,7 @@ export interface FileRouteTypes {
     | '/api/dstny-documents/list'
     | '/api/dstny-documents/update'
     | '/api/dstny-documents/upload'
+    | '/api/dstny-templates/list'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -2245,6 +2257,7 @@ export interface RootRouteChildren {
   ApiDstnyDocumentsListRoute: typeof ApiDstnyDocumentsListRoute
   ApiDstnyDocumentsUpdateRoute: typeof ApiDstnyDocumentsUpdateRoute
   ApiDstnyDocumentsUploadRoute: typeof ApiDstnyDocumentsUploadRoute
+  ApiDstnyTemplatesListRoute: typeof ApiDstnyTemplatesListRoute
   ApiExternalMemoryCandidatesRoute: typeof ApiExternalMemoryCandidatesRoute
   ApiExternalMemoryProvidersRoute: typeof ApiExternalMemoryProvidersRoute
   ApiExternalMemorySearchRoute: typeof ApiExternalMemorySearchRoute
@@ -3396,6 +3409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExternalMemoryCandidatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dstny-templates/list': {
+      id: '/api/dstny-templates/list'
+      path: '/api/dstny-templates/list'
+      fullPath: '/api/dstny-templates/list'
+      preLoaderRoute: typeof ApiDstnyTemplatesListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dstny-documents/upload': {
       id: '/api/dstny-documents/upload'
       path: '/api/dstny-documents/upload'
@@ -3834,6 +3854,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDstnyDocumentsListRoute: ApiDstnyDocumentsListRoute,
   ApiDstnyDocumentsUpdateRoute: ApiDstnyDocumentsUpdateRoute,
   ApiDstnyDocumentsUploadRoute: ApiDstnyDocumentsUploadRoute,
+  ApiDstnyTemplatesListRoute: ApiDstnyTemplatesListRoute,
   ApiExternalMemoryCandidatesRoute: ApiExternalMemoryCandidatesRoute,
   ApiExternalMemoryProvidersRoute: ApiExternalMemoryProvidersRoute,
   ApiExternalMemorySearchRoute: ApiExternalMemorySearchRoute,

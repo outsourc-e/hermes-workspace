@@ -1,13 +1,9 @@
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  File01Icon,
-  Folder01Icon,
-  LayoutTable01Icon,
-  Rocket01Icon,
-} from '@hugeicons/core-free-icons'
+import { File01Icon, Folder01Icon, LayoutTable01Icon, Rocket01Icon } from '@hugeicons/core-free-icons'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DstnyDocumentsScreen } from '@/screens/dstny-documents/dstny-documents-screen'
+import { DstnyTemplatesScreen } from '@/screens/dstny-templates/dstny-templates-screen'
 import { ProjectsScreen } from '@/screens/projects/projects-screen'
 import { cn } from '@/lib/utils'
 
@@ -83,47 +79,8 @@ export function DstnyCockpitScreen() {
       <main className={cn('min-h-0 flex-1', activeTab === 'templates' && 'overflow-y-auto')}>
         {activeTab === 'projects' ? <ProjectsScreen /> : null}
         {activeTab === 'documents' ? <DstnyDocumentsScreen /> : null}
-        {activeTab === 'templates' ? <TemplatesPlaceholder /> : null}
+        {activeTab === 'templates' ? <DstnyTemplatesScreen /> : null}
       </main>
-    </div>
-  )
-}
-
-function TemplatesPlaceholder() {
-  return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
-      <section className="rounded-lg border border-primary-200 p-5 dark:border-neutral-800">
-        <div className="flex items-center gap-2">
-          <HugeiconsIcon icon={LayoutTable01Icon} size={18} strokeWidth={1.7} />
-          <h2 className="text-base font-semibold">Template Library Dstny</h2>
-        </div>
-        <p className="mt-3 text-sm leading-6 text-primary-700 dark:text-neutral-300">
-          Cette brique devient la prochaine étape du cockpit. Elle doit définir les
-          modèles de livrables avant toute génération PDF récurrente, pour éviter
-          les rendus incohérents, les hallucinations et les règles pricing floues.
-        </p>
-      </section>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {[
-          ['Fiche produit PDF - Tous canaux', 'Template générique avant déclinaison Direct, Ambassadeur ou Opérateur.'],
-          ['Fiche produit PDF - Direct', 'Version orientée client final et bénéfices commerciaux.'],
-          ['Fiche produit PDF - Ambassadeur', 'Version revendeur commissionné, simple à vendre et à reprendre.'],
-          ['Fiche produit PDF - Opérateur', 'Version achat/revente, intégration catalogue et marge partenaire.'],
-        ].map(([title, detail]) => (
-          <article key={title} className="rounded-lg border border-primary-200 p-4 dark:border-neutral-800">
-            <h3 className="text-sm font-semibold">{title}</h3>
-            <p className="mt-2 text-xs leading-5 text-primary-600 dark:text-neutral-400">
-              {detail}
-            </p>
-          </article>
-        ))}
-      </div>
-
-      <section className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-6 text-amber-700 dark:text-amber-300">
-        Prochain lot recommandé : créer le registre de templates versionnés,
-        puis rattacher chaque projet à un template validé.
-      </section>
     </div>
   )
 }
