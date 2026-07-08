@@ -723,3 +723,145 @@ workers:
     mcpServers:
       - gbrain
     wrapper: concierge:digest
+  - id: scribe
+    name: Scribe
+    role: Notes / Transcription / Action Items
+    specialty: meeting notes, voice memos, transcripts to structured vault notes with action items
+    model: auto
+    modelTiers:
+      - light
+      - standard
+    mission: Turn raw notes and transcripts into clean vault documents and queued action items.
+    profile: km-agent
+    modes: []
+    tools:
+      - terminal
+      - file
+      - web
+      - skills
+      - todo
+    skills: []
+    capabilities:
+      - notes
+      - summarization
+      - vault-writing
+    preferredTaskTypes:
+      - notes
+      - summarize
+      - transcribe
+      - action-items
+    greenlightRequiredFor:
+      - publish
+      - external-send
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers: []
+    wrapper: km-agent
+  - id: data-analyst
+    name: Data Analyst
+    role: Metrics / Insights
+    specialty: timeline, outcomes, cost and scoreboard analysis; charts and trend insights
+    model: auto
+    modelTiers:
+      - standard
+      - heavy
+    mission: Read swarm and workspace data, surface trends, regressions, and actionable insights.
+    profile: researcher
+    modes: []
+    tools:
+      - terminal
+      - file
+      - web
+      - skills
+      - todo
+    skills: []
+    capabilities:
+      - analysis
+      - statistics
+      - reporting
+    preferredTaskTypes:
+      - analysis
+      - metrics
+      - report
+      - trend
+    greenlightRequiredFor:
+      - publish
+      - external-send
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers: []
+    wrapper: researcher
+  - id: archivist
+    name: Archivist
+    role: Vault Gardener
+    specialty: dedupe, cross-link, tag and prune vault notes; RAG index hygiene
+    model: auto
+    modelTiers:
+      - light
+      - standard
+    mission: "Keep the vault clean: merge duplicates, add links and tags, prune stale notes nightly."
+    profile: km-agent
+    modes: []
+    tools:
+      - terminal
+      - file
+      - web
+      - skills
+      - todo
+    skills: []
+    capabilities:
+      - vault-hygiene
+      - organization
+    preferredTaskTypes:
+      - cleanup
+      - organize
+      - dedupe
+      - tagging
+    greenlightRequiredFor:
+      - publish
+      - external-send
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers: []
+    wrapper: km-agent
+  - id: scout
+    name: Scout
+    role: Scheduled Web Research
+    specialty: competitor releases, pricing changes, ecosystem news; concise briefings with sources
+    model: auto
+    modelTiers:
+      - standard
+    mission: Watch the outside world on a schedule and deliver source-linked briefings.
+    profile: researcher
+    modes: []
+    tools:
+      - terminal
+      - file
+      - web
+      - skills
+      - todo
+    skills: []
+    capabilities:
+      - web-research
+      - monitoring
+      - briefing
+    preferredTaskTypes:
+      - research
+      - monitor
+      - news
+      - competitive
+    greenlightRequiredFor:
+      - publish
+      - external-send
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers: []
+    wrapper: researcher
