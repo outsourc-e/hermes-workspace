@@ -2,8 +2,8 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { getProjectBundle } from './project-cockpit'
-import { prepareProductSheetProject } from './dstny-agent-actions'
+import { addProjectSource, getProjectBundle } from './project-cockpit'
+import { prepareProductSheetProject, reviewExistingProject } from './dstny-agent-actions'
 
 describe('dstny agent actions', () => {
   beforeEach(() => {
@@ -28,6 +28,8 @@ describe('dstny agent actions', () => {
     expect(bundle?.artifacts[0]?.title).toContain('Brouillon fiche produit')
     expect(bundle?.decisions[0]?.topic).toBe('Mode de production')
     expect(bundle?.contentDraft?.fields.promise).toContain('raccorder la téléphonie')
+    expect(result.quality.status).toBe('bloque')
+    expect(result.quality.blocking[0]).toContain('Source produit')
   })
 
   it('updates an existing project instead of forcing a new one', () => {
@@ -44,5 +46,39 @@ describe('dstny agent actions', () => {
     expect(second.project.templateId).toBe('template_fiche_produit_pdf_operateur')
     expect(second.project.tags).toContain('canal:operateur')
     expect(second.markdown).toContain('marque blanche')
+  })
+
+  it('reviews an existing project and distinguishes placeholders from real sources', () => {
+    const prepared = prepareProductSheetProject({
+      product: 'Mobile',
+      channel: 'tous',
+      request: 'Prépare une fiche produit Mobile sans inventer de prix',
+    })
+
+    const initialReview = reviewExistingProject({ projectId: prepared.project.id })
+    expect(initialReview.quality.status).toBe('bloque')
+    expect(initialReview.quality.blocking.join(' ')).toContain('Source produit active manquante')
+
+    addProjectSource({
+      projectId: prepared.project.id,
+      type: 'rag_document',
+      title: 'Catalogue produit Mobile Dstny actif',
+      link: 'Catalogue produit mobile source interne',
+      confidence: 'fort',
+      status: 'a_valider',
+    })
+    addProjectSource({
+      projectId: prepared.project.id,
+      type: 'rag_document',
+      title: 'Catalogue tarifaire Mobile Dstny actif',
+      link: 'Grille tarif mobile source interne',
+      confidence: 'fort',
+      status: 'a_valider',
+    })
+
+    const reviewed = reviewExistingProject({ projectId: prepared.project.id })
+    expect(reviewed.quality.blocking).toHaveLength(0)
+    expect(reviewed.quality.ready.join(' ')).toContain('Source produit exploitable')
+    expect(reviewed.quality.ready.join(' ')).toContain('Source pricing exploitable')
   })
 })

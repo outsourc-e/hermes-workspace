@@ -23,7 +23,7 @@ const CHANNEL_TEMPLATE_IDS: Record<string, string> = {
 }
 
 export type DstnyAgentActionInput = {
-  action?: 'prepare_product_sheet'
+  action?: 'prepare_product_sheet' | 'review_project'
   projectId?: string | null
   product?: string | null
   channel?: string | null
@@ -32,7 +32,18 @@ export type DstnyAgentActionInput = {
   owner?: string | null
 }
 
-export type DstnyAgentActionResult = {
+export type ProjectQualityReview = {
+  score: number
+  status: 'bloque' | 'a_cadrer' | 'pret_brouillon' | 'pret_validation'
+  blocking: Array<string>
+  warnings: Array<string>
+  ready: Array<string>
+  missing: Array<string>
+  nextAction: string
+  summary: string
+}
+
+export type PrepareProductSheetResult = {
   ok: true
   action: 'prepare_product_sheet'
   project: ProjectRecord
@@ -40,7 +51,19 @@ export type DstnyAgentActionResult = {
   brief: string
   markdown: string
   warnings: Array<string>
+  quality: ProjectQualityReview
 }
+
+export type ReviewProjectResult = {
+  ok: true
+  action: 'review_project'
+  project: ProjectRecord
+  bundle: ProjectBundle
+  brief: string
+  quality: ProjectQualityReview
+}
+
+export type DstnyAgentActionResult = PrepareProductSheetResult | ReviewProjectResult
 
 function clean(value: string | null | undefined): string {
   return typeof value === 'string'
@@ -85,6 +108,120 @@ function projectObjective(product: string, channel: string): string {
     `Le livrable doit adapter le discours au canal ${channel}, distinguer faits sources, hypotheses, pricing a valider et recommandations PMM.`,
     'Aucune information tarifaire ne doit etre publiee sans source active rattachee au projet.',
   ].join(' ')
+}
+
+function textOf(values: Array<string | null | undefined>): string {
+  return values.filter(Boolean).join(' ').toLowerCase()
+}
+
+function hasRealSource(bundle: ProjectBundle, kind: 'produit' | 'pricing' | 'commercial' | 'technique'): boolean {
+  return bundle.sources.some((source) => {
+    if (source.status === 'archive' || source.status === 'obsolete') return false
+    if (source.type === 'note') return false
+    const text = textOf([source.title, source.link, source.sourceId])
+    if (text.includes('à rattacher') || text.includes('a rattacher')) return false
+    if (text.includes('expression de besoin')) return false
+    if (kind === 'produit') return /(produit|catalogue|fiche|offre)/i.test(text)
+    if (kind === 'pricing') return /(pricing|prix|tarif|grille|catalogue tarifaire)/i.test(text)
+    if (kind === 'commercial') return /(commercial|sales|pitch|argumentaire|battle|support)/i.test(text)
+    if (kind === 'technique') return /(technique|guide|architecture|procédure|procedure|contrat|sla)/i.test(text)
+    return false
+  })
+}
+
+function hasProjectSignal(bundle: ProjectBundle, pattern: RegExp): boolean {
+  return pattern.test(textOf([
+    bundle.title,
+    bundle.objective,
+    bundle.templateId,
+    bundle.nextAction,
+    ...bundle.tags,
+    ...bundle.decisions.map((decision) => `${decision.topic} ${decision.decision}`),
+  ]))
+}
+
+export function reviewProjectQuality(bundle: ProjectBundle): ProjectQualityReview {
+  const isProductSheet = hasProjectSignal(bundle, /(fiche.produit|livrable-pdf|template_fiche_produit_pdf|pdf)/i)
+  const hasProductSource = hasRealSource(bundle, 'produit')
+  const hasPricingSource = hasRealSource(bundle, 'pricing')
+  const hasMarkdownDraft = Boolean(bundle.contentDraft?.markdown || bundle.artifacts.some((artifact) => artifact.type === 'markdown'))
+  const hasPdfArtifact = bundle.artifacts.some((artifact) => artifact.type === 'pdf')
+  const hasChannel = hasProjectSignal(bundle, /canal:|direct|ambassadeur|op[eé]rateur|tous/i)
+  const hasPricingGuardrail = hasProjectSignal(bundle, /prix|pricing|tarif|aucun prix|source tarifaire|ne publier aucun prix/i)
+  const hasSourceSection = Boolean(bundle.contentDraft?.fields?.sources || bundle.contentDraft?.markdown?.includes('## Sources et limites'))
+
+  const ready: Array<string> = []
+  const missing: Array<string> = []
+  const blocking: Array<string> = []
+  const warnings: Array<string> = []
+
+  if (isProductSheet) ready.push('Type de livrable identifié : fiche produit PDF')
+  else warnings.push('Type de livrable à préciser si le projet doit produire un PDF structuré.')
+
+  if (hasChannel) ready.push('Canal ou cible identifié')
+  else missing.push('Canal cible à préciser : Direct, Ambassadeur, Opérateur ou Tous.')
+
+  if (hasMarkdownDraft) ready.push('Brouillon Markdown ou Studio contenu présent')
+  else missing.push('Brouillon structuré à générer avant revue éditoriale.')
+
+  if (hasSourceSection) ready.push('Section sources/limites prévue')
+  else missing.push('Section sources et limites à ajouter.')
+
+  if (hasProductSource) ready.push('Source produit exploitable rattachée')
+  else blocking.push('Source produit active manquante : le contenu reste non publiable.')
+
+  if (hasPricingSource) ready.push('Source pricing exploitable rattachée')
+  else if (hasPricingGuardrail) warnings.push('Pricing non sourcé : prix à masquer ou à laisser explicitement à valider.')
+  else blocking.push('Pricing non cadré : ajouter une source tarifaire ou masquer les prix.')
+
+  if (hasPdfArtifact) ready.push('Artefact PDF prévu ou rattaché')
+  else warnings.push('Artefact PDF non encore généré : normal avant validation du contenu.')
+
+  if (bundle.sources.some((source) => /ovh|fax|whatsapp|ringover/i.test(textOf([source.title, source.link])))) {
+    warnings.push('Certaines sources semblent hors périmètre : vérifier leur pertinence avant de les citer.')
+  }
+
+  const totalChecks = 7
+  const passed = [
+    isProductSheet,
+    hasChannel,
+    hasMarkdownDraft,
+    hasSourceSection,
+    hasProductSource,
+    hasPricingSource || hasPricingGuardrail,
+    hasPdfArtifact,
+  ].filter(Boolean).length
+  const score = Math.round((passed / totalChecks) * 100)
+  const status: ProjectQualityReview['status'] =
+    blocking.length > 0
+      ? 'bloque'
+      : warnings.length > 0
+        ? 'a_cadrer'
+        : hasPdfArtifact
+          ? 'pret_validation'
+          : 'pret_brouillon'
+  const nextAction =
+    blocking[0] ||
+    warnings[0] ||
+    'Relire le brouillon, rattacher les sources citées et préparer l’export PDF.'
+
+  const summary = [
+    `Score qualité : ${score}/100.`,
+    blocking.length ? `Blocages : ${blocking.length}.` : 'Aucun blocage critique détecté.',
+    warnings.length ? `Points à cadrer : ${warnings.length}.` : 'Pas d’avertissement majeur.',
+    `Action suivante : ${nextAction}`,
+  ].join(' ')
+
+  return {
+    score,
+    status,
+    blocking,
+    warnings,
+    ready,
+    missing,
+    nextAction,
+    summary,
+  }
 }
 
 export function prepareProductSheetProject(input: DstnyAgentActionInput): DstnyAgentActionResult {
@@ -182,6 +319,7 @@ export function prepareProductSheetProject(input: DstnyAgentActionInput): DstnyA
 
   const bundle = getProjectBundle(project.id)
   if (!bundle) throw new Error('Project bundle could not be loaded')
+  const quality = reviewProjectQuality(bundle)
 
   return {
     ok: true,
@@ -191,13 +329,29 @@ export function prepareProductSheetProject(input: DstnyAgentActionInput): DstnyA
     brief: buildProjectBrief(bundle),
     markdown,
     warnings,
+    quality,
+  }
+}
+
+export function reviewExistingProject(input: DstnyAgentActionInput): ReviewProjectResult {
+  const projectId = clean(input.projectId)
+  if (!projectId) throw new Error('projectId is required')
+  const bundle = getProjectBundle(projectId)
+  if (!bundle) throw new Error('Project not found')
+  const quality = reviewProjectQuality(bundle)
+  return {
+    ok: true,
+    action: 'review_project',
+    project: bundle,
+    bundle,
+    brief: buildProjectBrief(bundle),
+    quality,
   }
 }
 
 export function runDstnyAgentAction(input: DstnyAgentActionInput): DstnyAgentActionResult {
   const action = input.action || 'prepare_product_sheet'
-  if (action !== 'prepare_product_sheet') {
-    throw new Error(`Unsupported agent action: ${action}`)
-  }
-  return prepareProductSheetProject(input)
+  if (action === 'prepare_product_sheet') return prepareProductSheetProject(input)
+  if (action === 'review_project') return reviewExistingProject(input)
+  throw new Error(`Unsupported agent action: ${action}`)
 }

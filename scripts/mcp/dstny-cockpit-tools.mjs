@@ -52,6 +52,21 @@ const tools = [
       required: ['request'],
     },
   },
+  {
+    name: 'dstny_review_project',
+    description:
+      'Review an existing Dstny cockpit project and return quality status, blockers, missing sources, warnings and recommended next action before producing or exporting deliverables.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Cockpit project id, for example project_45ed60a254b6453a.',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
 ]
 
 function send(message) {
@@ -87,6 +102,25 @@ async function callAgentAction(args) {
   return payload
 }
 
+async function callProjectReview(args) {
+  const response = await fetch(`${WORKSPACE_URL}/api/projects/agent-action`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(TOKEN ? { 'x-dstny-agent-action-token': TOKEN } : {}),
+    },
+    body: JSON.stringify({
+      action: 'review_project',
+      projectId: args.projectId,
+    }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Workspace project review failed (${response.status})`)
+  }
+  return payload
+}
+
 function formatActionResult(payload) {
   const warnings = Array.isArray(payload.warnings) && payload.warnings.length
     ? `\n\nAlertes:\n${payload.warnings.map((item) => `- ${item}`).join('\n')}`
@@ -110,6 +144,36 @@ function formatActionResult(payload) {
     '',
     payload.markdown || '',
   ].join('\n').trim()
+}
+
+function formatReviewResult(payload) {
+  const quality = payload.quality || {}
+  const lines = [
+    'Revue qualité projet.',
+    '',
+    `Projet: ${payload.project?.title || '-'}`,
+    `ID: ${payload.project?.id || '-'}`,
+    `Statut qualité: ${quality.status || '-'}`,
+    `Score: ${typeof quality.score === 'number' ? `${quality.score}/100` : '-'}`,
+    `Action suivante: ${quality.nextAction || '-'}`,
+    '',
+    'Résumé:',
+    quality.summary || '-',
+    '',
+    'Blocages:',
+    ...(quality.blocking?.length ? quality.blocking.map((item) => `- ${item}`) : ['- Aucun']),
+    '',
+    'Points à cadrer:',
+    ...(quality.warnings?.length ? quality.warnings.map((item) => `- ${item}`) : ['- Aucun']),
+    '',
+    'Éléments prêts:',
+    ...(quality.ready?.length ? quality.ready.map((item) => `- ${item}`) : ['- Aucun']),
+    '',
+    'Brief projet:',
+    '',
+    payload.brief || '',
+  ]
+  return lines.join('\n').trim()
 }
 
 async function handle(message) {
@@ -139,14 +203,24 @@ async function handle(message) {
   if (method === 'tools/call') {
     const name = params?.name
     const args = params?.arguments || {}
-    if (name !== 'dstny_prepare_product_sheet') {
-      throw new Error(`Unknown tool: ${name}`)
+    if (name === 'dstny_prepare_product_sheet') {
+      const payload = await callAgentAction(args)
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: textResult(formatActionResult(payload)),
+      }
     }
-    const payload = await callAgentAction(args)
-    return {
-      jsonrpc: '2.0',
-      id,
-      result: textResult(formatActionResult(payload)),
+    if (name === 'dstny_review_project') {
+      const payload = await callProjectReview(args)
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: textResult(formatReviewResult(payload)),
+      }
+    }
+    {
+      throw new Error(`Unknown tool: ${name}`)
     }
   }
 

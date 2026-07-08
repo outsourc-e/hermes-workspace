@@ -474,6 +474,7 @@ export function ProjectsScreen() {
   const [savingDetails, setSavingDetails] = useState(false)
   const [savingContent, setSavingContent] = useState(false)
   const [brief, setBrief] = useState('')
+  const [briefTitle, setBriefTitle] = useState('Brief Hermes')
   const [contentFields, setContentFields] = useState<Record<string, string>>({})
   const [contentMarkdown, setContentMarkdown] = useState('')
   const [projectForm, setProjectForm] = useState({
@@ -767,11 +768,71 @@ export function ProjectsScreen() {
       const result = await readJson<{ brief: string }>(
         `/api/projects/brief?id=${encodeURIComponent(selected.id)}`,
       )
+      setBriefTitle('Brief Hermes')
       setBrief(result.brief)
       await navigator.clipboard?.writeText(result.brief).catch(() => undefined)
       toast('Brief projet prêt et copié.', { type: 'success' })
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Brief impossible.', { type: 'error' })
+    }
+  }
+
+  async function generateQualityReview() {
+    if (!selected) return
+    try {
+      const result = await readJson<{
+        quality: {
+          score: number
+          status: string
+          summary: string
+          nextAction: string
+          blocking: Array<string>
+          warnings: Array<string>
+          ready: Array<string>
+          missing: Array<string>
+        }
+        brief: string
+      }>('/api/projects/agent-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'review_project',
+          projectId: selected.id,
+        }),
+      })
+      const qualityText = [
+        `Revue qualité - ${selected.title}`,
+        '',
+        `Score : ${result.quality.score}/100`,
+        `Statut : ${optionLabel(result.quality.status)}`,
+        '',
+        result.quality.summary,
+        '',
+        'Blocages',
+        ...(result.quality.blocking.length ? result.quality.blocking.map((item) => `- ${item}`) : ['- Aucun']),
+        '',
+        'Points à cadrer',
+        ...(result.quality.warnings.length ? result.quality.warnings.map((item) => `- ${item}`) : ['- Aucun']),
+        '',
+        'Éléments prêts',
+        ...(result.quality.ready.length ? result.quality.ready.map((item) => `- ${item}`) : ['- Aucun']),
+        '',
+        'Manquants',
+        ...(result.quality.missing.length ? result.quality.missing.map((item) => `- ${item}`) : ['- Aucun']),
+        '',
+        'Prochaine action',
+        result.quality.nextAction,
+        '',
+        'Brief projet',
+        '',
+        result.brief,
+      ].join('\n')
+      setBriefTitle('Revue qualité')
+      setBrief(qualityText)
+      await navigator.clipboard?.writeText(qualityText).catch(() => undefined)
+      toast('Revue qualité prête et copiée.', { type: 'success' })
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Revue qualité impossible.', { type: 'error' })
     }
   }
 
@@ -969,6 +1030,10 @@ export function ProjectsScreen() {
                       <Button size="sm" onClick={generateBrief}>
                         <HugeiconsIcon icon={Rocket01Icon} size={15} strokeWidth={1.7} />
                         Travailler avec Hermes
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={generateQualityReview}>
+                        <HugeiconsIcon icon={CheckListIcon} size={15} strokeWidth={1.7} />
+                        Revue qualité
                       </Button>
                     </div>
                   </div>
@@ -1340,7 +1405,7 @@ export function ProjectsScreen() {
 
               <aside className="min-w-0 rounded-lg border border-primary-200 dark:border-neutral-800">
                 <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 dark:border-neutral-800">
-                  <div className="text-sm font-semibold">Brief Hermes</div>
+                  <div className="text-sm font-semibold">{briefTitle}</div>
                   <Button
                     size="sm"
                     variant="ghost"
