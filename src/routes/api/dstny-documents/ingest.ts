@@ -18,6 +18,21 @@ function ingestCommand(): string {
   )
 }
 
+function parseRagIngestStdout(stdout: string): {
+  docId: string | null
+  chunks: number | null
+} {
+  try {
+    const parsed = JSON.parse(stdout) as { doc_id?: unknown; chunks?: unknown }
+    return {
+      docId: typeof parsed.doc_id === 'string' ? parsed.doc_id : null,
+      chunks: typeof parsed.chunks === 'number' ? parsed.chunks : null,
+    }
+  } catch {
+    return { docId: null, chunks: null }
+  }
+}
+
 export const Route = createFileRoute('/api/dstny-documents/ingest')({
   server: {
     handlers: {
@@ -64,8 +79,10 @@ export const Route = createFileRoute('/api/dstny-documents/ingest')({
             timeout: 120_000,
             maxBuffer: 1024 * 1024,
           })
+          const ragResult = parseRagIngestStdout(result.stdout?.toString() || '')
           const updated = updateDstnyDocumentRecord(id, {
             ingestionStatus: 'indexed',
+            ragDocId: ragResult.docId,
             ragCollection: document.collection,
             ingestedAt: new Date().toISOString(),
             lastError: null,
@@ -74,6 +91,7 @@ export const Route = createFileRoute('/api/dstny-documents/ingest')({
           return json({
             ok: true,
             document: updated,
+            rag: ragResult,
             stdout: result.stdout?.toString() || '',
             stderr: result.stderr?.toString() || '',
           })

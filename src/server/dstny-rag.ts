@@ -1,4 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
 
 export type DstnyRagSource = {
   id: string
@@ -27,6 +29,7 @@ const DEFAULT_TOKEN_FILE = '/etc/cassian/secrets/rag_api_token'
 const DEFAULT_TIMEOUT_MS = 2500
 const MAX_CONTEXT_SOURCES = 6
 const MAX_EXCERPT_CHARS = 900
+const MAX_DOCUMENT_CONTEXT_CHUNKS = 8
 
 const RAG_TRIGGER_RE =
   /\b(dstny|metacentrex|meta\s*2\.?0|alianza|mbcaas|ucaas|sip|trunk|connectiv|ftth|ftte|ftto|backup\s*4g|mobile|teams|call2teams|pricing|prix|tarif|catalogue|offre|produit|battle\s*card|concurr|wholesale|operateur|opérateur|ambassadeur|direct|partenaire|source|document|contrat|rag)\b/i
@@ -62,6 +65,18 @@ function ragToken(): string {
     return ''
   }
   return ''
+}
+
+function hermesRoot(): string {
+  return resolve(
+    process.env.HERMES_HOME?.trim() ||
+      process.env.CLAUDE_HOME?.trim() ||
+      join(homedir(), '.hermes'),
+  )
+}
+
+function ragRoot(): string {
+  return resolve(process.env.DSTNY_RAG_ROOT?.trim() || join(hermesRoot(), 'rag'))
 }
 
 export function shouldUseDstnyRag(message: string): boolean {
@@ -108,6 +123,23 @@ function truncateExcerpt(value: string): string {
   const normalized = value.replace(/\s+/g, ' ').trim()
   if (normalized.length <= MAX_EXCERPT_CHARS) return normalized
   return `${normalized.slice(0, MAX_EXCERPT_CHARS - 1).trim()}…`
+}
+
+function normalizeComparable(value: string | null | undefined): string {
+  return (value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+function readJsonLine(value: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(value) as Record<string, unknown>
+  } catch {
+    return null
+  }
 }
 
 function candidateItems(payload: unknown): Array<unknown> {
@@ -214,6 +246,89 @@ export function buildDstnyRagPromptContext(context: DstnyRagContext): string {
     ...sourceBlocks,
     '</dstny_rag_context>',
   ].join('\n')
+}
+
+export function getDstnyRagDocumentSources(input: {
+  title: string
+  ragDocId?: string | null
+  collection?: string | null
+  space?: string | null
+  limit?: number | null
+}): Array<DstnyRagSource> {
+  const space = input.space?.trim() || process.env.DSTNY_RAG_SPACE || 'work-dstny'
+  const manifestsDir = join(ragRoot(), space, 'manifests')
+  const chunksDir = join(ragRoot(), space, 'chunks')
+  if (!existsSync(manifestsDir) || !existsSync(chunksDir)) return []
+
+  const wantedTitle = normalizeComparable(input.title)
+  const wantedDocId = input.ragDocId?.trim()
+  const wantedCollection = input.collection?.trim()
+  let docId = ''
+  let title = input.title
+  let collection = wantedCollection || null
+  let product: string | null = null
+  let channel: string | null = null
+
+  for (const fileName of readdirSync(manifestsDir)) {
+    if (!fileName.endsWith('.json')) continue
+    const manifest = readRecord(
+      readJsonLine(readFileSync(join(manifestsDir, fileName), 'utf-8')),
+    )
+    if (!manifest) continue
+    const metadata = readRecord(manifest.metadata) || {}
+    const manifestDocId = readString(manifest.doc_id, metadata.doc_id)
+    const manifestTitle = readString(metadata.title, manifest.title)
+    const manifestProject = readString(metadata.project)
+    const titleMatches =
+      wantedTitle &&
+      normalizeComparable(manifestTitle) === wantedTitle
+    const docMatches = wantedDocId && manifestDocId === wantedDocId
+    const collectionMatches = !wantedCollection || manifestProject === wantedCollection
+    if ((docMatches || titleMatches) && collectionMatches) {
+      docId = manifestDocId
+      title = manifestTitle || title
+      collection = manifestProject || collection
+      product = readString(metadata.product) || null
+      const tags = Array.isArray(metadata.tags) ? metadata.tags : []
+      channel =
+        tags
+          .map((tag) => (typeof tag === 'string' ? tag : ''))
+          .find((tag) => tag.startsWith('canal:'))
+          ?.slice('canal:'.length) || null
+      break
+    }
+  }
+
+  if (!docId) return []
+  const chunkPath = join(chunksDir, `${docId}.jsonl`)
+  if (!existsSync(chunkPath)) return []
+  const sources: Array<DstnyRagSource> = []
+  const maxSources = Math.min(
+    Math.max(1, input.limit || MAX_DOCUMENT_CONTEXT_CHUNKS),
+    MAX_DOCUMENT_CONTEXT_CHUNKS,
+  )
+  for (const line of readFileSync(chunkPath, 'utf-8').split('\n')) {
+    if (!line.trim()) continue
+    const chunk = readRecord(readJsonLine(line))
+    if (!chunk) continue
+    const text = readString(chunk.text)
+    if (!text || /^## Page \d+\s*$/i.test(text.trim())) continue
+    sources.push({
+      id: `S${sources.length + 1}`,
+      title,
+      documentId: docId,
+      chunkId: readString(chunk.chunk_id) || null,
+      collection,
+      product,
+      channel,
+      documentDate: null,
+      version: null,
+      score: null,
+      excerpt: truncateExcerpt(text),
+    })
+    if (sources.length >= maxSources) break
+  }
+  return sources
 }
 
 export function appendDstnyRagContextToMessage(

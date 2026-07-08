@@ -2,6 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { getDstnyDocumentRecord } from '../../../server/dstny-documents'
+import {
+  buildDstnyRagPromptContext,
+  getDstnyRagDocumentSources,
+} from '../../../server/dstny-rag'
 
 function buildPrompt(title: string, context: string): string {
   return [
@@ -52,6 +56,23 @@ export const Route = createFileRoute('/api/dstny-documents/analyze-prompt')({
           return json({ ok: false, error: 'Document not found' }, { status: 404 })
         }
 
+        const ragSources =
+          document.ingestionStatus === 'indexed'
+            ? getDstnyRagDocumentSources({
+                title: document.title,
+                ragDocId: document.ragDocId,
+                collection: document.ragCollection || document.collection,
+              })
+            : []
+        const ragContext = ragSources.length
+          ? buildDstnyRagPromptContext({
+              status: 'reliable',
+              query: document.title,
+              sources: ragSources,
+              elapsedMs: 0,
+            })
+          : ''
+
         const context = [
           'Metadonnees disponibles :',
           `- Collection : ${document.collection}`,
@@ -64,10 +85,14 @@ export const Route = createFileRoute('/api/dstny-documents/analyze-prompt')({
           `- Date document : ${document.documentDate || 'non renseignee'}`,
           `- Resume existant : ${document.summary || 'non renseigne'}`,
           `- Statut RAG : ${document.ingestionStatus}`,
+          `- RAG doc_id : ${document.ragDocId || 'non renseigne'}`,
           '',
-          document.ingestionStatus === 'indexed'
-            ? 'Utilise le RAG pour citer les passages pertinents avant de conclure.'
-            : 'Le document n est pas encore indexe : demande son indexation ou analyse le fichier fourni si accessible dans la conversation.',
+          ragContext
+            ? 'Extraits du document selectionne a utiliser en priorite :'
+            : document.ingestionStatus === 'indexed'
+              ? 'Le document est marque indexe, mais aucun extrait deterministe n a ete retrouve. Signale ce probleme et demande une reindexation.'
+              : 'Le document n est pas encore indexe : demande son indexation ou analyse le fichier fourni si accessible dans la conversation.',
+          ragContext,
         ].join('\n')
 
         return json({

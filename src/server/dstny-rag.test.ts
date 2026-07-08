@@ -1,7 +1,11 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   appendDstnyRagContextToMessage,
   buildDstnyRagPromptContext,
+  getDstnyRagDocumentSources,
   normalizeDstnyRagSources,
   shouldUseDstnyRag,
   type DstnyRagContext,
@@ -70,5 +74,48 @@ describe('dstny rag helpers', () => {
     expect(prompt).toContain('[S1]')
     expect(prompt).toContain('Ne melange pas Direct')
     expect(appendDstnyRagContextToMessage('Question', context)).toContain('Question utilisateur:')
+  })
+
+  it('loads deterministic sources for a selected Dstny document', () => {
+    const home = mkdtempSync(join(tmpdir(), 'dstny-rag-doc-test-'))
+    process.env.HERMES_HOME = home
+    const base = join(home, 'rag', 'work-dstny')
+    mkdirSync(join(base, 'manifests'), { recursive: true })
+    mkdirSync(join(base, 'chunks'), { recursive: true })
+    writeFileSync(
+      join(base, 'manifests', 'doc_1.json'),
+      JSON.stringify({
+        doc_id: 'doc_1',
+        metadata: {
+          title: 'Feature Package Bundles',
+          project: 'dstny_produits',
+          product: 'metacentrex',
+          tags: ['canal:tous'],
+        },
+      }),
+    )
+    writeFileSync(
+      join(base, 'chunks', 'doc_1.jsonl'),
+      [
+        JSON.stringify({ chunk_id: 0, text: '## Page 1' }),
+        JSON.stringify({ chunk_id: 1, text: 'Le bundle inclut les fonctions principales.' }),
+        JSON.stringify({ chunk_id: 2, text: 'Un module optionnel peut etre active selon le besoin.' }),
+      ].join('\n'),
+    )
+
+    const sources = getDstnyRagDocumentSources({
+      title: 'Feature Package Bundles',
+      collection: 'dstny_produits',
+    })
+
+    expect(sources).toHaveLength(2)
+    expect(sources[0]).toMatchObject({
+      id: 'S1',
+      title: 'Feature Package Bundles',
+      documentId: 'doc_1',
+      collection: 'dstny_produits',
+      product: 'metacentrex',
+      channel: 'tous',
+    })
   })
 })
