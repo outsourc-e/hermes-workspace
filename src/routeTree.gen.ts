@@ -132,6 +132,7 @@ import { Route as ApiProjectsListRouteImport } from './routes/api/projects/list'
 import { Route as ApiProjectsCreateRouteImport } from './routes/api/projects/create'
 import { Route as ApiProjectsContentRouteImport } from './routes/api/projects/content'
 import { Route as ApiProjectsBriefRouteImport } from './routes/api/projects/brief'
+import { Route as ApiProjectsAgentActionRouteImport } from './routes/api/projects/agent-action'
 import { Route as ApiProjectsAddSourceRouteImport } from './routes/api/projects/add-source'
 import { Route as ApiProjectsAddDecisionRouteImport } from './routes/api/projects/add-decision'
 import { Route as ApiProjectsAddArtifactRouteImport } from './routes/api/projects/add-artifact'
@@ -803,6 +804,11 @@ const ApiProjectsBriefRoute = ApiProjectsBriefRouteImport.update({
   path: '/api/projects/brief',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProjectsAgentActionRoute = ApiProjectsAgentActionRouteImport.update({
+  id: '/api/projects/agent-action',
+  path: '/api/projects/agent-action',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiProjectsAddSourceRoute = ApiProjectsAddSourceRouteImport.update({
   id: '/api/projects/add-source',
   path: '/api/projects/add-source',
@@ -1237,6 +1243,7 @@ export interface FileRoutesByFullPath {
   '/api/projects/add-artifact': typeof ApiProjectsAddArtifactRoute
   '/api/projects/add-decision': typeof ApiProjectsAddDecisionRoute
   '/api/projects/add-source': typeof ApiProjectsAddSourceRoute
+  '/api/projects/agent-action': typeof ApiProjectsAgentActionRoute
   '/api/projects/brief': typeof ApiProjectsBriefRoute
   '/api/projects/content': typeof ApiProjectsContentRoute
   '/api/projects/create': typeof ApiProjectsCreateRoute
@@ -1415,6 +1422,7 @@ export interface FileRoutesByTo {
   '/api/projects/add-artifact': typeof ApiProjectsAddArtifactRoute
   '/api/projects/add-decision': typeof ApiProjectsAddDecisionRoute
   '/api/projects/add-source': typeof ApiProjectsAddSourceRoute
+  '/api/projects/agent-action': typeof ApiProjectsAgentActionRoute
   '/api/projects/brief': typeof ApiProjectsBriefRoute
   '/api/projects/content': typeof ApiProjectsContentRoute
   '/api/projects/create': typeof ApiProjectsCreateRoute
@@ -1595,6 +1603,7 @@ export interface FileRoutesById {
   '/api/projects/add-artifact': typeof ApiProjectsAddArtifactRoute
   '/api/projects/add-decision': typeof ApiProjectsAddDecisionRoute
   '/api/projects/add-source': typeof ApiProjectsAddSourceRoute
+  '/api/projects/agent-action': typeof ApiProjectsAgentActionRoute
   '/api/projects/brief': typeof ApiProjectsBriefRoute
   '/api/projects/content': typeof ApiProjectsContentRoute
   '/api/projects/create': typeof ApiProjectsCreateRoute
@@ -1776,6 +1785,7 @@ export interface FileRouteTypes {
     | '/api/projects/add-artifact'
     | '/api/projects/add-decision'
     | '/api/projects/add-source'
+    | '/api/projects/agent-action'
     | '/api/projects/brief'
     | '/api/projects/content'
     | '/api/projects/create'
@@ -1954,6 +1964,7 @@ export interface FileRouteTypes {
     | '/api/projects/add-artifact'
     | '/api/projects/add-decision'
     | '/api/projects/add-source'
+    | '/api/projects/agent-action'
     | '/api/projects/brief'
     | '/api/projects/content'
     | '/api/projects/create'
@@ -2133,6 +2144,7 @@ export interface FileRouteTypes {
     | '/api/projects/add-artifact'
     | '/api/projects/add-decision'
     | '/api/projects/add-source'
+    | '/api/projects/agent-action'
     | '/api/projects/brief'
     | '/api/projects/content'
     | '/api/projects/create'
@@ -2295,6 +2307,7 @@ export interface RootRouteChildren {
   ApiProjectsAddArtifactRoute: typeof ApiProjectsAddArtifactRoute
   ApiProjectsAddDecisionRoute: typeof ApiProjectsAddDecisionRoute
   ApiProjectsAddSourceRoute: typeof ApiProjectsAddSourceRoute
+  ApiProjectsAgentActionRoute: typeof ApiProjectsAgentActionRoute
   ApiProjectsBriefRoute: typeof ApiProjectsBriefRoute
   ApiProjectsContentRoute: typeof ApiProjectsContentRoute
   ApiProjectsCreateRoute: typeof ApiProjectsCreateRoute
@@ -3170,6 +3183,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProjectsBriefRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/projects/agent-action': {
+      id: '/api/projects/agent-action'
+      path: '/api/projects/agent-action'
+      fullPath: '/api/projects/agent-action'
+      preLoaderRoute: typeof ApiProjectsAgentActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/projects/add-source': {
       id: '/api/projects/add-source'
       path: '/api/projects/add-source'
@@ -3900,6 +3920,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProjectsAddArtifactRoute: ApiProjectsAddArtifactRoute,
   ApiProjectsAddDecisionRoute: ApiProjectsAddDecisionRoute,
   ApiProjectsAddSourceRoute: ApiProjectsAddSourceRoute,
+  ApiProjectsAgentActionRoute: ApiProjectsAgentActionRoute,
   ApiProjectsBriefRoute: ApiProjectsBriefRoute,
   ApiProjectsContentRoute: ApiProjectsContentRoute,
   ApiProjectsCreateRoute: ApiProjectsCreateRoute,
