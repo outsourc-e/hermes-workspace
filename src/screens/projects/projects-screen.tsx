@@ -223,6 +223,100 @@ function toneForStatus(status: string): string {
   return 'border-accent-500/30 bg-accent-500/10 text-accent-700 dark:text-accent-300'
 }
 
+function projectIsPdfProductSheet(project: Project): boolean {
+  const haystack = [
+    project.title,
+    project.objective,
+    ...project.tags,
+    ...project.artifacts.map((artifact) => artifact.type),
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    haystack.includes('fiche_produit_pdf') ||
+    haystack.includes('fiche produit') ||
+    haystack.includes('livrable-pdf') ||
+    haystack.includes('pdf')
+  )
+}
+
+function hasSource(project: Project, predicate: (source: ProjectSource) => boolean): boolean {
+  return project.sources.some(predicate)
+}
+
+function hasArtifact(project: Project, predicate: (artifact: ProjectArtifact) => boolean): boolean {
+  return project.artifacts.some(predicate)
+}
+
+function getAiPlan(project: Project) {
+  const isPdfSheet = projectIsPdfProductSheet(project)
+  const hasProductSource = hasSource(project, (source) => {
+    const text = `${source.title} ${source.link || ''}`.toLowerCase()
+    return text.includes('produit') || text.includes('catalogue') || text.includes('source')
+  })
+  const hasPricingSource = hasSource(project, (source) => {
+    const text = `${source.title} ${source.link || ''}`.toLowerCase()
+    return text.includes('pricing') || text.includes('prix') || text.includes('tarif')
+  })
+  const hasMarkdown = hasArtifact(project, (artifact) => artifact.type === 'markdown')
+  const hasPdf = hasArtifact(project, (artifact) => artifact.type === 'pdf')
+  const hasChannelDecision = project.decisions.some((decision) =>
+    `${decision.topic} ${decision.decision}`.toLowerCase().includes('canal'),
+  )
+  const hasPricingDecision = project.decisions.some((decision) =>
+    `${decision.topic} ${decision.decision}`.toLowerCase().includes('pricing') ||
+    `${decision.topic} ${decision.decision}`.toLowerCase().includes('prix'),
+  )
+
+  const roles: Array<[string, string]> = isPdfSheet
+    ? [
+        ['PMM métier', 'Cadrer cible, bénéfices client, objections et angle commercial.'],
+        ['Analyste RAG', 'Extraire uniquement les faits sourcés et signaler les trous documentaires.'],
+        ['Pricing', 'Distinguer prix public, prix partenaire, hypothèse et donnée validée.'],
+        ['Rédacteur', 'Produire une fiche courte, claire, prête à relire.'],
+        ['Designer PDF', 'Transformer le contenu en livrable premium lisible et commercial.'],
+        ['QA anti-hallucination', 'Contrôler chaque claim, source, prix et limite de publication.'],
+      ]
+    : [
+        ['Chef de projet IA', 'Transformer la demande en lots, livrables et critères d’acceptation.'],
+        ['Analyste métier', 'Identifier les enjeux, dépendances et décisions nécessaires.'],
+        ['Producteur livrable', 'Créer l’artefact attendu dans le bon format.'],
+        ['QA', 'Vérifier cohérence, sources, limites et prochaine action.'],
+      ]
+
+  const stages = isPdfSheet
+    ? [
+        'Pré-vol sources : confirmer source produit, source pricing, canal et statut de publication.',
+        'Extraction RAG : produire les faits sourcés et les incertitudes.',
+        'Synthèse PMM : transformer les faits en bénéfices, cible, objections et pitch.',
+        'Rédaction v0.1 : générer le Markdown source avec hypothèses et points à valider.',
+        'Contrôle QA : bloquer les prix ou claims non sourcés.',
+        'Export PDF : générer la version premium via PDF Engine, puis rattacher l’artefact.',
+      ]
+    : [
+        'Pré-vol : vérifier sources, objectif et livrables attendus.',
+        'Découpage : proposer les lots de travail et rôles utiles.',
+        'Production : générer le premier artefact exploitable.',
+        'Contrôle : lister limites, risques et validations humaines.',
+      ]
+
+  const checklist: Array<[string, boolean]> = [
+    ['Source produit présente', hasProductSource],
+    ['Source pricing présente ou prix explicitement masqués', hasPricingSource || hasPricingDecision],
+    ['Canal ou cible cadré', hasChannelDecision || project.tags.some((tag) => tag.startsWith('canal:'))],
+    ['Artefact source Markdown prévu', hasMarkdown],
+    ['Artefact PDF prévu', hasPdf],
+    ['Décisions critiques enregistrées', project.decisions.length > 0],
+  ]
+
+  const missing = checklist
+    .filter(([, done]) => !done)
+    .map(([label]) => String(label))
+
+  return { roles, stages, checklist, missing }
+}
+
 function Badge({ children, tone }: { children: React.ReactNode; tone?: string }) {
   return (
     <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium', tone)}>
@@ -313,6 +407,7 @@ export function ProjectsScreen() {
   const projects = projectsQuery.data?.projects || []
   const options = projectsQuery.data?.options
   const selected = projects.find((project) => project.id === selectedId) || projects[0] || null
+  const aiPlan = selected ? getAiPlan(selected) : null
 
   useEffect(() => {
     if (!selected) {
@@ -770,6 +865,97 @@ export function ProjectsScreen() {
                     </div>
                   </div>
                 </div>
+
+                {aiPlan ? (
+                  <div className="rounded-lg border border-primary-200 p-4 dark:border-neutral-800">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold">Plan IA & Qualité</h3>
+                        <p className="mt-1 text-xs leading-5 text-primary-600 dark:text-neutral-400">
+                          Ce bloc traduit le projet en équipe IA, étapes de production, contrôles qualité et points manquants avant de consommer des tokens.
+                        </p>
+                      </div>
+                      <Badge
+                        tone={
+                          aiPlan.missing.length === 0
+                            ? toneForStatus('valide')
+                            : toneForStatus('a_valider')
+                        }
+                      >
+                        {aiPlan.missing.length === 0
+                          ? 'Prêt à produire'
+                          : `${aiPlan.missing.length} points à cadrer`}
+                      </Badge>
+                    </div>
+
+                    {aiPlan.missing.length > 0 ? (
+                      <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-700 dark:text-amber-300">
+                        <div className="font-semibold">Pré-vol recommandé</div>
+                        <div className="mt-1">
+                          Ne lance pas la production complète tant que ces points ne sont pas couverts :
+                          {' '}
+                          {aiPlan.missing.join(', ')}.
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold uppercase text-primary-500 dark:text-neutral-400">
+                          Équipe IA
+                        </div>
+                        <div className="space-y-2">
+                          {aiPlan.roles.map(([role, detail]) => (
+                            <div key={role} className="rounded-lg border border-primary-200 p-3 dark:border-neutral-800">
+                              <div className="text-sm font-semibold">{role}</div>
+                              <div className="mt-1 text-xs leading-5 text-primary-600 dark:text-neutral-400">
+                                {detail}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold uppercase text-primary-500 dark:text-neutral-400">
+                          Production
+                        </div>
+                        <ol className="space-y-2">
+                          {aiPlan.stages.map((stage, index) => (
+                            <li key={stage} className="flex gap-2 rounded-lg border border-primary-200 p-3 text-xs leading-5 dark:border-neutral-800">
+                              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary-100 text-[11px] font-semibold dark:bg-neutral-900">
+                                {index + 1}
+                              </span>
+                              <span>{stage}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold uppercase text-primary-500 dark:text-neutral-400">
+                          Checklist
+                        </div>
+                        <div className="space-y-2">
+                          {aiPlan.checklist.map(([label, done]) => (
+                            <div
+                              key={String(label)}
+                              className={cn(
+                                'flex items-center gap-2 rounded-lg border p-3 text-xs',
+                                done
+                                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                  : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+                              )}
+                            >
+                              <span className="text-sm font-semibold">{done ? 'OK' : 'À cadrer'}</span>
+                              <span>{label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Panel title="Sources" icon={File01Icon} count={selected.sources.length}>
