@@ -55,6 +55,21 @@ export function Swarm2QueuePanel({ className }: { className?: string }) {
     },
   })
 
+  // Optimistic: reflect cancel/approve instantly, reconcile on settle.
+  type QueueData = { items?: Array<{ id: string; status: string }> }
+  const patchItem = (id: string, status: string) => {
+    queryClient.setQueryData<QueueData>(['swarm-queue'], (prev) =>
+      prev
+        ? {
+            ...prev,
+            items: (prev.items ?? []).map((i) =>
+              i.id === id ? { ...i, status } : i,
+            ),
+          }
+        : prev,
+    )
+  }
+
   const cancelMutation = useMutation({
     mutationFn: async (id: string) => {
       await fetch('/api/swarm-queue', {
@@ -63,7 +78,8 @@ export function Swarm2QueuePanel({ className }: { className?: string }) {
         body: JSON.stringify({ action: 'cancel', id }),
       })
     },
-    onSuccess: () => void invalidate(),
+    onMutate: (id: string) => patchItem(id, 'cancelled'),
+    onSettled: () => void invalidate(),
   })
 
   const approveMutation = useMutation({
@@ -74,7 +90,8 @@ export function Swarm2QueuePanel({ className }: { className?: string }) {
         body: JSON.stringify({ action: 'approve', id }),
       })
     },
-    onSuccess: () => void invalidate(),
+    onMutate: (id: string) => patchItem(id, 'queued'),
+    onSettled: () => void invalidate(),
   })
 
   const open = (data?.items ?? []).filter(

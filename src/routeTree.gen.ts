@@ -70,6 +70,7 @@ import { Route as ApiSwarmLifecycleRouteImport } from './routes/api/swarm-lifecy
 import { Route as ApiSwarmKanbanRouteImport } from './routes/api/swarm-kanban'
 import { Route as ApiSwarmHealthRouteImport } from './routes/api/swarm-health'
 import { Route as ApiSwarmGoalsRouteImport } from './routes/api/swarm-goals'
+import { Route as ApiSwarmEventsRouteImport } from './routes/api/swarm-events'
 import { Route as ApiSwarmEnvironmentRouteImport } from './routes/api/swarm-environment'
 import { Route as ApiSwarmDispatchRouteImport } from './routes/api/swarm-dispatch'
 import { Route as ApiSwarmDirectChatRouteImport } from './routes/api/swarm-direct-chat'
@@ -487,6 +488,11 @@ const ApiSwarmHealthRoute = ApiSwarmHealthRouteImport.update({
 const ApiSwarmGoalsRoute = ApiSwarmGoalsRouteImport.update({
   id: '/api/swarm-goals',
   path: '/api/swarm-goals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmEventsRoute = ApiSwarmEventsRouteImport.update({
+  id: '/api/swarm-events',
+  path: '/api/swarm-events',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmEnvironmentRoute = ApiSwarmEnvironmentRouteImport.update({
@@ -1138,6 +1144,7 @@ export interface FileRoutesByFullPath {
   '/api/swarm-direct-chat': typeof ApiSwarmDirectChatRoute
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
+  '/api/swarm-events': typeof ApiSwarmEventsRoute
   '/api/swarm-goals': typeof ApiSwarmGoalsRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
@@ -1312,6 +1319,7 @@ export interface FileRoutesByTo {
   '/api/swarm-direct-chat': typeof ApiSwarmDirectChatRoute
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
+  '/api/swarm-events': typeof ApiSwarmEventsRoute
   '/api/swarm-goals': typeof ApiSwarmGoalsRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
@@ -1488,6 +1496,7 @@ export interface FileRoutesById {
   '/api/swarm-direct-chat': typeof ApiSwarmDirectChatRoute
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
+  '/api/swarm-events': typeof ApiSwarmEventsRoute
   '/api/swarm-goals': typeof ApiSwarmGoalsRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
@@ -1665,6 +1674,7 @@ export interface FileRouteTypes {
     | '/api/swarm-direct-chat'
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
+    | '/api/swarm-events'
     | '/api/swarm-goals'
     | '/api/swarm-health'
     | '/api/swarm-kanban'
@@ -1839,6 +1849,7 @@ export interface FileRouteTypes {
     | '/api/swarm-direct-chat'
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
+    | '/api/swarm-events'
     | '/api/swarm-goals'
     | '/api/swarm-health'
     | '/api/swarm-kanban'
@@ -2014,6 +2025,7 @@ export interface FileRouteTypes {
     | '/api/swarm-direct-chat'
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
+    | '/api/swarm-events'
     | '/api/swarm-goals'
     | '/api/swarm-health'
     | '/api/swarm-kanban'
@@ -2190,6 +2202,7 @@ export interface RootRouteChildren {
   ApiSwarmDirectChatRoute: typeof ApiSwarmDirectChatRoute
   ApiSwarmDispatchRoute: typeof ApiSwarmDispatchRoute
   ApiSwarmEnvironmentRoute: typeof ApiSwarmEnvironmentRoute
+  ApiSwarmEventsRoute: typeof ApiSwarmEventsRoute
   ApiSwarmGoalsRoute: typeof ApiSwarmGoalsRoute
   ApiSwarmHealthRoute: typeof ApiSwarmHealthRoute
   ApiSwarmKanbanRoute: typeof ApiSwarmKanbanRoute
@@ -2681,6 +2694,13 @@ declare module '@tanstack/react-router' {
       path: '/api/swarm-goals'
       fullPath: '/api/swarm-goals'
       preLoaderRoute: typeof ApiSwarmGoalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-events': {
+      id: '/api/swarm-events'
+      path: '/api/swarm-events'
+      fullPath: '/api/swarm-events'
+      preLoaderRoute: typeof ApiSwarmEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/swarm-environment': {
@@ -3763,6 +3783,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmDirectChatRoute: ApiSwarmDirectChatRoute,
   ApiSwarmDispatchRoute: ApiSwarmDispatchRoute,
   ApiSwarmEnvironmentRoute: ApiSwarmEnvironmentRoute,
+  ApiSwarmEventsRoute: ApiSwarmEventsRoute,
   ApiSwarmGoalsRoute: ApiSwarmGoalsRoute,
   ApiSwarmHealthRoute: ApiSwarmHealthRoute,
   ApiSwarmKanbanRoute: ApiSwarmKanbanRoute,

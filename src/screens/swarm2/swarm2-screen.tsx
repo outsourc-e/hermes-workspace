@@ -10,6 +10,7 @@ import {
   type CSSProperties,
 } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSwarmEvents } from '@/hooks/use-swarm-events'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlarmClockIcon,
@@ -1331,6 +1332,8 @@ export function Swarm2Screen() {
   >(null)
   const topRef = useRef<HTMLDivElement | null>(null)
 
+  // SSE pushes state-change events; polls below become slow fallbacks.
+  useSwarmEvents()
   const runtimeQuery = useQuery({
     queryKey: ['swarm2', 'runtime'],
     queryFn: fetchRuntime,
