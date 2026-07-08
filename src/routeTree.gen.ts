@@ -81,6 +81,7 @@ import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-np
 import { Route as ApiPlaygroundAdminRouteImport } from './routes/api/playground-admin'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiNovaWorkScanRouteImport } from './routes/api/nova-work-scan'
 import { Route as ApiNovaWantsRouteImport } from './routes/api/nova-wants'
 import { Route as ApiNovaFabricRouteImport } from './routes/api/nova-fabric'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
@@ -531,6 +532,11 @@ const ApiPingRoute = ApiPingRouteImport.update({
 const ApiPathsRoute = ApiPathsRouteImport.update({
   id: '/api/paths',
   path: '/api/paths',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNovaWorkScanRoute = ApiNovaWorkScanRouteImport.update({
+  id: '/api/nova-work-scan',
+  path: '/api/nova-work-scan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNovaWantsRoute = ApiNovaWantsRouteImport.update({
@@ -1049,6 +1055,7 @@ export interface FileRoutesByFullPath {
   '/api/models': typeof ApiModelsRoute
   '/api/nova-fabric': typeof ApiNovaFabricRoute
   '/api/nova-wants': typeof ApiNovaWantsRoute
+  '/api/nova-work-scan': typeof ApiNovaWorkScanRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1212,6 +1219,7 @@ export interface FileRoutesByTo {
   '/api/models': typeof ApiModelsRoute
   '/api/nova-fabric': typeof ApiNovaFabricRoute
   '/api/nova-wants': typeof ApiNovaWantsRoute
+  '/api/nova-work-scan': typeof ApiNovaWorkScanRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1377,6 +1385,7 @@ export interface FileRoutesById {
   '/api/models': typeof ApiModelsRoute
   '/api/nova-fabric': typeof ApiNovaFabricRoute
   '/api/nova-wants': typeof ApiNovaWantsRoute
+  '/api/nova-work-scan': typeof ApiNovaWorkScanRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1543,6 +1552,7 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/nova-fabric'
     | '/api/nova-wants'
+    | '/api/nova-work-scan'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1706,6 +1716,7 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/nova-fabric'
     | '/api/nova-wants'
+    | '/api/nova-work-scan'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1870,6 +1881,7 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/nova-fabric'
     | '/api/nova-wants'
+    | '/api/nova-work-scan'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -2035,6 +2047,7 @@ export interface RootRouteChildren {
   ApiModelsRoute: typeof ApiModelsRoute
   ApiNovaFabricRoute: typeof ApiNovaFabricRoute
   ApiNovaWantsRoute: typeof ApiNovaWantsRoute
+  ApiNovaWorkScanRoute: typeof ApiNovaWorkScanRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiPlaygroundAdminRoute: typeof ApiPlaygroundAdminRoute
@@ -2615,6 +2628,13 @@ declare module '@tanstack/react-router' {
       path: '/api/paths'
       fullPath: '/api/paths'
       preLoaderRoute: typeof ApiPathsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nova-work-scan': {
+      id: '/api/nova-work-scan'
+      path: '/api/nova-work-scan'
+      fullPath: '/api/nova-work-scan'
+      preLoaderRoute: typeof ApiNovaWorkScanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/nova-wants': {
@@ -3520,6 +3540,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelsRoute: ApiModelsRoute,
   ApiNovaFabricRoute: ApiNovaFabricRoute,
   ApiNovaWantsRoute: ApiNovaWantsRoute,
+  ApiNovaWorkScanRoute: ApiNovaWorkScanRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiPlaygroundAdminRoute: ApiPlaygroundAdminRoute,

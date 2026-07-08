@@ -826,6 +826,33 @@ export function createNovaFabricReviewProposal(
     proposedDiff: input.proposedDiff,
   }
   fabric.reviewQueue.push(review)
+
+  const requestedReceipt: NovaFabricEventRecord = {
+    ...baseRecord({
+      id: `event-${randomUUID()}`,
+      type: 'event',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      provenance: 'Mission Control server review request receipt',
+      riskLevel: review.riskLevel,
+      approvalLevel: review.approvalLevel,
+      verificationState: 'tool-verified',
+      sourceLinks: [
+        ...review.sourceLinks,
+        { label: 'Fabric review', value: review.id, kind: 'receipt' },
+      ],
+      receiptLinks: [
+        { label: 'Fabric review', value: review.id, kind: 'receipt' },
+      ],
+      titleForRisk: `${review.title} ${review.reason} requested`,
+    }),
+    type: 'event',
+    title: `Review requested: ${review.title}`,
+    summary: `Approval requested for ${review.targetType}${review.targetId ? `/${review.targetId}` : ''}: ${review.reason}`,
+    eventKind: 'approval',
+  }
+  fabric.events.push(requestedReceipt)
+
   fabric.updatedAt = timestamp
   writeFabricFile(fabric)
   return review

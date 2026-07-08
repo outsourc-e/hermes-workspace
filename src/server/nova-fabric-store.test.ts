@@ -202,8 +202,10 @@ describe('nova fabric store', () => {
     expect(updated?.status).toBe('approved')
 
     const snapshot = getNovaFabricSnapshot()
-    const receipt = snapshot.fabric?.events.find((event) =>
-      event.receiptLinks.some((link) => link.value === review.id),
+    const receipt = snapshot.fabric?.events.find(
+      (event) =>
+        event.title.startsWith('Review approved:') &&
+        event.receiptLinks.some((link) => link.value === review.id),
     )
 
     expect(receipt).toMatchObject({
