@@ -145,34 +145,92 @@ type SkillSummary = {
 const KNOWN_CATEGORIES = [
   'All',
   'Web & Frontend',
+  'Frontend',
+  'Backend',
   'Coding Agents',
+  'Agentic Systems',
   'Git & GitHub',
   'DevOps & Cloud',
+  'Infrastructure Engineering',
+  'Infrastructure & Platform',
+  'Platform Engineering',
+  'Reliability Engineering',
+  'Reliability & Observability',
   'Browser & Automation',
+  'Automation',
   'Image & Video',
+  'Multimodal',
+  'Multimodal & Voice',
+  'Spatial / AR-VR',
   'Search & Research',
+  'Research',
   'AI & LLMs',
+  'Data & Analytics',
+  'Data & ML',
+  'Security Engineering',
+  'Security & Compliance',
+  'Compliance & Governance',
+  'Quality Engineering',
+  'Quality & Testing',
+  'Performance Engineering',
+  'Performance',
+  'Accessibility & Localization',
+  'Accessibility',
+  'i18n & Localization',
+  'Content Engineering',
+  'Content',
+  'Growth Engineering',
+  'Growth',
+  'Developer Experience',
+  'DevEx & Tooling',
+  'Marketplace & Trust',
+  'Web3 & Economy',
+  'Web3',
+  'Edge & IoT',
+  'Sustainability Engineering',
+  'Sustainability',
   'Productivity',
   'Marketing & Sales',
   'Communication',
-  'Data & Analytics',
   'Finance & Crypto',
+  'Identity & Access',
+  'Secrets',
+  'Feature Flags',
+  'Developer Portal',
+  'Service Mesh',
+  'Event-Driven',
+  'Governance & Trust',
+  'Federation & Interop',
+  'Design',
+  'Documentation',
+  'Writing',
+  'Media',
+  'Creative',
+  'Business',
+  'Finance',
+  'Product',
+  'Planning',
+  'Collaboration',
+  'Testing',
 ] as const
 
 const FEATURED_SKILLS: Array<{ id: string; group: string }> = [
   { id: 'dbalve/fast-io', group: 'Most Popular' },
   { id: 'okoddcat/gitflow', group: 'Most Popular' },
   { id: 'atomtanstudio/craft-do', group: 'Most Popular' },
+  { id: 'multi-agent-task-orchestrator', group: 'Agentic Systems' },
+  { id: 'web3-testing', group: 'Web3' },
+  { id: 'fda-medtech-compliance-auditor', group: 'Security & Compliance' },
   { id: 'bro3886/gtasks-cli', group: 'New This Week' },
   { id: 'vvardhan14/pokerpal', group: 'New This Week' },
   {
     id: 'veeramanikandanr48/docker-containerization',
-    group: 'Developer Tools',
+    group: 'DevEx & Platform',
   },
-  { id: 'veeramanikandanr48/azure-auth', group: 'Developer Tools' },
+  { id: 'veeramanikandanr48/azure-auth', group: 'DevEx & Platform' },
   { id: 'dbalve/fastio-skills', group: 'Productivity' },
-  { id: 'gillberto1/moltwallet', group: 'Productivity' },
-  { id: 'veeramanikandanr48/backtest-expert', group: 'Productivity' },
+  { id: 'gillberto1/moltwallet', group: 'Marketplace & Trust' },
+  { id: 'veeramanikandanr48/backtest-expert', group: 'Finance & Crypto' },
 ]
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -225,36 +283,103 @@ const CATEGORY_ALIASES: Record<string, string> = {
   search: 'Search & Research',
   feeds: 'Search & Research',
   'web-frontend': 'Web & Frontend',
-  frontend: 'Web & Frontend',
+  frontend: 'Frontend',
   web: 'Web & Frontend',
-  'software-development': 'Coding Agents',
+  backend: 'Backend',
+  'software-development': 'DevEx & Tooling',
   coding: 'Coding Agents',
-  development: 'Coding Agents',
+  development: 'DevEx & Tooling',
+  'developer-tools': 'DevEx & Tooling',
+  'core-dev': 'DevEx & Tooling',
+  'tool-quality': 'DevEx & Tooling',
+  'context-optimization': 'DevEx & Tooling',
+  'prompt-engineering': 'DevEx & Tooling',
+  agent: 'Agentic Systems',
+  agents: 'Agentic Systems',
+  swarm: 'Agentic Systems',
+  orchestration: 'Agentic Systems',
+  'multi-agent': 'Agentic Systems',
+  'multiagent': 'Agentic Systems',
   devops: 'DevOps & Cloud',
   cloud: 'DevOps & Cloud',
   'devops-cloud': 'DevOps & Cloud',
-  mlops: 'DevOps & Cloud',
+  platform: 'Infrastructure & Platform',
+  'platform-engineering': 'Platform Engineering',
+  'infrastructure-platform': 'Infrastructure & Platform',
+  infrastructure: 'Infrastructure & Platform',
+  mlops: 'Data & ML',
+  'data-science': 'Data & ML',
+  'data-engineering': 'Data & ML',
+  'data-ai': 'Data & ML',
+  'machine-learning': 'Data & ML',
+  'devex': 'DevEx & Tooling',
+  'developer-experience': 'Developer Experience',
   git: 'Git & GitHub',
   github: 'Git & GitHub',
   'git-github': 'Git & GitHub',
   browser: 'Browser & Automation',
-  automation: 'Browser & Automation',
+  automation: 'Automation',
   'browser-automation': 'Browser & Automation',
   image: 'Image & Video',
   video: 'Image & Video',
-  media: 'Image & Video',
-  creative: 'Image & Video',
+  media: 'Media',
+  creative: 'Creative',
   'image-video': 'Image & Video',
   gifs: 'Image & Video',
   diagramming: 'Image & Video',
+  'voice': 'Multimodal & Voice',
+  audio: 'Multimodal & Voice',
+  speech: 'Multimodal & Voice',
+  vision: 'Multimodal & Voice',
+  multimodal: 'Multimodal',
+  'multimodal-voice': 'Multimodal & Voice',
+  spatial: 'Spatial / AR-VR',
+  ar: 'Spatial / AR-VR',
+  vr: 'Spatial / AR-VR',
+  'ar-vr': 'Spatial / AR-VR',
+  arvr: 'Spatial / AR-VR',
+  'threejs': 'Spatial / AR-VR',
+  spline: 'Spatial / AR-VR',
   'autonomous-ai-agents': 'AI & LLMs',
   ai: 'AI & LLMs',
   llm: 'AI & LLMs',
-  agents: 'AI & LLMs',
   mcp: 'AI & LLMs',
   'inference-sh': 'AI & LLMs',
-  'data-science': 'Data & Analytics',
   data: 'Data & Analytics',
+  analytics: 'Data & Analytics',
+  security: 'Security & Compliance',
+  appsec: 'Security & Compliance',
+  compliance: 'Security & Compliance',
+  governance: 'Governance & Trust',
+  quality: 'Quality & Testing',
+  testing: 'Quality & Testing',
+  performance: 'Performance',
+  a11y: 'Accessibility',
+  accessibility: 'Accessibility',
+  localization: 'i18n & Localization',
+  i18n: 'i18n & Localization',
+  l10n: 'i18n & Localization',
+  content: 'Content',
+  cms: 'Content',
+  growth: 'Growth',
+  onboarding: 'Growth',
+  activation: 'Growth',
+  referral: 'Growth',
+  marketplace: 'Marketplace & Trust',
+  pricing: 'Marketplace & Trust',
+  monetization: 'Marketplace & Trust',
+  wallet: 'Marketplace & Trust',
+  trust: 'Governance & Trust',
+  web3: 'Web3',
+  blockchain: 'Web3',
+  solidity: 'Web3',
+  defi: 'Web3',
+  edge: 'Edge & IoT',
+  iot: 'Edge & IoT',
+  sensor: 'Edge & IoT',
+  sustainability: 'Sustainability',
+  green: 'Sustainability',
+  carbon: 'Sustainability',
   'social-media': 'Marketing & Sales',
   social: 'Marketing & Sales',
   email: 'Communication',
@@ -265,7 +390,7 @@ const CATEGORY_ALIASES: Record<string, string> = {
   apple: 'Productivity',
   leisure: 'Productivity',
   gaming: 'Productivity',
-  'red-teaming': 'AI & LLMs',
+  'red-teaming': 'Security Engineering',
   domain: 'Productivity',
   dogfood: 'Productivity',
   productivity: 'Productivity',
@@ -293,21 +418,131 @@ function guessCategory(record: Record<string, unknown>): string {
     readString(record.group) ||
     readString(record.section)
   if (direct) return normalizeCategoryLabel(direct)
+
   const tags = readStringArray(record.tags).map((tag) => tag.toLowerCase())
-  if (tags.some((tag) => tag.includes('frontend') || tag.includes('react'))) {
+  const haystack = [
+    readString(record.slug),
+    readString(record.name),
+    readString(record.description),
+    ...tags,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  const has = (...terms: string[]) => terms.some((term) => haystack.includes(term))
+
+  if (has('accessibility', 'a11y', 'wcag', 'screen-reader', 'aria')) {
+    return 'Accessibility'
+  }
+  if (has('i18n', 'l10n', 'localization', 'translation', 'locale', 'rtl')) {
+    return 'i18n & Localization'
+  }
+  if (has('security', 'appsec', 'threat', 'zeroize', 'sast', 'cve', 'vulnerability')) {
+    return 'Security & Compliance'
+  }
+  if (has('iam', 'identity', 'auth', 'oauth', 'sso', 'rbac', 'permission')) {
+    return 'Identity & Access'
+  }
+  if (has('secret', 'vault', 'keyvault', 'rotation', 'credential')) {
+    return 'Secrets'
+  }
+  if (has('service mesh', 'service-mesh', 'istio', 'linkerd', 'mtls')) {
+    return 'Service Mesh'
+  }
+  if (has('event-driven', 'eventhub', 'eventgrid', 'pubsub', 'kafka', 'cqrs', 'saga', 'streaming')) {
+    return 'Event-Driven'
+  }
+  if (has('agent', 'swarm', 'orchestr', 'multi-agent', 'evolution', 'subagent')) {
+    return 'Agentic Systems'
+  }
+  if (has('voice', 'audio', 'speech', 'tts', 'asr', 'multimodal')) {
+    return 'Multimodal'
+  }
+  if (has('vision', 'image', 'video', 'media', 'creative')) {
+    return 'Multimodal'
+  }
+  if (has('ar/', 'ar-vr', 'arvr', 'vr', 'visionos', 'threejs', 'spline', 'unity', 'quest')) {
+    return 'Spatial / AR-VR'
+  }
+  if (has('edge', 'iot', 'sensor', 'matter', 'embedded', 'smart-home')) {
+    return 'Edge & IoT'
+  }
+  if (has('web3', 'blockchain', 'solidity', 'defi', 'nft', 'token')) {
+    return 'Web3'
+  }
+  if (has('sustainability', 'climate', 'energy', 'carbon', 'esg')) {
+    return 'Sustainability'
+  }
+  if (has('reliability', 'sre', 'incident', 'on-call', 'observability', 'uptime', 'monitoring')) {
+    return 'Reliability & Observability'
+  }
+  if (has('performance', 'latency', 'throughput', 'profiling', 'optimization', 'perf')) {
+    return 'Performance'
+  }
+  if (has('quality', 'qa', 'mutation', 'property', 'test', 'testing', 'regression')) {
+    return 'Quality & Testing'
+  }
+  if (has('growth', 'onboarding', 'activation', 'referral', 'acquisition', 'retention')) {
+    return 'Growth'
+  }
+  if (has('content', 'cms', 'editorial', 'copy', 'writing', 'narrative')) {
+    return 'Content'
+  }
+  if (has('developer-portal', 'developer portal', 'api-management', 'apicenter', 'openapi')) {
+    return 'Developer Portal'
+  }
+  if (has('feature-flag', 'feature flags', 'featureflags', 'launchdarkly')) {
+    return 'Feature Flags'
+  }
+  if (has('governance', 'policy', 'guardrail', 'audit', 'trust')) {
+    return 'Governance & Trust'
+  }
+  if (has('federation', 'interop', 'multi-cloud', 'cross-company')) {
+    return 'Federation & Interop'
+  }
+  if (has('platform', 'platforming', 'infra', 'cloud', 'kubernetes', 'terraform', 'deployment')) {
+    return 'Infrastructure & Platform'
+  }
+  if (has('devex', 'developer experience', 'developer-tools', 'prompt-engineering', 'context-optimization', 'tool-quality')) {
+    return 'DevEx & Tooling'
+  }
+  if (has('ml', 'model', 'training', 'feature-store', 'experiment', 'forecast', 'llmops', 'data-engineering', 'data-science', 'mlops')) {
+    return 'Data & ML'
+  }
+  if (has('frontend', 'react', 'vue', 'svelte', 'next', 'tailwind')) {
     return 'Web & Frontend'
   }
-  if (tags.some((tag) => tag.includes('browser'))) {
-    return 'Browser & Automation'
+  if (has('backend', 'api', 'server', 'service', 'database')) {
+    return 'Backend'
   }
-  if (tags.some((tag) => tag.includes('git'))) {
-    return 'Git & GitHub'
-  }
-  if (tags.some((tag) => tag.includes('research') || tag.includes('search'))) {
+  if (has('research', 'search', 'literature', 'arxiv')) {
     return 'Search & Research'
   }
+  if (has('documentation', 'docs', 'readme', 'api-doc')) {
+    return 'Documentation'
+  }
+  if (has('automation', 'workflow', 'script', 'bot', 'scheduled')) {
+    return 'Automation'
+  }
+  if (has('business', 'strategy', 'market', 'pricing', 'monetization', 'sales')) {
+    return 'Business'
+  }
+  if (has('finance', 'wallet', 'billing', 'accounting', 'backtest')) {
+    return 'Finance'
+  }
+  if (has('product', 'roadmap', 'product-management', 'planning')) {
+    return 'Product'
+  }
+  if (has('collaboration', 'team', 'shared', 'workflow')) {
+    return 'Collaboration'
+  }
+
   if (tags.some((tag) => tag.includes('ai') || tag.includes('llm'))) {
     return 'AI & LLMs'
+  }
+  if (tags.some((tag) => tag.includes('data'))) {
+    return 'Data & Analytics'
   }
   return 'Productivity'
 }

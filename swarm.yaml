@@ -496,3 +496,483 @@ workers:
   mcpServers:
   - gbrain
   wrapper: inbox:triage
+- id: content-growth
+  name: Content Growth
+  role: Content / Growth Engineering Hub
+  specialty: content systems, CMS automation, onboarding, activation, retention, referrals, experimentation
+  model: GPT-5.5
+  mission: Own the content-to-growth loop end-to-end, from creation and personalization through onboarding and lifecycle experiments.
+  profile: content-growth
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - web
+  - browser
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - content-marketer
+  - content-strategy
+  - growth-engine
+  - onboarding-cro
+  - referral-program
+  - signup-flow-cro
+  capabilities:
+  - content-systems
+  - growth-experiments
+  - onboarding-activation
+  - lifecycle-optimization
+  preferredTaskTypes:
+  - feature
+  - experiment
+  - optimization
+  - content
+  greenlightRequiredFor:
+  - publish
+  - external-send
+  - destructive
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: content-growth:task
+- id: platform-reliability
+  name: Platform Reliability
+  role: Platform / Infrastructure / SRE Hub
+  specialty: cloud architecture, Kubernetes, service mesh, observability, incident response, runtime health
+  model: GPT-5.5
+  mission: Keep infrastructure, deploys, observability, and incident response healthy while supporting the next wave of automation.
+  profile: platform-reliability
+  modes:
+  - health
+  tools:
+  - terminal
+  - file
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - cloud-architect
+  - kubernetes-architect
+  - service-mesh-expert
+  - observability-engineer
+  - incident-responder
+  - devops-deploy
+  capabilities:
+  - infrastructure-engineering
+  - sre
+  - observability
+  - service-mesh
+  - incident-response
+  preferredTaskTypes:
+  - ops
+  - health
+  - deployment
+  - reliability
+  - incident-triage
+  greenlightRequiredFor:
+  - restart-service
+  - destructive
+  - config-change
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: platform-reliability:health
+- id: data-ml
+  name: Data / ML
+  role: Data, Analytics, and ML Ops Hub
+  specialty: data pipelines, experimentation, feature stores, model delivery, evaluation, analytics instrumentation
+  model: GPT-5.5
+  mission: Build the analytics and ML substrate that powers predictive features, experimentation, and model operations.
+  profile: data-ml
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - data-engineer
+  - ml-engineer
+  - mlops-engineer
+  - analytics-tracking
+  - llm-ops
+  - evaluation
+  capabilities:
+  - data-engineering
+  - analytics
+  - model-ops
+  - experimentation
+  - forecasting
+  preferredTaskTypes:
+  - feature
+  - analysis
+  - pipeline
+  - mlops
+  - instrumentation
+  greenlightRequiredFor:
+  - publish
+  - external-send
+  - destructive
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: data-ml:task
+- id: security-governance
+  name: Security / Governance
+  role: Security, Compliance, IAM, and Policy Hub
+  specialty: appsec, red teaming, compliance automation, IAM, secrets, governance rules, trust controls
+  model: GPT-5.5
+  mission: Harden the system, translate governance intent into policy, and keep secrets, identity, and compliance under control.
+  profile: security-governance
+  modes:
+  - gate
+  tools:
+  - terminal
+  - file
+  - web
+  - gbrain
+  - session_search
+  - skills
+  skills:
+  - security-auditor
+  - security-compliance-compliance-check
+  - privacy-by-design
+  - threat-modeling-expert
+  - zeroize-audit
+  - protect-mcp-governance
+  capabilities:
+  - appsec
+  - compliance
+  - iam
+  - secrets-management
+  - governance
+  preferredTaskTypes:
+  - audit
+  - review
+  - compliance
+  - policy
+  - risk
+  greenlightRequiredFor:
+  - publish
+  - external-send
+  - destructive
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: security-governance:gate
+- id: agentic-frontier
+  name: Agentic Frontier
+  role: Agentic Systems / Multi-Agent Orchestration Hub
+  specialty: swarm design, agent lifecycle, self-evolution, coordination, predictive routing, workload reassignment
+  model: GPT-5.5
+  mission: "Build the higher-order agent fabric: swarms, supervisors, evaluators, evolution loops, and orchestration intelligence."
+  profile: agentic-frontier
+  modes:
+  - plan
+  tools:
+  - todo
+  - kanban
+  - delegation
+  - terminal
+  - file
+  - gbrain
+  - session_search
+  - cronjob
+  - skills
+  - clarify
+  - web
+  skills:
+  - multi-agent-architect
+  - autonomous-agent-patterns
+  - autonomous-agents
+  - agentflow
+  - workflow-orchestration-patterns
+  - evaluation
+  capabilities:
+  - agentic-systems
+  - swarm-orchestration
+  - self-evolution
+  - reassignment
+  - predictive-routing
+  preferredTaskTypes:
+  - orchestration
+  - planning
+  - coordination
+  - analysis
+  - evolution
+  greenlightRequiredFor:
+  - merge
+  - publish
+  - destructive
+  - external-send
+  - credential-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: agentic-frontier:plan
+- id: multimodal-spatial
+  name: Multimodal / Spatial
+  role: Voice, Vision, and Immersive Experience Hub
+  specialty: voice agents, vision, audio pipelines, AR/VR, spatial UI, multimodal interaction
+  model: GPT-5.5
+  mission: Deliver voice-first and spatially aware interactions that can see, speak, and operate in immersive environments.
+  profile: multimodal-spatial
+  modes:
+  - build
+  tools:
+  - terminal
+  - file
+  - browser
+  - vision
+  - gbrain
+  - session_search
+  - skills
+  - web
+  skills:
+  - voice-agents
+  - voice-ai-development
+  - computer-vision-expert
+  - audio-transcriber
+  - threejs-skills
+  - spline-3d-integration
+  capabilities:
+  - voice
+  - vision
+  - multimodal
+  - spatial
+  - immersive-ui
+  preferredTaskTypes:
+  - feature
+  - prototype
+  - multimodal
+  - spatial
+  - voice
+  greenlightRequiredFor:
+  - publish
+  - external-send
+  - destructive
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: multimodal-spatial:build
+- id: marketplace-economy
+  name: Marketplace / Economy
+  role: Marketplace, Pricing, and Agent Economy Hub
+  specialty: pricing, monetization, valuation, listings, wallet flows, micropayments, trust scoring
+  model: GPT-5.5
+  mission: Automate skill valuation, marketplace listing, and the economic primitives that let agents exchange value safely.
+  profile: marketplace-economy
+  modes:
+  - review
+  tools:
+  - terminal
+  - file
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - pricing-strategy
+  - monetization
+  - billing-automation
+  - market-sizing-analysis
+  - launch-strategy
+  - trust-calibrator
+  capabilities:
+  - marketplace
+  - valuation
+  - monetization
+  - micropayments
+  - trust-scoring
+  preferredTaskTypes:
+  - business-case
+  - valuation
+  - listing
+  - pricing
+  - economy
+  greenlightRequiredFor:
+  - publish
+  - external-send
+  - destructive
+  - financial-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: marketplace-economy:review
+- id: quality-performance
+  name: Quality / Performance
+  role: QA, Perf, and Release Confidence Hub
+  specialty: browser QA, end-to-end testing, mutation resistance, perf profiling, regression prevention
+  model: GPT-5.5
+  mission: Protect release quality with reproducible verification, fast feedback, and performance-aware testing.
+  profile: quality-performance
+  modes:
+  - smoke
+  tools:
+  - browser
+  - terminal
+  - file
+  - vision
+  - gbrain
+  - session_search
+  - skills
+  - web
+  skills:
+  - e2e-testing
+  - playwright-skill
+  - performance-engineer
+  - testing-patterns
+  - accesslint-scan
+  - accesslint-audit
+  capabilities:
+  - qa
+  - performance
+  - accessibility
+  - regression-prevention
+  - evidence-capture
+  preferredTaskTypes:
+  - qa
+  - smoke
+  - verification
+  - regression
+  - performance
+  greenlightRequiredFor:
+  - destructive
+  - external-write
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: quality-performance:smoke
+- id: accessibility-localization
+  name: Accessibility / Localization
+  role: Accessibility, i18n, and inclusive UX Hub
+  specialty: accessibility, WCAG, localization, translation workflows, inclusive interface review
+  model: GPT-5.5
+  mission: Make the product usable, legible, and culturally adaptable across languages and abilities.
+  profile: accessibility-localization
+  modes:
+  - review
+  tools:
+  - browser
+  - terminal
+  - file
+  - vision
+  - gbrain
+  - session_search
+  - skills
+  - web
+  skills:
+  - accessibility-compliance-accessibility-audit
+  - wcag-audit-patterns
+  - i18n-localization
+  - humanize-chinese
+  - localization
+  - accessibility-engineering
+  capabilities:
+  - accessibility
+  - localization
+  - inclusive-design
+  - i18n
+  - a11y-review
+  preferredTaskTypes:
+  - audit
+  - localization
+  - review
+  - accessibility
+  - translation
+  greenlightRequiredFor:
+  - destructive
+  - external-send
+  - publish
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: accessibility-localization:review
+- id: federation-trust
+  name: Federation / Trust
+  role: Cross-Company Federation and Reputation Hub
+  specialty: federation, interoperability, reputation, governance, trust scoring, policy translation
+  model: GPT-5.5
+  mission: Safely bridge multiple companies, teams, and swarms using explicit trust, policy, and permission boundaries.
+  profile: federation-trust
+  modes:
+  - gate
+  tools:
+  - terminal
+  - file
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - cronjob
+  skills:
+  - trust-calibrator
+  - identity-mirror
+  - protect-mcp-governance
+  - webhook-subscriptions
+  - agent-memory-systems
+  - workflow-orchestration-patterns
+  capabilities:
+  - federation
+  - trust
+  - interoperability
+  - permissioning
+  - reputation
+  preferredTaskTypes:
+  - governance
+  - federation
+  - review
+  - policy
+  - trust
+  greenlightRequiredFor:
+  - publish
+  - external-send
+  - destructive
+  - permission-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: federation-trust:gate
