@@ -117,6 +117,13 @@ export type ProjectContentDraftRecord = {
   updatedAt: string
 }
 
+export type StarterTemplateContext = {
+  id: string
+  name: string
+  channel: string
+  sections: Array<{ id: string; title: string; purpose: string; required: boolean }>
+}
+
 export type CreateProjectInput = {
   title: string
   objective?: string | null
@@ -577,6 +584,159 @@ export function buildMarkdownFromContent(input: {
   lines.push('- Source : a completer ou a confirmer.')
   lines.push('- Statut : brouillon non publiable sans validation.')
   return lines.join('\n').trim()
+}
+
+function projectText(project: ProjectRecord): string {
+  return [
+    project.title,
+    project.objective,
+    project.templateId,
+    ...project.tags,
+  ].filter(Boolean).join(' ').toLowerCase()
+}
+
+function inferProductFamily(project: ProjectRecord): string {
+  const text = projectText(project)
+  if (/(ftto|ftte|ftth|fibre|connectivit|sd-wan|backup 4g|routeur|internet)/i.test(text)) {
+    return 'connectivite'
+  }
+  if (/(mobile|sim|data|forfait|4g|5g)/i.test(text)) return 'mobile'
+  if (/(metacentrex|centrex|ucaas|telephonie|voip|pbx|sip|trunk)/i.test(text)) return 'ucaas'
+  if (/(teams|call2teams)/i.test(text)) return 'teams'
+  return 'generique'
+}
+
+function productLabel(project: ProjectRecord): string {
+  return project.title
+    .replace(/^fiche produit pdf\s*-\s*/i, '')
+    .replace(/^go-to-market\s*-\s*/i, '')
+    .replace(/^analyse pricing\s*-\s*/i, '')
+    .replace(/^outil web\s*-\s*/i, '')
+    .trim() || 'l’offre'
+}
+
+function channelLabel(template: StarterTemplateContext | null | undefined, project: ProjectRecord): string {
+  const raw = template?.channel || project.tags.find((tag) => tag.startsWith('canal:'))?.replace('canal:', '') || 'tous'
+  const labels: Record<string, string> = {
+    tous: 'tous canaux',
+    direct: 'vente directe',
+    ambassadeur: 'ambassadeurs',
+    operateur: 'opérateur / marque blanche',
+    interne: 'interne',
+  }
+  return labels[raw] || raw
+}
+
+function familyMessages(family: string, product: string, channel: string) {
+  const base = {
+    promise: `${product} aide à clarifier une offre et à la rendre plus simple à vendre sur le canal ${channel}.`,
+    target: `Clients ou partenaires concernés par ${product}. Segment exact à confirmer selon le catalogue et les canaux actifs.`,
+    problems: [
+      'Offre difficile à expliquer rapidement.',
+      'Bénéfices client ou partenaire insuffisamment formalisés.',
+      'Différences de canal à clarifier avant publication.',
+    ],
+    benefits: [
+      'Message commercial plus clair.',
+      'Support réutilisable par les équipes.',
+      'Réduction des zones floues avant validation.',
+    ],
+    offer: `Périmètre de ${product} à compléter avec les composants exacts, options, dépendances et limites connues.`,
+  }
+
+  if (family === 'connectivite') {
+    return {
+      promise: `${product} permet de sécuriser et structurer l’accès réseau des sites clients avec une connectivité adaptée aux usages critiques, au télétravail, aux communications cloud et aux services opérés.`,
+      target: channel.includes('opérateur')
+        ? 'Opérateurs, partenaires marque blanche ou revendeurs qui veulent intégrer une offre de connectivité fiable dans leur propre catalogue, avec un modèle achat/revente clair.'
+        : channel.includes('ambassadeur')
+          ? 'Ambassadeurs qui adressent des PME, ETI ou sites multi-implantations ayant besoin d’un accès Internet professionnel simple à vendre, fiable et complémentaire aux offres voix/cloud.'
+          : 'Entreprises ayant besoin d’un accès Internet professionnel fiable pour leurs usages métiers, communications unifiées, cloud, télétravail ou sites critiques.',
+      problems: [
+        'Les clients comparent souvent les offres uniquement au prix sans percevoir les différences de service, de débit, de garantie ou d’accompagnement.',
+        'Les commerciaux ont besoin d’un discours simple pour distinguer FTTH, FTTE, FTTO, backup et options associées.',
+        'Le canal de vente doit clarifier ce qui relève du prix public, du prix partenaire ou de l’intégration catalogue.',
+      ],
+      benefits: [
+        'Fiabilise les usages métier dépendants du réseau : voix, cloud, outils collaboratifs, télétravail et applications critiques.',
+        'Facilite la vente croisée avec UCaaS, téléphonie hébergée, SIP Trunk, Teams ou services managés.',
+        'Permet d’adapter le niveau de service au besoin réel du site : accès principal, accès critique, backup ou montée en gamme.',
+        channel.includes('opérateur')
+          ? 'Donne au partenaire une brique connectivité intégrable dans son catalogue avec un discours orienté marge, récurrence et maîtrise du parcours client.'
+          : 'Donne aux équipes commerciales un argumentaire simple : sécuriser les usages, réduire les risques d’interruption et mieux qualifier le besoin réseau.',
+      ],
+      offer: `Décrire ici les accès couverts par ${product} : technologie, débit, GTR/SLA si applicable, routeur, backup, options, éligibilité, délai de livraison, support et limites. Les éléments exacts doivent être confirmés par catalogue actif.`,
+    }
+  }
+
+  if (family === 'ucaas') {
+    return {
+      promise: `${product} aide à moderniser la téléphonie d’entreprise avec une solution hébergée, opérée et plus simple à faire évoluer.`,
+      target: 'Entreprises ou partenaires qui veulent simplifier la téléphonie, réduire la complexité PBX et accompagner les nouveaux usages voix, mobilité et collaboration.',
+      problems: [
+        'Téléphonie historique difficile à faire évoluer.',
+        'Besoin de relier voix fixe, mobilité, télétravail et outils collaboratifs.',
+        'Nécessité de clarifier les licences, options et limites avant vente.',
+      ],
+      benefits: [
+        'Simplifie l’exploitation et les évolutions de la téléphonie.',
+        'Rend le discours commercial plus lisible entre socle, licences et options.',
+        'Aide à protéger la valeur du parc installé en ajoutant les bons usages plutôt qu’en remplaçant tout.',
+      ],
+      offer: `Décrire ici le socle, les licences, les options, les terminaux, les dépendances techniques et les règles canal de ${product}.`,
+    }
+  }
+
+  return base
+}
+
+export function buildStarterContentFields(input: {
+  project: ProjectRecord
+  template?: StarterTemplateContext | null
+}): Record<string, string> {
+  const project = input.project
+  const template = input.template || null
+  const product = productLabel(project)
+  const channel = channelLabel(template, project)
+  const family = inferProductFamily(project)
+  const messages = familyMessages(family, product, channel)
+  const fields: Record<string, string> = {}
+
+  for (const section of template?.sections || []) {
+    if (section.id === 'promise') fields[section.id] = messages.promise
+    else if (section.id === 'target') fields[section.id] = messages.target
+    else if (section.id === 'problems') fields[section.id] = messages.problems.map((item) => `- ${item}`).join('\n')
+    else if (section.id === 'benefits') fields[section.id] = messages.benefits.map((item) => `- ${item}`).join('\n')
+    else if (section.id === 'offer') fields[section.id] = messages.offer
+    else if (section.id === 'pricing') {
+      fields[section.id] = [
+        'À compléter uniquement avec une source tarifaire active.',
+        `Canal concerné : ${channel}.`,
+        'Ne pas mélanger prix public, prix partenaire, prix d’achat et hypothèse de travail.',
+        'Si aucune source pricing fiable n’est disponible, masquer les prix et lister les points à valider.',
+      ].join('\n')
+    } else if (section.id === 'objections') {
+      fields[section.id] = [
+        '- “Pourquoi cette offre plutôt qu’un accès moins cher ?” → Répondre par le niveau de service, les usages critiques, l’accompagnement et la cohérence avec les services Dstny.',
+        '- “Est-ce adapté à tous les sites ?” → Qualifier le besoin : criticité, débit, usages voix/cloud, backup, budget et contraintes d’éligibilité.',
+        '- “Quels prix appliquer ?” → Répondre uniquement avec le catalogue actif du canal concerné.',
+      ].join('\n')
+    } else if (section.id === 'sources') {
+      fields[section.id] = [
+        'Sources à rattacher avant publication :',
+        '- catalogue produit actif ;',
+        '- source pricing du canal concerné ;',
+        '- fiche technique ou procédure si disponible ;',
+        '- arbitrages internes ou décisions projet.',
+        '',
+        'Statut : brouillon métier pré-rempli, à valider avec sources.',
+      ].join('\n')
+    } else {
+      fields[section.id] = section.purpose
+    }
+  }
+
+  return fields
 }
 
 export function buildProjectBrief(project: ProjectBundle): string {

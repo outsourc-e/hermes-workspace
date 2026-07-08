@@ -5,6 +5,7 @@ import { getTemplate } from '../../../server/dstny-templates'
 import {
   addProjectArtifact,
   buildMarkdownFromContent,
+  buildStarterContentFields,
   getProject,
   getProjectContentDraft,
   saveProjectContentDraft,
@@ -35,7 +36,7 @@ export const Route = createFileRoute('/api/projects/content')({
 
         try {
           const body = (await request.json().catch(() => ({}))) as SaveProjectContentDraftInput & {
-            action?: 'save' | 'generate_markdown'
+            action?: 'save' | 'generate_markdown' | 'suggest_content'
             createArtifact?: boolean
           }
           const project = getProject(body.projectId)
@@ -43,6 +44,16 @@ export const Route = createFileRoute('/api/projects/content')({
 
           let markdown = body.markdown
           const template = getTemplate(body.templateId || project.templateId || '')
+          let fields = body.fields || {}
+          if (body.action === 'suggest_content') {
+            const existing = Object.fromEntries(
+              Object.entries(fields).filter(([, value]) => typeof value === 'string' && value.trim()),
+            )
+            fields = {
+              ...buildStarterContentFields({ project, template }),
+              ...existing,
+            }
+          }
           if (body.action === 'generate_markdown') {
             const sectionTitles = Object.fromEntries(
               (template?.sections || []).map((section) => [section.id, section.title]),
@@ -51,13 +62,14 @@ export const Route = createFileRoute('/api/projects/content')({
               project,
               templateName: template?.name,
               sectionTitles,
-              fields: body.fields || {},
+              fields,
             })
           }
 
           const draft = saveProjectContentDraft({
             ...body,
             templateId: body.templateId || project.templateId,
+            fields,
             markdown,
           })
 

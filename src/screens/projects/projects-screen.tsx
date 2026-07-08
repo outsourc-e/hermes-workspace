@@ -775,7 +775,7 @@ export function ProjectsScreen() {
     }
   }
 
-  async function saveContentDraft(action: 'save' | 'generate_markdown') {
+  async function saveContentDraft(action: 'save' | 'generate_markdown' | 'suggest_content') {
     if (!selected) return
     setSavingContent(true)
     try {
@@ -793,9 +793,17 @@ export function ProjectsScreen() {
           createArtifact: action === 'generate_markdown',
         }),
       })
+      setContentFields(result.draft.fields || {})
       setContentMarkdown(result.draft.markdown || '')
       await refreshProjects()
-      toast(action === 'generate_markdown' ? 'Markdown généré.' : 'Brouillon enregistré.', { type: 'success' })
+      toast(
+        action === 'generate_markdown'
+          ? 'Markdown généré.'
+          : action === 'suggest_content'
+            ? 'Brouillon métier pré-rempli.'
+            : 'Brouillon enregistré.',
+        { type: 'success' },
+      )
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Studio contenu indisponible.', { type: 'error' })
     } finally {
@@ -1181,6 +1189,14 @@ export function ProjectsScreen() {
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={savingContent}
+                          onClick={() => void saveContentDraft('suggest_content')}
+                        >
+                          Pré-remplir avec Hermes
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

@@ -8,6 +8,7 @@ import {
   addProjectSource,
   buildProjectBrief,
   buildMarkdownFromContent,
+  buildStarterContentFields,
   createProject,
   getProject,
   getProjectBundle,
@@ -152,5 +153,32 @@ describe('project cockpit registry', () => {
     expect(draft.markdown).toContain('## Promesse')
     expect(bundle?.contentDraft?.fields.promise).toContain('connectivite fiable')
     expect(bundle?.contentDraft?.markdown).toContain('Statut : brouillon')
+  })
+
+  it('suggests business starter content by product family and channel', async () => {
+    const project = createProject({
+      title: 'Fiche produit PDF - Connectivité FTTO',
+      templateId: 'template_fiche_produit_pdf_operateur',
+      tags: 'fiche_produit_pdf, connectivite, canal:operateur',
+    })
+    const fields = buildStarterContentFields({
+      project,
+      template: {
+        id: 'template_fiche_produit_pdf_operateur',
+        name: 'Fiche produit PDF - Opérateur / Marque blanche',
+        channel: 'operateur',
+        sections: [
+          { id: 'promise', title: 'Promesse', purpose: '', required: true },
+          { id: 'target', title: 'Cible', purpose: '', required: true },
+          { id: 'benefits', title: 'Bénéfices', purpose: '', required: true },
+          { id: 'pricing', title: 'Pricing', purpose: '', required: true },
+        ],
+      },
+    })
+
+    expect(fields.promise).toContain('connectivité')
+    expect(fields.target).toContain('marque blanche')
+    expect(fields.benefits).toContain('catalogue')
+    expect(fields.pricing).toContain('source tarifaire active')
   })
 })
