@@ -31,6 +31,7 @@ usage=$(curl -s -m 15 -H "Cookie: claude-auth=$TOK" "$BASE_URL/api/swarm-usage" 
 timeline=$(curl -s -m 15 -H "Cookie: claude-auth=$TOK" "$BASE_URL/api/swarm-timeline?limit=500" || echo '{}')
 queue=$(curl -s -m 15 -H "Cookie: claude-auth=$TOK" "$BASE_URL/api/swarm-queue" || echo '{}')
 scoreboard=$(curl -s -m 15 -H "Cookie: claude-auth=$TOK" "$BASE_URL/api/swarm-scoreboard" || echo '{}')
+goals=$(curl -s -m 15 -H "Cookie: claude-auth=$TOK" "$BASE_URL/api/swarm-goals" || echo '{}')
 
 # Watchdog incidents in the last 24h (log lines carry no timestamps, so use
 # file mtime as "recent" proxy plus today's alert lines).
@@ -59,12 +60,12 @@ return out' 2>/dev/null | head -6 || true)
 disk_free=$(df -g "$HOME" 2>/dev/null | awk 'NR==2 {print $4}')
 
 message=$(WATCHDOG_RECENT="$watchdog_recent" CALENDAR_TODAY="$calendar_today" DISK_FREE="$disk_free" \
-  python3 - "$missions" "$health" "$usage" "$timeline" "$queue" "$scoreboard" <<'PY'
+  python3 - "$missions" "$health" "$usage" "$timeline" "$queue" "$scoreboard" "$goals" <<'PY'
 import sys, json, os, time
 def load(i):
     try: return json.loads(sys.argv[i])
     except Exception: return {}
-m, h, u, tl, q, sb = (load(i) for i in range(1, 7))
+m, h, u, tl, q, sb, gl = (load(i) for i in range(1, 8))
 missions = m.get('missions', []) if isinstance(m, dict) else []
 blocked, active, greenlight = 0, 0, []
 for mi in missions:
@@ -91,6 +92,8 @@ guards = [e for e in entries if e.get('type') == 'branch_guard']
 # Queue state.
 qitems = q.get('items', []) if isinstance(q, dict) else []
 q_open = [i for i in qitems if i.get('status') in ('queued', 'dispatched')]
+proposals = [i for i in qitems if i.get('status') == 'proposed']
+active_goals = [g for g in (gl.get('goals', []) if isinstance(gl, dict) else []) if g.get('state') == 'active']
 
 # Scoreboard: workers under 60% success with ≥3 attempts.
 weak = []
@@ -110,6 +113,12 @@ if failed:
         lines.append(f"  ↳ {e.get('workerId','?')}: {str(e.get('message',''))[:110]}")
 if weak:
     lines.append("• 📉 Underperforming: " + ", ".join(weak[:4]))
+if proposals:
+    lines.append(f"• 💡 {len(proposals)} swarm proposal(s) awaiting approval (`!proposals`):")
+    for pr in proposals[:3]:
+        lines.append(f"  ↳ `{pr.get('id','')}` {str(pr.get('task',''))[:100]}")
+for g in active_goals[:3]:
+    lines.append(f"• 🎯 Goal [iter {g.get('iterations',0)}/{g.get('maxIterations',5)}]: {str(g.get('goal',''))[:100]}")
 lines.append(f"• Tokens today: {today:,}" + (f" / {cap.get('capTokens'):,} cap" if cap.get('enabled') else ""))
 disk = os.environ.get('DISK_FREE', '')
 if disk:

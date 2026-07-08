@@ -29,7 +29,7 @@ export type QueueItem = {
   task: string
   worker: string | null // null = auto-pick idle worker at drain time
   priority: QueuePriority
-  status: 'queued' | 'dispatched' | 'done' | 'failed' | 'cancelled'
+  status: 'proposed' | 'queued' | 'dispatched' | 'done' | 'failed' | 'cancelled'
   createdAt: number
   dispatchedAt: number | null
   note: string | null
@@ -63,11 +63,9 @@ function loadQueue(): QueueFile {
 
 function saveQueue(queue: QueueFile): void {
   // Cap history: keep all open items plus the most recent closed ones.
-  const open = queue.items.filter(
-    (i) => i.status === 'queued' || i.status === 'dispatched',
-  )
-  const closed = queue.items
-    .filter((i) => i.status !== 'queued' && i.status !== 'dispatched')
+  const OPEN = new Set(['proposed', 'queued', 'dispatched'])
+  const open = queue.items.filter((i) => OPEN.has(i.status))
+  const closed = queue.items.filter((i) => !OPEN.has(i.status))
     .slice(-Math.max(0, MAX_ITEMS - open.length))
   const next = { items: [...open, ...closed] }
   mkdirSync(dirname(swarmQueuePath()), { recursive: true })
@@ -90,6 +88,7 @@ export function enqueueTask(input: {
   worker?: string | null
   priority?: number
   note?: string | null
+  status?: 'proposed' | 'queued'
 }): QueueItem {
   const task = input.task.trim().slice(0, MAX_TASK_CHARS)
   if (!task) throw new Error('task required')
@@ -102,7 +101,7 @@ export function enqueueTask(input: {
     task,
     worker: input.worker?.trim() || null,
     priority,
-    status: 'queued',
+    status: input.status ?? 'queued',
     createdAt: Date.now(),
     dispatchedAt: null,
     note: input.note?.trim() || null,

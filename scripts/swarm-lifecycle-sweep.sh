@@ -128,3 +128,20 @@ except Exception: print("")' 2>/dev/null || echo '')
     echo "{\"at\":$(date +%s)000,\"zombie_reaped\":\"$REAPED\"}" >> "$LOG_FILE"
   fi
 fi
+
+# ---- proactive proposals + goal engine ------------------------------------------
+# Scanners suggest work (status=proposed, operator approves); goal engine
+# advances at most one standing goal per cycle. Both honor the Clear All pause.
+curl -sS -m 30 -X POST -H 'Content-Type: application/json' \
+  -d '{"action":"propose"}' "http://127.0.0.1:3000/api/swarm-queue" >/dev/null 2>&1 || true
+GOAL_STEP=$(curl -sS -m 660 -X POST -H 'Content-Type: application/json' \
+  -d '{"action":"step"}' "http://127.0.0.1:3000/api/swarm-goals" 2>/dev/null || echo '')
+if [ -n "$GOAL_STEP" ]; then
+  OUTCOME=$(printf '%s' "$GOAL_STEP" | python3 -c 'import json,sys
+try: print(json.load(sys.stdin).get("outcome",""))
+except Exception: print("")' 2>/dev/null || echo '')
+  case "$OUTCOME" in
+    ""|"no active goals"|"paused"|waiting*) : ;;
+    *) echo "{\"at\":$(date +%s)000,\"goal_step\":\"$OUTCOME\"}" >> "$LOG_FILE" ;;
+  esac
+fi

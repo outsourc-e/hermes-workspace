@@ -8,6 +8,7 @@ let dir: string
 let prev: string | undefined
 
 beforeAll(() => {
+  process.env.HERMES_DISPATCH_PAUSE_PATH = join(tmpdir(), 'no-pause-' + Date.now())
   dir = mkdtempSync(join(tmpdir(), 'swarm-queue-'))
   prev = process.env.HERMES_SWARM_QUEUE_PATH
   process.env.HERMES_SWARM_QUEUE_PATH = join(dir, 'queue.json')

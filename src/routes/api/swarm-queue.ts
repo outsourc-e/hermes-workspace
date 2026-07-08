@@ -16,6 +16,7 @@ import {
   planQueueDrain,
   updateQueueItem,
 } from '../../server/swarm-queue'
+import { generateProposals } from '../../server/swarm-suggest'
 import { dispatchSwarmAssignments } from './swarm-dispatch'
 
 export const Route = createFileRoute('/api/swarm-queue')({
@@ -36,6 +37,28 @@ export const Route = createFileRoute('/api/swarm-queue')({
           body = (await request.json()) as Record<string, unknown>
         } catch {
           return json({ ok: false, error: 'Invalid JSON' }, { status: 400 })
+        }
+
+        if (body.action === 'propose') {
+          // Run the proactive scanners (called by the lifecycle sweep).
+          const created = generateProposals()
+          return json({ ok: true, action: 'propose', created })
+        }
+
+        if (body.action === 'approve') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          const current = listQueue().find((i) => i.id === id)
+          if (!current) {
+            return json({ ok: false, error: 'Unknown id' }, { status: 404 })
+          }
+          if (current.status !== 'proposed') {
+            return json(
+              { ok: false, error: `Item is ${current.status}, not proposed` },
+              { status: 400 },
+            )
+          }
+          const item = updateQueueItem(id, { status: 'queued' })
+          return json({ ok: true, item })
         }
 
         if (body.action === 'cancel') {
@@ -76,7 +99,11 @@ export const Route = createFileRoute('/api/swarm-queue')({
                 status: 'dispatched',
                 worker: plan.workerId,
               })
-              results.push({ id: plan.item.id, workerId: plan.workerId, ok: true })
+              results.push({
+                id: plan.item.id,
+                workerId: plan.workerId,
+                ok: true,
+              })
             } catch (error) {
               results.push({
                 id: plan.item.id,

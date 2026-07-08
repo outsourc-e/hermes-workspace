@@ -16,7 +16,7 @@ import {
 } from '../../server/swarm-pipeline'
 import { dispatchSwarmAssignments } from './swarm-dispatch'
 
-async function dispatchStage(
+export async function dispatchStage(
   assignments: Array<{ workerId: string; task: string }>,
 ) {
   const res = (await dispatchSwarmAssignments({
@@ -35,12 +35,7 @@ async function dispatchStage(
   return (res.results ?? []).map((r) => ({
     workerId: r.workerId,
     ok: r.ok,
-    summary: (
-      r.checkpoint?.result ||
-      r.error ||
-      r.output ||
-      ''
-    ).slice(0, 1000),
+    summary: (r.checkpoint?.result || r.error || r.output || '').slice(0, 1000),
   }))
 }
 

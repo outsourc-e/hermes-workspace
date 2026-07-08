@@ -30,7 +30,8 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-const ENV_FILE = process.env.HERMES_ENV_FILE || join(homedir(), '.hermes', '.env')
+const ENV_FILE =
+  process.env.HERMES_ENV_FILE || join(homedir(), '.hermes', '.env')
 const BASE_URL = process.env.SWARM_BASE_URL || 'http://localhost:3000'
 const SESSIONS_FILE =
   process.env.SWARM_SESSIONS_FILE ||
@@ -43,7 +44,12 @@ function getenv(name) {
     const line = readFileSync(ENV_FILE, 'utf8')
       .split('\n')
       .find((l) => l.startsWith(`${name}=`))
-    return line ? line.slice(name.length + 1).replace(/^["']|["']\s*$/g, '').trim() : ''
+    return line
+      ? line
+          .slice(name.length + 1)
+          .replace(/^["']|["']\s*$/g, '')
+          .trim()
+      : ''
   } catch {
     return ''
   }
@@ -54,7 +60,8 @@ const CHANNEL =
   process.env.DISCORD_HOME_CHANNEL ||
   getenv('DISCORD_HOME_CHANNEL') ||
   getenv('DISCORD_DIGEST_CHANNEL')
-const OPERATOR_ID = process.env.DISCORD_OPERATOR_ID || getenv('DISCORD_OPERATOR_ID')
+const OPERATOR_ID =
+  process.env.DISCORD_OPERATOR_ID || getenv('DISCORD_OPERATOR_ID')
 
 if (!BOT_TOKEN || !CHANNEL) {
   console.error('[discord-bot] missing DISCORD_BOT_TOKEN or channel — exiting')
@@ -123,7 +130,9 @@ async function cmdStatus() {
     workspace('/api/swarm-health'),
   ])
   const list = missions.missions || []
-  const active = list.filter((m) => ['executing', 'dispatching', 'planning', 'reviewing'].includes(m.state))
+  const active = list.filter((m) =>
+    ['executing', 'dispatching', 'planning', 'reviewing'].includes(m.state),
+  )
   const blocked = list.filter((m) => m.state === 'blocked')
   const warnings = health?.summary?.warnings || []
   const lines = [
@@ -131,9 +140,15 @@ async function cmdStatus() {
     `Missions: ${active.length} active, ${blocked.length} blocked (last ${list.length})`,
   ]
   for (const m of active.slice(0, 5)) {
-    lines.push(`• \`${m.id}\` ${m.state} — ${String(m.title || '').slice(0, 80)}`)
+    lines.push(
+      `• \`${m.id}\` ${m.state} — ${String(m.title || '').slice(0, 80)}`,
+    )
   }
-  lines.push(warnings.length ? `Health warnings: ${warnings.slice(0, 3).join(' | ').slice(0, 300)}` : 'Health: no warnings')
+  lines.push(
+    warnings.length
+      ? `Health warnings: ${warnings.slice(0, 3).join(' | ').slice(0, 300)}`
+      : 'Health: no warnings',
+  )
   await say(lines.join('\n'))
 }
 
@@ -176,13 +191,21 @@ async function cmdDispatch(workerId, task) {
 async function cmdUnblock(missionId, assignmentId, resolution) {
   const res = await workspace('/api/swarm-missions', {
     method: 'POST',
-    body: JSON.stringify({ action: 'unblock', missionId, assignmentId, resolution }),
+    body: JSON.stringify({
+      action: 'unblock',
+      missionId,
+      assignmentId,
+      resolution,
+    }),
   })
-  if (!res.ok) return say(`Failed: ${String(res.error || 'unknown').slice(0, 200)}`)
+  if (!res.ok)
+    return say(`Failed: ${String(res.error || 'unknown').slice(0, 200)}`)
   if (resolution === 'retry' && res.redispatch) {
     await cmdDispatch(res.redispatch.workerId, res.redispatch.task)
   } else {
-    await say(`Assignment \`${assignmentId}\` ${resolution === 'retry' ? 'retried' : 'dismissed'} ✅`)
+    await say(
+      `Assignment \`${assignmentId}\` ${resolution === 'retry' ? 'retried' : 'dismissed'} ✅`,
+    )
   }
 }
 
@@ -191,7 +214,11 @@ async function cmdClearBlocked() {
     method: 'POST',
     body: JSON.stringify({ action: 'clear-blocked' }),
   })
-  await say(res.ok ? 'Blocked board cleared ✅' : `Failed: ${String(res.error || '').slice(0, 200)}`)
+  await say(
+    res.ok
+      ? 'Blocked board cleared ✅'
+      : `Failed: ${String(res.error || '').slice(0, 200)}`,
+  )
 }
 
 async function cmdQueueAdd(rest) {
@@ -219,7 +246,9 @@ async function cmdQueueAdd(rest) {
 
 async function cmdQueueList() {
   const res = await workspace('/api/swarm-queue')
-  const open = (res.items || []).filter((i) => ['queued', 'dispatched'].includes(i.status))
+  const open = (res.items || []).filter((i) =>
+    ['queued', 'dispatched'].includes(i.status),
+  )
   if (!open.length) return say('Queue empty. 🎉')
   const rows = open
     .slice(0, 15)
@@ -230,12 +259,54 @@ async function cmdQueueList() {
   await say(`**Task queue** (${open.length} open)\n${rows.join('\n')}`)
 }
 
+
+async function cmdProposals() {
+  const res = await workspace('/api/swarm-queue')
+  const proposed = (res.items || []).filter((i) => i.status === 'proposed')
+  if (!proposed.length) return say('No open proposals.')
+  const rows = proposed.slice(0, 10).map(
+    (i) => `• \`${i.id}\` ${i.task.slice(0, 120)}`,
+  )
+  await say(`**Swarm proposals** (approve: \`!approve <id>\`)\n${rows.join('\n')}`)
+}
+
+async function cmdApprove(id) {
+  if (!id) return say('Usage: `!approve <id>`')
+  const res = await workspace('/api/swarm-queue', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'approve', id }),
+  })
+  await say(res.ok ? `Approved \`${id}\` → queued ✅` : `Failed: ${String(res.error || '').slice(0, 200)}`)
+}
+
+async function cmdGoalAdd(rest) {
+  const goal = rest.join(' ')
+  if (!goal) return say('Usage: `!goal <standing goal…>`')
+  const res = await workspace('/api/swarm-goals', {
+    method: 'POST',
+    body: JSON.stringify({ goal }),
+  })
+  await say(res.ok ? `Goal \`${res.goal.id}\` active — swarm plans first pipeline within 10 min ✅` : `Failed: ${String(res.error || '').slice(0, 200)}`)
+}
+
+async function cmdGoals() {
+  const res = await workspace('/api/swarm-goals')
+  const goals = (res.goals || []).slice(0, 8)
+  if (!goals.length) return say('No goals. Add one: `!goal <text>`')
+  const rows = goals.map(
+    (g) => `• \`${g.id}\` [${g.state}, iter ${g.iterations}/${g.maxIterations}] ${g.goal.slice(0, 100)}`,
+  )
+  await say(`**Standing goals**\n${rows.join('\n')}`)
+}
+
 const HELP = [
   '**Hermes swarm bot**',
   '`!status` — missions + health',
   '`!blocked` — blocked assignments',
   '`!queue [p1|p2|p3] [@worker] <task…>` — add to queue (operator only)',
   '`!queuelist` — show queue',
+  '`!proposals` — swarm-suggested tasks · `!approve <id>` (operator only)',
+  '`!goal <text…>` — add standing goal (operator only) · `!goals` — list',
   '`!dispatch <worker> <task…>` — send work (operator only)',
   '`!retry <missionId> <assignmentId>` — retry blocked (operator only)',
   '`!dismiss <missionId> <assignmentId>` — dismiss blocked (operator only)',
@@ -248,7 +319,13 @@ async function handle(msg) {
   const [cmd, ...rest] = text.split(/\s+/)
   const isOperator = OPERATOR_ID && msg.author?.id === OPERATOR_ID
 
-  const mutating = ['!dispatch', '!retry', '!dismiss', '!clearblocked', '!queue'].includes(cmd)
+  const mutating = [
+    '!dispatch',
+    '!retry',
+    '!dismiss',
+    '!clearblocked',
+    '!queue',
+  , '!approve', '!goal'].includes(cmd)
   if (mutating && !isOperator) {
     await say(
       OPERATOR_ID
@@ -271,12 +348,22 @@ async function handle(msg) {
       const [missionId, assignmentId] = rest
       if (!missionId || !assignmentId)
         return say(`Usage: \`${cmd} <missionId> <assignmentId>\``)
-      await cmdUnblock(missionId, assignmentId, cmd === '!retry' ? 'retry' : 'dismiss')
+      await cmdUnblock(
+        missionId,
+        assignmentId,
+        cmd === '!retry' ? 'retry' : 'dismiss',
+      )
     } else if (cmd === '!clearblocked') await cmdClearBlocked()
     else if (cmd === '!queue') await cmdQueueAdd(rest)
     else if (cmd === '!queuelist') await cmdQueueList()
+    else if (cmd === '!proposals') await cmdProposals()
+    else if (cmd === '!approve') await cmdApprove(rest[0])
+    else if (cmd === '!goal') await cmdGoalAdd(rest)
+    else if (cmd === '!goals') await cmdGoals()
   } catch (err) {
-    await say(`Command failed: ${String(err?.message || err).slice(0, 200)}`).catch(() => {})
+    await say(
+      `Command failed: ${String(err?.message || err).slice(0, 200)}`,
+    ).catch(() => {})
   }
 }
 
@@ -308,7 +395,9 @@ async function resolveChannel() {
       try {
         await discord(`/channels/${c.id}/messages?limit=1`)
         channelId = c.id
-        console.log(`[discord-bot] configured channel unreachable; using #${c.name} (${c.id})`)
+        console.log(
+          `[discord-bot] configured channel unreachable; using #${c.name} (${c.id})`,
+        )
         return
       } catch {
         /* try next */
@@ -325,7 +414,9 @@ async function main() {
   // Start from the latest message so old history isn't replayed.
   const recent = await discord(`/channels/${channelId}/messages?limit=1`)
   lastId = recent[0]?.id || ''
-  console.log(`[discord-bot] online as ${me.username}, watching channel ${channelId}`)
+  console.log(
+    `[discord-bot] online as ${me.username}, watching channel ${channelId}`,
+  )
 
   for (;;) {
     try {

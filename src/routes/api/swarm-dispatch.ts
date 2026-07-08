@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { ragSearchSafe } from '../../server/rag-index'
+import { processVerification } from '../../server/swarm-verify'
 import {
   newestCheckpointFromMessages,
   parseSwarmCheckpoint,
@@ -79,6 +80,7 @@ type AssignmentRequest = {
   dependsOn?: Array<string>
   reviewRequired?: boolean
   direct?: boolean
+  oneshot?: boolean
 }
 
 type DispatchRequest = {
@@ -298,6 +300,7 @@ function parseAssignments(value: unknown): Array<AssignmentRequest> {
     const reviewRequired =
       typeof obj.reviewRequired === 'boolean' ? obj.reviewRequired : undefined
     const direct = typeof obj.direct === 'boolean' ? obj.direct : undefined
+    const oneshot = typeof obj.oneshot === 'boolean' ? obj.oneshot : undefined
     if (!workerId || !task || !validateWorkerId(workerId)) continue
     assignments.push({
       workerId,
@@ -306,6 +309,7 @@ function parseAssignments(value: unknown): Array<AssignmentRequest> {
       dependsOn,
       reviewRequired,
       direct,
+      oneshot,
     })
   }
   return assignments
@@ -709,6 +713,14 @@ function finalizeDispatch(
       /* skill harvest is best-effort */
     }
   }
+  // Trust-but-verify: queue adversarial review of fresh DONE work; alert on
+  // refuted verdicts coming back from the verifier.
+  processVerification({
+    workerId,
+    task: assignment.task,
+    ok: result.ok,
+    checkpoint: result.checkpoint,
+  })
   recordDispatchBlock(workerId, assignment, result, options)
 }
 
@@ -1378,11 +1390,12 @@ function runWorker(
     }
 
     // Prefer the persistent live agent session when available/startable.
-    const liveResult = await sendPromptToLiveSession(
-      workerId,
-      prompt,
-      routed?.model ?? null,
-    )
+    // assignment.oneshot forces the direct CLI path — callers that need the
+    // full answer synchronously (goal planning) can't use the live TUI,
+    // whose first checkpoint is often just an ack.
+    const liveResult = assignment.oneshot
+      ? null
+      : await sendPromptToLiveSession(workerId, prompt, routed?.model ?? null)
     if (liveResult) {
       markDispatchResult(workerId, liveResult)
       if (options?.waitForCheckpoint && liveResult.ok) {
@@ -1496,7 +1509,11 @@ function runWorker(
         workerId,
         assignment,
         liveResult,
-        { tier: routed?.tier ?? null, model: routed?.model ?? null, mode: 'tmux' },
+        {
+          tier: routed?.tier ?? null,
+          model: routed?.model ?? null,
+          mode: 'tmux',
+        },
         options,
       )
       resolve(liveResult)
@@ -1518,7 +1535,11 @@ function runWorker(
         workerId,
         assignment,
         result,
-        { tier: routed?.tier ?? null, model: routed?.model ?? null, mode: 'oneshot' },
+        {
+          tier: routed?.tier ?? null,
+          model: routed?.model ?? null,
+          mode: 'oneshot',
+        },
         options,
       )
       resolve(result)
@@ -1542,164 +1563,195 @@ function runWorker(
     }
 
     const launchOneshot = (modelArg: string | null): void => {
-    const proc = execFile(
-      cmd,
-      buildHermesChatQueryArgs(prompt, {
-        model: modelArg,
-        bypassApprovals,
-      }),
-      {
-        env,
-        // Run oneshot workers in the shared workspace root (not $HOME) so any
-        // files an agent writes land in the Files-page root instead of
-        // scattering project output across the home directory.
-        cwd: defaultWorkspaceRoot(),
-        timeout: timeoutMs,
-        maxBuffer: MAX_OUTPUT_CHARS,
-        killSignal: 'SIGTERM',
-      },
-      (error, stdout, stderr) => {
-        const durationMs = Date.now() - startedAt
-        const stdoutStr = (stdout || '').toString()
-        const stderrStr = (stderr || '').toString()
-        const out =
-          stdoutStr.length > MAX_OUTPUT_CHARS
-            ? stdoutStr.slice(-MAX_OUTPUT_CHARS)
-            : stdoutStr
+      const proc = execFile(
+        cmd,
+        buildHermesChatQueryArgs(prompt, {
+          model: modelArg,
+          bypassApprovals,
+        }),
+        {
+          env,
+          // Run oneshot workers in the shared workspace root (not $HOME) so any
+          // files an agent writes land in the Files-page root instead of
+          // scattering project output across the home directory.
+          cwd: defaultWorkspaceRoot(),
+          timeout: timeoutMs,
+          maxBuffer: MAX_OUTPUT_CHARS,
+          killSignal: 'SIGTERM',
+        },
+        (error, stdout, stderr) => {
+          const durationMs = Date.now() - startedAt
+          const stdoutStr = (stdout || '').toString()
+          const stderrStr = (stderr || '').toString()
+          const out =
+            stdoutStr.length > MAX_OUTPUT_CHARS
+              ? stdoutStr.slice(-MAX_OUTPUT_CHARS)
+              : stdoutStr
 
-        if (error) {
-          // Router escalation: one retry on the next tier up before
-          // surfacing the failure (light task that turned out hard, model
-          // refused/context blown, transient provider error).
-          if (escalationLeft > 0 && currentTier) {
-            const nextTier = escalateTier(currentTier)
-            if (nextTier) {
-              escalationLeft -= 1
-              currentTier = nextTier
-              launchOneshot(TIER_MODELS[nextTier])
-              return
+          if (error) {
+            // Router escalation: one retry on the next tier up before
+            // surfacing the failure (light task that turned out hard, model
+            // refused/context blown, transient provider error).
+            if (escalationLeft > 0 && currentTier) {
+              const nextTier = escalateTier(currentTier)
+              if (nextTier) {
+                escalationLeft -= 1
+                currentTier = nextTier
+                launchOneshot(TIER_MODELS[nextTier])
+                return
+              }
             }
+            const code = (error as { code?: number | null }).code ?? null
+            const result: WorkerResult = {
+              workerId,
+              ok: false,
+              output: out,
+              error: stderrStr.trim() || error.message,
+              durationMs,
+              exitCode: typeof code === 'number' ? code : null,
+              delivery: 'oneshot',
+            }
+            markDispatchResult(workerId, result)
+            finalizeDispatch(
+              workerId,
+              assignment,
+              result,
+              {
+                tier: currentTier,
+                model: currentTier ? TIER_MODELS[currentTier] : null,
+                mode: 'oneshot',
+              },
+              options,
+            )
+            resolve(result)
+            return
           }
-          const code = (error as { code?: number | null }).code ?? null
+
           const result: WorkerResult = {
             workerId,
-            ok: false,
+            ok: true,
             output: out,
-            error: stderrStr.trim() || error.message,
+            error: stderrStr.trim() || null,
             durationMs,
-            exitCode: typeof code === 'number' ? code : null,
+            exitCode: 0,
             delivery: 'oneshot',
           }
+          if (options?.waitForCheckpoint) {
+            const checkpoint = parseSwarmCheckpoint(out)
+            if (checkpoint) {
+              markCheckpointResult(
+                workerId,
+                checkpoint,
+                options?.notifySessionKey ?? 'main',
+              )
+              recordMissionCheckpoint({
+                missionId: options?.missionId,
+                assignmentId: assignment.assignmentId ?? null,
+                workerId,
+                checkpoint,
+                source: 'swarm-dispatch',
+              })
+              appendSwarmMemoryEvent({
+                workerId,
+                missionId: options?.missionId ?? null,
+                assignmentId: assignment.assignmentId ?? null,
+                type: 'checkpoint',
+                summary:
+                  checkpoint.result ?? `Checkpoint ${checkpoint.stateLabel}`,
+                checkpoint,
+                event: {
+                  stateLabel: checkpoint.stateLabel,
+                  filesChanged: checkpoint.filesChanged,
+                  commandsRun: checkpoint.commandsRun,
+                  blocker: checkpoint.blocker,
+                  nextAction: checkpoint.nextAction,
+                },
+              })
+              publishSwarmCheckpointNotification({
+                workerId,
+                missionId: options?.missionId ?? null,
+                assignmentId: assignment.assignmentId ?? null,
+                checkpoint,
+                notifySessionKey: options?.notifySessionKey ?? 'main',
+              })
+              result.checkpoint = checkpoint
+              result.checkpointStatus = 'checkpointed'
+            } else {
+              // A oneshot that exited 0 ran to completion — the agent just
+              // didn't emit the structured checkpoint block. Synthesize a DONE
+              // checkpoint from its output so the assignment is recorded as
+              // completed instead of hanging as a false timeout/block.
+              const synthetic: ParsedSwarmCheckpoint = {
+                stateLabel: 'DONE',
+                runtimeState: 'idle',
+                checkpointStatus: 'done',
+                filesChanged: null,
+                commandsRun: null,
+                result:
+                  out.trim().slice(-500) ||
+                  'Completed (no structured checkpoint).',
+                blocker: null,
+                nextAction: null,
+                raw: out.trim().slice(-2000),
+              }
+              markCheckpointResult(
+                workerId,
+                synthetic,
+                options?.notifySessionKey ?? 'main',
+              )
+              recordMissionCheckpoint({
+                missionId: options?.missionId,
+                assignmentId: assignment.assignmentId ?? null,
+                workerId,
+                checkpoint: synthetic,
+                source: 'swarm-dispatch',
+              })
+              result.checkpoint = synthetic
+              result.checkpointStatus = 'checkpointed'
+            }
+          } else {
+            result.checkpointStatus = 'not-requested'
+          }
           markDispatchResult(workerId, result)
-          finalizeDispatch(workerId, assignment, result, { tier: currentTier, model: currentTier ? TIER_MODELS[currentTier] : null, mode: 'oneshot' }, options)
+          finalizeDispatch(
+            workerId,
+            assignment,
+            result,
+            {
+              tier: currentTier,
+              model: currentTier ? TIER_MODELS[currentTier] : null,
+              mode: 'oneshot',
+            },
+            options,
+          )
           resolve(result)
-          return
-        }
+        },
+      )
 
+      proc.on('error', (error) => {
         const result: WorkerResult = {
           workerId,
-          ok: true,
-          output: out,
-          error: stderrStr.trim() || null,
-          durationMs,
-          exitCode: 0,
+          ok: false,
+          output: '',
+          error: error.message,
+          durationMs: Date.now() - startedAt,
+          exitCode: null,
           delivery: 'oneshot',
         }
-        if (options?.waitForCheckpoint) {
-          const checkpoint = parseSwarmCheckpoint(out)
-          if (checkpoint) {
-            markCheckpointResult(
-              workerId,
-              checkpoint,
-              options?.notifySessionKey ?? 'main',
-            )
-            recordMissionCheckpoint({
-              missionId: options?.missionId,
-              assignmentId: assignment.assignmentId ?? null,
-              workerId,
-              checkpoint,
-              source: 'swarm-dispatch',
-            })
-            appendSwarmMemoryEvent({
-              workerId,
-              missionId: options?.missionId ?? null,
-              assignmentId: assignment.assignmentId ?? null,
-              type: 'checkpoint',
-              summary:
-                checkpoint.result ?? `Checkpoint ${checkpoint.stateLabel}`,
-              checkpoint,
-              event: {
-                stateLabel: checkpoint.stateLabel,
-                filesChanged: checkpoint.filesChanged,
-                commandsRun: checkpoint.commandsRun,
-                blocker: checkpoint.blocker,
-                nextAction: checkpoint.nextAction,
-              },
-            })
-            publishSwarmCheckpointNotification({
-              workerId,
-              missionId: options?.missionId ?? null,
-              assignmentId: assignment.assignmentId ?? null,
-              checkpoint,
-              notifySessionKey: options?.notifySessionKey ?? 'main',
-            })
-            result.checkpoint = checkpoint
-            result.checkpointStatus = 'checkpointed'
-          } else {
-            // A oneshot that exited 0 ran to completion — the agent just
-            // didn't emit the structured checkpoint block. Synthesize a DONE
-            // checkpoint from its output so the assignment is recorded as
-            // completed instead of hanging as a false timeout/block.
-            const synthetic: ParsedSwarmCheckpoint = {
-              stateLabel: 'DONE',
-              runtimeState: 'idle',
-              checkpointStatus: 'done',
-              filesChanged: null,
-              commandsRun: null,
-              result:
-                out.trim().slice(-500) || 'Completed (no structured checkpoint).',
-              blocker: null,
-              nextAction: null,
-              raw: out.trim().slice(-2000),
-            }
-            markCheckpointResult(
-              workerId,
-              synthetic,
-              options?.notifySessionKey ?? 'main',
-            )
-            recordMissionCheckpoint({
-              missionId: options?.missionId,
-              assignmentId: assignment.assignmentId ?? null,
-              workerId,
-              checkpoint: synthetic,
-              source: 'swarm-dispatch',
-            })
-            result.checkpoint = synthetic
-            result.checkpointStatus = 'checkpointed'
-          }
-        } else {
-          result.checkpointStatus = 'not-requested'
-        }
         markDispatchResult(workerId, result)
-        finalizeDispatch(workerId, assignment, result, { tier: currentTier, model: currentTier ? TIER_MODELS[currentTier] : null, mode: 'oneshot' }, options)
+        finalizeDispatch(
+          workerId,
+          assignment,
+          result,
+          {
+            tier: currentTier,
+            model: currentTier ? TIER_MODELS[currentTier] : null,
+            mode: 'oneshot',
+          },
+          options,
+        )
         resolve(result)
-      },
-    )
-
-    proc.on('error', (error) => {
-      const result: WorkerResult = {
-        workerId,
-        ok: false,
-        output: '',
-        error: error.message,
-        durationMs: Date.now() - startedAt,
-        exitCode: null,
-        delivery: 'oneshot',
-      }
-      markDispatchResult(workerId, result)
-      finalizeDispatch(workerId, assignment, result, { tier: currentTier, model: currentTier ? TIER_MODELS[currentTier] : null, mode: 'oneshot' }, options)
-      resolve(result)
-    })
+      })
     }
     launchOneshot(routed?.model ?? null)
   })
@@ -1734,7 +1786,10 @@ export async function evaluateSpendCap(): Promise<SpendCapStatus> {
   let spentTokens = 0
   try {
     const usage = await getSwarmUsage()
-    spentTokens = usage.workers.reduce((sum, w) => sum + (w.today.total || 0), 0)
+    spentTokens = usage.workers.reduce(
+      (sum, w) => sum + (w.today.total || 0),
+      0,
+    )
   } catch {
     // Can't read usage → fail open (don't wedge the swarm on a stats error).
     return {

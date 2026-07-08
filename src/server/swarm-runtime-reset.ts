@@ -210,11 +210,12 @@ export function reapZombieSwarmRuntimes(staleMinutes = 30): Array<string> {
   return reaped
 }
 
-const DISPATCH_PAUSE_PATH = join(
-  SWARM_CANONICAL_REPO,
-  '.runtime',
-  'dispatch-pause-until',
-)
+function dispatchPausePath(): string {
+  return (
+    process.env.HERMES_DISPATCH_PAUSE_PATH ||
+    join(SWARM_CANONICAL_REPO, '.runtime', 'dispatch-pause-until')
+  )
+}
 
 /**
  * Post-Clear-All dispatch pause. Automated dispatchers (queue drain,
@@ -224,7 +225,7 @@ const DISPATCH_PAUSE_PATH = join(
 export function pauseAutomatedDispatch(minutes = 10): void {
   try {
     mkdirSync(join(SWARM_CANONICAL_REPO, '.runtime'), { recursive: true })
-    writeFileSync(DISPATCH_PAUSE_PATH, String(Date.now() + minutes * 60_000))
+    writeFileSync(dispatchPausePath(), String(Date.now() + minutes * 60_000))
   } catch {
     /* best-effort */
   }
@@ -232,8 +233,8 @@ export function pauseAutomatedDispatch(minutes = 10): void {
 
 export function automatedDispatchPausedUntil(): number | null {
   try {
-    if (!existsSync(DISPATCH_PAUSE_PATH)) return null
-    const until = Number(readFileSync(DISPATCH_PAUSE_PATH, 'utf8').trim())
+    if (!existsSync(dispatchPausePath())) return null
+    const until = Number(readFileSync(dispatchPausePath(), 'utf8').trim())
     return Number.isFinite(until) && until > Date.now() ? until : null
   } catch {
     return null

@@ -9,7 +9,7 @@ type QueueItem = {
   task: string
   worker: string | null
   priority: 1 | 2 | 3
-  status: 'queued' | 'dispatched' | 'done' | 'failed' | 'cancelled'
+  status: 'proposed' | 'queued' | 'dispatched' | 'done' | 'failed' | 'cancelled'
   createdAt: number
 }
 
@@ -66,8 +66,22 @@ export function Swarm2QueuePanel({ className }: { className?: string }) {
     onSuccess: () => void invalidate(),
   })
 
+  const approveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await fetch('/api/swarm-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve', id }),
+      })
+    },
+    onSuccess: () => void invalidate(),
+  })
+
   const open = (data?.items ?? []).filter(
-    (i) => i.status === 'queued' || i.status === 'dispatched',
+    (i) =>
+      i.status === 'queued' ||
+      i.status === 'dispatched' ||
+      i.status === 'proposed',
   )
 
   return (
@@ -147,13 +161,22 @@ export function Swarm2QueuePanel({ className }: { className?: string }) {
               <span className="min-w-0 flex-1 truncate" title={item.task}>
                 {item.task}
               </span>
-              {item.status === 'queued' ? (
+              {item.status === 'proposed' ? (
+                <button
+                  type="button"
+                  onClick={() => approveMutation.mutate(item.id)}
+                  className="shrink-0 rounded border border-emerald-500/50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-emerald-500 hover:bg-emerald-500/10"
+                >
+                  Approve
+                </button>
+              ) : null}
+              {item.status === 'queued' || item.status === 'proposed' ? (
                 <button
                   type="button"
                   onClick={() => cancelMutation.mutate(item.id)}
                   className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)] hover:text-red-500"
                 >
-                  Cancel
+                  {item.status === 'proposed' ? 'Dismiss' : 'Cancel'}
                 </button>
               ) : null}
             </li>

@@ -1,3 +1,26 @@
+## 2026-07-07 — Tier H: auto-verification, standing goals, proactive proposals
+
+- **Auto-verification** (`src/server/swarm-verify.ts`): every non-trivial DONE
+  checkpoint (≥120 chars task, not from reviewer/qa, not itself a
+  verification) auto-queues a P1 `[verify]` task for the reviewer, who must
+  end RESULT with "VERDICT: CONFIRMED" or "VERDICT: REFUTED — reason".
+  Refuted → Discord alert from the server. Deduped per claim; disable with
+  HERMES_SWARM_AUTO_VERIFY=0. Loop-safe: verify tasks are never verified.
+- **Standing goals** (`src/server/swarm-goals.ts`, `/api/swarm-goals`,
+  `.runtime/swarm-goals.json`): operator states a goal (UI/API/Discord
+  `!goal <text>`); each sweep cycle the engine advances ONE goal one step:
+  strategist plans a JSON pipeline → pipeline runs → strategist assesses →
+  done / next iteration. Bounded by maxIterations (default 5, cap 10);
+  honors the Clear All pause; every transition logged in goal notes.
+  `!goals` lists; pause/resume/abandon via API.
+- **Proactive proposals** (`src/server/swarm-suggest.ts`): deterministic
+  scanners (recurring block reasons ≥3, workers <50% success over ≥5 tasks,
+  frequent zombie reaps) file queue items with status `proposed` — never
+  auto-dispatched. Approve via queue panel button, `!approve <id>`, or see
+  them in the morning briefing. Max 5 open proposals, fingerprint-deduped.
+- Queue gains `proposed` status; drain ignores it. Sweep now also runs
+  propose + one goal step per cycle.
+
 ## 2026-07-07 — Clear All actually clears: zombie reaper, kill-first reset, dispatch pause, per-worker Stop **[RECURS — do not regress]**
 
 Operator report: worker stuck "reviewing" 5h; Clear All appeared dead. Three
