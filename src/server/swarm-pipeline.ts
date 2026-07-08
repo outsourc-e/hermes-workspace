@@ -50,6 +50,7 @@ export type PipelineRun = {
   state: 'running' | 'completed' | 'failed'
   createdAt: number
   finishedAt: number | null
+  error?: string
   stages: Array<PipelineStageResult>
 }
 
@@ -88,7 +89,31 @@ function saveRuns(file: PipelinesFile): void {
   renameSync(tmp, pipelinesPath())
 }
 
+/**
+ * A run lives in the dispatching process's memory; a server restart orphans
+ * it in 'running' forever (checkpoint may land but nobody consumes it).
+ * Reap anything past the theoretical max runtime (5 stages x 900s + slack).
+ */
+const MAX_RUN_AGE_MS = 2 * 60 * 60 * 1000
+
+export function reapOrphanedPipelineRuns(): number {
+  const file = loadRuns()
+  let reaped = 0
+  for (const run of file.runs) {
+    if (run.state !== 'running') continue
+    if (Date.now() - run.createdAt > MAX_RUN_AGE_MS) {
+      run.state = 'failed'
+      run.error = 'orphaned: exceeded max runtime (server restart mid-run?)'
+      run.finishedAt = Date.now()
+      reaped += 1
+    }
+  }
+  if (reaped) saveRuns(file)
+  return reaped
+}
+
 export function listPipelineRuns(): Array<PipelineRun> {
+  reapOrphanedPipelineRuns()
   return loadRuns().runs.slice().reverse()
 }
 
@@ -115,9 +140,7 @@ export function parsePipelineStages(raw: unknown): Array<PipelineStage> {
     }
     const assignmentsRaw = Array.isArray(s.assignments) ? s.assignments : []
     if (assignmentsRaw.length === 0 || assignmentsRaw.length > MAX_PARALLEL) {
-      throw new Error(
-        `Stage ${i + 1}: 1–${MAX_PARALLEL} assignments required`,
-      )
+      throw new Error(`Stage ${i + 1}: 1–${MAX_PARALLEL} assignments required`)
     }
     const assignments = assignmentsRaw.map((a) => {
       const item = a as { workerId?: unknown; task?: unknown }
@@ -150,9 +173,9 @@ export function renderStageContext(stage: PipelineStageResult): string {
   return lines.join('\n')
 }
 
-export type StageDispatcher = (assignments: Array<PipelineAssignment>) => Promise<
-  Array<{ workerId: string; ok: boolean; summary: string }>
->
+export type StageDispatcher = (
+  assignments: Array<PipelineAssignment>,
+) => Promise<Array<{ workerId: string; ok: boolean; summary: string }>>
 
 /**
  * Run a pipeline. The dispatcher is injected so the route can pass the real
