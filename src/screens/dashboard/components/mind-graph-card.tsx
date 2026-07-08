@@ -1,4 +1,4 @@
-﻿import { useQuery } from '@tanstack/react-query'
+﻿import { useMutation, useQuery, useQueryClient  } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import {
@@ -8,6 +8,7 @@ import {
   seededUnit,
   shortTitle,
 } from './nova-galaxy-model'
+import type { VaultGraphInsights } from '../../../server/vault-graph-insights'
 import type {
   CelestialBody,
   GalaxyArm,
@@ -901,6 +902,32 @@ export function MindGraphCard() {
     refetchInterval: 45_000,
     refetchIntervalInBackground: true,
   })
+  const insightsQuery = useQuery({
+    queryKey: ['dashboard', 'knowledge-insights'],
+    queryFn: async (): Promise<{ ok: boolean; insights: VaultGraphInsights }> => {
+      const response = await fetch('/api/knowledge/insights')
+      if (!response.ok) throw new Error(`insights ${response.status}`)
+      return (await response.json()) as { ok: boolean; insights: VaultGraphInsights }
+    },
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  })
+  const queryClient = useQueryClient()
+  const proposeCleanup = useMutation({
+    mutationFn: async (rec: VaultGraphInsights['recommendations'][number]) => {
+      const response = await fetch('/api/knowledge/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rec),
+      })
+      if (!response.ok) throw new Error(`propose ${response.status}`)
+      return response.json()
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['taylor-approvals'] })
+      void queryClient.invalidateQueries({ queryKey: ['nova-fabric'] })
+    },
+  })
   const model = useMemo(
     () => buildGalaxyModel(graphQuery.data),
     [graphQuery.data],
@@ -1127,6 +1154,37 @@ export function MindGraphCard() {
               ))}
             </div>
           </div>
+
+          {insightsQuery.data?.insights ? (
+            <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">
+              <div className="nova-label">Vault health</div>
+              <div className="mt-2 flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                <span>{insightsQuery.data.insights.orphans.length} orphans</span>
+                <span>{insightsQuery.data.insights.staleImportant.length} stale hubs</span>
+                <span>{insightsQuery.data.insights.duplicateCandidates.length} dupe candidates</span>
+              </div>
+              <div className="mt-2 space-y-1.5">
+                {insightsQuery.data.insights.recommendations.slice(0, 3).map((rec) => (
+                  <div
+                    key={`${rec.kind}-${rec.title}`}
+                    className="rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.4)] px-2 py-1.5"
+                  >
+                    <div className="truncate font-mono text-[10px] text-[var(--theme-text-soft)]">
+                      {rec.title}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={proposeCleanup.isPending}
+                      onClick={() => proposeCleanup.mutate(rec)}
+                      className="mt-1 rounded border border-[var(--theme-border)] px-2 py-0.5 text-[10px] text-[var(--theme-text)] hover:border-[var(--theme-accent-border)] disabled:opacity-50"
+                    >
+                      Propose cleanup review
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {visibleComets.length > 0 ? (
             <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">

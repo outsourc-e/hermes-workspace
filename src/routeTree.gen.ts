@@ -155,6 +155,7 @@ import { Route as ApiKnowledgeSyncRouteImport } from './routes/api/knowledge/syn
 import { Route as ApiKnowledgeSearchRouteImport } from './routes/api/knowledge/search'
 import { Route as ApiKnowledgeReadRouteImport } from './routes/api/knowledge/read'
 import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/list'
+import { Route as ApiKnowledgeInsightsRouteImport } from './routes/api/knowledge/insights'
 import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
 import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
 import { Route as ApiHermesworldReservationsRouteImport } from './routes/api/hermesworld/reservations'
@@ -905,6 +906,11 @@ const ApiKnowledgeListRoute = ApiKnowledgeListRouteImport.update({
   path: '/api/knowledge/list',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiKnowledgeInsightsRoute = ApiKnowledgeInsightsRouteImport.update({
+  id: '/api/knowledge/insights',
+  path: '/api/knowledge/insights',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiKnowledgeGraphRoute = ApiKnowledgeGraphRouteImport.update({
   id: '/api/knowledge/graph',
   path: '/api/knowledge/graph',
@@ -1123,6 +1129,7 @@ export interface FileRoutesByFullPath {
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
+  '/api/knowledge/insights': typeof ApiKnowledgeInsightsRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
   '/api/knowledge/read': typeof ApiKnowledgeReadRoute
   '/api/knowledge/search': typeof ApiKnowledgeSearchRoute
@@ -1288,6 +1295,7 @@ export interface FileRoutesByTo {
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
+  '/api/knowledge/insights': typeof ApiKnowledgeInsightsRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
   '/api/knowledge/read': typeof ApiKnowledgeReadRoute
   '/api/knowledge/search': typeof ApiKnowledgeSearchRoute
@@ -1455,6 +1463,7 @@ export interface FileRoutesById {
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
+  '/api/knowledge/insights': typeof ApiKnowledgeInsightsRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
   '/api/knowledge/read': typeof ApiKnowledgeReadRoute
   '/api/knowledge/search': typeof ApiKnowledgeSearchRoute
@@ -1623,6 +1632,7 @@ export interface FileRouteTypes {
     | '/api/hermesworld/reservations'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
+    | '/api/knowledge/insights'
     | '/api/knowledge/list'
     | '/api/knowledge/read'
     | '/api/knowledge/search'
@@ -1788,6 +1798,7 @@ export interface FileRouteTypes {
     | '/api/hermesworld/reservations'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
+    | '/api/knowledge/insights'
     | '/api/knowledge/list'
     | '/api/knowledge/read'
     | '/api/knowledge/search'
@@ -1954,6 +1965,7 @@ export interface FileRouteTypes {
     | '/api/hermesworld/reservations'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
+    | '/api/knowledge/insights'
     | '/api/knowledge/list'
     | '/api/knowledge/read'
     | '/api/knowledge/search'
@@ -2114,6 +2126,7 @@ export interface RootRouteChildren {
   ApiHermesworldReservationsRoute: typeof ApiHermesworldReservationsRouteWithChildren
   ApiKnowledgeConfigRoute: typeof ApiKnowledgeConfigRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
+  ApiKnowledgeInsightsRoute: typeof ApiKnowledgeInsightsRoute
   ApiKnowledgeListRoute: typeof ApiKnowledgeListRoute
   ApiKnowledgeReadRoute: typeof ApiKnowledgeReadRoute
   ApiKnowledgeSearchRoute: typeof ApiKnowledgeSearchRoute
@@ -3161,6 +3174,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiKnowledgeListRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/knowledge/insights': {
+      id: '/api/knowledge/insights'
+      path: '/api/knowledge/insights'
+      fullPath: '/api/knowledge/insights'
+      preLoaderRoute: typeof ApiKnowledgeInsightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/knowledge/graph': {
       id: '/api/knowledge/graph'
       path: '/api/knowledge/graph'
@@ -3615,6 +3635,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHermesworldReservationsRoute: ApiHermesworldReservationsRouteWithChildren,
   ApiKnowledgeConfigRoute: ApiKnowledgeConfigRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,
+  ApiKnowledgeInsightsRoute: ApiKnowledgeInsightsRoute,
   ApiKnowledgeListRoute: ApiKnowledgeListRoute,
   ApiKnowledgeReadRoute: ApiKnowledgeReadRoute,
   ApiKnowledgeSearchRoute: ApiKnowledgeSearchRoute,
