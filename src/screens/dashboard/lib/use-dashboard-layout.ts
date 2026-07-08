@@ -20,6 +20,11 @@ export type WidgetId =
   | 'sessions_intelligence'
   | 'logs_tail'
   | 'operator_tip'
+  | 'nova_wants'
+  | 'nova_fabric'
+  | 'control_loops'
+  | 'trust_ledger'
+  | 'notebook_bridge'
   | 'skills_usage'
   | 'achievements'
   | 'mix_rhythm'
@@ -60,16 +65,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
   {
     id: 'cache_efficiency',
     label: 'Cache efficiency',
-    description:
-      'Cache-hit rate with daily sparkline. Higher = lower cost.',
+    description: 'Cache-hit rate with daily sparkline. Higher = lower cost.',
     column: 'main',
     hideable: true,
   },
   {
     id: 'velocity',
     label: 'Velocity',
-    description:
-      'Sessions/day average + delta vs prior period + sparkline.',
+    description: 'Sessions/day average + delta vs prior period + sparkline.',
     column: 'main',
     hideable: true,
   },
@@ -102,6 +105,44 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     description:
       'Context-aware tip that adapts to the live overview (cache, cron, drift, etc.).',
     column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'nova_wants',
+    label: 'Nova Wants',
+    description:
+      'Protected operational board for Nova requests, needs, approvals, and self-state proposals.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'nova_fabric',
+    label: 'Nova Fabric',
+    description:
+      'Source-linked continuity layer for events, self-state, source map, and consolidation review.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'control_loops',
+    label: 'Control loops',
+    description:
+      'Operational Nova/Hermes productivity loops with real source readiness and dry-run prompts.',
+    column: 'rail',
+    hideable: true,
+  },
+  {
+    id: 'trust_ledger',
+    label: 'Trust ledger',
+    description: 'Source-backed capability milestones and weak areas.',
+    column: 'rail',
+    hideable: true,
+  },
+  {
+    id: 'notebook_bridge',
+    label: 'NotebookLM bridge',
+    description: 'Manual synthesis bridge from Obsidian to reviewed notes.',
+    column: 'rail',
     hideable: true,
   },
   {
@@ -171,9 +212,7 @@ function readLayout(): StoredLayout {
     }
     const valid = new Set<WidgetId>(WIDGET_CATALOG.map((w) => w.id))
     const incoming = Array.isArray(parsed.hidden) ? parsed.hidden : []
-    const filtered = incoming.filter((id): id is WidgetId =>
-      valid.has(id as WidgetId),
-    )
+    const filtered = incoming.filter((id): id is WidgetId => valid.has(id))
     // Schema migration: when we introduce new widgets that should be
     // off-by-default, bump STORAGE_VERSION and union the prior user
     // hides with the new defaults so existing installs don't suddenly
@@ -251,15 +290,9 @@ export function useDashboardLayout() {
   // Reset returns to the iteration-006 defaults rather than "show
   // literally everything" so first-time users hitting Reset don't
   // suddenly see Logs they never asked for.
-  const reset = useCallback(
-    () => setHidden(new Set(DEFAULT_HIDDEN)),
-    [],
-  )
+  const reset = useCallback(() => setHidden(new Set(DEFAULT_HIDDEN)), [])
 
-  const isVisible = useCallback(
-    (id: WidgetId) => !hidden.has(id),
-    [hidden],
-  )
+  const isVisible = useCallback((id: WidgetId) => !hidden.has(id), [hidden])
 
   const counts = useMemo(() => {
     const total = WIDGET_CATALOG.length

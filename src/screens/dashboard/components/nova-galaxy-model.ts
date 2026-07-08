@@ -201,7 +201,7 @@ function buildAdjacency(
 }
 
 function chooseSeeds(nodes: Array<SeedNode>): Array<SeedNode> {
-  const systemCount = clamp(Math.round(Math.sqrt(nodes.length) / 2), 1, 8)
+  const systemCount = clamp(Math.round(Math.sqrt(nodes.length) * 0.54), 2, 9)
   return [...nodes]
     .sort((a, b) => b.degree - a.degree || a.title.localeCompare(b.title))
     .slice(0, systemCount)
@@ -261,10 +261,10 @@ function sizeTier(value: number, max: number): number {
 
 function folderAnchor(arm: GalaxyArm): Vec3 {
   const angle = arm.angle
-  const radius = 28
+  const radius = 29
   return {
     x: Math.cos(angle) * radius,
-    y: Math.sin(angle * 1.31) * 9,
+    y: Math.sin(angle * 1.31) * 10,
     z: Math.sin(angle) * radius,
   }
 }
@@ -317,7 +317,7 @@ function settleSystems(
         const dy = a.y - b.y
         const dz = a.z - b.z
         const distanceSq = Math.max(10, dx * dx + dy * dy + dz * dz)
-        const force = 18 / distanceSq
+        const force = 34 / distanceSq
         const distance = Math.sqrt(distanceSq)
         const ax = (dx / distance) * force
         const ay = (dy / distance) * force
@@ -341,21 +341,21 @@ function settleSystems(
       const dz = b.z - a.z
       const da = deltas.get(link.source)!
       const db = deltas.get(link.target)!
-      da.x += dx * 0.006
-      da.y += dy * 0.006
-      da.z += dz * 0.006
-      db.x -= dx * 0.006
-      db.y -= dy * 0.006
-      db.z -= dz * 0.006
+      da.x += dx * 0.004
+      da.y += dy * 0.004
+      da.z += dz * 0.004
+      db.x -= dx * 0.004
+      db.y -= dy * 0.004
+      db.z -= dz * 0.004
     }
 
     for (const system of systems) {
       const position = positions.get(system.id)!
       const delta = deltas.get(system.id)!
       const anchor = folderAnchor(system.arm)
-      position.x += delta.x + (anchor.x - position.x) * 0.012
-      position.y += delta.y + (anchor.y - position.y) * 0.012
-      position.z += delta.z + (anchor.z - position.z) * 0.012
+      position.x += delta.x + (anchor.x - position.x) * 0.008
+      position.y += delta.y + (anchor.y - position.y) * 0.008
+      position.z += delta.z + (anchor.z - position.z) * 0.008
     }
   }
 
@@ -408,7 +408,7 @@ function cometPoint(index: number, total: number, seed: string): Vec3 {
 }
 
 function createStarfield(): Array<StarfieldPoint> {
-  return Array.from({ length: 920 }, (_, index) => {
+  return Array.from({ length: 1350 }, (_, index) => {
     const seed = `star:${index}`
     const layer = index % 3
     return {
@@ -417,7 +417,7 @@ function createStarfield(): Array<StarfieldPoint> {
       z: (seededUnit(`${seed}:z`) - 0.5) * (150 + layer * 90),
       r: 0.035 + layer * 0.018 + seededUnit(`${seed}:r`) * 0.04,
       layer,
-      alpha: 0.2 + seededUnit(`${seed}:a`) * 0.58,
+      alpha: 0.18 + seededUnit(`${seed}:a`) * 0.58,
       warm: seededUnit(`${seed}:warm`) > 0.78,
     }
   })
@@ -447,8 +447,9 @@ function strongestLinks(
   for (const link of sorted) {
     const sourceCount = counts.get(link.source) ?? 0
     const targetCount = counts.get(link.target) ?? 0
-    if (sourceCount >= 3 || targetCount >= 3) continue
+    if (sourceCount >= 2 || targetCount >= 2) continue
     capped.push(link)
+    if (capped.length >= 260) break
     counts.set(link.source, sourceCount + 1)
     counts.set(link.target, targetCount + 1)
   }
@@ -551,7 +552,7 @@ export function buildGalaxyModel(
     arm.systemCount = entries.length
     entries.forEach((entry, index) => {
       const anchor = folderAnchor(arm)
-      const spread = stableJitter(entry.seedId, 22 + index * 1.5)
+      const spread = stableJitter(entry.seedId, 17 + index * 1.8)
       communityEntries.push({
         ...entry,
         arm,
@@ -592,9 +593,10 @@ export function buildGalaxyModel(
     const tags = entry.community
       .filter((node) => node.id !== entry.planet.id)
       .map((node, index) => {
-        const ring = 4.5 + (index % 9) * 1.2 + seededUnit(`${node.id}:ring`) * 3
+        const ring =
+          7.2 + (index % 10) * 1.55 + seededUnit(`${node.id}:ring`) * 3.8
         const theta = seededUnit(`${node.id}:theta`) * Math.PI * 2
-        const vertical = (seededUnit(`${node.id}:vertical`) - 0.5) * 6
+        const vertical = (seededUnit(`${node.id}:vertical`) - 0.5) * 8.5
         return createBody({
           node,
           kind: 'tag',

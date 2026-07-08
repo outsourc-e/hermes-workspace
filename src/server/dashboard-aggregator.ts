@@ -1,3 +1,6 @@
+﻿import { buildKnowledgeGraph, knowledgeRootExists } from './knowledge-browser'
+import { listMemoryFiles } from './memory-browser'
+
 /**
  * Aggregator for the Workspace dashboard overview.
  *
@@ -31,8 +34,123 @@ export type DashboardOverview = {
   insights: Array<DashboardInsight>
   /** Aggregated triage list: failed crons + platform errors + log errors. */
   incidents: Array<DashboardIncident>
+  /** Source-backed capability maturity ledger for Nova/Hermes. */
+  trustLedger: DashboardTrustLedgerSection | null
+  /** Operational productivity loops with real source readiness. */
+  controlLoops: DashboardControlLoopsSection | null
+  /** Manual NotebookLM synthesis bridge, when Obsidian data is available. */
+  notebookBridge: DashboardNotebookBridgeSection | null
 }
 
+export type ControlLoopStatus = 'ready' | 'partial' | 'not-wired'
+
+export type ControlLoopSourceStatus =
+  | 'connected'
+  | 'available'
+  | 'not-wired'
+  | 'unavailable'
+
+export type DashboardControlLoopSource = {
+  label: string
+  status: ControlLoopSourceStatus
+  detail: string
+}
+
+export type DashboardControlLoop = {
+  id:
+    | 'morning-command-center'
+    | 'email-to-taylor-kanban'
+    | 'jobboard-caretaker'
+    | 'design-intake-triage'
+    | 'cost-route-watch'
+    | 'shutdown-routine'
+  label: string
+  purpose: string
+  connectedSystems: Array<DashboardControlLoopSource>
+  status: ControlLoopStatus
+  readiness: string
+  lastUsedAt: string | null
+  nextScheduledAt: string | null
+  dryRunPrompt: string
+  guardrails: Array<string>
+  sourceLinks: Array<DashboardTrustLedgerSourceLink>
+}
+
+export type DashboardControlLoopsSection = {
+  generatedAt: string
+  summary: {
+    total: number
+    ready: number
+    partial: number
+    notWired: number
+  }
+  riskGates: Array<string>
+  loops: Array<DashboardControlLoop>
+}
+
+export type TrustLedgerStatus =
+  | 'Unwired'
+  | 'Tested'
+  | 'Reliable'
+  | 'Trusted'
+  | 'Autonomous'
+
+export type DashboardTrustLedgerSourceLink = {
+  label: string
+  href: string
+}
+
+export type DashboardTrustLedgerMilestone = {
+  id: string
+  label: string
+  status: TrustLedgerStatus
+  progress: {
+    current: number
+    target: number
+    unit: string
+  }
+  summary: string
+  evidence: Array<string>
+  weakArea: string | null
+  sourceLinks: Array<DashboardTrustLedgerSourceLink>
+  updatedAt: string | null
+}
+
+export type DashboardTrustLedgerSection = {
+  score: number
+  highestStatus: TrustLedgerStatus
+  milestones: Array<DashboardTrustLedgerMilestone>
+  recentUnlocks: Array<DashboardTrustLedgerMilestone>
+  weakAreas: Array<DashboardTrustLedgerMilestone>
+  counters: {
+    milestones: number
+    reliableOrBetter: number
+    trustedOrBetter: number
+    autonomous: number
+  }
+}
+
+export type NotebookBridgeStageStatus = 'Ready' | 'Manual' | 'Draft' | 'Blocked'
+
+export type DashboardNotebookBridgeStage = {
+  id: string
+  label: string
+  status: NotebookBridgeStageStatus
+  summary: string
+  sourceLinks: Array<DashboardTrustLedgerSourceLink>
+}
+
+export type DashboardNotebookBridgeSection = {
+  mode: 'manual-approval'
+  canonicalSource: string
+  synthesisLayer: string
+  writebackTargets: Array<string>
+  vaultNotes: number
+  vaultLinks: number
+  lastVaultUpdate: string | null
+  guardrails: Array<string>
+  stages: Array<DashboardNotebookBridgeStage>
+}
 export type DashboardSkillsUsageSection = {
   totalLoads: number
   totalEdits: number
@@ -174,7 +292,13 @@ export type DashboardAnalyticsSection = {
   totalSessions: number
   /** API call count over the window. */
   totalApiCalls: number
-  topModels: Array<{ id: string; tokens: number; calls: number; cost: number; sessions: number }>
+  topModels: Array<{
+    id: string
+    tokens: number
+    calls: number
+    cost: number
+    sessions: number
+  }>
   /**
    * Per-day rollup for sparklines. ISO date string + tokens + sessions
    * + cost per day. Always returned, even when empty.
@@ -247,6 +371,26 @@ async function safeJson<T>(
     return (await res.json()) as T
   } catch {
     return null
+  }
+}
+
+async function safeUrlJson<T>(
+  url: string,
+  timeoutMs = 2500,
+): Promise<T | null> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { accept: 'application/json' },
+    })
+    if (!res.ok) return null
+    return (await res.json()) as T
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
   }
 }
 
@@ -341,12 +485,12 @@ function normalizePlatforms(raw: unknown): Array<DashboardPlatformEntry> {
 
 function normalizeCron(raw: unknown): DashboardCronSection | null {
   if (!raw) return null
-  let jobs: Array<Record<string, unknown>> = []
+  let jobs: Array<unknown> = []
   if (Array.isArray(raw)) {
-    jobs = raw as Array<Record<string, unknown>>
-  } else if (raw && typeof raw === 'object') {
+    jobs = raw
+  } else if (typeof raw === 'object') {
     const r = raw as Record<string, unknown>
-    if (Array.isArray(r.jobs)) jobs = r.jobs as Array<Record<string, unknown>>
+    if (Array.isArray(r.jobs)) jobs = r.jobs
   }
   if (!Array.isArray(jobs)) return null
 
@@ -366,7 +510,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       typeof j.last_error === 'string'
         ? j.last_error
         : typeof j.last_delivery_error === 'string'
-          ? (j.last_delivery_error)
+          ? j.last_delivery_error
           : null
     const isFailure =
       lastStatus === 'failed' ||
@@ -376,16 +520,13 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       failed += 1
       const id = readString(j.id) || readString(j.name) || 'unknown'
       const name = readString(j.name) || id
-      const lastRunAt =
-        typeof j.last_run_at === 'string' ? j.last_run_at : null
+      const lastRunAt = typeof j.last_run_at === 'string' ? j.last_run_at : null
       recentFailures.push({ id, name, lastError, lastRunAt })
     }
     const candidates = [
       typeof j.next_run_at === 'string' ? Date.parse(j.next_run_at) : NaN,
       typeof j.next_run === 'string' ? Date.parse(j.next_run) : NaN,
-      typeof j.next_run_at === 'number'
-        ? (j.next_run_at) * 1000
-        : NaN,
+      typeof j.next_run_at === 'number' ? j.next_run_at * 1000 : NaN,
     ].filter((v) => Number.isFinite(v))
     for (const ts of candidates) {
       if (nextRunMs === null || ts < nextRunMs) nextRunMs = ts
@@ -419,7 +560,9 @@ function normalizeKanban(raw: unknown): DashboardKanbanSection | null {
     topBlocked: [],
   }
 
-  const bucketFor = (status: string): keyof Pick<
+  const bucketFor = (
+    status: string,
+  ): keyof Pick<
     DashboardKanbanSection,
     'triage' | 'todo' | 'ready' | 'running' | 'blocked' | 'done' | 'other'
   > => {
@@ -427,7 +570,8 @@ function normalizeKanban(raw: unknown): DashboardKanbanSection | null {
     if (s === 'triage') return 'triage'
     if (s === 'todo' || s === 'queued') return 'todo'
     if (s === 'ready') return 'ready'
-    if (s === 'running' || s === 'claimed' || s === 'in_progress') return 'running'
+    if (s === 'running' || s === 'claimed' || s === 'in_progress')
+      return 'running'
     if (s === 'blocked') return 'blocked'
     if (s === 'done' || s === 'completed' || s === 'complete') return 'done'
     return 'other'
@@ -472,8 +616,7 @@ function normalizeAchievementUnlock(
     category: readString(r.category) || 'General',
     icon: readString(r.icon) || 'Star',
     tier: typeof r.tier === 'string' ? r.tier : null,
-    unlockedAt:
-      typeof r.unlocked_at === 'number' ? (r.unlocked_at) : null,
+    unlockedAt: typeof r.unlocked_at === 'number' ? r.unlocked_at : null,
   }
 }
 
@@ -486,9 +629,7 @@ function normalizeAchievements(
   if (recentArr.length === 0 && (!all || typeof all !== 'object')) return null
   const recentUnlocks = recentArr
     .map(normalizeAchievementUnlock)
-    .filter(
-      (entry): entry is DashboardAchievementUnlock => entry !== null,
-    )
+    .filter((entry): entry is DashboardAchievementUnlock => entry !== null)
     .slice(0, limit)
 
   let totalUnlocked = 0
@@ -546,14 +687,13 @@ function normalizeSkillsUsage(
         skill,
         totalCount: readNumber(e.total_count),
         percentage: readNumber(e.percentage),
-        lastUsedAt:
-          typeof e.last_used_at === 'number'
-            ? (e.last_used_at)
-            : null,
+        lastUsedAt: typeof e.last_used_at === 'number' ? e.last_used_at : null,
       }
     })
     .filter(
-      (e): e is {
+      (
+        e,
+      ): e is {
         skill: string
         totalCount: number
         percentage: number
@@ -562,10 +702,7 @@ function normalizeSkillsUsage(
     )
     .sort((a, b) => b.totalCount - a.totalCount)
     .slice(0, 5)
-  if (
-    !summary &&
-    topSkills.length === 0
-  ) {
+  if (!summary && topSkills.length === 0) {
     return null
   }
   return {
@@ -598,9 +735,7 @@ function normalizeAnalytics(
     totalsRaw?.total_output ?? r.total_output ?? r.output_tokens,
   )
   const cacheReadTokens = readNumber(
-    totalsRaw?.total_cache_read ??
-      r.total_cache_read ??
-      r.cache_read_tokens,
+    totalsRaw?.total_cache_read ?? r.total_cache_read ?? r.cache_read_tokens,
   )
   const reasoningTokens = readNumber(
     totalsRaw?.total_reasoning ?? r.total_reasoning ?? r.reasoning_tokens,
@@ -628,9 +763,7 @@ function normalizeAnalytics(
   // reasoning are exposed separately for the rich UI.
   const fallbackTotal = readNumber(r.total_tokens)
   const totalTokens =
-    inputTokens + outputTokens > 0
-      ? inputTokens + outputTokens
-      : fallbackTotal
+    inputTokens + outputTokens > 0 ? inputTokens + outputTokens : fallbackTotal
 
   const modelsRaw = Array.isArray(r.by_model)
     ? r.by_model
@@ -649,14 +782,19 @@ function normalizeAnalytics(
       const tokensOut = readNumber(e.output_tokens)
       return {
         id,
-        tokens: tokensIn + tokensOut > 0 ? tokensIn + tokensOut : readNumber(e.tokens),
+        tokens:
+          tokensIn + tokensOut > 0
+            ? tokensIn + tokensOut
+            : readNumber(e.tokens),
         calls: readNumber(e.api_calls ?? e.calls ?? e.requests),
         cost: readNumber(e.estimated_cost ?? e.cost),
         sessions: readNumber(e.sessions),
       }
     })
     .filter(
-      (entry): entry is {
+      (
+        entry,
+      ): entry is {
         id: string
         tokens: number
         calls: number
@@ -686,7 +824,9 @@ function normalizeAnalytics(
       }
     })
     .filter(
-      (entry): entry is {
+      (
+        entry,
+      ): entry is {
         day: string
         inputTokens: number
         outputTokens: number
@@ -873,16 +1013,12 @@ function computeInsights(
   // glance.
   const ops: Array<string> = []
   if (cron && cron.failed > 0) {
-    ops.push(
-      `${cron.failed} failed cron job${cron.failed === 1 ? '' : 's'}`,
-    )
+    ops.push(`${cron.failed} failed cron job${cron.failed === 1 ? '' : 's'}`)
   }
   if (cron && cron.nextRunAt) {
     const nextMs = Date.parse(cron.nextRunAt)
     if (Number.isFinite(nextMs) && nextMs - Date.now() < -7 * 86_400_000) {
-      ops.push(
-        `${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`,
-      )
+      ops.push(`${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`)
     }
   }
   if (
@@ -902,7 +1038,7 @@ function computeInsights(
   if (ops.length > 0) {
     out.push({
       tone: ops.length >= 2 ? 'warn' : 'info',
-      text: ops.join(' · ') + '.',
+      text: ops.join(' Â· ') + '.',
     })
   }
 
@@ -976,7 +1112,9 @@ function computeIncidents(
       severity: 'warn',
       source: 'kanban',
       label: `${kanban.blocked} kanban task${kanban.blocked === 1 ? '' : 's'} blocked`,
-      detail: kanban.topBlocked.map((t) => t.title).join(' · ') || 'blocked cards need attention',
+      detail:
+        kanban.topBlocked.map((t) => t.title).join(' Â· ') ||
+        'blocked cards need attention',
       href: '/swarm2',
     })
   }
@@ -1007,7 +1145,7 @@ function computeIncidents(
       severity: 'warn',
       source: 'config',
       label: `${diff} config diff${diff === 1 ? '' : 's'} pending`,
-      detail: `local v${status.configVersion} · latest v${status.latestConfigVersion}`,
+      detail: `local v${status.configVersion} Â· latest v${status.latestConfigVersion}`,
       href: '/settings',
     })
   }
@@ -1077,6 +1215,871 @@ function normalizeLogs(
   }
 }
 
+const TRUST_STATUS_ORDER: Array<TrustLedgerStatus> = [
+  'Unwired',
+  'Tested',
+  'Reliable',
+  'Trusted',
+  'Autonomous',
+]
+
+type TrustLedgerBuildInput = {
+  status: DashboardStatusSection | null
+  cron: DashboardCronSection | null
+  kanban: DashboardKanbanSection | null
+  analytics: DashboardAnalyticsSection | null
+  skillsUsage: DashboardSkillsUsageSection | null
+  sessionsRaw: unknown
+  skillsRaw: unknown
+  oauthProvidersRaw: unknown
+}
+
+function trustRank(status: TrustLedgerStatus): number {
+  return TRUST_STATUS_ORDER.indexOf(status)
+}
+
+function statusAt(
+  value: number,
+  thresholds: Partial<Record<TrustLedgerStatus, number>>,
+): TrustLedgerStatus {
+  let status: TrustLedgerStatus = 'Unwired'
+  for (const candidate of TRUST_STATUS_ORDER) {
+    const threshold = thresholds[candidate]
+    if (threshold !== undefined && value >= threshold) status = candidate
+  }
+  return status
+}
+
+function safeLocal<T>(reader: () => T, fallback: T): T {
+  try {
+    return reader()
+  } catch {
+    return fallback
+  }
+}
+
+function newestIso(values: Array<string | null | undefined>): string | null {
+  let newest = 0
+  for (const value of values) {
+    if (!value) continue
+    const ts = Date.parse(value)
+    if (Number.isFinite(ts) && ts > newest) newest = ts
+  }
+  return newest > 0 ? new Date(newest).toISOString() : null
+}
+
+function countPayloadItems(raw: unknown, keys: Array<string>): number {
+  if (Array.isArray(raw)) return raw.length
+  if (!raw || typeof raw !== 'object') return 0
+  const record = raw as Record<string, unknown>
+  for (const key of keys) {
+    const candidate = record[key]
+    if (Array.isArray(candidate)) return candidate.length
+    if (typeof candidate === 'number' && Number.isFinite(candidate))
+      return candidate
+  }
+  return 0
+}
+
+type OauthSignal = {
+  name: string
+  text: string
+  connected: boolean
+}
+
+function collectOauthSignals(raw: unknown): Array<OauthSignal> {
+  const out: Array<OauthSignal> = []
+  const seen = new Set<unknown>()
+
+  const visit = (value: unknown, depth: number) => {
+    if (!value || typeof value !== 'object' || seen.has(value) || depth > 4)
+      return
+    seen.add(value)
+
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, depth + 1)
+      return
+    }
+
+    const record = value as Record<string, unknown>
+    const name =
+      readString(record.name) ||
+      readString(record.id) ||
+      readString(record.provider) ||
+      readString(record.service) ||
+      readString(record.type)
+    const text = JSON.stringify(record).toLowerCase()
+    const looksRelevant = /google|gmail|calendar|oauth|provider/.test(text)
+    const statusText = [
+      record.state,
+      record.status,
+      record.auth_status,
+      record.connection_status,
+    ]
+      .map(readString)
+      .join(' ')
+      .toLowerCase()
+    const explicitlyDown =
+      /disconnected|missing|error|failed|revoked|expired/.test(statusText)
+    const booleanConnected = [
+      record.connected,
+      record.configured,
+      record.enabled,
+      record.authenticated,
+      record.authorized,
+      record.active,
+      record.ready,
+    ].some((entry) => entry === true)
+    const statusConnected =
+      /connected|configured|authorized|authenticated|active|ready|ok/.test(
+        statusText,
+      )
+
+    if (looksRelevant && (name || statusText)) {
+      out.push({
+        name: name || 'oauth-provider',
+        text,
+        connected: !explicitlyDown && (booleanConnected || statusConnected),
+      })
+    }
+
+    for (const child of Object.values(record)) visit(child, depth + 1)
+  }
+
+  visit(raw, 0)
+  return out
+}
+
+function buildTrustLedger(
+  input: TrustLedgerBuildInput,
+): DashboardTrustLedgerSection {
+  const memoryFiles = safeLocal(() => listMemoryFiles(), [])
+  const knowledge = safeLocal(
+    () => (knowledgeRootExists() ? buildKnowledgeGraph() : null),
+    null,
+  )
+  const now = new Date().toISOString()
+  const sessionCount = Math.max(
+    input.analytics?.totalSessions ?? 0,
+    countPayloadItems(input.sessionsRaw, [
+      'sessions',
+      'items',
+      'rows',
+      'total',
+    ]),
+  )
+  const apiCalls = input.analytics?.totalApiCalls ?? 0
+  const installedSkills = Math.max(
+    countPayloadItems(input.skillsRaw, [
+      'skills',
+      'items',
+      'installed',
+      'total',
+    ]),
+    input.skillsUsage?.distinctSkills ?? 0,
+  )
+  const skillActions = input.skillsUsage?.totalActions ?? 0
+  const oauthSignals = collectOauthSignals(input.oauthProvidersRaw)
+  const googleSignals = oauthSignals.filter((entry) =>
+    /google|gmail|calendar/.test(entry.text),
+  )
+  const gmailConnected = googleSignals.some(
+    (entry) => entry.connected && /gmail|mail|google/.test(entry.text),
+  )
+  const calendarConnected = googleSignals.some(
+    (entry) => entry.connected && /calendar|gcal|google/.test(entry.text),
+  )
+  const connectedGoogleSignals = [gmailConnected, calendarConnected].filter(
+    Boolean,
+  ).length
+  const knowledgeNodes = knowledge?.nodes.length ?? 0
+  const knowledgeEdges = knowledge?.edges.length ?? 0
+  const latestKnowledge = newestIso(
+    knowledge?.nodes.map((node) => node.modified) ?? [],
+  )
+
+  const cronTotal = input.cron?.total ?? 0
+  const cronFailed = input.cron?.failed ?? 0
+  const cronPaused = input.cron?.paused ?? 0
+  let cronStatus: TrustLedgerStatus = 'Unwired'
+  if (cronTotal > 0) cronStatus = 'Tested'
+  if (cronTotal >= 2 && cronFailed === 0) cronStatus = 'Reliable'
+  if (cronTotal >= 3 && cronFailed === 0 && input.cron?.nextRunAt)
+    cronStatus = 'Trusted'
+  if (
+    cronTotal >= 3 &&
+    cronFailed === 0 &&
+    cronPaused === 0 &&
+    input.cron?.nextRunAt
+  ) {
+    cronStatus = 'Autonomous'
+  }
+
+  const kanbanTotal = input.kanban?.total ?? 0
+  const kanbanDone = input.kanban?.done ?? 0
+  const kanbanRunning = input.kanban?.running ?? 0
+  const kanbanBlocked = input.kanban?.blocked ?? 0
+  let kanbanStatus: TrustLedgerStatus = 'Unwired'
+  if (kanbanTotal > 0) kanbanStatus = 'Tested'
+  if (kanbanDone + kanbanRunning > 0) kanbanStatus = 'Reliable'
+  if (kanbanDone >= 5 && kanbanBlocked === 0) kanbanStatus = 'Trusted'
+  if (kanbanDone >= 10 && kanbanRunning > 0 && kanbanBlocked === 0)
+    kanbanStatus = 'Autonomous'
+
+  let authStatus: TrustLedgerStatus = 'Unwired'
+  if (googleSignals.length > 0) authStatus = 'Tested'
+  if (connectedGoogleSignals === 1) authStatus = 'Reliable'
+  if (connectedGoogleSignals >= 2) authStatus = 'Trusted'
+
+  const milestones: Array<DashboardTrustLedgerMilestone> = [
+    {
+      id: 'session-history',
+      label: 'Hermes session history',
+      status: statusAt(sessionCount, { Tested: 1, Reliable: 10, Trusted: 25 }),
+      progress: { current: sessionCount, target: 50, unit: 'sessions' },
+      summary: `${sessionCount} session${sessionCount === 1 ? '' : 's'} and ${apiCalls} API call${apiCalls === 1 ? '' : 's'} in the analytics window.`,
+      evidence: [
+        `Analytics window: ${input.analytics?.windowDays ?? 30} days`,
+        `${apiCalls} API calls observed`,
+      ],
+      weakArea:
+        sessionCount >= 10
+          ? null
+          : 'Needs more completed live sessions before Nova can be called reliable here.',
+      sourceLinks: [
+        { label: 'Sessions', href: '/chat' },
+        { label: 'Analytics', href: '/dashboard' },
+      ],
+      updatedAt: input.status?.updatedAt ?? now,
+    },
+    {
+      id: 'memory-recall',
+      label: 'Hermes memory recall',
+      status: statusAt(memoryFiles.length, {
+        Tested: 1,
+        Reliable: 5,
+        Trusted: 20,
+      }),
+      progress: { current: memoryFiles.length, target: 20, unit: 'files' },
+      summary: `${memoryFiles.length} browsable Hermes memory file${memoryFiles.length === 1 ? '' : 's'} available to Mission Control.`,
+      evidence: memoryFiles.slice(0, 3).map((file) => file.path),
+      weakArea:
+        memoryFiles.length >= 5
+          ? null
+          : 'Memory browser has too little source material to prove stable recall.',
+      sourceLinks: [{ label: 'Memory', href: '/memory' }],
+      updatedAt: newestIso(memoryFiles.map((file) => file.modified)) ?? now,
+    },
+    {
+      id: 'skills',
+      label: 'Skills execution',
+      status: statusAt(Math.max(skillActions, installedSkills), {
+        Tested: 1,
+        Reliable: 10,
+        Trusted: 50,
+      }),
+      progress: {
+        current: Math.max(skillActions, installedSkills),
+        target: 50,
+        unit: 'skill signals',
+      },
+      summary: `${installedSkills} skill${installedSkills === 1 ? '' : 's'} installed or observed; ${skillActions} skill action${skillActions === 1 ? '' : 's'} used in-window.`,
+      evidence:
+        input.skillsUsage?.topSkills
+          .slice(0, 3)
+          .map(
+            (skill) => `${shortSkillName(skill.skill)}: ${skill.totalCount}`,
+          ) ?? [],
+      weakArea:
+        skillActions >= 10
+          ? null
+          : 'Skills exist, but recent usage is still light.',
+      sourceLinks: [{ label: 'Skills', href: '/skills' }],
+      updatedAt: now,
+    },
+    {
+      id: 'scheduled-wakeups',
+      label: 'Cron and wakeups',
+      status: cronStatus,
+      progress: { current: cronTotal, target: 3, unit: 'jobs' },
+      summary: `${cronTotal} scheduled job${cronTotal === 1 ? '' : 's'}; ${cronFailed} failed and ${cronPaused} paused.`,
+      evidence: [
+        input.cron?.nextRunAt
+          ? `Next run: ${input.cron.nextRunAt}`
+          : 'No next run reported',
+        ...(input.cron?.recentFailures ?? [])
+          .slice(0, 2)
+          .map((job) => `${job.name}: ${job.lastError || 'failed'}`),
+      ],
+      weakArea:
+        cronFailed > 0 || cronPaused > 0
+          ? 'Cron has paused or failed jobs that need review.'
+          : null,
+      sourceLinks: [{ label: 'Jobs', href: '/jobs' }],
+      updatedAt: input.cron?.nextRunAt ?? now,
+    },
+    {
+      id: 'job-board-events',
+      label: 'Job board events',
+      status: kanbanStatus,
+      progress: { current: kanbanDone, target: 10, unit: 'done jobs' },
+      summary: `${kanbanTotal} board item${kanbanTotal === 1 ? '' : 's'}; ${kanbanRunning} running, ${kanbanDone} done, ${kanbanBlocked} blocked.`,
+      evidence:
+        input.kanban?.topBlocked.slice(0, 3).map((task) => task.title) ?? [],
+      weakArea:
+        kanbanBlocked > 0
+          ? 'Blocked work remains on the board.'
+          : kanbanTotal > 0
+            ? null
+            : 'No job-board events were returned.',
+      sourceLinks: [
+        { label: 'Jobs', href: '/jobs' },
+        { label: 'Board', href: '/swarm2' },
+      ],
+      updatedAt: now,
+    },
+    {
+      id: 'gmail-calendar-auth',
+      label: 'Gmail and Calendar auth',
+      status: authStatus,
+      progress: {
+        current: connectedGoogleSignals,
+        target: 2,
+        unit: 'auth lanes',
+      },
+      summary: `${connectedGoogleSignals}/2 Google work lanes show connected signals.`,
+      evidence: googleSignals
+        .slice(0, 4)
+        .map(
+          (entry) => `${entry.name}: ${entry.connected ? 'connected' : 'seen'}`,
+        ),
+      weakArea:
+        connectedGoogleSignals >= 2
+          ? null
+          : 'Gmail and Calendar are not both proven connected from the OAuth provider endpoint.',
+      sourceLinks: [
+        { label: 'Settings', href: '/settings' },
+        { label: 'MCP', href: '/mcp' },
+      ],
+      updatedAt: now,
+    },
+    {
+      id: 'obsidian-notes',
+      label: 'Obsidian vault graph',
+      status: statusAt(Math.min(knowledgeNodes, knowledgeEdges * 2), {
+        Tested: 1,
+        Reliable: 25,
+        Trusted: 100,
+      }),
+      progress: { current: knowledgeNodes, target: 250, unit: 'notes' },
+      summary: `${knowledgeNodes} note${knowledgeNodes === 1 ? '' : 's'} and ${knowledgeEdges} wikilink edge${knowledgeEdges === 1 ? '' : 's'} parsed from the configured knowledge root.`,
+      evidence: knowledge?.nodes.slice(0, 3).map((node) => node.path) ?? [],
+      weakArea:
+        knowledgeEdges >= 10
+          ? null
+          : 'The vault graph has too few links to prove durable relationship recall.',
+      sourceLinks: [
+        { label: 'Memory', href: '/memory' },
+        { label: 'Galaxy', href: '/dashboard' },
+      ],
+      updatedAt: latestKnowledge ?? now,
+    },
+  ]
+
+  const counters = {
+    milestones: milestones.length,
+    reliableOrBetter: milestones.filter(
+      (m) => trustRank(m.status) >= trustRank('Reliable'),
+    ).length,
+    trustedOrBetter: milestones.filter(
+      (m) => trustRank(m.status) >= trustRank('Trusted'),
+    ).length,
+    autonomous: milestones.filter((m) => m.status === 'Autonomous').length,
+  }
+  const highestStatus = milestones.reduce<TrustLedgerStatus>(
+    (best, item) =>
+      trustRank(item.status) > trustRank(best) ? item.status : best,
+    'Unwired',
+  )
+  const score = Math.round(
+    (milestones.reduce((sum, item) => sum + trustRank(item.status), 0) /
+      (milestones.length * (TRUST_STATUS_ORDER.length - 1))) *
+      100,
+  )
+
+  return {
+    score,
+    highestStatus,
+    milestones,
+    recentUnlocks: [...milestones]
+      .filter((m) => trustRank(m.status) >= trustRank('Reliable'))
+      .sort((a, b) => {
+        const timeDelta =
+          Date.parse(b.updatedAt || '') - Date.parse(a.updatedAt || '')
+        if (Number.isFinite(timeDelta) && timeDelta !== 0) return timeDelta
+        return trustRank(b.status) - trustRank(a.status)
+      })
+      .slice(0, 3),
+    weakAreas: milestones
+      .filter((m) => m.weakArea || trustRank(m.status) < trustRank('Reliable'))
+      .sort((a, b) => trustRank(a.status) - trustRank(b.status))
+      .slice(0, 4),
+    counters,
+  }
+}
+
+type JobBoardReadModel = {
+  online: boolean
+  version: string | null
+  stateKeys: number
+  events: number
+  taylorKanbanItems: number
+}
+
+async function readJobBoardModel(): Promise<JobBoardReadModel> {
+  const base = (
+    process.env.NOVA_JOBBOARD_URL ||
+    process.env.NEON_MOON_JOBBOARD_URL ||
+    'http://127.0.0.1:8765'
+  ).replace(/\/+$/, '')
+
+  const [ping, versionRaw, stateRaw, eventsRaw] = await Promise.all([
+    safeUrlJson<unknown>(`${base}/ping`),
+    safeUrlJson<unknown>(`${base}/version`),
+    safeUrlJson<unknown>(`${base}/state`, 4000),
+    safeUrlJson<unknown>(`${base}/events`),
+  ])
+
+  const state =
+    stateRaw && typeof stateRaw === 'object' && !Array.isArray(stateRaw)
+      ? (stateRaw as Record<string, unknown>)
+      : null
+  const version =
+    versionRaw && typeof versionRaw === 'object'
+      ? (readOptionalString((versionRaw as Record<string, unknown>).id) ??
+        String((versionRaw as Record<string, unknown>).id ?? ''))
+      : null
+  let taylorKanbanItems = 0
+  const taylorRaw = state?.['nm-taylor-kanban']
+  if (typeof taylorRaw === 'string') {
+    try {
+      const parsed = JSON.parse(taylorRaw) as unknown
+      if (Array.isArray(parsed)) taylorKanbanItems = parsed.length
+    } catch {
+      taylorKanbanItems = 0
+    }
+  }
+
+  return {
+    online:
+      Boolean(ping) ||
+      Boolean(versionRaw) ||
+      Boolean(stateRaw) ||
+      Boolean(eventsRaw),
+    version: version && version.length > 0 ? version : null,
+    stateKeys: state ? Object.keys(state).length : 0,
+    events: Array.isArray(eventsRaw) ? eventsRaw.length : 0,
+    taylorKanbanItems,
+  }
+}
+
+type ControlLoopBuildInput = {
+  status: DashboardStatusSection | null
+  cron: DashboardCronSection | null
+  kanban: DashboardKanbanSection | null
+  analytics: DashboardAnalyticsSection | null
+  skillsRaw: unknown
+  oauthProvidersRaw: unknown
+  jobBoard: JobBoardReadModel
+}
+
+function skillInstalled(raw: unknown, id: string): boolean {
+  const text = JSON.stringify(raw ?? {}).toLowerCase()
+  return text.includes(id.toLowerCase())
+}
+
+function source(
+  label: string,
+  ok: boolean,
+  detailWhenOk: string,
+  detailWhenMissing: string,
+  availableOnly = false,
+): DashboardControlLoopSource {
+  return {
+    label,
+    status: ok ? (availableOnly ? 'available' : 'connected') : 'not-wired',
+    detail: ok ? detailWhenOk : detailWhenMissing,
+  }
+}
+
+function loopStatus(
+  sources: Array<DashboardControlLoopSource>,
+  skillReady: boolean,
+): ControlLoopStatus {
+  const liveSources = sources.filter(
+    (item) => item.status === 'connected' || item.status === 'available',
+  ).length
+  if (skillReady && liveSources >= Math.max(2, sources.length - 1))
+    return 'ready'
+  if (skillReady || liveSources > 0) return 'partial'
+  return 'not-wired'
+}
+
+function nextForCron(
+  cron: DashboardCronSection | null,
+  hint: string,
+): string | null {
+  if (!cron?.nextRunAt || !hint) return null
+  return null
+}
+
+function buildControlLoops(
+  input: ControlLoopBuildInput,
+): DashboardControlLoopsSection {
+  const now = new Date().toISOString()
+  const oauthSignals = collectOauthSignals(input.oauthProvidersRaw)
+  const gmailConnected = oauthSignals.some(
+    (entry) => entry.connected && /gmail|mail|google/.test(entry.text),
+  )
+  const calendarConnected = oauthSignals.some(
+    (entry) => entry.connected && /calendar|gcal|google/.test(entry.text),
+  )
+  const hermesOnline = Boolean(input.status?.gatewayState)
+  const cronOnline = (input.cron?.total ?? 0) > 0
+  const analyticsOnline = input.analytics !== null
+  const jobBoardOnline = input.jobBoard.online
+  const taylorKanbanOnline = input.jobBoard.taylorKanbanItems > 0
+  const skillsEndpointOnline =
+    input.skillsRaw !== null &&
+    input.skillsRaw !== undefined &&
+    JSON.stringify(input.skillsRaw).length > 2
+  const vaultOnline = knowledgeRootExists()
+
+  const makeLoop = (
+    loop: Omit<DashboardControlLoop, 'status' | 'readiness'>,
+  ): DashboardControlLoop => {
+    const installed = skillInstalled(input.skillsRaw, loop.id)
+    const status = loopStatus(loop.connectedSystems, installed)
+    const readyCount = loop.connectedSystems.filter(
+      (item) => item.status === 'connected' || item.status === 'available',
+    ).length
+    return {
+      ...loop,
+      status,
+      readiness: installed
+        ? `${readyCount}/${loop.connectedSystems.length} systems live; skill detected`
+        : `${readyCount}/${loop.connectedSystems.length} systems live; skill not detected`,
+    }
+  }
+
+  const commonGuardrails = [
+    'Dry-run only from Mission Control.',
+    'No emails/messages are sent.',
+    'No money, spend, login, credential, or destructive action.',
+    'Customer/vendor-facing actions require Taylor approval.',
+  ]
+
+  const loops: Array<DashboardControlLoop> = [
+    makeLoop({
+      id: 'morning-command-center',
+      label: 'Morning Command Center',
+      purpose:
+        'Pull the morning operating picture and return first-fire plus a 3-item plan.',
+      connectedSystems: [
+        source(
+          'Gmail',
+          gmailConnected,
+          'OAuth provider signal seen',
+          'Google/Gmail auth not proven',
+        ),
+        source(
+          'Calendar',
+          calendarConnected,
+          'Calendar auth signal seen',
+          'Calendar auth not proven',
+        ),
+        source(
+          'Neon Moon board',
+          jobBoardOnline,
+          `Board v${input.jobBoard.version ?? 'unknown'} online`,
+          'Board HTTP endpoints unavailable',
+        ),
+        source(
+          'Taylor kanban',
+          taylorKanbanOnline,
+          `${input.jobBoard.taylorKanbanItems} items`,
+          'nm-taylor-kanban not found in board state',
+        ),
+        source(
+          'Cost route',
+          analyticsOnline,
+          `${input.analytics?.totalTokens ?? 0} tokens in window`,
+          'Hermes analytics unavailable',
+        ),
+      ],
+      lastUsedAt: null,
+      nextScheduledAt: nextForCron(input.cron, 'morning'),
+      dryRunPrompt:
+        'Dry-run Morning Command Center: read Gmail, Calendar, Neon Moon board, Taylor kanban, and route/cost status; produce first-fire plus exactly 3 morning priorities. Draft only. No sends or writes.',
+      guardrails: commonGuardrails,
+      sourceLinks: [
+        { label: 'Dashboard', href: '/dashboard' },
+        { label: 'Jobs', href: '/jobs' },
+      ],
+    }),
+    makeLoop({
+      id: 'email-to-taylor-kanban',
+      label: 'Email to Taylor Kanban',
+      purpose:
+        'Triage Gmail action items into Taylor personal kanban and draft replies only.',
+      connectedSystems: [
+        source(
+          'Gmail',
+          gmailConnected,
+          'OAuth provider signal seen',
+          'Google/Gmail auth not proven',
+        ),
+        source(
+          'Taylor kanban',
+          taylorKanbanOnline,
+          `${input.jobBoard.taylorKanbanItems} items`,
+          'nm-taylor-kanban not found in board state',
+        ),
+        source(
+          'Hermes skills',
+          skillsEndpointOnline,
+          'Installed skills endpoint answered',
+          'Skills endpoint unavailable',
+          true,
+        ),
+      ],
+      lastUsedAt: null,
+      nextScheduledAt: null,
+      dryRunPrompt:
+        'Dry-run Email to Taylor Kanban: scan Gmail for actionable items, propose kanban cards for nm-taylor-kanban, and draft replies only. Do not send, archive, label, or write without approval.',
+      guardrails: commonGuardrails,
+      sourceLinks: [
+        { label: 'Taylor kanban', href: 'http://127.0.0.1:8765' },
+        { label: 'Settings', href: '/settings' },
+      ],
+    }),
+    makeLoop({
+      id: 'jobboard-caretaker',
+      label: 'Jobboard Caretaker',
+      purpose:
+        'Check Neon Moon board health, version, events, and Taylor kanban through HTTP only.',
+      connectedSystems: [
+        source(
+          'Board /ping',
+          jobBoardOnline,
+          'HTTP board answered',
+          'Board /ping unavailable',
+        ),
+        source(
+          'Board /version',
+          Boolean(input.jobBoard.version),
+          `Version ${input.jobBoard.version}`,
+          'Board /version unavailable',
+        ),
+        source(
+          'Board /state',
+          input.jobBoard.stateKeys > 0,
+          `${input.jobBoard.stateKeys} keys`,
+          'Board /state unavailable',
+        ),
+        source(
+          'Board /events',
+          input.jobBoard.events > 0,
+          `${input.jobBoard.events} events`,
+          'Board /events unavailable',
+        ),
+        source(
+          'Taylor kanban',
+          taylorKanbanOnline,
+          `${input.jobBoard.taylorKanbanItems} items`,
+          'nm-taylor-kanban not found',
+        ),
+      ],
+      lastUsedAt: null,
+      nextScheduledAt: nextForCron(input.cron, 'jobboard'),
+      dryRunPrompt:
+        'Dry-run Jobboard Caretaker: check /ping, /version, /state, /events, and Taylor kanban. Summarize health/version/events. Do not edit state.json. Do not call /set, /event, or /sync-now.',
+      guardrails: [
+        ...commonGuardrails,
+        'HTTP endpoints only; never edit state.json.',
+      ],
+      sourceLinks: [{ label: 'Job board', href: 'http://127.0.0.1:8765' }],
+    }),
+    makeLoop({
+      id: 'design-intake-triage',
+      label: 'Design Intake Triage',
+      purpose:
+        'Classify invoices, quote emails, art requests, digitizing, mockups, tracing, and order-entry prep.',
+      connectedSystems: [
+        source(
+          'Gmail',
+          gmailConnected,
+          'OAuth provider signal seen',
+          'Google/Gmail auth not proven',
+        ),
+        source(
+          'Obsidian vault',
+          vaultOnline,
+          'Unified vault exists',
+          'Vault path unavailable',
+        ),
+        source(
+          'Taylor kanban',
+          taylorKanbanOnline,
+          `${input.jobBoard.taylorKanbanItems} items`,
+          'Taylor kanban unavailable',
+        ),
+      ],
+      lastUsedAt: null,
+      nextScheduledAt: null,
+      dryRunPrompt:
+        'Dry-run Design Intake Triage: classify recent invoices, quotes, art requests, vector tracing, digitizing, mockups, and order-entry prep. Route next action to Taylor/staff/vendor as recommendations only.',
+      guardrails: commonGuardrails,
+      sourceLinks: [
+        { label: 'Memory', href: '/memory' },
+        { label: 'Taylor kanban', href: 'http://127.0.0.1:8765' },
+      ],
+    }),
+    makeLoop({
+      id: 'cost-route-watch',
+      label: 'Cost Route Watch',
+      purpose:
+        'Watch Hermes/session DB/provider route usage, estimates, billing mode, and route leaks.',
+      connectedSystems: [
+        source(
+          'Hermes status',
+          hermesOnline,
+          input.status?.gatewayState ?? 'online',
+          'Hermes status unavailable',
+        ),
+        source(
+          'Session analytics',
+          analyticsOnline,
+          `${input.analytics?.totalSessions ?? 0} sessions`,
+          'Analytics unavailable',
+        ),
+        source(
+          'Cost estimates',
+          analyticsOnline,
+          input.analytics?.costLabel ?? 'available',
+          'Cost route data unavailable',
+        ),
+      ],
+      lastUsedAt: null,
+      nextScheduledAt: null,
+      dryRunPrompt:
+        'Dry-run Cost Route Watch: inspect Hermes analytics/session usage and provider route mix. Estimate 1h/5h/24h tokens and cost, flag route leaks, and make no provider/config changes.',
+      guardrails: commonGuardrails,
+      sourceLinks: [
+        { label: 'Analytics', href: '/dashboard' },
+        { label: 'Settings', href: '/settings' },
+      ],
+    }),
+    makeLoop({
+      id: 'shutdown-routine',
+      label: 'Shutdown Routine',
+      purpose:
+        'Park open loops, separate real fires from fake fires, queue reminders, and protect evening boundary.',
+      connectedSystems: [
+        source(
+          'Cron',
+          cronOnline,
+          `${input.cron?.total ?? 0} jobs`,
+          'Cron jobs unavailable',
+        ),
+        source(
+          'Taylor kanban',
+          taylorKanbanOnline,
+          `${input.jobBoard.taylorKanbanItems} items`,
+          'Taylor kanban unavailable',
+        ),
+        source(
+          'Hermes status',
+          hermesOnline,
+          input.status?.gatewayState ?? 'online',
+          'Hermes status unavailable',
+        ),
+      ],
+      lastUsedAt: null,
+      nextScheduledAt: nextForCron(input.cron, 'shutdown'),
+      dryRunPrompt:
+        'Dry-run Shutdown Routine: list open loops, identify real fires vs fake fires, queue suggested reminders/follow-ups, and propose an evening boundary. No writes or sends.',
+      guardrails: commonGuardrails,
+      sourceLinks: [
+        { label: 'Jobs', href: '/jobs' },
+        { label: 'Dashboard', href: '/dashboard' },
+      ],
+    }),
+  ]
+
+  return {
+    generatedAt: now,
+    summary: {
+      total: loops.length,
+      ready: loops.filter((loop) => loop.status === 'ready').length,
+      partial: loops.filter((loop) => loop.status === 'partial').length,
+      notWired: loops.filter((loop) => loop.status === 'not-wired').length,
+    },
+    riskGates: commonGuardrails,
+    loops,
+  }
+}
+
+function buildNotebookBridge(): DashboardNotebookBridgeSection | null {
+  const knowledge = safeLocal(
+    () => (knowledgeRootExists() ? buildKnowledgeGraph() : null),
+    null,
+  )
+  if (!knowledge) return null
+  return {
+    mode: 'manual-approval',
+    canonicalSource: 'Obsidian vault',
+    synthesisLayer: 'NotebookLM',
+    writebackTargets: ['agents/kimi', 'inbox'],
+    vaultNotes: knowledge.nodes.length,
+    vaultLinks: knowledge.edges.length,
+    lastVaultUpdate: newestIso(knowledge.nodes.map((node) => node.modified)),
+    guardrails: [
+      'Obsidian remains the source of truth.',
+      'NotebookLM outputs are synthesis drafts only.',
+      'Writeback requires manual approval and source links.',
+    ],
+    stages: [
+      {
+        id: 'vault-sources',
+        label: 'Vault source pack',
+        status: knowledge.nodes.length > 0 ? 'Ready' : 'Blocked',
+        summary:
+          'Mission Control can enumerate Obsidian notes and wikilinks for a source bundle.',
+        sourceLinks: [{ label: 'Memory', href: '/memory' }],
+      },
+      {
+        id: 'notebooklm-synthesis',
+        label: 'NotebookLM synthesis',
+        status: 'Manual',
+        summary:
+          'NotebookLM summaries, mind maps, and audio overviews are manually generated outside the source vault.',
+        sourceLinks: [
+          { label: 'NotebookLM', href: 'https://notebooklm.google.com/' },
+        ],
+      },
+      {
+        id: 'reviewed-writeback',
+        label: 'Reviewed writeback',
+        status: 'Draft',
+        summary:
+          'Approved synthesis becomes structured notes in agents/kimi or inbox with source links.',
+        sourceLinks: [{ label: 'Inbox', href: '/memory' }],
+      },
+    ],
+  }
+}
+
 export type BuildOverviewExtraFetchers = {
   /**
    * Optional fetcher for the gateway runtime endpoint (`/health/detailed`).
@@ -1103,6 +2106,10 @@ export async function buildDashboardOverview(
     analyticsRaw,
     kanbanRaw,
     logsRaw,
+    sessionsRaw,
+    skillsRaw,
+    oauthProvidersRaw,
+    jobBoard,
   ] = await Promise.all([
     safeJson<unknown>(fetcher, '/api/status'),
     options.gatewayFetcher
@@ -1121,6 +2128,13 @@ export async function buildDashboardOverview(
     ),
     safeJson<unknown>(fetcher, '/api/plugins/kanban/board'),
     safeJson<unknown>(fetcher, `/api/logs?lines=${logsLimit}`),
+    safeJson<unknown>(fetcher, '/api/sessions?limit=50&offset=0'),
+    safeJson<unknown>(
+      fetcher,
+      '/api/skills?tab=installed&limit=200&summary=search',
+    ),
+    safeJson<unknown>(fetcher, '/api/providers/oauth'),
+    readJobBoardModel(),
   ])
 
   const status = normalizeStatus(statusRaw, healthRaw)
@@ -1132,22 +2146,45 @@ export async function buildDashboardOverview(
   const skillsUsage = normalizeSkillsUsage(analyticsRaw)
   const insights = computeInsights(analytics, cron, status, skillsUsage, kanban)
   const incidents = computeIncidents(status, platforms, cron, logs, kanban)
+  const achievements = normalizeAchievements(
+    achRecentRaw,
+    achAllRaw,
+    achievementsLimit,
+  )
+  const trustLedger = buildTrustLedger({
+    status,
+    cron,
+    kanban,
+    analytics,
+    skillsUsage,
+    sessionsRaw,
+    skillsRaw,
+    oauthProvidersRaw,
+  })
+  const controlLoops = buildControlLoops({
+    status,
+    cron,
+    kanban,
+    analytics,
+    skillsRaw,
+    oauthProvidersRaw,
+    jobBoard,
+  })
 
   return {
     status,
     platforms,
     cron,
     kanban,
-    achievements: normalizeAchievements(
-      achRecentRaw,
-      achAllRaw,
-      achievementsLimit,
-    ),
+    achievements,
     modelInfo: normalizeModelInfo(modelInfoRaw),
     analytics,
     logs,
     skillsUsage,
     insights,
     incidents,
+    trustLedger,
+    controlLoops,
+    notebookBridge: buildNotebookBridge(),
   }
 }

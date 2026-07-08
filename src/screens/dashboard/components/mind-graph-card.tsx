@@ -51,7 +51,7 @@ type PlanetObject = {
   atmosphere: THREE.Mesh
   material: THREE.MeshStandardMaterial
   ringMaterial: THREE.MeshBasicMaterial
-  atmosphereMaterial: THREE.MeshBasicMaterial
+  atmosphereMaterial: THREE.ShaderMaterial
 }
 type CometObject = {
   body: CelestialBody
@@ -65,14 +65,15 @@ type LineObject = {
   material: THREE.LineDashedMaterial
 }
 
-const SPACE = '#090A12'
-const SPACE_SOFT = '#0D0E18'
+const SPACE = '#030814'
+const SPACE_SOFT = '#071426'
 const AMBER = '#FF8C1A'
 const GOLD = '#FFB347'
 const TAN = '#D4A276'
 const COPPER = '#7A441E'
-const TAG_LIMIT_IDLE = 42
+const TAG_LIMIT_IDLE = 7
 const TAG_LIMIT_ACTIVE = 140
+const IDLE_TAGS_PER_SYSTEM = 4
 
 async function readKnowledgeGraph(): Promise<KnowledgeGraphResponse> {
   const response = await fetch('/api/knowledge/graph')
@@ -142,45 +143,120 @@ function bodyPosition(body: CelestialBody): THREE.Vector3 {
 }
 
 function planetRadius(body: CelestialBody, system?: PlanetarySystem): number {
-  if (body.kind === 'core') return 2.2 + body.sizeTier * 0.42
-  return 1.28 + (system?.sizeTier ?? body.sizeTier) * 0.34
+  if (body.kind === 'core') return 2.7 + body.sizeTier * 0.4
+  return 1.24 + (system?.sizeTier ?? body.sizeTier) * 0.26
 }
 
 function createPlanetTexture(body: CelestialBody): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
-  canvas.width = 128
-  canvas.height = 128
+  canvas.width = 256
+  canvas.height = 256
   const context = canvas.getContext('2d')!
-  const base = context.createRadialGradient(40, 34, 4, 64, 64, 72)
-  base.addColorStop(0, '#FFF1CC')
-  base.addColorStop(0.2, body.kind === 'core' ? '#FFB347' : '#D4A276')
-  base.addColorStop(0.56, '#7A441E')
-  base.addColorStop(1, '#0D0E18')
+
+  const base = context.createLinearGradient(0, 0, 256, 256)
+  base.addColorStop(0, body.kind === 'core' ? '#6A3D17' : '#102744')
+  base.addColorStop(0.34, body.kind === 'core' ? '#3F2712' : '#183A5A')
+  base.addColorStop(0.72, body.kind === 'core' ? '#1E150C' : '#0B1B31')
+  base.addColorStop(1, '#02060E')
   context.fillStyle = base
-  context.fillRect(0, 0, 128, 128)
-  for (let i = 0; i < 28; i += 1) {
+  context.fillRect(0, 0, 256, 256)
+
+  for (let i = 0; i < 74; i += 1) {
     const seed = `${body.id}:texture:${i}`
-    context.globalAlpha = 0.08 + seededUnit(`${seed}:a`) * 0.11
+    context.globalAlpha = 0.055 + seededUnit(`${seed}:a`) * 0.13
     context.strokeStyle =
-      seededUnit(`${seed}:warm`) > 0.5 ? '#FFB347' : '#4A2A10'
-    context.lineWidth = 2 + seededUnit(`${seed}:w`) * 7
+      seededUnit(`${seed}:warm`) > 0.62
+        ? body.kind === 'core'
+          ? '#FFB85A'
+          : '#C78A4B'
+        : body.kind === 'core'
+          ? '#9D5B22'
+          : '#4F83A8'
+    context.lineWidth = 1 + seededUnit(`${seed}:w`) * 5
     context.beginPath()
-    const y = seededUnit(`${seed}:y`) * 128
-    context.moveTo(-24, y)
+    const y = seededUnit(`${seed}:y`) * 256
+    context.moveTo(-42, y)
     context.bezierCurveTo(
-      28,
-      y + (seededUnit(`${seed}:c1`) - 0.5) * 46,
-      82,
-      y + (seededUnit(`${seed}:c2`) - 0.5) * 52,
-      152,
-      y + (seededUnit(`${seed}:c3`) - 0.5) * 32,
+      54,
+      y + (seededUnit(`${seed}:c1`) - 0.5) * 82,
+      162,
+      y + (seededUnit(`${seed}:c2`) - 0.5) * 96,
+      304,
+      y + (seededUnit(`${seed}:c3`) - 0.5) * 56,
     )
     context.stroke()
   }
+
+  const stormCount = body.kind === 'core' ? 5 : 3
+  for (let i = 0; i < stormCount; i += 1) {
+    const seed = `${body.id}:storm:${i}`
+    const x = 54 + seededUnit(`${seed}:x`) * 150
+    const y = 48 + seededUnit(`${seed}:y`) * 160
+    const radius = 7 + seededUnit(`${seed}:r`) * 18
+    const glow = context.createRadialGradient(x, y, 0, x, y, radius)
+    glow.addColorStop(
+      0,
+      body.kind === 'core'
+        ? 'rgba(255, 179, 71, 0.26)'
+        : 'rgba(255, 196, 122, 0.08)',
+    )
+    glow.addColorStop(1, 'rgba(255, 179, 71, 0)')
+    context.globalAlpha = 1
+    context.fillStyle = glow
+    context.fillRect(x - radius, y - radius, radius * 2, radius * 2)
+  }
+
+  const limb = context.createRadialGradient(88, 70, 18, 128, 128, 142)
+  limb.addColorStop(0, 'rgba(255, 241, 204, 0.26)')
+  limb.addColorStop(0.36, 'rgba(255, 179, 71, 0.06)')
+  limb.addColorStop(0.74, 'rgba(2, 7, 18, 0.14)')
+  limb.addColorStop(1, 'rgba(1, 4, 10, 0.56)')
+  context.globalAlpha = 1
+  context.fillStyle = limb
+  context.fillRect(0, 0, 256, 256)
+
   context.globalAlpha = 1
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   return texture
+}
+
+function createAtmosphereMaterial(
+  color: string,
+  opacity: number,
+): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      glowColor: { value: new THREE.Color(color) },
+      uOpacity: { value: opacity },
+    },
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+      void main() {
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vNormal = normalize(normalMatrix * normal);
+        vViewPosition = -mvPosition.xyz;
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 glowColor;
+      uniform float uOpacity;
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+      void main() {
+        vec3 viewDir = normalize(vViewPosition);
+        float rim = 1.0 - max(dot(normalize(vNormal), viewDir), 0.0);
+        float halo = smoothstep(0.28, 1.0, rim);
+        gl_FragColor = vec4(glowColor, halo * uOpacity);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+  })
 }
 
 function createStarTexture(): THREE.Texture {
@@ -215,9 +291,9 @@ function createFogNebula(): THREE.Sprite {
   canvas.height = 512
   const context = canvas.getContext('2d')!
   const glow = context.createRadialGradient(256, 256, 0, 256, 256, 256)
-  glow.addColorStop(0, 'rgba(255, 140, 26, 0.18)')
-  glow.addColorStop(0.32, 'rgba(122, 68, 30, 0.10)')
-  glow.addColorStop(0.7, 'rgba(74, 42, 16, 0.045)')
+  glow.addColorStop(0, 'rgba(255, 179, 71, 0.2)')
+  glow.addColorStop(0.32, 'rgba(122, 68, 30, 0.12)')
+  glow.addColorStop(0.7, 'rgba(74, 42, 16, 0.05)')
   glow.addColorStop(1, 'rgba(9, 10, 18, 0)')
   context.fillStyle = glow
   context.fillRect(0, 0, 512, 512)
@@ -227,12 +303,12 @@ function createFogNebula(): THREE.Sprite {
     map: texture,
     transparent: true,
     depthWrite: false,
-    opacity: 0.84,
+    opacity: 0.58,
     blending: THREE.AdditiveBlending,
   })
   const sprite = new THREE.Sprite(material)
-  sprite.position.set(10, -5, -34)
-  sprite.scale.set(62, 38, 1)
+  sprite.position.set(-4, -2, -22)
+  sprite.scale.set(118, 54, 1)
   return sprite
 }
 function Galaxy3D({
@@ -253,9 +329,9 @@ function Galaxy3D({
   const searchRef = useRef(searchTerm)
   const reducedMotionRef = useRef(false)
   const cameraStateRef = useRef<CameraState>({
-    yaw: -0.42,
-    pitch: 0.16,
-    distance: 76,
+    yaw: -0.34,
+    pitch: 0.12,
+    distance: 86,
     target: new THREE.Vector3(0, 0, 0),
   })
 
@@ -272,8 +348,8 @@ function Galaxy3D({
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(SPACE)
-    scene.fog = new THREE.FogExp2(SPACE_SOFT, 0.012)
-    const camera = new THREE.PerspectiveCamera(54, 1, 0.1, 420)
+    scene.fog = new THREE.FogExp2(SPACE_SOFT, 0.0085)
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 460)
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     renderer.setClearColor(SPACE, 1)
@@ -285,12 +361,14 @@ function Galaxy3D({
     )
     host.appendChild(renderer.domElement)
 
-    const ambient = new THREE.AmbientLight('#D4A276', 0.42)
-    const key = new THREE.PointLight('#FFB347', 2.6, 120)
-    key.position.set(0, 14, 28)
-    const fill = new THREE.PointLight('#7A441E', 1.8, 150)
-    fill.position.set(-34, -18, -12)
-    scene.add(ambient, key, fill, createFogNebula())
+    const ambient = new THREE.AmbientLight('#D4A276', 0.34)
+    const key = new THREE.DirectionalLight('#FFE4A6', 3.1)
+    key.position.set(-18, 20, 28)
+    const coreLight = new THREE.PointLight('#FFB347', 2.3, 120)
+    coreLight.position.set(-6, 9, 18)
+    const fill = new THREE.PointLight('#163456', 0.46, 150)
+    fill.position.set(26, -14, -24)
+    scene.add(ambient, key, coreLight, fill, createFogNebula())
 
     const starPositions = new Float32Array(model.starfield.length * 3)
     const starColors = new Float32Array(model.starfield.length * 3)
@@ -314,7 +392,7 @@ function Galaxy3D({
       starGeometry,
       new THREE.PointsMaterial({
         map: createStarTexture(),
-        size: 0.34,
+        size: 0.46,
         vertexColors: true,
         transparent: true,
         opacity: 0.76,
@@ -333,12 +411,17 @@ function Galaxy3D({
       const radius = planetRadius(body, system)
       const texture = createPlanetTexture(body)
       const material = new THREE.MeshStandardMaterial({
-        color: body.kind === 'core' ? '#FFB347' : '#D4A276',
+        color: body.kind === 'core' ? '#FFE2A8' : '#EAF6FF',
         map: texture,
-        roughness: 0.72,
-        metalness: 0.08,
+        roughness: 0.92,
+        metalness: 0.02,
+        emissive:
+          body.kind === 'core'
+            ? new THREE.Color('#7A441E')
+            : new THREE.Color('#0B1B31'),
+        emissiveIntensity: body.kind === 'core' ? 0.24 : 0.13,
         transparent: true,
-        opacity: 0.96,
+        opacity: 0.98,
       })
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(radius, 48, 32),
@@ -354,32 +437,29 @@ function Galaxy3D({
       const ringMaterial = new THREE.MeshBasicMaterial({
         color: body.kind === 'core' ? AMBER : armTint,
         transparent: true,
-        opacity: body.kind === 'core' ? 0.68 : 0.44,
+        opacity: body.kind === 'core' ? 0.28 : 0.11,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       })
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(
-          radius * 1.48,
-          Math.max(0.025, radius * 0.025),
-          8,
-          96,
+          radius * (body.kind === 'core' ? 1.86 : 1.72),
+          Math.max(0.022, radius * 0.014),
+          10,
+          128,
         ),
         ringMaterial,
       )
       ring.position.copy(mesh.position)
       ring.rotation.set(body.orbitTilt, 0.42, 0.12)
 
-      const atmosphereMaterial = new THREE.MeshBasicMaterial({
-        color: body.kind === 'core' ? AMBER : GOLD,
-        transparent: true,
-        opacity: body.kind === 'core' ? 0.24 : 0.1,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      })
+      const atmosphereMaterial = createAtmosphereMaterial(
+        body.kind === 'core' ? AMBER : GOLD,
+        body.kind === 'core' ? 0.46 : 0.2,
+      )
       const atmosphere = new THREE.Mesh(
         new THREE.SphereGeometry(
-          radius * (body.kind === 'core' ? 1.92 : 1.58),
+          radius * (body.kind === 'core' ? 1.34 : 1.22),
           32,
           20,
         ),
@@ -433,18 +513,19 @@ function Galaxy3D({
     })
 
     const homeTarget = (() => {
-      const corePosition = model.core ? bodyPositions.get(model.core.id) : null
-      if (corePosition) return corePosition.clone()
       if (model.systems.length === 0) return new THREE.Vector3(0, 0, 0)
       const target = new THREE.Vector3()
-      let count = 0
-      for (const system of model.systems) {
+      let weightTotal = 0
+      for (const system of model.systems.slice(0, 12)) {
         const position = bodyPositions.get(system.planet.id)
         if (!position) continue
-        target.add(position)
-        count += 1
+        const weight = Math.max(1, Math.sqrt(system.totalLinks))
+        target.addScaledVector(position, weight)
+        weightTotal += weight
       }
-      return count > 0 ? target.divideScalar(count) : new THREE.Vector3(0, 0, 0)
+      return weightTotal > 0
+        ? target.divideScalar(weightTotal)
+        : new THREE.Vector3(0, 0, 0)
     })()
     if (!selectedRef.current) cameraStateRef.current.target.copy(homeTarget)
     const lineObjects: Array<LineObject> = []
@@ -459,9 +540,9 @@ function Galaxy3D({
       const material = new THREE.LineDashedMaterial({
         color: GOLD,
         transparent: true,
-        opacity: 0.15,
-        dashSize: 0.22,
-        gapSize: 0.32,
+        opacity: 0.1,
+        dashSize: 0.3,
+        gapSize: 0.42,
         depthWrite: false,
       })
       const line = new THREE.LineSegments(geometry, material)
@@ -494,7 +575,7 @@ function Galaxy3D({
       const selected = selectedRef.current
       const selectedPosition = selected ? bodyPositions.get(selected.id) : null
       const desiredTarget = selectedPosition ?? homeTarget
-      const desiredDistance = selectedPosition ? 20 : 76
+      const desiredDistance = selectedPosition ? 13 : 86
       state.target.lerp(desiredTarget, reducedMotionRef.current ? 1 : 0.065)
       state.distance +=
         (desiredDistance - state.distance) *
@@ -505,7 +586,7 @@ function Galaxy3D({
           (0.16 + Math.sin(now / 19000) * 0.035 - state.pitch) * 0.012
       }
       state.pitch = clamp(state.pitch, -0.72, 0.72)
-      state.distance = clamp(state.distance, 12, 118)
+      state.distance = clamp(state.distance, 11, 118)
       const cosPitch = Math.cos(state.pitch)
       camera.position.set(
         state.target.x + Math.sin(state.yaw) * cosPitch * state.distance,
@@ -545,17 +626,17 @@ function Galaxy3D({
         planet.mesh.scale.setScalar(pulse)
         planet.mesh.rotation.y += reducedMotionRef.current
           ? 0
-          : 0.0018 + planet.body.sizeTier * 0.0003
+          : 0.0028 + planet.body.sizeTier * 0.00045
         planet.material.opacity = opacity * (active ? 1 : 0.9)
         planet.ringMaterial.opacity =
-          opacity * (planet.body.kind === 'core' ? 0.72 : active ? 0.64 : 0.34)
-        planet.atmosphereMaterial.opacity =
+          opacity * (planet.body.kind === 'core' ? 0.3 : active ? 0.24 : 0.06)
+        planet.atmosphereMaterial.uniforms.uOpacity.value =
           opacity *
           (planet.body.kind === 'core'
-            ? 0.32
+            ? 0.34
             : active || warm > 0.65
-              ? 0.18
-              : 0.07)
+              ? 0.22
+              : 0.1)
       }
       for (const comet of cometObjects) {
         const drift = reducedMotionRef.current
@@ -584,7 +665,7 @@ function Galaxy3D({
           ((source && matchesSearch(source, query)) ||
             (target && matchesSearch(target, query))),
         )
-        link.material.opacity = active ? 0.48 : searched ? 0.34 : 0.15
+        link.material.opacity = active ? 0.34 : searched ? 0.24 : 0.045
       }
     }
 
@@ -601,6 +682,20 @@ function Galaxy3D({
         force = false,
       ) => {
         const point = bodyPosition(body)
+        if (kind === 'planet') {
+          const right = new THREE.Vector3().setFromMatrixColumn(
+            camera.matrixWorld,
+            0,
+          )
+          const up = new THREE.Vector3().setFromMatrixColumn(
+            camera.matrixWorld,
+            1,
+          )
+          const offset =
+            planetRadius(body) * (body.kind === 'core' ? 1.8 : 1.55)
+          point.addScaledVector(right, offset)
+          point.addScaledVector(up, offset * 0.34)
+        }
         vector.copy(point).project(camera)
         if (vector.z < -1 || vector.z > 1) return
         const distance = camera.position.distanceTo(point)
@@ -609,28 +704,40 @@ function Galaxy3D({
           body.id === hovered?.id ||
           body.id === selected?.id
         const searched = Boolean(query && matchesSearch(body, query))
-        if (!force && kind === 'tag' && !active && !searched && distance > 62)
+        if (!force && kind === 'tag' && !active && !searched && distance > 28)
           return
         let opacity = bodyVisibleOpacity(body, activeIds, query)
-        if (kind === 'tag' && !active && !searched) opacity *= 0.55
+        if (kind === 'tag' && !active && !searched) opacity *= 0.28
         projected.push({
           id: body.id,
           kind,
           body,
           x: (vector.x * 0.5 + 0.5) * width,
           y: (-vector.y * 0.5 + 0.5) * height,
-          scale: clamp(1.25 - distance / 130, 0.62, 1.08),
+          scale: clamp(1.12 - distance / 154, 0.56, 0.92),
           opacity,
           active: active || searched,
         })
       }
-      const visibleSystems = model.systems.slice(
-        0,
-        selected || hovered || query ? TAG_LIMIT_ACTIVE : TAG_LIMIT_IDLE,
+      const visibleSystems = model.systems.slice(0, TAG_LIMIT_ACTIVE)
+      const idlePlanetsShown = new Set(
+        model.systems.slice(0, TAG_LIMIT_IDLE).map((system) => system.id),
       )
       for (const system of visibleSystems) {
+        const showPlanetLabel =
+          selected ||
+          hovered ||
+          query ||
+          system.planet.kind === 'core' ||
+          idlePlanetsShown.has(system.id)
+        if (!showPlanetLabel) continue
         pushLabel(system.planet, 'planet', true)
-        const tagLimit = activeIds.has(system.id) || query ? 28 : 1
+        const tagLimit =
+          activeIds.has(system.id) || query
+            ? 28
+            : idlePlanetsShown.has(system.id)
+              ? IDLE_TAGS_PER_SYSTEM
+              : 0
         for (const tag of system.tags.slice(0, tagLimit)) pushLabel(tag, 'tag')
       }
       setLabels(projected)
@@ -696,7 +803,7 @@ function Galaxy3D({
     }
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
-      cameraStateRef.current.distance += event.deltaY * 0.035
+      cameraStateRef.current.distance += event.deltaY * 0.026
       cameraStateRef.current.distance = clamp(
         cameraStateRef.current.distance,
         12,
@@ -761,7 +868,7 @@ function Galaxy3D({
             onMouseLeave={() => onHover(null)}
             className={`pointer-events-auto absolute max-w-[210px] -translate-x-1/2 -translate-y-1/2 truncate border backdrop-blur-sm transition-colors ${
               label.kind === 'planet'
-                ? 'rounded-md border-transparent bg-transparent px-1 text-[14px] font-semibold text-[var(--theme-text-strong)] shadow-[0_0_12px_rgba(9,10,18,0.92)]'
+                ? 'rounded-md border-transparent bg-[rgba(2,7,18,0.16)] px-1.5 text-[13px] font-semibold text-[var(--theme-text-strong)] shadow-[0_0_16px_rgba(2,7,18,0.96)]'
                 : 'rounded border-[rgba(255,179,71,0.16)] bg-[rgba(9,10,18,0.48)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--theme-text-soft)]'
             } ${label.active ? 'text-[var(--theme-accent-secondary)]' : ''}`}
             style={{
@@ -829,16 +936,16 @@ export function MindGraphCard() {
     <section
       id="nova-mind-graph"
       aria-labelledby="nova-mind-graph-title"
-      className="nova-galaxy-card relative overflow-hidden rounded-xl border p-3 sm:p-4"
+      className="nova-galaxy-card relative overflow-hidden rounded-xl border p-2.5 sm:p-4"
     >
-      <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-start">
+      <div className="relative z-10 flex flex-col gap-3 xl:flex-row xl:items-start">
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <div className="nova-label">Mind graph</div>
               <h2
                 id="nova-mind-graph-title"
-                className="mt-1 text-2xl font-semibold text-[var(--theme-text-strong)]"
+                className="mt-1 text-xl font-semibold text-[var(--theme-text-strong)] sm:text-2xl"
               >
                 Obsidian galaxy
               </h2>
@@ -848,13 +955,13 @@ export function MindGraphCard() {
                 links.
               </p>
             </div>
-            <div className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--theme-accent-secondary)]">
+            <div className="max-w-full rounded-full border border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--theme-accent-secondary)] sm:tracking-[0.16em]">
               {graphQuery.isFetching ? 'syncing' : 'vault live'} -{' '}
               {model.totals.bodies} bodies - {model.totals.links} links
             </div>
           </div>
 
-          <div className="nova-galaxy-field relative mt-3 min-h-[430px] flex-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] sm:h-[560px] lg:h-[650px]">
+          <div className="nova-galaxy-field relative mt-3 h-[58vh] min-h-[360px] flex-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] sm:h-[560px] lg:h-[650px]">
             <Galaxy3D
               model={model}
               selectedBody={selectedBody}
@@ -865,7 +972,7 @@ export function MindGraphCard() {
               onHover={handleHover}
               onSelect={handleSelect}
             />
-            <div className="absolute left-3 right-3 top-3 z-20 flex flex-wrap items-center gap-2">
+            <div className="absolute left-2 right-2 top-2 z-20 flex flex-wrap items-center gap-1.5 sm:left-3 sm:right-3 sm:top-3 sm:gap-2">
               <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.72)] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)] backdrop-blur-sm">
                 auto-sync 45s
               </div>
@@ -876,14 +983,14 @@ export function MindGraphCard() {
                     type="button"
                     key={arm.id}
                     onClick={() => toggleArm(arm)}
-                    className={`rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${disabled ? 'border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.58)] text-[var(--theme-muted-2)]' : 'border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] text-[var(--theme-accent-secondary)]'}`}
+                    className={`rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] transition-colors sm:text-[10px] sm:tracking-[0.12em] ${disabled ? 'border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.58)] text-[var(--theme-muted-2)]' : 'border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] text-[var(--theme-accent-secondary)]'}`}
                     aria-pressed={!disabled}
                   >
                     {arm.name}
                   </button>
                 )
               })}
-              <label className="ml-auto flex min-w-[180px] items-center rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.72)] px-2 py-1 backdrop-blur-sm">
+              <label className="order-last flex w-full min-w-0 items-center rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.72)] px-2 py-1 backdrop-blur-sm sm:order-none sm:ml-auto sm:w-auto sm:min-w-[180px]">
                 <span className="sr-only">Search galaxy notes</span>
                 <input
                   value={searchTerm}
@@ -918,7 +1025,7 @@ export function MindGraphCard() {
           </div>
         </div>
 
-        <aside className="relative z-10 flex w-full flex-col gap-3 lg:w-72">
+        <aside className="relative z-10 grid w-full grid-cols-1 gap-3 md:grid-cols-2 xl:flex xl:w-72 xl:flex-col">
           <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">
             <div className="nova-label">Obsidian reflection</div>
             <div className="mt-3 grid grid-cols-2 gap-2">
