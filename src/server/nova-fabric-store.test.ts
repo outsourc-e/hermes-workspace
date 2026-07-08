@@ -188,4 +188,31 @@ describe('nova fabric store', () => {
     const updated = updateNovaFabricReviewStatus(review.id, 'parked')
     expect(updated?.status).toBe('parked')
   })
+
+  it('writes an approval receipt event when a review status changes', () => {
+    const review = createNovaFabricReviewProposal({
+      title: 'Approve risky want',
+      reason: 'Taylor approved the protected action.',
+      targetType: 'nova-wants',
+      targetId: 'want-protected-action',
+      proposedDiff: { status: 'done' },
+    })
+
+    const updated = updateNovaFabricReviewStatus(review.id, 'approved')
+    expect(updated?.status).toBe('approved')
+
+    const snapshot = getNovaFabricSnapshot()
+    const receipt = snapshot.fabric?.events.find((event) =>
+      event.receiptLinks.some((link) => link.value === review.id),
+    )
+
+    expect(receipt).toMatchObject({
+      eventKind: 'approval',
+      verificationState: 'taylor-approved',
+      approvalLevel: 'explicit-approval',
+      riskLevel: review.riskLevel,
+    })
+    expect(receipt?.summary).toContain('Approve risky want')
+    expect(receipt?.summary).toContain('approved')
+  })
 })

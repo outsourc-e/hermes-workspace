@@ -911,9 +911,49 @@ export function updateNovaFabricReviewStatus(
   const fabric = loadWritableFabric()
   const review = fabric.reviewQueue.find((item) => item.id === id)
   if (!review) return null
+  const previousStatus = review.status
+  const timestamp = nowIso()
   review.status = status
-  review.updatedAt = nowIso()
-  fabric.updatedAt = review.updatedAt
+  review.updatedAt = timestamp
+
+  if (previousStatus !== status) {
+    const receipt: NovaFabricEventRecord = {
+      ...baseRecord({
+        id: `event-${randomUUID()}`,
+        type: 'event',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        provenance: 'Mission Control server review status receipt',
+        riskLevel: review.riskLevel,
+        approvalLevel: 'explicit-approval',
+        verificationState:
+          status === 'approved' ? 'taylor-approved' : 'tool-verified',
+        sourceLinks: [
+          ...review.sourceLinks,
+          {
+            label: 'Fabric review',
+            value: review.id,
+            kind: 'receipt',
+          },
+        ],
+        receiptLinks: [
+          {
+            label: 'Fabric review',
+            value: review.id,
+            kind: 'receipt',
+          },
+        ],
+        titleForRisk: `${review.title} ${review.reason} ${status}`,
+      }),
+      type: 'event',
+      title: `Review ${status}: ${review.title}`,
+      summary: `${review.title} moved from ${previousStatus} to ${status} for ${review.targetType}${review.targetId ? `/${review.targetId}` : ''}.`,
+      eventKind: 'approval',
+    }
+    fabric.events.push(receipt)
+  }
+
+  fabric.updatedAt = timestamp
   writeFabricFile(fabric)
   return review
 }
