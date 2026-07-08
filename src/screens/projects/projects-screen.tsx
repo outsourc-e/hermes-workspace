@@ -8,7 +8,7 @@ import {
   Rocket01Icon,
 } from '@hugeicons/core-free-icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
@@ -182,6 +182,7 @@ export function ProjectsScreen() {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [savingDetails, setSavingDetails] = useState(false)
   const [brief, setBrief] = useState('')
   const [projectForm, setProjectForm] = useState({
     title: '',
@@ -202,6 +203,12 @@ export function ProjectsScreen() {
     topic: '',
     decision: '',
   })
+  const [editForm, setEditForm] = useState({
+    title: '',
+    objective: '',
+    tags: '',
+    nextAction: '',
+  })
 
   const listUrl = useMemo(() => {
     const params = new URLSearchParams()
@@ -217,6 +224,20 @@ export function ProjectsScreen() {
   const projects = projectsQuery.data?.projects || []
   const options = projectsQuery.data?.options
   const selected = projects.find((project) => project.id === selectedId) || projects[0] || null
+
+  useEffect(() => {
+    if (!selected) {
+      setEditForm({ title: '', objective: '', tags: '', nextAction: '' })
+      return
+    }
+
+    setEditForm({
+      title: selected.title,
+      objective: selected.objective || '',
+      tags: selected.tags.join(', '),
+      nextAction: selected.nextAction || '',
+    })
+  }, [selected?.id])
 
   async function refreshProjects() {
     await queryClient.invalidateQueries({ queryKey: ['project-cockpit'] })
@@ -253,6 +274,36 @@ export function ProjectsScreen() {
       await refreshProjects()
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Mise à jour impossible.', { type: 'error' })
+    }
+  }
+
+  async function saveProjectDetails(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selected) return
+    setSavingDetails(true)
+    try {
+      await readJson('/api/projects/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selected.id,
+          patch: {
+            title: editForm.title,
+            objective: editForm.objective,
+            tags: editForm.tags
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+            nextAction: editForm.nextAction,
+          },
+        }),
+      })
+      await refreshProjects()
+      toast('Projet mis à jour.', { type: 'success' })
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Mise à jour impossible.', { type: 'error' })
+    } finally {
+      setSavingDetails(false)
     }
   }
 
@@ -451,6 +502,55 @@ export function ProjectsScreen() {
                     </div>
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <form onSubmit={saveProjectDetails} className="space-y-3 rounded-lg border border-primary-200 p-3 dark:border-neutral-800 sm:col-span-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold">Cadrage projet</div>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={savingDetails || !editForm.title.trim()}
+                        >
+                          Enregistrer
+                        </Button>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <FieldLabel>Titre du projet</FieldLabel>
+                          <Input
+                            value={editForm.title}
+                            onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <FieldLabel>Tags</FieldLabel>
+                          <Input
+                            value={editForm.tags}
+                            onChange={(event) => setEditForm((current) => ({ ...current, tags: event.target.value }))}
+                            placeholder="metacentrex, pricing"
+                            className="h-8"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <FieldLabel>Objectif</FieldLabel>
+                        <textarea
+                          value={editForm.objective}
+                          onChange={(event) => setEditForm((current) => ({ ...current, objective: event.target.value }))}
+                          placeholder="Ce que le projet doit permettre d'obtenir"
+                          className="min-h-24 w-full resize-y rounded-lg border border-primary-200 bg-surface px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-neutral-800 dark:bg-neutral-950"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <FieldLabel>Prochaine action</FieldLabel>
+                        <Input
+                          value={editForm.nextAction}
+                          onChange={(event) => setEditForm((current) => ({ ...current, nextAction: event.target.value }))}
+                          placeholder="Ex. Faire analyser les sources par Hermes"
+                          className="h-8"
+                        />
+                      </div>
+                    </form>
                     <div className="space-y-1.5">
                       <FieldLabel>Statut</FieldLabel>
                       <SelectField
