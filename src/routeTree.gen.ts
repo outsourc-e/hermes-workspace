@@ -30,6 +30,7 @@ import { Route as FilesRouteImport } from './routes/files'
 import { Route as EchoStudioRouteImport } from './routes/echo-studio'
 import { Route as EarlyAccessRouteImport } from './routes/early-access'
 import { Route as DstnyDocumentsRouteImport } from './routes/dstny-documents'
+import { Route as DstnyCockpitRouteImport } from './routes/dstny-cockpit'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as AgoraRouteImport } from './routes/agora'
@@ -287,6 +288,11 @@ const EarlyAccessRoute = EarlyAccessRouteImport.update({
 const DstnyDocumentsRoute = DstnyDocumentsRouteImport.update({
   id: '/dstny-documents',
   path: '/dstny-documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DstnyCockpitRoute = DstnyCockpitRouteImport.update({
+  id: '/dstny-cockpit',
+  path: '/dstny-cockpit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -1070,6 +1076,7 @@ export interface FileRoutesByFullPath {
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/dstny-cockpit': typeof DstnyCockpitRoute
   '/dstny-documents': typeof DstnyDocumentsRoute
   '/early-access': typeof EarlyAccessRoute
   '/echo-studio': typeof EchoStudioRoute
@@ -1246,6 +1253,7 @@ export interface FileRoutesByTo {
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/dstny-cockpit': typeof DstnyCockpitRoute
   '/dstny-documents': typeof DstnyDocumentsRoute
   '/early-access': typeof EarlyAccessRoute
   '/echo-studio': typeof EchoStudioRoute
@@ -1422,6 +1430,7 @@ export interface FileRoutesById {
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/dstny-cockpit': typeof DstnyCockpitRoute
   '/dstny-documents': typeof DstnyDocumentsRoute
   '/early-access': typeof EarlyAccessRoute
   '/echo-studio': typeof EchoStudioRoute
@@ -1600,6 +1609,7 @@ export interface FileRouteTypes {
     | '/agora'
     | '/conductor'
     | '/dashboard'
+    | '/dstny-cockpit'
     | '/dstny-documents'
     | '/early-access'
     | '/echo-studio'
@@ -1776,6 +1786,7 @@ export interface FileRouteTypes {
     | '/agora'
     | '/conductor'
     | '/dashboard'
+    | '/dstny-cockpit'
     | '/dstny-documents'
     | '/early-access'
     | '/echo-studio'
@@ -1951,6 +1962,7 @@ export interface FileRouteTypes {
     | '/agora'
     | '/conductor'
     | '/dashboard'
+    | '/dstny-cockpit'
     | '/dstny-documents'
     | '/early-access'
     | '/echo-studio'
@@ -2128,6 +2140,7 @@ export interface RootRouteChildren {
   AgoraRoute: typeof AgoraRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
+  DstnyCockpitRoute: typeof DstnyCockpitRoute
   DstnyDocumentsRoute: typeof DstnyDocumentsRoute
   EarlyAccessRoute: typeof EarlyAccessRoute
   EchoStudioRoute: typeof EchoStudioRoute
@@ -2415,6 +2428,13 @@ declare module '@tanstack/react-router' {
       path: '/dstny-documents'
       fullPath: '/dstny-documents'
       preLoaderRoute: typeof DstnyDocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dstny-cockpit': {
+      id: '/dstny-cockpit'
+      path: '/dstny-cockpit'
+      fullPath: '/dstny-cockpit'
+      preLoaderRoute: typeof DstnyCockpitRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -3709,6 +3729,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgoraRoute: AgoraRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
+  DstnyCockpitRoute: DstnyCockpitRoute,
   DstnyDocumentsRoute: DstnyDocumentsRoute,
   EarlyAccessRoute: EarlyAccessRoute,
   EchoStudioRoute: EchoStudioRoute,

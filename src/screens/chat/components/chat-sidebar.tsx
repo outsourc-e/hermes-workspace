@@ -579,13 +579,15 @@ function ChatSidebarComponent({
   const isSkillsActive = pathname === '/skills'
   const isMcpActive = pathname === '/mcp'
   const isFilesActive = pathname === '/files'
-  const isProjectsActive = pathname === '/projects'
+  const isDstnyCockpitActive =
+    pathname === '/dstny-cockpit' ||
+    pathname === '/projects' ||
+    pathname === '/dstny-documents'
   const isPlaygroundActive = pathname === '/playground'
   const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
-  const isDstnyDocumentsActive = pathname === '/dstny-documents'
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
@@ -593,8 +595,16 @@ function ChatSidebarComponent({
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
   )
-  const mainRoutes = ['/chat', '/new', '/projects', '/files', '/terminal']
-  const knowledgeRoutes = ['/memory', '/dstny-documents', '/skills']
+  const mainRoutes = [
+    '/chat',
+    '/new',
+    '/dstny-cockpit',
+    '/projects',
+    '/dstny-documents',
+    '/files',
+    '/terminal',
+  ]
+  const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
 
   useEffect(() => {
@@ -803,10 +813,10 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/projects',
-      icon: Folder01Icon,
-      label: 'Projets',
-      active: isProjectsActive,
+      to: '/dstny-cockpit',
+      icon: Building01Icon,
+      label: 'Cockpit Dstny',
+      active: isDstnyCockpitActive,
     },
     {
       kind: 'link',
@@ -878,13 +888,6 @@ function ChatSidebarComponent({
       icon: BrainIcon,
       label: t('nav.memory'),
       active: isMemoryActive,
-    },
-    {
-      kind: 'link',
-      to: '/dstny-documents',
-      icon: File01Icon,
-      label: 'Documents Dstny',
-      active: isDstnyDocumentsActive,
     },
     {
       kind: 'link',
