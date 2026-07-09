@@ -1402,13 +1402,13 @@ function countPayloadItems(raw: unknown, keys: Array<string>): number {
   return 0
 }
 
-type OauthSignal = {
+export type OauthSignal = {
   name: string
   text: string
   connected: boolean
 }
 
-function collectOauthSignals(raw: unknown): Array<OauthSignal> {
+export function collectOauthSignals(raw: unknown): Array<OauthSignal> {
   const out: Array<OauthSignal> = []
   const seen = new Set<unknown>()
 

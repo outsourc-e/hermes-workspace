@@ -96,6 +96,7 @@ import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiHermesTasksRouteImport } from './routes/api/hermes-tasks'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiGovernanceRouteImport } from './routes/api/governance'
+import { Route as ApiGoogleWorkspaceRouteImport } from './routes/api/google-workspace'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
@@ -615,6 +616,11 @@ const ApiGovernanceRoute = ApiGovernanceRouteImport.update({
   path: '/api/governance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGoogleWorkspaceRoute = ApiGoogleWorkspaceRouteImport.update({
+  id: '/api/google-workspace',
+  path: '/api/google-workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
   id: '/api/gateway-status',
   path: '/api/gateway-status',
@@ -1081,6 +1087,7 @@ export interface FileRoutesByFullPath {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/google-workspace': typeof ApiGoogleWorkspaceRoute
   '/api/governance': typeof ApiGovernanceRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
@@ -1251,6 +1258,7 @@ export interface FileRoutesByTo {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/google-workspace': typeof ApiGoogleWorkspaceRoute
   '/api/governance': typeof ApiGovernanceRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
@@ -1423,6 +1431,7 @@ export interface FileRoutesById {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/google-workspace': typeof ApiGoogleWorkspaceRoute
   '/api/governance': typeof ApiGovernanceRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
@@ -1596,6 +1605,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/google-workspace'
     | '/api/governance'
     | '/api/hermes-config'
     | '/api/hermes-tasks'
@@ -1766,6 +1776,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/google-workspace'
     | '/api/governance'
     | '/api/hermes-config'
     | '/api/hermes-tasks'
@@ -1937,6 +1948,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/google-workspace'
     | '/api/governance'
     | '/api/hermes-config'
     | '/api/hermes-tasks'
@@ -2109,6 +2121,7 @@ export interface RootRouteChildren {
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
+  ApiGoogleWorkspaceRoute: typeof ApiGoogleWorkspaceRoute
   ApiGovernanceRoute: typeof ApiGovernanceRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
   ApiHermesTasksRoute: typeof ApiHermesTasksRouteWithChildren
@@ -2811,6 +2824,13 @@ declare module '@tanstack/react-router' {
       path: '/api/governance'
       fullPath: '/api/governance'
       preLoaderRoute: typeof ApiGovernanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/google-workspace': {
+      id: '/api/google-workspace'
+      path: '/api/google-workspace'
+      fullPath: '/api/google-workspace'
+      preLoaderRoute: typeof ApiGoogleWorkspaceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/gateway-status': {
@@ -3650,6 +3670,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
+  ApiGoogleWorkspaceRoute: ApiGoogleWorkspaceRoute,
   ApiGovernanceRoute: ApiGovernanceRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
   ApiHermesTasksRoute: ApiHermesTasksRouteWithChildren,
