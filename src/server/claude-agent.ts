@@ -52,6 +52,14 @@ function readClaudeEnv(): Record<string, string> {
   }
 }
 
+function isHermesAgentDir(candidate: string): boolean {
+  return (
+    existsSync(resolve(candidate, 'webapi')) ||
+    (existsSync(resolve(candidate, 'hermes_cli', 'main.py')) &&
+      existsSync(resolve(candidate, 'gateway')))
+  )
+}
+
 /** Same directory resolution logic as vite.config.ts. Kept in sync. */
 export function resolveClaudeAgentDir(
   env: Record<string, string | undefined> = process.env,
@@ -73,7 +81,7 @@ export function resolveClaudeAgentDir(
   )
 
   for (const candidate of candidates) {
-    if (existsSync(resolve(candidate, 'webapi'))) return candidate
+    if (isHermesAgentDir(candidate)) return candidate
   }
 
   return null
