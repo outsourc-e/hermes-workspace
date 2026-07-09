@@ -467,105 +467,165 @@ function ProductSheetPreview({
   const offer = fieldValue(fields, 'offer', 'Perimetre de l’offre a completer avec les sources produit.')
   const pricing = fieldValue(fields, 'pricing', 'Pricing masque tant que la source tarifaire active n’est pas rattachee.')
   const sources = fieldValue(fields, 'sources', 'Sources a rattacher avant publication.')
+  const problems = listItems(fieldValue(fields, 'problems')).slice(0, 3)
+  const benefits = listItems(fieldValue(fields, 'benefits')).slice(0, 4)
+  const objections = listItems(fieldValue(fields, 'objections')).slice(0, 3)
 
   return (
     <div className="rounded-lg border border-primary-200 p-4 dark:border-neutral-800">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold">Apercu template PDF</h3>
+          <h3 className="text-sm font-semibold">Apercu fiche produit B2B</h3>
           <p className="mt-1 text-xs leading-5 text-primary-600 dark:text-neutral-400">
-            Rendu de principe du livrable. Le contenu peut venir du studio, d’une dictee, d’un document ou du RAG.
+            Trame orientee vente et achat. Elle doit aider a qualifier, comparer, vendre et valider, sans storytelling inutile.
           </p>
         </div>
         <Badge tone={toneForStatus('a_valider')}>v0.1 visuel</Badge>
       </div>
 
       <div className="mt-4 overflow-x-auto rounded-lg bg-neutral-950/5 p-4 dark:bg-neutral-950">
-        <article className="mx-auto min-h-[780px] w-[560px] max-w-full overflow-hidden rounded-sm bg-white text-slate-950 shadow-xl ring-1 ring-black/10">
-          <header className="relative overflow-hidden bg-slate-950 px-8 py-7 text-white">
-            <div className="absolute right-0 top-0 h-full w-32 bg-amber-400" />
-            <div className="relative z-10">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300">
-                Fiche produit Dstny
+        <article
+          className="mx-auto min-h-[790px] w-[560px] max-w-full overflow-hidden bg-white text-[#261616] shadow-xl ring-1 ring-black/10"
+          style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
+        >
+          <header className="grid grid-cols-[1fr_112px] border-b border-[#e7edf0]">
+            <div className="bg-white px-7 py-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-[22px] font-black tracking-tight text-[#181999]">Dstny</div>
+                <div className="rounded-full bg-[#00a5b5]/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#006487]">
+                  Fiche produit
+                </div>
               </div>
-              <h4 className="mt-4 max-w-[390px] text-2xl font-semibold leading-tight">
+              <h4 className="mt-8 text-[26px] font-extrabold leading-tight text-[#261616]">
                 {project.title.replace(/^Fiche produit PDF\s*-\s*/i, '')}
               </h4>
-              <p className="mt-3 max-w-[420px] text-sm leading-6 text-slate-200">
+              <p className="mt-3 max-w-[390px] text-[13px] font-medium leading-6 text-[#38344d]">
                 {promise}
               </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-                  {channel}
-                </span>
-                <span className="rounded-full bg-amber-400 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-950">
-                  Brouillon source
-                </span>
+              <div className="mt-5 grid grid-cols-3 gap-2">
+                <div className="border-l-4 border-[#00a5b5] bg-[#f4fafb] px-3 py-2">
+                  <div className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#006487]">Canal</div>
+                  <div className="mt-1 text-[11px] font-bold text-[#261616]">{channel}</div>
+                </div>
+                <div className="border-l-4 border-[#ff9015] bg-[#fff7ed] px-3 py-2">
+                  <div className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#8a4a00]">Usage</div>
+                  <div className="mt-1 text-[11px] font-bold text-[#261616]">Vendre / acheter</div>
+                </div>
+                <div className="border-l-4 border-[#7e0a5c] bg-[#fbf2f8] px-3 py-2">
+                  <div className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#7e0a5c]">Statut</div>
+                  <div className="mt-1 text-[11px] font-bold text-[#261616]">Brouillon</div>
+                </div>
               </div>
+            </div>
+            <div className="bg-[#00a5b5]">
+              <div className="h-1/3 bg-[#ff9015]" />
+              <div className="h-1/3 bg-[#00496b]" />
+              <div className="h-1/3 bg-[#7e0a5c]" />
             </div>
           </header>
 
-          <div className="grid gap-0 border-b border-slate-200 md:grid-cols-[1.1fr_0.9fr]">
-            <section className="border-r border-slate-200 p-6">
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Cible</div>
-              <p className="mt-2 text-xs leading-5 text-slate-700">{target}</p>
-            </section>
-            <section className="p-6">
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                Probleme client
+          <section className="grid border-b border-[#e7edf0] md:grid-cols-[0.95fr_1.05fr]">
+            <div className="border-r border-[#e7edf0] p-5">
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
+                Pour qui ?
               </div>
-              <div className="mt-2">
-                <PreviewList value={fieldValue(fields, 'problems')} limit={3} />
+              <p className="mt-2 text-[12px] font-medium leading-5 text-[#38344d]">{target}</p>
+            </div>
+            <div className="p-5">
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
+                Signaux d’achat
               </div>
-            </section>
-          </div>
+              <ul className="mt-2 space-y-1.5">
+                {(problems.length ? problems : ['Besoin client a qualifier.']).map((item) => (
+                  <li key={item} className="flex gap-2 text-[11px] leading-5 text-[#38344d]">
+                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#ff9015]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
 
-          <section className="p-6">
-            <div className="grid gap-5 md:grid-cols-[0.95fr_1.05fr]">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                  Benefices commerciaux
-                </div>
-                <div className="mt-3">
-                  <PreviewList value={fieldValue(fields, 'benefits')} />
-                </div>
+          <section className="grid border-b border-[#e7edf0] md:grid-cols-[1fr_0.82fr]">
+            <div className="p-5">
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
+                Pourquoi le proposer ?
               </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                  Ce que contient l’offre
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-700">{offer}</p>
+              <div className="mt-3 grid gap-2">
+                {(benefits.length ? benefits : ['Benefice commercial a completer.']).map((item) => (
+                  <div key={item} className="border-l-4 border-[#00a5b5] bg-[#f7fbfc] px-3 py-2">
+                    <div className="text-[11px] font-semibold leading-5 text-[#261616]">{item}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="border-l border-[#e7edf0] bg-[#f8fafb] p-5">
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
+                Critères d’achat
+              </div>
+              <div className="mt-3 space-y-2">
+                {['Fit client', 'Pré-requis', 'Conditions', 'Prix source'].map((item, index) => (
+                  <div key={item} className="flex items-center justify-between border-b border-[#dbe6ea] pb-1.5 text-[11px]">
+                    <span className="font-semibold text-[#38344d]">{item}</span>
+                    <span className={index === 3 ? 'font-bold text-[#7e0a5c]' : 'font-bold text-[#00a5b5]'}>
+                      {index === 3 ? 'A valider' : 'A qualifier'}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
 
-          <section className="grid border-y border-slate-200 md:grid-cols-[0.85fr_1.15fr]">
-            <div className="bg-amber-50 p-6">
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">
-                Pricing
+          <section className="grid border-b border-[#e7edf0] md:grid-cols-[1fr_1fr]">
+            <div className="border-r border-[#e7edf0] p-5">
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
+                Offre vendable
               </div>
-              <p className="mt-2 text-xs leading-5 text-slate-800">{pricing}</p>
+              <p className="mt-2 text-[12px] leading-5 text-[#38344d]">{offer}</p>
             </div>
-            <div className="p-6">
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                Objections a preparer
+            <div className="p-5">
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
+                Objections clés
               </div>
-              <div className="mt-2">
-                <PreviewList value={fieldValue(fields, 'objections')} limit={3} />
+              <ul className="mt-2 space-y-1.5">
+                {(objections.length ? objections : ['Objection a preparer.']).map((item) => (
+                  <li key={item} className="flex gap-2 text-[11px] leading-5 text-[#38344d]">
+                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#7e0a5c]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          <section className="grid border-b border-[#e7edf0] md:grid-cols-[0.9fr_1.1fr]">
+            <div className="bg-[#00496b] p-5 text-white">
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#ffe652]">
+                Pricing / achat
+              </div>
+              <p className="mt-2 text-[12px] font-medium leading-5 text-white/90">{pricing}</p>
+            </div>
+            <div className="p-5">
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
+                A retenir par le commercial
+              </div>
+              <div className="mt-3 rounded-md border border-[#ff9015]/40 bg-[#fff7ed] p-3 text-[12px] font-bold leading-5 text-[#261616]">
+                Qualifier le besoin, confirmer le canal et ne publier aucune condition tarifaire sans source active.
               </div>
             </div>
           </section>
 
-          <footer className="grid gap-4 p-6 md:grid-cols-[1fr_auto]">
+          <footer className="grid gap-4 p-5 md:grid-cols-[1fr_auto]">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                Sources et limites
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
+                Sources, limites et publication
               </div>
-              <p className="mt-2 line-clamp-4 text-[11px] leading-5 text-slate-600">{sources}</p>
+              <p className="mt-2 line-clamp-4 text-[10px] leading-4 text-[#5b6670]">{sources}</p>
             </div>
-            <div className="self-end text-right text-[10px] leading-4 text-slate-500">
+            <div className="self-end text-right text-[10px] leading-4 text-[#5b6670]">
+              <div className="font-bold text-[#181999]">Dstny</div>
               <div>{formatDate(project.updatedAt)}</div>
-              <div>{project.status === 'valide' ? 'Valide' : 'Non publiable sans validation'}</div>
+              <div>{project.status === 'valide' ? 'Validé' : 'Non publiable'}</div>
             </div>
           </footer>
         </article>
