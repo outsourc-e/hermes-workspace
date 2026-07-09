@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { McpServerCard } from './components/mcp-server-card'
@@ -59,14 +59,14 @@ export function McpScreen() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase text-primary-500 tabular-nums">
-                Nova Mission Control Â· MCP
+                Hermes Workspace · MCP
               </p>
               <h1 className="text-2xl font-medium text-ink text-balance sm:text-3xl">
                 MCP Servers
               </h1>
               <p className="text-sm text-primary-500 text-pretty sm:text-base">
                 Discover, install, and manage Model Context Protocol servers
-                exposed to Nova gateway.
+                exposed to Hermes Agent.
               </p>
             </div>
             <Button
@@ -85,7 +85,7 @@ export function McpScreen() {
               role="status"
               className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
             >
-              âš  Local fallback mode â€” using config.yaml. Test, Discover, and
+              ⚠ Local fallback mode — using config.yaml. Test, Discover, and
               Logs require the new hermes-agent /api/mcp endpoints.
             </div>
           ) : null}
@@ -111,7 +111,7 @@ export function McpScreen() {
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={
                   tab === 'marketplace'
-                    ? 'Search MCP catalogâ€¦'
+                    ? 'Search MCP catalog…'
                     : 'Search servers by name'
                 }
                 className={`${TOOLBAR_FIELD} flex-1`}
@@ -163,7 +163,7 @@ export function McpScreen() {
               {hubQuery.data?.warnings && hubQuery.data.warnings.length > 0 ? (
                 hubQuery.data.results && hubQuery.data.results.length > 0 ? (
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    âš  One or more sources unavailable; showing local results.
+                    ⚠ One or more sources unavailable; showing local results.
                     <span className="ml-1 text-[11px] text-primary-500">
                       ({hubQuery.data.warnings[0]})
                     </span>
@@ -200,7 +200,7 @@ export function McpScreen() {
                     onClick={() => hubQuery.fetchNextPage()}
                   >
                     {hubQuery.isFetchingNextPage
-                      ? 'Loadingâ€¦'
+                      ? 'Loading…'
                       : `Load more (${(hubQuery.data?.results.length ?? 0).toLocaleString()} of ${(hubQuery.data?.total ?? 0).toLocaleString()})`}
                   </Button>
                 </div>
@@ -250,8 +250,8 @@ function ServerList({ query, onEdit }: ServerListProps) {
   if (query.isLoading) {
     return (
       <EmptyCard
-        title="Loading serversâ€¦"
-        description="Fetching MCP servers from Nova gateway."
+        title="Loading servers…"
+        description="Fetching MCP servers from Hermes Agent."
       />
     )
   }
@@ -305,7 +305,7 @@ function EmptyCard({ title, description, tone = 'neutral' }: EmptyCardProps) {
 }
 
 // ---------------------------------------------------------------------------
-// MarketplaceGrid â€” Phase 3.0 Marketplace tab
+// MarketplaceGrid — Phase 3.0 Marketplace tab
 // ---------------------------------------------------------------------------
 
 const TRUST_PILL: Record<string, { label: string; className: string }> = {
@@ -364,7 +364,7 @@ function MarketplaceGrid({
     return (
       <EmptyCard
         title="No results"
-        description="Try a different search term. The registry may be unavailable â€” local presets are used as fallback."
+        description="Try a different search term. The registry may be unavailable — local presets are used as fallback."
       />
     )
   }

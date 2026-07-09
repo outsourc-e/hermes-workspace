@@ -3,10 +3,8 @@
   CheckmarkCircle02Icon,
   ConsoleIcon,
   Edit02Icon,
-  Moon02Icon,
   PuzzleIcon,
   Settings02Icon,
-  Sun02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
@@ -57,14 +55,13 @@ import { normalizeDashboardSessionsPayload } from './lib/sessions-query'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
 import type { SessionRowData } from './components/sessions-intelligence-card'
 import type { AnalyticsPeriod } from './components/analytics-chart-card'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import type { ClaudeSession } from '@/server/claude-api'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { useCrewStatus } from '@/hooks/use-crew-status'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { cn } from '@/lib/utils'
-import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
@@ -132,6 +129,58 @@ function useDashboardPalette() {
 
   return palette
 }
+
+const NOVA_MISSION_CONTROL_STYLE = {
+  colorScheme: 'dark',
+  backgroundColor: 'var(--theme-bg)',
+  color: 'var(--theme-text)',
+  backgroundImage:
+    'radial-gradient(circle at 14% 18%, rgba(99, 199, 255, 0.14), transparent 19rem), radial-gradient(circle at 76% 8%, rgba(255, 179, 71, 0.08), transparent 22rem), linear-gradient(rgba(99, 199, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(99, 199, 255, 0.035) 1px, transparent 1px)',
+  backgroundSize: 'auto, auto, 36px 36px, 36px 36px',
+  '--theme-bg': '#050b16',
+  '--theme-sidebar': '#071426',
+  '--theme-panel': '#0a1b33',
+  '--theme-card': '#0d203b',
+  '--theme-card2': '#10284a',
+  '--theme-elevated': '#153a66',
+  '--theme-border': 'rgba(99, 199, 255, 0.24)',
+  '--theme-border-subtle': 'rgba(157, 220, 255, 0.12)',
+  '--theme-border-strong': 'rgba(255, 140, 26, 0.52)',
+  '--theme-text': '#ffd27a',
+  '--theme-text-strong': '#fff1cc',
+  '--theme-text-soft': '#d4a276',
+  '--theme-muted': 'rgba(157, 220, 255, 0.66)',
+  '--theme-muted-2': 'rgba(157, 220, 255, 0.44)',
+  '--theme-glass': 'rgba(5, 11, 22, 0.88)',
+  '--theme-focus': '#ffd27a',
+  '--theme-accent': '#ff8c1a',
+  '--theme-accent-secondary': '#ffb347',
+  '--theme-accent-soft': '#ffd27a',
+  '--theme-on-accent': '#050b16',
+  '--theme-blue': '#63c7ff',
+  '--theme-blue-secondary': '#9ddcff',
+  '--theme-blue-deep': '#153a66',
+  '--theme-blue-subtle': 'rgba(99, 199, 255, 0.1)',
+  '--theme-blue-border': 'rgba(99, 199, 255, 0.28)',
+  '--theme-accent-subtle': 'rgba(255, 140, 26, 0.1)',
+  '--theme-accent-border': 'rgba(255, 140, 26, 0.42)',
+  '--theme-glow-low': '0 0 10px rgba(255, 140, 26, 0.18)',
+  '--theme-glow-medium': '0 0 18px rgba(255, 140, 26, 0.28)',
+  '--theme-glow-high': '0 0 30px rgba(255, 179, 71, 0.38)',
+  '--theme-active': '#ff8c1a',
+  '--theme-link': '#9ddcff',
+  '--theme-success': '#63c7ff',
+  '--theme-warning': '#ffb347',
+  '--theme-danger': '#ff8c1a',
+  '--theme-stripe': 'rgba(99, 199, 255, 0.055)',
+  '--theme-header-bg': 'rgba(5, 11, 22, 0.94)',
+  '--theme-header-border': 'rgba(99, 199, 255, 0.18)',
+  '--theme-input': '#071426',
+  '--theme-hover': 'rgba(99, 199, 255, 0.1)',
+  '--color-surface': '#050b16',
+  '--color-surface-deep': '#020712',
+  '--color-ink': '#ffd27a',
+} as CSSProperties
 
 function toMilliseconds(value: number | null | undefined): number | null {
   if (!value || !Number.isFinite(value)) return null
@@ -979,15 +1028,12 @@ export function DashboardScreen() {
 
   const palette = useDashboardPalette()
 
-  const updateSettings = useSettingsStore((state) => state.updateSettings)
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof document === 'undefined') return true
-    const dt = document.documentElement.getAttribute('data-theme') || ''
-    return !dt.endsWith('-light')
-  })
-
   return (
-    <div className="min-h-full">
+    <div
+      data-nova-mission-control="true"
+      className="min-h-full"
+      style={NOVA_MISSION_CONTROL_STYLE}
+    >
       {/* Floating mobile nav: hamburger left, theme toggle right */}
       <div
         className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12"
@@ -1015,40 +1061,13 @@ export function DashboardScreen() {
             />
           </svg>
         </button>
-        <button
-          type="button"
-          aria-label="Toggle theme"
-          onClick={() => {
-            const LIGHT_DARK_PAIRS: Record<string, string> = {
-              'claude-nous': 'claude-nous-light',
-              'claude-nous-light': 'claude-nous',
-              'claude-official': 'claude-official-light',
-              'claude-official-light': 'claude-official',
-              'claude-classic': 'claude-classic-light',
-              'claude-classic-light': 'claude-classic',
-              'claude-slate': 'claude-slate-light',
-              'claude-slate-light': 'claude-slate',
-            }
-            const cur =
-              document.documentElement.getAttribute('data-theme') || 'scifi'
-            const nextDataTheme = LIGHT_DARK_PAIRS[cur] || 'scifi'
-            import('@/lib/theme').then(({ setTheme }) => {
-              setTheme(nextDataTheme as any)
-            })
-            const nextMode = 'dark'
-            applyTheme(nextMode)
-            updateSettings({ theme: nextMode })
-            setIsDark(true)
-          }}
-          className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
+        <span
+          className="flex h-11 items-center rounded-xl px-3 font-mono text-[10px] uppercase tracking-[0.16em]"
           style={{ color: 'var(--theme-muted)' }}
+          title="Nova Mission Control keeps its cockpit palette local to this dashboard."
         >
-          <HugeiconsIcon
-            icon={isDark ? Sun02Icon : Moon02Icon}
-            size={20}
-            strokeWidth={1.5}
-          />
-        </button>
+          local skin
+        </span>
       </div>
       <div className="space-y-4 px-3 py-4 pb-28 pt-14 sm:px-4 md:space-y-5 md:px-8 md:py-6 md:pt-4 lg:px-10">
         {/* ── Header: brand lockup left, action cluster right.

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -29,7 +29,7 @@ export function OnboardingWizard() {
   } = useOnboardingStore()
   const [canProceed, setCanProceed] = useState(true)
 
-  // Run once on client mount â€” checks localStorage and opens if not completed
+  // Run once on client mount — checks localStorage and opens if not completed
   useEffect(() => {
     initialize()
   }, [initialize])
@@ -147,7 +147,7 @@ export function OnboardingWizard() {
                         {step.id === 'welcome' ? (
                           <img
                             src="/claude-avatar.webp"
-                            alt="Nova gateway"
+                            alt="Hermes Agent"
                             className="size-16 rounded-2xl"
                           />
                         ) : (

@@ -1,7 +1,7 @@
 {
-  "name": "Nova Mission Control",
-  "short_name": "Nova",
-  "description": "Installable control surface for Nova chat, tools, files, memory, jobs, and agent workflows.",
+  "name": "Hermes Workspace",
+  "short_name": "Hermes",
+  "description": "Installable control surface for Hermes Agent chat, tools, files, memory, jobs, and agent workflows.",
   "id": "/?app=hermes-workspace",
   "start_url": "/?source=pwa",
   "scope": "/",

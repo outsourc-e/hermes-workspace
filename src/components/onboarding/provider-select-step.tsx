@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import {
@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-/* â”€â”€ Provider Definitions â”€â”€ */
+/* ── Provider Definitions ── */
 
 type Provider = {
   id: string
@@ -92,18 +92,18 @@ const PROVIDERS: Array<Provider> = [
     logo: <AnthropicLogo className="size-8" />,
     placeholder: 'sk-ant-...',
     helpUrl: 'https://console.anthropic.com/settings/keys',
-    helpLabel: 'Get API key â†’',
+    helpLabel: 'Get API key →',
   },
   {
     id: 'openrouter',
     name: 'OpenRouter',
     description:
-      'One Nova gateway connection to 200+ AI models. Ideal for flexibility and experimentation',
+      'One Hermes Agent connection to 200+ AI models. Ideal for flexibility and experimentation',
     badge: 'Popular',
     logo: <OpenRouterLogo className="size-8" />,
     placeholder: 'sk-or-v1-...',
     helpUrl: 'https://openrouter.ai/keys',
-    helpLabel: 'Get API key â†’',
+    helpLabel: 'Get API key →',
   },
   {
     id: 'google',
@@ -112,7 +112,7 @@ const PROVIDERS: Array<Provider> = [
     logo: <GoogleLogo className="size-8" />,
     placeholder: 'AI...',
     helpUrl: 'https://aistudio.google.com/apikey',
-    helpLabel: 'Get API key â†’',
+    helpLabel: 'Get API key →',
   },
   {
     id: 'openai',
@@ -121,11 +121,11 @@ const PROVIDERS: Array<Provider> = [
     logo: <OpenAILogo className="size-8" />,
     placeholder: 'sk-...',
     helpUrl: 'https://platform.openai.com/api-keys',
-    helpLabel: 'Get API key â†’',
+    helpLabel: 'Get API key →',
   },
 ]
 
-/* â”€â”€ Component â”€â”€ */
+/* ── Component ── */
 
 type ProviderSelectStepProps = {
   onComplete: (providerId: string, apiKey: string) => void
@@ -167,7 +167,7 @@ export function ProviderSelectStep({
       }
     } catch {
       setValidated(false)
-      setError('Validation failed â€” check your connection')
+      setError('Validation failed — check your connection')
     } finally {
       setValidating(false)
     }
@@ -375,7 +375,7 @@ export function ProviderSelectStep({
             validated === true && 'bg-green-600 hover:bg-green-700',
           )}
         >
-          {validated === true ? 'Continue âœ“' : 'Continue'}
+          {validated === true ? 'Continue ✓' : 'Continue'}
         </Button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -240,7 +240,7 @@ export function ClaudeOnboarding() {
         setBackendStatus('ready')
         setBackendMessage(
           data.capabilities.sessions
-            ? 'Backend connected. Core chat works, and Nova gateway gateway enhancements are available.'
+            ? 'Backend connected. Core chat works, and Hermes Agent gateway enhancements are available.'
             : 'Backend connected. Core chat is ready.',
         )
         return
@@ -522,15 +522,15 @@ export function ClaudeOnboarding() {
             <div className="space-y-4 text-center">
               <img
                 src="/claude-avatar.webp"
-                alt="Nova gateway"
+                alt="Hermes Agent"
                 className="mx-auto size-20 rounded-2xl"
                 style={{
                   filter: 'drop-shadow(0 8px 24px rgba(99,102,241,0.3))',
                 }}
               />
-              <h2 className="text-xl font-bold">Welcome to Nova Mission Control</h2>
+              <h2 className="text-xl font-bold">Welcome to Hermes Workspace</h2>
               <p className="text-sm" style={mutedStyle}>
-                Works with any OpenAI-compatible backend. Nova gateway gateway APIs
+                Works with any OpenAI-compatible backend. Hermes Agent gateway APIs
                 unlock sessions, memory, skills, and other extras automatically.
               </p>
               <button
@@ -550,10 +550,10 @@ export function ClaudeOnboarding() {
 
           {step === 'connect' && (
             <div className="space-y-4 text-center">
-              <div className="text-4xl">ðŸ”Œ</div>
+              <div className="text-4xl">🔌</div>
               <h2 className="text-lg font-bold">Connect Your Backend</h2>
               <p className="text-sm" style={mutedStyle}>
-                Start by verifying that Nova Mission Control can reach your
+                Start by verifying that Hermes Workspace can reach your
                 OpenAI-compatible backend.
               </p>
 
@@ -600,8 +600,8 @@ export function ClaudeOnboarding() {
                     </p>
                     <p className="mt-2" style={mutedStyle}>
                       Use any backend that exposes{' '}
-                      <code>/v1/chat/completions</code>. If you point Nova gateway
-                      Workspace at a Nova gateway gateway, enhanced features unlock
+                      <code>/v1/chat/completions</code>. If you point Hermes Agent
+                      Workspace at a Hermes Agent gateway, enhanced features unlock
                       automatically.
                     </p>
                     <div
@@ -650,14 +650,14 @@ export function ClaudeOnboarding() {
               <p className="text-center text-xs" style={mutedStyle}>
                 {canEditConfig
                   ? 'Save provider settings here, then choose a model before testing chat.'
-                  : 'This backend manages provider settings outside Nova Mission Control. Confirm the model you expect to use, then test chat.'}
+                  : 'This backend manages provider settings outside Hermes Workspace. Confirm the model you expect to use, then test chat.'}
               </p>
 
               <div className="rounded-xl p-3 text-xs" style={cardStyle}>
                 <p style={mutedStyle}>Backend mode</p>
                 <p className="mt-1">
                   {backendInfo?.capabilities?.sessions
-                    ? 'Nova gateway gateway detected'
+                    ? 'Hermes Agent gateway detected'
                     : 'Portable OpenAI-compatible backend'}
                 </p>
                 {configuredModel ? (
@@ -771,14 +771,14 @@ export function ClaudeOnboarding() {
                             className="w-full rounded-lg border py-2 text-xs font-medium"
                             style={{ borderColor: 'var(--theme-border)' }}
                           >
-                            Open Nous Portal â†—
+                            Open Nous Portal ↗
                           </button>
                         ) : null}
                       </div>
                     )}
                     {oauthStep === 'success' && (
                       <div className="flex items-center gap-2 text-sm text-green-500">
-                        <span>âœ“</span>
+                        <span>✓</span>
                         <span>Authenticated successfully.</span>
                       </div>
                     )}
@@ -967,7 +967,7 @@ export function ClaudeOnboarding() {
                   disabled={!backendSupportsChat}
                   className="flex-1 rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
                 >
-                  Continue â†’
+                  Continue →
                 </button>
               </div>
             </div>
@@ -975,10 +975,10 @@ export function ClaudeOnboarding() {
 
           {step === 'test' && (
             <div className="space-y-4 text-center">
-              <div className="text-4xl">ðŸ§ª</div>
+              <div className="text-4xl">🧪</div>
               <h2 className="text-lg font-bold">Test Chat</h2>
               <p className="text-sm" style={mutedStyle}>
-                Verify that core chat works first. Enhanced Nova gateway features are
+                Verify that core chat works first. Enhanced Hermes Agent features are
                 optional and appear automatically when supported.
               </p>
 
@@ -1060,7 +1060,7 @@ export function ClaudeOnboarding() {
                     ) : (
                       <p className="mt-2 text-xs text-yellow-400">
                         Confirm the backend is running and still reachable from
-                        Nova Mission Control.
+                        Hermes Workspace.
                       </p>
                     )}
                   </div>
@@ -1076,7 +1076,7 @@ export function ClaudeOnboarding() {
                       className="flex-1 rounded-lg border py-2 text-xs font-medium"
                       style={{ borderColor: 'var(--theme-border)' }}
                     >
-                      â† Back
+                      ← Back
                     </button>
                   </div>
                   <button
@@ -1093,30 +1093,30 @@ export function ClaudeOnboarding() {
 
           {step === 'done' && (
             <div className="space-y-4 text-center">
-              <div className="text-5xl">ðŸŽ‰</div>
+              <div className="text-5xl">🎉</div>
               <h2 className="text-xl font-bold">Workspace Ready</h2>
               <p className="text-sm" style={mutedStyle}>
                 Core chat is set up.{' '}
                 {enhancedFeatures.length > 0
-                  ? 'This backend also exposes Nova gateway gateway enhancements.'
-                  : 'If you later connect a Nova gateway gateway, enhanced features unlock automatically.'}
+                  ? 'This backend also exposes Hermes Agent gateway enhancements.'
+                  : 'If you later connect a Hermes Agent gateway, enhanced features unlock automatically.'}
               </p>
               <div
                 className="grid grid-cols-3 gap-2 text-xs"
                 style={mutedStyle}
               >
                 <div className="rounded-xl p-2" style={cardStyle}>
-                  <div className="mb-1 text-lg">ðŸ’¬</div>
+                  <div className="mb-1 text-lg">💬</div>
                   <div>Chat Ready</div>
                 </div>
                 <div className="rounded-xl p-2" style={cardStyle}>
-                  <div className="mb-1 text-lg">link</div>
+                  <div className="mb-1 text-lg">🔗</div>
                   <div>
                     {enhancedFeatures.length > 0 ? 'Enhanced' : 'Portable'}
                   </div>
                 </div>
                 <div className="rounded-xl p-2" style={cardStyle}>
-                  <div className="mb-1 text-lg">mem</div>
+                  <div className="mb-1 text-lg">🧠</div>
                   <div>
                     {enhancedFeatures.length > 0
                       ? enhancedFeatures.length

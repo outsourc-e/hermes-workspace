@@ -1,11 +1,11 @@
-﻿import type { Step } from 'react-joyride'
+import type { Step } from 'react-joyride'
 
 export const tourSteps: Array<Step> = [
   // Step 1: Welcome
   {
     target: 'body',
     placement: 'center',
-    title: 'Welcome to Nova Mission Control! âš•',
+    title: 'Welcome to Hermes Workspace! ⚕',
     content: (
       <div
         style={{
@@ -17,7 +17,7 @@ export const tourSteps: Array<Step> = [
       >
         <img
           src="/claude-avatar.webp"
-          alt="Nova gateway"
+          alt="Hermes Agent"
           style={{ width: 48, height: 48, borderRadius: 12 }}
         />
         <p style={{ textAlign: 'center', margin: 0 }}>
@@ -74,7 +74,7 @@ export const tourSteps: Array<Step> = [
     placement: 'right',
     title: 'Built-in Terminal',
     content:
-      'Built-in terminal for quick commands. Execute shell commands without leaving Nova Mission Control.',
+      'Built-in terminal for quick commands. Execute shell commands without leaving Hermes Workspace.',
   },
   // Step 9: Usage Meter (in header)
   {
@@ -90,14 +90,14 @@ export const tourSteps: Array<Step> = [
     placement: 'right',
     title: 'Settings & Customization',
     content:
-      'Configure providers, themes, accent colors, and more. Make Nova Mission Control yours.',
+      'Configure providers, themes, accent colors, and more. Make Hermes Workspace yours.',
   },
   // Step 11: Finish
   {
     target: 'body',
     placement: 'center',
-    title: "You're all set! ðŸŽ‰",
+    title: "You're all set! 🎉",
     content:
-      'Start chatting with your AI, explore the tools, and customize Nova Mission Control to fit your workflow. Need help? Press ? to see all keyboard shortcuts.',
+      'Start chatting with your AI, explore the tools, and customize Hermes Workspace to fit your workflow. Need help? Press ? to see all keyboard shortcuts.',
   },
 ]

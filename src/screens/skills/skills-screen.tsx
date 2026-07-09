@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
@@ -82,7 +82,7 @@ function normalizeProfileSkill(raw: ProfileSkillRaw): SkillSummary {
     tags: [],
     homepage: null,
     category: titleCaseCategory(raw.category),
-    icon: 'âœ¨',
+    icon: '✨',
     content: '',
     fileCount: 0,
     sourcePath: raw.path || '',
@@ -231,7 +231,7 @@ export function SkillsScreen() {
     return defaultProfile?.name ?? profiles[0]?.name ?? ''
   }, [profiles, profilesQuery.data?.activeProfile])
 
-  // Pick a sensible default once profiles arrive â€” match the dashboard's
+  // Pick a sensible default once profiles arrive — match the dashboard's
   // pattern (active first, then default, then any).
   useEffect(() => {
     if (!profiles.length || selectedProfile) return
@@ -255,7 +255,7 @@ export function SkillsScreen() {
   }, [searchInput, tab])
 
   // When viewing a non-active profile, the marketplace/featured tabs don't
-  // apply â€” the dashboard's per-profile endpoint only enumerates installed
+  // apply — the dashboard's per-profile endpoint only enumerates installed
   // skills inside that profile's own skills/ dir. Snap back to 'installed'
   // so the page stays consistent when the user changes profile.
   useEffect(() => {
@@ -430,16 +430,16 @@ export function SkillsScreen() {
           category: String(category),
           icon:
             skill.source === 'github'
-              ? 'ðŸ™'
+              ? '🐙'
               : skill.source === 'official' || skill.trust_level === 'builtin'
-                ? 'âœ…'
+                ? '✅'
                 : skill.source === 'skills-sh'
-                  ? 'ðŸ“¦'
+                  ? '📦'
                   : skill.source === 'lobehub'
-                    ? 'ðŸ§Š'
+                    ? '🧊'
                     : skill.source === 'claude-marketplace'
-                      ? 'ðŸ¤–'
-                      : 'ðŸ§©',
+                      ? '🤖'
+                      : '🧩',
           content: [
             skill.description,
             skill.identifier ? `Identifier: ${skill.identifier}` : '',
@@ -477,12 +477,12 @@ export function SkillsScreen() {
       await writeTextToClipboard(command)
       toast(`${message} Copied: ${command}`, {
         type: 'warning',
-        icon: 'ðŸ“‹',
+        icon: '📋',
       })
     } catch {
       toast(`${message} ${command}`, {
         type: 'warning',
-        icon: 'ðŸ“‹',
+        icon: '📋',
         duration: 7000,
       })
     }
@@ -594,7 +594,7 @@ export function SkillsScreen() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       setActionError(errorMessage)
-      toast(errorMessage, { type: 'error', icon: 'âŒ' })
+      toast(errorMessage, { type: 'error', icon: '❌' })
     } finally {
       setActionSkillId(null)
     }
@@ -643,7 +643,7 @@ export function SkillsScreen() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase text-primary-500 tabular-nums">
-                Nova Mission Control Marketplace
+                Hermes Workspace Marketplace
               </p>
               <h1 className="text-2xl font-medium text-ink text-balance sm:text-3xl">
                 Skills Browser
@@ -798,8 +798,8 @@ export function SkillsScreen() {
                 (hubQuery.data.source === 'installed-fallback' ||
                   hubQuery.data.source === 'error') ? (
                 <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-                  Skills Hub search unavailable â€” showing installed skills
-                  instead. Ensure the Nova gateway gateway is running.
+                  Skills Hub search unavailable — showing installed skills
+                  instead. Ensure the Hermes Agent gateway is running.
                 </div>
               ) : null}
 
@@ -885,7 +885,7 @@ export function SkillsScreen() {
                   {selectedSkill.icon} {selectedSkill.name}
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-pretty">
-                  by {selectedSkill.author} â€¢ {selectedSkill.category} â€¢{' '}
+                  by {selectedSkill.author} • {selectedSkill.category} •{' '}
                   {selectedSkill.fileCount.toLocaleString()} files
                 </DialogDescription>
                 {selectedSkill.security && (
@@ -1125,7 +1125,7 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <span className="text-primary-500 font-medium w-16 shrink-0">
-              Nova Mission Control
+              Hermes Workspace
             </span>
             <span
               className={cn(
@@ -1157,7 +1157,7 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
             className="flex w-full items-center justify-between px-3 py-2 text-accent-500 hover:text-accent-600 transition-colors"
           >
             <span className="text-[11px] font-medium">Details</span>
-            <span className="text-[10px]">{showDetails ? 'â–²' : 'â–¼'}</span>
+            <span className="text-[10px]">{showDetails ? '▲' : '▼'}</span>
           </button>
           {showDetails && (
             <div className="px-3 pb-3 space-y-1">
@@ -1166,7 +1166,7 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
                   key={flag}
                   className="flex items-start gap-2 text-primary-600"
                 >
-                  <span className="mt-0.5 text-[9px] text-primary-400">â—</span>
+                  <span className="mt-0.5 text-[9px] text-primary-400">●</span>
                   <span>{flag}</span>
                 </div>
               ))}
@@ -1176,7 +1176,7 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
       )}
       <div className="border-t border-primary-100 px-3 py-2">
         <p className="text-[10px] text-primary-400 italic">
-          Like a lobster shell, security has layers â€” review code before you run
+          Like a lobster shell, security has layers — review code before you run
           it.
         </p>
       </div>

@@ -1,4 +1,4 @@
-﻿import { HugeiconsIcon } from '@hugeicons/react'
+import { HugeiconsIcon } from '@hugeicons/react'
 import {
   CheckmarkCircle02Icon,
   CloudIcon,
@@ -44,7 +44,7 @@ import { Input } from '@/components/ui/input'
 import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
-// useWorkspaceStore removed â€” hamburger eliminated on mobile
+// useWorkspaceStore removed — hamburger eliminated on mobile
 
 const VALID_SECTION_IDS: ReadonlyArray<SettingsNavId> = SETTINGS_NAV_ITEMS.map(
   (item) => item.id,
@@ -350,7 +350,7 @@ function SettingsRoute() {
           {/* -- Connection ------------------ */}
           {activeSection === 'connection' && <ConnectionSection />}
 
-          {/* â”€â”€ Nova gateway â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Hermes Agent ──────────────────────────────────── */}
           {activeSection === 'claude' && (
             <ClaudeConfigSection activeView="claude" />
           )}
@@ -367,7 +367,7 @@ function SettingsRoute() {
             <ClaudeConfigSection activeView="display" />
           )}
 
-          {/* â”€â”€ Appearance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Appearance ──────────────────────────────────────── */}
           {activeSection === 'appearance' && (
             <>
               <SettingsSection
@@ -449,10 +449,10 @@ function SettingsRoute() {
             </>
           )}
 
-          {/* â”€â”€ Chat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Chat ────────────────────────────────────────────── */}
           {activeSection === 'chat' && <ChatDisplaySection />}
 
-          {/* â”€â”€ Editor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Editor ──────────────────────────────────────────── */}
           {activeSection === ('editor' as SettingsSectionId) && (
             <SettingsSection
               title="Editor"
@@ -510,7 +510,7 @@ function SettingsRoute() {
             </SettingsSection>
           )}
 
-          {/* â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Notifications ───────────────────────────────────── */}
           {activeSection === ('language' as SettingsSectionId) && (
             <SettingsSection
               title="Language"
@@ -686,7 +686,7 @@ function SettingsRoute() {
   )
 }
 
-// â”€â”€ Profile Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Profile Section ─────────────────────────────────────────────────────
 
 const PROFILE_IMAGE_MAX_DIMENSION = 128
 const PROFILE_IMAGE_MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -796,7 +796,7 @@ function _ProfileSection() {
       </SettingsRow>
       <SettingsRow
         label="Profile picture"
-        description="Resized to 128Ã—128, stored locally."
+        description="Resized to 128×128, stored locally."
       >
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
@@ -830,7 +830,7 @@ function _ProfileSection() {
   )
 }
 
-// â”€â”€ Chat Display Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Chat Display Section ────────────────────────────────────────────────
 
 function ChatDisplaySection() {
   const { settings: chatSettings, updateSettings: updateChatSettings } =
@@ -884,7 +884,7 @@ function ChatDisplaySection() {
           label="Enter key behavior"
           description={
             chatSettings.enterBehavior === 'newline'
-              ? 'Enter inserts a newline. Use âŒ˜/Ctrl+Enter to send.'
+              ? 'Enter inserts a newline. Use ⌘/Ctrl+Enter to send.'
               : 'Enter sends the message. Use Shift+Enter for a newline.'
           }
         >
@@ -946,12 +946,12 @@ function ChatDisplaySection() {
           />
         </SettingsRow>
       </SettingsSection>
-      {/* Mobile Navigation removed â€” not relevant for Nova Mission Control */}
+      {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
     </>
   )
 }
 
-// â”€â”€ Loader Style Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Loader Style Section ────────────────────────────────────────────────
 
 type LoaderStyleOption = { value: LoaderStyle; label: string }
 
@@ -980,7 +980,7 @@ function getPreset(style: LoaderStyle): BrailleSpinnerPreset | null {
 function LoaderPreview({ style }: { style: LoaderStyle }) {
   if (style === 'dots') return <ThreeDotsSpinner />
   if (style === 'lobster')
-    return <span className="inline-block text-sm animate-pulse">ðŸ¦ž</span>
+    return <span className="inline-block text-sm animate-pulse">🦞</span>
   if (style === 'logo') return <LogoLoader />
   const preset = getPreset(style)
   return preset ? (
@@ -1035,7 +1035,7 @@ function _LoaderStyleSection() {
   )
 }
 
-// â”€â”€ Nova gateway Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Hermes Agent Configuration ──────────────────────────────────────
 
 type ClaudeProvider = {
   id: string
@@ -1379,7 +1379,7 @@ function ClaudeConfigSection({
   if (loading) {
     return (
       <SettingsSection
-        title="Nova gateway"
+        title="Hermes Agent"
         description="Loading configuration..."
         icon={Settings02Icon}
       >
@@ -1394,12 +1394,12 @@ function ClaudeConfigSection({
   if (!data) {
     return (
       <SettingsSection
-        title="Nova gateway"
+        title="Hermes Agent"
         description="Could not load Hermes configuration."
         icon={Settings02Icon}
       >
         <p className="text-sm" style={{ color: 'var(--theme-muted)' }}>
-          Make sure Nova gateway is running on localhost:8642
+          Make sure Hermes Agent is running on localhost:8642
         </p>
       </SettingsSection>
     )
@@ -1560,7 +1560,7 @@ function ClaudeConfigSection({
     <>
       <SettingsSection
         title="Model & Provider"
-        description="Configure the default AI model for Nova gateway."
+        description="Configure the default AI model for Hermes Agent."
         icon={SourceCodeSquareIcon}
       >
         <SettingsRow
@@ -1582,7 +1582,7 @@ function ClaudeConfigSection({
                 {availableProviders.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.label}
-                    {p.authenticated ? ' âœ“' : ''}
+                    {p.authenticated ? ' ✓' : ''}
                   </option>
                 ))}
               </select>
@@ -1616,7 +1616,7 @@ function ClaudeConfigSection({
                 {availableModels.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.id}
-                    {m.description ? ` â€” ${m.description}` : ''}
+                    {m.description ? ` — ${m.description}` : ''}
                   </option>
                 ))}
               </select>
@@ -1657,7 +1657,7 @@ function ClaudeConfigSection({
                 Fallback model (optional)
               </p>
               <p className="text-xs text-primary-600">
-                Used only if the primary model fails. Keep empty to disable â€” avoids mixing this
+                Used only if the primary model fails. Keep empty to disable — avoids mixing this
                 up with your main provider (for example OpenRouter only here, local primary above).
               </p>
             </div>
@@ -1755,7 +1755,7 @@ function ClaudeConfigSection({
               key={provider.id}
               label={provider.name}
               description={
-                provider.configured ? 'âœ… Configured' : 'âŒ Not configured'
+                provider.configured ? '✅ Configured' : '❌ Not configured'
               }
             >
               <div className="flex w-full max-w-sm items-center gap-2">
@@ -1790,7 +1790,7 @@ function ClaudeConfigSection({
                             setKeyInput('')
                           }}
                         >
-                          âœ•
+                          ✕
                         </Button>
                       </div>
                     ) : (
@@ -1822,7 +1822,7 @@ function ClaudeConfigSection({
 
       <SettingsSection
         title="Memory"
-        description="Configure Nova gateway memory and user profiles."
+        description="Configure Hermes Agent memory and user profiles."
         icon={UserIcon}
       >
         <SettingsRow
@@ -1893,7 +1893,7 @@ function ClaudeConfigSection({
             <p className="mt-1 text-xs text-primary-600">
               <span className="font-medium">Title</span> is for your list only (e.g.{' '}
               <span className="font-mono">Qwen3.6.Eclipse</span> = model + host).{' '}
-              <span className="font-medium">Provider id</span> is the config name Hermes uses â€” leave
+              <span className="font-medium">Provider id</span> is the config name Hermes uses — leave
               blank to derive a safe id from the title. Optional row API key is stored on this
               provider entry, not in .env.
             </p>
@@ -2052,13 +2052,13 @@ function ClaudeConfigSection({
                   >
                     <td className="px-3 py-2 align-top text-xs text-primary-600">Saved</td>
                     <td className="max-w-[160px] px-3 py-2 align-top text-xs font-medium text-primary-900 break-words">
-                      {entry.title || 'â€”'}
+                      {entry.title || '—'}
                     </td>
                     <td className="px-3 py-2 align-top font-mono text-xs text-primary-800">
-                      {entry.name || 'â€”'}
+                      {entry.name || '—'}
                     </td>
                     <td className="max-w-[240px] px-3 py-2 align-top font-mono text-xs text-primary-700 break-all">
-                      {entry.base_url || 'â€”'}
+                      {entry.base_url || '—'}
                     </td>
                     <td className="px-3 py-2 align-top text-right">
                       <div className="flex flex-wrap justify-end gap-1.5">
@@ -2192,10 +2192,10 @@ function ClaudeConfigSection({
           label="Manifest: CUSTOM_API_KEY"
           description={
             customApiKeyConfigured
-              ? 'âœ… Saved in ~/.hermes/.env for the manifest OpenAI provider.'
+              ? '✅ Saved in ~/.hermes/.env for the manifest OpenAI provider.'
               : customEndpointConfigured
-                ? 'â—‹ Not set â€” optional when your endpoint is local or needs no env key.'
-                : 'â—‹ Optional. Leave blank if you do not use providers.manifest + CUSTOM_API_KEY.'
+                ? '○ Not set — optional when your endpoint is local or needs no env key.'
+                : '○ Optional. Leave blank if you do not use providers.manifest + CUSTOM_API_KEY.'
           }
         >
           <div className="flex w-full max-w-sm flex-col gap-1">
@@ -2233,7 +2233,7 @@ function ClaudeConfigSection({
                       variant="ghost"
                       onClick={() => setEditingCustomKey(false)}
                     >
-                      âœ•
+                      ✕
                     </Button>
                   </div>
                 ) : (
@@ -2266,8 +2266,8 @@ function ClaudeConfigSection({
           label="Manifest: base URL"
           description={
             manifestBaseUrlOnly
-              ? `âœ… ${manifestBaseUrlOnly}`
-              : 'â—‹ Optional â€” only if you use providers.manifest (separate from primary base URL).'
+              ? `✅ ${manifestBaseUrlOnly}`
+              : '○ Optional — only if you use providers.manifest (separate from primary base URL).'
           }
         >
           <div className="flex w-full max-w-sm flex-col gap-1">
@@ -2321,7 +2321,7 @@ function ClaudeConfigSection({
                         setCustomBaseUrl(manifestBaseUrlOnly)
                       }}
                     >
-                      âœ•
+                      ✕
                     </Button>
                   </div>
                 ) : (
@@ -2352,7 +2352,7 @@ function ClaudeConfigSection({
 
       <SettingsSection
         title="About"
-        description="Nova gateway runtime information."
+        description="Hermes Agent runtime information."
         icon={Notification03Icon}
       >
         <SettingsRow
@@ -2827,7 +2827,7 @@ function ClaudeConfigSection({
   )
 }
 
-// â”€â”€ Connection Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Connection Section ──────────────────────────────────────────────────
 
 type ConnectionSettings = {
   gateway: string
@@ -2876,7 +2876,7 @@ function ConnectionSection() {
       const data = (await res.json()) as ConnectionSettings & { error?: string }
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
       setCurrent(data)
-      setMessage('Saved. Connection updated â€” no restart needed.')
+      setMessage('Saved. Connection updated — no restart needed.')
     } catch (err) {
       setIsError(true)
       setMessage(err instanceof Error ? err.message : 'Failed to save')
@@ -2916,17 +2916,17 @@ function ConnectionSection() {
   const sourceLabel: Record<ConnectionSettings['source'], string> = {
     override: 'Runtime override (saved in workspace-overrides.json)',
     env: 'From HERMES_API_URL / HERMES_DASHBOARD_URL env vars',
-    default: 'Defaults â€” no override set',
+    default: 'Defaults — no override set',
   }
 
   return (
     <SettingsSection
       title="Connection"
-      description="Point the workspace at your Nova gateway services. Useful for Tailscale, LAN, or remote-server setups (#101)."
+      description="Point the workspace at your Hermes Agent services. Useful for Tailscale, LAN, or remote-server setups (#101)."
       icon={Link01Icon}
     >
       <div className="text-xs text-primary-600">
-        {current ? sourceLabel[current.source] : 'Loadingâ€¦'}
+        {current ? sourceLabel[current.source] : 'Loading…'}
       </div>
 
       <SettingsRow
@@ -2946,7 +2946,7 @@ function ConnectionSection() {
 
       <SettingsRow
         label="Dashboard URL"
-        description="Extended APIs â€” sessions, skills, config, jobs. Default http://127.0.0.1:9119."
+        description="Extended APIs — sessions, skills, config, jobs. Default http://127.0.0.1:9119."
       >
         <input
           className={inputClass}
@@ -2961,7 +2961,7 @@ function ConnectionSection() {
 
       <div className="flex items-center gap-2 pt-2">
         <Button size="sm" onClick={save} disabled={saving}>
-          {saving ? 'Savingâ€¦' : 'Save & reprobe'}
+          {saving ? 'Saving…' : 'Save & reprobe'}
         </Button>
         <Button
           size="sm"
@@ -2988,7 +2988,7 @@ function ConnectionSection() {
         the gateway to its Tailscale IP (e.g. <code>http://100.x.y.z:8642</code>
         ) and ensure the gateway listens on <code>0.0.0.0</code> (set{' '}
         <code>API_SERVER_HOST=0.0.0.0</code> in the agent-side <code>.env</code>
-        ). No workspace restart needed â€” capabilities reprobe on save.
+        ). No workspace restart needed — capabilities reprobe on save.
       </div>
     </SettingsSection>
   )

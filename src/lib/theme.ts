@@ -21,79 +21,79 @@ export const THEMES: Array<{
   {
     id: 'claude-nous',
     label: 'Nous',
-    description: 'Deep teal background, cream accent',
-    icon: 'N',
+    description: 'Deep teal background, cream accent — matches Nous Research chrome',
+    icon: '◱',
   },
   {
     id: 'claude-nous-light',
     label: 'Nous Light',
     description: 'Cold paper white with restrained cobalt framing',
-    icon: 'N',
+    icon: '◲',
   },
   {
     id: 'matrix',
     label: 'Matrix',
-    description: 'Black glass terminal field with phosphor signal glow',
-    icon: 'M',
+    description: 'Black glass terminal field with phosphor green signal glow',
+    icon: '▣',
   },
   {
     id: 'matrix-light',
     label: 'Matrix Light',
     description: 'White terminal paper with green signal accents',
-    icon: 'M',
+    icon: '▣',
   },
   {
     id: 'claude-official',
-    label: 'Legacy',
-    description: 'Legacy navy and indigo workspace theme',
-    icon: 'L',
+    label: 'Hermes',
+    description: 'Navy and indigo flagship theme',
+    icon: '⚕',
   },
   {
     id: 'claude-official-light',
-    label: 'Legacy Light',
-    description: 'Legacy paper theme with muted cobalt accents',
-    icon: 'L',
+    label: 'Hermes Light',
+    description: 'Editorial paper white with muted cobalt accents',
+    icon: '⚕',
   },
   {
     id: 'claude-classic',
     label: 'Bronze',
     description: 'Bronze accents on dark charcoal',
-    icon: 'B',
+    icon: '🔶',
   },
   {
     id: 'claude-classic-light',
     label: 'Bronze Light',
     description: 'Warm parchment with bronze accents',
-    icon: 'B',
+    icon: '🔶',
   },
   {
     id: 'claude-slate',
     label: 'Slate',
     description: 'Cool blue developer theme',
-    icon: 'S',
+    icon: '🔷',
   },
   {
     id: 'claude-slate-light',
     label: 'Slate Light',
     description: 'GitHub-light palette with blue accents',
-    icon: 'S',
+    icon: '🔷',
   },
   {
     id: 'scifi',
-    label: 'Nova',
-    description: 'Navy-black room with amber memory light',
-    icon: '=',
+    label: 'SciFi',
+    description: 'Cyberpunk HUD — deep navy, cyan neon, orange highlights',
+    icon: '🌌',
   },
   {
     id: 'scifi-light',
-    label: 'Nova',
-    description: 'Nova dark room alias for light-mode requests',
-    icon: '=',
+    label: 'SciFi Light',
+    description: 'Cold steel and teal — cyberpunk interface in daylight',
+    icon: '🌌',
   },
 ]
 
 const STORAGE_KEY = 'claude-theme'
-const DEFAULT_THEME: ThemeId = 'scifi'
+const DEFAULT_THEME: ThemeId = 'claude-nous'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
 const LIGHT_THEME_MAP: Record<
   Exclude<ThemeId, `${string}-light`>,
@@ -104,7 +104,7 @@ const LIGHT_THEME_MAP: Record<
   'claude-official': 'claude-official-light',
   'claude-classic': 'claude-classic-light',
   'claude-slate': 'claude-slate-light',
-  scifi: 'scifi-light',
+  'scifi': 'scifi-light',
 }
 const DARK_THEME_MAP: Record<
   Extract<ThemeId, `${string}-light`>,
@@ -124,6 +124,7 @@ const LIGHT_THEMES = new Set<ThemeId>([
   'claude-official-light',
   'claude-classic-light',
   'claude-slate-light',
+  'scifi-light',
 ])
 
 export function isValidTheme(

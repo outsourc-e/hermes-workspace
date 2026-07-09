@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
 
-const BASE_TITLE = 'Nova Mission Control'
+const BASE_TITLE = 'Hermes Workspace'
 
 /**
  * Sets document.title for the current page.
- * Usage: usePageTitle('Sessions') -> "Sessions - Nova Mission Control"
+ * Usage: usePageTitle('Sessions') → "Sessions — Hermes Workspace"
  */
 export function usePageTitle(page: string) {
   useEffect(() => {

@@ -15,7 +15,7 @@ export function formatTaskAssigneeLabel(
   assigneeLabels: Record<string, string>,
 ): string {
   const resolvedLabel = assignee ? (assigneeLabels[assignee] ?? assignee) : 'Unassigned'
-  return `scope: ${resolvedLabel}`
+  return `Assignee: ${resolvedLabel}`
 }
 
 export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDragging }: Props) {
@@ -32,8 +32,8 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
       onClick={onClick}
       className={cn(
         'relative rounded-lg border p-3 cursor-pointer transition-all select-none',
-        'bg-[#080d12]/95 border-amber-500/20',
-        'hover:border-amber-400/55',
+        'bg-[var(--theme-card)] border-[var(--theme-border)]',
+        'hover:border-[var(--theme-accent)]',
         isDragging ? 'opacity-40 rotate-1 shadow-2xl' : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]',
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: priorityColor }}
@@ -45,31 +45,31 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
         title={`Priority: ${task.priority}`}
       />
 
-      <p className="mb-1 line-clamp-2 pr-4 font-mono text-sm font-medium leading-snug text-amber-50">
+      <p className="text-sm font-medium text-[var(--theme-text)] leading-snug mb-1 line-clamp-2 pr-4">
         {task.title}
       </p>
 
       {task.description && (
-        <p className="mb-2 line-clamp-2 text-xs text-amber-100/65">
+        <p className="text-xs text-[var(--theme-muted)] line-clamp-2 mb-2">
           {task.description}
         </p>
       )}
 
       <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="rounded-sm border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-amber-200">
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
             {assigneeLabel}
           </span>
           {visibleTags.map((tag) => (
             <span
               key={tag}
-              className="rounded-sm border border-amber-500/20 bg-amber-500/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-amber-200/80"
+              className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]"
             >
               {tag}
             </span>
           ))}
           {extraTagCount > 0 && (
-            <span className="rounded-sm border border-amber-500/20 bg-amber-500/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-amber-200/80">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
               +{extraTagCount} more
             </span>
           )}

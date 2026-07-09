@@ -109,10 +109,10 @@ const themeColorScript = `
 `
 
 const DEFAULT_SPLASH_HTML = `
-<img src="/nova-idle-poster.png" alt="Nova" style="width:92px;height:92px;margin-bottom:20px;border-radius:18px;object-fit:cover;filter:drop-shadow(0 8px 32px rgba(255,140,26,0.45))" />
-<div style="font:700 24px/1.1 system-ui,-apple-system,sans-serif;color:#FFF1CC">Nova Mission Control</div>
-<div style="margin-top:8px;font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0.16em;color:#D4A276;text-transform:uppercase">SoulSync // Stable</div>
-<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,179,71,0.14);border-radius:3px;overflow:hidden;position:relative"><div id="splash-bar" style="width:0%;height:100%;background:#FF8C1A;border-radius:3px;transition:width 0.4s ease"></div></div>
+<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,#FFAC02 45%, transparent))" />
+<img src="/claude-banner.png" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5))" />
+<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:#9CB2AE">Workspace</div>
+<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;position:relative"><div id="splash-bar" style="width:0%;height:100%;background:#FFAC02;border-radius:3px;transition:width 0.4s ease"></div></div>
 `
 
 export const Route = createRootRoute({
@@ -127,12 +127,12 @@ export const Route = createRootRoute({
           'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual',
       },
       {
-        title: 'Nova Mission Control',
+        title: 'Hermes Workspace',
       },
       {
         name: 'description',
         content:
-          'Nova Mission Control for chat, tools, files, memory, and jobs.',
+          'Hermes Agent workspace for chat, tools, files, memory, and jobs.',
       },
       {
         property: 'og:image',
@@ -483,13 +483,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             } catch(e){}
 
             var isDark = !['claude-nous-light','claude-official-light','claude-classic-light','claude-slate-light'].includes(theme);
-            var quips = ["Checking memory fragments...","Warming the amber grid...","Opening the visual link...","Syncing SoulSync...","Preparing Nova's room...","Stabilizing the cockpit..."];
+            var quips = ["Consulting the oracle...","Loading ancient knowledge...","Warming up the messenger...","Calibrating tool chain...","Summoning your agent...","Preparing the workspace...","Bridging realms...","Initializing agent runtime..."];
             var quip = quips[Math.floor(Math.random() * quips.length)];
 
             d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease;';
-            d.innerHTML = '<img src="/nova-idle-poster.png" alt="Nova" style="width:92px;height:92px;margin-bottom:20px;border-radius:18px;object-fit:cover;filter:drop-shadow(0 8px 32px rgba(255,140,26,0.45))" />'
-              + '<div style="font:700 24px/1.1 system-ui,-apple-system,sans-serif;color:#FFF1CC">Nova Mission Control</div>'
-              + '<div style="margin-top:8px;font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0.16em;color:'+muted+';text-transform:uppercase">SoulSync // Stable</div>'
+            d.innerHTML = '<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
+              + '<img src="'+(isDark ? '/claude-banner.png' : '/claude-banner-light.png')+'" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
+              + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+'">Workspace</div>'
               + '<div style="margin-top:28px;width:140px;height:3px;background:'+(isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')+';border-radius:3px;overflow:hidden;position:relative"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';
 
             var bar = document.getElementById('splash-bar');
