@@ -23,6 +23,7 @@ export type WidgetId =
   | 'nova_wants'
   | 'nova_fabric'
   | 'taylor_approvals'
+  | 'session_bridge'
   | 'live_systems'
   | 'agent_workforce'
   | 'git_work'
@@ -116,6 +117,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Nova Wants',
     description:
       'Protected operational board for Nova requests, needs, approvals, and self-state proposals.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'session_bridge',
+    label: 'Session bridge',
+    description:
+      'Live Nova/Hermes state: current route/model, active session and task, background jobs, blockers, and the latest work receipts.',
     column: 'main',
     hideable: true,
   },

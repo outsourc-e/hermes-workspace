@@ -604,7 +604,7 @@ function normalizePlatforms(raw: unknown): Array<DashboardPlatformEntry> {
     .filter((entry): entry is DashboardPlatformEntry => entry !== null)
 }
 
-function normalizeCron(raw: unknown): DashboardCronSection | null {
+export function normalizeCron(raw: unknown): DashboardCronSection | null {
   if (!raw) return null
   let jobs: Array<unknown> = []
   if (Array.isArray(raw)) {

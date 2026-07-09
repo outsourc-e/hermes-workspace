@@ -39,6 +39,7 @@ import { LogsTailCard } from './components/logs-tail-card'
 import { MindGraphCard } from './components/mind-graph-card'
 import { NovaFabricCard } from './components/nova-fabric-card'
 import { NovaWantsCard } from './components/nova-wants-card'
+import { NovaSessionBridgeCard } from './components/nova-session-bridge-card'
 import { TaylorApprovalQueueCard } from './components/taylor-approval-queue-card'
 import { NotebookLmBridgeCard } from './components/notebooklm-bridge-card'
 import { OperatorTipCard } from './components/operator-tip-card'
@@ -1220,6 +1221,9 @@ export function DashboardScreen() {
 
         <DailyCheckCard />
 
+        <WidgetShell id="session_bridge" layout={layout}>
+          <NovaSessionBridgeCard />
+        </WidgetShell>
         <WidgetShell id="taylor_approvals" layout={layout}>
           <TaylorApprovalQueueCard />
         </WidgetShell>

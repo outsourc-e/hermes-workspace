@@ -84,6 +84,7 @@ import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiNovaWorkScanRouteImport } from './routes/api/nova-work-scan'
 import { Route as ApiNovaWantsRouteImport } from './routes/api/nova-wants'
+import { Route as ApiNovaSessionBridgeRouteImport } from './routes/api/nova-session-bridge'
 import { Route as ApiNovaFabricRouteImport } from './routes/api/nova-fabric'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiMemoryRouteImport } from './routes/api/memory'
@@ -549,6 +550,11 @@ const ApiNovaWorkScanRoute = ApiNovaWorkScanRouteImport.update({
 const ApiNovaWantsRoute = ApiNovaWantsRouteImport.update({
   id: '/api/nova-wants',
   path: '/api/nova-wants',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNovaSessionBridgeRoute = ApiNovaSessionBridgeRouteImport.update({
+  id: '/api/nova-session-bridge',
+  path: '/api/nova-session-bridge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNovaFabricRoute = ApiNovaFabricRouteImport.update({
@@ -1066,6 +1072,7 @@ export interface FileRoutesByFullPath {
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
   '/api/nova-fabric': typeof ApiNovaFabricRoute
+  '/api/nova-session-bridge': typeof ApiNovaSessionBridgeRoute
   '/api/nova-wants': typeof ApiNovaWantsRoute
   '/api/nova-work-scan': typeof ApiNovaWorkScanRoute
   '/api/paths': typeof ApiPathsRoute
@@ -1232,6 +1239,7 @@ export interface FileRoutesByTo {
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
   '/api/nova-fabric': typeof ApiNovaFabricRoute
+  '/api/nova-session-bridge': typeof ApiNovaSessionBridgeRoute
   '/api/nova-wants': typeof ApiNovaWantsRoute
   '/api/nova-work-scan': typeof ApiNovaWorkScanRoute
   '/api/paths': typeof ApiPathsRoute
@@ -1400,6 +1408,7 @@ export interface FileRoutesById {
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
   '/api/nova-fabric': typeof ApiNovaFabricRoute
+  '/api/nova-session-bridge': typeof ApiNovaSessionBridgeRoute
   '/api/nova-wants': typeof ApiNovaWantsRoute
   '/api/nova-work-scan': typeof ApiNovaWorkScanRoute
   '/api/paths': typeof ApiPathsRoute
@@ -1569,6 +1578,7 @@ export interface FileRouteTypes {
     | '/api/memory'
     | '/api/models'
     | '/api/nova-fabric'
+    | '/api/nova-session-bridge'
     | '/api/nova-wants'
     | '/api/nova-work-scan'
     | '/api/paths'
@@ -1735,6 +1745,7 @@ export interface FileRouteTypes {
     | '/api/memory'
     | '/api/models'
     | '/api/nova-fabric'
+    | '/api/nova-session-bridge'
     | '/api/nova-wants'
     | '/api/nova-work-scan'
     | '/api/paths'
@@ -1902,6 +1913,7 @@ export interface FileRouteTypes {
     | '/api/memory'
     | '/api/models'
     | '/api/nova-fabric'
+    | '/api/nova-session-bridge'
     | '/api/nova-wants'
     | '/api/nova-work-scan'
     | '/api/paths'
@@ -2070,6 +2082,7 @@ export interface RootRouteChildren {
   ApiMemoryRoute: typeof ApiMemoryRouteWithChildren
   ApiModelsRoute: typeof ApiModelsRoute
   ApiNovaFabricRoute: typeof ApiNovaFabricRoute
+  ApiNovaSessionBridgeRoute: typeof ApiNovaSessionBridgeRoute
   ApiNovaWantsRoute: typeof ApiNovaWantsRoute
   ApiNovaWorkScanRoute: typeof ApiNovaWorkScanRoute
   ApiPathsRoute: typeof ApiPathsRoute
@@ -2675,6 +2688,13 @@ declare module '@tanstack/react-router' {
       path: '/api/nova-wants'
       fullPath: '/api/nova-wants'
       preLoaderRoute: typeof ApiNovaWantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nova-session-bridge': {
+      id: '/api/nova-session-bridge'
+      path: '/api/nova-session-bridge'
+      fullPath: '/api/nova-session-bridge'
+      preLoaderRoute: typeof ApiNovaSessionBridgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/nova-fabric': {
@@ -3579,6 +3599,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMemoryRoute: ApiMemoryRouteWithChildren,
   ApiModelsRoute: ApiModelsRoute,
   ApiNovaFabricRoute: ApiNovaFabricRoute,
+  ApiNovaSessionBridgeRoute: ApiNovaSessionBridgeRoute,
   ApiNovaWantsRoute: ApiNovaWantsRoute,
   ApiNovaWorkScanRoute: ApiNovaWorkScanRoute,
   ApiPathsRoute: ApiPathsRoute,
