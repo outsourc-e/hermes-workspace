@@ -425,6 +425,155 @@ function getTemplatePreflight(project: Project, template: DeliverableTemplate | 
   }
 }
 
+function fieldValue(fields: Record<string, string>, id: string, fallback = 'A completer'): string {
+  const value = fields[id]?.trim()
+  return value || fallback
+}
+
+function listItems(value: string): Array<string> {
+  return value
+    .split('\n')
+    .map((line) => line.replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean)
+}
+
+function PreviewList({ value, limit = 4 }: { value: string; limit?: number }) {
+  const items = listItems(value).slice(0, limit)
+  if (!items.length) return <p className="text-[11px] leading-5 text-slate-500">A completer.</p>
+  return (
+    <ul className="space-y-1.5">
+      {items.map((item) => (
+        <li key={item} className="flex gap-2 text-[11px] leading-5 text-slate-700">
+          <span className="mt-2 size-1.5 shrink-0 rounded-full bg-amber-500" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function ProductSheetPreview({
+  project,
+  template,
+  fields,
+}: {
+  project: Project
+  template: DeliverableTemplate
+  fields: Record<string, string>
+}) {
+  const channel = optionLabel(template.channel)
+  const promise = fieldValue(fields, 'promise', project.objective || 'Promesse produit a cadrer.')
+  const target = fieldValue(fields, 'target', 'Cible a confirmer selon le canal et les sources.')
+  const offer = fieldValue(fields, 'offer', 'Perimetre de l’offre a completer avec les sources produit.')
+  const pricing = fieldValue(fields, 'pricing', 'Pricing masque tant que la source tarifaire active n’est pas rattachee.')
+  const sources = fieldValue(fields, 'sources', 'Sources a rattacher avant publication.')
+
+  return (
+    <div className="rounded-lg border border-primary-200 p-4 dark:border-neutral-800">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold">Apercu template PDF</h3>
+          <p className="mt-1 text-xs leading-5 text-primary-600 dark:text-neutral-400">
+            Rendu de principe du livrable. Le contenu peut venir du studio, d’une dictee, d’un document ou du RAG.
+          </p>
+        </div>
+        <Badge tone={toneForStatus('a_valider')}>v0.1 visuel</Badge>
+      </div>
+
+      <div className="mt-4 overflow-x-auto rounded-lg bg-neutral-950/5 p-4 dark:bg-neutral-950">
+        <article className="mx-auto min-h-[780px] w-[560px] max-w-full overflow-hidden rounded-sm bg-white text-slate-950 shadow-xl ring-1 ring-black/10">
+          <header className="relative overflow-hidden bg-slate-950 px-8 py-7 text-white">
+            <div className="absolute right-0 top-0 h-full w-32 bg-amber-400" />
+            <div className="relative z-10">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300">
+                Fiche produit Dstny
+              </div>
+              <h4 className="mt-4 max-w-[390px] text-2xl font-semibold leading-tight">
+                {project.title.replace(/^Fiche produit PDF\s*-\s*/i, '')}
+              </h4>
+              <p className="mt-3 max-w-[420px] text-sm leading-6 text-slate-200">
+                {promise}
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                  {channel}
+                </span>
+                <span className="rounded-full bg-amber-400 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-950">
+                  Brouillon source
+                </span>
+              </div>
+            </div>
+          </header>
+
+          <div className="grid gap-0 border-b border-slate-200 md:grid-cols-[1.1fr_0.9fr]">
+            <section className="border-r border-slate-200 p-6">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Cible</div>
+              <p className="mt-2 text-xs leading-5 text-slate-700">{target}</p>
+            </section>
+            <section className="p-6">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                Probleme client
+              </div>
+              <div className="mt-2">
+                <PreviewList value={fieldValue(fields, 'problems')} limit={3} />
+              </div>
+            </section>
+          </div>
+
+          <section className="p-6">
+            <div className="grid gap-5 md:grid-cols-[0.95fr_1.05fr]">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Benefices commerciaux
+                </div>
+                <div className="mt-3">
+                  <PreviewList value={fieldValue(fields, 'benefits')} />
+                </div>
+              </div>
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Ce que contient l’offre
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-700">{offer}</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="grid border-y border-slate-200 md:grid-cols-[0.85fr_1.15fr]">
+            <div className="bg-amber-50 p-6">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">
+                Pricing
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-800">{pricing}</p>
+            </div>
+            <div className="p-6">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                Objections a preparer
+              </div>
+              <div className="mt-2">
+                <PreviewList value={fieldValue(fields, 'objections')} limit={3} />
+              </div>
+            </div>
+          </section>
+
+          <footer className="grid gap-4 p-6 md:grid-cols-[1fr_auto]">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                Sources et limites
+              </div>
+              <p className="mt-2 line-clamp-4 text-[11px] leading-5 text-slate-600">{sources}</p>
+            </div>
+            <div className="self-end text-right text-[10px] leading-4 text-slate-500">
+              <div>{formatDate(project.updatedAt)}</div>
+              <div>{project.status === 'valide' ? 'Valide' : 'Non publiable sans validation'}</div>
+            </div>
+          </footer>
+        </article>
+      </div>
+    </div>
+  )
+}
+
 function Badge({ children, tone }: { children: React.ReactNode; tone?: string }) {
   return (
     <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium', tone)}>
@@ -1300,6 +1449,14 @@ export function ProjectsScreen() {
                           />
                         </div>
                       ))}
+                    </div>
+
+                    <div className="mt-4">
+                      <ProductSheetPreview
+                        project={selected}
+                        template={selectedTemplate}
+                        fields={contentFields}
+                      />
                     </div>
 
                     {contentMarkdown ? (
