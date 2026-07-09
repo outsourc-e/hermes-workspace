@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { resolveClaudeAgentDir } from './claude-agent'
+import { resolveClaudeAgentDir, resolveClaudeAgentLaunch } from './claude-agent'
 
 const tempDirs: string[] = []
 
@@ -52,6 +52,15 @@ describe('resolveClaudeAgentDir', () => {
         HERMES_AGENT_PATH: hermesAgentDir,
       }),
     ).toBe(hermesAgentDir)
+  })
+
+  it('launches a modern Hermes checkout through gateway.run when no CLI binary is available', () => {
+    const hermesAgentDir = createModernHermesAgentDir('hermes-agent-modern-')
+
+    expect(resolveClaudeAgentLaunch(hermesAgentDir, null)).toEqual({
+      command: 'python3',
+      commandArgs: ['-m', 'gateway.run'],
+    })
   })
 
   it('falls back to legacy CLAUDE_AGENT_PATH for backward compatibility', () => {

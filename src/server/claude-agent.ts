@@ -156,6 +156,38 @@ export function resolveClaudePython(agentDir: string): string {
   return 'python3'
 }
 
+export function resolveClaudeAgentLaunch(
+  agentDir: string | null,
+  claudeBin: string | null,
+): { command: string; commandArgs: Array<string> } {
+  if (claudeBin) {
+    return { command: claudeBin, commandArgs: ['gateway', 'run'] }
+  }
+
+  if (!agentDir) {
+    throw new Error('Cannot resolve a Hermes Agent launch command without an installation')
+  }
+
+  const useGatewayRun = existsSync(resolve(agentDir, 'gateway', 'run.py'))
+  return useGatewayRun
+    ? {
+        command: resolveClaudePython(agentDir),
+        commandArgs: ['-m', 'gateway.run'],
+      }
+    : {
+        command: resolveClaudePython(agentDir),
+        commandArgs: [
+          '-m',
+          'uvicorn',
+          'webapi.app:app',
+          '--host',
+          '0.0.0.0',
+          '--port',
+          String(CLAUDE_START_PORT),
+        ],
+      }
+}
+
 export async function isClaudeAgentHealthy(
   port = CLAUDE_START_PORT,
 ): Promise<boolean> {
@@ -191,22 +223,11 @@ export async function startClaudeAgent(): Promise<StartClaudeAgentResult> {
       let commandArgs: Array<string>
       let cwd: string | undefined
 
-      if (claudeBin) {
-        command = claudeBin
-        commandArgs = ['gateway', 'run']
+      if (claudeBin || agentDir) {
+        const launch = resolveClaudeAgentLaunch(agentDir, claudeBin)
+        command = launch.command
+        commandArgs = launch.commandArgs
         cwd = agentDir ?? undefined
-      } else if (agentDir) {
-        command = resolveClaudePython(agentDir)
-        commandArgs = [
-          '-m',
-          'uvicorn',
-          'webapi.app:app',
-          '--host',
-          '0.0.0.0',
-          '--port',
-          String(CLAUDE_START_PORT),
-        ]
-        cwd = agentDir
       } else {
         return {
           ok: false,
