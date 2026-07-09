@@ -935,6 +935,32 @@ export function MindGraphCard() {
   const selectedBody = selectedId
     ? (model.bodyById.get(selectedId) ?? null)
     : null
+  // Operational galaxy: a selected real note is read from the vault via
+  // /api/knowledge/read (content + resolved backlinks) — no invented data.
+  const selectedNotePath =
+    selectedBody && selectedBody.path.toLowerCase().endsWith('.md')
+      ? selectedBody.path
+      : null
+  const noteQuery = useQuery({
+    queryKey: ['dashboard', 'knowledge-note', selectedNotePath],
+    enabled: selectedNotePath !== null,
+    queryFn: async (): Promise<{
+      page: { title: string; path: string; modified: string }
+      content: string
+      backlinks: Array<string>
+    }> => {
+      const response = await fetch(
+        `/api/knowledge/read?path=${encodeURIComponent(selectedNotePath ?? '')}`,
+      )
+      if (!response.ok) throw new Error(`read ${response.status}`)
+      return (await response.json()) as {
+        page: { title: string; path: string; modified: string }
+        content: string
+        backlinks: Array<string>
+      }
+    },
+    staleTime: 60_000,
+  })
   const hoveredBody = hoveredId ? (model.bodyById.get(hoveredId) ?? null) : null
   const focusedBody = selectedBody ?? hoveredBody ?? model.core
   const largestSystems = model.systems.slice(0, 6)
@@ -1127,6 +1153,50 @@ export function MindGraphCard() {
                 </div>
               ) : null}
             </div>
+
+            {selectedNotePath ? (
+              <div className="mt-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.54)] px-3 py-2">
+                <div className="nova-label">Note (live from vault)</div>
+                {noteQuery.isLoading ? (
+                  <p className="mt-2 text-[11px] text-[var(--theme-muted)]">
+                    Reading {selectedNotePath}…
+                  </p>
+                ) : null}
+                {noteQuery.isError ? (
+                  <p className="mt-2 text-[11px] text-[var(--theme-danger)]">
+                    Could not read this note from the vault.
+                  </p>
+                ) : null}
+                {noteQuery.data ? (
+                  <>
+                    <div className="mt-2 max-h-44 overflow-y-auto whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--theme-text-soft)]">
+                      {noteQuery.data.content.trim() || 'Empty note.'}
+                    </div>
+                    <div className="mt-2 border-t border-[var(--theme-border-subtle)] pt-2">
+                      <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                        {noteQuery.data.backlinks.length} backlink
+                        {noteQuery.data.backlinks.length === 1 ? '' : 's'}
+                      </div>
+                      {noteQuery.data.backlinks.length > 0 ? (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {noteQuery.data.backlinks.slice(0, 6).map((backlink) => (
+                            <button
+                              key={backlink}
+                              type="button"
+                              onClick={() => setSelectedId(backlink)}
+                              title={backlink}
+                              className="max-w-full truncate rounded-full border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[9px] text-[var(--theme-accent-secondary)] transition-colors hover:border-[var(--theme-accent-border)]"
+                            >
+                              {backlink.split('/').pop()?.replace(/\.md$/i, '') ?? backlink}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">
