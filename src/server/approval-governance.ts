@@ -162,7 +162,7 @@ export function evaluateGovernedAction(input: {
   // Scope binding: an approval is only valid for the exact category+action it
   // was proposed for. Without this, ANY approved review id (say, a harmless
   // vault cleanup) could be replayed to authorize spending or an email send.
-  const diff = review.proposedDiff as Record<string, unknown>
+  const diff = review.proposedDiff
   const approvedCategory =
     typeof diff.governedCategory === 'string' ? diff.governedCategory : null
   const approvedAction = typeof diff.action === 'string' ? diff.action : null
