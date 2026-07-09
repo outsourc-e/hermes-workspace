@@ -24,6 +24,7 @@ export type WidgetId =
   | 'nova_fabric'
   | 'taylor_approvals'
   | 'session_bridge'
+  | 'agent_lanes'
   | 'live_systems'
   | 'agent_workforce'
   | 'git_work'
@@ -117,6 +118,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Nova Wants',
     description:
       'Protected operational board for Nova requests, needs, approvals, and self-state proposals.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'agent_lanes',
+    label: 'Agent lanes',
+    description:
+      'Control tower + worker lanes (Nova/Hermes, Claude Code, Codex, Cursor, subagents) from real process/session/handoff evidence.',
     column: 'main',
     hideable: true,
   },
