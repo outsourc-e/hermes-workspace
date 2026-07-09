@@ -452,6 +452,63 @@ function PreviewList({ value, limit = 4 }: { value: string; limit?: number }) {
   )
 }
 
+function DstnyPreviewHeader({
+  channel,
+  page,
+}: {
+  channel: string
+  page: string
+}) {
+  return (
+    <div className="flex items-start justify-between border-b border-[#b9e4e9] pb-4">
+      <div className="text-[24px] font-black tracking-tight text-[#00a5b5]">dstny</div>
+      <div className="text-right text-[8px] font-bold uppercase tracking-[0.2em] text-[#008c9a]">
+        <div>Canal {channel}</div>
+        <div className="mt-1 font-medium normal-case tracking-normal text-[#38344d]">{page}</div>
+      </div>
+    </div>
+  )
+}
+
+function DstnyPreviewPage({
+  children,
+  page,
+}: {
+  children: React.ReactNode
+  page: string
+}) {
+  return (
+    <article
+      className="mx-auto min-h-[760px] w-[560px] max-w-full bg-white px-7 py-7 text-[#261616] shadow-xl ring-1 ring-black/10"
+      style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
+    >
+      {children}
+      <div className="mt-8 flex items-end justify-between border-t border-[#b9e4e9] pt-4 text-[8px] text-[#38344d]">
+        <div>
+          <div className="font-bold">Dstny France Partenaires</div>
+          <div>Document brouillon - validation sources requise avant diffusion.</div>
+        </div>
+        <div className="font-bold text-[#008c9a]">{page}</div>
+      </div>
+    </article>
+  )
+}
+
+function DstnyMiniCard({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-lg border border-[#ffd9b0] px-3 py-3">
+      <div className="text-[8px] font-extrabold uppercase tracking-[0.18em] text-[#ff9015]">{label}</div>
+      <div className="mt-2 text-[11px] font-bold leading-5 text-[#261616]">{value}</div>
+    </div>
+  )
+}
+
 function ProductSheetPreview({
   project,
   template,
@@ -470,6 +527,11 @@ function ProductSheetPreview({
   const problems = listItems(fieldValue(fields, 'problems')).slice(0, 3)
   const benefits = listItems(fieldValue(fields, 'benefits')).slice(0, 4)
   const objections = listItems(fieldValue(fields, 'objections')).slice(0, 3)
+  const options = listItems(fieldValue(fields, 'options')).slice(0, 5)
+  const qualification = listItems(fieldValue(fields, 'qualification')).slice(0, 5)
+  const conditions = listItems(fieldValue(fields, 'conditions')).slice(0, 5)
+  const productName = project.title.replace(/^Fiche produit PDF\s*-\s*/i, '')
+  const statusLabel = project.status === 'valide' ? 'V1 publiable' : 'Brouillon non publiable'
 
   return (
     <div className="rounded-lg border border-primary-200 p-4 dark:border-neutral-800">
@@ -483,152 +545,151 @@ function ProductSheetPreview({
         <Badge tone={toneForStatus('a_valider')}>v0.1 visuel</Badge>
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-lg bg-neutral-950/5 p-4 dark:bg-neutral-950">
-        <article
-          className="mx-auto min-h-[790px] w-[560px] max-w-full overflow-hidden bg-white text-[#261616] shadow-xl ring-1 ring-black/10"
-          style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
-        >
-          <header className="grid grid-cols-[1fr_112px] border-b border-[#e7edf0]">
-            <div className="bg-white px-7 py-6">
-              <div className="flex items-center justify-between gap-4">
-                <div className="text-[22px] font-black tracking-tight text-[#181999]">Dstny</div>
-                <div className="rounded-full bg-[#00a5b5]/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#006487]">
-                  Fiche produit
+      <div className="mt-4 space-y-6 overflow-x-auto rounded-lg bg-neutral-950/5 p-4 dark:bg-neutral-950">
+        <DstnyPreviewPage page="1 / 3">
+          <DstnyPreviewHeader channel={channel} page={`Édition ${formatDate(project.updatedAt)} · ${statusLabel}`} />
+          <section className="mt-6 overflow-hidden rounded-xl bg-gradient-to-br from-[#b95b00] via-[#d87500] to-[#ffb24a] p-5 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-white/20 px-3 py-1 text-[9px] font-extrabold uppercase tracking-[0.12em]">Offre B2B</span>
+                  <span className="rounded-full bg-[#ffe652] px-3 py-1 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#261616]">{channel}</span>
                 </div>
+                <h4 className="mt-4 text-[24px] font-black leading-tight">{productName}</h4>
+                <p className="mt-3 max-w-[330px] text-[12px] font-semibold leading-5 text-white">{promise}</p>
               </div>
-              <h4 className="mt-8 text-[26px] font-extrabold leading-tight text-[#261616]">
-                {project.title.replace(/^Fiche produit PDF\s*-\s*/i, '')}
-              </h4>
-              <p className="mt-3 max-w-[390px] text-[13px] font-medium leading-6 text-[#38344d]">
-                {promise}
-              </p>
-              <div className="mt-5 grid grid-cols-3 gap-2">
-                <div className="border-l-4 border-[#00a5b5] bg-[#f4fafb] px-3 py-2">
-                  <div className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#006487]">Canal</div>
-                  <div className="mt-1 text-[11px] font-bold text-[#261616]">{channel}</div>
-                </div>
-                <div className="border-l-4 border-[#ff9015] bg-[#fff7ed] px-3 py-2">
-                  <div className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#8a4a00]">Usage</div>
-                  <div className="mt-1 text-[11px] font-bold text-[#261616]">Vendre / acheter</div>
-                </div>
-                <div className="border-l-4 border-[#7e0a5c] bg-[#fbf2f8] px-3 py-2">
-                  <div className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#7e0a5c]">Statut</div>
-                  <div className="mt-1 text-[11px] font-bold text-[#261616]">Brouillon</div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-[#00a5b5]">
-              <div className="h-1/3 bg-[#ff9015]" />
-              <div className="h-1/3 bg-[#00496b]" />
-              <div className="h-1/3 bg-[#7e0a5c]" />
-            </div>
-          </header>
-
-          <section className="grid border-b border-[#e7edf0] md:grid-cols-[0.95fr_1.05fr]">
-            <div className="border-r border-[#e7edf0] p-5">
-              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
-                Pour qui ?
-              </div>
-              <p className="mt-2 text-[12px] font-medium leading-5 text-[#38344d]">{target}</p>
-            </div>
-            <div className="p-5">
-              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
-                Signaux d’achat
-              </div>
-              <ul className="mt-2 space-y-1.5">
-                {(problems.length ? problems : ['Besoin client a qualifier.']).map((item) => (
-                  <li key={item} className="flex gap-2 text-[11px] leading-5 text-[#38344d]">
-                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#ff9015]" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-
-          <section className="grid border-b border-[#e7edf0] md:grid-cols-[1fr_0.82fr]">
-            <div className="p-5">
-              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
-                Pourquoi le proposer ?
-              </div>
-              <div className="mt-3 grid gap-2">
-                {(benefits.length ? benefits : ['Benefice commercial a completer.']).map((item) => (
-                  <div key={item} className="border-l-4 border-[#00a5b5] bg-[#f7fbfc] px-3 py-2">
-                    <div className="text-[11px] font-semibold leading-5 text-[#261616]">{item}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="border-l border-[#e7edf0] bg-[#f8fafb] p-5">
-              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
-                Critères d’achat
-              </div>
-              <div className="mt-3 space-y-2">
-                {['Fit client', 'Pré-requis', 'Conditions', 'Prix source'].map((item, index) => (
-                  <div key={item} className="flex items-center justify-between border-b border-[#dbe6ea] pb-1.5 text-[11px]">
-                    <span className="font-semibold text-[#38344d]">{item}</span>
-                    <span className={index === 3 ? 'font-bold text-[#7e0a5c]' : 'font-bold text-[#00a5b5]'}>
-                      {index === 3 ? 'A valider' : 'A qualifier'}
-                    </span>
-                  </div>
-                ))}
+              <div className="min-w-[130px] rounded-xl bg-[#00a5b5] p-4 text-right shadow-lg">
+                <div className="text-[8px] font-extrabold uppercase tracking-[0.16em] text-white">Prix</div>
+                <div className="mt-1 text-[22px] font-black">À valider</div>
+                <div className="mt-1 text-[8px] font-bold uppercase text-[#ffe652]">HT/mois · source requise</div>
               </div>
             </div>
           </section>
 
-          <section className="grid border-b border-[#e7edf0] md:grid-cols-[1fr_1fr]">
-            <div className="border-r border-[#e7edf0] p-5">
-              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
-                Offre vendable
+          <section className="mt-6 grid grid-cols-3 gap-4">
+            {(benefits.length ? benefits : ['Bénéfice commercial à compléter.']).slice(0, 3).map((item) => (
+              <div key={item} className="rounded-lg bg-[#fff7ed] p-3">
+                <div className="mb-2 size-7 rounded-full bg-[#ff9015]/15" />
+                <div className="text-[11px] font-bold leading-5 text-[#261616]">{item}</div>
               </div>
-              <p className="mt-2 text-[12px] leading-5 text-[#38344d]">{offer}</p>
-            </div>
-            <div className="p-5">
-              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
-                Objections clés
-              </div>
-              <ul className="mt-2 space-y-1.5">
-                {(objections.length ? objections : ['Objection a preparer.']).map((item) => (
-                  <li key={item} className="flex gap-2 text-[11px] leading-5 text-[#38344d]">
-                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#7e0a5c]" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            ))}
           </section>
 
-          <section className="grid border-b border-[#e7edf0] md:grid-cols-[0.9fr_1.1fr]">
-            <div className="bg-[#00496b] p-5 text-white">
-              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#ffe652]">
-                Pricing / achat
-              </div>
-              <p className="mt-2 text-[12px] font-medium leading-5 text-white/90">{pricing}</p>
-            </div>
-            <div className="p-5">
-              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
-                A retenir par le commercial
-              </div>
-              <div className="mt-3 rounded-md border border-[#ff9015]/40 bg-[#fff7ed] p-3 text-[12px] font-bold leading-5 text-[#261616]">
-                Qualifier le besoin, confirmer le canal et ne publier aucune condition tarifaire sans source active.
-              </div>
-            </div>
-          </section>
-
-          <footer className="grid gap-4 p-5 md:grid-cols-[1fr_auto]">
+          <section className="mt-7 grid grid-cols-[1fr_150px] gap-5">
             <div>
-              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#00496b]">
-                Sources, limites et publication
+              <div className="text-[18px] font-black leading-tight text-[#261616]">Pour qui et pourquoi le proposer</div>
+              <div className="mt-1 h-0.5 w-7 bg-[#00a5b5]" />
+              <p className="mt-5 text-[12px] font-semibold leading-5 text-[#38344d]">{target}</p>
+              <ol className="mt-5 space-y-4">
+                {(problems.length ? problems : ['Signal d’achat à qualifier.']).map((item, index) => (
+                  <li key={item} className="grid grid-cols-[32px_1fr] gap-3">
+                    <div className="text-[18px] font-black text-[#00a5b5]">{String(index + 1).padStart(2, '0')}</div>
+                    <div className="text-[11px] font-semibold leading-5 text-[#38344d]">{item}</div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <aside className="rounded-xl border border-[#b9e4e9] bg-[#eefbfc] p-4">
+              <div className="text-[8px] font-extrabold uppercase tracking-[0.18em] text-[#008c9a]">À pousser</div>
+              <div className="mt-3 space-y-3">
+                {(options.length ? options : ['Option à valider.']).slice(0, 3).map((item) => (
+                  <div key={item} className="border-b border-[#b9e4e9] pb-2 text-[10px] font-bold leading-4 text-[#261616]">{item}</div>
+                ))}
               </div>
-              <p className="mt-2 line-clamp-4 text-[10px] leading-4 text-[#5b6670]">{sources}</p>
+            </aside>
+          </section>
+        </DstnyPreviewPage>
+
+        <DstnyPreviewPage page="2 / 3">
+          <DstnyPreviewHeader channel={channel} page={`Configuration · ${statusLabel}`} />
+          <section className="mt-6">
+            <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#008c9a]">Socle offre</div>
+            <h4 className="mt-2 text-[18px] font-black text-[#261616]">Configuration, inclus et grille</h4>
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <DstnyMiniCard label="Canal" value={channel} />
+              <DstnyMiniCard label="Statut prix" value="Source active requise" />
+              <DstnyMiniCard label="Publication" value={statusLabel} />
+              <DstnyMiniCard label="Format" value="HT/mois" />
+              <DstnyMiniCard label="Engagement" value="À confirmer" />
+              <DstnyMiniCard label="Version" value={formatDate(project.updatedAt)} />
             </div>
-            <div className="self-end text-right text-[10px] leading-4 text-[#5b6670]">
-              <div className="font-bold text-[#181999]">Dstny</div>
-              <div>{formatDate(project.updatedAt)}</div>
-              <div>{project.status === 'valide' ? 'Validé' : 'Non publiable'}</div>
+          </section>
+
+          <section className="mt-7 grid grid-cols-[1fr_160px] gap-5">
+            <div>
+              <div className="rounded-lg border border-[#ffd9b0] p-4">
+                <div className="text-[8px] font-extrabold uppercase tracking-[0.18em] text-[#ff9015]">Description offre</div>
+                <p className="mt-2 text-[12px] leading-5 text-[#38344d]">{offer}</p>
+              </div>
+              <div className="mt-5 overflow-hidden rounded-lg border border-[#e7edf0]">
+                <div className="grid grid-cols-[0.9fr_1fr_1fr_1fr] bg-[#f7f2fb] text-[9px] font-black text-[#7e0a5c]">
+                  <div className="bg-[#008c9a] px-3 py-2 text-white">Forfait</div>
+                  <div className="px-3 py-2 text-right">Sans engagement</div>
+                  <div className="px-3 py-2 text-right">12 mois</div>
+                  <div className="px-3 py-2 text-right">24 mois</div>
+                </div>
+                {['Niveau 1', 'Niveau 2', 'Niveau 3'].map((row) => (
+                  <div key={row} className="grid grid-cols-[0.9fr_1fr_1fr_1fr] border-t border-[#e7edf0] text-[10px]">
+                    <div className="bg-[#eefbfc] px-3 py-2 font-bold text-[#00496b]">{row}</div>
+                    <div className="px-3 py-2 text-right">À valider</div>
+                    <div className="px-3 py-2 text-right">À valider</div>
+                    <div className="px-3 py-2 text-right">À valider</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-[9px] italic text-[#5b6670]">{pricing}</div>
             </div>
-          </footer>
-        </article>
+            <aside className="rounded-xl bg-[#00496b] p-4 text-white">
+              <div className="text-[8px] font-extrabold uppercase tracking-[0.18em] text-[#ffe652]">Avant devis</div>
+              <ul className="mt-3 space-y-2">
+                {(qualification.length ? qualification : ['Point à vérifier.']).slice(0, 5).map((item) => (
+                  <li key={item} className="text-[10px] font-semibold leading-4 text-white/90">{item}</li>
+                ))}
+              </ul>
+            </aside>
+          </section>
+        </DstnyPreviewPage>
+
+        <DstnyPreviewPage page="3 / 3">
+          <DstnyPreviewHeader channel={channel} page={`Conditions · ${statusLabel}`} />
+          <section className="mt-6">
+            <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#008c9a]">Options utiles</div>
+            <h4 className="mt-2 text-[18px] font-black text-[#261616]">Options, conditions et garde-fous</h4>
+            <div className="mt-4 overflow-hidden rounded-lg border border-[#e7edf0]">
+              <div className="bg-[#008c9a] px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-white">Options à activer</div>
+              {(options.length ? options : ['Option à compléter avec source.']).map((item, index) => (
+                <div key={item} className="flex justify-between gap-4 border-t border-[#e7edf0] px-3 py-2 text-[10px]">
+                  <span className="font-semibold text-[#261616]">{item}</span>
+                  <span className="font-bold text-[#008c9a]">{index === 0 ? 'Incluse si source' : 'À valider'}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-7 grid grid-cols-[170px_1fr] gap-5">
+            <aside className="rounded-lg border border-[#b9e4e9] bg-[#eefbfc] p-4">
+              <div className="text-[8px] font-extrabold uppercase tracking-[0.18em] text-[#008c9a]">À savoir avant commande</div>
+              <ul className="mt-3 space-y-2">
+                {(qualification.length ? qualification : ['Point à vérifier.']).slice(0, 4).map((item) => (
+                  <li key={item} className="text-[10px] font-semibold leading-4 text-[#38344d]">{item}</li>
+                ))}
+              </ul>
+            </aside>
+            <div>
+              <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#ff9015]">Ne pas promettre</div>
+              <ul className="mt-3 grid gap-2">
+                {(conditions.length ? conditions : ['Condition à cadrer.']).slice(0, 5).map((item) => (
+                  <li key={item} className="rounded-lg bg-[#fbf8fb] px-3 py-2 text-[10px] font-semibold leading-4 text-[#38344d]">{item}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          <section className="mt-7">
+            <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#7e0a5c]">Sources et limites</div>
+            <p className="mt-2 rounded-lg border border-[#e7edf0] bg-[#fbf8fb] p-3 text-[10px] leading-4 text-[#5b6670]">{sources}</p>
+          </section>
+        </DstnyPreviewPage>
       </div>
     </div>
   )

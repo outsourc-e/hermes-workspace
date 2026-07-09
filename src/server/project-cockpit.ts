@@ -810,9 +810,42 @@ export function buildStarterContentFields(input: {
       fields[section.id] = [
         'À compléter uniquement avec une source tarifaire active.',
         `Canal concerné : ${channel}.`,
+        'Format attendu : prix HT/mois, engagement, date de validité, source et ligne tarifaire.',
         'Ne pas mélanger prix public, prix partenaire, prix d’achat et hypothèse de travail.',
         'Si aucune source pricing fiable n’est disponible, masquer les prix et lister les points à valider.',
       ].join('\n')
+    } else if (section.id === 'options') {
+      if (family === 'mobile') {
+        fields[section.id] = [
+          '- eSIM : à afficher comme incluse uniquement si la source catalogue le confirme.',
+          '- Renfort data : prix et paliers à confirmer par catalogue actif.',
+          '- Multi-SIM / tablette : à confirmer selon compatibilité et canal.',
+          '- Packs roaming : distinguer Europe incluse, international sur devis et hors forfait.',
+        ].join('\n')
+      } else {
+        fields[section.id] = [
+          '- Options principales à rattacher depuis le catalogue actif.',
+          '- Distinguer inclus, activable, sur devis et soumis à compatibilité.',
+          '- Ne pas afficher de prix option sans source tarifaire active.',
+        ].join('\n')
+      }
+    } else if (section.id === 'qualification') {
+      if (family === 'mobile') {
+        fields[section.id] = [
+          '- Couverture locale du réseau sur les sites sensibles ou zones d’usage.',
+          '- Compatibilité terminal : 5G, eSIM, double SIM, routeur ou tablette.',
+          '- Besoin réel de data mensuelle et risque de hors forfait.',
+          '- Roaming : Europe, international, usages ponctuels ou intensifs.',
+          '- Portabilité, engagement, flotte et processus de commande.',
+        ].join('\n')
+      } else {
+        fields[section.id] = [
+          '- Cible client et usage réel à qualifier.',
+          '- Pré-requis techniques et dépendances internes.',
+          '- Canal commercial, engagement et conditions applicables.',
+          '- Prix, options et limites à confirmer avant devis.',
+        ].join('\n')
+      }
     } else if (section.id === 'objections') {
       if (family === 'mobile') {
         fields[section.id] = [
@@ -828,6 +861,22 @@ export function buildStarterContentFields(input: {
           '- “Quels prix appliquer ?” → Répondre uniquement avec le catalogue actif du canal concerné.',
         ].join('\n')
       }
+    } else if (section.id === 'conditions') {
+      if (family === 'mobile') {
+        fields[section.id] = [
+          '- Couverture réseau : ne pas promettre une couverture partout ; vérifier les zones critiques.',
+          '- Activation / portabilité : dépend du parcours de commande et des prérequis client.',
+          '- Roaming Europe : soumis aux règles d’usage raisonnable et aux limites du forfait.',
+          '- Hors forfait : usages non inclus ou hors enveloppe facturables selon grille opérateur.',
+          '- Support : périmètre à confirmer selon canal et responsabilités Dstny/partenaire.',
+        ].join('\n')
+      } else {
+        fields[section.id] = [
+          '- Ne pas promettre de délai, SLA, débit, marge ou activation sans source active.',
+          '- Lister les prérequis, exclusions, limites d’usage et responsabilités canal.',
+          '- Signaler les points à valider avant diffusion externe.',
+        ].join('\n')
+      }
     } else if (section.id === 'sources') {
       fields[section.id] = [
         'Sources à rattacher avant publication :',
@@ -836,6 +885,7 @@ export function buildStarterContentFields(input: {
         '- fiche technique ou procédure si disponible ;',
         '- arbitrages internes ou décisions projet.',
         '',
+        'Chaque prix publié doit pointer vers une source datée et une ligne tarifaire identifiable.',
         'Statut : brouillon métier pré-rempli, à valider avec sources.',
       ].join('\n')
     } else {
