@@ -5,6 +5,22 @@ import type {
   DashboardControlLoop,
   DashboardControlLoopsSection,
 } from '@/server/dashboard-aggregator'
+import type {
+  ControlLoopRunResult,
+  RunnableControlLoopId,
+} from '@/server/control-loop-runner'
+
+const RUNNABLE_LOOP_IDS: ReadonlySet<string> = new Set([
+  'cost-route-watch',
+  'morning-command-center',
+  'jobboard-caretaker',
+])
+
+type RunResponse = {
+  ok: boolean
+  result: ControlLoopRunResult
+  receiptId: string | null
+}
 
 const LOOP_STATUS_STYLE: Record<ControlLoopStatus, string> = {
   ready:
@@ -136,6 +152,12 @@ export function ControlLoopsCard({
   controlLoops: DashboardControlLoopsSection | null
 }) {
   const [activeLoopId, setActiveLoopId] = useState<string | null>(null)
+  const [runState, setRunState] = useState<
+    | { phase: 'idle' }
+    | { phase: 'running'; loopId: string }
+    | { phase: 'done'; loopId: string; response: RunResponse }
+    | { phase: 'error'; loopId: string; message: string }
+  >({ phase: 'idle' })
   const activeLoop = useMemo(
     () => controlLoops?.loops.find((loop) => loop.id === activeLoopId) ?? null,
     [activeLoopId, controlLoops?.loops],
@@ -145,6 +167,29 @@ export function ControlLoopsCard({
 
   async function handleDryRun(loop: DashboardControlLoop) {
     setActiveLoopId(loop.id)
+    if (RUNNABLE_LOOP_IDS.has(loop.id)) {
+      // Real server-side dry run: gathers live sources, writes a fabric
+      // receipt, and refuses every external write without approval.
+      setRunState({ phase: 'running', loopId: loop.id })
+      try {
+        const response = await fetch('/api/control-loops/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ loopId: loop.id as RunnableControlLoopId }),
+        })
+        if (!response.ok) throw new Error(`run failed: ${response.status}`)
+        const payload = (await response.json()) as RunResponse
+        setRunState({ phase: 'done', loopId: loop.id, response: payload })
+      } catch (error) {
+        setRunState({
+          phase: 'error',
+          loopId: loop.id,
+          message: error instanceof Error ? error.message : 'run failed',
+        })
+      }
+      return
+    }
+    setRunState({ phase: 'idle' })
     try {
       await navigator.clipboard.writeText(loop.dryRunPrompt)
     } catch {
@@ -216,7 +261,63 @@ export function ControlLoopsCard({
           ))}
         </div>
 
-        {activeLoop ? (
+        {runState.phase === 'running' ? (
+          <div className="rounded-lg border border-[var(--theme-accent-border)] bg-[var(--theme-card2)]/65 p-3 text-[11px] text-[var(--theme-muted)]">
+            Running {runState.loopId} against live sources…
+          </div>
+        ) : null}
+        {runState.phase === 'error' ? (
+          <div className="rounded-lg border border-[var(--theme-danger)]/40 bg-[color-mix(in_srgb,var(--theme-danger)_8%,transparent)] p-3 text-[11px] text-[var(--theme-danger)]">
+            {runState.loopId}: {runState.message}
+          </div>
+        ) : null}
+        {runState.phase === 'done' ? (
+          <div className="rounded-lg border border-[var(--theme-accent-border)] bg-[var(--theme-card2)]/65 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--theme-accent-secondary)]">
+                {runState.response.result.loopId} · dry run{' '}
+                {runState.response.result.ok ? 'completed' : 'degraded'}
+              </div>
+              {runState.response.receiptId ? (
+                <span className="font-mono text-[9px] text-[var(--theme-success)]">
+                  receipt {runState.response.receiptId.slice(0, 14)}…
+                </span>
+              ) : (
+                <span className="font-mono text-[9px] text-[var(--theme-warning)]">
+                  no receipt written
+                </span>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] font-semibold text-[var(--theme-text)]">
+              {runState.response.result.summary}
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {runState.response.result.findings.map((finding) => (
+                <li key={finding} className="text-[11px] text-[var(--theme-muted)]">
+                  • {finding}
+                </li>
+              ))}
+            </ul>
+            {runState.response.result.refusals.length > 0 ? (
+              <div className="mt-2 border-t border-[var(--theme-border)] pt-2">
+                <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[var(--theme-warning)]">
+                  Refused without Taylor approval
+                </div>
+                <ul className="mt-1 space-y-0.5">
+                  {runState.response.result.refusals.map((refusal) => (
+                    <li
+                      key={refusal}
+                      className="text-[10px] leading-relaxed text-[var(--theme-muted)]"
+                    >
+                      {refusal}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {activeLoop && runState.phase === 'idle' ? (
           <div className="rounded-lg border border-[var(--theme-accent-border)] bg-[var(--theme-card2)]/65 p-3">
             <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--theme-accent-secondary)]">
               Dry-run prompt copied when allowed

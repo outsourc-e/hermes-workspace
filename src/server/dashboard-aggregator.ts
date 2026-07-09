@@ -1803,7 +1803,7 @@ export function summarizeTaylorKanban(
   return summary
 }
 
-type JobBoardReadModel = {
+export type JobBoardReadModel = {
   online: boolean
   version: string | null
   stateKeys: number
@@ -1812,7 +1812,7 @@ type JobBoardReadModel = {
   taylorKanban: TaylorKanbanSummary | null
 }
 
-async function readJobBoardModel(): Promise<JobBoardReadModel> {
+export async function readJobBoardModel(): Promise<JobBoardReadModel> {
   const base = (
     process.env.NOVA_JOBBOARD_URL ||
     process.env.NEON_MOON_JOBBOARD_URL ||
