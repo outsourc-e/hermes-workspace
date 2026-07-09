@@ -136,6 +136,18 @@ describe('buildNovaSessionBridge', () => {
     expect(bridge.blockers.some((entry) => /approval/i.test(entry))).toBe(false)
   })
 
+  it('flags a degraded approval queue as a blocker', () => {
+    const bridge = buildNovaSessionBridge(
+      baseInput({
+        gatewayReachable: true,
+        approvals: { pending: 0, actionable: 0, degraded: true },
+      }),
+    )
+    expect(bridge.blockers.some((entry) => /approval queue degraded/i.test(entry))).toBe(
+      true,
+    )
+  })
+
   it('returns the newest verified receipts first, capped at five', () => {
     const events = Array.from({ length: 8 }, (_, index) => ({
       title: `Receipt ${index}`,

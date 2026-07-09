@@ -76,12 +76,15 @@ describe('evaluateGovernedAction', () => {
     expect(verdict.reason).toMatch(/pending/i)
   })
 
-  it('allows only when the named review is server-side approved', () => {
+  it('allows only when the named review is server-side approved for this exact action', () => {
     const review = createNovaFabricReviewProposal({
       title: 'Send vendor status email',
       reason: 'weekly update',
       targetType: 'source-map',
-      proposedDiff: { action: 'send' },
+      proposedDiff: {
+        governedCategory: 'external-message',
+        action: 'send vendor status email',
+      },
     })
     updateNovaFabricReviewStatus(review.id, 'approved', 'taylor said yes')
     const verdict = evaluateGovernedAction({
@@ -91,6 +94,47 @@ describe('evaluateGovernedAction', () => {
     })
     expect(verdict.allowed).toBe(true)
     expect(verdict.reviewId).toBe(review.id)
+  })
+
+  it('refuses a review approved for a DIFFERENT category or action (no scope confusion)', () => {
+    const review = createNovaFabricReviewProposal({
+      title: 'Governed action: rename a self-state note',
+      reason: 'harmless rename',
+      targetType: 'self-state',
+      proposedDiff: { governedCategory: 'nova-self-state', action: 'rename note' },
+    })
+    updateNovaFabricReviewStatus(review.id, 'approved', 'fine for the rename')
+    // The SAME approved review id must not authorize an unrelated category.
+    const crossCategory = evaluateGovernedAction({
+      category: 'spending',
+      action: 'buy credits',
+      approvedReviewId: review.id,
+    })
+    expect(crossCategory.allowed).toBe(false)
+    expect(crossCategory.reason).toMatch(/does not cover|different/i)
+    // Nor a different action within the same category.
+    const crossAction = evaluateGovernedAction({
+      category: 'nova-self-state',
+      action: 'delete all self-state',
+      approvedReviewId: review.id,
+    })
+    expect(crossAction.allowed).toBe(false)
+  })
+
+  it('refuses a review that never declared a governed category', () => {
+    const review = createNovaFabricReviewProposal({
+      title: 'Vault cleanup: merge duplicates',
+      reason: 'insights recommendation',
+      targetType: 'source-map',
+      proposedDiff: { cleanupKind: 'merge-duplicates' },
+    })
+    updateNovaFabricReviewStatus(review.id, 'approved', 'yes clean it')
+    const verdict = evaluateGovernedAction({
+      category: 'external-message',
+      action: 'send email',
+      approvedReviewId: review.id,
+    })
+    expect(verdict.allowed).toBe(false)
   })
 
   it('refuses a rejected review even if the browser claims otherwise', () => {

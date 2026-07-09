@@ -1,4 +1,7 @@
-import { getNovaFabricSnapshot } from './nova-fabric-store'
+import {
+  createNovaFabricReviewProposal,
+  getNovaFabricSnapshot,
+} from './nova-fabric-store'
 
 /**
  * Universal approval governance for Mission Control.
@@ -156,10 +159,50 @@ export function evaluateGovernedAction(input: {
     }
   }
 
+  // Scope binding: an approval is only valid for the exact category+action it
+  // was proposed for. Without this, ANY approved review id (say, a harmless
+  // vault cleanup) could be replayed to authorize spending or an email send.
+  const diff = review.proposedDiff as Record<string, unknown>
+  const approvedCategory =
+    typeof diff.governedCategory === 'string' ? diff.governedCategory : null
+  const approvedAction = typeof diff.action === 'string' ? diff.action : null
+  if (approvedCategory !== input.category || approvedAction !== input.action) {
+    return {
+      ...base,
+      allowed: false,
+      reason: `Review ${review.id} does not cover this action — it approved ${approvedCategory ?? 'no governed category'} / ${approvedAction ?? 'no action'}, not ${input.category} / ${input.action}`,
+    }
+  }
+
   return {
     ...base,
     allowed: true,
     reviewId: review.id,
     reason: `Approved via fabric review ${review.id}`,
   }
+}
+
+/**
+ * Creates the correctly-scoped fabric review for a governed action. The
+ * resulting review (once Taylor approves it) is the ONLY thing
+ * evaluateGovernedAction will accept for this exact category+action pair.
+ */
+export function proposeGovernedAction(input: {
+  category: GovernedActionCategory
+  action: string
+  target?: string
+  reason: string
+}) {
+  return createNovaFabricReviewProposal({
+    title: `Governed action: ${input.action}`,
+    reason: input.reason,
+    targetType: 'source-map',
+    proposedDiff: {
+      governedCategory: input.category,
+      action: input.action,
+      ...(input.target ? { target: input.target } : {}),
+    },
+    provenance: 'Mission Control approval governance',
+    riskLevel: 'high',
+  })
 }
