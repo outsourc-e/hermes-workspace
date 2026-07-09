@@ -41,6 +41,7 @@ export type CelestialBody = KnowledgeGraphNode & {
   folder: string
   kind: CelestialKind
   degree: number
+  importance: number
   systemId?: string
   planetId?: string
   armId: string
@@ -107,6 +108,14 @@ export type GalaxyModel = {
     systems: number
     comets: number
   }
+}
+
+export function focusBodyForNavigation(
+  model: GalaxyModel,
+  body: CelestialBody | null,
+): CelestialBody | null {
+  if (!body) return null
+  return model.systemByBodyId.get(body.id)?.planet ?? body
 }
 
 type SeedNode = KnowledgeGraphNode & {
@@ -254,6 +263,16 @@ function recencyFor(modified?: string): {
   return { tier: 'cool', ageHours }
 }
 
+function operationalImportance(
+  node: SeedNode,
+  kind: CelestialKind,
+  recency: { tier: CelestialBody['recencyTier']; ageHours: number },
+): number {
+  const kindWeight = kind === 'core' ? 20 : kind === 'planet' ? 8 : kind === 'tag' ? 2 : 1
+  const recencyWeight = recency.tier === 'hot' ? 4 : recency.tier === 'warm' ? 2 : 0
+  return kindWeight + node.degree * 6 + recencyWeight
+}
+
 function sizeTier(value: number, max: number): number {
   if (max <= 0) return 1
   return clamp(Math.ceil((value / max) * 5), 1, 5)
@@ -378,6 +397,7 @@ function createBody(input: {
   return {
     ...input.node,
     kind: input.kind,
+    importance: operationalImportance(input.node, input.kind, recency),
     systemId: input.systemId,
     planetId: input.planetId,
     armId: input.arm.id,
@@ -594,9 +614,9 @@ export function buildGalaxyModel(
       .filter((node) => node.id !== entry.planet.id)
       .map((node, index) => {
         const ring =
-          7.2 + (index % 10) * 1.55 + seededUnit(`${node.id}:ring`) * 3.8
+          6.4 + (index % 10) * 1.8 + seededUnit(`${node.id}:ring`) * 4.6
         const theta = seededUnit(`${node.id}:theta`) * Math.PI * 2
-        const vertical = (seededUnit(`${node.id}:vertical`) - 0.5) * 8.5
+        const vertical = (seededUnit(`${node.id}:vertical`) - 0.5) * 17
         return createBody({
           node,
           kind: 'tag',

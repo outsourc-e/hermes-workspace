@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import {
   buildGalaxyModel,
   clamp,
+  focusBodyForNavigation,
   obsidianUri,
   seededUnit,
   shortTitle,
@@ -54,6 +55,11 @@ type PlanetObject = {
   ringMaterial: THREE.MeshBasicMaterial
   atmosphereMaterial: THREE.ShaderMaterial
 }
+type TagObject = {
+  body: CelestialBody
+  mesh: THREE.Mesh
+  material: THREE.MeshStandardMaterial
+}
 type CometObject = {
   body: CelestialBody
   group: THREE.Group
@@ -72,9 +78,9 @@ const AMBER = '#FF8C1A'
 const GOLD = '#FFB347'
 const TAN = '#D4A276'
 const COPPER = '#7A441E'
-const TAG_LIMIT_IDLE = 7
-const TAG_LIMIT_ACTIVE = 140
-const IDLE_TAGS_PER_SYSTEM = 4
+const TAG_LIMIT_IDLE = 16
+const TAG_LIMIT_ACTIVE = 220
+const IDLE_TAGS_PER_SYSTEM = 8
 
 async function readKnowledgeGraph(): Promise<KnowledgeGraphResponse> {
   const response = await fetch('/api/knowledge/graph')
@@ -144,8 +150,10 @@ function bodyPosition(body: CelestialBody): THREE.Vector3 {
 }
 
 function planetRadius(body: CelestialBody, system?: PlanetarySystem): number {
-  if (body.kind === 'core') return 2.7 + body.sizeTier * 0.4
-  return 1.24 + (system?.sizeTier ?? body.sizeTier) * 0.26
+  const importance = Math.max(body.importance, system?.planet.importance ?? 0)
+  const scaled = Math.log2(importance + 1)
+  if (body.kind === 'core') return 3.65 + scaled * 0.58
+  return 1.38 + scaled * 0.48
 }
 
 function createPlanetTexture(body: CelestialBody): THREE.CanvasTexture {
@@ -155,10 +163,10 @@ function createPlanetTexture(body: CelestialBody): THREE.CanvasTexture {
   const context = canvas.getContext('2d')!
 
   const base = context.createLinearGradient(0, 0, 256, 256)
-  base.addColorStop(0, body.kind === 'core' ? '#6A3D17' : '#102744')
-  base.addColorStop(0.34, body.kind === 'core' ? '#3F2712' : '#183A5A')
-  base.addColorStop(0.72, body.kind === 'core' ? '#1E150C' : '#0B1B31')
-  base.addColorStop(1, '#02060E')
+  base.addColorStop(0, body.kind === 'core' ? '#7A4619' : '#5A4530')
+  base.addColorStop(0.34, body.kind === 'core' ? '#4A2B12' : '#3C2F23')
+  base.addColorStop(0.72, body.kind === 'core' ? '#28180B' : '#211A16')
+  base.addColorStop(1, '#05070C')
   context.fillStyle = base
   context.fillRect(0, 0, 256, 256)
 
@@ -332,7 +340,7 @@ function Galaxy3D({
   const cameraStateRef = useRef<CameraState>({
     yaw: -0.34,
     pitch: 0.12,
-    distance: 86,
+    distance: 68,
     target: new THREE.Vector3(0, 0, 0),
   })
 
@@ -404,6 +412,8 @@ function Galaxy3D({
     scene.add(stars)
 
     const planetObjects = new Map<string, PlanetObject>()
+    const tagObjects: Array<TagObject> = []
+    const tagGeometry = new THREE.IcosahedronGeometry(0.28, 1)
     const hitObjects: Array<THREE.Object3D> = []
     const bodyPositions = new Map<string, THREE.Vector3>()
 
@@ -412,7 +422,7 @@ function Galaxy3D({
       const radius = planetRadius(body, system)
       const texture = createPlanetTexture(body)
       const material = new THREE.MeshStandardMaterial({
-        color: body.kind === 'core' ? '#FFE2A8' : '#EAF6FF',
+        color: body.kind === 'core' ? '#FFE2A8' : '#E9CFA8',
         map: texture,
         roughness: 0.92,
         metalness: 0.02,
@@ -478,12 +488,31 @@ function Galaxy3D({
         ringMaterial,
         atmosphereMaterial,
       })
-      for (const tag of system.tags)
-        bodyPositions.set(tag.id, bodyPosition(tag))
+      for (const tag of system.tags) {
+        const tagMaterial = new THREE.MeshStandardMaterial({
+          color: armTint,
+          emissive: new THREE.Color(armTint),
+          emissiveIntensity: tag.recencyTier === 'hot' ? 0.52 : 0.18,
+          roughness: 0.44,
+          metalness: 0.18,
+          transparent: true,
+          opacity: 0.9,
+        })
+        const marker = new THREE.Mesh(tagGeometry, tagMaterial)
+        marker.position.copy(bodyPosition(tag))
+        marker.scale.setScalar(
+          0.68 + Math.min(0.72, Math.log2(tag.importance + 1) * 0.16),
+        )
+        marker.userData.bodyId = tag.id
+        bodyPositions.set(tag.id, marker.position.clone())
+        hitObjects.push(marker)
+        scene.add(marker)
+        tagObjects.push({ body: tag, mesh: marker, material: tagMaterial })
+      }
     }
 
     const cometObjects: Array<CometObject> = []
-    model.comets.slice(0, 8).forEach((body) => {
+    model.comets.forEach((body) => {
       const group = new THREE.Group()
       group.position.copy(bodyPosition(body))
       const material = new THREE.MeshBasicMaterial({
@@ -495,6 +524,8 @@ function Galaxy3D({
         new THREE.SphereGeometry(0.16, 12, 8),
         material,
       )
+      comet.userData.bodyId = body.id
+      hitObjects.push(comet)
       const tailMaterial = new THREE.LineBasicMaterial({
         color: COPPER,
         transparent: true,
@@ -574,9 +605,15 @@ function Galaxy3D({
     const updateCamera = (now: number) => {
       const state = cameraStateRef.current
       const selected = selectedRef.current
-      const selectedPosition = selected ? bodyPositions.get(selected.id) : null
+      const focusBody = focusBodyForNavigation(model, selected)
+      const selectedSystem = focusBody
+        ? model.systemByBodyId.get(focusBody.id)
+        : null
+      const selectedPosition = focusBody ? bodyPositions.get(focusBody.id) : null
       const desiredTarget = selectedPosition ?? homeTarget
-      const desiredDistance = selectedPosition ? 13 : 86
+      const desiredDistance = selectedSystem
+        ? clamp(10 + Math.sqrt(selectedSystem.bodyCount) * 2.15, 14, 28)
+        : 68
       state.target.lerp(desiredTarget, reducedMotionRef.current ? 1 : 0.065)
       state.distance +=
         (desiredDistance - state.distance) *
@@ -638,6 +675,22 @@ function Galaxy3D({
             : active || warm > 0.65
               ? 0.22
               : 0.1)
+      }
+      for (const tag of tagObjects) {
+        const opacity = bodyVisibleOpacity(tag.body, activeIds, query)
+        const active =
+          (tag.body.systemId && activeIds.has(tag.body.systemId)) ||
+          tag.body.id === activeBodyId
+        const pulse =
+          tag.body.recencyTier === 'hot' && !reducedMotionRef.current
+            ? 1 + Math.sin(now / 680 + tag.body.orbitPhase) * 0.13
+            : 1
+        const baseScale =
+          0.68 + Math.min(0.72, Math.log2(tag.body.importance + 1) * 0.16)
+        tag.mesh.scale.setScalar(baseScale * pulse * (active ? 1.32 : 1))
+        tag.material.opacity = opacity * (active ? 1 : 0.66)
+        tag.material.emissiveIntensity =
+          active ? 0.9 : tag.body.recencyTier === 'hot' ? 0.52 : 0.14
       }
       for (const comet of cometObjects) {
         const drift = reducedMotionRef.current
@@ -892,6 +945,7 @@ function Galaxy3D({
 }
 export function MindGraphCard() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [inspectedId, setInspectedId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [disabledArms, setDisabledArms] = useState<Set<string>>(() => new Set())
   const [searchTerm, setSearchTerm] = useState('')
@@ -935,11 +989,14 @@ export function MindGraphCard() {
   const selectedBody = selectedId
     ? (model.bodyById.get(selectedId) ?? null)
     : null
+  const inspectedBody = inspectedId
+    ? (model.bodyById.get(inspectedId) ?? null)
+    : null
   // Operational galaxy: a selected real note is read from the vault via
   // /api/knowledge/read (content + resolved backlinks) — no invented data.
   const selectedNotePath =
-    selectedBody && selectedBody.path.toLowerCase().endsWith('.md')
-      ? selectedBody.path
+    inspectedBody && inspectedBody.path.toLowerCase().endsWith('.md')
+      ? inspectedBody.path
       : null
   const noteQuery = useQuery({
     queryKey: ['dashboard', 'knowledge-note', selectedNotePath],
@@ -962,11 +1019,23 @@ export function MindGraphCard() {
     staleTime: 60_000,
   })
   const hoveredBody = hoveredId ? (model.bodyById.get(hoveredId) ?? null) : null
-  const focusedBody = selectedBody ?? hoveredBody ?? model.core
+  const focusedBody = inspectedBody ?? hoveredBody ?? model.core
   const largestSystems = model.systems.slice(0, 6)
   const visibleComets = model.comets.slice(0, 3)
 
-  const clearSelection = useCallback(() => setSelectedId(null), [])
+  useEffect(() => {
+    if (!selectedId) {
+      setInspectedId(null)
+      return
+    }
+    const arrival = window.setTimeout(() => setInspectedId(selectedId), 720)
+    return () => window.clearTimeout(arrival)
+  }, [selectedId])
+
+  const clearSelection = useCallback(() => {
+    setSelectedId(null)
+    setInspectedId(null)
+  }, [])
   useEscape(clearSelection)
   const handleHover = useCallback(
     (body: CelestialBody | null) => setHoveredId(body?.id ?? null),
@@ -995,17 +1064,16 @@ export function MindGraphCard() {
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="nova-label">Mind graph</div>
+              <div className="nova-label">Operational map</div>
               <h2
                 id="nova-mind-graph-title"
                 className="mt-1 text-xl font-semibold text-[var(--theme-text-strong)] sm:text-2xl"
               >
-                Obsidian galaxy
+                Nova’s working universe
               </h2>
               <p className="mt-1 max-w-2xl text-sm text-[var(--theme-muted)]">
-                Fly through Nova's vault: ringed planets for major notes,
-                drifting text tags for ideas, and dotted constellations for
-                links.
+                Projects, agents, handoffs, and decisions mapped as a navigable
+                3D field. Select a body to fly into its system.
               </p>
             </div>
             <div className="max-w-full rounded-full border border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--theme-accent-secondary)] sm:tracking-[0.16em]">
@@ -1112,7 +1180,7 @@ export function MindGraphCard() {
           </div>
 
           <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">
-            <div className="nova-label">Focused star</div>
+            <div className="nova-label">System inspector</div>
             <div className="mt-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.54)] px-3 py-2">
               <div className="flex items-start justify-between gap-2">
                 <div>

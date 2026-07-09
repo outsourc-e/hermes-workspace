@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGalaxyModel } from './nova-galaxy-model'
+import { buildGalaxyModel, focusBodyForNavigation } from './nova-galaxy-model'
 import type { KnowledgeGraphResponse } from './nova-galaxy-model'
 
 function graph(): KnowledgeGraphResponse {
@@ -32,6 +32,21 @@ describe('buildGalaxyModel', () => {
     const model = buildGalaxyModel(graph())
     expect(model.core.id).toBe('hub.md')
     expect(model.core.kind).toBe('core')
+  })
+
+  it('ranks highly connected hubs above passive notes for operational sizing', () => {
+    const model = buildGalaxyModel(graph())
+    const core = model.bodyById.get('hub.md')
+    const leaf = model.bodyById.get('a.md')
+
+    expect(core?.importance).toBeGreaterThan(leaf?.importance ?? 0)
+  })
+
+  it('navigates a selected idea into its owning system hub', () => {
+    const model = buildGalaxyModel(graph())
+    const leaf = model.bodyById.get('a.md') ?? null
+
+    expect(focusBodyForNavigation(model, leaf)?.id).toBe('hub.md')
   })
 
   it('turns orphan notes into comets', () => {
