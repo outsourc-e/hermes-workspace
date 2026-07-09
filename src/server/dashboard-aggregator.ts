@@ -1,6 +1,7 @@
 ﻿import { execFileSync } from 'node:child_process'
 import { buildKnowledgeGraph, knowledgeRootExists } from './knowledge-browser'
 import { listMemoryFiles } from './memory-browser'
+import { getTaylorApprovalQueue } from './taylor-approval-queue'
 import { listSwarmMissions } from './swarm-missions'
 import type { SwarmMission, SwarmMissionAssignment } from './swarm-missions'
 
@@ -53,7 +54,24 @@ export type DashboardOverview = {
 
 export type ControlLoopStatus = 'ready' | 'partial' | 'not-wired'
 
-export type LiveSystemStatus = 'online' | 'degraded' | 'offline' | 'not-wired'
+/**
+ * Truth taxonomy for Mission Control panels:
+ * - `operational` — connected to real data AND healthy.
+ * - `connected` — real data parsed from the source, but nothing actionable yet.
+ * - `reachable` — the source answered, but no real data could be proven.
+ * - `approval-gated` — connected, with items or writes waiting on Taylor.
+ * - `degraded` — connected but reporting errors/anomalies.
+ * - `offline` — probed and down.
+ * - `not-wired` — no source configured or responding.
+ */
+export type LiveSystemStatus =
+  | 'operational'
+  | 'connected'
+  | 'reachable'
+  | 'approval-gated'
+  | 'degraded'
+  | 'offline'
+  | 'not-wired'
 
 export type AgentWorkerStatus =
   | 'idle'
@@ -135,7 +153,10 @@ export type DashboardLiveSystemsSection = {
   generatedAt: string
   summary: {
     total: number
-    online: number
+    operational: number
+    connected: number
+    reachable: number
+    approvalGated: number
     degraded: number
     offline: number
     notWired: number
@@ -2051,7 +2072,20 @@ export function buildRouteCostAnomalies(
   return anomalies
 }
 
-type LiveSystemsBuildInput = {
+export type LiveSystemsApprovalsProbe = {
+  pending: number
+  actionable: number
+  degraded: boolean
+}
+
+export type LiveSystemsVaultProbe = {
+  reachable: boolean
+  nodeCount: number
+  memoryFiles: number
+  newestModified: string | null
+}
+
+export type LiveSystemsBuildInput = {
   status: DashboardStatusSection | null
   platforms: Array<DashboardPlatformEntry>
   cron: DashboardCronSection | null
@@ -2062,6 +2096,9 @@ type LiveSystemsBuildInput = {
   oauthProvidersRaw: unknown
   jobBoard: JobBoardReadModel
   gitWork?: DashboardGitWorkSection | null
+  approvals?: LiveSystemsApprovalsProbe | null
+  /** Injectable for tests; when absent the local vault is probed directly. */
+  vaultProbe?: LiveSystemsVaultProbe | null
 }
 
 function liveSystem(
@@ -2084,16 +2121,30 @@ function platformLooksBad(entry: DashboardPlatformEntry): boolean {
   return /error|failed|missing|disconnected|offline|revoked/i.test(entry.state)
 }
 
-function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSection {
+function probeLocalVault(): LiveSystemsVaultProbe {
+  const memoryFiles = safeLocal(() => listMemoryFiles(), [])
+  const reachable = safeLocal(() => knowledgeRootExists(), false)
+  const knowledge = safeLocal(() => (reachable ? buildKnowledgeGraph() : null), null)
+  return {
+    reachable,
+    nodeCount: knowledge?.nodes.length ?? 0,
+    memoryFiles: memoryFiles.length,
+    newestModified: newestIso([
+      ...(knowledge?.nodes.map((node) => node.modified) ?? []),
+      ...memoryFiles.map((file) => file.modified),
+    ]),
+  }
+}
+
+export function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSection {
   const generatedAt = new Date().toISOString()
   const oauthSignals = collectOauthSignals(input.oauthProvidersRaw)
   const googleSignals = oauthSignals.filter((entry) => /google|gmail|calendar/.test(entry.text))
   const gmailConnected = googleSignals.some((entry) => entry.connected && /gmail|mail|google/.test(entry.text))
   const calendarConnected = googleSignals.some((entry) => entry.connected && /calendar|gcal|google/.test(entry.text))
   const skillsCount = countPayloadItems(input.skillsRaw, ['skills', 'items', 'installed', 'total'])
-  const memoryFiles = safeLocal(() => listMemoryFiles(), [])
-  const vaultReachable = safeLocal(() => knowledgeRootExists(), false)
-  const knowledge = safeLocal(() => (vaultReachable ? buildKnowledgeGraph() : null), null)
+  const vault = input.vaultProbe ?? probeLocalVault()
+  const approvals = input.approvals ?? null
   const platformErrors = input.platforms.filter((entry) => platformLooksBad(entry))
   const platformOnline = input.platforms.filter((entry) => platformLooksOnline(entry)).length
 
@@ -2101,18 +2152,22 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
     liveSystem(
       'hermes-gateway',
       'Hermes gateway',
-      input.status ? (platformErrors.length > 0 ? 'degraded' : 'online') : 'offline',
+      input.status ? (platformErrors.length > 0 ? 'degraded' : 'operational') : 'offline',
       input.status
-        ? `${input.status.gatewayState || 'unknown'}; ${input.status.activeAgents} active agent${input.status.activeAgents === 1 ? '' : 's'}`
+        ? `${input.status.gatewayState || 'unknown'}; ${input.status.activeAgents} active agent${input.status.activeAgents === 1 ? '' : 's'}; ${platformOnline} platform${platformOnline === 1 ? '' : 's'} up`
         : 'Gateway status endpoint unavailable',
-      '/api/status + /health/detailed',
+      '/api/gateway-status + /api/status',
       '/settings',
       input.status?.lastHeartbeatAt ?? input.status?.updatedAt ?? null,
     ),
     liveSystem(
       'model-route',
       'Model route',
-      input.modelInfo ? 'online' : 'not-wired',
+      input.modelInfo
+        ? input.modelInfo.provider && input.modelInfo.model
+          ? 'operational'
+          : 'connected'
+        : 'not-wired',
       input.modelInfo
         ? `${input.modelInfo.provider || 'unknown'} / ${input.modelInfo.model || 'unknown model'}`
         : 'Model info endpoint unavailable',
@@ -2123,8 +2178,16 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
     liveSystem(
       'tools-skills',
       'Skills/tools',
-      skillsCount > 0 ? 'online' : 'not-wired',
-      skillsCount > 0 ? `${skillsCount} installed skill${skillsCount === 1 ? '' : 's'} returned` : 'Skills endpoint did not return installed skills',
+      skillsCount > 0
+        ? 'operational'
+        : input.skillsRaw !== null && input.skillsRaw !== undefined
+          ? 'reachable'
+          : 'not-wired',
+      skillsCount > 0
+        ? `${skillsCount} installed skill${skillsCount === 1 ? '' : 's'} returned`
+        : input.skillsRaw !== null && input.skillsRaw !== undefined
+          ? 'Skills endpoint answered but returned no installed skills'
+          : 'Skills endpoint unavailable',
       '/api/skills',
       '/skills',
       generatedAt,
@@ -2136,8 +2199,8 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
         ? input.cron.failed > 0
           ? 'degraded'
           : input.cron.total > 0
-            ? 'online'
-            : 'not-wired'
+            ? 'operational'
+            : 'connected'
         : 'not-wired',
       input.cron
         ? `${input.cron.total} job${input.cron.total === 1 ? '' : 's'}; ${input.cron.failed} failed; ${input.cron.paused} paused`
@@ -2150,13 +2213,15 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
       'google-workspace',
       'Google Workspace',
       gmailConnected && calendarConnected
-        ? 'online'
+        ? 'approval-gated'
         : googleSignals.length > 0
-          ? 'degraded'
+          ? 'reachable'
           : 'not-wired',
-      googleSignals.length > 0
-        ? `${gmailConnected ? 'Gmail' : 'Gmail not proven'}; ${calendarConnected ? 'Calendar' : 'Calendar not proven'}`
-        : 'No Google/Gmail/Calendar OAuth signal returned',
+      gmailConnected && calendarConnected
+        ? 'Gmail + Calendar connected; reads only — sends/schedules wait on Taylor approval'
+        : googleSignals.length > 0
+          ? `${gmailConnected ? 'Gmail' : 'Gmail not proven'}; ${calendarConnected ? 'Calendar' : 'Calendar not proven'}`
+          : 'No Google/Gmail/Calendar OAuth signal returned',
       '/api/providers/oauth',
       '/settings',
       generatedAt,
@@ -2164,22 +2229,28 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
     liveSystem(
       'obsidian-vault',
       'Obsidian vault',
-      vaultReachable ? ((knowledge?.nodes.length ?? 0) > 0 ? 'online' : 'degraded') : 'not-wired',
-      vaultReachable
-        ? `${knowledge?.nodes.length ?? 0} graph node${(knowledge?.nodes.length ?? 0) === 1 ? '' : 's'}; ${memoryFiles.length} memory file${memoryFiles.length === 1 ? '' : 's'}`
+      vault.reachable ? (vault.nodeCount > 0 ? 'operational' : 'reachable') : 'not-wired',
+      vault.reachable
+        ? `${vault.nodeCount} graph node${vault.nodeCount === 1 ? '' : 's'}; ${vault.memoryFiles} memory file${vault.memoryFiles === 1 ? '' : 's'}`
         : 'Knowledge root/vault not reachable',
-      'unified-vault + memory files',
+      '/api/knowledge/graph + /api/knowledge/insights',
       '/memory',
-      newestIso([...(knowledge?.nodes.map((node) => node.modified) ?? []), ...memoryFiles.map((file) => file.modified)]),
+      vault.newestModified,
     ),
     liveSystem(
       'neon-moon-job-board',
       'Neon Moon job board',
-      input.jobBoard.online ? 'online' : 'not-wired',
       input.jobBoard.online
-        ? `v${input.jobBoard.version ?? 'unknown'}; ${input.jobBoard.taylorKanbanItems} Taylor kanban item${input.jobBoard.taylorKanbanItems === 1 ? '' : 's'}`
+        ? input.jobBoard.taylorKanban
+          ? 'operational'
+          : 'reachable'
+        : 'not-wired',
+      input.jobBoard.online
+        ? input.jobBoard.taylorKanban
+          ? `v${input.jobBoard.version ?? 'unknown'}; ${input.jobBoard.taylorKanbanItems} Taylor kanban item${input.jobBoard.taylorKanbanItems === 1 ? '' : 's'}`
+          : `ping OK (v${input.jobBoard.version ?? 'unknown'}); kanban state not parsed`
         : 'Job board HTTP endpoints unavailable',
-      'job board HTTP endpoints',
+      'job board /ping + /state (HTTP only)',
       '/swarm2',
       generatedAt,
     ),
@@ -2189,7 +2260,7 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
       input.kanban
         ? input.kanban.blocked > 0
           ? 'degraded'
-          : 'online'
+          : 'operational'
         : 'not-wired',
       input.kanban
         ? `${input.kanban.total} card${input.kanban.total === 1 ? '' : 's'}; ${input.kanban.blocked} blocked`
@@ -2204,7 +2275,7 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
       input.analytics
         ? buildRouteCostAnomalies(input.analytics).length > 0
           ? 'degraded'
-          : 'online'
+          : 'operational'
         : 'not-wired',
       input.analytics
         ? (buildRouteCostAnomalies(input.analytics)[0] ??
@@ -2214,14 +2285,14 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
               : `$${input.analytics.estimatedCostUsd.toFixed(2)}`
           } cost signal in ${input.analytics.windowDays}d`)
         : 'Analytics usage endpoint unavailable',
-      '/api/analytics/usage',
+      '/api/analytics/usage + /api/provider-usage',
       '/dashboard',
       generatedAt,
     ),
     liveSystem(
       'github-agent-work',
       'GitHub/agent work',
-      input.gitWork ? 'online' : 'not-wired',
+      input.gitWork ? 'operational' : 'not-wired',
       input.gitWork
         ? `${input.gitWork.branch ?? 'unknown branch'} @ ${input.gitWork.latestCommit?.hash ?? '?'} · ${
             input.gitWork.clean
@@ -2233,16 +2304,42 @@ function buildLiveSystems(input: LiveSystemsBuildInput): DashboardLiveSystemsSec
       null,
       input.gitWork ? generatedAt : null,
     ),
+    liveSystem(
+      'taylor-approvals',
+      'Taylor approvals',
+      approvals
+        ? approvals.degraded
+          ? 'degraded'
+          : approvals.pending > 0
+            ? 'approval-gated'
+            : 'operational'
+        : 'not-wired',
+      approvals
+        ? approvals.degraded
+          ? 'Approval queue degraded — fabric store unreadable'
+          : approvals.pending > 0
+            ? `${approvals.pending} item${approvals.pending === 1 ? '' : 's'} waiting on Taylor (${approvals.actionable} actionable here)`
+            : 'Queue clear — nothing waiting on Taylor'
+        : 'Approval queue unavailable',
+      '/api/taylor-approvals',
+      '/dashboard',
+      generatedAt,
+    ),
   ]
 
   const summary = {
     total: systems.length,
-    online: systems.filter((item) => item.status === 'online').length,
+    operational: systems.filter((item) => item.status === 'operational').length,
+    connected: systems.filter((item) => item.status === 'connected').length,
+    reachable: systems.filter((item) => item.status === 'reachable').length,
+    approvalGated: systems.filter((item) => item.status === 'approval-gated').length,
     degraded: systems.filter((item) => item.status === 'degraded').length,
     offline: systems.filter((item) => item.status === 'offline').length,
     notWired: systems.filter((item) => item.status === 'not-wired').length,
   }
 
+  // approval-gated means "needs Taylor", not "broken" — it is surfaced by the
+  // approval queue panel, so only real outages become blockers here.
   const blockers = systems
     .filter((item) => item.status === 'offline' || item.status === 'degraded' || item.status === 'not-wired')
     .slice(0, 4)
@@ -2742,6 +2839,14 @@ export async function buildDashboardOverview(
     jobBoard,
   })
   const gitWork = readGitWorkSection()
+  const approvalsProbe = safeLocal((): LiveSystemsApprovalsProbe => {
+    const queue = getTaylorApprovalQueue()
+    return {
+      pending: queue.counts.total,
+      actionable: queue.counts.actionable,
+      degraded: queue.degraded,
+    }
+  }, null)
   const liveSystems = buildLiveSystems({
     status,
     platforms,
@@ -2753,6 +2858,7 @@ export async function buildDashboardOverview(
     oauthProvidersRaw,
     jobBoard,
     gitWork,
+    approvals: approvalsProbe,
   })
   const agentWorkforce = buildAgentWorkforceSection(swarmMissions)
 

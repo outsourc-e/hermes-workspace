@@ -567,12 +567,13 @@ describe('buildDashboardOverview', () => {
 
     expect(systems.get('hermes-gateway')?.status).toBe('degraded')
     expect(systems.get('model-route')?.detail).toContain('gpt-5.5')
-    expect(systems.get('tools-skills')?.status).toBe('online')
+    expect(systems.get('tools-skills')?.status).toBe('operational')
     expect(systems.get('cron-background')?.status).toBe('degraded')
-    expect(systems.get('google-workspace')?.status).toBe('online')
+    // Google reads are proven but sends/schedules stay behind Taylor approval.
+    expect(systems.get('google-workspace')?.status).toBe('approval-gated')
     const gitWorkSystem = systems.get('github-agent-work')
-    expect(['online', 'not-wired']).toContain(gitWorkSystem?.status)
-    if (gitWorkSystem?.status === 'online') {
+    expect(['operational', 'not-wired']).toContain(gitWorkSystem?.status)
+    if (gitWorkSystem?.status === 'operational') {
       expect(gitWorkSystem.detail).toContain('receipts via /api/nova-work-scan')
     }
     expect(overview.liveSystems.summary.total).toBe(

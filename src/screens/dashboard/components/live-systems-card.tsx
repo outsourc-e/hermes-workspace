@@ -8,10 +8,25 @@ const STATUS_META: Record<
   LiveSystemStatus,
   { label: string; dot: string; tone: string }
 > = {
-  online: {
-    label: 'online',
+  operational: {
+    label: 'operational',
     dot: 'bg-[var(--theme-success)]',
     tone: 'border-[color-mix(in_srgb,var(--theme-success)_35%,var(--theme-border))] text-[var(--theme-success)]',
+  },
+  connected: {
+    label: 'connected',
+    dot: 'bg-[color-mix(in_srgb,var(--theme-success)_60%,var(--theme-muted))]',
+    tone: 'border-[color-mix(in_srgb,var(--theme-success)_22%,var(--theme-border))] text-[color-mix(in_srgb,var(--theme-success)_70%,var(--theme-text))]',
+  },
+  reachable: {
+    label: 'reachable',
+    dot: 'bg-[var(--theme-accent)]',
+    tone: 'border-[color-mix(in_srgb,var(--theme-accent)_30%,var(--theme-border))] text-[var(--theme-accent)]',
+  },
+  'approval-gated': {
+    label: 'needs Taylor',
+    dot: 'bg-[var(--theme-warning)]',
+    tone: 'border-[color-mix(in_srgb,var(--theme-warning)_45%,var(--theme-border))] text-[var(--theme-warning)]',
   },
   degraded: {
     label: 'degraded',
@@ -127,13 +142,21 @@ export function LiveSystemsCard({
               secrets, no customer/vendor actions.
             </p>
           </div>
-          <div className="grid grid-cols-4 gap-1.5 text-center">
+          <div className="grid grid-cols-5 gap-1.5 text-center">
             <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)]/55 px-2 py-1.5">
               <div className="font-mono text-sm font-semibold text-[var(--theme-success)]">
-                {liveSystems.summary.online}
+                {liveSystems.summary.operational + liveSystems.summary.connected}
               </div>
               <div className="font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
-                online
+                live
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)]/55 px-2 py-1.5">
+              <div className="font-mono text-sm font-semibold text-[var(--theme-warning)]">
+                {liveSystems.summary.approvalGated}
+              </div>
+              <div className="font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
+                needs&nbsp;T
               </div>
             </div>
             <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)]/55 px-2 py-1.5">
@@ -154,7 +177,7 @@ export function LiveSystemsCard({
             </div>
             <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)]/55 px-2 py-1.5">
               <div className="font-mono text-sm font-semibold text-[var(--theme-muted)]">
-                {liveSystems.summary.notWired}
+                {liveSystems.summary.notWired + liveSystems.summary.reachable}
               </div>
               <div className="font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
                 unwired
