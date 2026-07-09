@@ -18,11 +18,12 @@ const GENERIC_TITLE_PATTERNS = [
   /^session \d/i,
   /^conversation$/i,
   /^chat$/i,
+  /^local chat$/i,
   /^[0-9a-f]{6,}/i,
   /^\w{8} \(\d{4}-\d{2}-\d{2}\)$/,
 ]
 
-function isGenericTitle(title: string): boolean {
+export function isGenericTitle(title: string): boolean {
   const trimmed = title.trim()
   if (!trimmed || trimmed === 'New Session') return true
   return GENERIC_TITLE_PATTERNS.some((pattern) => pattern.test(trimmed))

@@ -7,6 +7,38 @@ import server from './dist/server/server.js'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLIENT_DIR = join(__dirname, 'dist', 'client')
 
+// Content Security Policy — emitted as an HTTP response header on EVERY
+// response so the policy survives any edge body transformations (e.g.
+// Cloudflare's JS Challenge inserting a `<meta http-equiv="Content-Security-Policy">`
+// with a per-request nonce into the served HTML when a request trips the
+// "impersonate browsers" rule).
+//
+// KEEP IN SYNC with `src/lib/csp.ts` (single source of truth) and
+// `src/routes/__root.tsx` APP_CSP (which emits the same policy as `<meta>`).
+// If you change the directives here, change them in all three places.
+const APP_CSP_HEADERS = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self' ws: wss: http: https:",
+  "worker-src 'self' blob:",
+  "media-src 'self' blob: data:",
+  "frame-src 'self' http: https:",
+].join('; ')
+
+const ALWAYS_HEADERS = {
+  'Content-Security-Policy': APP_CSP_HEADERS,
+  // Tighten later if/when CSP moves to nonce-based — the dash prefix
+  // makes adding/removing trivial without searching the codebase.
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+}
+
 const port = parseInt(process.env.PORT || '3000', 10)
 // Default HOST to localhost-only. Operators who want the workspace reachable
 // on a LAN / Tailscale / public surface must opt in explicitly with
@@ -203,10 +235,32 @@ async function requestHandler(req, res) {
   try {
     const response = await server.fetch(request)
 
-    res.writeHead(
-      response.status,
-      Object.fromEntries(response.headers.entries()),
-    )
+    // Merge ALWAYS_HEADERS on top of the SSR-emitted headers. These MUST
+    // win — sending them here means the policy is observable even if the
+    // body got replaced by an edge-side JS Challenge or WAF response page.
+    const headers = Object.fromEntries(response.headers.entries())
+    for (const [name, value] of Object.entries(ALWAYS_HEADERS)) {
+      if (typeof value === 'string') headers[name] = value
+    }
+
+    // /api/* responses must NEVER be cacheable by intermediaries — the SPA
+    // uses /api/auth-check, /api/connection-status, etc. to decide whether
+    // to show the password form. Cloudflare's Browser Cache TTL default
+    // (7200s) is applied to any GET that doesn't say `no-store`, which
+    // caused the auth-check response to be served stale from the edge
+    // for ~2h after a fresh login, trapping the user in a password loop.
+    // Strip any Cache-Control/Pragma/Expires on API responses so the
+    // edge never reuses them. Hash-named assets keep their immutable
+    // header (set above in tryServeStatic) and are unaffected here
+    // because static assets short-circuit before this branch.
+    const reqPathname = new URL(request.url).pathname
+    if (reqPathname.startsWith('/api/')) {
+      headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+      headers['Pragma'] = 'no-cache'
+      headers['Expires'] = '0'
+    }
+
+    res.writeHead(response.status, headers)
 
     if (response.body) {
       const reader = response.body.getReader()

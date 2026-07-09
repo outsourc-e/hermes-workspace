@@ -376,8 +376,12 @@ export function OperationalWorkerCard({
     >
       {!settingsOpen ? (
       <>
-      <div className="relative flex min-h-8 items-center">
-        <div className="absolute left-0 flex max-w-[10rem] flex-wrap items-center gap-1 text-[10px] text-[var(--theme-muted)]/85">
+      {/* Below md the three header groups wrap into two rows (name on top, pills +
+          role below) instead of the absolute-positioned single-row layout, which
+          physically overlaps the centered name on narrow cards (left+right groups
+          can claim 19rem). */}
+      <div className="relative flex min-h-8 flex-wrap items-center gap-y-1 md:flex-nowrap">
+        <div className="order-2 flex max-w-[10rem] flex-wrap items-center gap-1 text-[10px] text-[var(--theme-muted)]/85 md:absolute md:left-0 md:order-none">
           <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-1.5 py-0.5">
             {modelLabel}
           </span>
@@ -385,7 +389,7 @@ export function OperationalWorkerCard({
             {projectBranch || projectName || (hasPreview ? 'preview' : 'main')}
           </span>
         </div>
-        <div className="flex w-full justify-center px-28">
+        <div className="order-1 flex w-full justify-center px-2 md:order-none md:px-28">
           <h3 className="min-w-0 text-center text-sm font-semibold text-[var(--theme-text)]">
             <span className="inline-flex max-w-full items-center justify-center gap-2">
               {avatarGlyph ? <span>{avatarGlyph}</span> : null}
@@ -412,9 +416,9 @@ export function OperationalWorkerCard({
           </h3>
         </div>
 
-        <div className="absolute right-0 flex max-w-[9rem] items-center gap-1">
+        <div className="order-3 ml-auto flex min-w-0 max-w-[9rem] items-center gap-1 md:absolute md:right-0 md:order-none md:ml-0">
           <span
-            className="truncate rounded-full border border-[var(--theme-accent)]/30 bg-[var(--theme-accent-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]"
+            className="min-w-0 truncate rounded-full border border-[var(--theme-accent)]/30 bg-[var(--theme-accent-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]"
             title={role}
           >
             {role}

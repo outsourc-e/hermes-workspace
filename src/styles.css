@@ -4,6 +4,48 @@
 /* Tailwind v4 — enable dark: variant on .dark class (set by __root.tsx) */
 @variant dark (&:where(.dark, .dark *));
 
+/* ── Custom color tokens ───────────────────────────────────────────────
+   Tailwind v4 only generates utilities (bg-surface, text-ink,
+   bg-primary-900, bg-accent-500, …) for colors declared in @theme.
+   Without this block, every primary/accent/ink/surface class in the app
+   compiles to no CSS at all: the per-theme remap blocks further down
+   ("Maps bg-primary-50 … so ALL existing Tailwind classes work") set
+   variables that no generated rule ever consumed. Values here are
+   fallbacks — the [data-theme=…] remaps and the .system dark block
+   override them at runtime exactly as originally intended. */
+@theme {
+  --color-surface: var(--theme-bg, oklch(0.11 0.005 80));
+  --color-surface-deep: var(--theme-bg, oklch(0.08 0.005 80));
+  --color-ink: var(--theme-text, oklch(0.95 0.002 80));
+
+  --color-primary-50: var(--theme-panel, oklch(0.14 0.005 80));
+  --color-primary-100: var(--theme-card, oklch(0.18 0.005 80));
+  --color-primary-200: var(--theme-border, oklch(0.26 0.006 80));
+  --color-primary-300: var(--theme-border-subtle, oklch(0.34 0.006 80));
+  --color-primary-400: var(--theme-muted, oklch(0.44 0.006 80));
+  --color-primary-500: var(--theme-muted, oklch(0.55 0.006 80));
+  --color-primary-600: var(--theme-muted, oklch(0.68 0.006 80));
+  --color-primary-700: var(--theme-text, oklch(0.76 0.005 80));
+  --color-primary-800: var(--theme-text, oklch(0.84 0.004 80));
+  --color-primary-900: var(--theme-text, oklch(0.9 0.003 80));
+  --color-primary-950: var(--theme-text, oklch(0.95 0.002 80));
+
+  /* Accent ramp follows Tailwind's 50=lightest → 950=darkest convention,
+     derived from the live theme accent; 400/500/600 defer to the theme
+     vars the remap blocks target. */
+  --color-accent-50: color-mix(in srgb, var(--theme-accent, #8a8f98) 10%, white);
+  --color-accent-100: color-mix(in srgb, var(--theme-accent, #8a8f98) 20%, white);
+  --color-accent-200: color-mix(in srgb, var(--theme-accent, #8a8f98) 35%, white);
+  --color-accent-300: color-mix(in srgb, var(--theme-accent, #8a8f98) 55%, white);
+  --color-accent-400: var(--theme-accent-secondary, var(--theme-accent, #8a8f98));
+  --color-accent-500: var(--theme-accent, #8a8f98);
+  --color-accent-600: var(--theme-accent, #8a8f98);
+  --color-accent-700: color-mix(in srgb, var(--theme-accent, #8a8f98) 70%, black);
+  --color-accent-800: color-mix(in srgb, var(--theme-accent, #8a8f98) 55%, black);
+  --color-accent-900: color-mix(in srgb, var(--theme-accent, #8a8f98) 40%, black);
+  --color-accent-950: color-mix(in srgb, var(--theme-accent, #8a8f98) 25%, black);
+}
+
 :root {
   --tabbar-h: 80px;
   /* Chat content max-width — controlled by Settings > Chat Display (see #89).

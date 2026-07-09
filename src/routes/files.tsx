@@ -293,7 +293,7 @@ function FilesRoute() {
                 </>
               ) : (
                 <>
-                  <h1 className="text-base font-medium md:text-lg">Files</h1>
+                  <h1 className="hidden text-base font-medium md:block md:text-lg">Files</h1>
                   <p className="hidden text-sm text-primary-600 sm:block">
                     Click a file in the sidebar to load it into the editor.
                   </p>

@@ -30,7 +30,13 @@ import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-import { ChatPanel } from '@/components/chat-panel'
+// Lazy: ChatPanel statically imports ChatScreen and with it the chat
+// markdown pipeline; keeping it out of the eager entry means non-chat
+// routes stop paying for chat at first paint. The chat route itself
+// already lazy-loads ChatScreen through its own boundary.
+const ChatPanel = lazy(() =>
+  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
+)
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
@@ -461,7 +467,13 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               className="flex flex-col"
               style={{
                 position: 'absolute',
-                inset: '44px 0 0 0',
+                // 44px leaves room for the Nova top bar; bottom respects the
+                // mobile tab bar (inset:0 would put the input bar behind it).
+                // --tabbar-h is live: 0px whenever the bar hides.
+                top: '44px',
+                left: 0,
+                right: 0,
+                bottom: isMobile ? 'var(--tabbar-h, 80px)' : 0,
                 visibility: isOnTerminalRoute ? 'visible' : 'hidden',
                 pointerEvents: isOnTerminalRoute ? 'auto' : 'none',
                 zIndex: isOnTerminalRoute ? 1 : -1,
@@ -504,7 +516,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           </main>
 
           {/* Chat panel — visible on non-chat routes (but not in HermesWorld, which has its own in-game chat) */}
-          {!isOnChatRoute && !isOnPlaygroundRoute && !isMobile && <ChatPanel />}
+          {!isOnChatRoute && !isOnPlaygroundRoute && !isChromeFreeSurface && !isMobile && (
+            <Suspense fallback={null}>
+              <ChatPanel />
+            </Suspense>
+          )}
         </div>
 
         {/* Floating chat toggle — visible on non-chat routes (but not in HermesWorld) */}

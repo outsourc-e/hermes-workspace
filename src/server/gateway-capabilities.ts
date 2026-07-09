@@ -288,19 +288,35 @@ export async function fetchDashboardToken(options?: {
   dashboardTokenPromise = (async () => {
     // Dashboard injects the session token inline on `/` (root), not on
     // `/index.html` which serves the raw Vite-built HTML without the token.
-    const res = await fetch(`${CLAUDE_DASHBOARD_URL}/`, {
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    })
-    if (!res.ok) {
-      throw new Error(`Dashboard index failed: ${res.status}`)
+    // When the dashboard requires auth (302 → /auth/login) or the login page
+    // is broken (500), return empty string so protected API calls degrade
+    // gracefully — the caller already handles 401/non-ok via safeJson.
+    try {
+      const res = await fetch(`${CLAUDE_DASHBOARD_URL}/`, {
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
+      if (!res.ok) {
+        console.warn(
+          `[gateway] Dashboard index returned ${res.status} — token unavailable`,
+        )
+        return ''
+      }
+      const html = await res.text()
+      const token = html.match(DASHBOARD_TOKEN_REGEX)?.[1]?.trim() || ''
+      if (!token) {
+        console.warn(
+          '[gateway] Dashboard session token not found in root HTML',
+        )
+        return ''
+      }
+      dashboardTokenCache = token
+      return token
+    } catch (err) {
+      console.warn(
+        `[gateway] Failed to fetch dashboard token: ${err instanceof Error ? err.message : err}`,
+      )
+      return ''
     }
-    const html = await res.text()
-    const token = html.match(DASHBOARD_TOKEN_REGEX)?.[1]?.trim() || ''
-    if (!token) {
-      throw new Error('Dashboard session token not found in root HTML')
-    }
-    dashboardTokenCache = token
-    return token
   })()
 
   try {
@@ -455,7 +471,24 @@ async function probeChatCompletions(): Promise<boolean> {
     if (getRes.status === 405) return true
     if (getRes.ok) return true
     if (getRes.status === 400 || getRes.status === 422) return true
-    if (getRes.status === 404) return false
+    if (getRes.status === 404) {
+      // Some OpenAI-compatible backends (e.g. `hermes proxy`) only route POST
+      // for /v1/chat/completions and return 404 — not 405 — for GET. Confirm
+      // the endpoint exists with a lightweight POST: an empty body triggers a
+      // validation error (400/422) on a real endpoint and 404 on an absent one.
+      // No tokens are spent because the request fails validation before inference.
+      try {
+        const postRes = await fetch(`${CLAUDE_API}/v1/chat/completions`, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: '{}',
+          signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        })
+        return postRes.status !== 404
+      } catch {
+        return false
+      }
+    }
     return true
   } catch {
     return false
@@ -758,6 +791,14 @@ async function autoDetectGatewayUrl(): Promise<void> {
 }
 
 async function autoDetectDashboardUrl(): Promise<void> {
+  // Mirror autoDetectGatewayUrl: skip discovery when the dashboard URL was set
+  // explicitly. HERMES_DASHBOARD_URL is the documented primary var (see the
+  // resolution order at the top of this file); CLAUDE_DASHBOARD_URL is the
+  // legacy alias. Probing only the hard-coded :9119 candidate when
+  // HERMES_DASHBOARD_URL points elsewhere lets a co-located dashboard on the
+  // default port silently override the operator's explicit choice — e.g. in a
+  // multi-user setup it attaches to another user's dashboard and leaks their
+  // session list. Honor both vars so an explicit setting always wins.
   if (process.env.HERMES_DASHBOARD_URL || process.env.CLAUDE_DASHBOARD_URL) return
 
   const candidates = [

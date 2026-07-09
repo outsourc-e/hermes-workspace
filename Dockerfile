@@ -16,7 +16,9 @@ RUN corepack enable && apt-get update && apt-get install -y --no-install-recomme
 WORKDIR /app
 
 # Install deps (cache-friendly: copy only manifests first)
-COPY package.json pnpm-lock.yaml* ./
+# NOTE: pnpm-workspace.yaml carries the allowBuilds approvals (electron/esbuild/…);
+# it must be present or pnpm 10+/11 fatally errors on ignored build scripts.
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* .npmrc* ./
 RUN pnpm install --frozen-lockfile
 
 # Copy sources and build
