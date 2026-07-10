@@ -1,4 +1,4 @@
-import { HugeiconsIcon } from '@hugeicons/react'
+﻿import { HugeiconsIcon } from '@hugeicons/react'
 import { BrainIcon, CodeIcon, PuzzleIcon } from '@hugeicons/core-free-icons'
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
@@ -55,7 +55,7 @@ export function ChatEmptyState({
         if (active) setActiveProfile(active)
       })
       .catch(() => {
-        // silently ignore — profile info is cosmetic
+        // silently ignore â€” profile info is cosmetic
       })
   }, [])
 
@@ -67,12 +67,12 @@ export function ChatEmptyState({
       className="flex h-full flex-col items-center justify-center px-4 py-8"
     >
       <div className="flex max-w-xl flex-col items-center text-center">
-        {/* Avatar in editorial frame, no glow — architectural restraint */}
+        {/* Avatar in editorial frame, no glow â€” architectural restraint */}
         <div className="relative mb-6">
           <img
-            src="/claude-avatar.webp"
-            alt="Hermes Agent"
-            className="relative size-20 rounded-md"
+            src="/nova-idle-poster.png"
+            alt="Nova"
+            className="relative size-20 rounded-md object-cover"
             style={{
               border: '1px solid var(--theme-border)',
               padding: '4px',
@@ -86,7 +86,7 @@ export function ChatEmptyState({
           className="micro-label mb-2"
           style={{ color: 'var(--theme-muted)' }}
         >
-          Hermes Workspace
+          Nova Mission Control
         </p>
 
         {/* Editorial display title */}
@@ -94,20 +94,20 @@ export function ChatEmptyState({
           className="editorial-display text-3xl"
           style={{ color: 'var(--theme-text)' }}
         >
-          Begin a session
+          Jack in
         </h2>
 
         {activeProfile && (
           <span className="mt-2 text-xs" style={{ color: 'var(--theme-accent)' }}>
             {activeProfile.name}
-            {activeProfile.model ? ` · ${activeProfile.model}` : ''}
+            {activeProfile.model ? ` Â· ${activeProfile.model}` : ''}
           </span>
         )}
 
         {!compact && (
           <>
             <p className="mt-3 text-sm" style={{ color: 'var(--theme-muted)' }}>
-              Agent chat · live tools · memory · full observability
+              Agent chat Â· live tools Â· memory Â· full observability
             </p>
           </>
         )}

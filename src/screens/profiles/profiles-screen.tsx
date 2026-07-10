@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -56,7 +56,7 @@ async function readJson<T>(url: string): Promise<T> {
 }
 
 function formatDate(value?: string): string {
-  if (!value) return '—'
+  if (!value) return 'â€”'
   const parsed = Date.parse(value)
   if (Number.isNaN(parsed)) return value
   return new Intl.DateTimeFormat(undefined, {
@@ -268,7 +268,7 @@ export function ProfilesScreen() {
         oldName: renameTarget.name,
         newName: renameValue.trim(),
       })
-      toast(`Renamed ${renameTarget.name} → ${renameValue.trim()}`, {
+      toast(`Renamed ${renameTarget.name} â†’ ${renameValue.trim()}`, {
         type: 'success',
       })
       setRenameTarget(null)
@@ -501,7 +501,7 @@ export function ProfilesScreen() {
         }}
       >
         <DialogContent className="w-[min(560px,94vw)] max-w-none p-0">
-          {/* ── Header ─────────────────────────────────── */}
+          {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="border-b border-primary-200 px-6 pb-4 pt-5 dark:border-neutral-800">
             <div className="flex items-center gap-3">
               <div className="inline-flex size-10 items-center justify-center rounded-xl border border-primary-200 bg-primary-100/70 dark:border-neutral-700 dark:bg-neutral-900">
@@ -560,7 +560,7 @@ export function ProfilesScreen() {
             </div>
           </div>
 
-          {/* ── Body ──────────────────────────────────── */}
+          {/* â”€â”€ Body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="px-6 py-5">
             {wizardStep === 1 && (
               <div className="space-y-5">
@@ -581,7 +581,7 @@ export function ProfilesScreen() {
                       &quot;default&quot;.
                     </p>
                   ) : newProfileName.trim() && nameValid ? (
-                    <p className="text-xs text-emerald-600">✓ Valid name</p>
+                    <p className="text-xs text-emerald-600">âœ“ Valid name</p>
                   ) : (
                     <p className="text-xs text-primary-400 dark:text-neutral-500">
                       Choose a short, memorable identifier
@@ -605,11 +605,11 @@ export function ProfilesScreen() {
                     onChange={(e) => setCloneFrom(e.target.value)}
                     className="h-11 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
                   >
-                    <option value="">Start fresh — empty config</option>
+                    <option value="">Start fresh â€” empty config</option>
                     {profiles.map((p) => (
                       <option key={p.name} value={p.name}>
                         {p.name} {p.model ? `(${p.model})` : ''}{' '}
-                        {p.active ? '• active' : ''}
+                        {p.active ? 'â€¢ active' : ''}
                       </option>
                     ))}
                   </select>
@@ -639,11 +639,11 @@ export function ProfilesScreen() {
                   </label>
                   {loadingModels ? (
                     <div className="flex h-11 items-center rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-500">
-                      Loading configured models…
+                      Loading configured modelsâ€¦
                     </div>
                   ) : allModels.length === 0 ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                      No models found. Make sure Hermes Agent is running and
+                      No models found. Make sure Nova gateway is running and
                       has models configured.
                     </div>
                   ) : (
@@ -657,7 +657,7 @@ export function ProfilesScreen() {
                       }}
                       className="h-11 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
                     >
-                      <option value="">Skip — configure later</option>
+                      <option value="">Skip â€” configure later</option>
                       {allModels.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name || m.id}
@@ -668,7 +668,7 @@ export function ProfilesScreen() {
                   )}
                   {wizardModel && (
                     <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                      ✓ {wizardModel}
+                      âœ“ {wizardModel}
                       {wizardProvider ? ` via ${wizardProvider}` : ''}
                     </p>
                   )}
@@ -724,7 +724,7 @@ export function ProfilesScreen() {
             )}
           </div>
 
-          {/* ── Footer ─────────────────────────────────── */}
+          {/* â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="flex items-center justify-between border-t border-primary-200 px-6 py-4 dark:border-neutral-800">
             <div>
               {wizardStep > 1 && (
@@ -885,12 +885,12 @@ export function ProfilesScreen() {
                 onClick={() => void detailQuery.refetch()}
                 disabled={detailQuery.isFetching}
               >
-                {detailQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+                {detailQuery.isFetching ? 'Refreshingâ€¦' : 'Refresh'}
               </Button>
             </div>
           </div>
 
-          {/* Body — scrollable */}
+          {/* Body â€” scrollable */}
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {detailQuery.data?.profile ? (
               <div className="space-y-4 text-sm">
@@ -940,7 +940,7 @@ export function ProfilesScreen() {
                       onClick={() => void handleSaveDescription()}
                       disabled={savingDescription}
                     >
-                      {savingDescription ? 'Saving…' : 'Save'}
+                      {savingDescription ? 'Savingâ€¦' : 'Save'}
                     </Button>
                   </div>
                   <textarea

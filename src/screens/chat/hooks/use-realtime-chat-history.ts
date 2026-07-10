@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useChatStream } from '../../../hooks/use-chat-stream'
 import { useChatStore } from '../../../stores/chat-store'
@@ -27,8 +27,8 @@ function readClientId(message: ChatMessage): string {
  *
  * Uses a multi-field strategy because different server versions / channel
  * adapters shape the SSE payload differently:
- *   • Modern format:  content: [{type:'text', text:'...'}]
- *   • Legacy format:  text: '...' | body: '...' | message: '...'
+ *   â€¢ Modern format:  content: [{type:'text', text:'...'}]
+ *   â€¢ Legacy format:  text: '...' | body: '...' | message: '...'
  *
  * textFromMessage() only reads the content-array format, so using it alone
  * causes the dedup to miss echoes that carry a top-level `text` field,
@@ -188,7 +188,7 @@ export function useRealtimeChatHistory({
     onUserMessage: useCallback(
       (message: ChatMessage, source?: string) => {
         // Filter internal system messages (pre-compaction flushes, heartbeat
-        // prompts, subagent announcements) — these should never appear in the
+        // prompts, subagent announcements) â€” these should never appear in the
         // chat UI. The chat-store has its own filter, but this callback
         // also appends directly to the query cache via appendHistoryMessage,
         // bypassing the store filter entirely.
@@ -216,14 +216,14 @@ export function useRealtimeChatHistory({
         if (effectiveSessionKey && effectiveSessionKey !== 'new') {
           // Early-exit dedup: if the SSE echo has no clientId AND its text
           // content (or attachment signature) matches an existing optimistic
-          // user message in the cache, skip the append — the optimistic entry
+          // user message in the cache, skip the append â€” the optimistic entry
           // is already displayed.
           //
           // Bug: previous implementation used textFromMessage() which only
           // reads from the content-array format. Some server / channel
           // adapters echo the message with a top-level `text` or `body` field
           // instead, causing extractUserMessageText() to return '' and the
-          // dedup guard to be skipped — resulting in a duplicate user message.
+          // dedup guard to be skipped â€” resulting in a duplicate user message.
           //
           // Fix: use extractUserMessageText() which checks both the
           // content-array AND legacy top-level text/body/message fields.
@@ -265,7 +265,7 @@ export function useRealtimeChatHistory({
                 return false
               })
               if (hasOptimistic) {
-                // The optimistic message is already displayed — skip SSE echo
+                // The optimistic message is already displayed â€” skip SSE echo
                 onUserMessage?.(message, source)
                 return
               }
@@ -314,7 +314,7 @@ export function useRealtimeChatHistory({
           effectiveSessionKey === 'new'
         ) {
           setLastCompletedRunAt(Date.now())
-          // Refetch history after generation completes — keeps chat in sync
+          // Refetch history after generation completes â€” keeps chat in sync
           if (effectiveSessionKey && effectiveSessionKey !== 'new') {
             const key = chatQueryKeys.history(
               effectiveFriendlyId,
@@ -335,8 +335,8 @@ export function useRealtimeChatHistory({
 
             // Issue #441 fix: Directly merge realtime buffer into history cache
             // INSTEAD of invalidateQueries. The old approach caused a race:
-            // invalidateQueries → refetch (async) → merge runs with stale data
-            // → duplicates appear briefly → refetch completes → fixed.
+            // invalidateQueries â†’ refetch (async) â†’ merge runs with stale data
+            // â†’ duplicates appear briefly â†’ refetch completes â†’ fixed.
             //
             // New approach: merge realtime messages into the cache synchronously,
             // then clear the realtime buffer in the same tick. A background
@@ -398,11 +398,11 @@ export function useRealtimeChatHistory({
                   })()
                 : null
 
-            // Clear realtime buffer immediately — no more stale data in render
+            // Clear realtime buffer immediately â€” no more stale data in render
             store.clearRealtimeBuffer(effectiveSessionKey)
             clearCompletedStreaming()
 
-            // Background refetch for long-term consistency — doesn't block render
+            // Background refetch for long-term consistency â€” doesn't block render
             queryClient.invalidateQueries({ queryKey: key, refetchType: 'all' }).then(() => {
               // Re-inject the completed assistant message if compaction dropped it
               if (completedAssistant) {
@@ -431,7 +431,7 @@ export function useRealtimeChatHistory({
               reInjectOptimistic()
             })
 
-            // Check for compaction — significant message count drop
+            // Check for compaction â€” significant message count drop
             const newData =
               queryClient.getQueryData<Record<string, unknown>>(key)
             const newCount =
@@ -443,10 +443,10 @@ export function useRealtimeChatHistory({
             ) {
               onCompactionEnd?.()
               toast(
-                'Context compacted — older messages were summarized to free up space',
+                'Context compacted â€” older messages were summarized to free up space',
                 {
                   type: 'info',
-                  icon: '🗜️',
+                  icon: 'ðŸ—œï¸',
                   duration: 8000,
                 },
               )
@@ -491,7 +491,7 @@ export function useRealtimeChatHistory({
     (s) => s.realtimeMessages.get(effectiveSessionKey) ?? EMPTY_MESSAGES,
   )
 
-  // Subscribe directly to streaming state — useMemo with stable fn ref was stale (bug #1)
+  // Subscribe directly to streaming state â€” useMemo with stable fn ref was stale (bug #1)
   const streamingState = useChatStore(
     (s) => s.streamingState.get(effectiveSessionKey) ?? null,
   )
@@ -514,7 +514,7 @@ export function useRealtimeChatHistory({
     if (startedNewStream) {
       clearCompletedStreaming()
     }
-    // Streaming just completed — capture final text so the message stays
+    // Streaming just completed â€” capture final text so the message stays
     // visible during the handoff from streaming placeholder to history message.
     // The stub useChatStream never fires onDone, so this is the only path.
     if (prev && prev.text && !streamingState) {
@@ -540,7 +540,7 @@ export function useRealtimeChatHistory({
     persistPortableHistory(mergedMessages)
   }, [mergedMessages, portableMode])
 
-  // History has caught up — cleanup realtime buffer outside render
+  // History has caught up â€” cleanup realtime buffer outside render
   // DISABLED: This was aggressively clearing realtime messages before history
   // caught up, causing the "message appears then disappears" bug.
   // TODO: Re-enable with smarter timing (e.g. only after history confirms the message)
@@ -575,9 +575,9 @@ export function useRealtimeChatHistory({
       .join('\n')
       .toLowerCase()
 
-    // Only trigger on Hermes Agent's actual mid-compaction signal.
+    // Only trigger on Nova gateway's actual mid-compaction signal.
     // "pre-compaction memory flush" and "store durable memories now" are routine
-    // heartbeat messages — do NOT match those here.
+    // heartbeat messages â€” do NOT match those here.
     if (!textCandidates.includes('compacting context')) return
 
     const signal = `${latest.role ?? ''}:${textCandidates}`
@@ -586,15 +586,15 @@ export function useRealtimeChatHistory({
     onCompactionStart()
   }, [onCompactionStart, realtimeMessages])
 
-  // Periodic history sync — catch missed messages every 30s
+  // Periodic history sync â€” catch missed messages every 30s
   // Skip during active streaming to prevent race conditions
   useEffect(() => {
     if (!effectiveSessionKey || effectiveSessionKey === 'new' || !enabled)
       return
     syncIntervalRef.current = setInterval(() => {
-      // Don't poll during active streaming — causes flicker/overwrites
+      // Don't poll during active streaming â€” causes flicker/overwrites
       if (streamingStateRef.current !== null) return
-      // Guard window: don't poll right after streaming clears — new stream
+      // Guard window: don't poll right after streaming clears â€” new stream
       // may be starting and history API may return stale/incomplete data
       if (Date.now() - lastStreamClearTimeRef.current < 3000) return
       const key = chatQueryKeys.history(

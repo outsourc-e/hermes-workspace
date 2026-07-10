@@ -64,12 +64,13 @@ export function formatModelName(raw: string): string {
     return stripped.replace(/gpt-/gi, 'GPT-')
   }
   if (lower === 'delivery-mirror') return 'Mirror'
-  if (lower.includes('kimi')) return 'Kimi K2.5'
+  if (lower.includes('kimi')) {
+    const match = stripped.match(/kimi[- _]?k?(\d+(?:[._]\d+)?)/i)
+    return match ? `Kimi K${match[1].replace('_', '.')}` : 'Kimi'
+  }
 
   // Fallback: clean up dashes/underscores and title-case
-  return stripped
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+  return stripped.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 /**
@@ -96,7 +97,7 @@ export function formatSkillName(raw: string): string {
   if (!raw) return '—'
   const trimmed = raw.trim()
   if (!trimmed.includes(':') && !trimmed.includes('/')) return trimmed
-  const segments = trimmed.split(/[:\/]/)
+  const segments = trimmed.split(/[:/]/)
   return segments[segments.length - 1] || trimmed
 }
 

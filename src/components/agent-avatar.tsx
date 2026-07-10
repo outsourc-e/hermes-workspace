@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useSyncExternalStore } from 'react'
 import {
@@ -138,12 +138,12 @@ function AgentAvatar({
               className={cn('leading-none', getEmojiSizeClassName(size))}
               aria-hidden="true"
             >
-              🦞
+              ðŸ¦ž
             </span>
           ) : (
             <img
               src="/claude-avatar.webp"
-              alt="Hermes Agent"
+              alt="Nova gateway"
               className={cn(
                 getLogoSizeClassName(size),
                 iconClassName,

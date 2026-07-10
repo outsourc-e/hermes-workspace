@@ -1,9 +1,9 @@
-/**
- * AgoraScreen — the Hermes Workspace community lobby (v0.0).
+﻿/**
+ * AgoraScreen â€” the Nova Mission Control community lobby (v0.0).
  *
  * Layout:
- *   [Top bar: title · BETA · online count]
- *   [World canvas (flex-1) · right column with Online + Chat]
+ *   [Top bar: title Â· BETA Â· online count]
+ *   [World canvas (flex-1) Â· right column with Online + Chat]
  *
  * v0.1 will swap the local mock room for a real WebSocket-backed room.
  */
@@ -35,7 +35,7 @@ export function AgoraScreen() {
   }
 
   function handleWave(user: AgoraUser) {
-    sendMessage(`👋 hey ${user.profile.displayName}`)
+    sendMessage(`ðŸ‘‹ hey ${user.profile.displayName}`)
     setDrawerOpen(false)
   }
 
@@ -47,7 +47,7 @@ export function AgoraScreen() {
         style={{ borderColor: 'var(--theme-border)' }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-base font-semibold truncate">🏛️ Agora</span>
+          <span className="text-base font-semibold truncate">ðŸ›ï¸ Agora</span>
           <span
             className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em]"
             style={{

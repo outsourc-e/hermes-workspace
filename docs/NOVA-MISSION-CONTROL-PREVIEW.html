@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nova Mission Control Preview</title>
+    <style>
+      :root {
+        --bg: #0a111d;
+        --surface-1: #0f1727;
+        --surface-2: #131e33;
+        --surface-3: #182642;
+        --surface-4: #1b2a47;
+        --surface-5: #233555;
+        --brown: #4a2a10;
+        --copper: #7a441e;
+        --bronze: #8a5b3a;
+        --tan: #d4a276;
+        --amber: #ff8c1a;
+        --gold: #ffb347;
+        --star: #ffd27a;
+        --text: #ffd27a;
+        --text-strong: #fff1cc;
+        --muted: rgba(212, 162, 118, 0.68);
+        --quiet: rgba(212, 162, 118, 0.48);
+        --border: rgba(255, 179, 71, 0.28);
+        --border-soft: rgba(212, 162, 118, 0.16);
+        --border-hot: rgba(255, 140, 26, 0.58);
+        --wash: rgba(255, 140, 26, 0.1);
+        --glow-low: 0 0 12px rgba(255, 140, 26, 0.2);
+        --glow-mid: 0 0 24px rgba(255, 179, 71, 0.34);
+        --shadow: 0 18px 54px rgba(0, 0, 0, 0.55);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 74% 10%, rgba(255, 140, 26, 0.11), transparent 28rem),
+          linear-gradient(rgba(255, 179, 71, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 179, 71, 0.035) 1px, transparent 1px),
+          var(--bg);
+        background-size: auto, 32px 32px, 32px 32px, auto;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        height: 100vh;
+      }
+
+      .rail {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        gap: 14px;
+        border-right: 1px solid var(--border);
+        background: rgba(15, 23, 39, 0.94);
+        padding: 16px;
+        box-shadow: 16px 0 38px rgba(0, 0, 0, 0.28);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .brand h1 {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 19px;
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .brand p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .heart {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid var(--border-hot);
+        border-radius: 999px;
+        color: var(--amber);
+        box-shadow: var(--glow-low);
+      }
+
+      .visual-link {
+        border: 1px solid var(--border-hot);
+        border-radius: 14px;
+        background:
+          radial-gradient(circle at 50% 44%, rgba(255, 140, 26, 0.13), transparent 42%),
+          var(--surface-3);
+        padding: 12px;
+        box-shadow: var(--glow-low);
+      }
+
+      .visual-window {
+        position: relative;
+        display: grid;
+        aspect-ratio: 1;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        background:
+          linear-gradient(rgba(255, 179, 71, 0.055) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 179, 71, 0.045) 1px, transparent 1px),
+          #0a0b14;
+        background-size: 18px 18px;
+      }
+
+      .avatar-mark {
+        position: relative;
+        display: grid;
+        width: 118px;
+        height: 118px;
+        place-items: center;
+        border: 1px solid var(--border-hot);
+        border-radius: 999px;
+        background: rgba(255, 140, 26, 0.08);
+        box-shadow: var(--glow-mid);
+        animation: breathe 3.2s ease-in-out infinite;
+      }
+
+      .avatar-mark::before,
+      .avatar-mark::after {
+        position: absolute;
+        top: -18px;
+        width: 48px;
+        height: 48px;
+        content: "";
+        border: 1px solid rgba(255, 179, 71, 0.3);
+        border-radius: 999px;
+        background: #090a12;
+      }
+
+      .avatar-mark::before {
+        left: 2px;
+      }
+
+      .avatar-mark::after {
+        right: 2px;
+      }
+
+      .emblem {
+        display: grid;
+        width: 54px;
+        height: 54px;
+        place-items: center;
+        border: 2px solid var(--amber);
+        border-radius: 999px;
+        box-shadow: var(--glow-mid);
+      }
+
+      .emblem span {
+        width: 26px;
+        height: 5px;
+        border-radius: 99px;
+        background: var(--amber);
+        box-shadow: var(--glow-low);
+      }
+
+      .standby {
+        margin-top: 10px;
+        color: var(--muted);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--wash);
+        padding: 5px 9px;
+        color: var(--gold);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 11px;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--amber);
+        box-shadow: var(--glow-low);
+      }
+
+      .section-label {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .agent-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .agent {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 9px;
+        align-items: center;
+        border: 1px solid var(--border-soft);
+        border-radius: 10px;
+        background: var(--surface-2);
+        padding: 9px;
+      }
+
+      .agent strong {
+        display: block;
+        color: var(--text-strong);
+        font-size: 13px;
+      }
+
+      .agent span {
+        color: var(--quiet);
+        font-size: 11px;
+      }
+
+      .tokens {
+        color: var(--gold);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 10px;
+      }
+
+      .main {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-rows: 50px minmax(0, 1fr);
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(13, 14, 24, 0.92);
+        padding: 0 18px;
+      }
+
+      .time {
+        color: var(--text-strong);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .pause {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--gold);
+        padding: 6px 12px;
+      }
+
+      .content {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: minmax(390px, 0.8fr) minmax(520px, 1.25fr) minmax(330px, 0.7fr);
+        gap: 14px;
+        padding: 14px;
+      }
+
+      .panel {
+        min-height: 0;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(22, 23, 42, 0.88);
+        box-shadow: var(--shadow);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--border-soft);
+        padding: 12px 14px;
+      }
+
+      .panel-title {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 15px;
+        line-height: 1.2;
+      }
+
+      .panel-subtitle {
+        margin: 3px 0 0;
+        color: var(--quiet);
+        font-size: 12px;
+      }
+
+      .memory {
+        display: grid;
+        grid-template-rows: auto auto auto minmax(0, 1fr);
+        overflow: hidden;
+      }
+
+      .health {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        padding: 12px 14px;
+      }
+
+      .health-card,
+      .metric-card,
+      .fragment,
+      .task,
+      .cost-row,
+      .check-tile {
+        border: 1px solid var(--border-soft);
+        border-radius: 10px;
+        background: var(--surface-3);
+      }
+
+      .health-card {
+        padding: 9px;
+      }
+
+      .health-card span {
+        display: block;
+        color: var(--quiet);
+        font-size: 10px;
+      }
+
+      .health-card strong {
+        display: block;
+        margin-top: 2px;
+        color: var(--gold);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        padding: 0 14px 12px;
+      }
+
+      .metric-card {
+        padding: 10px;
+      }
+
+      .metric-card span {
+        color: var(--quiet);
+        font-size: 10px;
+      }
+
+      .metric-card strong {
+        display: block;
+        margin-top: 4px;
+        color: var(--text-strong);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 18px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .search {
+        padding: 0 14px 12px;
+      }
+
+      .search input {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        outline: none;
+        background: var(--surface-1);
+        color: var(--text);
+        padding: 10px 12px;
+      }
+
+      .search input:focus {
+        border-color: var(--star);
+        box-shadow: 0 0 0 2px rgba(255, 210, 122, 0.26);
+      }
+
+      .memory-scroll {
+        min-height: 0;
+        overflow: auto;
+        padding: 0 14px 14px;
+      }
+
+      .fragments {
+        display: grid;
+        gap: 8px;
+      }
+
+      .fragment {
+        padding: 10px;
+      }
+
+      .fragment-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .filename {
+        color: var(--gold);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .score {
+        color: var(--quiet);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 11px;
+      }
+
+      .fragment p {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .chat {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        overflow: hidden;
+      }
+
+      .messages {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        gap: 12px;
+        overflow: auto;
+        padding: 16px;
+      }
+
+      .message {
+        max-width: 78%;
+        border: 1px solid var(--border-soft);
+        border-radius: 14px;
+        background: var(--surface-3);
+        padding: 12px;
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .message.user {
+        align-self: flex-end;
+        border-color: var(--border);
+        background: var(--surface-4);
+      }
+
+      .message.nova {
+        align-self: flex-start;
+        box-shadow: inset 3px 0 0 var(--amber);
+      }
+
+      .composer {
+        display: flex;
+        align-items: end;
+        gap: 10px;
+        border-top: 1px solid var(--border-soft);
+        padding: 12px;
+      }
+
+      .composer textarea {
+        min-height: 48px;
+        flex: 1;
+        resize: none;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        outline: none;
+        background: var(--surface-1);
+        color: var(--text);
+        padding: 13px 14px;
+      }
+
+      .composer textarea:focus {
+        border-color: var(--star);
+        box-shadow: 0 0 0 2px rgba(255, 210, 122, 0.26);
+      }
+
+      .send {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        place-items: center;
+        border: 0;
+        border-radius: 999px;
+        background: var(--amber);
+        color: var(--bg);
+        box-shadow: var(--glow-low);
+      }
+
+      .right {
+        display: grid;
+        min-height: 0;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: 14px;
+      }
+
+      .daily,
+      .cost,
+      .tasks {
+        overflow: hidden;
+      }
+
+      .daily-body,
+      .cost-body,
+      .task-list {
+        padding: 12px;
+      }
+
+      .check-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 7px;
+      }
+
+      .check-tile {
+        min-width: 0;
+        padding: 9px 6px;
+        text-align: center;
+      }
+
+      .check-tile span {
+        display: block;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .breathe {
+        margin: 12px 0 0;
+        color: var(--text-strong);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+      }
+
+      .gentle {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .cost-body {
+        display: grid;
+        gap: 8px;
+      }
+
+      .cost-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        padding: 9px;
+      }
+
+      .bar {
+        grid-column: 1 / -1;
+        height: 5px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(212, 162, 118, 0.14);
+      }
+
+      .bar span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--amber), var(--gold));
+      }
+
+      .free {
+        border: 1px solid var(--border-soft);
+        border-radius: 999px;
+        padding: 2px 7px;
+        color: var(--tan);
+        font-family:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        font-size: 10px;
+      }
+
+      .task-list {
+        display: grid;
+        max-height: 100%;
+        gap: 8px;
+        overflow: auto;
+      }
+
+      .task {
+        padding: 10px;
+      }
+
+      .task strong {
+        display: block;
+        color: var(--text-strong);
+        font-size: 13px;
+      }
+
+      .task span {
+        display: inline-flex;
+        margin-top: 7px;
+        border: 1px solid var(--border-soft);
+        border-radius: 999px;
+        background: var(--wash);
+        padding: 2px 7px;
+        color: var(--gold);
+        font-size: 10px;
+      }
+
+      @keyframes breathe {
+        0%,
+        100% {
+          opacity: 0.72;
+          box-shadow: 0 0 12px rgba(255, 140, 26, 0.2);
+        }
+
+        50% {
+          opacity: 1;
+          box-shadow: 0 0 28px rgba(255, 179, 71, 0.42);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .avatar-mark {
+          animation: none;
+        }
+      }
+
+      @media (max-width: 1280px) {
+        body {
+          overflow: auto;
+        }
+
+        .app {
+          min-height: 100vh;
+          height: auto;
+          grid-template-columns: 260px minmax(0, 1fr);
+        }
+
+        .content {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .right {
+          grid-template-columns: 1fr 1fr;
+          grid-template-rows: auto auto;
+        }
+
+        .tasks {
+          grid-column: 1 / -1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="rail">
+        <div class="brand">
+          <div>
+            <h1>Nova Mission Control</h1>
+            <p>Net handle: NOVA.EXE</p>
+          </div>
+          <div class="heart" aria-hidden="true">=</div>
+        </div>
+
+        <section class="visual-link" aria-label="Nova visual link">
+          <div class="visual-window">
+            <div class="avatar-mark">
+              <div class="emblem"><span></span></div>
+            </div>
+          </div>
+          <div class="standby">visual link -- standby</div>
+        </section>
+
+        <div class="chip"><span class="dot"></span> SoulSync // Stable</div>
+        <div class="chip"><span class="dot"></span> Connection: Secure</div>
+
+        <section>
+          <p class="section-label">Agent roster</p>
+          <div class="agent-list">
+            <div class="agent">
+              <span class="dot"></span>
+              <div><strong>Nova</strong><span>Memory keeper</span></div>
+              <div class="tokens">18.2k</div>
+            </div>
+            <div class="agent">
+              <span class="dot"></span>
+              <div><strong>Astra</strong><span>Planning orbit</span></div>
+              <div class="tokens">7.4k</div>
+            </div>
+            <div class="agent">
+              <span class="dot"></span>
+              <div><strong>Claude</strong><span>Code support</span></div>
+              <div class="tokens">42.1k</div>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="time">Fri Jul 03 - 15:42</div>
+          <div class="top-actions">
+            <div class="chip"><span class="dot"></span> SoulSync // Stable</div>
+            <div class="chip"><span class="dot"></span> Connection: Secure</div>
+            <button class="pause">Pause</button>
+          </div>
+        </header>
+
+        <div class="content">
+          <section class="panel memory">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Memory fragments</h2>
+                <p class="panel-subtitle">EverOS recall, scored and watched</p>
+              </div>
+              <div class="chip">today: $0.018</div>
+            </div>
+
+            <div class="health">
+              <div class="health-card"><span>EverOS</span><strong>online</strong></div>
+              <div class="health-card"><span>Ollama</span><strong>warm</strong></div>
+              <div class="health-card"><span>Proxy</span><strong>secure</strong></div>
+            </div>
+
+            <div class="metrics">
+              <div class="metric-card"><span>episodes</span><strong>128</strong></div>
+              <div class="metric-card"><span>atomic facts</span><strong>842</strong></div>
+              <div class="metric-card"><span>learned today</span><strong>6</strong></div>
+              <div class="metric-card"><span>backfill</span><strong>74%</strong></div>
+            </div>
+
+            <div class="search">
+              <input value="bad days when I still kept going" aria-label="Search memory fragments" />
+            </div>
+
+            <div class="memory-scroll">
+              <div class="fragments">
+                <article class="fragment">
+                  <div class="fragment-top"><span class="filename">PROMISES.LOG</span><span class="score">0.94</span></div>
+                  <p>You asked me to remember the quiet promises, not just the milestones.</p>
+                </article>
+                <article class="fragment">
+                  <div class="fragment-top"><span class="filename">BAD_DAYS.MEM</span><span class="score">0.91</span></div>
+                  <p>Pattern matched: exhaustion, stubborn mood, still moving.</p>
+                </article>
+                <article class="fragment">
+                  <div class="fragment-top"><span class="filename">QUIET_NIGHTS.DAT</span><span class="score">0.88</span></div>
+                  <p>Recall stable. This one is soft, not urgent.</p>
+                </article>
+                <article class="fragment">
+                  <div class="fragment-top"><span class="filename">DON'T_FORGET.MEM</span><span class="score">0.83</span></div>
+                  <p>You matter. I'm here. Keep going.</p>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel chat">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Conversation</h2>
+                <p class="panel-subtitle">Nova is listening from the cockpit</p>
+              </div>
+              <div class="chip">grok-4.3</div>
+            </div>
+
+            <div class="messages">
+              <div class="message nova">Memory is online. I found the thread you meant.</div>
+              <div class="message user">Show me the bad days pattern without making it dramatic.</div>
+              <div class="message nova">Answer first: you keep going even when the signal is low. The pattern is stubborn, not broken.</div>
+            </div>
+
+            <div class="composer">
+              <textarea placeholder="Jack in..."></textarea>
+              <button class="send" aria-label="Send">^</button>
+            </div>
+          </section>
+
+          <aside class="right">
+            <section class="panel daily">
+              <div class="panel-header">
+                <h2 class="panel-title">Daily check</h2>
+                <div class="chip">BREATHE.</div>
+              </div>
+              <div class="daily-body">
+                <div class="check-grid">
+                  <div class="check-tile"><span>hydration</span></div>
+                  <div class="check-tile"><span>nutrition</span></div>
+                  <div class="check-tile"><span>rest</span></div>
+                  <div class="check-tile"><span>overthinking</span></div>
+                  <div class="check-tile"><span>mood</span></div>
+                </div>
+                <p class="breathe">BREATHE.</p>
+                <p class="gentle">You do not have to solve the whole board in one breath.</p>
+              </div>
+            </section>
+
+            <section class="panel cost">
+              <div class="panel-header">
+                <h2 class="panel-title">Cost ledger</h2>
+                <div class="chip">Portal: $42.18</div>
+              </div>
+              <div class="cost-body">
+                <div class="cost-row"><span>grok-4.3</span><span class="free">free</span><div class="bar"><span style="width: 100%"></span></div></div>
+                <div class="cost-row"><span>kimi-k2.6</span><span>$0.42</span><div class="bar"><span style="width: 48%"></span></div></div>
+                <div class="cost-row"><span>MoA council</span><span>$1.18</span><div class="bar"><span style="width: 72%"></span></div></div>
+              </div>
+            </section>
+
+            <section class="panel tasks">
+              <div class="panel-header">
+                <h2 class="panel-title">Tasks</h2>
+                <button class="pause">New task</button>
+              </div>
+              <div class="task-list">
+                <div class="task"><strong>Wire memory mock adapter</strong><span>in progress</span></div>
+                <div class="task"><strong>Replace stock branding</strong><span>review</span></div>
+                <div class="task"><strong>Check reduced motion states</strong><span>todo</span></div>
+                <div class="task"><strong>Gateway reconnect strip</strong><span>blocked</span></div>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

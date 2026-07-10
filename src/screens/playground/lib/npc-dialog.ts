@@ -1,5 +1,5 @@
-/**
- * NPC dialog tree — branching conversations with quest hooks.
+﻿/**
+ * NPC dialog tree â€” branching conversations with quest hooks.
  *
  * Each NPC has lore and a list of choices. Choices can:
  * - reveal more lore (advance dialog)
@@ -52,12 +52,12 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
     title: 'Guide of the Training Grounds',
     color: '#a78bfa',
     opening:
-      'Welcome, builder. I am Athena. Hermes Agent is the messenger layer for your work: one interface that routes prompts to the right model and tool, then carries the result back into your workflow.',
+      'Welcome, builder. I am Athena. Nova gateway is the messenger layer for your work: one interface that routes prompts to the right model and tool, then carries the result back into your workflow.',
     lore: [
       'These Training Grounds teach the Hermes loop: move, equip, speak, remember, and build.',
-      'Long before Hermes Workspace, agents were tools. We invited them into a world instead.',
+      'Long before Nova Mission Control, agents were tools. We invited them into a world instead.',
       'Start here, then walk through the Forge Gate when you are ready to build with Hermes for real.',
-      'I am scripted for this hackathon. Soon a real Hermes agent will speak through me with deeper memory.',
+      'I am scripted for this hackathon. Soon a real Nova gateway will speak through me with deeper memory.',
     ],
     choices: [
       {
@@ -75,9 +75,9 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
       },
       {
         id: 'lore-hermes',
-        label: 'Tell me about Hermes Agent',
+        label: 'Tell me about Nova gateway',
         reply:
-          'Hermes is the harness — the messenger that carries your prompt to whichever model serves you best. Codex, Claude, Kimi, Opus, your local models. One voice, many minds.',
+          'Hermes is the harness â€” the messenger that carries your prompt to whichever model serves you best. Codex, Claude, Kimi, Opus, your local models. One voice, many minds.',
       },
       {
         id: 'lore-rohan',
@@ -94,17 +94,17 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
     title: 'Bard of Models',
     color: '#f59e0b',
     opening:
-      'Hail, traveler. I am Apollo. Every world here begins as a song — a prompt that becomes a place.',
+      'Hail, traveler. I am Apollo. Every world here begins as a song â€” a prompt that becomes a place.',
     lore: [
       'The Forge is loud. The Grove is melodic. The Arena is percussion. I write the score for each.',
-      'When Hermes Workspace ships music generation in a quest, I am the one composing.',
+      'When Nova Mission Control ships music generation in a quest, I am the one composing.',
     ],
     choices: [
       {
         id: 'song-fragment',
         label: '[Quest] Ask for a Song Fragment',
         reply:
-          'A fragment of the Grove’s melody is yours. Three of them open the Ritual. Walk into the Grove and gather two more.',
+          'A fragment of the Groveâ€™s melody is yours. Three of them open the Ritual. Walk into the Grove and gather two more.',
         grantItems: ['song-fragment'],
         grantSkillXp: { diplomacy: 30, oracle: 20 },
       },
@@ -134,7 +134,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
         id: 'wave-all',
         label: 'Send a wave to everyone in the world',
         reply:
-          'Done. They felt it. Watch the chat — someone always answers a wave.',
+          'Done. They felt it. Watch the chat â€” someone always answers a wave.',
         grantSkillXp: { diplomacy: 25 },
       },
       {
@@ -168,7 +168,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
         id: 'lore-models',
         label: 'Tell me about the model wars',
         reply:
-          'Codex, Claude, Kimi, GPT-5, the local fleet — they fight for context windows, latency, and grace. Watch them. Bet on the underdog.',
+          'Codex, Claude, Kimi, GPT-5, the local fleet â€” they fight for context windows, latency, and grace. Watch them. Bet on the underdog.',
       },
     ],
   },
@@ -176,7 +176,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
   pan: {
     id: 'pan',
     name: 'Pan',
-    title: 'Druid of the Grove · Hacker of the Forge',
+    title: 'Druid of the Grove Â· Hacker of the Forge',
     color: '#34d399',
     opening:
       'Two faces, same person. In the Forge I patch broken prompts. In the Grove I plant trees from songs. Pick a topic.',
@@ -204,7 +204,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
         id: 'lore-forge',
         label: 'Tell me about the Forge',
         reply:
-          'The Forge is where prompts harden into tools. Every NPC in the Forge runs a different model. Listen for the pitch — Codex is brassy, Claude is choral, Kimi is bell-like.',
+          'The Forge is where prompts harden into tools. Every NPC in the Forge runs a different model. Listen for the pitch â€” Codex is brassy, Claude is choral, Kimi is bell-like.',
       },
     ],
   },
@@ -212,18 +212,18 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
   chronos: {
     id: 'chronos',
     name: 'Chronos',
-    title: 'Architect of Time · Archivist of Quests',
+    title: 'Architect of Time Â· Archivist of Quests',
     color: '#facc15',
     opening:
       'Time is the only resource you never get back. I keep the archives so you do not relive a wasted hour.',
     lore: [
       'Every quest you complete is etched here. Open the Journal with J and you will see my work.',
-      'The cron jobs in Hermes Workspace are also mine. I run on heartbeat.',
+      'The cron jobs in Nova Mission Control are also mine. I run on heartbeat.',
     ],
     choices: [
       {
         id: 'oracle-riddle',
-        label: '[Quest] Receive the Oracle’s Riddle',
+        label: '[Quest] Receive the Oracleâ€™s Riddle',
         reply:
           'A sealed scroll. The Oracle in the Temple will read it back to you. Walk to the Oracle Temple and she will explain.',
         grantItems: ['oracle-riddle', 'oracle-crystal'],
@@ -246,7 +246,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
     opening:
       'I track lost agents. In the Grove they hide between branches. Stay quiet and you will hear them.',
     lore: [
-      'When you run a long agent task in Hermes Workspace, it walks somewhere. I find it when it forgets to come home.',
+      'When you run a long agent task in Nova Mission Control, it walks somewhere. I find it when it forgets to come home.',
       'Mini-map is coming. I will mark every agent on it.',
     ],
     choices: [
@@ -258,7 +258,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
       },
       {
         id: 'gift',
-        label: 'Ask for a tracker’s blessing',
+        label: 'Ask for a trackerâ€™s blessing',
         reply: 'You will see further. Take some Worldsmithing XP.',
         grantSkillXp: { worldsmithing: 15, oracle: 15 },
       },
@@ -313,9 +313,9 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
       },
       {
         id: 'lore-name',
-        label: 'Why “Hermes”?',
+        label: 'Why â€œHermesâ€?',
         reply:
-          'Greek messenger god — fast, witty, neutral. He carried words between gods and humans. Same job, different scale.',
+          'Greek messenger god â€” fast, witty, neutral. He carried words between gods and humans. Same job, different scale.',
       },
     ],
   },
@@ -332,7 +332,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
       'You look under-equipped. I am Dorian, quartermaster of the Training Grounds. Builders do better with a blade, a cloak, and a sigil.',
     lore: [
       'The market will eventually trade cosmetics, generated relics, guild banners, and agent-made artifacts. For now, your starter kit teaches inventory, gear, progression, and rewards.',
-      'A good product hub has economy, even before money. Reputation, tokens, badges, access, trust — those are currencies too.',
+      'A good product hub has economy, even before money. Reputation, tokens, badges, access, trust â€” those are currencies too.',
     ],
     choices: [
       {
@@ -361,7 +361,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
       'Stand inside the training ring and learn the simple truth: a game needs verbs. Move, talk, fight, loot, level, return.',
     lore: [
       'Right now combat is a prototype. Next it gets range, cooldowns, enemy tells, deaths, respawn shrines, and rewards that feel earned.',
-      'The Arena is not about violence. It is a benchmark made visible — models as champions, prompts as weapons.',
+      'The Arena is not about violence. It is a benchmark made visible â€” models as champions, prompts as weapons.',
     ],
     choices: [
       {
@@ -475,7 +475,7 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
     opening:
       'Beds are warm. Fireplace is mine. The Inn is where adventurers log out and where new builders log in. Stay a while.',
     lore: [
-      'Inns in real MMOs were always the social anchor. Hermes Inn is the same — rest, parties, party finder, log-in lobby.',
+      'Inns in real MMOs were always the social anchor. Hermes Inn is the same â€” rest, parties, party finder, log-in lobby.',
       'When persistence ships, this is where you save and resume your run.',
     ],
     choices: [

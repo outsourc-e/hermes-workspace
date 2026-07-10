@@ -1,16 +1,16 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 
 /**
  * Hour-of-day activity heatmap.
  *
  * Backend doesn't expose `activity.by_hour[]` from `/api/analytics/usage`
- * yet (the Hermes Agent confirmed it's computed internally but dropped
+ * yet (the Nova gateway confirmed it's computed internally but dropped
  * at the API boundary). We rebuild it locally from the session list
- * the dashboard already has — every session row has `startedAt`, so we
+ * the dashboard already has â€” every session row has `startedAt`, so we
  * bucket those into 24 hour-of-day cells.
  *
- * Not a full date×hour heatmap; that's a true 7×24 grid we'll add when
- * the backend exposes it. This is the 1×24 strip rolled up across the
+ * Not a full dateÃ—hour heatmap; that's a true 7Ã—24 grid we'll add when
+ * the backend exposes it. This is the 1Ã—24 strip rolled up across the
  * window which matches what InsightsEngine already returns server-side.
  */
 export function HourOfDayCard({
@@ -62,7 +62,7 @@ export function HourOfDayCard({
           className="font-mono text-[9px] uppercase tracking-[0.15em]"
           style={{ color: 'var(--theme-muted)' }}
         >
-          peak {formatHour(peakHour)} · {total} sessions
+          peak {formatHour(peakHour)} Â· {total} sessions
         </span>
       </div>
 
@@ -84,7 +84,7 @@ export function HourOfDayCard({
                 height: count === 0 ? 4 : `${Math.max(8, heightPct)}%`,
                 minHeight: 4,
               }}
-              title={`${formatHour(hour)} · ${count} session${count === 1 ? '' : 's'}`}
+              title={`${formatHour(hour)} Â· ${count} session${count === 1 ? '' : 's'}`}
             />
           )
         })}

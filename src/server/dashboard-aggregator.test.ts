@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDashboardOverview } from './dashboard-aggregator'
+import { buildAgentWorkforceSection, buildDashboardOverview, buildGitWorkSection } from './dashboard-aggregator'
 import type { DashboardFetcher } from './dashboard-aggregator'
 
 function jsonResponse(payload: unknown, status = 200): Response {
@@ -512,4 +512,183 @@ describe('buildDashboardOverview', () => {
     expect(overview.modelInfo).toBeNull()
     expect(overview.analytics).toBeNull()
   })
+
+  it('builds a live systems wiring map from real overview sources', async () => {
+    const fetcher = makeFetcher({
+      '/api/status': {
+        gateway_state: 'running',
+        active_agents: 3,
+        updated_at: '2026-07-08T15:00:00Z',
+        platforms: {
+          api_server: { state: 'connected', updated_at: '2026-07-08T15:00:00Z' },
+          telegram: { state: 'error', error_message: 'token expired' },
+        },
+      },
+      '/api/model/info': {
+        provider: 'openai-codex',
+        model: 'gpt-5.5',
+      },
+      '/api/cron/jobs': {
+        jobs: [
+          { id: 'ok', state: 'scheduled', next_run_at: '2026-07-09T12:00:00Z' },
+          { id: 'bad', state: 'scheduled', last_status: 'failed', last_error: 'boom' },
+        ],
+      },
+      '/api/plugins/kanban/board': {
+        columns: [{ id: 'done' }],
+        cards: [{ id: 'a', columnId: 'done', title: 'done card' }],
+      },
+      '/api/analytics/usage': {
+        period_days: 30,
+        totals: {
+          total_input: 100,
+          total_output: 50,
+          total_sessions: 1,
+          total_api_calls: 2,
+          estimated_cost: 0.12,
+        },
+        daily: [],
+      },
+      '/api/skills': {
+        skills: [{ name: 'morning-command-center' }],
+      },
+      '/api/providers/oauth': {
+        providers: [
+          { name: 'google-gmail', status: 'connected', connected: true },
+          { name: 'google-calendar', status: 'connected', connected: true },
+        ],
+      },
+    })
+
+    const overview = await buildDashboardOverview({ fetcher })
+    const systems = new Map(
+      overview.liveSystems.systems.map((system) => [system.id, system]),
+    )
+
+    expect(systems.get('hermes-gateway')?.status).toBe('degraded')
+    expect(systems.get('model-route')?.detail).toContain('gpt-5.5')
+    expect(systems.get('tools-skills')?.status).toBe('operational')
+    expect(systems.get('cron-background')?.status).toBe('degraded')
+    // Google reads are proven but sends/schedules stay behind Taylor approval.
+    expect(systems.get('google-workspace')?.status).toBe('approval-gated')
+    const gitWorkSystem = systems.get('github-agent-work')
+    expect(['operational', 'not-wired']).toContain(gitWorkSystem?.status)
+    if (gitWorkSystem?.status === 'operational') {
+      expect(gitWorkSystem.detail).toContain('receipts via /api/nova-work-scan')
+    }
+    expect(overview.liveSystems.summary.total).toBe(
+      overview.liveSystems.systems.length,
+    )
+    expect(overview.liveSystems.blockers.length).toBeGreaterThan(0)
+  })
+
+
+  it('builds read-only agent workforce status from swarm missions', () => {
+    const workforce = buildAgentWorkforceSection([
+      {
+        id: 'mission-1',
+        title: 'Wire Mission Control',
+        state: 'executing',
+        createdAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_010_000,
+        events: [],
+        assignments: [
+          {
+            id: 'a1',
+            workerId: 'builder',
+            task: 'Implement Live Systems',
+            rationale: null,
+            dependsOn: [],
+            reviewRequired: false,
+            state: 'dispatched',
+            dispatchedAt: 1_700_000_005_000,
+            completedAt: null,
+            reviewedAt: null,
+            reviewedBy: null,
+            checkpoint: null,
+          },
+          {
+            id: 'a2',
+            workerId: 'reviewer',
+            task: 'Review Fabric receipts',
+            rationale: null,
+            dependsOn: [],
+            reviewRequired: true,
+            state: 'checkpointed',
+            dispatchedAt: 1_700_000_003_000,
+            completedAt: 1_700_000_009_000,
+            reviewedAt: null,
+            reviewedBy: null,
+            checkpoint: null,
+          },
+          {
+            id: 'a3',
+            workerId: 'ops-watch',
+            task: 'Check blockers',
+            rationale: null,
+            dependsOn: [],
+            reviewRequired: false,
+            state: 'blocked',
+            dispatchedAt: 1_700_000_002_000,
+            completedAt: 1_700_000_004_000,
+            reviewedAt: null,
+            reviewedBy: null,
+            checkpoint: null,
+          },
+        ],
+      },
+    ])
+
+    expect(workforce.summary).toMatchObject({
+      missions: 1,
+      workers: 3,
+      active: 3,
+      blocked: 1,
+      reviewing: 1,
+    })
+    expect(workforce.workers[0]).toMatchObject({
+      workerId: 'ops-watch',
+      status: 'blocked',
+      currentTask: 'Check blockers',
+      missionId: 'mission-1',
+    })
+    expect(workforce.recentMissions[0]).toMatchObject({
+      id: 'mission-1',
+      assignments: 3,
+      blocked: 1,
+      reviewing: 1,
+    })
+  })
+
+
+  it('builds read-only git work status from local git output', () => {
+    const gitWork = buildGitWorkSection({
+      statusPorcelain: '## feature/nova-skin...fork/feature/nova-skin [ahead 2, behind 1]\n M src/server/dashboard-aggregator.ts\n?? src/screens/dashboard/components/github-work-card.tsx',
+      remotes:
+        'origin\thttps://github.com/outsourc-e/hermes-workspace (fetch)\norigin\thttps://github.com/outsourc-e/hermes-workspace (push)\nfork\thttps://github.com/goodmorningmrj/hermes-workspace (fetch)\nfork\thttps://github.com/goodmorningmrj/hermes-workspace (push)',
+      latestCommit: '8992e63\tfeat(nova): add read-only agent workforce panel',
+      upstream: 'fork/feature/nova-skin',
+      prUrl: 'https://github.com/outsourc-e/hermes-workspace/pull/709',
+    })
+
+    expect(gitWork).toMatchObject({
+      branch: 'feature/nova-skin',
+      clean: false,
+      ahead: 2,
+      behind: 1,
+      changedFiles: 2,
+      upstream: 'fork/feature/nova-skin',
+      prUrl: 'https://github.com/outsourc-e/hermes-workspace/pull/709',
+    })
+    expect(gitWork.latestCommit).toMatchObject({
+      hash: '8992e63',
+      subject: 'feat(nova): add read-only agent workforce panel',
+    })
+    expect(gitWork.remotes).toHaveLength(2)
+    expect(gitWork.remotes[1]).toMatchObject({
+      name: 'fork',
+      pushUrl: 'https://github.com/goodmorningmrj/hermes-workspace',
+    })
+  })
+
 })

@@ -1600,3 +1600,79 @@ code {
    Tailwind oklch values and .system dark mode overrides.
    ═══════════════════════════════════════════════════════════════════ */
 @import './scifi-theme.css';
+
+/* ═══════════════════════════════════════════════════════════════════
+   NOVA COCKPIT FULL-VIEWPORT SKIN — active only while the Mission
+   Control dashboard route is mounted (dashboard-screen sets
+   data-nova-cockpit on <html>). Per the binding spec: once inside
+   Mission Control, EVERYTHING in view is Nova navy/amber — no mixed
+   skin. This must beat every [data-theme='...'] block above (html +
+   attribute = higher specificity) so the shell (sidebar, pills, top
+   bar) cannot stay green/teal around the cockpit.
+   Keep these values in sync with NOVA_COCKPIT_TOKENS
+   (src/screens/dashboard/lib/nova-cockpit-theme.ts).
+   ═══════════════════════════════════════════════════════════════════ */
+html[data-nova-cockpit='true'] {
+  --theme-bg: #050b16;
+  --theme-sidebar: #071426;
+  --theme-panel: #0a1b33;
+  --theme-card: #0d203b;
+  --theme-card2: #10284a;
+  --theme-elevated: #153a66;
+  --theme-border: rgba(255, 179, 71, 0.16);
+  --theme-border-subtle: rgba(255, 210, 122, 0.1);
+  --theme-text: #ffd27a;
+  --theme-text-strong: #fff1cc;
+  --theme-muted: rgba(212, 190, 160, 0.55);
+  --theme-glass: rgba(5, 11, 22, 0.88);
+  --theme-focus: #ffd27a;
+  --theme-accent: #ff8c1a;
+  --theme-accent-secondary: #ffb347;
+  --theme-accent-subtle: rgba(255, 140, 26, 0.1);
+  --theme-accent-border: rgba(255, 140, 26, 0.42);
+  --theme-active: #ff8c1a;
+  --theme-link: #ffb347;
+  --theme-success: #ffd27a;
+  --theme-warning: #ffb347;
+  --theme-danger: #ff6b4a;
+  --theme-stripe: rgba(255, 179, 71, 0.05);
+  --theme-header-bg: rgba(5, 11, 22, 0.94);
+  --theme-header-border: rgba(255, 179, 71, 0.16);
+}
+
+/* Nova skin: scrollbars + selection stay warm, never violet/gray-purple. */
+html[data-nova-cockpit='true'] *:hover {
+  scrollbar-color: rgba(255, 179, 71, 0.28) transparent;
+}
+html[data-nova-cockpit='true'] *::-webkit-scrollbar-thumb {
+  background: rgba(255, 179, 71, 0.24);
+}
+html[data-nova-cockpit='true'] ::selection {
+  background: rgba(255, 140, 26, 0.35);
+}
+
+/* Nova skin: chat/composer/tool-card/code vars — the theme blocks define
+   these separately from --theme-*; without covering them the chat module
+   stayed 22% teal in the pixel audit. */
+html[data-nova-cockpit='true'] {
+  --chat-user-bg: #10284a;
+  --chat-user-border: rgba(255, 140, 26, 0.28);
+  --chat-user-foreground: #fff1cc;
+  --chat-assistant-bg: #0a1b33;
+  --chat-assistant-border: rgba(255, 210, 122, 0.1);
+  --chat-assistant-foreground: #ffd27a;
+  --composer-bg: #0d203b;
+  --composer-border: rgba(255, 179, 71, 0.2);
+  --composer-placeholder: rgba(212, 190, 160, 0.45);
+  --tool-card-bg: #0a1b33;
+  --tool-card-border: rgba(255, 179, 71, 0.15);
+  --tool-card-title: #ffd27a;
+  --tool-card-muted: rgba(212, 190, 160, 0.55);
+  --code-bg: #071426;
+  --code-border: rgba(255, 179, 71, 0.12);
+  --code-foreground: #ffd27a;
+  --theme-input: #0d203b;
+  --theme-shadow-1: 0 1px 2px rgba(2, 6, 14, 0.55);
+  --theme-shadow-2: 0 6px 16px rgba(2, 6, 14, 0.48);
+  --theme-shadow-3: 0 16px 36px rgba(2, 6, 14, 0.58);
+}

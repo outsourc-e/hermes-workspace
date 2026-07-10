@@ -142,6 +142,7 @@ export const DASHBOARD_REQUIRED_INSTRUCTIONS =
 export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Hermes backend does not support the sessions API. ${CLAUDE_UPGRADE_INSTRUCTIONS}`
 
 const PROBE_TIMEOUT_MS = 3_000
+const DASHBOARD_AUTO_DETECT_TIMEOUT_MS = 750
 // Probe TTL: 120s when the gateway is healthy, 15s when it isn't. The
 // shorter window during 'disconnected' state means a Docker stack where
 // the workspace boots before the agent recovers within ~15s of the agent
@@ -338,16 +339,16 @@ export async function dashboardAuthHeaders(options?: {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-function withDashboardBase(path: string): string {
-  if (/^https?:\/\//i.test(path)) return path
-  return `${CLAUDE_DASHBOARD_URL}${path.startsWith('/') ? path : `/${path}`}`
+function withDashboardBase(routePath: string): string {
+  if (/^https?:\/\//i.test(routePath)) return routePath
+  return `${CLAUDE_DASHBOARD_URL}${routePath.startsWith('/') ? routePath : `/${routePath}`}`
 }
 
 export async function dashboardFetch(
-  path: string,
+  routePath: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const requestPath = withDashboardBase(path)
+  const requestPath = withDashboardBase(routePath)
   const method = (init.method || 'GET').toUpperCase()
   const doFetch = async (forceToken = false) => {
     const headers = new Headers(init.headers)
@@ -390,12 +391,12 @@ export async function dashboardFetch(
  * `/health/detailed`.
  */
 export async function gatewayFetch(
-  path: string,
+  routePath: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const url = /^https?:\/\//i.test(path)
-    ? path
-    : `${CLAUDE_API}${path.startsWith('/') ? path : `/${path}`}`
+  const url = /^https?:\/\//i.test(routePath)
+    ? routePath
+    : `${CLAUDE_API}${routePath.startsWith('/') ? routePath : `/${routePath}`}`
   const headers = new Headers(init.headers)
   for (const [k, v] of Object.entries(authHeaders())) {
     if (!headers.has(k)) headers.set(k, v)
@@ -405,9 +406,9 @@ export async function gatewayFetch(
 
 // ── Probing ───────────────────────────────────────────────────────
 
-async function probe(path: string): Promise<boolean> {
+async function probe(routePath: string): Promise<boolean> {
   try {
-    const res = await fetch(`${CLAUDE_API}${path}`, {
+    const res = await fetch(`${CLAUDE_API}${routePath}`, {
       headers: authHeaders(),
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
@@ -688,7 +689,7 @@ const DASHBOARD_BACKED_APIS = new Set([
 
 export function getCapabilityWarningMessage(
   next: GatewayCapabilities,
-  criticalMissing: string[],
+  criticalMissing: Array<string>,
 ): string | null {
   if (criticalMissing.length === 0 || (!next.health && !next.dashboard.available)) {
     return null
@@ -800,20 +801,32 @@ async function autoDetectDashboardUrl(): Promise<void> {
   // session list. Honor both vars so an explicit setting always wins.
   if (process.env.HERMES_DASHBOARD_URL || process.env.CLAUDE_DASHBOARD_URL) return
 
-  const candidates = ['http://127.0.0.1:9119']
+  const candidates = [
+    'http://127.0.0.1:9119',
+    ...discoverLoopbackDashboardCandidates(),
+  ]
   for (const candidate of candidates) {
     try {
       const res = await fetch(`${candidate}/api/status`, {
-        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        signal: AbortSignal.timeout(DASHBOARD_AUTO_DETECT_TIMEOUT_MS),
       })
       if (res.ok) {
+        const body = (await res.json().catch(() => null)) as { version?: string } | null
+        if (!body?.version) continue
         CLAUDE_DASHBOARD_URL = candidate
+        if (candidate !== 'http://127.0.0.1:9119') {
+          console.log(`[gateway] Connected to Hermes dashboard at ${CLAUDE_DASHBOARD_URL}`)
+        }
         return
       }
     } catch {
       // continue
     }
   }
+}
+
+function discoverLoopbackDashboardCandidates(): Array<string> {
+  return ['http://127.0.0.1:9120', 'http://127.0.0.1:9121']
 }
 
 export async function probeGateway(options?: {

@@ -1,4 +1,4 @@
-import type { DashboardOverview } from '@/server/dashboard-aggregator'
+﻿import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
 function formatTokens(n: number): string {
   if (!n || n <= 0) return '0'
@@ -18,7 +18,7 @@ type Slice = {
 /**
  * Token mix card. Pure derive-from-aggregator: shows the input vs
  * output vs cache vs reasoning split as a stacked horizontal bar plus
- * a tiny legend table. The Hermes Agent confirmed this is chartable
+ * a tiny legend table. The Nova gateway confirmed this is chartable
  * today from `daily[].input_tokens / output_tokens / cache_read_tokens
  * / reasoning_tokens` (no backend change required).
  *
@@ -86,12 +86,12 @@ export function TokenMixCard({
           className="text-[10px] font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'var(--theme-text)' }}
         >
-          Token mix · {analytics.windowDays}d
+          Token mix Â· {analytics.windowDays}d
         </h3>
         <span
           className="font-mono text-[9px] uppercase tracking-[0.15em]"
           style={{ color: 'var(--theme-muted)' }}
-          title="Output as % of input — proxy for how chatty the model is."
+          title="Output as % of input â€” proxy for how chatty the model is."
         >
           out/in {ratio.toFixed(1)}%
         </span>
@@ -150,7 +150,7 @@ export function TokenMixCard({
                   className="ml-1"
                   style={{ color: 'var(--theme-muted)' }}
                 >
-                  · {widthPct.toFixed(0)}%
+                  Â· {widthPct.toFixed(0)}%
                 </span>
               </span>
             </li>

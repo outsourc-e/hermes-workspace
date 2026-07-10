@@ -1,5 +1,5 @@
-/**
- * useAgoraRoom — local mock room state for v0.0.
+﻿/**
+ * useAgoraRoom â€” local mock room state for v0.0.
  *
  * - Owns self position + facing
  * - Owns mock other-user list with gentle ambient drift
@@ -53,7 +53,7 @@ export function useAgoraRoom({
     setSelf((prev) => ({ ...prev, profile }))
   }, [profile])
 
-  // ── Movement (WASD / arrows) ───────────────────────────────
+  // â”€â”€ Movement (WASD / arrows) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const keysRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
@@ -115,7 +115,7 @@ export function useAgoraRoom({
     return () => cancelAnimationFrame(raf)
   }, [world.width, world.height])
 
-  // ── Ambient drift for fake users ──────────────────────────
+  // â”€â”€ Ambient drift for fake users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const id = window.setInterval(() => {
       setOthers((prev) =>
@@ -129,7 +129,7 @@ export function useAgoraRoom({
     return () => window.clearInterval(id)
   }, [world.width, world.height])
 
-  // ── Tap-to-walk (mobile) ───────────────────────────────────
+  // â”€â”€ Tap-to-walk (mobile) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const moveSelfToward = useCallback(
     (targetX: number, targetY: number) => {
       setSelf((prev) => {
@@ -154,7 +154,7 @@ export function useAgoraRoom({
     [world.width, world.height],
   )
 
-  // ── Chat ──────────────────────────────────────────────────
+  // â”€â”€ Chat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const sendMessage = useCallback(
     (body: string) => {
       const trimmed = body.trim().slice(0, 280)
@@ -188,7 +188,7 @@ export function useAgoraRoom({
       'anyone testing the voice POC?',
       'where do I drop bug reports',
       'love the Greek pantheon',
-      'just installed Hermes Workspace, hi everyone',
+      'just installed Nova Mission Control, hi everyone',
     ]
     let cancelled = false
     const tick = () => {
@@ -222,7 +222,7 @@ export function useAgoraRoom({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Derived: active speech bubbles per user ────────────────
+  // â”€â”€ Derived: active speech bubbles per user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const activeBubbles = useMemo(() => {
     const now = Date.now()
     const map = new Map<string, AgoraMessage>()
@@ -241,7 +241,7 @@ export function useAgoraRoom({
     return () => window.clearInterval(id)
   }, [])
 
-  // ── Proximity: who is "near me" ────────────────────────────
+  // â”€â”€ Proximity: who is "near me" â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const nearbyIds = useMemo(() => {
     const ids = new Set<string>()
     for (const o of others) {

@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+﻿import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { PlaygroundActionBar } from './components/playground-actionbar'
 import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
 import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
@@ -93,7 +93,7 @@ export function PlaygroundScreen() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isNarrow, setIsNarrow] = useState(false)
   const [objectivePulseKey, setObjectivePulseKey] = useState(0)
-  // Focus mode — hides side rail (Quest Tracker, Inventory panel, Builders Nearby chip)
+  // Focus mode â€” hides side rail (Quest Tracker, Inventory panel, Builders Nearby chip)
   // so the player can see the world while playing/recording.
   // Auto-engages on first movement; toggle with F.
   const [focusMode, setFocusMode] = useState(false)
@@ -387,7 +387,7 @@ export function PlaygroundScreen() {
   }
 
   function handleIncomingChat(msg: { id: string; name: string; color: string; text: string; ts: number }) {
-    // Defensive: never accept a chat that we sent ourselves — the server tries
+    // Defensive: never accept a chat that we sent ourselves â€” the server tries
     // to filter, but old chat ring entries from previous selfIds can leak.
     if (msg.name === (rpg.state.playerProfile.displayName || 'You')) return
     addChatMessage({
@@ -433,7 +433,7 @@ export function PlaygroundScreen() {
         return attackMonster(18 + Math.floor(Math.random() * 6), false)
       case 'summon':
         rpg.useMp(20)
-        // Spawn a 60-second familiar via custom event — the world component listens.
+        // Spawn a 60-second familiar via custom event â€” the world component listens.
         window.dispatchEvent(
           new CustomEvent('hermes-playground-summon-familiar', {
             detail: { durationMs: 60000, color: '#a78bfa' },
@@ -674,7 +674,7 @@ export function PlaygroundScreen() {
           worldAccent={WORLD_META[world].accent}
           toasts={rpg.toasts}
         />
-        {/* Online chip removed — the chat header now shows live player count + NPC count. */}
+        {/* Online chip removed â€” the chat header now shows live player count + NPC count. */}
         {!focusMode && <NearbyBuildersChip players={remotePlayersInZone} />}
         {!focusMode && (!isNarrow || mobileMenuOpen) ? (
           <LazyPanelBoundary>
@@ -706,12 +706,12 @@ export function PlaygroundScreen() {
             />
           </LazyPanelBoundary>
         ) : null}
-        {/* Focus mode toggle — eyeball icon (sits in the gap between minimap and quest tracker) */}
+        {/* Focus mode toggle â€” eyeball icon (sits in the gap between minimap and quest tracker) */}
         <button
           type="button"
           onClick={() => setFocusMode((v) => !v)}
-          aria-label={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode — hide side rail (F)'}
-          title={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode — hide side rail (F)'}
+          aria-label={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode â€” hide side rail (F)'}
+          title={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode â€” hide side rail (F)'}
           className="pointer-events-auto fixed right-3 top-[230px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[16px] text-white shadow-xl backdrop-blur-xl md:flex"
           style={{
             boxShadow: focusMode ? `0 0 14px ${WORLD_META[world].accent}88` : '0 8px 22px rgba(0,0,0,.55)',
@@ -719,7 +719,7 @@ export function PlaygroundScreen() {
           }}
         >
           <span aria-hidden="true" style={{ filter: focusMode ? 'none' : 'grayscale(0.4)' }}>
-            {focusMode ? '👁️' : '👁'}
+            {focusMode ? 'ðŸ‘ï¸' : 'ðŸ‘'}
           </span>
         </button>
         <button
@@ -730,7 +730,7 @@ export function PlaygroundScreen() {
           className="pointer-events-auto fixed right-3 top-[314px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-xl backdrop-blur-xl md:flex"
           style={{ boxShadow: '0 8px 22px rgba(0,0,0,.55)', borderColor: 'rgba(241,197,109,0.42)' }}
         >
-          ⚙
+          âš™
         </button>
         <button
           type="button"
@@ -837,12 +837,12 @@ function PlaygroundRightRail({
 }: PlaygroundRightRailProps) {
   const hudAccent = accent === '#d9b35f' ? '#F1C56D' : accent
   const railItems: Array<{ label: string; glyph: string; onClick: () => void; active?: boolean }> = [
-    { label: focusMode ? 'Exit focus' : 'Sigil focus', glyph: '☤', onClick: onToggleFocus, active: focusMode },
-    { label: 'Inventory', glyph: '▣', onClick: onOpenInventory },
+    { label: focusMode ? 'Exit focus' : 'Sigil focus', glyph: 'â˜¤', onClick: onToggleFocus, active: focusMode },
+    { label: 'Inventory', glyph: 'â–£', onClick: onOpenInventory },
     { label: 'Quest scroll', glyph: '?', onClick: onOpenJournal },
-    { label: 'Map', glyph: '◇', onClick: onOpenMap },
-    { label: 'Settings', glyph: '⚙', onClick: onOpenSettings },
-    { label: adminMode ? 'Hide admin' : 'Admin shield', glyph: '⌂', onClick: onToggleAdmin, active: adminMode },
+    { label: 'Map', glyph: 'â—‡', onClick: onOpenMap },
+    { label: 'Settings', glyph: 'âš™', onClick: onOpenSettings },
+    { label: adminMode ? 'Hide admin' : 'Admin shield', glyph: 'âŒ‚', onClick: onToggleAdmin, active: adminMode },
   ]
   return (
     <div
@@ -910,7 +910,7 @@ function OnboardingHintCard({ open }: { open: boolean }) {
   return (
     <div className="pointer-events-none fixed left-1/2 top-[108px] z-[92] w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl border border-amber-200/35 bg-black/76 p-3 text-white shadow-2xl backdrop-blur-xl">
       <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-amber-200/70">Training hint</div>
-      <div className="mt-1 text-sm font-black text-[#F1C56D]">Move • Talk • Jump • Crouch</div>
+      <div className="mt-1 text-sm font-black text-[#F1C56D]">Move â€¢ Talk â€¢ Jump â€¢ Crouch</div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-white/72">
         <span><kbd className="text-amber-100">WASD</kbd> Move</span>
         <span><kbd className="text-amber-100">E</kbd> Talk</span>
@@ -960,7 +960,7 @@ function TitleScreen({
             '0 0 0 1px rgba(34,211,238,0.08), 0 30px 80px rgba(0,0,0,0.65), 0 0 80px rgba(34,211,238,0.08)',
         }}
       >
-        {/* Hero — cinematic title block */}
+        {/* Hero â€” cinematic title block */}
         <div className="relative h-[400px] overflow-hidden">
           <PlaygroundHeroCanvas />
           {/* Vignette */}
@@ -975,9 +975,9 @@ function TitleScreen({
                 boxShadow: '0 0 18px rgba(250,204,21,0.18)',
               }}
             >
-              <span style={{ color: '#facc15' }}>✦</span>
-              Hermes Agent Realm
-              <span className="opacity-60">· Nous Research × Kimi</span>
+              <span style={{ color: '#facc15' }}>âœ¦</span>
+              Nova gateway Realm
+              <span className="opacity-60">Â· Nous Research Ã— Kimi</span>
             </div>
             <img
               src="/assets/hermesworld/art/hermesworld-logo-horizontal.svg"
@@ -992,7 +992,7 @@ function TitleScreen({
                   'drop-shadow(0 12px 34px rgba(2,7,11,0.62)) drop-shadow(0 0 34px rgba(245,217,122,0.22))',
               }}
             />
-            {/* ASCII signature — distinctive, hand-crafted feel */}
+            {/* ASCII signature â€” distinctive, hand-crafted feel */}
             <pre
               className="mt-3 hidden text-[8px] leading-[1.05] md:block"
               style={{
@@ -1011,11 +1011,11 @@ function TitleScreen({
               className="mt-2 text-[10px] font-bold uppercase tracking-[0.45em]"
               style={{ color: 'rgba(245, 217, 122, 0.7)' }}
             >
-              — the agent MMO —
+              â€” the agent MMO â€”
             </div>
             <p className="mt-5 max-w-[560px] text-[15px] leading-relaxed text-white/72">
               {displayName.trim().length === 0
-                ? 'Step into a shared world of Hermes agents. Train, build, and quest with builders worldwide.'
+                ? 'Step into a shared world of Nova gateways. Train, build, and quest with builders worldwide.'
                 : tutorialComplete
                   ? `Welcome back, ${displayName}. Six worlds await.`
                   : `${displayName}, your training awaits. Six worlds. One builder. Forge your path.`}
@@ -1023,7 +1023,7 @@ function TitleScreen({
           </div>
         </div>
 
-        {/* Bottom — entry block */}
+        {/* Bottom â€” entry block */}
         <div className="relative grid gap-6 p-7 lg:grid-cols-[1.4fr_0.6fr]">
           <div className="space-y-4">
             <div
@@ -1038,7 +1038,7 @@ function TitleScreen({
                 className="text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: '#fde68a' }}
               >
-                ❖ Identify Yourself
+                â– Identify Yourself
               </div>
               <input
                 value={displayName}
@@ -1059,7 +1059,7 @@ function TitleScreen({
                     background: 'rgba(255,255,255,0.03)',
                   }}
                 >
-                  🎭 Customize Avatar
+                  ðŸŽ­ Customize Avatar
                 </button>
                 <button
                   type="button"
@@ -1080,9 +1080,9 @@ function TitleScreen({
               </div>
             </div>
             <div className="grid gap-2 text-[12px] sm:grid-cols-3">
-              <PremiumFeatureCard icon="❁" title="Six Worlds" desc="Training Grounds → Forge → Arena" />
-              <PremiumFeatureCard icon="⛔" title="Live Multiplayer" desc="Walk with builders worldwide" />
-              <PremiumFeatureCard icon="🔮" title="Hermes Skills" desc="Promptcraft · Memory · Diplomacy" />
+              <PremiumFeatureCard icon="â" title="Six Worlds" desc="Training Grounds â†’ Forge â†’ Arena" />
+              <PremiumFeatureCard icon="â›”" title="Live Multiplayer" desc="Walk with builders worldwide" />
+              <PremiumFeatureCard icon="ðŸ”®" title="Hermes Skills" desc="Promptcraft Â· Memory Â· Diplomacy" />
             </div>
           </div>
 
@@ -1094,7 +1094,7 @@ function TitleScreen({
             }}
           >
             <div className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(34,211,238,0.85)' }}>
-              ◈ Your Path
+              â—ˆ Your Path
             </div>
             <ol className="mt-4 space-y-3 text-[13px]">
               {[
@@ -1336,7 +1336,7 @@ function CameraPresetToast() {
   if (!name) return null
   return (
     <div className="pointer-events-none fixed left-1/2 top-[88px] z-[85] w-[min(86vw,360px)] -translate-x-1/2">
-      <Toast title="Camera preset" rarity="common" icon="🎬">
+      <Toast title="Camera preset" rarity="common" icon="ðŸŽ¬">
         {name}
       </Toast>
     </div>
@@ -1345,18 +1345,18 @@ function CameraPresetToast() {
 
 const HERMES_LORE_LINES = [
   'Hermes carried prompts between the gods of Olympus and the builders of Earth.',
-  'A Hermes Agent is just a fast, faithful messenger — with memory.',
+  'A Nova gateway is just a fast, faithful messenger â€” with memory.',
   'Promptcraft is the first skill. Diplomacy is the last.',
   'Build small. Ship now. Iterate at the speed of intent.',
   'Memory turns moments into a story. Story turns a tool into a teammate.',
   'The Forge is where prompts harden into tools. The Arena is where they earn their keep.',
   'Six worlds. One builder. Forge your path.',
-  'Every NPC here teaches a real Hermes Agent skill. Listen.',
+  'Every NPC here teaches a real Nova gateway skill. Listen.',
   'Routing is the art of choosing the right tool, the right model, the right moment.',
   'You are not alone. The Agora is full of builders walking the same road.',
 ]
 
-/** Loading screen shown during world transitions — rotating Hermes lore + spinner. */
+/** Loading screen shown during world transitions â€” rotating Hermes lore + spinner. */
 function TransitionLoadingScreen({ active, worldName }: { active: boolean; worldName: string }) {
   const [lore, setLore] = useState(HERMES_LORE_LINES[0])
   useEffect(() => {
@@ -1377,7 +1377,7 @@ function TransitionLoadingScreen({ active, worldName }: { active: boolean; world
           className="text-[12px] font-bold uppercase tracking-[0.45em]"
           style={{ color: 'rgba(245, 217, 122, 0.7)' }}
         >
-          — entering —
+          â€” entering â€”
         </div>
         <div
           className="text-[44px] leading-none font-black"
@@ -1409,7 +1409,7 @@ function TransitionLoadingScreen({ active, worldName }: { active: boolean; world
           </div>
         </div>
         <p className="max-w-[440px] text-[13px] italic leading-relaxed text-white/65">
-          “{lore}”
+          â€œ{lore}â€
         </p>
       </div>
       <style>{`@keyframes hermes-loading-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }`}</style>
@@ -1433,7 +1433,7 @@ function PlaygroundHelpHud({ worldName }: { worldName: string }) {
       </button>
       {open && (
         <div className="rounded-xl border border-white/10 bg-black/85 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-white/80 backdrop-blur-xl">
-          Click ground = walk · Click NPC = talk · WASD · Shift sprint · 1 Strike · 2 Dash · 3 Bolt · 4 Summon · E talk · J journal · M map · T chat · F focus · Drag mouse to rotate camera
+          Click ground = walk Â· Click NPC = talk Â· WASD Â· Shift sprint Â· 1 Strike Â· 2 Dash Â· 3 Bolt Â· 4 Summon Â· E talk Â· J journal Â· M map Â· T chat Â· F focus Â· Drag mouse to rotate camera
         </div>
       )}
     </div>
@@ -1495,49 +1495,49 @@ function PlaygroundUtilityDock({
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
         title="Screenshot the world (PNG)"
       >
-        📸
+        ðŸ“¸
       </button>
       <button
         onClick={toggleFullscreen}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
         title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
       >
-        {isFullscreen ? '⤢' : '⛶'}
+        {isFullscreen ? 'â¤¢' : 'â›¶'}
       </button>
       <button
         onClick={copyShareLink}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
         title="Copy share link"
       >
-        🔗
+        ðŸ”—
       </button>
       <button
         onClick={onReplayNarration}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
         title="Replay world narration"
       >
-        📢
+        ðŸ“¢
       </button>
       <button
         onClick={onToggleNarration}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
         title={narrationMuted ? 'Unmute narration' : 'Mute narration'}
       >
-        {narrationMuted ? '🔇' : '🗣️'}
+        {narrationMuted ? 'ðŸ”‡' : 'ðŸ—£ï¸'}
       </button>
       <button
         onClick={onToggleAudio}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
         title={audioMuted ? 'Unmute audio' : 'Mute audio'}
       >
-        {audioMuted ? '🔇' : '🔊'}
+        {audioMuted ? 'ðŸ”‡' : 'ðŸ”Š'}
       </button>
       <button
         onClick={onCustomize}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/65 text-base text-cyan-100 backdrop-blur-xl hover:bg-cyan-400/20"
         title="Customize avatar (C)"
       >
-        👤
+        ðŸ‘¤
       </button>
     </div>
   )

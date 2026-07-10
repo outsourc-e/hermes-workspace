@@ -3,7 +3,7 @@ import { execSync, spawn } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import net from 'node:net'
-import { resolve, dirname } from 'node:path'
+import { delimiter, resolve, dirname } from 'node:path'
 import os from 'node:os'
 
 // devtools removed
@@ -17,6 +17,14 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 // ---------------------------------------------------------------------------
 // Hermes Agent auto-start helpers
 // ---------------------------------------------------------------------------
+
+function isHermesAgentDir(candidate: string): boolean {
+  return (
+    existsSync(resolve(candidate, 'webapi')) ||
+    (existsSync(resolve(candidate, 'hermes_cli', 'main.py')) &&
+      existsSync(resolve(candidate, 'gateway')))
+  )
+}
 
 /** Resolve the hermes-agent directory using a priority-ordered fallback chain:
  *  1. HERMES_AGENT_PATH env var (explicit override)
@@ -38,21 +46,38 @@ function resolveClaudeAgentDir(env: Record<string, string>): string | null {
   candidates.push(
     resolve(workspaceRoot, 'hermes-agent'), // sibling (old README)
     resolve(workspaceRoot, '..', 'hermes-agent'), // one level up
-    resolve(os.homedir(), '.claude', 'hermes-agent'), // Nous installer default
+    resolve(os.homedir(), '.hermes', 'hermes-agent'), // Nous installer default
+    resolve(os.homedir(), 'AppData', 'Local', 'hermes', 'hermes-agent'), // Windows installer default
+    resolve(os.homedir(), '.claude', 'hermes-agent'), // legacy installer default
     resolve(os.homedir(), 'hermes-agent'), // ~/hermes-agent
   )
 
   for (const candidate of candidates) {
-    if (existsSync(resolve(candidate, 'webapi'))) return candidate
+    if (isHermesAgentDir(candidate)) return candidate
   }
   return null
 }
 
 /** Find the Hermes CLI binary used to start the local gateway. */
 function resolveClaudeBinary(): string | null {
+  const windowsHermesScripts = resolve(
+    os.homedir(),
+    'AppData',
+    'Local',
+    'hermes',
+    'hermes-agent',
+    'venv',
+    'Scripts',
+  )
   const candidates = [
     process.env.HERMES_CLI_BIN || '',
+    resolve(windowsHermesScripts, 'hermes.exe'),
+    resolve(windowsHermesScripts, 'hermes-agent.exe'),
+    resolve(windowsHermesScripts, 'hermes'),
+    resolve(windowsHermesScripts, 'hermes-agent'),
     resolve(os.homedir(), '.hermes', 'hermes-agent', 'venv', 'bin', 'hermes'),
+    resolve(os.homedir(), '.local', 'bin', 'hermes'),
+    resolve(os.homedir(), '.hermes', 'bin', 'hermes'),
     resolve(os.homedir(), '.claude', 'bin', 'claude'),
     resolve(os.homedir(), '.local', 'bin', 'claude'),
   ]
@@ -66,6 +91,10 @@ function resolveClaudeBinary(): string | null {
  *  Prefers .venv/bin/python inside agentDir, falls back to system python3.
  */
 function resolveClaudePython(agentDir: string): string {
+  const windowsVenvPython = resolve(agentDir, 'venv', 'Scripts', 'python.exe')
+  if (existsSync(windowsVenvPython)) return windowsVenvPython
+  const windowsDotVenvPython = resolve(agentDir, '.venv', 'Scripts', 'python.exe')
+  if (existsSync(windowsDotVenvPython)) return windowsDotVenvPython
   const venvPython = resolve(agentDir, '.venv', 'bin', 'python')
   if (existsSync(venvPython)) return venvPython
   // uv creates 'venv' not '.venv' sometimes
@@ -178,14 +207,17 @@ const config = defineConfig(({ mode, command }) => {
       env: {
         ...process.env,
         PATH: [
+          resolve(os.homedir(), 'AppData', 'Local', 'hermes', 'hermes-agent', 'venv', 'Scripts'),
           resolve(os.homedir(), '.claude', 'bin'),
           resolve(os.homedir(), '.local', 'bin'),
+          agentDir ? resolve(agentDir, '.venv', 'Scripts') : '',
+          agentDir ? resolve(agentDir, 'venv', 'Scripts') : '',
           agentDir ? resolve(agentDir, '.venv', 'bin') : '',
           agentDir ? resolve(agentDir, 'venv', 'bin') : '',
           process.env.PATH || '',
         ]
           .filter(Boolean)
-          .join(':'),
+          .join(delimiter),
       },
     })
 

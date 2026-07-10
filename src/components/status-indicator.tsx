@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useQuery } from '@tanstack/react-query'
 
@@ -84,10 +84,10 @@ function buildTooltip(
     if (!data.modelConfigured) parts.push('No model selected')
   }
   if (data.status === 'enhanced') {
-    parts.push('Hermes Agent gateway enhancements detected')
+    parts.push('Nova gateway gateway enhancements detected')
   }
   if (data.activeModel) parts.push(`Model: ${data.activeModel}`)
-  return parts.join(' · ')
+  return parts.join(' Â· ')
 }
 
 /**

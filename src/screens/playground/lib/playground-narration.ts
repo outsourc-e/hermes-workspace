@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Hermes Playground narration system.
  *
  * Uses the browser's built-in Web Speech API (SpeechSynthesis) so we don't
@@ -18,7 +18,7 @@ const NARRATION: Record<PlaygroundWorldId, { name: string; lines: string[] }> = 
   training: {
     name: 'Training Grounds',
     lines: [
-      'Welcome to the Training Grounds. This is where every Hermes Agent begins.',
+      'Welcome to the Training Grounds. This is where every Nova gateway begins.',
       'Walk to the glowing Arrival Circle. Talk to Athena to accept your first quest.',
       'You will learn five skills: movement, gear, chat, memory, and building.',
       'Press F to toggle focus mode while playing. The arrow at the top of the screen points to your current objective.',
@@ -35,7 +35,7 @@ const NARRATION: Record<PlaygroundWorldId, { name: string; lines: string[] }> = 
   forge: {
     name: 'The Forge',
     lines: [
-      'You stand in the Forge — the builder realm where prompts harden into tools.',
+      'You stand in the Forge â€” the builder realm where prompts harden into tools.',
       'Pan the Hacker and Chronos the Architect can help you ship a real Hermes-powered tool.',
       'This is where engineering meets magic. Pick up the Forge Shard to advance.',
     ],
@@ -43,7 +43,7 @@ const NARRATION: Record<PlaygroundWorldId, { name: string; lines: string[] }> = 
   grove: {
     name: 'The Grove',
     lines: [
-      'You enter the Grove — a bioluminescent forest for music, ritual, and creative work.',
+      'You enter the Grove â€” a bioluminescent forest for music, ritual, and creative work.',
       'Here you will find Pan the Druid, Apollo the Songkeeper, and Artemis the Tracker.',
       'Gather a Song Fragment to learn how Hermes can weave creative content.',
     ],

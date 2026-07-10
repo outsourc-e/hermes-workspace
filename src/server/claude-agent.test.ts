@@ -1,16 +1,26 @@
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { resolveClaudeAgentDir } from './claude-agent'
+import { resolveClaudeAgentDir, resolveClaudeAgentLaunch } from './claude-agent'
 
 const tempDirs: string[] = []
 
 function createAgentDir(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix))
   mkdirSync(join(dir, 'webapi'))
+  tempDirs.push(dir)
+  return dir
+}
+
+function createModernHermesAgentDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix))
+  mkdirSync(join(dir, 'hermes_cli'), { recursive: true })
+  mkdirSync(join(dir, 'gateway'), { recursive: true })
+  writeFileSync(join(dir, 'hermes_cli', 'main.py'), '')
+  writeFileSync(join(dir, 'gateway', 'run.py'), '')
   tempDirs.push(dir)
   return dir
 }
@@ -32,6 +42,25 @@ describe('resolveClaudeAgentDir', () => {
         CLAUDE_AGENT_PATH: legacyAgentDir,
       }),
     ).toBe(hermesAgentDir)
+  })
+
+  it('recognizes current Hermes Agent installs that no longer ship webapi', () => {
+    const hermesAgentDir = createModernHermesAgentDir('hermes-agent-modern-')
+
+    expect(
+      resolveClaudeAgentDir({
+        HERMES_AGENT_PATH: hermesAgentDir,
+      }),
+    ).toBe(hermesAgentDir)
+  })
+
+  it('launches a modern Hermes checkout through gateway.run when no CLI binary is available', () => {
+    const hermesAgentDir = createModernHermesAgentDir('hermes-agent-modern-')
+
+    expect(resolveClaudeAgentLaunch(hermesAgentDir, null)).toEqual({
+      command: 'python3',
+      commandArgs: ['-m', 'gateway.run'],
+    })
   })
 
   it('falls back to legacy CLAUDE_AGENT_PATH for backward compatibility', () => {

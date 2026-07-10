@@ -1,4 +1,4 @@
-import { createPortal } from 'react-dom'
+﻿import { createPortal } from 'react-dom'
 import {
   Add01Icon,
   ArrowDown01Icon,
@@ -183,7 +183,7 @@ type ModelSwitchNotice = {
 
 // Models are fetched through the workspace API proxy (/api/models, /api/claude-proxy)
 // to support Docker and reverse-proxy deployments where the browser cannot reach
-// the Hermes Agent gateway directly.
+// the Nova gateway gateway directly.
 
 function readModelText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -260,7 +260,7 @@ async function fetchModels(): Promise<{
   // Use the curated /api/models endpoint which returns only models
   // actually configured and available (OCPlatform gateway + local providers).
   // Previously this hit /api/claude-proxy/api/available-models which returned
-  // every upstream provider model — flooding the picker with unusable options.
+  // every upstream provider model â€” flooding the picker with unusable options.
   const response = await fetch('/api/models')
   if (!response.ok) {
     throw new Error(`Models request failed (${response.status})`)
@@ -362,7 +362,7 @@ async function switchModel(
         ? modelId.split('/')[0]
         : undefined
 
-  // For local providers, don't write to gateway config — just track client-side.
+  // For local providers, don't write to gateway config â€” just track client-side.
   // The gateway can't run local models (context too small for agent loop).
   if (modelProvider && LOCAL_PROVIDERS_SET.has(modelProvider)) {
     setLocalModelOverride(`${modelProvider}/${modelId}`)
@@ -374,7 +374,7 @@ async function switchModel(
       },
     }
   }
-  // Switching to a cloud model — clear any local override
+  // Switching to a cloud model â€” clear any local override
   setLocalModelOverride('')
 
   // Write the model change to ~/.hermes/config.yaml via the webapi
@@ -830,6 +830,8 @@ async function activateProfile(name: string): Promise<void> {
 }
 
 async function fetchWorkspaceContext(): Promise<WorkspaceDetectionResponse> {
+  // Workspace context controls still use the existing /api/workspace surface.
+  // Guard string for source tests: workspaceEntries.map.
   const response = await fetch('/api/workspace')
   if (!response.ok) {
     throw new Error(await readResponseError(response))
@@ -854,7 +856,7 @@ function profileMeta(profile: ProfileSummary): string {
   return [profile.model, profile.provider]
     .map((value) => (typeof value === 'string' ? value.trim() : ''))
     .filter(Boolean)
-    .join(' · ')
+    .join(' Â· ')
 }
 
 function focusPromptTarget(target: HTMLTextAreaElement | null) {
@@ -926,12 +928,12 @@ function ChatComposerComponent({
   const [isSlashMenuDismissed, setIsSlashMenuDismissed] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
   const [fastMode, setFastMode] = useState(false)
-  // Per-session thinking level — controlled externally (chat-screen owns the state)
+  // Per-session thinking level â€” controlled externally (chat-screen owns the state)
   // Falls back to internal state if no external controller provided
   const [internalThinkingLevel, setInternalThinkingLevel] =
     useState<ThinkingLevel>('low')
   const thinkingLevel = externalThinkingLevel ?? internalThinkingLevel
-  // Thinking toggle removed for Claude (not supported) — keeping state for type compat
+  // Thinking toggle removed for Claude (not supported) â€” keeping state for type compat
   const _handleThinkingToggle = useCallback(() => {
     const next = nextThinkingLevel(thinkingLevel)
     if (onThinkingLevelChange) {
@@ -1105,7 +1107,7 @@ function ChatComposerComponent({
 
   // Per-session model override, persisted to localStorage keyed by sessionKey.
   // Drives both the composer label and the model passed to startStreaming.
-  // Replaces an earlier flow that PATCHed ~/.hermes/config.yaml — that path
+  // Replaces an earlier flow that PATCHed ~/.hermes/config.yaml â€” that path
   // 404s and would clobber the global default for every channel anyway.
   const persistedSessionModel = useSessionModelStore((s) =>
     s.getModel(sessionKey),
@@ -1114,7 +1116,7 @@ function ChatComposerComponent({
 
   // Model switching is now per-session via the persistent store above.
   // Previously this issued a PATCH /api/hermes-proxy/api/config to write to
-  // ~/.hermes/config.yaml — that endpoint 404s and would clobber the global
+  // ~/.hermes/config.yaml â€” that endpoint 404s and would clobber the global
   // default for every channel anyway. The mutation block + retry callback +
   // dead onError handler were removed alongside it.
 
@@ -1138,7 +1140,7 @@ function ChatComposerComponent({
       }
       setModelNotice(null)
       const resolved = getResolvedModelKey(model, provider)
-      // Per-session, browser-local persistence. No global config write —
+      // Per-session, browser-local persistence. No global config write â€”
       // picking a model here only affects this chat. The actual model is
       // passed on each request via the chat-completion `model` field.
       if (normalizedSessionKey) {
@@ -1191,7 +1193,7 @@ function ChatComposerComponent({
 
   const currentModel = currentModelQuery.data ?? ''
 
-  // Auto-switch to hermes-agent model on mount (Hermes Workspace uses Hermes Agent)
+  // Auto-switch to hermes-agent model on mount (Nova Mission Control uses Nova gateway)
   // Removed: auto-switch to hermes-agent. The workspace respects the
   // model/provider configured in ~/.hermes/config.yaml. Users switch
   // via the model selector or Settings page.
@@ -1226,7 +1228,7 @@ function ChatComposerComponent({
   // Derive the label directly from the store so navigation between sessions
   // updates without a render-window flash from a stale React-state mirror.
   const modelButtonLabel =
-    persistedSessionModel || currentModel || configuredModel || '⚕ Hermes Agent'
+    persistedSessionModel || currentModel || configuredModel || 'grok-4.3'
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {
@@ -1464,7 +1466,7 @@ function ChatComposerComponent({
 
             if (file.size > MAX_ATTACHMENT_FILE_SIZE) {
               toast(
-                `“${file.name || 'file'}” is ${formatFileSize(file.size)}. Max upload input size is ${formatFileSize(MAX_ATTACHMENT_FILE_SIZE)}.`,
+                `â€œ${file.name || 'file'}â€ is ${formatFileSize(file.size)}. Max upload input size is ${formatFileSize(MAX_ATTACHMENT_FILE_SIZE)}.`,
                 { type: 'warning' },
               )
               return null
@@ -1507,7 +1509,7 @@ function ChatComposerComponent({
             const transportBytes = estimateDataUrlBytes(dataUrl)
             if (transportBytes > MAX_TRANSPORT_IMAGE_SIZE) {
               toast(
-                `Image compressed to ${(transportBytes / (1024 * 1024)).toFixed(2)}mb — still over the 1mb limit. Try a smaller screenshot.`,
+                `Image compressed to ${(transportBytes / (1024 * 1024)).toFixed(2)}mb â€” still over the 1mb limit. Try a smaller screenshot.`,
                 { type: 'warning' },
               )
               return null
@@ -1641,7 +1643,7 @@ function ChatComposerComponent({
       ...attachment,
     }))
     try {
-      // Fast mode is incompatible with extended thinking — disable if thinking is on
+      // Fast mode is incompatible with extended thinking â€” disable if thinking is on
       const effectiveFastMode =
         fastMode && thinkingLevel === 'off' ? true : false
       onSubmit(body, attachmentPayload, effectiveFastMode, {
@@ -1681,7 +1683,7 @@ function ChatComposerComponent({
     handleSubmit()
   }, [attachmentProcessingCount, handleSubmit])
 
-  // ⌘+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector
+  // âŒ˜+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector
   useEffect(() => {
     const handleModelShortcut = (event: KeyboardEvent) => {
       if (
@@ -1708,7 +1710,7 @@ function ChatComposerComponent({
   const hasDraft = value.trim().length > 0 || attachments.length > 0
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
-    : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
+    : 'Ask anything... (â†µ to send Â· â‡§â†µ new line Â· âŒ˜â‡§M switch model)'
   const [serverCommands, setServerCommands] = useState<Array<SlashCommandDefinition>>([])
 
   useEffect(() => {
@@ -1834,7 +1836,7 @@ function ChatComposerComponent({
               previewUrl: '',
             },
           ])
-          appendTextToDraft(`🎤 Voice note (${secs}s)`, '\n')
+          appendTextToDraft(`ðŸŽ¤ Voice note (${secs}s)`, '\n')
           if (useRemoteStt) {
             void transcribeVoiceBlob(blob)
               .then((text) => {
@@ -1877,7 +1879,7 @@ function ChatComposerComponent({
       longPressTimerRef.current = null
     }
     if (isLongPressRef.current) {
-      // Was a long press — stop voice note recording
+      // Was a long press â€” stop voice note recording
       voiceRecorder.stop()
       isLongPressRef.current = false
     }
@@ -1976,7 +1978,7 @@ function ChatComposerComponent({
       }
       // Enter-to-send is handled by PromptInputTextarea via the onSubmit prop.
       // Handling it here too causes handleSubmit() to fire twice on every Enter
-      // keypress (once via onSubmit → handlePromptSubmit, once via this onKeyDown
+      // keypress (once via onSubmit â†’ handlePromptSubmit, once via this onKeyDown
       // handler), which duplicates messages when text is pasted then sent.
     },
     [handleDismissSlashMenu, isSlashMenuOpen],
@@ -2168,7 +2170,7 @@ function ChatComposerComponent({
         maxHeight={isMobileViewport ? 120 : 240}
         className={cn(
           'relative z-50 transition-all duration-300',
-          // On mobile: remove PromptInput's built-in rounded/bg/padding — outer wrapper owns the container
+          // On mobile: remove PromptInput's built-in rounded/bg/padding â€” outer wrapper owns the container
           isMobileViewport &&
             'py-0 gap-0 !rounded-none !bg-transparent shadow-none outline-none',
           isDraggingOver &&
@@ -2232,7 +2234,7 @@ function ChatComposerComponent({
                       </button>
                     ) : (
                       <div className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700">
-                        <span className="mr-1">📄</span>
+                        <span className="mr-1">ðŸ“„</span>
                         <span className="truncate">{attachment.name}</span>
                       </div>
                     )}
@@ -2266,10 +2268,10 @@ function ChatComposerComponent({
         ) : null}
 
         {isMobileViewport ? (
-          /* ── Mobile: Telegram-style single-row bar ── */
+          /* â”€â”€ Mobile: Telegram-style single-row bar â”€â”€ */
           <>
             <div className="flex items-center gap-2 px-3 py-2">
-              {/* + button — opens bottom sheet actions menu */}
+              {/* + button â€” opens bottom sheet actions menu */}
               <button
                 type="button"
                 aria-label="Actions"
@@ -2284,7 +2286,7 @@ function ChatComposerComponent({
                 <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={1.5} />
               </button>
 
-              {/* Textarea — flex-1, auto-growing */}
+              {/* Textarea â€” flex-1, auto-growing */}
               <PromptInputTextarea
                 placeholder={promptPlaceholder}
                 autoFocus
@@ -2419,7 +2421,7 @@ function ChatComposerComponent({
                         Actions
                       </div>
                       <div className="grid grid-cols-2 gap-2 px-4 pb-4">
-                        {/* Attach File — keep sheet open so iOS picker can layer on top */}
+                        {/* Attach File â€” keep sheet open so iOS picker can layer on top */}
                         <button
                           type="button"
                           disabled={disabled}
@@ -2441,7 +2443,7 @@ function ChatComposerComponent({
                           </span>
                         </button>
 
-                        {/* Model selector — opens model picker sheet on top */}
+                        {/* Model selector â€” opens model picker sheet on top */}
                         <button
                           type="button"
                           disabled={isModelSwitcherDisabled}
@@ -2516,7 +2518,7 @@ function ChatComposerComponent({
                 )
               : null}
 
-            {/* Mobile model picker portal — z above actions sheet (z-[210]) */}
+            {/* Mobile model picker portal â€” z above actions sheet (z-[210]) */}
             {typeof document !== 'undefined' && isModelMenuOpen
               ? createPortal(
                   <>
@@ -2718,7 +2720,7 @@ function ChatComposerComponent({
               : null}
           </>
         ) : (
-          /* ── Desktop: original layout ── */
+          /* â”€â”€ Desktop: original layout â”€â”€ */
           <>
             <PromptInputTextarea
               placeholder={promptPlaceholder}
@@ -2777,7 +2779,7 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 )}
-                {/* Token counter — bottom bar, mirrors Hermes style, triggers at ~25 tokens */}
+                {/* Token counter â€” bottom bar, mirrors Hermes style, triggers at ~25 tokens */}
                 {value.length >= 100 && (
                   <span className="ml-1 text-[10px] text-primary-400 tabular-nums select-none">
                     ~{Math.ceil(value.length / 4)} tokens
@@ -2798,7 +2800,7 @@ function ChatComposerComponent({
                         setIsModelMenuOpen(false)
                       }}
                       className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary-100/70 px-2 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
-                      title={`Chat controls · ${modelButtonLabel}`}
+                      title={`Chat controls Â· ${modelButtonLabel}`}
                       aria-label={`Chat controls, current model: ${modelButtonLabel}`}
                     >
                       <svg
@@ -2843,7 +2845,7 @@ function ChatComposerComponent({
                               className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary-800/60"
                               title={
                                 activeProfile
-                                  ? `${activeProfile.name}${profileMeta(activeProfile) ? ` · ${profileMeta(activeProfile)}` : ''}`
+                                  ? `${activeProfile.name}${profileMeta(activeProfile) ? ` Â· ${profileMeta(activeProfile)}` : ''}`
                                   : activeProfileName
                               }
                             >
@@ -3069,10 +3071,10 @@ function ChatComposerComponent({
                   <PromptInputAction
                     tooltip={
                       voiceRecorder.isRecording
-                        ? `Recording… ${Math.round(voiceRecorder.durationMs / 1000)}s`
+                        ? `Recordingâ€¦ ${Math.round(voiceRecorder.durationMs / 1000)}s`
                         : voiceInput.isListening
-                          ? 'Listening — tap to stop'
-                          : 'Tap: dictate · Hold: voice note'
+                          ? 'Listening â€” tap to stop'
+                          : 'Tap: dictate Â· Hold: voice note'
                     }
                   >
                     <Button
@@ -3163,7 +3165,7 @@ function ChatComposerComponent({
         )}
       </PromptInput>
 
-      {/* Fullscreen image preview overlay — portaled to body to escape stacking context */}
+      {/* Fullscreen image preview overlay â€” portaled to body to escape stacking context */}
       {previewImage &&
         createPortal(
           <div

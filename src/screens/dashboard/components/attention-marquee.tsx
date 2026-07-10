@@ -5,11 +5,12 @@ import type {
 } from '@/server/dashboard-aggregator'
 
 const SOURCE_GLYPH: Record<DashboardIncident['source'], string> = {
-  cron: '⏰',
-  platform: '🔌',
-  log: '📜',
-  config: '⚙️',
-  gateway: '🛰️',
+  cron: 'clock',
+  kanban: 'board',
+  platform: 'link',
+  log: 'log',
+  config: 'cfg',
+  gateway: 'gate',
 }
 
 const SEVERITY_COLOR: Record<DashboardIncident['severity'], string> = {
@@ -18,18 +19,25 @@ const SEVERITY_COLOR: Record<DashboardIncident['severity'], string> = {
   info: 'var(--theme-muted)',
 }
 
+function compactDetail(item: DashboardIncident): string {
+  const detail = item.detail.trim()
+  if (!detail) return ''
+
+  const lower = detail.toLowerCase()
+  if (
+    item.source === 'cron' &&
+    lower.includes('global inference config drifted')
+  ) {
+    return 'config drift blocked scheduled run; pin model/provider in Jobs'
+  }
+
+  if (detail.length <= 96) return detail
+  return `${detail.slice(0, 92).trim()}...`
+}
+
 /**
- * Right-to-left marquee that surfaces the same `incidents[]` payload
- * the legacy `AttentionCard` used to render. Lives inside `OpsStrip`
- * so attention items occupy the same horizontal "10-second status
- * read" line operators already glance at.
- *
- * Behavior:
- * - Hidden when there are no incidents (no empty marquee row).
- * - Clones the list once so the loop animation stitches seamlessly.
- * - Pauses on hover so the operator can read a long item.
- * - Each item is a button that routes to the most context-appropriate
- *   page (cron → /jobs, config → /settings, log/gateway → /logs).
+ * Compact incident ticker. It keeps the real incident list clickable while
+ * trimming verbose backend errors into a readable operator summary.
  */
 export function AttentionMarquee({
   overview,
@@ -61,16 +69,14 @@ export function AttentionMarquee({
           color: 'var(--theme-warning)',
         }}
       >
-        ⚠️ Attention · {items.length}
+        Attention · {items.length}
       </span>
 
-      {/* Fade mask on right edge for "ticker continues" feel. */}
       <span
         aria-hidden
         className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12"
         style={{
-          background:
-            'linear-gradient(90deg, transparent, var(--theme-card))',
+          background: 'linear-gradient(90deg, transparent, var(--theme-card))',
         }}
       />
 
@@ -78,9 +84,7 @@ export function AttentionMarquee({
         className="flex min-w-0 flex-1 overflow-hidden whitespace-nowrap"
         style={{ maskImage: 'linear-gradient(90deg, black 96%, transparent)' }}
       >
-        <div
-          className="oc-marquee-track flex shrink-0 items-center gap-6 pl-3 will-change-transform"
-        >
+        <div className="oc-marquee-track flex shrink-0 items-center gap-6 pl-3 will-change-transform">
           {tracks.map((item, idx) => {
             const handleClick = () => {
               if (item.href) {
@@ -99,6 +103,7 @@ export function AttentionMarquee({
                 navigate({ to: '/settings', search: {} })
               else navigate({ to: '/jobs' })
             }
+            const detail = compactDetail(item)
             return (
               <button
                 key={`${item.id}-${idx}`}
@@ -107,15 +112,20 @@ export function AttentionMarquee({
                 className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] hover:underline"
                 style={{ color: SEVERITY_COLOR[item.severity] }}
               >
-                <span aria-hidden className="text-[12px]">
-                  {SOURCE_GLYPH[item.source] ?? '•'}
+                <span
+                  aria-hidden
+                  className="rounded border px-1 py-0.5 text-[8px] leading-none"
+                  style={{
+                    borderColor:
+                      'color-mix(in srgb, currentColor 35%, transparent)',
+                  }}
+                >
+                  {SOURCE_GLYPH[item.source]}
                 </span>
-                <span style={{ color: 'var(--theme-text)' }}>
-                  {item.label}
-                </span>
-                {item.detail ? (
+                <span style={{ color: 'var(--theme-text)' }}>{item.label}</span>
+                {detail ? (
                   <span style={{ color: 'var(--theme-muted)' }}>
-                    · {item.detail}
+                    · {detail}
                   </span>
                 ) : null}
               </button>

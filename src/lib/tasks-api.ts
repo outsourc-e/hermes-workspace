@@ -223,31 +223,31 @@ export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'us
 // --- Display constants ---------------------------------------------------
 
 export const COLUMN_LABELS: Record<TaskColumn, string> = {
-  backlog: 'Triage',
+  backlog: 'Memory queue',
   todo: 'Ready',
-  in_progress: 'Running',
-  review: 'Review',
+  in_progress: 'Active',
+  review: 'Needs eyes',
   blocked: 'Blocked',
-  done: 'Done',
+  done: 'Closed',
   deleted: 'Deleted',
 }
 
 export const COLUMN_ORDER: Array<TaskColumn> = ['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done']
 
 export const PRIORITY_COLORS: Record<TaskPriority, string> = {
-  high: '#ef4444',
-  medium: '#f97316',
-  low: '#6b7280',
+  high: '#ff6b35',
+  medium: '#ffb347',
+  low: '#a8a8a8',
 }
 
 export const COLUMN_COLORS: Record<TaskColumn, string> = {
-  backlog: '#6b7280',
-  todo: '#3b82f6',
-  in_progress: '#f97316',
-  review: '#a855f7',
-  blocked: '#ef4444',
-  done: '#22c55e',
-  deleted: '#374151',
+  backlog: '#a8a8a8',
+  todo: '#ffd27a',
+  in_progress: '#ff8c1a',
+  review: '#ffb347',
+  blocked: '#ff6b35',
+  done: '#cce6a0',
+  deleted: '#2d2f34',
 }
 
 export function isOverdue(task: ClaudeTask): boolean {

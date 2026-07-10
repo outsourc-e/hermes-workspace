@@ -9,6 +9,13 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/toast'
+import {
+  novaMemoryHealth,
+  searchNovaMemoryActivity,
+  searchNovaMemoryFragments,
+  type NovaMemoryActivity,
+  type NovaMemoryFragment,
+} from '@/lib/nova-memory-adapter'
 import { cn } from '@/lib/utils'
 
 type MemoryFileMeta = {
@@ -116,6 +123,17 @@ export function MemoryBrowserScreen() {
   const lineRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const queryClient = useQueryClient()
   const searchTerm = deferredSearch.trim()
+  const novaActivity = useMemo(
+    () => searchNovaMemoryActivity(searchTerm),
+    [searchTerm],
+  )
+  const novaFragments = useMemo(
+    () => searchNovaMemoryFragments(searchTerm),
+    [searchTerm],
+  )
+  const memoryDegraded = novaMemoryHealth.some(
+    (item) => item.status !== 'online',
+  )
 
   const filesQuery = useQuery({
     queryKey: ['memory', 'list'],
@@ -249,7 +267,7 @@ export function MemoryBrowserScreen() {
       style={{ backgroundColor: 'var(--theme-bg)', color: 'var(--theme-text)' }}
     >
       <div
-        className="px-3 py-3 md:px-4"
+        className="space-y-3 px-3 py-3 md:px-4"
         style={{
           borderBottom: '1px solid var(--theme-border)',
           backgroundColor: 'var(--theme-bg)',
@@ -278,7 +296,7 @@ export function MemoryBrowserScreen() {
               <input
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search memory files"
+                placeholder="Search recall, fragments, and memory files"
                 className="w-full rounded-xl py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-accent-500"
                 style={{
                   border: '1px solid var(--theme-border)',
@@ -289,6 +307,30 @@ export function MemoryBrowserScreen() {
             </div>
           </div>
         </div>
+        {memoryDegraded ? (
+          <div className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-amber-200">
+            memory offline -- recall degraded to notes
+          </div>
+        ) : null}
+        <div className="grid gap-2 md:grid-cols-3">
+          {novaMemoryHealth.map((item) => (
+            <div key={item.id} className="nova-metric">
+              <div className="nova-label">{item.label}</div>
+              <div className="mt-1 flex items-end justify-between gap-2">
+                <span className="font-mono text-lg text-amber-100">
+                  {item.status}
+                </span>
+                <span className="font-mono text-xs text-amber-300/80">
+                  {item.latencyMs}ms
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+          <NovaActivityFeed items={novaActivity} />
+          <NovaFragmentStrip fragments={novaFragments} />
+        </div>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 md:grid-cols-3 md:p-4">
@@ -298,8 +340,8 @@ export function MemoryBrowserScreen() {
             className="flex items-center justify-between px-3 py-2 text-left md:cursor-default"
             onClick={() => setMobileFilesOpen((value) => !value)}
           >
-            <span className="text-xs font-semibold uppercase tracking-wide text-primary-500 dark:text-neutral-400">
-              Memory Files ({fileItems.length})
+            <span className="nova-label">
+              Memory files ({fileItems.length})
             </span>
             <span className="md:hidden text-primary-500 dark:text-neutral-400">
               <HugeiconsIcon
@@ -312,8 +354,8 @@ export function MemoryBrowserScreen() {
 
           {searchEnabled ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-              <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-primary-400 dark:text-neutral-500">
-                Search Results
+              <div className="nova-label mb-2 px-1">
+                File results
               </div>
               <div className="space-y-1">
                 {searchQuery.isLoading ? (
@@ -378,7 +420,7 @@ export function MemoryBrowserScreen() {
                   />
                 ) : null}
 
-                <div className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-primary-400 dark:text-neutral-500">
+                <div className="nova-label px-1 pt-2">
                   memory/ or memories/
                 </div>
                 {memoryFiles.length === 0 ? (
@@ -578,6 +620,112 @@ function FileRow({
         {formatBytes(file.size)} · {formatModified(file.modified)}
       </div>
     </button>
+  )
+}
+
+function NovaActivityFeed({ items }: { items: Array<NovaMemoryActivity> }) {
+  return (
+    <section className="rounded-xl border border-amber-500/25 bg-black/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="nova-label">Live activity feed</div>
+        <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-300/70">
+          recall + write
+        </div>
+      </div>
+      <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+        {items.length === 0 ? (
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/70">
+            No recall events for this query.
+          </div>
+        ) : (
+          items.map((item) => (
+            <div
+              key={item.id}
+              className="nova-feed-new rounded-lg border border-amber-500/20 bg-[#0b1118]/85 px-3 py-2"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[11px] text-amber-300">
+                  {item.at}
+                </span>
+                <ScopeBadge scope={item.scope} />
+                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-100/70">
+                  {item.kind === 'recall' ? 'recall' : 'new memory'}
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-amber-50/85">
+                {item.kind === 'recall' ? (
+                  <>
+                    <span className="text-amber-300/80">{item.query}</span>
+                    <span className="text-amber-100/45"> -&gt; </span>
+                    <span>{item.topHit}</span>
+                    <span className="text-amber-100/45"> -&gt; </span>
+                    <span>{item.latencyMs}ms</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-amber-300">
+                      {item.factsExtracted} facts extracted
+                    </span>
+                    <span className="text-amber-100/55"> into scope </span>
+                    <span>{item.scope}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
+function NovaFragmentStrip({
+  fragments,
+}: {
+  fragments: Array<NovaMemoryFragment>
+}) {
+  return (
+    <section className="rounded-xl border border-amber-500/25 bg-black/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="nova-label">Fragments</div>
+        <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-300/70">
+          mock adapter
+        </div>
+      </div>
+      <div className="grid max-h-44 gap-2 overflow-y-auto pr-1 md:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+        {fragments.length === 0 ? (
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/70 md:col-span-3 lg:col-span-1 xl:col-span-3">
+            No fragment cards match this query.
+          </div>
+        ) : (
+          fragments.map((fragment) => (
+            <article key={fragment.id} className="nova-fragment">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="min-w-0 truncate font-mono text-xs font-semibold text-amber-50">
+                  {fragment.title}
+                </h3>
+                <ScopeBadge scope={fragment.scope} />
+              </div>
+              <p className="line-clamp-3 text-xs leading-relaxed text-amber-100/75">
+                {fragment.body}
+              </p>
+              <div className="mt-2 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-amber-300/65">
+                <span>{Math.round(fragment.confidence * 100)}%</span>
+                <span className="truncate">{fragment.updatedAt}</span>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ScopeBadge({ scope }: { scope: 'default' | 'bf-01' }) {
+  return (
+    <span className="shrink-0 rounded-sm border border-amber-500/35 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-amber-200">
+      {scope}
+    </span>
   )
 }
 

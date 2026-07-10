@@ -1,6 +1,6 @@
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { delimiter, dirname, join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 
 const CLAUDE_HEALTH_TIMEOUT_MS = 2_000
@@ -52,6 +52,14 @@ function readClaudeEnv(): Record<string, string> {
   }
 }
 
+function isHermesAgentDir(candidate: string): boolean {
+  return (
+    existsSync(resolve(candidate, 'webapi')) ||
+    (existsSync(resolve(candidate, 'hermes_cli', 'main.py')) &&
+      existsSync(resolve(candidate, 'gateway')))
+  )
+}
+
 /** Same directory resolution logic as vite.config.ts. Kept in sync. */
 export function resolveClaudeAgentDir(
   env: Record<string, string | undefined> = process.env,
@@ -68,11 +76,12 @@ export function resolveClaudeAgentDir(
     resolve(workspaceRoot, 'hermes-agent'),          // sibling (old README)
     resolve(workspaceRoot, '..', 'hermes-agent'),    // one level up
     resolve(homedir(), '.hermes', 'hermes-agent'),   // Nous installer default
+    resolve(homedir(), 'AppData', 'Local', 'hermes', 'hermes-agent'), // Windows installer default
     resolve(homedir(), 'hermes-agent'),              // ~/hermes-agent
   )
 
   for (const candidate of candidates) {
-    if (existsSync(resolve(candidate, 'webapi'))) return candidate
+    if (isHermesAgentDir(candidate)) return candidate
   }
 
   return null
@@ -80,7 +89,20 @@ export function resolveClaudeAgentDir(
 
 /** Find the `claude` CLI binary installed by Nous's installer (or on PATH). */
 export function resolveClaudeBinary(): string | null {
+  const windowsHermesScripts = resolve(
+    homedir(),
+    'AppData',
+    'Local',
+    'hermes',
+    'hermes-agent',
+    'venv',
+    'Scripts',
+  )
   const candidates = [
+    resolve(windowsHermesScripts, 'hermes.exe'),
+    resolve(windowsHermesScripts, 'hermes-agent.exe'),
+    resolve(windowsHermesScripts, 'hermes'),
+    resolve(windowsHermesScripts, 'hermes-agent'),
     resolve(homedir(), '.local', 'bin', 'hermes'),
     resolve(homedir(), '.hermes', 'bin', 'hermes'),
     resolve(homedir(), '.claude', 'bin', 'claude'),
@@ -89,10 +111,41 @@ export function resolveClaudeBinary(): string | null {
   for (const c of candidates) {
     if (existsSync(c)) return c
   }
+
+  return resolveBinaryFromPath(['hermes', 'hermes-agent'])
+}
+
+function resolveBinaryFromPath(binaryNames: Array<string>): string | null {
+  const lookup = process.platform === 'win32' ? 'where.exe' : 'which'
+  const names =
+    process.platform === 'win32'
+      ? binaryNames.flatMap((name) => [name, `${name}.exe`])
+      : binaryNames
+
+  for (const name of names) {
+    try {
+      const output = execFileSync(lookup, [name], {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+      const first = output
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find(Boolean)
+      if (first && existsSync(first)) return first
+    } catch {
+      // Keep scanning the explicit installer paths below.
+    }
+  }
+
   return null
 }
 
 export function resolveClaudePython(agentDir: string): string {
+  const windowsVenvPython = resolve(agentDir, 'venv', 'Scripts', 'python.exe')
+  if (existsSync(windowsVenvPython)) return windowsVenvPython
+  const windowsDotVenvPython = resolve(agentDir, '.venv', 'Scripts', 'python.exe')
+  if (existsSync(windowsDotVenvPython)) return windowsDotVenvPython
   const venvPython = resolve(agentDir, '.venv', 'bin', 'python')
   if (existsSync(venvPython)) return venvPython
   const uvVenv = resolve(agentDir, 'venv', 'bin', 'python')
@@ -101,6 +154,38 @@ export function resolveClaudePython(agentDir: string): string {
   const nousPython = resolve(homedir(), '.claude', 'venv', 'bin', 'python')
   if (existsSync(nousPython)) return nousPython
   return 'python3'
+}
+
+export function resolveClaudeAgentLaunch(
+  agentDir: string | null,
+  claudeBin: string | null,
+): { command: string; commandArgs: Array<string> } {
+  if (claudeBin) {
+    return { command: claudeBin, commandArgs: ['gateway', 'run'] }
+  }
+
+  if (!agentDir) {
+    throw new Error('Cannot resolve a Hermes Agent launch command without an installation')
+  }
+
+  const useGatewayRun = existsSync(resolve(agentDir, 'gateway', 'run.py'))
+  return useGatewayRun
+    ? {
+        command: resolveClaudePython(agentDir),
+        commandArgs: ['-m', 'gateway.run'],
+      }
+    : {
+        command: resolveClaudePython(agentDir),
+        commandArgs: [
+          '-m',
+          'uvicorn',
+          'webapi.app:app',
+          '--host',
+          '0.0.0.0',
+          '--port',
+          String(CLAUDE_START_PORT),
+        ],
+      }
 }
 
 export async function isClaudeAgentHealthy(
@@ -138,22 +223,11 @@ export async function startClaudeAgent(): Promise<StartClaudeAgentResult> {
       let commandArgs: Array<string>
       let cwd: string | undefined
 
-      if (claudeBin) {
-        command = claudeBin
-        commandArgs = ['gateway', 'run']
+      if (claudeBin || agentDir) {
+        const launch = resolveClaudeAgentLaunch(agentDir, claudeBin)
+        command = launch.command
+        commandArgs = launch.commandArgs
         cwd = agentDir ?? undefined
-      } else if (agentDir) {
-        command = resolveClaudePython(agentDir)
-        commandArgs = [
-          '-m',
-          'uvicorn',
-          'webapi.app:app',
-          '--host',
-          '0.0.0.0',
-          '--port',
-          String(CLAUDE_START_PORT),
-        ]
-        cwd = agentDir
       } else {
         return {
           ok: false,
@@ -173,12 +247,15 @@ export async function startClaudeAgent(): Promise<StartClaudeAgentResult> {
             ...process.env,
             ...claudeEnv,
             PATH: [
+              resolve(homedir(), 'AppData', 'Local', 'hermes', 'hermes-agent', 'venv', 'Scripts'),
               resolve(homedir(), '.claude', 'bin'),
               resolve(homedir(), '.local', 'bin'),
+              agentDir ? resolve(agentDir, '.venv', 'Scripts') : '',
+              agentDir ? resolve(agentDir, 'venv', 'Scripts') : '',
               agentDir ? resolve(agentDir, '.venv', 'bin') : '',
               agentDir ? resolve(agentDir, 'venv', 'bin') : '',
               process.env.PATH || '',
-            ].filter(Boolean).join(':'),
+            ].filter(Boolean).join(delimiter),
           },
         },
       )

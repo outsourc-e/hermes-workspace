@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -57,11 +57,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-// ── Language ────────────────────────────────────────────────────────────
+// â”€â”€ Language â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 import { LOCALE_LABELS,  getLocale, setLocale } from '@/lib/i18n'
 
-// ── Types ───────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type SectionId =
   | 'claude'
@@ -97,7 +97,7 @@ function _isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
 }
 void _isDarkEnterpriseTheme
 
-// ── Shared building blocks ──────────────────────────────────────────────
+// â”€â”€ Shared building blocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SectionHeader({
   title,
@@ -150,7 +150,7 @@ function Row({
 const SETTINGS_CARD_CLASS =
   'rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm'
 
-// ── Section components ──────────────────────────────────────────────────
+// â”€â”€ Section components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const PROVIDER_CARDS: Array<{
   id: string
@@ -160,7 +160,7 @@ const PROVIDER_CARDS: Array<{
   authType: 'oauth' | 'api_key' | 'none'
   envKey?: string
 }> = [
-  // Local providers first — zero setup
+  // Local providers first â€” zero setup
   {
     id: 'ollama',
     name: 'Ollama',
@@ -391,7 +391,7 @@ function HermesContent() {
         for (const p of d.providers || []) {
           const envKey = p.envKeys?.[0]
           if (!p.configured || !envKey) continue
-          keys[envKey] = p.maskedCredentials?.[envKey] || '••••'
+          keys[envKey] = p.maskedCredentials?.[envKey] || 'â€¢â€¢â€¢â€¢'
         }
         setConfiguredKeys(keys)
         // Load custom provider config (may be stored as 'custom' or legacy 'manifest')
@@ -420,7 +420,7 @@ function HermesContent() {
     for (const p of d.providers || []) {
       const envKey = p.envKeys?.[0]
       if (!p.configured || !envKey) continue
-      keys[envKey] = p.maskedCredentials?.[envKey] || '••••'
+      keys[envKey] = p.maskedCredentials?.[envKey] || 'â€¢â€¢â€¢â€¢'
     }
     setConfiguredKeys(keys)
   }
@@ -611,7 +611,7 @@ function HermesContent() {
   if (!configAvailable) {
     return (
       <BackendUnavailableState
-        feature="Hermes Agent Settings"
+        feature="Nova gateway Settings"
         description={getUnavailableReason('config')}
       />
     )
@@ -667,7 +667,7 @@ function HermesContent() {
                 !!configuredKeys[p.envKey])
             const missingKey =
               p.authType === 'api_key' && !verified && p.id !== 'custom'
-            // hasKey gates click — keep OAuth + local clickable (existing
+            // hasKey gates click â€” keep OAuth + local clickable (existing
             // behaviour) so users can still authenticate via the card.
             const hasKey =
               p.authType === 'none' ||
@@ -724,7 +724,7 @@ function HermesContent() {
                     const disc = localDiscovery?.providers.find(
                       (lp) => lp.id === p.id,
                     )
-                    if (disc?.online) return '🟢 Detected'
+                    if (disc?.online) return 'ðŸŸ¢ Detected'
                     if (p.authType === 'oauth') return 'OAuth'
                     if (p.authType === 'none') return 'Local'
                     return hasKey ? 'Key set' : 'Key required'
@@ -861,7 +861,7 @@ function HermesContent() {
                           {model.id}
                           {defaultProvider === provider.id &&
                           defaultModelId === model.id
-                            ? ' · default'
+                            ? ' Â· default'
                             : ''}
                         </button>
                       ))}
@@ -875,7 +875,7 @@ function HermesContent() {
                           size="sm"
                           onClick={() => setDefaultModel(provider.id, activeModel)}
                         >
-                          Set as default: {provider.id} · {activeModel}
+                          Set as default: {provider.id} Â· {activeModel}
                         </Button>
                       </div>
                     ) : null}
@@ -894,7 +894,7 @@ function HermesContent() {
             className="mb-1 text-xs font-semibold uppercase tracking-wider"
             style={mutedStyle}
           >
-            Model — pick one, then confirm below
+            Model â€” pick one, then confirm below
           </p>
           <div className="flex flex-wrap gap-2">
             {(() => {
@@ -927,7 +927,7 @@ function HermesContent() {
               >
                 {model}
                 {defaultProvider === activeProvider && defaultModelId === model
-                  ? ' · default'
+                  ? ' Â· default'
                   : ''}
               </button>
             ))}
@@ -939,14 +939,14 @@ function HermesContent() {
                 size="sm"
                 onClick={() => setDefaultModel(activeProvider, activeModel)}
               >
-                Set as default: {activeProvider} · {activeModel}
+                Set as default: {activeProvider} Â· {activeModel}
               </Button>
             </div>
           ) : null}
         </div>
       )}
 
-      {/* Custom OpenAI-compatible endpoint fields — Base URL only; API key lives in API Keys section */}
+      {/* Custom OpenAI-compatible endpoint fields â€” Base URL only; API key lives in API Keys section */}
       {activeProvider === 'custom' && (
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>
@@ -1070,7 +1070,7 @@ function HermesContent() {
                 size="sm"
                 onClick={() => setDefaultModel('custom', customModel)}
               >
-                Set as default: custom · {customModel}
+                Set as default: custom Â· {customModel}
               </Button>
             </div>
           ) : null}
@@ -1084,7 +1084,7 @@ function HermesContent() {
         if (!disc || !disc.needsRestart) return null
         return (
           <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-            ⚠️ Gateway restart needed to use {disc.name}. Run{' '}
+            Gateway restart needed to use {disc.name}. Run{' '}
             <code className="rounded bg-black/30 px-1">
               hermes gateway restart
             </code>{' '}
@@ -1265,12 +1265,12 @@ function HermesContent() {
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
           <span style={mutedStyle}>Model</span>
-          <span className="font-mono font-medium">{activeModel || '—'}</span>
+          <span className="font-mono font-medium">{activeModel || 'â€”'}</span>
           <span style={mutedStyle}>Provider</span>
           <span className="font-mono font-medium">
             {PROVIDER_CARDS.find((p) => p.id === activeProvider)?.name ||
               activeProvider ||
-              '—'}
+              'â€”'}
           </span>
           <span style={mutedStyle}>Config</span>
           <span className="font-mono font-medium">~/.hermes/config.yaml</span>
@@ -1479,7 +1479,7 @@ function AppearanceContent() {
           ))}
         </div>
       </div>
-      {/* Accent color removed — themes control accent */}
+      {/* Accent color removed â€” themes control accent */}
       <div className={SETTINGS_CARD_CLASS}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
           Enterprise Theme
@@ -1489,7 +1489,7 @@ function AppearanceContent() {
       <div className={SETTINGS_CARD_CLASS}>
         <Row
           label="System metrics footer"
-          description="Show a persistent footer with CPU, RAM, disk, and Hermes Agent status."
+          description="Show a persistent footer with CPU, RAM, disk, and Nova gateway status."
         >
           <Switch
             checked={settings.showSystemMetricsFooter}
@@ -1500,7 +1500,7 @@ function AppearanceContent() {
           />
         </Row>
 
-        {/* Mobile chat nav removed — not relevant for Hermes */}
+        {/* Mobile chat nav removed â€” not relevant for Hermes */}
       </div>
     </div>
   )
@@ -1761,7 +1761,7 @@ function _LoaderContent() {
   function Preview({ style }: { style: LoaderStyle }) {
     if (style === 'dots') return <ThreeDotsSpinner />
     if (style === 'lobster')
-      return <span className="inline-block text-sm animate-pulse">🦞</span>
+      return <span className="inline-block text-sm animate-pulse">ðŸ¦ž</span>
     if (style === 'logo') return <LogoLoader />
     const p = getPreset(style)
     return p ? (
@@ -1848,7 +1848,7 @@ function ChatContent() {
           label="Enter key behavior"
           description={
             cs.enterBehavior === 'newline'
-              ? 'Enter inserts a newline. Use ⌘/Ctrl+Enter to send.'
+              ? 'Enter inserts a newline. Use âŒ˜/Ctrl+Enter to send.'
               : 'Enter sends the message. Use Shift+Enter for a newline.'
           }
         >
@@ -1894,7 +1894,7 @@ function ChatContent() {
           />
         </Row>
       </div>
-      {/* Loading animation removed — not relevant for Hermes */}
+      {/* Loading animation removed â€” not relevant for Hermes */}
     </div>
   )
 }
@@ -1980,11 +1980,11 @@ function _AdvancedContent() {
     <div className="space-y-4">
       <SectionHeader
         title="Advanced"
-        description="Hermes Agent endpoint and connectivity."
+        description="Nova gateway endpoint and connectivity."
       />
       <div className={SETTINGS_CARD_CLASS}>
         <Row
-          label="Hermes Agent URL"
+          label="Nova gateway URL"
           description="Used for API requests from Studio"
         >
           <div className="w-full max-w-sm">
@@ -1994,7 +1994,7 @@ function _AdvancedContent() {
               value={settings.claudeUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"
-              aria-label="Hermes Agent URL"
+              aria-label="Nova gateway URL"
               aria-invalid={!!urlError}
               aria-describedby={urlError ? urlErrorId : undefined}
             />
@@ -2051,7 +2051,7 @@ function _AdvancedContent() {
   )
 }
 
-// ── Error Boundary ──────────────────────────────────────────────────────
+// â”€â”€ Error Boundary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class SettingsErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -2085,7 +2085,7 @@ class SettingsErrorBoundary extends Component<
   }
 }
 
-// ── Agent Behavior ──────────────────────────────────────────────────────
+// â”€â”€ Agent Behavior â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function AgentBehaviorContent() {
   const [config, setConfig] = useState<Record<string, unknown>>({})
@@ -2174,7 +2174,7 @@ function AgentBehaviorContent() {
   )
 }
 
-// ── Voice (TTS + STT) ──────────────────────────────────────────────────
+// â”€â”€ Voice (TTS + STT) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function VoiceContent() {
   const [tts, setTts] = useState<Record<string, unknown>>({})
@@ -2345,7 +2345,7 @@ function VoiceContent() {
   )
 }
 
-// ── Display ─────────────────────────────────────────────────────────────
+// â”€â”€ Display â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function DisplayContent() {
   const [config, setConfig] = useState<Record<string, unknown>>({})
@@ -2471,7 +2471,7 @@ function LanguageContent() {
   )
 }
 
-// ── Main Dialog ─────────────────────────────────────────────────────────
+// â”€â”€ Main Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
   claude: HermesContent,
@@ -2521,7 +2521,7 @@ export function SettingsDialog({
                 Settings
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Configure Hermes Workspace
+                Configure Nova Mission Control
               </DialogDescription>
             </div>
             <DialogClose
@@ -2605,7 +2605,7 @@ export function SettingsDialog({
               href="/settings"
               className="ml-2 font-medium underline underline-offset-2 hover:text-primary-700 dark:hover:text-neutral-200"
             >
-              All settings →
+              All settings â†’
             </a>
           </div>
         </div>

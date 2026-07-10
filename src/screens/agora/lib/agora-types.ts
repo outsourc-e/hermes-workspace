@@ -1,5 +1,5 @@
-/**
- * Agora — shared types for the Hermes Workspace community surface.
+﻿/**
+ * Agora â€” shared types for the Nova Mission Control community surface.
  *
  * v0.0: local mock lobby with fake users.
  * v0.1+: same types will be used for real WebSocket multiplayer.
@@ -41,7 +41,7 @@ export interface AgoraProfile {
   status: AgoraStatus
   /** Optional links (twitter, github, etc) */
   links?: { label: string; url: string }[]
-  /** Current activity hint, e.g. "Building Hermes Workspace" */
+  /** Current activity hint, e.g. "Building Nova Mission Control" */
   activity?: string
 }
 
@@ -76,7 +76,7 @@ export interface AgoraWorld {
   height: number
   /** Default spawn point for new users. */
   spawn: { x: number; y: number }
-  /** Theme accent for chrome — uses theme tokens. */
+  /** Theme accent for chrome â€” uses theme tokens. */
   theme?: 'agora' | 'temple' | 'cyberpunk' | 'office'
 }
 

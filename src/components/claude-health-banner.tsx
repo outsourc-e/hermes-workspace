@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 
 const POLL_INTERVAL = 30_000
@@ -56,7 +56,7 @@ export function ClaudeHealthBanner({
       }}
     >
       <span className="inline-block h-2 w-2 rounded-full bg-white/60 animate-pulse" />
-      <span>Hermes Agent unreachable{lastError ? ` — ${lastError}` : ''}</span>
+      <span>Nova gateway unreachable{lastError ? ` -- ${lastError}` : ''}</span>
       <button
         type="button"
         onClick={() => {
