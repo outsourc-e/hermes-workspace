@@ -51,11 +51,12 @@ import { TopModelsCard } from './components/top-models-card'
 import { TrustLedgerCard } from './components/trust-ledger-card'
 import { VelocityCard } from './components/velocity-card'
 import { WidgetShell } from './components/widget-shell'
+import { CHART_FALLBACKS, NOVA_COCKPIT_STYLE } from './lib/nova-cockpit-theme'
 import { normalizeDashboardSessionsPayload } from './lib/sessions-query'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
 import type { SessionRowData } from './components/sessions-intelligence-card'
 import type { AnalyticsPeriod } from './components/analytics-chart-card'
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import type { ClaudeSession } from '@/server/claude-api'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
@@ -100,15 +101,18 @@ function alpha(color: string, amount: number): string {
 
 function readDashboardPalette() {
   return {
-    accent: themeColor('--theme-accent', '#6366f1'),
-    accentSecondary: themeColor('--theme-accent-secondary', '#8b5cf6'),
-    success: themeColor('--theme-success', '#22c55e'),
-    warning: themeColor('--theme-warning', '#f59e0b'),
-    danger: themeColor('--theme-danger', '#ef4444'),
-    muted: themeColor('--theme-muted', '#6b7280'),
-    border: themeColor('--theme-border', '#333333'),
-    card: themeColor('--theme-card', '#1a1a2e'),
-    text: themeColor('--theme-text', '#e5e7eb'),
+    accent: themeColor('--theme-accent', CHART_FALLBACKS.accent),
+    accentSecondary: themeColor(
+      '--theme-accent-secondary',
+      CHART_FALLBACKS.accentSecondary,
+    ),
+    success: themeColor('--theme-success', CHART_FALLBACKS.success),
+    warning: themeColor('--theme-warning', CHART_FALLBACKS.warning),
+    danger: themeColor('--theme-danger', CHART_FALLBACKS.danger),
+    muted: themeColor('--theme-muted', CHART_FALLBACKS.muted),
+    border: themeColor('--theme-border', CHART_FALLBACKS.border),
+    card: themeColor('--theme-card', CHART_FALLBACKS.card),
+    text: themeColor('--theme-text', CHART_FALLBACKS.text),
   }
 }
 
@@ -129,58 +133,6 @@ function useDashboardPalette() {
 
   return palette
 }
-
-const NOVA_MISSION_CONTROL_STYLE = {
-  colorScheme: 'dark',
-  backgroundColor: 'var(--theme-bg)',
-  color: 'var(--theme-text)',
-  backgroundImage:
-    'radial-gradient(circle at 14% 18%, rgba(99, 199, 255, 0.14), transparent 19rem), radial-gradient(circle at 76% 8%, rgba(255, 179, 71, 0.08), transparent 22rem), linear-gradient(rgba(99, 199, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(99, 199, 255, 0.035) 1px, transparent 1px)',
-  backgroundSize: 'auto, auto, 36px 36px, 36px 36px',
-  '--theme-bg': '#050b16',
-  '--theme-sidebar': '#071426',
-  '--theme-panel': '#0a1b33',
-  '--theme-card': '#0d203b',
-  '--theme-card2': '#10284a',
-  '--theme-elevated': '#153a66',
-  '--theme-border': 'rgba(99, 199, 255, 0.24)',
-  '--theme-border-subtle': 'rgba(157, 220, 255, 0.12)',
-  '--theme-border-strong': 'rgba(255, 140, 26, 0.52)',
-  '--theme-text': '#ffd27a',
-  '--theme-text-strong': '#fff1cc',
-  '--theme-text-soft': '#d4a276',
-  '--theme-muted': 'rgba(157, 220, 255, 0.66)',
-  '--theme-muted-2': 'rgba(157, 220, 255, 0.44)',
-  '--theme-glass': 'rgba(5, 11, 22, 0.88)',
-  '--theme-focus': '#ffd27a',
-  '--theme-accent': '#ff8c1a',
-  '--theme-accent-secondary': '#ffb347',
-  '--theme-accent-soft': '#ffd27a',
-  '--theme-on-accent': '#050b16',
-  '--theme-blue': '#63c7ff',
-  '--theme-blue-secondary': '#9ddcff',
-  '--theme-blue-deep': '#153a66',
-  '--theme-blue-subtle': 'rgba(99, 199, 255, 0.1)',
-  '--theme-blue-border': 'rgba(99, 199, 255, 0.28)',
-  '--theme-accent-subtle': 'rgba(255, 140, 26, 0.1)',
-  '--theme-accent-border': 'rgba(255, 140, 26, 0.42)',
-  '--theme-glow-low': '0 0 10px rgba(255, 140, 26, 0.18)',
-  '--theme-glow-medium': '0 0 18px rgba(255, 140, 26, 0.28)',
-  '--theme-glow-high': '0 0 30px rgba(255, 179, 71, 0.38)',
-  '--theme-active': '#ff8c1a',
-  '--theme-link': '#9ddcff',
-  '--theme-success': '#63c7ff',
-  '--theme-warning': '#ffb347',
-  '--theme-danger': '#ff8c1a',
-  '--theme-stripe': 'rgba(99, 199, 255, 0.055)',
-  '--theme-header-bg': 'rgba(5, 11, 22, 0.94)',
-  '--theme-header-border': 'rgba(99, 199, 255, 0.18)',
-  '--theme-input': '#071426',
-  '--theme-hover': 'rgba(99, 199, 255, 0.1)',
-  '--color-surface': '#050b16',
-  '--color-surface-deep': '#020712',
-  '--color-ink': '#ffd27a',
-} as CSSProperties
 
 function toMilliseconds(value: number | null | undefined): number | null {
   if (!value || !Number.isFinite(value)) return null
@@ -1032,7 +984,7 @@ export function DashboardScreen() {
     <div
       data-nova-mission-control="true"
       className="min-h-full"
-      style={NOVA_MISSION_CONTROL_STYLE}
+      style={NOVA_COCKPIT_STYLE}
     >
       {/* Floating mobile nav: hamburger left, theme toggle right */}
       <div
