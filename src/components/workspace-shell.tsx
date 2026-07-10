@@ -21,7 +21,8 @@ import {
   useState,
 } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
+import type { AuthStatus } from '@/lib/claude-auth'
+import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
@@ -29,19 +30,11 @@ import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-// Lazy: ChatPanel statically imports ChatScreen and with it the chat
-// markdown pipeline; keeping it out of the eager entry means non-chat
-// routes stop paying for chat at first paint. The chat route itself
-// already lazy-loads ChatScreen through its own boundary.
-const ChatPanel = lazy(() =>
-  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
-)
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { MobilePageHeader } from '@/components/mobile-page-header'
-
 import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
 import { ClaudeReconnectBanner } from '@/components/claude-reconnect-banner'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
@@ -49,6 +42,14 @@ import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
+
+// Lazy: ChatPanel statically imports ChatScreen and with it the chat
+// markdown pipeline; keeping it out of the eager entry means non-chat
+// routes stop paying for chat at first paint. The chat route itself
+// already lazy-loads ChatScreen through its own boundary.
+const ChatPanel = lazy(() =>
+  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
+)
 
 const TerminalWorkspace = lazy(() =>
   import('@/components/terminal/terminal-workspace').then((m) => ({
