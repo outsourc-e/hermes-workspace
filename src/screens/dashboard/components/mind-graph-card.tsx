@@ -114,7 +114,10 @@ const NEBULA_MAX_SCALE = GALAXY_RADIUS * 0.28
 // Blend embers 20-30% toward their arm's logarithmic spiral path so the
 // dust arms read as the hero once the planet meshes are gone.
 const SPIRAL_ARM_COUNT = 3
-const SPIRAL_BLEND = 0.25
+// 0.25 left bodies 75% on the legacy settled-system layout — the scene read
+// as "the old galaxy combined with the new". Full replacement: bodies live
+// ON their spiral arm (small residual keeps per-cluster identity).
+const SPIRAL_BLEND = 0.88
 const SPIRAL_TO_SYSTEM_SCALE = 7.1
 
 function easeInOutCubic(t: number): number {

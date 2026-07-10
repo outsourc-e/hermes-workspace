@@ -87,6 +87,16 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   // ChatGPT-style: track visual viewport height for keyboard-aware layout
   useMobileKeyboard()
 
+  // Nova skin, app-wide: every module renders navy/amber via the
+  // html[data-nova-cockpit] override block in styles.css (Taylor's call —
+  // no green/teal shell anywhere, not just on the dashboard route).
+  useEffect(() => {
+    document.documentElement.dataset.novaCockpit = 'true'
+    return () => {
+      delete document.documentElement.dataset.novaCockpit
+    }
+  }, [])
+
   const [creatingSession, setCreatingSession] = useState(false)
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false

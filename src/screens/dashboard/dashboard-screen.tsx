@@ -951,16 +951,8 @@ export function DashboardScreen() {
     }
   }, [period])
 
-  // Full-viewport Nova skin: while Mission Control is mounted the WHOLE
-  // view — including the workspace shell (sidebar, status pills, top bar) —
-  // goes navy/amber via the html[data-nova-cockpit] override in styles.css.
-  // Spec: "once inside Mission Control, everything is Nova. No mixed skin."
-  useEffect(() => {
-    document.documentElement.dataset.novaCockpit = 'true'
-    return () => {
-      delete document.documentElement.dataset.novaCockpit
-    }
-  }, [])
+  // Nova skin stamping moved to WorkspaceShell (app-wide, always on) —
+  // Taylor: every module goes navy/amber, not just the dashboard.
 
   // Aggregate dashboard overview — surfaces the data the native
   // Hermes dashboard exposes (status, platforms, cron, achievements,
