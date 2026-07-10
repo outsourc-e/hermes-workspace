@@ -129,4 +129,25 @@ describe('cockpit chrome token tripwire', () => {
   it('GALAXY_PALETTE.blues stays untouched — neon blues are canon there, never in chrome', () => {
     expect(GALAXY_PALETTE.blues).toEqual(['#63C7FF', '#9DDCFF', '#2E7FD9'])
   })
+
+  it('actually sees a real number of colors — guards against silent parser drift', () => {
+    // If token values migrate to a format extractColors cannot parse, every
+    // hue assertion above passes vacuously. This floor makes that loud.
+    const total = entries.reduce(
+      (count, [, value]) => count + extractColors(value).length,
+      0,
+    )
+    expect(total).toBeGreaterThan(20)
+  })
+
+  it('no named CSS colors sneak past the hue parser', () => {
+    const NAMED_COLOR =
+      /\b(green|lime|olive|purple|violet|indigo|cyan|teal|aqua|magenta|fuchsia|emerald|blue|navy|red|pink|orange|yellow|white|black|gray|grey)\b/i
+    for (const [key, value] of entries) {
+      expect(
+        NAMED_COLOR.test(value),
+        `${key}="${value}" uses a named color the tripwire cannot hue-check — use hex/rgba`,
+      ).toBe(false)
+    }
+  })
 })
