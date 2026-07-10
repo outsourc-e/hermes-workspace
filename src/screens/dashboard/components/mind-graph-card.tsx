@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { GALAXY_PALETTE } from '../lib/nova-cockpit-theme'
 import {
+  armRankPlacement,
   buildGalaxyModel,
   clamp,
   clusterHue,
@@ -10,14 +11,12 @@ import {
   focusBodyForNavigation,
   focusDistanceForSystem,
   folderTintFor,
-  hashString,
   isHub,
   obsidianUri,
   recencyGlow,
   resolveProjectedLabels,
   selectLabelCandidates,
   shortTitle,
-  spiralPosition,
 } from './nova-galaxy-model'
 import type { VaultGraphInsights } from '../../../server/vault-graph-insights'
 import type {
@@ -29,11 +28,6 @@ import type {
   ProjectedLabel,
 } from './nova-galaxy-model'
 
-type DustField = {
-  positions: Float32Array
-  colors: Float32Array
-}
-
 type NebulaRegion = {
   armId: string
   color: string
@@ -44,7 +38,7 @@ type NebulaRegion = {
 
 type Galaxy3DProps = {
   model: GalaxyModel
-  dustField: DustField
+  bodyPlacements: Map<string, THREE.Vector3>
   nebulaRegions: Array<NebulaRegion>
   selectedBody: CelestialBody | null
   hoveredBody: CelestialBody | null
@@ -63,8 +57,8 @@ type CameraState = {
 }
 // Embers-only: every planet-kind body (including the core) renders as a
 // soft additive amber sprite instead of a textured sphere/ring/atmosphere
-// mesh trio. The core stacks two sprites (outer halo + inner glow); every
-// other planet is a single sprite.
+// mesh trio. The core stacks three sprites (outer halo + inner glow +
+// cluster halo); every other planet gets its ember sprite plus a halo.
 type PlanetObject = {
   body: CelestialBody
   system: PlanetarySystem
@@ -73,10 +67,16 @@ type PlanetObject = {
   baseScales: Array<number>
   baseOpacities: Array<number>
 }
+// Every note star — tag-kind or planet-kind — is a soft additive sprite
+// plus a soft tinted halo sprite. The galaxy IS the map: there is no
+// separate "marker mesh" tier for the smaller notes anymore.
 type TagObject = {
   body: CelestialBody
-  mesh: THREE.Mesh
-  material: THREE.MeshStandardMaterial
+  sprite: THREE.Sprite
+  material: THREE.SpriteMaterial
+  halo: THREE.Sprite
+  haloMaterial: THREE.SpriteMaterial
+  baseScale: number
 }
 type CometObject = {
   body: CelestialBody
@@ -97,28 +97,40 @@ const AMBER = '#FF8C1A'
 const GOLD = '#FFB347'
 const TAN = '#D4A276'
 const COPPER = '#7A441E'
-const NEUTRAL_TAG = '#C9B79A'
-const OVERVIEW_DISTANCE = 96
+// TILT_DEG=32 from the approved demo — steeper than the previous 16° pitch
+// so the disc reads as a tilted-plane spiral instead of a near-top-down view.
+const CAMERA_TILT_DEG = 32
+const CAMERA_TILT_RAD = (CAMERA_TILT_DEG * Math.PI) / 180
+// Distance tuned so the ~62-unit-radius spiral fills roughly 60% of frame
+// width at the 38° camera FOV (verified against the approved reference via
+// the screenshot verify-loop).
+const OVERVIEW_DISTANCE = 190
 const GLIDE_DURATION_MS = 600
 // Embers-only planet sizing: emberSize(degree) * ~2.2, matching the
 // approved dust-forward demo (no textured spheres/rings/atmospheres).
 const PLANET_EMBER_SCALE = 2.2
+// Every tag-kind note star — bigger per-star than the old marker-mesh era
+// so ~400 real notes still read as a living young galaxy even though they
+// are sparser than the old 19k-point procedural dust field (correctly so
+// — every point is now a real note, not decorative filler).
+const NOTE_EMBER_SCALE = 1.6
 const CORE_INNER_MULTIPLIER = 1.5
 const CORE_OUTER_MULTIPLIER = 2.7
-// Rough radius of the settled system layout (folderAnchor tops out around
-// 46 + 5*3.5) — used only as a reference scale for the nebula-clamp and
-// spiral-arm-blend math below, not an exact bound.
-const GALAXY_RADIUS = 62
-const NEBULA_MAX_OPACITY = 0.15
-const NEBULA_MAX_SCALE = GALAXY_RADIUS * 0.28
-// Blend embers 20-30% toward their arm's logarithmic spiral path so the
-// dust arms read as the hero once the planet meshes are gone.
-const SPIRAL_ARM_COUNT = 3
-// 0.25 left bodies 75% on the legacy settled-system layout — the scene read
-// as "the old galaxy combined with the new". Full replacement: bodies live
-// ON their spiral arm (small residual keeps per-cluster identity).
-const SPIRAL_BLEND = 0.88
-const SPIRAL_TO_SYSTEM_SCALE = 7.1
+// Every note star gets a soft tinted halo riding behind it. Kept modest —
+// with hundreds of real notes bulging near the core on a dense arm, a
+// bigger/brighter halo stacks additively into a blown-out disc instead of
+// a readable cluster of individual stars.
+const HALO_SCALE_MULTIPLIER = 2
+const HALO_OPACITY = 0.09
+// Reference radius for the nebula-scale clamp only — matches
+// armRankPlacement's own coordinate space (radius runs 2.5 .. 2.5 +
+// ARM_SPIRAL_MAX_RADIUS(52) = 54.5).
+const GALAXY_RADIUS = 54.5
+// Nebula sprites read as subtle tints riding the arms, not floating blobs:
+// 0.14-0.18 opacity per the approved demo.
+const NEBULA_MIN_OPACITY = 0.14
+const NEBULA_MAX_OPACITY = 0.18
+const NEBULA_MAX_SCALE = GALAXY_RADIUS * 0.22
 
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
@@ -191,41 +203,89 @@ function bodyPosition(body: CelestialBody): THREE.Vector3 {
   return new THREE.Vector3(body.baseX, body.baseY, body.baseZ)
 }
 
-/**
- * Nudge a body's (x, z) 20-30% toward the nearest point on its arm's
- * logarithmic spiral curve (same `spiralPosition` the dust field uses),
- * so embers read as riding the arms instead of scattering off them.
- * `spiralPosition`'s output lives in a much smaller coordinate space than
- * the settled system layout, so it is rescaled by SPIRAL_TO_SYSTEM_SCALE
- * before blending.
- */
-function armSpiralBlend(body: CelestialBody): { x: number; z: number } {
-  const radius = Math.hypot(body.baseX, body.baseZ)
-  const radiusNorm = clamp(radius / GALAXY_RADIUS, 0.04, 1)
-  const armIndex = body.armIndex % SPIRAL_ARM_COUNT
-  const seedIndex = hashString(body.id) % 100_000
-  const spiral = spiralPosition(seedIndex, armIndex, SPIRAL_ARM_COUNT, radiusNorm)
-  const targetX = spiral.x * SPIRAL_TO_SYSTEM_SCALE
-  const targetZ = spiral.z * SPIRAL_TO_SYSTEM_SCALE
-  return {
-    x: body.baseX + (targetX - body.baseX) * SPIRAL_BLEND,
-    z: body.baseZ + (targetZ - body.baseZ) * SPIRAL_BLEND,
-  }
-}
-
-/** Visual placement for an ember: planets/core/tags blend toward their
- * spiral arm; comets keep their own drifting-orphan base position. */
-function emberPosition(body: CelestialBody): THREE.Vector3 {
-  if (body.kind === 'comet') return bodyPosition(body)
-  const blended = armSpiralBlend(body)
-  return new THREE.Vector3(blended.x, body.baseY, blended.z)
-}
-
 /** Base sprite scale for a planet-kind ember: emberSize(degree) * ~2.2,
  * with a small size bump for hub bodies (mirrors the tag-ember rule). */
 function planetEmberBaseSize(body: CelestialBody): number {
   const hub = isHub(body.degree)
   return emberSize(body.degree) * PLANET_EMBER_SCALE * (hub ? 1.12 : 1)
+}
+
+/** Base sprite scale for a tag-kind note star: emberSize(degree) * ~1.6,
+ * with a small size bump for hub bodies. */
+function noteEmberBaseSize(body: CelestialBody): number {
+  const hub = isHub(body.degree)
+  return emberSize(body.degree) * NOTE_EMBER_SCALE * (hub ? 1.15 : 1)
+}
+
+type ArmRank = { rankInArm: number; armNoteCount: number }
+
+/**
+ * Ranks every planet-/tag-kind body within its arm by `modified` ascending
+ * (oldest first — missing dates sort as oldest of all), so armRankPlacement
+ * can place the oldest notes nearest the core and the newest at the
+ * growing tip. Core and comets are excluded — the core sits at the
+ * origin and comets keep their own drifting-orphan placement.
+ */
+function computeArmRanks(model: GalaxyModel): Map<string, ArmRank> {
+  const byArm = new Map<string, Array<CelestialBody>>()
+  for (const body of model.bodies) {
+    if (body.kind === 'core' || body.kind === 'comet') continue
+    const bucket = byArm.get(body.armId) ?? []
+    bucket.push(body)
+    byArm.set(body.armId, bucket)
+  }
+  const ranks = new Map<string, ArmRank>()
+  for (const bucket of byArm.values()) {
+    const sorted = [...bucket].sort((a, b) => {
+      const aTime = a.modified ? Date.parse(a.modified) : Number.NaN
+      const bTime = b.modified ? Date.parse(b.modified) : Number.NaN
+      const aValue = Number.isFinite(aTime) ? aTime : Number.NEGATIVE_INFINITY
+      const bValue = Number.isFinite(bTime) ? bTime : Number.NEGATIVE_INFINITY
+      if (aValue !== bValue) return aValue - bValue
+      return a.id.localeCompare(b.id)
+    })
+    sorted.forEach((body, index) => {
+      ranks.set(body.id, { rankInArm: index, armNoteCount: sorted.length })
+    })
+  }
+  return ranks
+}
+
+/**
+ * The one true screen position for every rendered body — the galaxy IS
+ * the map: every point of light comes from a real vault note, placed by
+ * `armRankPlacement` from its rank (oldest→newest) among its arm's real
+ * notes. No procedural dust, no blended legacy layout. The core sits at
+ * the origin; comets (orphans) keep their own drifting-rim position.
+ */
+function computeBodyPlacements(model: GalaxyModel): Map<string, THREE.Vector3> {
+  const ranks = computeArmRanks(model)
+  const armCount = Math.max(1, model.arms.length)
+  const placements = new Map<string, THREE.Vector3>()
+  for (const body of model.bodies) {
+    if (body.kind === 'core') {
+      placements.set(body.id, new THREE.Vector3(0, 0, 0))
+      continue
+    }
+    if (body.kind === 'comet') {
+      placements.set(body.id, bodyPosition(body))
+      continue
+    }
+    const rank = ranks.get(body.id)
+    if (!rank) {
+      placements.set(body.id, bodyPosition(body))
+      continue
+    }
+    const placed = armRankPlacement(
+      rank.rankInArm,
+      rank.armNoteCount,
+      body.armIndex,
+      armCount,
+      body.id,
+    )
+    placements.set(body.id, new THREE.Vector3(placed.x, placed.y, placed.z))
+  }
+  return placements
 }
 
 function createStarTexture(): THREE.Texture {
@@ -309,9 +369,6 @@ function createClusterNebula(color: string, opacity: number): THREE.Sprite {
   return new THREE.Sprite(material)
 }
 
-const DUST_POINTS_PER_ARM = 5500
-const DUST_ARM_COUNT = 3
-
 function clusterHueColor(hue: ReturnType<typeof clusterHue>): string {
   switch (hue) {
     case 'blue':
@@ -325,55 +382,38 @@ function clusterHueColor(hue: ReturnType<typeof clusterHue>): string {
   }
 }
 
-function buildDustField(): DustField {
-  const total = DUST_POINTS_PER_ARM * DUST_ARM_COUNT
-  const positions = new Float32Array(total * 3)
-  const colors = new Float32Array(total * 3)
-  let cursor = 0
-  for (let arm = 0; arm < DUST_ARM_COUNT; arm += 1) {
-    for (let i = 0; i < DUST_POINTS_PER_ARM; i += 1) {
-      const radiusNorm = i / DUST_POINTS_PER_ARM
-      const point = spiralPosition(i, arm, DUST_ARM_COUNT, radiusNorm)
-      positions[cursor * 3] = point.x
-      positions[cursor * 3 + 1] = point.y
-      positions[cursor * 3 + 2] = point.z
-      // amber core → neon-blue arms → deep-blue rim. The core stop must be
-      // warm gold, not near-white: white dust + additive stacking is what
-      // bloomed the dense center into the cyan-green hotspot.
-      const color = new THREE.Color()
-      if (radiusNorm < 0.18) color.set(GALAXY_PALETTE.ambers[2])
-      else if (radiusNorm < 0.62) color.set(GALAXY_PALETTE.blues[0])
-      else color.set(GALAXY_PALETTE.blues[2])
-      colors[cursor * 3] = color.r
-      colors[cursor * 3 + 1] = color.g
-      colors[cursor * 3 + 2] = color.b
-      cursor += 1
-    }
-  }
-  return { positions, colors }
-}
-
-function buildNebulaRegions(model: GalaxyModel): Array<NebulaRegion> {
+/**
+ * One nebula tint sprite per arm, positioned at the centroid of that
+ * arm's REAL star positions (not a point on some abstract curve) so the
+ * tint always reads as riding the actual notes. Scale grows with
+ * sqrt(note count) — more real notes, a visibly bigger cluster glow.
+ */
+function buildNebulaRegions(
+  model: GalaxyModel,
+  placements: Map<string, THREE.Vector3>,
+): Array<NebulaRegion> {
   return model.arms.map((arm, index) => {
-    const systemsInArm = model.systems.filter((s) => s.armId === arm.id)
-    const center = systemsInArm.reduce(
-      (acc, system) => ({
-        x: acc.x + system.baseX / Math.max(1, systemsInArm.length),
-        y: acc.y + system.baseY / Math.max(1, systemsInArm.length),
-        z: acc.z + system.baseZ / Math.max(1, systemsInArm.length),
-      }),
-      { x: 0, y: 0, z: 0 },
+    const armBodies = model.bodies.filter(
+      (body) => body.armId === arm.id && body.kind !== 'comet',
     )
+    const centroid = new THREE.Vector3()
+    let counted = 0
+    for (const body of armBodies) {
+      const position = placements.get(body.id)
+      if (!position) continue
+      centroid.add(position)
+      counted += 1
+    }
+    if (counted > 0) centroid.divideScalar(counted)
+    const noteCount = Math.max(1, armBodies.length)
     return {
       armId: arm.id,
       color: clusterHueColor(clusterHue(index)),
-      position: center,
-      // No single nebula blob may exceed ~28% of the galaxy radius — the
-      // old 26-50 range was blowing out into a solid bright wash.
-      scale: clamp(14 + Math.min(8, systemsInArm.length * 1.1), 8, NEBULA_MAX_SCALE),
+      position: { x: centroid.x, y: centroid.y, z: centroid.z },
+      scale: clamp(3 + Math.sqrt(noteCount) * 2.2, 6, NEBULA_MAX_SCALE),
       opacity: clamp(
-        0.06 + Math.min(0.05, systemsInArm.length * 0.008),
-        0.04,
+        NEBULA_MIN_OPACITY + Math.min(0.04, noteCount * 0.003),
+        NEBULA_MIN_OPACITY,
         NEBULA_MAX_OPACITY,
       ),
     }
@@ -390,7 +430,7 @@ type ClusterLabel = {
 
 function Galaxy3D({
   model,
-  dustField,
+  bodyPlacements,
   nebulaRegions,
   selectedBody,
   hoveredBody,
@@ -412,7 +452,7 @@ function Galaxy3D({
   const reducedMotionRef = useRef(false)
   const cameraStateRef = useRef<CameraState>({
     yaw: -0.92,
-    pitch: 0.28,
+    pitch: CAMERA_TILT_RAD,
     distance: OVERVIEW_DISTANCE,
     target: new THREE.Vector3(0, 4, 0),
   })
@@ -448,6 +488,12 @@ function Galaxy3D({
     })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
     renderer.setClearColor(SPACE, 1)
+    // Hundreds of real notes stack additive ember + halo sprites, densest
+    // right at the core where the log spiral bulges — filmic tone mapping
+    // gives that stack a soft rolloff instead of clipping to a flat white
+    // disc, matching the reference's warm-but-textured core.
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 0.82
     renderer.domElement.className =
       'nova-galaxy-canvas absolute inset-0 size-full'
     renderer.domElement.setAttribute(
@@ -469,69 +515,10 @@ function Galaxy3D({
     rim.position.set(18, 8, -40)
     scene.add(ambient, key, coreLight, fill, rim)
 
-    const starPositions = new Float32Array(model.starfield.length * 3)
-    const starColors = new Float32Array(model.starfield.length * 3)
-    model.starfield.forEach((star, index) => {
-      starPositions[index * 3] = star.x
-      starPositions[index * 3 + 1] = star.y
-      starPositions[index * 3 + 2] = star.z
-      const color = new THREE.Color(star.warm ? '#FFD27A' : '#FFF1CC')
-      color.multiplyScalar(star.alpha)
-      starColors[index * 3] = color.r
-      starColors[index * 3 + 1] = color.g
-      starColors[index * 3 + 2] = color.b
-    })
-    const starGeometry = new THREE.BufferGeometry()
-    starGeometry.setAttribute(
-      'position',
-      new THREE.BufferAttribute(starPositions, 3),
-    )
-    starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
-    const stars = new THREE.Points(
-      starGeometry,
-      new THREE.PointsMaterial({
-        map: createStarTexture(),
-        size: 0.46,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.76,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    )
-    scene.add(stars)
-
-    const dustGeometry = new THREE.BufferGeometry()
-    dustGeometry.setAttribute(
-      'position',
-      new THREE.BufferAttribute(dustField.positions, 3),
-    )
-    dustGeometry.setAttribute(
-      'color',
-      new THREE.BufferAttribute(dustField.colors, 3),
-    )
+    // No decorative starfield, no procedural dust field. Every rendered
+    // light from here on is a real vault note (or its halo / a link
+    // filament / a cluster nebula / the core) — the galaxy IS the map.
     const starTexture = createStarTexture()
-    const dust = new THREE.Points(
-      dustGeometry,
-      new THREE.PointsMaterial({
-        // Soft-sprite texture + larger size: at overview distance (~96) the
-        // untextured 0.22 points were sub-pixel and the spiral read as empty
-        // space. Dust-forward means the arms must visibly carry the scene.
-        map: starTexture,
-        size: 0.62,
-        vertexColors: true,
-        transparent: true,
-        // 0.62 opacity overexposed dense regions: additive stacking bloomed
-        // past blue into white-teal (reads green). Keep arms visible but let
-        // the core saturate warm instead of clipping to white.
-        opacity: 0.4,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    )
-    const dustGroup = new THREE.Group()
-    dustGroup.add(dust)
-    scene.add(dustGroup)
 
     const nebulaSprites = nebulaRegions.map((region) => {
       const sprite = createClusterNebula(region.color, region.opacity)
@@ -543,18 +530,21 @@ function Galaxy3D({
 
     const planetObjects = new Map<string, PlanetObject>()
     const tagObjects: Array<TagObject> = []
-    const tagGeometry = new THREE.IcosahedronGeometry(0.28, 1)
     const hitObjects: Array<THREE.Object3D> = []
     const bodyPositions = new Map<string, THREE.Vector3>()
+    // Every rendered body's screen position comes from armRankPlacement,
+    // computed once up front in the card's data-prep (bodyPlacements).
+    // Clone on read — the placements map is shared across renders/labels.
+    const getPosition = (id: string): THREE.Vector3 => {
+      const found = bodyPlacements.get(id)
+      return found ? found.clone() : new THREE.Vector3()
+    }
 
     for (const system of model.systems) {
       const body = system.planet
-      const armTint =
-        model.arms.find((arm) => arm.id === system.planet.armId)?.tint ??
-        folderTintFor(system.folder)
       const planetHub = isHub(body.degree)
       const baseSize = planetEmberBaseSize(body)
-      const position = emberPosition(body)
+      const position = getPosition(body.id)
       const sprites: Array<THREE.Sprite> = []
       const materials: Array<THREE.SpriteMaterial> = []
       const baseScales: Array<number> = []
@@ -570,7 +560,10 @@ function Galaxy3D({
         outer.scale.set(outerScale, outerScale, 1)
         outer.position.copy(position)
         outer.userData.bodyId = body.id
-        const inner = createEmberSprite(starTexture, GOLD, 0.92)
+        // Warm white, not gold: the reference core is a bright compact
+        // white-hot point that fades to amber at its edge (the AMBER outer
+        // halo below), not a solid gold disc.
+        const inner = createEmberSprite(starTexture, '#FFF1CC', 0.95)
         inner.scale.set(innerScale, innerScale, 1)
         inner.position.copy(position)
         inner.userData.bodyId = body.id
@@ -582,13 +575,26 @@ function Galaxy3D({
         )
         baseScales.push(outerScale, innerScale)
         baseOpacities.push(0.4, 0.92)
+
+        // Every star gets a soft halo, including the core.
+        const haloScale = outerScale * HALO_SCALE_MULTIPLIER
+        const halo = createEmberSprite(starTexture, folderTintFor(body.folder), HALO_OPACITY)
+        halo.scale.set(haloScale, haloScale, 1)
+        halo.position.copy(position)
+        scene.add(halo)
+        sprites.push(halo)
+        materials.push(halo.material as THREE.SpriteMaterial)
+        baseScales.push(haloScale)
+        baseOpacities.push(HALO_OPACITY)
       } else {
-        // Every other planet-kind body: a single large amber ember, no
-        // textured sphere/ring/atmosphere meshes.
+        // Every other planet-kind body: a single large ember, no textured
+        // sphere/ring/atmosphere meshes. Amber is reserved for hub embers
+        // (+ the core glow + one amber cluster tint) — regular planets read
+        // neon-blue so the arms stay blue-dominant per the reference.
         const scale = baseSize
         const sprite = createEmberSprite(
           starTexture,
-          planetHub ? GOLD : AMBER,
+          planetHub ? GOLD : GALAXY_PALETTE.blues[0],
           planetHub ? 0.92 : 0.82,
         )
         sprite.scale.set(scale, scale, 1)
@@ -599,6 +605,17 @@ function Galaxy3D({
         materials.push(sprite.material as THREE.SpriteMaterial)
         baseScales.push(scale)
         baseOpacities.push(planetHub ? 0.92 : 0.82)
+
+        // Every star gets a soft halo, tinted by its cluster.
+        const haloScale = scale * HALO_SCALE_MULTIPLIER
+        const halo = createEmberSprite(starTexture, folderTintFor(body.folder), HALO_OPACITY)
+        halo.scale.set(haloScale, haloScale, 1)
+        halo.position.copy(position)
+        scene.add(halo)
+        sprites.push(halo)
+        materials.push(halo.material as THREE.SpriteMaterial)
+        baseScales.push(haloScale)
+        baseOpacities.push(HALO_OPACITY)
       }
 
       bodyPositions.set(body.id, position.clone())
@@ -611,35 +628,46 @@ function Galaxy3D({
         baseOpacities,
       })
       for (const tag of system.tags) {
-        const tagMaterial = new THREE.MeshStandardMaterial({
-          color: NEUTRAL_TAG,
-          emissive: new THREE.Color(armTint),
-          emissiveIntensity: tag.recencyTier === 'hot' ? 0.46 : 0.12,
-          roughness: 0.58,
-          metalness: 0.12,
-          transparent: true,
-          opacity: 0.88,
-        })
-        const marker = new THREE.Mesh(tagGeometry, tagMaterial)
-        marker.position.copy(emberPosition(tag))
-        const nowIso = new Date().toISOString()
-        const glow = recencyGlow(tag.modified ?? tag.updated ?? '', nowIso)
+        const armTint =
+          model.arms.find((arm) => arm.id === tag.armId)?.tint ??
+          folderTintFor(tag.folder)
         const hub = isHub(tag.degree)
-        marker.scale.setScalar(emberSize(tag.degree) * (hub ? 1.15 : 1))
-        tagMaterial.emissiveIntensity = hub ? 0.55 : 0.12 + glow * 0.3
-        tagMaterial.emissive = new THREE.Color(hub ? AMBER : armTint)
-        marker.userData.bodyId = tag.id
-        bodyPositions.set(tag.id, marker.position.clone())
-        hitObjects.push(marker)
-        scene.add(marker)
-        tagObjects.push({ body: tag, mesh: marker, material: tagMaterial })
+        const baseScale = noteEmberBaseSize(tag)
+        const tagPosition = getPosition(tag.id)
+
+        const sprite = createEmberSprite(
+          starTexture,
+          hub ? GOLD : armTint,
+          hub ? 0.88 : 0.62,
+        )
+        sprite.scale.set(baseScale, baseScale, 1)
+        sprite.position.copy(tagPosition)
+        sprite.userData.bodyId = tag.id
+        scene.add(sprite)
+
+        const haloScale = baseScale * HALO_SCALE_MULTIPLIER
+        const halo = createEmberSprite(starTexture, folderTintFor(tag.folder), HALO_OPACITY)
+        halo.scale.set(haloScale, haloScale, 1)
+        halo.position.copy(tagPosition)
+        scene.add(halo)
+
+        bodyPositions.set(tag.id, tagPosition.clone())
+        hitObjects.push(sprite)
+        tagObjects.push({
+          body: tag,
+          sprite,
+          material: sprite.material as THREE.SpriteMaterial,
+          halo,
+          haloMaterial: halo.material as THREE.SpriteMaterial,
+          baseScale,
+        })
       }
     }
 
     const cometObjects: Array<CometObject> = []
     model.comets.forEach((body) => {
       const group = new THREE.Group()
-      group.position.copy(bodyPosition(body))
+      group.position.copy(getPosition(body.id))
       const material = new THREE.MeshBasicMaterial({
         color: TAN,
         transparent: true,
@@ -693,7 +721,7 @@ function Galaxy3D({
       cameraStateRef.current.target.copy(homeTarget)
       cameraStateRef.current.distance = OVERVIEW_DISTANCE
       cameraStateRef.current.yaw = -0.92
-      cameraStateRef.current.pitch = 0.28
+      cameraStateRef.current.pitch = CAMERA_TILT_RAD
     }
     const lineObjects: Array<LineObject> = []
     for (const link of model.links) {
@@ -714,7 +742,7 @@ function Galaxy3D({
           ? folderTintFor(sourceBody?.folder ?? 'vault')
           : GOLD,
         transparent: true,
-        opacity: sameSystem ? 0.05 : 0.028,
+        opacity: sameSystem ? 0.09 : 0.028,
         dashSize: sameSystem ? 0.22 : 0.34,
         gapSize: sameSystem ? 0.36 : 0.5,
         depthWrite: false,
@@ -841,10 +869,10 @@ function Galaxy3D({
       if (!selected && !isDragging && !reducedMotionRef.current) {
         state.yaw += Math.sin(now / 14000) * 0.00016 + 0.00012
         state.pitch +=
-          (0.28 + Math.sin(now / 21000) * 0.03 - state.pitch) * 0.01
+          (CAMERA_TILT_RAD + Math.sin(now / 21000) * 0.03 - state.pitch) * 0.01
       }
       state.pitch = clamp(state.pitch, -0.62, 0.78)
-      state.distance = clamp(state.distance, 11, 140)
+      state.distance = clamp(state.distance, 11, 220)
       const appliedYaw = state.yaw + parallaxYaw
       const appliedPitch = clamp(state.pitch + parallaxPitch, -0.62, 0.78)
       const cosPitch = Math.cos(appliedPitch)
@@ -922,19 +950,20 @@ function Galaxy3D({
           tag.body.recencyTier === 'hot' && !reducedMotionRef.current
             ? 1 + Math.sin(now / 680 + tag.body.orbitPhase) * 0.13
             : 1
-        const hub = isHub(tag.body.degree)
+        // recencyGlow drives alpha so this week's notes visibly shine.
         const glow = recencyGlow(tag.body.modified ?? tag.body.updated ?? '', nowIso)
-        const baseScale = emberSize(tag.body.degree) * (hub ? 1.15 : 1)
-        tag.mesh.scale.setScalar(baseScale * pulse * (active ? 1.28 : linked ? 1.12 : 1))
+        const activeBoost = active ? 1.28 : linked ? 1.12 : 1
+        const scale = tag.baseScale * pulse * activeBoost
+        tag.sprite.scale.set(scale, scale, 1)
         tag.material.opacity =
           opacity * (active ? 1 : linked ? 0.88 : 0.62) * (0.55 + glow * 0.45)
-        tag.material.emissiveIntensity = hub
-          ? 0.78
-          : active
-            ? 0.6
-            : linked
-              ? 0.5
-              : 0.12 + glow * 0.3
+        const haloScale = scale * HALO_SCALE_MULTIPLIER
+        tag.halo.scale.set(haloScale, haloScale, 1)
+        tag.haloMaterial.opacity = clamp(
+          opacity * HALO_OPACITY * (0.55 + glow * 0.45) * (active ? 1.4 : linked ? 1.15 : 1),
+          0,
+          0.22,
+        )
       }
       for (const comet of cometObjects) {
         const drift = reducedMotionRef.current
@@ -968,19 +997,21 @@ function Galaxy3D({
             (target && matchesSearch(target, query))),
         )
         const backbone = link.strength >= 12
+        const sameSystem =
+          Boolean(source?.systemId) && source?.systemId === target?.systemId
         if (isHoverFlare) {
           link.material.color.set(GALAXY_PALETTE.blues[0])
           link.material.opacity = 0.72
         } else {
           link.material.color.set(
-            source && target && source.systemId === target.systemId
-              ? folderTintFor(source.folder)
-              : GOLD,
+            sameSystem && source ? folderTintFor(source.folder) : GOLD,
           )
+          // Same-cluster filaments read slightly brighter at rest so the
+          // constellation structure between real notes stays legible.
           if (active) link.material.opacity = 0.42
           else if (searched) link.material.opacity = 0.22
           else if (backbone) link.material.opacity = 0.07
-          else link.material.opacity = 0.025
+          else link.material.opacity = sameSystem ? 0.09 : 0.025
         }
       }
     }
@@ -1001,7 +1032,7 @@ function Galaxy3D({
       const projected: Array<ProjectedLabel> = []
       const vector = new THREE.Vector3()
       for (const candidate of candidates) {
-        const point = emberPosition(candidate.body)
+        const point = getPosition(candidate.body.id)
         if (candidate.kind === 'planet') {
           const right = new THREE.Vector3().setFromMatrixColumn(
             camera.matrixWorld,
@@ -1090,7 +1121,6 @@ function Galaxy3D({
 
     const animate = (now: number) => {
       if (!reducedMotionRef.current) {
-        dustGroup.rotation.y = (now / ROTATION_PERIOD_MS) * Math.PI * 2
         for (const sprite of nebulaSprites) {
           sprite.material.rotation =
             (now / ROTATION_PERIOD_MS) * Math.PI * 2 * 0.4
@@ -1150,7 +1180,7 @@ function Galaxy3D({
       const vector = new THREE.Vector3()
       emberScreenPositions.clear()
       for (const tag of tagObjects) {
-        vector.copy(tag.mesh.position).project(camera)
+        vector.copy(tag.sprite.position).project(camera)
         if (vector.z < -1 || vector.z > 1) continue
         emberScreenPositions.set(tag.body.id, {
           x: (vector.x * 0.5 + 0.5) * width,
@@ -1225,7 +1255,7 @@ function Galaxy3D({
       cameraStateRef.current.distance = clamp(
         cameraStateRef.current.distance,
         12,
-        140,
+        220,
       )
     }
 
@@ -1291,7 +1321,7 @@ function Galaxy3D({
       renderer.dispose()
       host.removeChild(renderer.domElement)
     }
-  }, [model, dustField, nebulaRegions, onHover, onSelect])
+  }, [model, bodyPlacements, nebulaRegions, onHover, onSelect])
 
   return (
     <div ref={hostRef} className="absolute inset-0 overflow-hidden">
@@ -1416,8 +1446,11 @@ export function MindGraphCard() {
     () => buildGalaxyModel(graphQuery.data),
     [graphQuery.data],
   )
-  const dustField = useMemo(() => buildDustField(), [])
-  const nebulaRegions = useMemo(() => buildNebulaRegions(model), [model])
+  const bodyPlacements = useMemo(() => computeBodyPlacements(model), [model])
+  const nebulaRegions = useMemo(
+    () => buildNebulaRegions(model, bodyPlacements),
+    [model, bodyPlacements],
+  )
   const selectedBody = selectedId
     ? (model.bodyById.get(selectedId) ?? null)
     : null
@@ -1517,7 +1550,7 @@ export function MindGraphCard() {
           <div className="nova-galaxy-field relative mt-3 h-[58vh] min-h-[360px] flex-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] lg:h-[70vh] lg:min-h-[560px]">
             <Galaxy3D
               model={model}
-              dustField={dustField}
+              bodyPlacements={bodyPlacements}
               nebulaRegions={nebulaRegions}
               selectedBody={selectedBody}
               hoveredBody={hoveredBody}

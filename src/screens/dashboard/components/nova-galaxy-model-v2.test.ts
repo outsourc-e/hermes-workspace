@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   HUB_DEGREE_THRESHOLD,
+  armRankPlacement,
+  armTurnsForNoteCount,
   clusterHue,
   emberSize,
   folderTintFor,
@@ -8,7 +10,6 @@ import {
   isHub,
   mulberry32,
   recencyGlow,
-  spiralPosition,
 } from './nova-galaxy-model'
 
 describe('mulberry32 + gaussianFrom', () => {
@@ -33,32 +34,87 @@ describe('mulberry32 + gaussianFrom', () => {
   })
 })
 
-describe('spiralPosition', () => {
-  it('is deterministic — same inputs produce the same outputs', () => {
-    const a = spiralPosition(5, 1, 3, 0.6)
-    const b = spiralPosition(5, 1, 3, 0.6)
+describe('armTurnsForNoteCount', () => {
+  it('grows with the arm real note count — more notes, longer (more-wound) arm', () => {
+    expect(armTurnsForNoteCount(10)).toBeLessThan(armTurnsForNoteCount(40))
+    expect(armTurnsForNoteCount(40)).toBeLessThan(armTurnsForNoteCount(200))
+  })
+
+  it('clamps to [1.6, 6.4]', () => {
+    expect(armTurnsForNoteCount(0)).toBe(1.6)
+    expect(armTurnsForNoteCount(-5)).toBe(1.6)
+    expect(armTurnsForNoteCount(10_000)).toBe(6.4)
+  })
+})
+
+describe('armRankPlacement', () => {
+  it('is deterministic for identical inputs', () => {
+    const a = armRankPlacement(3, 12, 1, 4, 'note-a.md')
+    const b = armRankPlacement(3, 12, 1, 4, 'note-a.md')
     expect(a).toEqual(b)
   })
 
-  it('differs across arms for the same seed and radius', () => {
-    const arm0 = spiralPosition(5, 0, 3, 0.6)
-    const arm1 = spiralPosition(5, 1, 3, 0.6)
-    expect(arm0).not.toEqual(arm1)
+  it('produces different jittered output for a different seedKey', () => {
+    const a = armRankPlacement(3, 12, 1, 4, 'note-a.md')
+    const b = armRankPlacement(3, 12, 1, 4, 'note-b.md')
+    expect(a).not.toEqual(b)
   })
 
-  it('radius grows with radiusNorm — low radiusNorm stays near the core, high radiusNorm reaches the rim', () => {
-    // radiusNorm gates the exponential term multiplicatively, so the
-    // gap between a low and high sample dwarfs the bounded jitter
-    // term at every seed — this is a wide-margin comparison, not an
-    // exact-boundary one, precisely so it isn't seed-flaky.
-    for (let seed = 1; seed <= 10; seed += 1) {
-      const near = spiralPosition(seed, 0, 3, 0.05)
-      const far = spiralPosition(seed, 0, 3, 0.95)
-      const nearRadius = Math.hypot(near.x, near.z)
-      const farRadius = Math.hypot(far.x, far.z)
-      expect(farRadius, `seed ${seed}: far=${farRadius} near=${nearRadius}`).toBeGreaterThan(
-        nearRadius,
+  it('radius strictly grows with rank (raw, before jitter)', () => {
+    const armNoteCount = 24
+    let previousRadius = -Infinity
+    for (let rank = 0; rank < armNoteCount; rank += 1) {
+      const point = armRankPlacement(rank, armNoteCount, 0, 3, 'seed', {
+        raw: true,
+      })
+      const radius = Math.hypot(point.x, point.z)
+      expect(
+        radius,
+        `rank ${rank}: radius ${radius} should exceed previous ${previousRadius}`,
+      ).toBeGreaterThan(previousRadius)
+      previousRadius = radius
+    }
+  })
+
+  it('tNorm walks from just-off-core toward the tip as rank increases', () => {
+    const near = armRankPlacement(0, 20, 0, 3, 'seed')
+    const far = armRankPlacement(19, 20, 0, 3, 'seed')
+    expect(near.tNorm).toBeLessThan(far.tNorm)
+    expect(near.tNorm).toBeGreaterThan(0)
+    expect(far.tNorm).toBeLessThan(1)
+  })
+
+  it('a longer (more-populated) arm reaches farther at its tip than a shorter one', () => {
+    // Same relative tip rank (last note in the arm), but a much larger
+    // armNoteCount both raises `turns` (armTurnsForNoteCount) and pushes
+    // tNorm closer to 1 — the growth mechanic: more notes, longer arm.
+    const shortArmTip = armRankPlacement(9, 10, 0, 3, 'seed', { raw: true })
+    const longArmTip = armRankPlacement(199, 200, 0, 3, 'seed', { raw: true })
+    const shortRadius = Math.hypot(shortArmTip.x, shortArmTip.z)
+    const longRadius = Math.hypot(longArmTip.x, longArmTip.z)
+    expect(longRadius).toBeGreaterThan(shortRadius)
+  })
+
+  it('distinct arms never share an armOffset — same rank/count/seed places differently per arm', () => {
+    const armCount = 5
+    const seen = new Set<string>()
+    for (let armIndex = 0; armIndex < armCount; armIndex += 1) {
+      const point = armRankPlacement(2, 10, armIndex, armCount, 'seed', {
+        raw: true,
+      })
+      const key = `${point.x.toFixed(6)}:${point.z.toFixed(6)}`
+      expect(seen.has(key), `armIndex ${armIndex} collided with a prior arm`).toBe(
+        false,
       )
+      seen.add(key)
+    }
+  })
+
+  it('stays deterministic across repeated calls even with jitter enabled', () => {
+    for (let i = 0; i < 20; i += 1) {
+      const a = armRankPlacement(i, 30, 2, 4, `note-${i}.md`)
+      const b = armRankPlacement(i, 30, 2, 4, `note-${i}.md`)
+      expect(a).toEqual(b)
     }
   })
 })

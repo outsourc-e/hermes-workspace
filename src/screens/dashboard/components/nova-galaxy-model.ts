@@ -77,16 +77,6 @@ export type PlanetarySystem = {
   armPosition: number
 }
 
-export type StarfieldPoint = {
-  x: number
-  y: number
-  z: number
-  r: number
-  layer: number
-  alpha: number
-  warm: boolean
-}
-
 export type GalaxyConstellationLink = KnowledgeGraphEdge & {
   strength: number
 }
@@ -100,7 +90,6 @@ export type GalaxyModel = {
   bodyById: Map<string, CelestialBody>
   systemById: Map<string, PlanetarySystem>
   systemByBodyId: Map<string, PlanetarySystem>
-  starfield: Array<StarfieldPoint>
   links: Array<GalaxyConstellationLink>
   totals: {
     bodies: number
@@ -394,36 +383,88 @@ export function gaussianFrom(rng: () => number): number {
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
 }
 
-const SPIRAL_A = 1.6
-const SPIRAL_B = 0.28
-const SPIRAL_THETA_SPAN = 6.2
+// The galaxy IS the map: every rendered light is a real vault note, and
+// this is the one true placement function for it. No procedural dust, no
+// decorative starfield, no blended legacy layout — a note's position is
+// derived entirely from its rank (oldest→newest) among its arm's real
+// notes. MAX_RADIUS is the coordinate space every note-star lives in.
+export const ARM_SPIRAL_MAX_RADIUS = 52
+const ARM_SPIRAL_MIN_TURNS = 1.6
+const ARM_SPIRAL_MAX_TURNS = 6.4
+const ARM_SPIRAL_GROWTH_DIVISOR = 16
+const ARM_SPIRAL_B = 0.28
 
 /**
- * A point on a 3-arm logarithmic spiral (r = a·e^(bθ)), with
- * deterministic gaussian scatter layered on top so the arm reads as
- * dust rather than a clean line. `radiusNorm` in [0, 1] gates both the
- * radius (0 = core, 1 = rim) and the scatter width (dust is tighter
- * near the core, wider toward the rim).
+ * How many revolutions an arm winds through, driven by how many real
+ * notes actually live on it — the growth mechanic: more notes, longer
+ * (more-wound) arm. Exposed on its own so callers/tests can assert the
+ * growth relationship without re-deriving it from armRankPlacement's
+ * (x, y, z) output.
  */
-export function spiralPosition(
-  seedIndex: number,
+export function armTurnsForNoteCount(armNoteCount: number): number {
+  return clamp(
+    ARM_SPIRAL_MIN_TURNS + armNoteCount / ARM_SPIRAL_GROWTH_DIVISOR,
+    ARM_SPIRAL_MIN_TURNS,
+    ARM_SPIRAL_MAX_TURNS,
+  )
+}
+
+export type ArmRankPlacementOptions = {
+  /** Skip deterministic jitter — used by tests asserting the clean,
+   * monotonic radius/angle relationship before scatter is layered on. */
+  raw?: boolean
+}
+
+/**
+ * Places a single real note on its arm's logarithmic spiral, ranked by
+ * age among its arm's real notes (`rankInArm` of `armNoteCount`, both
+ * 0-based/1-based per the tNorm formula below — oldest near the core,
+ * newest at the growing tip). `turns` grows with the arm's real note
+ * count, so an arm with more notes winds further: the spiral physically
+ * grows as the vault grows. Deterministic gaussian jitter (seeded from
+ * `seedKey`, typically the note's id) keeps the arm reading as organic
+ * scatter rather than a clean line, without breaking reproducibility.
+ */
+export function armRankPlacement(
+  rankInArm: number,
+  armNoteCount: number,
   armIndex: number,
   armCount: number,
-  radiusNorm: number,
-): { x: number; y: number; z: number } {
-  const rng = mulberry32(seedIndex)
-  const armOffset = (Math.PI * 2 * armIndex) / Math.max(1, armCount)
-  const clampedRadius = clamp(radiusNorm, 0, 1)
-  const theta = clampedRadius * SPIRAL_THETA_SPAN + armOffset
-  const r = SPIRAL_A * Math.exp(SPIRAL_B * theta) * clampedRadius
-  const scatter = 1 - clampedRadius * 0.4
-  const jitterX = gaussianFrom(rng) * scatter * 2.4
-  const jitterY = gaussianFrom(rng) * scatter * 1.1
-  const jitterZ = gaussianFrom(rng) * scatter * 2.4
+  seedKey: string,
+  options?: ArmRankPlacementOptions,
+): { x: number; y: number; z: number; tNorm: number } {
+  const safeArmNoteCount = Math.max(0, armNoteCount)
+  const tNorm = (rankInArm + 1) / (safeArmNoteCount + 1)
+  const turns = armTurnsForNoteCount(safeArmNoteCount)
+  const armOffset = (armIndex * Math.PI * 2) / Math.max(1, armCount)
+  const theta = tNorm * turns
+  const norm =
+    (Math.exp(ARM_SPIRAL_B * theta) - 1) /
+    (Math.exp(ARM_SPIRAL_B * turns) - 1)
+  const radius = 2.5 + ARM_SPIRAL_MAX_RADIUS * norm
+  const angle = armOffset + theta
+
+  if (options?.raw) {
+    return {
+      x: Math.cos(angle) * radius,
+      y: 0,
+      z: Math.sin(angle) * radius,
+      tNorm,
+    }
+  }
+
+  const rng = mulberry32(hashString(seedKey))
+  const radialJitter = gaussianFrom(rng) * (0.8 + radius * 0.045)
+  const angularJitter = gaussianFrom(rng) * 0.05
+  const heightJitter = gaussianFrom(rng) * (3.2 * Math.exp(-radius / 18) + 0.25)
+  const finalRadius = Math.max(0.4, radius + radialJitter)
+  const finalAngle = angle + angularJitter
+
   return {
-    x: Math.cos(theta) * r + jitterX,
-    y: jitterY,
-    z: Math.sin(theta) * r + jitterZ,
+    x: Math.cos(finalAngle) * finalRadius,
+    y: heightJitter,
+    z: Math.sin(finalAngle) * finalRadius,
+    tNorm,
   }
 }
 
@@ -728,22 +769,6 @@ function cometPoint(index: number, total: number, seed: string): Vec3 {
   }
 }
 
-function createStarfield(): Array<StarfieldPoint> {
-  return Array.from({ length: 1350 }, (_, index) => {
-    const seed = `star:${index}`
-    const layer = index % 3
-    return {
-      x: (seededUnit(`${seed}:x`) - 0.5) * (150 + layer * 70),
-      y: (seededUnit(`${seed}:y`) - 0.5) * (90 + layer * 42),
-      z: (seededUnit(`${seed}:z`) - 0.5) * (150 + layer * 90),
-      r: 0.035 + layer * 0.018 + seededUnit(`${seed}:r`) * 0.04,
-      layer,
-      alpha: 0.18 + seededUnit(`${seed}:a`) * 0.58,
-      warm: seededUnit(`${seed}:warm`) > 0.78,
-    }
-  })
-}
-
 function strongestLinks(
   bodies: Array<CelestialBody>,
   edges: Array<KnowledgeGraphEdge>,
@@ -986,7 +1011,6 @@ export function buildGalaxyModel(
     bodyById,
     systemById,
     systemByBodyId,
-    starfield: createStarfield(),
     links: strongestLinks(bodies, edges),
     totals: {
       bodies: nodes.length,
