@@ -3,47 +3,7 @@ import type {
   DashboardLiveSystemsSection,
   LiveSystemStatus,
 } from '@/server/dashboard-aggregator'
-
-const STATUS_META: Record<
-  LiveSystemStatus,
-  { label: string; dot: string; tone: string }
-> = {
-  operational: {
-    label: 'operational',
-    dot: 'bg-[var(--theme-success)]',
-    tone: 'border-[color-mix(in_srgb,var(--theme-success)_35%,var(--theme-border))] text-[var(--theme-success)]',
-  },
-  connected: {
-    label: 'connected',
-    dot: 'bg-[color-mix(in_srgb,var(--theme-success)_60%,var(--theme-muted))]',
-    tone: 'border-[color-mix(in_srgb,var(--theme-success)_22%,var(--theme-border))] text-[color-mix(in_srgb,var(--theme-success)_70%,var(--theme-text))]',
-  },
-  reachable: {
-    label: 'reachable',
-    dot: 'bg-[var(--theme-accent)]',
-    tone: 'border-[color-mix(in_srgb,var(--theme-accent)_30%,var(--theme-border))] text-[var(--theme-accent)]',
-  },
-  'approval-gated': {
-    label: 'needs Taylor',
-    dot: 'bg-[var(--theme-warning)]',
-    tone: 'border-[color-mix(in_srgb,var(--theme-warning)_45%,var(--theme-border))] text-[var(--theme-warning)]',
-  },
-  degraded: {
-    label: 'degraded',
-    dot: 'bg-[var(--theme-warning)]',
-    tone: 'border-[color-mix(in_srgb,var(--theme-warning)_35%,var(--theme-border))] text-[var(--theme-warning)]',
-  },
-  offline: {
-    label: 'offline',
-    dot: 'bg-[var(--theme-danger)]',
-    tone: 'border-[color-mix(in_srgb,var(--theme-danger)_35%,var(--theme-border))] text-[var(--theme-danger)]',
-  },
-  'not-wired': {
-    label: 'not wired',
-    dot: 'bg-[var(--theme-muted)]',
-    tone: 'border-[var(--theme-border)] text-[var(--theme-muted)]',
-  },
-}
+import { STATUS_TONE } from '../lib/status-meta'
 
 function formatTime(value: string | null): string {
   if (!value) return 'no heartbeat'
@@ -58,7 +18,7 @@ function formatTime(value: string | null): string {
 }
 
 function StatusPill({ status }: { status: LiveSystemStatus }) {
-  const meta = STATUS_META[status]
+  const meta = STATUS_TONE(status)
   return (
     <span
       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.13em] ${meta.tone}`}

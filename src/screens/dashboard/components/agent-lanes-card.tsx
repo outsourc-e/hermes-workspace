@@ -2,21 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import type {
   AgentLane,
   AgentLaneRegistry,
-  AgentLaneStatus,
 } from '../../../server/agent-lane-registry'
+import { STATUS_TONE } from '../lib/status-meta'
 
 async function readLanes(): Promise<AgentLaneRegistry> {
   const response = await fetch('/api/agent-lanes')
   if (!response.ok) throw new Error(`Agent lanes read failed: ${response.status}`)
   return (await response.json()) as AgentLaneRegistry
-}
-
-const STATUS_META: Record<AgentLaneStatus, { label: string; dot: string }> = {
-  active: { label: 'active', dot: 'bg-[var(--theme-success)]' },
-  idle: { label: 'idle', dot: 'bg-[color-mix(in_srgb,var(--theme-success)_55%,var(--theme-muted))]' },
-  offline: { label: 'offline', dot: 'bg-[var(--theme-danger)]' },
-  'setup-needed': { label: 'setup needed', dot: 'bg-[var(--theme-accent)]' },
-  unknown: { label: 'unknown', dot: 'bg-[var(--theme-muted)]' },
 }
 
 function formatTime(value: string | null): string {
@@ -32,7 +24,7 @@ function formatTime(value: string | null): string {
 }
 
 function LaneRow({ lane }: { lane: AgentLane }) {
-  const meta = STATUS_META[lane.status]
+  const meta = STATUS_TONE(lane.status)
   return (
     <article className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)]/55 p-3">
       <div className="flex items-start justify-between gap-3">

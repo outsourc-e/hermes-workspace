@@ -9,6 +9,7 @@ import type {
   ControlLoopRunResult,
   RunnableControlLoopId,
 } from '@/server/control-loop-runner'
+import { STATUS_TONE } from '../lib/status-meta'
 
 const RUNNABLE_LOOP_IDS: ReadonlySet<string> = new Set([
   'cost-route-watch',
@@ -22,20 +23,16 @@ type RunResponse = {
   receiptId: string | null
 }
 
-const LOOP_STATUS_STYLE: Record<ControlLoopStatus, string> = {
-  ready:
-    'border-[color-mix(in_srgb,var(--theme-success)_38%,var(--theme-border))] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]',
-  partial:
-    'border-[color-mix(in_srgb,var(--theme-warning)_38%,var(--theme-border))] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]',
-  'not-wired':
-    'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)]',
+function loopStatusPillClass(status: ControlLoopStatus): string {
+  const meta = STATUS_TONE(status)
+  return `${meta.tone} bg-[color-mix(in_srgb,var(--theme-border)_0%,transparent)]`
 }
 
-const SOURCE_STATUS_STYLE: Record<ControlLoopSourceStatus, string> = {
-  connected: 'bg-[var(--theme-success)]',
-  available: 'bg-[var(--theme-accent)]',
-  'not-wired': 'bg-[var(--theme-muted)]',
-  unavailable: 'bg-[var(--theme-danger)]',
+const SOURCE_STATUS_MAP: Record<ControlLoopSourceStatus, string> = {
+  connected: 'operational',
+  available: 'setup-needed',
+  'not-wired': 'not-wired',
+  unavailable: 'offline',
 }
 
 function formatStatus(status: ControlLoopStatus): string {
@@ -58,7 +55,7 @@ function formatTime(value: string | null): string {
 function StatusBadge({ status }: { status: ControlLoopStatus }) {
   return (
     <span
-      className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${LOOP_STATUS_STYLE[status]}`}
+      className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${loopStatusPillClass(status)}`}
     >
       {formatStatus(status)}
     </span>
@@ -115,7 +112,7 @@ function LoopCard({
             className="inline-flex items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)]/60 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
           >
             <span
-              className={`size-1.5 rounded-full ${SOURCE_STATUS_STYLE[system.status]}`}
+              className={`size-1.5 rounded-full ${STATUS_TONE(SOURCE_STATUS_MAP[system.status]).dot}`}
             />
             {system.label}
           </span>

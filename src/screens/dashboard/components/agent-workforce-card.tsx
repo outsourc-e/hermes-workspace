@@ -3,38 +3,15 @@ import type {
   DashboardAgentWorker,
   DashboardAgentWorkforceSection,
 } from '@/server/dashboard-aggregator'
+import { STATUS_TONE } from '../lib/status-meta'
 
-const STATUS_META: Record<AgentWorkerStatus, { label: string; tone: string; dot: string }> = {
-  idle: {
-    label: 'idle',
-    tone: 'border-[var(--theme-border)] text-[var(--theme-muted)]',
-    dot: 'bg-[var(--theme-muted)]',
-  },
-  queued: {
-    label: 'queued',
-    tone: 'border-[color-mix(in_srgb,var(--theme-accent)_35%,var(--theme-border))] text-[var(--theme-accent)]',
-    dot: 'bg-[var(--theme-accent)]',
-  },
-  running: {
-    label: 'running',
-    tone: 'border-[color-mix(in_srgb,var(--theme-success)_35%,var(--theme-border))] text-[var(--theme-success)]',
-    dot: 'bg-[var(--theme-success)]',
-  },
-  blocked: {
-    label: 'blocked',
-    tone: 'border-[color-mix(in_srgb,var(--theme-danger)_35%,var(--theme-border))] text-[var(--theme-danger)]',
-    dot: 'bg-[var(--theme-danger)]',
-  },
-  reviewing: {
-    label: 'reviewing',
-    tone: 'border-[color-mix(in_srgb,var(--theme-warning)_35%,var(--theme-border))] text-[var(--theme-warning)]',
-    dot: 'bg-[var(--theme-warning)]',
-  },
-  done: {
-    label: 'done',
-    tone: 'border-[var(--theme-border)] text-[var(--theme-muted)]',
-    dot: 'bg-[var(--theme-muted)]',
-  },
+const WORKER_STATUS_MAP: Record<AgentWorkerStatus, string> = {
+  idle: 'idle',
+  queued: 'setup-needed',
+  running: 'active',
+  blocked: 'offline',
+  reviewing: 'degraded',
+  done: 'not-wired',
 }
 
 function formatTime(value: string | null): string {
@@ -50,7 +27,7 @@ function formatTime(value: string | null): string {
 }
 
 function WorkerRow({ worker }: { worker: DashboardAgentWorker }) {
-  const meta = STATUS_META[worker.status]
+  const meta = STATUS_TONE(WORKER_STATUS_MAP[worker.status])
   return (
     <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)]/70 p-3">
       <div className="flex items-start justify-between gap-3">

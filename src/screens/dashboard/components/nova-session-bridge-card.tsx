@@ -3,6 +3,7 @@ import type {
   NovaSessionBridge,
   SessionBridgeSourceState,
 } from '../../../server/nova-session-bridge'
+import { STATUS_TONE } from '../lib/status-meta'
 
 async function readBridge(): Promise<NovaSessionBridge> {
   const response = await fetch('/api/nova-session-bridge')
@@ -10,10 +11,12 @@ async function readBridge(): Promise<NovaSessionBridge> {
   return (await response.json()) as NovaSessionBridge
 }
 
-const SOURCE_TONE: Record<SessionBridgeSourceState, string> = {
-  ok: 'text-[var(--theme-success)]',
-  degraded: 'text-[var(--theme-warning)]',
-  unavailable: 'text-[var(--theme-muted)]',
+// 3-line adapter: SessionBridgeSourceState → STATUS_TONE's status
+// literal, then strip the border-color class since this label is
+// plain inline text (no pill/border in the markup below).
+function sourceToneText(state: SessionBridgeSourceState): string {
+  const status = state === 'ok' ? 'operational' : state === 'degraded' ? 'degraded' : 'not-wired'
+  return STATUS_TONE(status).tone.replace(/border-\S+\s*/, '').trim()
 }
 
 function formatTime(value: string | null): string {
@@ -164,7 +167,7 @@ export function NovaSessionBridgeCard() {
             {bridge.sources.map((source) => (
               <span
                 key={source.label}
-                className={`font-mono text-[9px] uppercase tracking-[0.1em] ${SOURCE_TONE[source.state]}`}
+                className={`font-mono text-[9px] uppercase tracking-[0.1em] ${sourceToneText(source.state)}`}
                 title={source.detail}
               >
                 {source.label}: {source.state}
