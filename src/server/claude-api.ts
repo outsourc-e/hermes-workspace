@@ -154,18 +154,33 @@ export async function getSession(sessionId: string): Promise<ClaudeSession> {
   return resp.session
 }
 
+function shouldFallbackFromDashboardCreateSession(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /Hermes Agent dashboard \/api\/sessions: (404|405|501)\b/.test(
+    message,
+  )
+}
+
 export async function createSession(opts?: {
   id?: string
   title?: string
   model?: string
 }): Promise<ClaudeSession> {
+  const body = opts || {}
   if (getCapabilities().dashboard.available) {
-    const resp = await createDashboardSession(opts || {})
-    return resp.session as ClaudeSession
+    try {
+      const resp = await createDashboardSession(body)
+      return resp.session as ClaudeSession
+    } catch (err) {
+      if (!shouldFallbackFromDashboardCreateSession(err)) throw err
+      console.warn(
+        '[claude-api] dashboard session creation unavailable; falling back to gateway /api/sessions',
+      )
+    }
   }
   const resp = await claudePost<{ session: ClaudeSession }>(
     '/api/sessions',
-    opts || {},
+    body,
   )
   return resp.session
 }
