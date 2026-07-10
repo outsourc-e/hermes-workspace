@@ -411,6 +411,14 @@ function buildNebulaRegions(model: GalaxyModel): Array<NebulaRegion> {
   })
 }
 
+type ClusterLabel = {
+  armId: string
+  name: string
+  x: number
+  y: number
+  opacity: number
+}
+
 function Galaxy3D({
   model,
   dustField,
@@ -425,6 +433,7 @@ function Galaxy3D({
 }: Galaxy3DProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [labels, setLabels] = useState<Array<ProjectedLabel>>([])
+  const [clusterLabels, setClusterLabels] = useState<Array<ClusterLabel>>([])
   const selectedRef = useRef<CelestialBody | null>(selectedBody)
   const hoveredRef = useRef<CelestialBody | null>(hoveredBody)
   const disabledRef = useRef<Set<string>>(disabledArms)
@@ -776,6 +785,7 @@ function Galaxy3D({
     let height = 1
     let frame = 0
     let lastLabelUpdate = 0
+    let lastClusterLabelUpdate = 0
     let isDragging = false
     let lastPointer = { x: 0, y: 0 }
     let pointerMoved = false
@@ -848,6 +858,15 @@ function Galaxy3D({
       const activeIds = activeSystemIds(model, selected, hovered)
       const activeBodyId = selected?.id ?? hovered?.id
       const nowIso = new Date().toISOString()
+      // L2: bodies directly wikilinked to the hovered ember brighten
+      // alongside the neon-blue edge flare below.
+      const hoveredLinkedIds = new Set<string>()
+      if (hovered) {
+        for (const link of lineObjects) {
+          if (link.source === hovered.id) hoveredLinkedIds.add(link.target)
+          else if (link.target === hovered.id) hoveredLinkedIds.add(link.source)
+        }
+      }
       for (const planet of planetObjects.values()) {
         const opacity = bodyVisibleOpacity(planet.body, activeIds, query)
         const active =
@@ -878,6 +897,7 @@ function Galaxy3D({
         const active =
           (tag.body.systemId && activeIds.has(tag.body.systemId)) ||
           tag.body.id === activeBodyId
+        const linked = !active && hoveredLinkedIds.has(tag.body.id)
         const pulse =
           tag.body.recencyTier === 'hot' && !reducedMotionRef.current
             ? 1 + Math.sin(now / 680 + tag.body.orbitPhase) * 0.13
@@ -885,13 +905,16 @@ function Galaxy3D({
         const hub = isHub(tag.body.degree)
         const glow = recencyGlow(tag.body.modified ?? tag.body.updated ?? '', nowIso)
         const baseScale = emberSize(tag.body.degree) * (hub ? 1.15 : 1)
-        tag.mesh.scale.setScalar(baseScale * pulse * (active ? 1.28 : 1))
-        tag.material.opacity = opacity * (active ? 1 : 0.62) * (0.55 + glow * 0.45)
+        tag.mesh.scale.setScalar(baseScale * pulse * (active ? 1.28 : linked ? 1.12 : 1))
+        tag.material.opacity =
+          opacity * (active ? 1 : linked ? 0.88 : 0.62) * (0.55 + glow * 0.45)
         tag.material.emissiveIntensity = hub
           ? 0.78
           : active
             ? 0.6
-            : 0.12 + glow * 0.3
+            : linked
+              ? 0.5
+              : 0.12 + glow * 0.3
       }
       for (const comet of cometObjects) {
         const drift = reducedMotionRef.current
@@ -915,16 +938,30 @@ function Galaxy3D({
           (target?.systemId && activeIds.has(target.systemId)) ||
           source?.id === activeBodyId ||
           target?.id === activeBodyId
+        // L2 edge-flare: hovered ember's links brighten to neon-blue for
+        // this frame only — recomputed every frame, never persisted state.
+        const isHoverFlare =
+          Boolean(hovered) && (source?.id === hovered?.id || target?.id === hovered?.id)
         const searched = Boolean(
           query &&
           ((source && matchesSearch(source, query)) ||
             (target && matchesSearch(target, query))),
         )
         const backbone = link.strength >= 12
-        if (active) link.material.opacity = 0.42
-        else if (searched) link.material.opacity = 0.22
-        else if (backbone) link.material.opacity = 0.07
-        else link.material.opacity = 0.025
+        if (isHoverFlare) {
+          link.material.color.set(GALAXY_PALETTE.blues[0])
+          link.material.opacity = 0.72
+        } else {
+          link.material.color.set(
+            source && target && source.systemId === target.systemId
+              ? folderTintFor(source.folder)
+              : GOLD,
+          )
+          if (active) link.material.opacity = 0.42
+          else if (searched) link.material.opacity = 0.22
+          else if (backbone) link.material.opacity = 0.07
+          else link.material.opacity = 0.025
+        }
       }
     }
 
@@ -1000,6 +1037,35 @@ function Galaxy3D({
       )
     }
 
+    // L1: always-on cluster/arm-level labels, thrown at 4Hz — deliberately
+    // coarser than the 90ms planet/tag cadence above so this cheap layer
+    // never gets starved by the denser one, and doesn't trigger re-renders
+    // at a rate that could cause a re-render storm.
+    const projectClusterLabels = () => {
+      const vector = new THREE.Vector3()
+      const projected: Array<ClusterLabel> = []
+      for (const region of nebulaRegions) {
+        vector.set(region.position.x, region.position.y, region.position.z)
+        vector.project(camera)
+        if (vector.z < -1 || vector.z > 1) continue
+        const arm = model.arms.find((a) => a.id === region.armId)
+        if (!arm) continue
+        const distance = camera.position.distanceTo(
+          new THREE.Vector3(region.position.x, region.position.y, region.position.z),
+        )
+        projected.push({
+          armId: region.armId,
+          name: arm.name,
+          x: (vector.x * 0.5 + 0.5) * width,
+          y: (-vector.y * 0.5 + 0.5) * height,
+          // Fades as the camera closes in — "constellation names always
+          // on, soft zoomed out, fade as camera closes in" (spec L1).
+          opacity: clamp(1 - (OVERVIEW_DISTANCE - distance) / OVERVIEW_DISTANCE, 0.12, 0.85),
+        })
+      }
+      setClusterLabels(projected)
+    }
+
     const animate = (now: number) => {
       if (!reducedMotionRef.current) {
         dustGroup.rotation.y = (now / ROTATION_PERIOD_MS) * Math.PI * 2
@@ -1012,10 +1078,15 @@ function Galaxy3D({
       parallaxPitch += (pointerParallax.y * 0.03 - parallaxPitch) * 0.04
       updateCamera(now)
       updateVisualState(now)
+      refreshEmberScreenPositions()
       renderer.render(scene, camera)
       if (now - lastLabelUpdate > 90) {
         projectLabels()
         lastLabelUpdate = now
+      }
+      if (now - lastClusterLabelUpdate > 250) {
+        projectClusterLabels()
+        lastClusterLabelUpdate = now
       }
       if (!document.hidden && isVisible) {
         frame = window.requestAnimationFrame(animate)
@@ -1040,6 +1111,39 @@ function Galaxy3D({
         ? (model.bodyById.get(String(hit.object.userData.bodyId)) ?? null)
         : null
     }
+    // L2 hover-identify: nearest tag-ember within 24 screen px wins over
+    // raycast picking. Tag embers are visually small dots — the raycast
+    // hit-sphere reads as "imprecise" against them — so screen-space
+    // nearest-neighbor is used for tags while raycast still covers
+    // planets/core/comets, which have real hit geometry sized to their
+    // visual radius.
+    const NEAREST_EMBER_PX = 24
+    const emberScreenPositions = new Map<string, { x: number; y: number }>()
+    const refreshEmberScreenPositions = () => {
+      const vector = new THREE.Vector3()
+      emberScreenPositions.clear()
+      for (const tag of tagObjects) {
+        vector.copy(tag.mesh.position).project(camera)
+        if (vector.z < -1 || vector.z > 1) continue
+        emberScreenPositions.set(tag.body.id, {
+          x: (vector.x * 0.5 + 0.5) * width,
+          y: (-vector.y * 0.5 + 0.5) * height,
+        })
+      }
+    }
+    const pickNearestEmber = (event: PointerEvent): CelestialBody | null => {
+      const bounds = renderer.domElement.getBoundingClientRect()
+      const px = event.clientX - bounds.left
+      const py = event.clientY - bounds.top
+      let best: { id: string; distance: number } | null = null
+      for (const [id, pos] of emberScreenPositions) {
+        const distance = Math.hypot(pos.x - px, pos.y - py)
+        if (distance <= NEAREST_EMBER_PX && (!best || distance < best.distance)) {
+          best = { id, distance }
+        }
+      }
+      return best ? (model.bodyById.get(best.id) ?? null) : null
+    }
     const onPointerMove = (event: PointerEvent) => {
       const bounds = renderer.domElement.getBoundingClientRect()
       pointerParallax = {
@@ -1055,7 +1159,8 @@ function Galaxy3D({
         lastPointer = { x: event.clientX, y: event.clientY }
         return
       }
-      const body = pickPlanet(event)
+      const nearestEmber = pickNearestEmber(event)
+      const body = nearestEmber ?? pickPlanet(event)
       renderer.domElement.style.cursor = body ? 'pointer' : 'grab'
       onHover(body)
     }
@@ -1068,7 +1173,10 @@ function Galaxy3D({
     const onPointerUp = (event: PointerEvent) => {
       isDragging = false
       renderer.domElement.releasePointerCapture(event.pointerId)
-      const body = pickPlanet(event)
+      // Click target matches whatever hover identified (L2 → L3): nearest
+      // screen-space ember wins over raycast so the body under the hover
+      // chip is always the body a click selects.
+      const body = pickNearestEmber(event) ?? pickPlanet(event)
       if (!pointerMoved) onSelect(body)
     }
     const onPointerLeave = () => {
@@ -1128,6 +1236,7 @@ function Galaxy3D({
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave)
       renderer.domElement.removeEventListener('wheel', onWheel)
       setLabels([])
+      setClusterLabels([])
       scene.traverse((object) => {
         if (
           'geometry' in object &&
@@ -1154,6 +1263,17 @@ function Galaxy3D({
           mapping vault
         </div>
       ) : null}
+      <div className="pointer-events-none absolute inset-0 z-[9]">
+        {clusterLabels.map((cluster) => (
+          <div
+            key={cluster.armId}
+            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-[rgba(255,179,71,0.14)] bg-[rgba(5,11,22,0.5)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-[var(--theme-accent-secondary)] backdrop-blur-sm"
+            style={{ left: cluster.x, top: cluster.y, opacity: cluster.opacity }}
+          >
+            {cluster.name}
+          </div>
+        ))}
+      </div>
       <div className="pointer-events-none absolute inset-0 z-10">
         {labels.map((label) => (
           <button
