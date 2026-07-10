@@ -46,6 +46,28 @@ the card is offscreen (IntersectionObserver); `prefers-reduced-motion` freezes
 rotation/pulse. (Budget exists because the 3-demo mockup page contributed to a
 RAM incident on 2026-07-10.)
 
+## Cockpit chrome + layout (added 2026-07-10, Taylor via Nova — binding)
+- **Chrome ban list:** no purple cards, no green brand chips, no cyan
+  borders/glows as *chrome*. Card surfaces, borders, buttons, chips, labels =
+  **navy + amber only**. Neon blues remain canon **inside the galaxy render
+  and data-glow accents**, never as card chrome.
+- **Shell vs cockpit boundary:** the Hermes shell may stay Hermes-branded;
+  everything inside the Mission Control dashboard surface is Nova navy/amber.
+  No mixed skin inside the cockpit.
+- **Galaxy is the hero:** on desktop the galaxy field renders tall
+  (~70vh, not a ~350px strip).
+- **Density:** kill the dead space under the galaxy; tighten the card grid —
+  denser cockpit, no "empty parking lot".
+- **Card hierarchy:** primary ops cards (Galaxy, Live Systems, Taylor
+  Approvals, Session Bridge) visually prominent; decorative/low-value cards
+  quieter and more compact.
+- **Desktop first:** do not spend this pass on mobile polish.
+- **Status semantics in chrome:** healthy = gold, attention/needs-Taylor =
+  amber, danger = warm red-amber; distinction also by brightness/shape, never
+  by green.
+- **Tripwire:** a unit test fails the build if cockpit chrome tokens resolve
+  to green/purple/cyan hues, so merges can't silently steal the skin again.
+
 ## Non-goals
 - No physics engine, no VR, no server changes beyond what exists.
 - No new colors outside the canon palette.
