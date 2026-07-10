@@ -95,6 +95,11 @@ const TAN = '#D4A276'
 const COPPER = '#7A441E'
 const NEUTRAL_TAG = '#C9B79A'
 const OVERVIEW_DISTANCE = 96
+const GLIDE_DURATION_MS = 600
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+}
 
 async function readKnowledgeGraph(): Promise<KnowledgeGraphResponse> {
   const response = await fetch('/api/knowledge/graph')
@@ -445,6 +450,14 @@ function Galaxy3D({
     distance: OVERVIEW_DISTANCE,
     target: new THREE.Vector3(0, 4, 0),
   })
+  const glideRef = useRef<{
+    active: boolean
+    startedAt: number
+    fromTarget: THREE.Vector3
+    fromDistance: number
+    toTarget: THREE.Vector3
+    toDistance: number
+  } | null>(null)
 
   useEffect(() => {
     selectedRef.current = selectedBody
@@ -786,6 +799,7 @@ function Galaxy3D({
     let frame = 0
     let lastLabelUpdate = 0
     let lastClusterLabelUpdate = 0
+    let lastSelectedId: string | null = selectedRef.current?.id ?? null
     let isDragging = false
     let lastPointer = { x: 0, y: 0 }
     let pointerMoved = false
@@ -817,10 +831,45 @@ function Galaxy3D({
       const desiredDistance = selectedSystem
         ? focusDistanceForSystem(selectedSystem)
         : OVERVIEW_DISTANCE
-      state.target.lerp(desiredTarget, reducedMotionRef.current ? 1 : 0.055)
-      state.distance +=
-        (desiredDistance - state.distance) *
-        (reducedMotionRef.current ? 1 : 0.048)
+
+      // L3: click = go & read — a genuine selection change kicks off a
+      // fixed ~600ms eased glide instead of the open-ended exponential
+      // follow (which converges but has no defined duration).
+      const currentSelectedId = selected?.id ?? null
+      if (currentSelectedId !== lastSelectedId && !reducedMotionRef.current) {
+        glideRef.current = {
+          active: true,
+          startedAt: now,
+          fromTarget: state.target.clone(),
+          fromDistance: state.distance,
+          toTarget: desiredTarget.clone(),
+          toDistance: desiredDistance,
+        }
+        lastSelectedId = currentSelectedId
+      } else if (currentSelectedId !== lastSelectedId) {
+        // Reduced motion: snap instead of gliding.
+        state.target.copy(desiredTarget)
+        state.distance = desiredDistance
+        lastSelectedId = currentSelectedId
+      }
+
+      const glide = glideRef.current
+      if (glide?.active) {
+        const t = clamp((now - glide.startedAt) / GLIDE_DURATION_MS, 0, 1)
+        const eased = easeInOutCubic(t)
+        state.target.lerpVectors(glide.fromTarget, glide.toTarget, eased)
+        state.distance = glide.fromDistance + (glide.toDistance - glide.fromDistance) * eased
+        if (t >= 1) glide.active = false
+      } else {
+        // No active glide (idle overview, or drag-driven re-target): keep
+        // the original soft exponential follow so free-look drag doesn't
+        // feel snappy/robotic.
+        state.target.lerp(desiredTarget, reducedMotionRef.current ? 1 : 0.055)
+        state.distance +=
+          (desiredDistance - state.distance) *
+          (reducedMotionRef.current ? 1 : 0.048)
+      }
+
       if (!selected && !isDragging && !reducedMotionRef.current) {
         state.yaw += Math.sin(now / 14000) * 0.00016 + 0.00012
         state.pitch +=

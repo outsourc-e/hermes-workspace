@@ -226,10 +226,16 @@ export function selectLabelCandidates(input: {
         : overviewHub
           ? 1
           : 0
-    const rankedTags = [...system.tags].sort(
-      (a, b) =>
-        b.importance - a.importance || a.title.localeCompare(b.title),
-    )
+    // While a cluster is focused, force hubs (by degree) ahead of the
+    // importance sort so top hub embers never lose their budget slot to
+    // a recently-touched non-hub tag.
+    const rankedTags = [...system.tags].sort((a, b) => {
+      if (isActive) {
+        const hubDelta = Number(isHub(b.degree)) - Number(isHub(a.degree))
+        if (hubDelta !== 0) return hubDelta
+      }
+      return b.importance - a.importance || a.title.localeCompare(b.title)
+    })
     let shown = 0
     for (const tag of rankedTags) {
       const matches =
