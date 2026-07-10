@@ -1109,7 +1109,7 @@ export function MindGraphCard() {
             </div>
           </div>
 
-          <div className="nova-galaxy-field relative mt-3 h-[58vh] min-h-[360px] flex-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] sm:h-[560px] lg:h-[650px]">
+          <div className="nova-galaxy-field relative mt-3 h-[58vh] min-h-[360px] flex-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] lg:h-[70vh] lg:min-h-[560px]">
             <Galaxy3D
               model={model}
               selectedBody={selectedBody}

@@ -986,6 +986,22 @@ export function DashboardScreen() {
       className="min-h-full"
       style={NOVA_COCKPIT_STYLE}
     >
+      {/* Quiet-tier decorative cards (operator_tip, achievements,
+         mix_rhythm, skills_usage, notebook_bridge, trust_ledger):
+         styled from this mount-site wrapper rather than touching each
+         card's internals (plan's original 4.4 called for a `nova-label`
+         header-class override + per-file `data-tier` attr, but none of
+         these six cards actually use the `nova-label` class — it's only
+         used by daily-check/home-mode/mind-graph — so that rule would
+         have been a no-op; adapted to target the Tailwind utility
+         classes these cards really render: `.p-4` padding on the two
+         `<section>`-based cards (notebook bridge, trust ledger) and the
+         shared `text-[10px]` eyebrow/header size used by 5 of 6). */}
+      <style>{`
+        [data-tier="quiet"] .p-4 { padding: 0.75rem; }
+        [data-tier="quiet"] .text-\\[10px\\] { font-size: 9px; }
+        [data-tier="quiet"] .nova-label { font-size: 9px; }
+      `}</style>
       {/* Floating mobile nav: hamburger left, theme toggle right */}
       <div
         className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12"
@@ -1191,27 +1207,36 @@ export function DashboardScreen() {
 
         <MindGraphCard />
 
+        {/* ── Primary ops row: hero-adjacent, always the first thing seen
+           after the galaxy. Iteration nova-cockpit-pass: pulled live
+           systems / approvals / session bridge out of the scattered
+           mid-page order so the operator sees "is anything broken" and
+           "does Nova need me" immediately below the galaxy. ── */}
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <WidgetShell id="taylor_approvals" layout={layout}>
+            <TaylorApprovalQueueCard />
+          </WidgetShell>
+          <WidgetShell id="session_bridge" layout={layout}>
+            <NovaSessionBridgeCard />
+          </WidgetShell>
+        </div>
+        <WidgetShell id="live_systems" layout={layout}>
+          <LiveSystemsCard liveSystems={overview?.liveSystems ?? null} />
+        </WidgetShell>
+
         <DailyCheckCard />
 
-        <WidgetShell id="session_bridge" layout={layout}>
-          <NovaSessionBridgeCard />
-        </WidgetShell>
-        <WidgetShell id="agent_lanes" layout={layout}>
-          <AgentLanesCard />
-        </WidgetShell>
-        <WidgetShell id="taylor_approvals" layout={layout}>
-          <TaylorApprovalQueueCard />
-        </WidgetShell>
-        <WidgetShell id="nova_wants" layout={layout}>
-          <NovaWantsCard />
-        </WidgetShell>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <WidgetShell id="agent_lanes" layout={layout}>
+            <AgentLanesCard />
+          </WidgetShell>
+          <WidgetShell id="nova_wants" layout={layout}>
+            <NovaWantsCard />
+          </WidgetShell>
+        </div>
 
         <WidgetShell id="nova_fabric" layout={layout}>
           <NovaFabricCard />
-        </WidgetShell>
-
-        <WidgetShell id="live_systems" layout={layout}>
-          <LiveSystemsCard liveSystems={overview?.liveSystems ?? null} />
         </WidgetShell>
 
         <WidgetShell id="agent_workforce" layout={layout}>
@@ -1319,9 +1344,11 @@ export function DashboardScreen() {
             child Sessions card's `flex-1` actually expands. */}
           <div className="flex min-h-full flex-col gap-3 lg:col-span-8">
             {layout.isVisible('operator_tip') ? (
-              <WidgetShell id="operator_tip" layout={layout}>
-                <OperatorTipCard overview={overview ?? null} />
-              </WidgetShell>
+              <div data-tier="quiet">
+                <WidgetShell id="operator_tip" layout={layout}>
+                  <OperatorTipCard overview={overview ?? null} />
+                </WidgetShell>
+              </div>
             ) : null}
             {layout.isVisible('sessions_intelligence') ? (
               <div className="flex min-h-0 flex-1 flex-col">
@@ -1359,27 +1386,37 @@ export function DashboardScreen() {
             <WidgetShell id="control_loops" layout={layout}>
               <ControlLoopsCard controlLoops={overview?.controlLoops ?? null} />
             </WidgetShell>
-            <WidgetShell id="trust_ledger" layout={layout}>
-              <TrustLedgerCard trustLedger={overview?.trustLedger ?? null} />
-            </WidgetShell>
-            <WidgetShell id="notebook_bridge" layout={layout}>
-              <NotebookLmBridgeCard bridge={overview?.notebookBridge ?? null} />
-            </WidgetShell>
-            <WidgetShell id="achievements" layout={layout}>
-              <AchievementsCard achievements={overview?.achievements ?? null} />
-            </WidgetShell>
-            <WidgetShell id="skills_usage" layout={layout}>
-              <SkillsUsageCard
-                usage={overview?.skillsUsage ?? null}
-                installedCount={skillsInstalled}
-                onOpen={() => navigate({ to: '/skills' })}
-              />
-            </WidgetShell>
+            <div data-tier="quiet">
+              <WidgetShell id="trust_ledger" layout={layout}>
+                <TrustLedgerCard trustLedger={overview?.trustLedger ?? null} />
+              </WidgetShell>
+            </div>
+            <div data-tier="quiet">
+              <WidgetShell id="notebook_bridge" layout={layout}>
+                <NotebookLmBridgeCard bridge={overview?.notebookBridge ?? null} />
+              </WidgetShell>
+            </div>
+            <div data-tier="quiet">
+              <WidgetShell id="achievements" layout={layout}>
+                <AchievementsCard achievements={overview?.achievements ?? null} />
+              </WidgetShell>
+            </div>
+            <div data-tier="quiet">
+              <WidgetShell id="skills_usage" layout={layout}>
+                <SkillsUsageCard
+                  usage={overview?.skillsUsage ?? null}
+                  installedCount={skillsInstalled}
+                  onOpen={() => navigate({ to: '/skills' })}
+                />
+              </WidgetShell>
+            </div>
             {/* `flex-1` here pushes the rhythm card to consume any
               remaining vertical space so the rail's bottom aligns
               with Sessions Intelligence. The card itself uses
-              h-full + flex-1 to honor the stretch. */}
-            <div className="flex min-h-0 flex-1 flex-col">
+              h-full + flex-1 to honor the stretch. `data-tier="quiet"`
+              lives on this same wrapper (not a nested div) so the
+              flex-1 stretch behavior is undisturbed. */}
+            <div className="flex min-h-0 flex-1 flex-col" data-tier="quiet">
               <WidgetShell id="mix_rhythm" layout={layout}>
                 <TokenMixHourCard
                   analytics={overview?.analytics ?? null}
