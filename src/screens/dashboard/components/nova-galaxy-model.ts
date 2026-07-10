@@ -360,6 +360,104 @@ export function obsidianUri(body: CelestialBody): string {
   return `obsidian://open?path=${encodeURIComponent(body.path)}`
 }
 
+/**
+ * Deterministic PRNG (mulberry32). Used for the dust-forward field's
+ * procedural scatter so the same vault graph always renders the same
+ * dust cloud — no re-shuffling on every re-render.
+ */
+export function mulberry32(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/** Standard normal sample via Box-Muller, drawn from a mulberry32 rng. */
+export function gaussianFrom(rng: () => number): number {
+  const u1 = Math.max(rng(), 1e-9)
+  const u2 = rng()
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
+}
+
+const SPIRAL_A = 1.6
+const SPIRAL_B = 0.28
+const SPIRAL_THETA_SPAN = 6.2
+
+/**
+ * A point on a 3-arm logarithmic spiral (r = a·e^(bθ)), with
+ * deterministic gaussian scatter layered on top so the arm reads as
+ * dust rather than a clean line. `radiusNorm` in [0, 1] gates both the
+ * radius (0 = core, 1 = rim) and the scatter width (dust is tighter
+ * near the core, wider toward the rim).
+ */
+export function spiralPosition(
+  seedIndex: number,
+  armIndex: number,
+  armCount: number,
+  radiusNorm: number,
+): { x: number; y: number; z: number } {
+  const rng = mulberry32(seedIndex)
+  const armOffset = (Math.PI * 2 * armIndex) / Math.max(1, armCount)
+  const clampedRadius = clamp(radiusNorm, 0, 1)
+  const theta = clampedRadius * SPIRAL_THETA_SPAN + armOffset
+  const r = SPIRAL_A * Math.exp(SPIRAL_B * theta) * clampedRadius
+  const scatter = 1 - clampedRadius * 0.4
+  const jitterX = gaussianFrom(rng) * scatter * 2.4
+  const jitterY = gaussianFrom(rng) * scatter * 1.1
+  const jitterZ = gaussianFrom(rng) * scatter * 2.4
+  return {
+    x: Math.cos(theta) * r + jitterX,
+    y: jitterY,
+    z: Math.sin(theta) * r + jitterZ,
+  }
+}
+
+const CLUSTER_HUE_CYCLE = ['blue', 'blue2', 'amber', 'blend'] as const
+export type ClusterHue = (typeof CLUSTER_HUE_CYCLE)[number]
+
+/** Round-robin cluster tint assignment: neon blues + one amber + blends. */
+export function clusterHue(folderIndex: number): ClusterHue {
+  const index =
+    ((folderIndex % CLUSTER_HUE_CYCLE.length) + CLUSTER_HUE_CYCLE.length) %
+    CLUSTER_HUE_CYCLE.length
+  return CLUSTER_HUE_CYCLE[index]
+}
+
+const RECENCY_HOT_DAYS = 7
+const RECENCY_COLD_DAYS = 90
+const RECENCY_FLOOR = 0.35
+
+/**
+ * Recency-driven ember brightness: 1.0 for anything touched in the
+ * last week, linear falloff to a 0.35 floor by 90 days, clamped.
+ */
+export function recencyGlow(modifiedIso: string, nowIso: string): number {
+  const modified = Date.parse(modifiedIso)
+  const now = Date.parse(nowIso)
+  if (!Number.isFinite(modified) || !Number.isFinite(now)) return RECENCY_FLOOR
+  const ageDays = Math.max(0, (now - modified) / 86_400_000)
+  if (ageDays <= RECENCY_HOT_DAYS) return 1
+  if (ageDays >= RECENCY_COLD_DAYS) return RECENCY_FLOOR
+  const t =
+    (ageDays - RECENCY_HOT_DAYS) / (RECENCY_COLD_DAYS - RECENCY_HOT_DAYS)
+  return clamp(1 - t * (1 - RECENCY_FLOOR), RECENCY_FLOOR, 1)
+}
+
+export const HUB_DEGREE_THRESHOLD = 6
+
+/** Ember visual size from wikilink degree — log-scaled so hubs read big without dominating. */
+export function emberSize(degree: number): number {
+  return 1 + Math.log2(1 + Math.max(0, degree)) * 0.6
+}
+
+/** Whether a note's degree crosses the hub threshold (amber pulse tier). */
+export function isHub(degree: number): boolean {
+  return degree >= HUB_DEGREE_THRESHOLD
+}
+
 function fallbackFolder(id: string): string {
   const parts = id.split(/[\\/]/).filter(Boolean)
   if (parts.length >= 2 && parts[0] === 'agents')
