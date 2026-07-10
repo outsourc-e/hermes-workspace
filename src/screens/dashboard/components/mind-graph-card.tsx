@@ -5,8 +5,12 @@ import {
   buildGalaxyModel,
   clamp,
   focusBodyForNavigation,
+  focusDistanceForSystem,
+  folderTintFor,
   obsidianUri,
+  resolveProjectedLabels,
   seededUnit,
+  selectLabelCandidates,
   shortTitle,
 } from './nova-galaxy-model'
 import type { VaultGraphInsights } from '../../../server/vault-graph-insights'
@@ -16,19 +20,8 @@ import type {
   GalaxyModel,
   KnowledgeGraphResponse,
   PlanetarySystem,
+  ProjectedLabel,
 } from './nova-galaxy-model'
-
-type LabelKind = 'planet' | 'tag'
-type ProjectedLabel = {
-  id: string
-  kind: LabelKind
-  body: CelestialBody
-  x: number
-  y: number
-  scale: number
-  opacity: number
-  active: boolean
-}
 type Galaxy3DProps = {
   model: GalaxyModel
   selectedBody: CelestialBody | null
@@ -69,6 +62,7 @@ type CometObject = {
 type LineObject = {
   source: string
   target: string
+  strength: number
   material: THREE.LineDashedMaterial
 }
 
@@ -78,9 +72,8 @@ const AMBER = '#FF8C1A'
 const GOLD = '#FFB347'
 const TAN = '#D4A276'
 const COPPER = '#7A441E'
-const TAG_LIMIT_IDLE = 16
-const TAG_LIMIT_ACTIVE = 220
-const IDLE_TAGS_PER_SYSTEM = 8
+const NEUTRAL_TAG = '#C9B79A'
+const OVERVIEW_DISTANCE = 96
 
 async function readKnowledgeGraph(): Promise<KnowledgeGraphResponse> {
   const response = await fetch('/api/knowledge/graph')
@@ -300,9 +293,9 @@ function createFogNebula(): THREE.Sprite {
   canvas.height = 512
   const context = canvas.getContext('2d')!
   const glow = context.createRadialGradient(256, 256, 0, 256, 256, 256)
-  glow.addColorStop(0, 'rgba(255, 179, 71, 0.2)')
-  glow.addColorStop(0.32, 'rgba(122, 68, 30, 0.12)')
-  glow.addColorStop(0.7, 'rgba(74, 42, 16, 0.05)')
+  glow.addColorStop(0, 'rgba(255, 179, 71, 0.12)')
+  glow.addColorStop(0.34, 'rgba(122, 68, 30, 0.07)')
+  glow.addColorStop(0.72, 'rgba(74, 42, 16, 0.03)')
   glow.addColorStop(1, 'rgba(9, 10, 18, 0)')
   context.fillStyle = glow
   context.fillRect(0, 0, 512, 512)
@@ -312,12 +305,12 @@ function createFogNebula(): THREE.Sprite {
     map: texture,
     transparent: true,
     depthWrite: false,
-    opacity: 0.58,
+    opacity: 0.34,
     blending: THREE.AdditiveBlending,
   })
   const sprite = new THREE.Sprite(material)
-  sprite.position.set(-4, -2, -22)
-  sprite.scale.set(118, 54, 1)
+  sprite.position.set(-28, -10, -48)
+  sprite.scale.set(92, 42, 1)
   return sprite
 }
 function Galaxy3D({
@@ -338,10 +331,10 @@ function Galaxy3D({
   const searchRef = useRef(searchTerm)
   const reducedMotionRef = useRef(false)
   const cameraStateRef = useRef<CameraState>({
-    yaw: -0.34,
-    pitch: 0.12,
-    distance: 68,
-    target: new THREE.Vector3(0, 0, 0),
+    yaw: -0.92,
+    pitch: 0.28,
+    distance: OVERVIEW_DISTANCE,
+    target: new THREE.Vector3(0, 4, 0),
   })
 
   useEffect(() => {
@@ -357,8 +350,8 @@ function Galaxy3D({
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(SPACE)
-    scene.fog = new THREE.FogExp2(SPACE_SOFT, 0.0085)
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 460)
+    scene.fog = new THREE.FogExp2(SPACE_SOFT, 0.0062)
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 520)
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     renderer.setClearColor(SPACE, 1)
@@ -370,14 +363,16 @@ function Galaxy3D({
     )
     host.appendChild(renderer.domElement)
 
-    const ambient = new THREE.AmbientLight('#D4A276', 0.34)
-    const key = new THREE.DirectionalLight('#FFE4A6', 3.1)
-    key.position.set(-18, 20, 28)
-    const coreLight = new THREE.PointLight('#FFB347', 2.3, 120)
-    coreLight.position.set(-6, 9, 18)
-    const fill = new THREE.PointLight('#163456', 0.46, 150)
-    fill.position.set(26, -14, -24)
-    scene.add(ambient, key, coreLight, fill, createFogNebula())
+    const ambient = new THREE.AmbientLight('#C8B59A', 0.28)
+    const key = new THREE.DirectionalLight('#FFE4A6', 2.7)
+    key.position.set(-28, 26, 34)
+    const coreLight = new THREE.PointLight('#FFB347', 1.8, 140)
+    coreLight.position.set(-10, 12, 24)
+    const fill = new THREE.PointLight('#163456', 0.58, 180)
+    fill.position.set(34, -16, -30)
+    const rim = new THREE.DirectionalLight('#7D9573', 0.35)
+    rim.position.set(18, 8, -40)
+    scene.add(ambient, key, coreLight, fill, rim, createFogNebula())
 
     const starPositions = new Float32Array(model.starfield.length * 3)
     const starColors = new Float32Array(model.starfield.length * 3)
@@ -421,16 +416,19 @@ function Galaxy3D({
       const body = system.planet
       const radius = planetRadius(body, system)
       const texture = createPlanetTexture(body)
+      const armTint =
+        model.arms.find((arm) => arm.id === system.planet.armId)?.tint ??
+        folderTintFor(system.folder)
       const material = new THREE.MeshStandardMaterial({
-        color: body.kind === 'core' ? '#FFE2A8' : '#E9CFA8',
+        color: body.kind === 'core' ? '#FFE2A8' : '#E8D7BC',
         map: texture,
-        roughness: 0.92,
-        metalness: 0.02,
+        roughness: 0.94,
+        metalness: 0.03,
         emissive:
           body.kind === 'core'
             ? new THREE.Color('#7A441E')
-            : new THREE.Color('#0B1B31'),
-        emissiveIntensity: body.kind === 'core' ? 0.24 : 0.13,
+            : new THREE.Color('#121820'),
+        emissiveIntensity: body.kind === 'core' ? 0.22 : 0.08,
         transparent: true,
         opacity: 0.98,
       })
@@ -443,21 +441,19 @@ function Galaxy3D({
       bodyPositions.set(body.id, mesh.position.clone())
       hitObjects.push(mesh)
 
-      const armTint =
-        model.arms.find((arm) => arm.id === system.planet.armId)?.tint ?? GOLD
       const ringMaterial = new THREE.MeshBasicMaterial({
         color: body.kind === 'core' ? AMBER : armTint,
         transparent: true,
-        opacity: body.kind === 'core' ? 0.28 : 0.11,
+        opacity: body.kind === 'core' ? 0.42 : 0.28,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       })
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(
-          radius * (body.kind === 'core' ? 1.86 : 1.72),
-          Math.max(0.022, radius * 0.014),
-          10,
-          128,
+          radius * (body.kind === 'core' ? 1.92 : 1.78),
+          Math.max(0.034, radius * 0.028),
+          12,
+          140,
         ),
         ringMaterial,
       )
@@ -465,12 +461,12 @@ function Galaxy3D({
       ring.rotation.set(body.orbitTilt, 0.42, 0.12)
 
       const atmosphereMaterial = createAtmosphereMaterial(
-        body.kind === 'core' ? AMBER : GOLD,
-        body.kind === 'core' ? 0.46 : 0.2,
+        body.kind === 'core' ? AMBER : armTint,
+        body.kind === 'core' ? 0.4 : 0.24,
       )
       const atmosphere = new THREE.Mesh(
         new THREE.SphereGeometry(
-          radius * (body.kind === 'core' ? 1.34 : 1.22),
+          radius * (body.kind === 'core' ? 1.34 : 1.24),
           32,
           20,
         ),
@@ -490,18 +486,18 @@ function Galaxy3D({
       })
       for (const tag of system.tags) {
         const tagMaterial = new THREE.MeshStandardMaterial({
-          color: armTint,
+          color: NEUTRAL_TAG,
           emissive: new THREE.Color(armTint),
-          emissiveIntensity: tag.recencyTier === 'hot' ? 0.52 : 0.18,
-          roughness: 0.44,
-          metalness: 0.18,
+          emissiveIntensity: tag.recencyTier === 'hot' ? 0.46 : 0.12,
+          roughness: 0.58,
+          metalness: 0.12,
           transparent: true,
-          opacity: 0.9,
+          opacity: 0.88,
         })
         const marker = new THREE.Mesh(tagGeometry, tagMaterial)
         marker.position.copy(bodyPosition(tag))
         marker.scale.setScalar(
-          0.68 + Math.min(0.72, Math.log2(tag.importance + 1) * 0.16),
+          0.62 + Math.min(0.9, Math.log2(tag.importance + 1) * 0.2),
         )
         marker.userData.bodyId = tag.id
         bodyPositions.set(tag.id, marker.position.clone())
@@ -545,42 +541,64 @@ function Galaxy3D({
     })
 
     const homeTarget = (() => {
-      if (model.systems.length === 0) return new THREE.Vector3(0, 0, 0)
+      if (model.systems.length === 0) return new THREE.Vector3(0, 4, 0)
       const target = new THREE.Vector3()
       let weightTotal = 0
-      for (const system of model.systems.slice(0, 12)) {
+      // Bias overview toward top systems but keep the camera off-center so
+      // composition reads as layered depth instead of a dead-on blob.
+      for (const system of model.systems.slice(0, 10)) {
         const position = bodyPositions.get(system.planet.id)
         if (!position) continue
         const weight = Math.max(1, Math.sqrt(system.totalLinks))
         target.addScaledVector(position, weight)
         weightTotal += weight
       }
-      return weightTotal > 0
-        ? target.divideScalar(weightTotal)
-        : new THREE.Vector3(0, 0, 0)
+      if (weightTotal <= 0) return new THREE.Vector3(0, 4, 0)
+      target.divideScalar(weightTotal)
+      target.y += 3.5
+      target.x -= 6
+      target.z += 4
+      return target
     })()
-    if (!selectedRef.current) cameraStateRef.current.target.copy(homeTarget)
+    if (!selectedRef.current) {
+      cameraStateRef.current.target.copy(homeTarget)
+      cameraStateRef.current.distance = OVERVIEW_DISTANCE
+      cameraStateRef.current.yaw = -0.92
+      cameraStateRef.current.pitch = 0.28
+    }
     const lineObjects: Array<LineObject> = []
     for (const link of model.links) {
       const source = bodyPositions.get(link.source)
       const target = bodyPositions.get(link.target)
       if (!source || !target) continue
+      const sourceBody = model.bodyById.get(link.source)
+      const targetBody = model.bodyById.get(link.target)
+      const sameSystem =
+        Boolean(sourceBody?.systemId) &&
+        sourceBody?.systemId === targetBody?.systemId
       const geometry = new THREE.BufferGeometry().setFromPoints([
         source,
         target,
       ])
       const material = new THREE.LineDashedMaterial({
-        color: GOLD,
+        color: sameSystem
+          ? folderTintFor(sourceBody?.folder ?? 'vault')
+          : GOLD,
         transparent: true,
-        opacity: 0.1,
-        dashSize: 0.3,
-        gapSize: 0.42,
+        opacity: sameSystem ? 0.05 : 0.028,
+        dashSize: sameSystem ? 0.22 : 0.34,
+        gapSize: sameSystem ? 0.36 : 0.5,
         depthWrite: false,
       })
       const line = new THREE.LineSegments(geometry, material)
       line.computeLineDistances()
       scene.add(line)
-      lineObjects.push({ source: link.source, target: link.target, material })
+      lineObjects.push({
+        source: link.source,
+        target: link.target,
+        strength: link.strength,
+        material,
+      })
     }
 
     const raycaster = new THREE.Raycaster()
@@ -610,21 +628,23 @@ function Galaxy3D({
         ? model.systemByBodyId.get(focusBody.id)
         : null
       const selectedPosition = focusBody ? bodyPositions.get(focusBody.id) : null
-      const desiredTarget = selectedPosition ?? homeTarget
+      const desiredTarget = selectedPosition
+        ? selectedPosition.clone().add(new THREE.Vector3(0, 1.4, 0))
+        : homeTarget
       const desiredDistance = selectedSystem
-        ? clamp(10 + Math.sqrt(selectedSystem.bodyCount) * 2.15, 14, 28)
-        : 68
-      state.target.lerp(desiredTarget, reducedMotionRef.current ? 1 : 0.065)
+        ? focusDistanceForSystem(selectedSystem)
+        : OVERVIEW_DISTANCE
+      state.target.lerp(desiredTarget, reducedMotionRef.current ? 1 : 0.055)
       state.distance +=
         (desiredDistance - state.distance) *
-        (reducedMotionRef.current ? 1 : 0.055)
+        (reducedMotionRef.current ? 1 : 0.048)
       if (!selected && !isDragging && !reducedMotionRef.current) {
-        state.yaw += Math.sin(now / 12000) * 0.00022 + 0.00018
+        state.yaw += Math.sin(now / 14000) * 0.00016 + 0.00012
         state.pitch +=
-          (0.16 + Math.sin(now / 19000) * 0.035 - state.pitch) * 0.012
+          (0.28 + Math.sin(now / 21000) * 0.03 - state.pitch) * 0.01
       }
-      state.pitch = clamp(state.pitch, -0.72, 0.72)
-      state.distance = clamp(state.distance, 11, 118)
+      state.pitch = clamp(state.pitch, -0.62, 0.78)
+      state.distance = clamp(state.distance, 11, 140)
       const cosPitch = Math.cos(state.pitch)
       camera.position.set(
         state.target.x + Math.sin(state.yaw) * cosPitch * state.distance,
@@ -667,14 +687,15 @@ function Galaxy3D({
           : 0.0028 + planet.body.sizeTier * 0.00045
         planet.material.opacity = opacity * (active ? 1 : 0.9)
         planet.ringMaterial.opacity =
-          opacity * (planet.body.kind === 'core' ? 0.3 : active ? 0.24 : 0.06)
+          opacity *
+          (planet.body.kind === 'core' ? 0.44 : active ? 0.36 : 0.2)
         planet.atmosphereMaterial.uniforms.uOpacity.value =
           opacity *
           (planet.body.kind === 'core'
-            ? 0.34
+            ? 0.32
             : active || warm > 0.65
-              ? 0.22
-              : 0.1)
+              ? 0.24
+              : 0.12)
       }
       for (const tag of tagObjects) {
         const opacity = bodyVisibleOpacity(tag.body, activeIds, query)
@@ -686,11 +707,11 @@ function Galaxy3D({
             ? 1 + Math.sin(now / 680 + tag.body.orbitPhase) * 0.13
             : 1
         const baseScale =
-          0.68 + Math.min(0.72, Math.log2(tag.body.importance + 1) * 0.16)
-        tag.mesh.scale.setScalar(baseScale * pulse * (active ? 1.32 : 1))
-        tag.material.opacity = opacity * (active ? 1 : 0.66)
+          0.62 + Math.min(0.9, Math.log2(tag.body.importance + 1) * 0.2)
+        tag.mesh.scale.setScalar(baseScale * pulse * (active ? 1.28 : 1))
+        tag.material.opacity = opacity * (active ? 1 : 0.62)
         tag.material.emissiveIntensity =
-          active ? 0.9 : tag.body.recencyTier === 'hot' ? 0.52 : 0.14
+          active ? 0.78 : tag.body.recencyTier === 'hot' ? 0.48 : 0.16
       }
       for (const comet of cometObjects) {
         const drift = reducedMotionRef.current
@@ -719,7 +740,11 @@ function Galaxy3D({
           ((source && matchesSearch(source, query)) ||
             (target && matchesSearch(target, query))),
         )
-        link.material.opacity = active ? 0.34 : searched ? 0.24 : 0.045
+        const backbone = link.strength >= 12
+        if (active) link.material.opacity = 0.42
+        else if (searched) link.material.opacity = 0.22
+        else if (backbone) link.material.opacity = 0.07
+        else link.material.opacity = 0.025
       }
     }
 
@@ -728,15 +753,19 @@ function Galaxy3D({
       const hovered = hoveredRef.current
       const query = searchRef.current.trim()
       const activeIds = activeSystemIds(model, selected, hovered)
+      const mode = selected || hovered || query ? 'focus' : 'overview'
+      const candidates = selectLabelCandidates({
+        model,
+        selectedBody: selected,
+        hoveredBody: hovered,
+        searchTerm: query,
+        mode,
+      })
       const projected: Array<ProjectedLabel> = []
       const vector = new THREE.Vector3()
-      const pushLabel = (
-        body: CelestialBody,
-        kind: LabelKind,
-        force = false,
-      ) => {
-        const point = bodyPosition(body)
-        if (kind === 'planet') {
+      for (const candidate of candidates) {
+        const point = bodyPosition(candidate.body)
+        if (candidate.kind === 'planet') {
           const right = new THREE.Vector3().setFromMatrixColumn(
             camera.matrixWorld,
             0,
@@ -746,55 +775,49 @@ function Galaxy3D({
             1,
           )
           const offset =
-            planetRadius(body) * (body.kind === 'core' ? 1.8 : 1.55)
+            planetRadius(candidate.body) *
+            (candidate.body.kind === 'core' ? 1.75 : 1.5)
           point.addScaledVector(right, offset)
-          point.addScaledVector(up, offset * 0.34)
+          point.addScaledVector(up, offset * 0.28)
         }
         vector.copy(point).project(camera)
-        if (vector.z < -1 || vector.z > 1) return
+        if (vector.z < -1 || vector.z > 1) continue
         const distance = camera.position.distanceTo(point)
+        if (
+          candidate.kind === 'tag' &&
+          mode === 'overview' &&
+          distance > 52 &&
+          candidate.body.id !== hovered?.id &&
+          candidate.body.id !== selected?.id
+        ) {
+          continue
+        }
         const active =
-          Boolean(body.systemId && activeIds.has(body.systemId)) ||
-          body.id === hovered?.id ||
-          body.id === selected?.id
-        const searched = Boolean(query && matchesSearch(body, query))
-        if (!force && kind === 'tag' && !active && !searched && distance > 28)
-          return
-        let opacity = bodyVisibleOpacity(body, activeIds, query)
-        if (kind === 'tag' && !active && !searched) opacity *= 0.28
+          Boolean(
+            candidate.body.systemId && activeIds.has(candidate.body.systemId),
+          ) ||
+          candidate.body.id === hovered?.id ||
+          candidate.body.id === selected?.id
+        const searched = Boolean(query && matchesSearch(candidate.body, query))
+        let opacity = bodyVisibleOpacity(candidate.body, activeIds, query)
+        if (candidate.kind === 'tag' && !active && !searched) opacity *= 0.34
+        if (candidate.kind === 'planet' && !active && !searched)
+          opacity *= mode === 'overview' ? 0.9 : 0.72
         projected.push({
-          id: body.id,
-          kind,
-          body,
+          id: candidate.id,
+          kind: candidate.kind,
+          body: candidate.body,
+          priority: candidate.priority,
           x: (vector.x * 0.5 + 0.5) * width,
           y: (-vector.y * 0.5 + 0.5) * height,
-          scale: clamp(1.12 - distance / 154, 0.56, 0.92),
+          scale: clamp(1.08 - distance / 170, 0.58, 0.96),
           opacity,
           active: active || searched,
         })
       }
-      const visibleSystems = model.systems.slice(0, TAG_LIMIT_ACTIVE)
-      const idlePlanetsShown = new Set(
-        model.systems.slice(0, TAG_LIMIT_IDLE).map((system) => system.id),
+      setLabels(
+        resolveProjectedLabels(projected, mode === 'overview' ? 34 : 26),
       )
-      for (const system of visibleSystems) {
-        const showPlanetLabel =
-          selected ||
-          hovered ||
-          query ||
-          system.planet.kind === 'core' ||
-          idlePlanetsShown.has(system.id)
-        if (!showPlanetLabel) continue
-        pushLabel(system.planet, 'planet', true)
-        const tagLimit =
-          activeIds.has(system.id) || query
-            ? 28
-            : idlePlanetsShown.has(system.id)
-              ? IDLE_TAGS_PER_SYSTEM
-              : 0
-        for (const tag of system.tags.slice(0, tagLimit)) pushLabel(tag, 'tag')
-      }
-      setLabels(projected)
     }
 
     const animate = (now: number) => {
@@ -857,11 +880,11 @@ function Galaxy3D({
     }
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
-      cameraStateRef.current.distance += event.deltaY * 0.026
+      cameraStateRef.current.distance += event.deltaY * 0.028
       cameraStateRef.current.distance = clamp(
         cameraStateRef.current.distance,
         12,
-        118,
+        140,
       )
     }
 
@@ -920,22 +943,26 @@ function Galaxy3D({
             onClick={() => onSelect(label.body)}
             onMouseEnter={() => onHover(label.body)}
             onMouseLeave={() => onHover(null)}
-            className={`pointer-events-auto absolute max-w-[210px] -translate-x-1/2 -translate-y-1/2 truncate border backdrop-blur-sm transition-colors ${
+            className={`pointer-events-auto absolute max-w-[190px] -translate-x-1/2 -translate-y-1/2 truncate border backdrop-blur-sm transition-colors ${
               label.kind === 'planet'
-                ? 'rounded-md border-transparent bg-[rgba(2,7,18,0.16)] px-1.5 text-[13px] font-semibold text-[var(--theme-text-strong)] shadow-[0_0_16px_rgba(2,7,18,0.96)]'
-                : 'rounded border-[rgba(255,179,71,0.16)] bg-[rgba(9,10,18,0.48)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--theme-text-soft)]'
-            } ${label.active ? 'text-[var(--theme-accent-secondary)]' : ''}`}
+                ? 'rounded-md border-[rgba(255,210,122,0.12)] bg-[rgba(2,7,18,0.42)] px-1.5 text-[12px] font-semibold text-[var(--theme-text-strong)] shadow-[0_0_14px_rgba(2,7,18,0.9)]'
+                : 'rounded border-[rgba(255,179,71,0.12)] bg-[rgba(9,10,18,0.55)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--theme-text-soft)]'
+            } ${label.active ? 'text-[var(--theme-accent-secondary)] border-[rgba(255,179,71,0.34)]' : ''}`}
             style={{
               left: label.x,
               top: label.y,
               opacity: label.opacity,
               transform: `translate(-50%, -50%) scale(${label.scale})`,
+              boxShadow:
+                label.kind === 'planet'
+                  ? `0 0 0 1px ${folderTintFor(label.body.folder)}33`
+                  : undefined,
             }}
             title={label.body.title}
           >
             {shortTitle(label.body.title).slice(
               0,
-              label.kind === 'planet' ? 42 : 28,
+              label.kind === 'planet' ? 36 : 24,
             )}
           </button>
         ))}
@@ -1028,7 +1055,7 @@ export function MindGraphCard() {
       setInspectedId(null)
       return
     }
-    const arrival = window.setTimeout(() => setInspectedId(selectedId), 720)
+    const arrival = window.setTimeout(() => setInspectedId(selectedId), 860)
     return () => window.clearTimeout(arrival)
   }, [selectedId])
 

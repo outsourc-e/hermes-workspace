@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { buildGalaxyModel, focusBodyForNavigation } from './nova-galaxy-model'
-import type { KnowledgeGraphResponse } from './nova-galaxy-model'
+import {
+  buildGalaxyModel,
+  focusBodyForNavigation,
+  focusDistanceForSystem,
+  folderTintFor,
+  resolveProjectedLabels,
+  selectLabelCandidates,
+} from './nova-galaxy-model'
+import type {
+  CelestialBody,
+  KnowledgeGraphResponse,
+  PlanetarySystem,
+} from './nova-galaxy-model'
 
 function graph(): KnowledgeGraphResponse {
   return {
@@ -10,6 +21,9 @@ function graph(): KnowledgeGraphResponse {
       { id: 'b.md', title: 'Note B', folder: 'agents/claude', path: 'b.md' },
       { id: 'c.md', title: 'Note C', folder: 'knowledge', path: 'c.md' },
       { id: 'd.md', title: 'Note D', folder: 'knowledge', path: 'd.md' },
+      { id: 'e.md', title: 'Note E', folder: 'agents/gpt', path: 'e.md' },
+      { id: 'f.md', title: 'Note F', folder: 'agents/gpt', path: 'f.md' },
+      { id: 'g.md', title: 'Note G', folder: 'agents/gpt', path: 'g.md' },
       {
         id: 'lonely.md',
         title: 'Lonely note',
@@ -23,15 +37,28 @@ function graph(): KnowledgeGraphResponse {
       { source: 'a.md', target: 'hub.md' },
       { source: 'c.md', target: 'hub.md' },
       { source: 'c.md', target: 'd.md' },
+      { source: 'e.md', target: 'f.md' },
+      { source: 'e.md', target: 'g.md' },
+      { source: 'f.md', target: 'e.md' },
     ],
   }
+}
+
+function distance3(
+  a: { baseX: number; baseY: number; baseZ: number },
+  b: { baseX: number; baseY: number; baseZ: number },
+): number {
+  const dx = a.baseX - b.baseX
+  const dy = a.baseY - b.baseY
+  const dz = a.baseZ - b.baseZ
+  return Math.sqrt(dx * dx + dy * dy + dz * dz)
 }
 
 describe('buildGalaxyModel', () => {
   it('crowns the most-linked note as the core', () => {
     const model = buildGalaxyModel(graph())
-    expect(model.core.id).toBe('hub.md')
-    expect(model.core.kind).toBe('core')
+    expect(model.core?.id).toBe('hub.md')
+    expect(model.core?.kind).toBe('core')
   })
 
   it('ranks highly connected hubs above passive notes for operational sizing', () => {
@@ -84,5 +111,153 @@ describe('buildGalaxyModel', () => {
   it('tolerates an empty graph without throwing', () => {
     const model = buildGalaxyModel({ nodes: [], edges: [] })
     expect(model.bodyById.size).toBeGreaterThanOrEqual(0)
+  })
+
+  it('separates major systems into distinct operational neighborhoods', () => {
+    const model = buildGalaxyModel(graph())
+    const planets = model.systems.map((system) => system.planet)
+    expect(planets.length).toBeGreaterThanOrEqual(2)
+
+    let minPlanetDistance = Number.POSITIVE_INFINITY
+    for (let i = 0; i < planets.length; i += 1) {
+      for (let j = i + 1; j < planets.length; j += 1) {
+        minPlanetDistance = Math.min(
+          minPlanetDistance,
+          distance3(planets[i], planets[j]),
+        )
+      }
+    }
+    expect(minPlanetDistance).toBeGreaterThan(18)
+
+    const depths = planets.map((planet) => planet.baseZ)
+    const depthSpan = Math.max(...depths) - Math.min(...depths)
+    const heights = planets.map((planet) => planet.baseY)
+    const heightSpan = Math.max(...heights) - Math.min(...heights)
+    expect(depthSpan + heightSpan).toBeGreaterThan(24)
+  })
+
+  it('keeps tags near their planet but not stacked into a single point', () => {
+    const model = buildGalaxyModel(graph())
+    const system = model.systems.find((entry) => entry.tags.length >= 2)
+    expect(system).toBeTruthy()
+    if (!system) return
+
+    for (const tag of system.tags) {
+      const radial = distance3(tag, system.planet)
+      expect(radial).toBeGreaterThan(7)
+      expect(radial).toBeLessThan(42)
+    }
+  })
+})
+
+describe('folderTintFor', () => {
+  it('maps known operational folders to distinct system colors', () => {
+    expect(folderTintFor('agents/claude')).toBe('#D7A84A')
+    expect(folderTintFor('agents/gpt')).toBe('#B46B37')
+    expect(folderTintFor('agents/kimi')).toBe('#B66A73')
+    expect(folderTintFor('knowledge')).toBe('#BFA35A')
+    expect(folderTintFor('inbox')).toBe('#6F819D')
+    expect(folderTintFor('misc-projects')).toBe('#7D9573')
+  })
+})
+
+describe('focusDistanceForSystem', () => {
+  it('pulls closer for small systems and stays farther for large ones', () => {
+    const small = {
+      bodyCount: 3,
+      sizeTier: 1,
+      planet: { kind: 'planet', sizeTier: 1, importance: 10 },
+    } as PlanetarySystem
+    const large = {
+      bodyCount: 48,
+      sizeTier: 5,
+      planet: { kind: 'core', sizeTier: 5, importance: 80 },
+    } as PlanetarySystem
+
+    const near = focusDistanceForSystem(small)
+    const far = focusDistanceForSystem(large)
+    expect(far).toBeGreaterThan(near)
+    expect(near).toBeGreaterThanOrEqual(12)
+    expect(far).toBeLessThanOrEqual(36)
+  })
+})
+
+describe('selectLabelCandidates / resolveProjectedLabels', () => {
+  it('limits overview labels to hubs and a few high-importance tags', () => {
+    const model = buildGalaxyModel(graph())
+    const candidates = selectLabelCandidates({
+      model,
+      selectedBody: null,
+      hoveredBody: null,
+      searchTerm: '',
+      mode: 'overview',
+    })
+
+    const planetCount = candidates.filter((item) => item.kind === 'planet').length
+    const tagCount = candidates.filter((item) => item.kind === 'tag').length
+    expect(planetCount).toBeLessThanOrEqual(8)
+    expect(tagCount).toBeLessThanOrEqual(4)
+    expect(candidates.some((item) => item.body.kind === 'core')).toBe(true)
+  })
+
+  it('reveals more local tags when a system is focused', () => {
+    const model = buildGalaxyModel(graph())
+    const leaf = model.bodyById.get('a.md') ?? null
+    const focused = selectLabelCandidates({
+      model,
+      selectedBody: leaf,
+      hoveredBody: null,
+      searchTerm: '',
+      mode: 'focus',
+    })
+    const overview = selectLabelCandidates({
+      model,
+      selectedBody: null,
+      hoveredBody: null,
+      searchTerm: '',
+      mode: 'overview',
+    })
+    const focusedTags = focused.filter((item) => item.kind === 'tag').length
+    const overviewTags = overview.filter((item) => item.kind === 'tag').length
+    expect(focusedTags).toBeGreaterThan(overviewTags)
+  })
+
+  it('rejects overlapping lower-priority labels in screen space', () => {
+    const model = buildGalaxyModel(graph())
+    const core = model.core
+    const leaf = model.bodyById.get('a.md')
+    expect(core && leaf).toBeTruthy()
+    if (!core || !leaf) return
+
+    const resolved = resolveProjectedLabels(
+      [
+        {
+          id: core.id,
+          kind: 'planet',
+          body: core,
+          x: 100,
+          y: 100,
+          scale: 1,
+          opacity: 1,
+          active: true,
+          priority: 100,
+        },
+        {
+          id: leaf.id,
+          kind: 'tag',
+          body: leaf as CelestialBody,
+          x: 104,
+          y: 102,
+          scale: 0.8,
+          opacity: 0.5,
+          active: false,
+          priority: 10,
+        },
+      ],
+      28,
+    )
+
+    expect(resolved).toHaveLength(1)
+    expect(resolved[0]?.id).toBe(core.id)
   })
 })

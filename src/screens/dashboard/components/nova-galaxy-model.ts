@@ -110,12 +110,194 @@ export type GalaxyModel = {
   }
 }
 
+export type LabelKind = 'planet' | 'tag'
+
+export type LabelCandidate = {
+  id: string
+  kind: LabelKind
+  body: CelestialBody
+  priority: number
+}
+
+export type ProjectedLabel = LabelCandidate & {
+  x: number
+  y: number
+  scale: number
+  opacity: number
+  active: boolean
+}
+
 export function focusBodyForNavigation(
   model: GalaxyModel,
   body: CelestialBody | null,
 ): CelestialBody | null {
   if (!body) return null
   return model.systemByBodyId.get(body.id)?.planet ?? body
+}
+
+export function folderTintFor(folder: string): string {
+  const key = folder.trim().toLowerCase()
+  if (key === 'agents/claude' || key.startsWith('agents/claude/'))
+    return '#D7A84A'
+  if (key === 'agents/gpt' || key.startsWith('agents/gpt/')) return '#B46B37'
+  if (key === 'agents/kimi' || key.startsWith('agents/kimi/')) return '#B66A73'
+  if (key === 'knowledge' || key.startsWith('knowledge/')) return '#BFA35A'
+  if (key === 'inbox' || key.startsWith('inbox/')) return '#6F819D'
+  if (key.includes('claude')) return '#D7A84A'
+  if (key.includes('gpt') || key.includes('codex')) return '#B46B37'
+  if (key.includes('kimi') || key.includes('nova')) return '#B66A73'
+  if (key.includes('knowledge') || key.includes('notes')) return '#BFA35A'
+  if (key.includes('inbox') || key.includes('triage')) return '#6F819D'
+  return '#7D9573'
+}
+
+export function focusDistanceForSystem(
+  system: Pick<PlanetarySystem, 'bodyCount' | 'sizeTier'> & {
+    planet: Pick<CelestialBody, 'kind' | 'sizeTier' | 'importance'>
+  },
+): number {
+  const mass =
+    Math.sqrt(Math.max(1, system.bodyCount)) * 1.85 +
+    system.sizeTier * 1.35 +
+    Math.log2(system.planet.importance + 1) * 0.9
+  const coreBonus = system.planet.kind === 'core' ? 3.5 : 0
+  return clamp(12.5 + mass + coreBonus, 12, 36)
+}
+
+export function selectLabelCandidates(input: {
+  model: GalaxyModel
+  selectedBody: CelestialBody | null
+  hoveredBody: CelestialBody | null
+  searchTerm: string
+  mode: 'overview' | 'focus'
+}): Array<LabelCandidate> {
+  const query = input.searchTerm.trim().toLowerCase()
+  const selectedSystem = input.selectedBody
+    ? input.model.systemByBodyId.get(input.selectedBody.id)
+    : undefined
+  const hoveredSystem = input.hoveredBody
+    ? input.model.systemByBodyId.get(input.hoveredBody.id)
+    : undefined
+  const activeSystemIds = new Set<string>()
+  if (selectedSystem) activeSystemIds.add(selectedSystem.id)
+  if (hoveredSystem) activeSystemIds.add(hoveredSystem.id)
+
+  const candidates = new Map<string, LabelCandidate>()
+  const push = (body: CelestialBody, kind: LabelKind, priority: number) => {
+    const existing = candidates.get(body.id)
+    if (existing && existing.priority >= priority) return
+    candidates.set(body.id, {
+      id: body.id,
+      kind,
+      body,
+      priority,
+    })
+  }
+
+  const rankedSystems = [...input.model.systems].sort(
+    (a, b) =>
+      b.planet.importance - a.planet.importance ||
+      b.totalLinks - a.totalLinks ||
+      a.planet.title.localeCompare(b.planet.title),
+  )
+
+  for (const system of rankedSystems) {
+    const isActive = activeSystemIds.has(system.id)
+    const isCore = system.planet.kind === 'core'
+    const overviewHub =
+      input.mode === 'overview' &&
+      (isCore ||
+        rankedSystems.indexOf(system) < 6 ||
+        system.planet.importance >= 24)
+    if (isActive || isCore || overviewHub || query) {
+      push(
+        system.planet,
+        'planet',
+        (isCore ? 120 : 80) +
+          system.planet.importance +
+          (isActive ? 40 : 0),
+      )
+    }
+
+    const tagBudget =
+      isActive || input.mode === 'focus'
+        ? 14
+        : query
+          ? 8
+          : overviewHub
+            ? 1
+            : 0
+    const rankedTags = [...system.tags].sort(
+      (a, b) =>
+        b.importance - a.importance || a.title.localeCompare(b.title),
+    )
+    let shown = 0
+    for (const tag of rankedTags) {
+      const matches =
+        !query ||
+        tag.title.toLowerCase().includes(query) ||
+        tag.path.toLowerCase().includes(query) ||
+        tag.folder.toLowerCase().includes(query)
+      const selected =
+        tag.id === input.selectedBody?.id || tag.id === input.hoveredBody?.id
+      if (!matches && !selected && !isActive && input.mode === 'overview') {
+        if (shown >= tagBudget) continue
+        if (tag.importance < 12 && tag.recencyTier === 'cool') continue
+      }
+      if (!matches && !selected && !isActive && !overviewHub) continue
+      if (!matches && !selected && shown >= tagBudget) continue
+      push(
+        tag,
+        'tag',
+        (selected ? 70 : isActive ? 40 : 12) +
+          tag.importance +
+          (tag.recencyTier === 'hot' ? 8 : 0),
+      )
+      shown += 1
+      if (!selected && shown >= tagBudget) {
+        // keep scanning only for explicit matches/selection
+        if (!query) break
+      }
+    }
+  }
+
+  if (input.selectedBody) {
+    const kind =
+      input.selectedBody.kind === 'tag' || input.selectedBody.kind === 'comet'
+        ? 'tag'
+        : 'planet'
+    push(input.selectedBody, kind === 'tag' ? 'tag' : 'planet', 200)
+  }
+  if (input.hoveredBody) {
+    const kind =
+      input.hoveredBody.kind === 'tag' || input.hoveredBody.kind === 'comet'
+        ? 'tag'
+        : 'planet'
+    push(input.hoveredBody, kind === 'tag' ? 'tag' : 'planet', 180)
+  }
+
+  return Array.from(candidates.values()).sort(
+    (a, b) => b.priority - a.priority || a.body.title.localeCompare(b.body.title),
+  )
+}
+
+export function resolveProjectedLabels(
+  labels: Array<ProjectedLabel>,
+  minDistance = 30,
+): Array<ProjectedLabel> {
+  const accepted: Array<ProjectedLabel> = []
+  const ordered = [...labels].sort(
+    (a, b) => b.priority - a.priority || a.body.title.localeCompare(b.body.title),
+  )
+  for (const label of ordered) {
+    const collides = accepted.some((other) => {
+      const dx = other.x - label.x
+      const dy = other.y - label.y
+      return Math.sqrt(dx * dx + dy * dy) < minDistance
+    })
+    if (!collides) accepted.push(label)
+  }
+  return accepted
 }
 
 type SeedNode = KnowledgeGraphNode & {
@@ -139,6 +321,8 @@ const FOLDER_TINTS = [
   '#6F819D',
   '#7D9573',
 ]
+
+const ARM_DEPTH_BIAS = [-18, 14, -8, 22, -24, 10]
 
 export function shortTitle(value: string): string {
   return value
@@ -280,11 +464,12 @@ function sizeTier(value: number, max: number): number {
 
 function folderAnchor(arm: GalaxyArm): Vec3 {
   const angle = arm.angle
-  const radius = 29
+  const radius = 46 + arm.index * 3.5
+  const depthBias = ARM_DEPTH_BIAS[arm.index % ARM_DEPTH_BIAS.length] ?? 0
   return {
-    x: Math.cos(angle) * radius,
-    y: Math.sin(angle * 1.31) * 10,
-    z: Math.sin(angle) * radius,
+    x: Math.cos(angle) * radius + depthBias * 0.18,
+    y: Math.sin(angle * 1.17) * 18 + (arm.index % 2 === 0 ? 6 : -5),
+    z: Math.sin(angle) * radius + depthBias,
   }
 }
 
@@ -335,12 +520,14 @@ function settleSystems(
         const dx = a.x - b.x
         const dy = a.y - b.y
         const dz = a.z - b.z
-        const distanceSq = Math.max(10, dx * dx + dy * dy + dz * dz)
-        const force = 34 / distanceSq
+        const distanceSq = Math.max(24, dx * dx + dy * dy + dz * dz)
+        const force = 86 / distanceSq
         const distance = Math.sqrt(distanceSq)
-        const ax = (dx / distance) * force
-        const ay = (dy / distance) * force
-        const az = (dz / distance) * force
+        // Soft minimum spacing keeps systems from collapsing into one blob.
+        const separation = distance < 22 ? ((22 - distance) / 22) * 1.4 : 0
+        const ax = (dx / distance) * (force + separation)
+        const ay = (dy / distance) * (force + separation) * 1.08
+        const az = (dz / distance) * (force + separation)
         const da = deltas.get(systems[i].id)!
         const db = deltas.get(systems[j].id)!
         da.x += ax
@@ -360,21 +547,21 @@ function settleSystems(
       const dz = b.z - a.z
       const da = deltas.get(link.source)!
       const db = deltas.get(link.target)!
-      da.x += dx * 0.004
-      da.y += dy * 0.004
-      da.z += dz * 0.004
-      db.x -= dx * 0.004
-      db.y -= dy * 0.004
-      db.z -= dz * 0.004
+      da.x += dx * 0.0024
+      da.y += dy * 0.0024
+      da.z += dz * 0.0024
+      db.x -= dx * 0.0024
+      db.y -= dy * 0.0024
+      db.z -= dz * 0.0024
     }
 
     for (const system of systems) {
       const position = positions.get(system.id)!
       const delta = deltas.get(system.id)!
       const anchor = folderAnchor(system.arm)
-      position.x += delta.x + (anchor.x - position.x) * 0.008
-      position.y += delta.y + (anchor.y - position.y) * 0.008
-      position.z += delta.z + (anchor.z - position.z) * 0.008
+      position.x += delta.x + (anchor.x - position.x) * 0.011
+      position.y += delta.y + (anchor.y - position.y) * 0.014
+      position.z += delta.z + (anchor.z - position.z) * 0.011
     }
   }
 
@@ -503,7 +690,7 @@ export function buildGalaxyModel(
     angle: -Math.PI / 2 + (Math.PI * 2 * index) / armCount,
     bodyCount: count,
     systemCount: 0,
-    tint: FOLDER_TINTS[index] ?? FOLDER_TINTS.at(-1)!,
+    tint: folderTintFor(name) || FOLDER_TINTS[index] || FOLDER_TINTS.at(-1)!,
   }))
   if (arms.length === 0) {
     arms.push({
@@ -513,7 +700,7 @@ export function buildGalaxyModel(
       angle: -Math.PI / 2,
       bodyCount: linkedNodes.length,
       systemCount: 0,
-      tint: FOLDER_TINTS.at(-1)!,
+      tint: folderTintFor('field stars'),
     })
   }
 
@@ -525,7 +712,7 @@ export function buildGalaxyModel(
     angle: Math.PI / 2,
     bodyCount: 0,
     systemCount: 0,
-    tint: FOLDER_TINTS.at(-1)!,
+    tint: folderTintFor('field stars'),
   }
 
   const nodesByArm = new Map<string, Array<SeedNode>>()
@@ -572,13 +759,13 @@ export function buildGalaxyModel(
     arm.systemCount = entries.length
     entries.forEach((entry, index) => {
       const anchor = folderAnchor(arm)
-      const spread = stableJitter(entry.seedId, 17 + index * 1.8)
+      const spread = stableJitter(entry.seedId, 24 + index * 2.6)
       communityEntries.push({
         ...entry,
         arm,
         initial: {
           x: anchor.x + spread.x,
-          y: anchor.y + spread.y,
+          y: anchor.y + spread.y + (index % 3 - 1) * 4.5,
           z: anchor.z + spread.z,
         },
       })
@@ -614,9 +801,13 @@ export function buildGalaxyModel(
       .filter((node) => node.id !== entry.planet.id)
       .map((node, index) => {
         const ring =
-          6.4 + (index % 10) * 1.8 + seededUnit(`${node.id}:ring`) * 4.6
-        const theta = seededUnit(`${node.id}:theta`) * Math.PI * 2
-        const vertical = (seededUnit(`${node.id}:vertical`) - 0.5) * 17
+          9.2 + (index % 12) * 2.15 + seededUnit(`${node.id}:ring`) * 5.4
+        const theta =
+          seededUnit(`${node.id}:theta`) * Math.PI * 2 +
+          (index / Math.max(1, entry.community.length)) * 0.85
+        const vertical =
+          (seededUnit(`${node.id}:vertical`) - 0.5) * 22 +
+          Math.sin(theta * 1.7) * 2.4
         return createBody({
           node,
           kind: 'tag',
@@ -628,7 +819,7 @@ export function buildGalaxyModel(
           offset: {
             x: Math.cos(theta) * ring,
             y: vertical,
-            z: Math.sin(theta) * ring,
+            z: Math.sin(theta) * ring * 0.92,
           },
         })
       })
