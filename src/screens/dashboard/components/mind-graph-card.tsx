@@ -334,9 +334,11 @@ function buildDustField(): DustField {
       positions[cursor * 3] = point.x
       positions[cursor * 3 + 1] = point.y
       positions[cursor * 3 + 2] = point.z
-      // amber-white core → neon-blue arms → deep-blue rim
+      // amber core → neon-blue arms → deep-blue rim. The core stop must be
+      // warm gold, not near-white: white dust + additive stacking is what
+      // bloomed the dense center into the cyan-green hotspot.
       const color = new THREE.Color()
-      if (radiusNorm < 0.18) color.set('#FFF1CC')
+      if (radiusNorm < 0.18) color.set(GALAXY_PALETTE.ambers[2])
       else if (radiusNorm < 0.62) color.set(GALAXY_PALETTE.blues[0])
       else color.set(GALAXY_PALETTE.blues[2])
       colors[cursor * 3] = color.r
@@ -513,10 +515,13 @@ function Galaxy3D({
         // untextured 0.22 points were sub-pixel and the spiral read as empty
         // space. Dust-forward means the arms must visibly carry the scene.
         map: starTexture,
-        size: 0.72,
+        size: 0.62,
         vertexColors: true,
         transparent: true,
-        opacity: 0.62,
+        // 0.62 opacity overexposed dense regions: additive stacking bloomed
+        // past blue into white-teal (reads green). Keep arms visible but let
+        // the core saturate warm instead of clipping to white.
+        opacity: 0.4,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       }),
