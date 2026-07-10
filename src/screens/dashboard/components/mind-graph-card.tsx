@@ -49,6 +49,7 @@ type Galaxy3DProps = {
   hoveredBody: CelestialBody | null
   disabledArms: Set<string>
   searchTerm: string
+  thisWeekOnly: boolean
   isLoading: boolean
   onHover: (body: CelestialBody | null) => void
   onSelect: (body: CelestialBody | null) => void
@@ -432,6 +433,7 @@ function Galaxy3D({
   hoveredBody,
   disabledArms,
   searchTerm,
+  thisWeekOnly,
   isLoading,
   onHover,
   onSelect,
@@ -443,6 +445,7 @@ function Galaxy3D({
   const hoveredRef = useRef<CelestialBody | null>(hoveredBody)
   const disabledRef = useRef<Set<string>>(disabledArms)
   const searchRef = useRef(searchTerm)
+  const thisWeekRef = useRef(thisWeekOnly)
   const reducedMotionRef = useRef(false)
   const cameraStateRef = useRef<CameraState>({
     yaw: -0.92,
@@ -464,7 +467,8 @@ function Galaxy3D({
     hoveredRef.current = hoveredBody
     disabledRef.current = disabledArms
     searchRef.current = searchTerm
-  }, [disabledArms, hoveredBody, searchTerm, selectedBody])
+    thisWeekRef.current = thisWeekOnly
+  }, [disabledArms, hoveredBody, searchTerm, selectedBody, thisWeekOnly])
 
   useEffect(() => {
     const host = hostRef.current
@@ -892,12 +896,20 @@ function Galaxy3D({
       body: CelestialBody,
       activeIds: Set<string>,
       query: string,
+      nowIso: string = new Date().toISOString(),
     ) => {
       const disabled = disabledRef.current.has(body.armId)
       let opacity = disabled ? 0.15 : 1
       if (activeIds.size > 0 && body.systemId && !activeIds.has(body.systemId))
         opacity *= 0.34
       if (query && !matchesSearch(body, query)) opacity *= 0.16
+      // L5 "this week" filter: dims embers with recencyGlow < 1 (i.e. not
+      // touched in the last 7 days, per recencyGlow's hot-day cutoff) —
+      // visuals only, bodies stay in the model.
+      if (thisWeekRef.current) {
+        const glow = recencyGlow(body.modified ?? body.updated ?? '', nowIso)
+        if (glow < 1) opacity *= 0.2
+      }
       return opacity
     }
     const updateVisualState = (now: number) => {
@@ -917,7 +929,7 @@ function Galaxy3D({
         }
       }
       for (const planet of planetObjects.values()) {
-        const opacity = bodyVisibleOpacity(planet.body, activeIds, query)
+        const opacity = bodyVisibleOpacity(planet.body, activeIds, query, nowIso)
         const active =
           activeIds.has(planet.system.id) || planet.body.id === activeBodyId
         const warm = warmth(planet.body)
@@ -942,7 +954,7 @@ function Galaxy3D({
               : 0.12)
       }
       for (const tag of tagObjects) {
-        const opacity = bodyVisibleOpacity(tag.body, activeIds, query)
+        const opacity = bodyVisibleOpacity(tag.body, activeIds, query, nowIso)
         const active =
           (tag.body.systemId && activeIds.has(tag.body.systemId)) ||
           tag.body.id === activeBodyId
@@ -975,7 +987,7 @@ function Galaxy3D({
           comet.body.baseY + Math.cos(drift * 0.7 + comet.body.orbitPhase) * 2
         comet.group.position.z =
           comet.body.baseZ + Math.cos(drift + comet.body.orbitPhase) * 8
-        const opacity = bodyVisibleOpacity(comet.body, activeIds, query)
+        const opacity = bodyVisibleOpacity(comet.body, activeIds, query, nowIso)
         comet.material.opacity = opacity * 0.48
         comet.tailMaterial.opacity = opacity * 0.16
       }
@@ -1364,6 +1376,33 @@ export function MindGraphCard() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [disabledArms, setDisabledArms] = useState<Set<string>>(() => new Set())
   const [searchTerm, setSearchTerm] = useState('')
+  const [thisWeekOnly, setThisWeekOnly] = useState(false)
+  // L4 search-to-fly: debounce keystrokes 300ms before hitting the real
+  // vault search endpoint, so the 3D-highlight `searchTerm` state above
+  // (already wired) stays snappy while the results dropdown below stays
+  // network-quiet.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300)
+    return () => window.clearTimeout(handle)
+  }, [searchTerm])
+  const searchResultsQuery = useQuery({
+    queryKey: ['dashboard', 'knowledge-search', debouncedSearch],
+    enabled: debouncedSearch.length > 0,
+    queryFn: async (): Promise<{
+      results: Array<{ path: string; title: string; line: number; text: string }>
+    }> => {
+      const response = await fetch(
+        `/api/knowledge/search?q=${encodeURIComponent(debouncedSearch)}`,
+      )
+      if (!response.ok) throw new Error(`search ${response.status}`)
+      return (await response.json()) as {
+        results: Array<{ path: string; title: string; line: number; text: string }>
+      }
+    },
+    staleTime: 15_000,
+  })
+  const searchResults = (searchResultsQuery.data?.results ?? []).slice(0, 8)
   const graphQuery = useQuery({
     queryKey: ['dashboard', 'knowledge-galaxy'],
     queryFn: readKnowledgeGraph,
@@ -1508,6 +1547,7 @@ export function MindGraphCard() {
               hoveredBody={hoveredBody}
               disabledArms={disabledArms}
               searchTerm={searchTerm}
+              thisWeekOnly={thisWeekOnly}
               isLoading={graphQuery.isLoading}
               onHover={handleHover}
               onSelect={handleSelect}
@@ -1530,15 +1570,79 @@ export function MindGraphCard() {
                   </button>
                 )
               })}
-              <label className="order-last flex w-full min-w-0 items-center rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.72)] px-2 py-1 backdrop-blur-sm sm:order-none sm:ml-auto sm:w-auto sm:min-w-[180px]">
-                <span className="sr-only">Search galaxy notes</span>
-                <input
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search notes"
-                  className="w-full bg-transparent font-mono text-[11px] text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted-2)]"
-                />
-              </label>
+              <button
+                type="button"
+                onClick={() => setThisWeekOnly((current) => !current)}
+                className={`rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] transition-colors sm:text-[10px] sm:tracking-[0.12em] ${thisWeekOnly ? 'border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] text-[var(--theme-accent-secondary)]' : 'border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.58)] text-[var(--theme-muted-2)]'}`}
+                aria-pressed={thisWeekOnly}
+              >
+                this week
+              </button>
+              <div className="relative order-last w-full sm:order-none sm:ml-auto sm:w-auto sm:min-w-[180px]">
+                <label className="flex w-full min-w-0 items-center rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.72)] px-2 py-1 backdrop-blur-sm">
+                  <span className="sr-only">Search galaxy notes</span>
+                  <input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Search notes"
+                    className="w-full bg-transparent font-mono text-[11px] text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted-2)]"
+                  />
+                </label>
+                {debouncedSearch && searchResults.length > 0 ? (
+                  <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-lg border border-[var(--theme-border)] bg-[rgba(5,11,22,0.94)] p-1 backdrop-blur-sm">
+                    {searchResults.map((result) => {
+                      const inGalaxy = model.bodyById.has(result.path)
+                      return (
+                        <button
+                          key={result.path}
+                          type="button"
+                          disabled={!inGalaxy}
+                          onClick={() => {
+                            if (!inGalaxy) return
+                            setSelectedId(result.path)
+                            setSearchTerm(result.title)
+                          }}
+                          className={`flex w-full items-center justify-between gap-2 truncate rounded px-2 py-1 text-left font-mono text-[10px] ${
+                            inGalaxy
+                              ? 'text-[var(--theme-text-soft)] hover:bg-[var(--theme-accent-subtle)] hover:text-[var(--theme-accent-secondary)]'
+                              : 'cursor-default text-[var(--theme-muted-2)]'
+                          }`}
+                          title={result.text}
+                        >
+                          <span className="truncate">{shortTitle(result.title)}</span>
+                          {!inGalaxy ? (
+                            <span className="shrink-0 text-[9px] normal-case tracking-normal text-[var(--theme-muted-2)]">
+                              not in galaxy (tag/unlinked)
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="pointer-events-none absolute bottom-2 left-2 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(5,11,22,0.72)] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.08em] text-[var(--theme-muted)] backdrop-blur-sm">
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full" style={{ background: GALAXY_PALETTE.blues[0] }} />
+                color = cluster
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2.5 rounded-full" style={{ background: GALAXY_PALETTE.ambers[1] }} />
+                size = links
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2 animate-pulse rounded-full" style={{ background: GALAXY_PALETTE.ambers[0] }} />
+                pulse = hub
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full" style={{ background: '#FFF1CC' }} />
+                bright = this week
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-1.5 rounded-full" style={{ background: TAN }} />
+                comet = orphan
+              </span>
             </div>
             {graphQuery.isError ? (
               <div className="absolute inset-0 z-30 flex items-center justify-center px-6 text-center">
