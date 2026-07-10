@@ -1,17 +1,23 @@
 ﻿import { useMutation, useQuery, useQueryClient  } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { GALAXY_PALETTE } from '../lib/nova-cockpit-theme'
 import {
   buildGalaxyModel,
   clamp,
+  clusterHue,
+  emberSize,
   focusBodyForNavigation,
   focusDistanceForSystem,
   folderTintFor,
+  isHub,
   obsidianUri,
+  recencyGlow,
   resolveProjectedLabels,
   seededUnit,
   selectLabelCandidates,
   shortTitle,
+  spiralPosition,
 } from './nova-galaxy-model'
 import type { VaultGraphInsights } from '../../../server/vault-graph-insights'
 import type {
@@ -22,8 +28,23 @@ import type {
   PlanetarySystem,
   ProjectedLabel,
 } from './nova-galaxy-model'
+
+type DustField = {
+  positions: Float32Array
+  colors: Float32Array
+}
+
+type NebulaRegion = {
+  armId: string
+  color: string
+  position: { x: number; y: number; z: number }
+  scale: number
+}
+
 type Galaxy3DProps = {
   model: GalaxyModel
+  dustField: DustField
+  nebulaRegions: Array<NebulaRegion>
   selectedBody: CelestialBody | null
   hoveredBody: CelestialBody | null
   disabledArms: Set<string>
@@ -287,15 +308,25 @@ function useEscape(handler: () => void): void {
   }, [handler])
 }
 
-function createFogNebula(): THREE.Sprite {
+function createClusterNebula(color: string): THREE.Sprite {
   const canvas = document.createElement('canvas')
   canvas.width = 512
   canvas.height = 512
   const context = canvas.getContext('2d')!
+  const base = new THREE.Color(color)
   const glow = context.createRadialGradient(256, 256, 0, 256, 256, 256)
-  glow.addColorStop(0, 'rgba(255, 179, 71, 0.12)')
-  glow.addColorStop(0.34, 'rgba(122, 68, 30, 0.07)')
-  glow.addColorStop(0.72, 'rgba(74, 42, 16, 0.03)')
+  glow.addColorStop(
+    0,
+    `rgba(${Math.round(base.r * 255)}, ${Math.round(base.g * 255)}, ${Math.round(base.b * 255)}, 0.10)`,
+  )
+  glow.addColorStop(
+    0.34,
+    `rgba(${Math.round(base.r * 255)}, ${Math.round(base.g * 255)}, ${Math.round(base.b * 255)}, 0.05)`,
+  )
+  glow.addColorStop(
+    0.72,
+    `rgba(${Math.round(base.r * 255)}, ${Math.round(base.g * 255)}, ${Math.round(base.b * 255)}, 0.02)`,
+  )
   glow.addColorStop(1, 'rgba(9, 10, 18, 0)')
   context.fillStyle = glow
   context.fillRect(0, 0, 512, 512)
@@ -305,16 +336,85 @@ function createFogNebula(): THREE.Sprite {
     map: texture,
     transparent: true,
     depthWrite: false,
-    opacity: 0.34,
+    opacity: 0.3,
     blending: THREE.AdditiveBlending,
   })
-  const sprite = new THREE.Sprite(material)
+  return new THREE.Sprite(material)
+}
+
+function createFogNebula(): THREE.Sprite {
+  const sprite = createClusterNebula(COPPER)
   sprite.position.set(-28, -10, -48)
   sprite.scale.set(92, 42, 1)
   return sprite
 }
+
+const DUST_POINTS_PER_ARM = 5500
+const DUST_ARM_COUNT = 3
+
+function clusterHueColor(hue: ReturnType<typeof clusterHue>): string {
+  switch (hue) {
+    case 'blue':
+      return GALAXY_PALETTE.blues[0]
+    case 'blue2':
+      return GALAXY_PALETTE.blues[1]
+    case 'amber':
+      return GALAXY_PALETTE.ambers[0]
+    case 'blend':
+      return GALAXY_PALETTE.ambers[2]
+  }
+}
+
+function buildDustField(): DustField {
+  const total = DUST_POINTS_PER_ARM * DUST_ARM_COUNT
+  const positions = new Float32Array(total * 3)
+  const colors = new Float32Array(total * 3)
+  let cursor = 0
+  for (let arm = 0; arm < DUST_ARM_COUNT; arm += 1) {
+    for (let i = 0; i < DUST_POINTS_PER_ARM; i += 1) {
+      const radiusNorm = i / DUST_POINTS_PER_ARM
+      const point = spiralPosition(i, arm, DUST_ARM_COUNT, radiusNorm)
+      positions[cursor * 3] = point.x
+      positions[cursor * 3 + 1] = point.y
+      positions[cursor * 3 + 2] = point.z
+      // amber-white core → neon-blue arms → deep-blue rim
+      const color = new THREE.Color()
+      if (radiusNorm < 0.18) color.set('#FFF1CC')
+      else if (radiusNorm < 0.62) color.set(GALAXY_PALETTE.blues[0])
+      else color.set(GALAXY_PALETTE.blues[2])
+      colors[cursor * 3] = color.r
+      colors[cursor * 3 + 1] = color.g
+      colors[cursor * 3 + 2] = color.b
+      cursor += 1
+    }
+  }
+  return { positions, colors }
+}
+
+function buildNebulaRegions(model: GalaxyModel): Array<NebulaRegion> {
+  return model.arms.map((arm, index) => {
+    const systemsInArm = model.systems.filter((s) => s.armId === arm.id)
+    const center = systemsInArm.reduce(
+      (acc, system) => ({
+        x: acc.x + system.baseX / Math.max(1, systemsInArm.length),
+        y: acc.y + system.baseY / Math.max(1, systemsInArm.length),
+        z: acc.z + system.baseZ / Math.max(1, systemsInArm.length),
+      }),
+      { x: 0, y: 0, z: 0 },
+    )
+    return {
+      armId: arm.id,
+      color: clusterHueColor(clusterHue(index)),
+      position: center,
+      scale: 26 + Math.min(24, systemsInArm.length * 2.4),
+    }
+  })
+}
+
 function Galaxy3D({
   model,
+  dustField,
+  nebulaRegions,
   selectedBody,
   hoveredBody,
   disabledArms,
@@ -352,8 +452,12 @@ function Galaxy3D({
     scene.background = new THREE.Color(SPACE)
     scene.fog = new THREE.FogExp2(SPACE_SOFT, 0.0062)
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 520)
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: 'low-power',
+    })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
     renderer.setClearColor(SPACE, 1)
     renderer.domElement.className =
       'nova-galaxy-canvas absolute inset-0 size-full'
@@ -372,7 +476,7 @@ function Galaxy3D({
     fill.position.set(34, -16, -30)
     const rim = new THREE.DirectionalLight('#7D9573', 0.35)
     rim.position.set(18, 8, -40)
-    scene.add(ambient, key, coreLight, fill, rim, createFogNebula())
+    scene.add(ambient, key, coreLight, fill, rim)
 
     const starPositions = new Float32Array(model.starfield.length * 3)
     const starColors = new Float32Array(model.starfield.length * 3)
@@ -405,6 +509,38 @@ function Galaxy3D({
       }),
     )
     scene.add(stars)
+
+    const dustGeometry = new THREE.BufferGeometry()
+    dustGeometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(dustField.positions, 3),
+    )
+    dustGeometry.setAttribute(
+      'color',
+      new THREE.BufferAttribute(dustField.colors, 3),
+    )
+    const dust = new THREE.Points(
+      dustGeometry,
+      new THREE.PointsMaterial({
+        size: 0.22,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.42,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    )
+    const dustGroup = new THREE.Group()
+    dustGroup.add(dust)
+    scene.add(dustGroup)
+
+    const nebulaSprites = nebulaRegions.map((region) => {
+      const sprite = createClusterNebula(region.color)
+      sprite.position.set(region.position.x, region.position.y, region.position.z)
+      sprite.scale.set(region.scale, region.scale * 0.55, 1)
+      scene.add(sprite)
+      return sprite
+    })
 
     const planetObjects = new Map<string, PlanetObject>()
     const tagObjects: Array<TagObject> = []
@@ -496,9 +632,12 @@ function Galaxy3D({
         })
         const marker = new THREE.Mesh(tagGeometry, tagMaterial)
         marker.position.copy(bodyPosition(tag))
-        marker.scale.setScalar(
-          0.62 + Math.min(0.9, Math.log2(tag.importance + 1) * 0.2),
-        )
+        const nowIso = new Date().toISOString()
+        const glow = recencyGlow(tag.modified ?? tag.updated ?? '', nowIso)
+        const hub = isHub(tag.degree)
+        marker.scale.setScalar(emberSize(tag.degree) * (hub ? 1.15 : 1))
+        tagMaterial.emissiveIntensity = hub ? 0.55 : 0.12 + glow * 0.3
+        tagMaterial.emissive = new THREE.Color(hub ? AMBER : armTint)
         marker.userData.bodyId = tag.id
         bodyPositions.set(tag.id, marker.position.clone())
         hitObjects.push(marker)
@@ -601,6 +740,36 @@ function Galaxy3D({
       })
     }
 
+    const spokeObjects: Array<LineObject> = []
+    if (model.core) {
+      const corePosition = bodyPositions.get(model.core.id)
+      if (corePosition) {
+        for (const system of model.systems) {
+          if (system.planet.id === model.core.id) continue
+          const systemPosition = bodyPositions.get(system.planet.id)
+          if (!systemPosition) continue
+          const geometry = new THREE.BufferGeometry().setFromPoints([
+            systemPosition,
+            corePosition,
+          ])
+          const material = new THREE.LineBasicMaterial({
+            color: AMBER,
+            transparent: true,
+            opacity: 0.035,
+            depthWrite: false,
+          })
+          const line = new THREE.Line(geometry, material)
+          scene.add(line)
+          spokeObjects.push({
+            source: system.planet.id,
+            target: model.core.id,
+            strength: 0,
+            material: material as unknown as THREE.LineDashedMaterial,
+          })
+        }
+      }
+    }
+
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
     let width = 1
@@ -610,6 +779,10 @@ function Galaxy3D({
     let isDragging = false
     let lastPointer = { x: 0, y: 0 }
     let pointerMoved = false
+    let pointerParallax = { x: 0, y: 0 }
+    let parallaxYaw = 0
+    let parallaxPitch = 0
+    const ROTATION_PERIOD_MS = 110_000
 
     const resize = () => {
       const bounds = host.getBoundingClientRect()
@@ -645,11 +818,13 @@ function Galaxy3D({
       }
       state.pitch = clamp(state.pitch, -0.62, 0.78)
       state.distance = clamp(state.distance, 11, 140)
-      const cosPitch = Math.cos(state.pitch)
+      const appliedYaw = state.yaw + parallaxYaw
+      const appliedPitch = clamp(state.pitch + parallaxPitch, -0.62, 0.78)
+      const cosPitch = Math.cos(appliedPitch)
       camera.position.set(
-        state.target.x + Math.sin(state.yaw) * cosPitch * state.distance,
-        state.target.y + Math.sin(state.pitch) * state.distance,
-        state.target.z + Math.cos(state.yaw) * cosPitch * state.distance,
+        state.target.x + Math.sin(appliedYaw) * cosPitch * state.distance,
+        state.target.y + Math.sin(appliedPitch) * state.distance,
+        state.target.z + Math.cos(appliedYaw) * cosPitch * state.distance,
       )
       camera.lookAt(state.target)
     }
@@ -672,6 +847,7 @@ function Galaxy3D({
       const query = searchRef.current.trim()
       const activeIds = activeSystemIds(model, selected, hovered)
       const activeBodyId = selected?.id ?? hovered?.id
+      const nowIso = new Date().toISOString()
       for (const planet of planetObjects.values()) {
         const opacity = bodyVisibleOpacity(planet.body, activeIds, query)
         const active =
@@ -706,12 +882,16 @@ function Galaxy3D({
           tag.body.recencyTier === 'hot' && !reducedMotionRef.current
             ? 1 + Math.sin(now / 680 + tag.body.orbitPhase) * 0.13
             : 1
-        const baseScale =
-          0.62 + Math.min(0.9, Math.log2(tag.body.importance + 1) * 0.2)
+        const hub = isHub(tag.body.degree)
+        const glow = recencyGlow(tag.body.modified ?? tag.body.updated ?? '', nowIso)
+        const baseScale = emberSize(tag.body.degree) * (hub ? 1.15 : 1)
         tag.mesh.scale.setScalar(baseScale * pulse * (active ? 1.28 : 1))
-        tag.material.opacity = opacity * (active ? 1 : 0.62)
-        tag.material.emissiveIntensity =
-          active ? 0.78 : tag.body.recencyTier === 'hot' ? 0.48 : 0.16
+        tag.material.opacity = opacity * (active ? 1 : 0.62) * (0.55 + glow * 0.45)
+        tag.material.emissiveIntensity = hub
+          ? 0.78
+          : active
+            ? 0.6
+            : 0.12 + glow * 0.3
       }
       for (const comet of cometObjects) {
         const drift = reducedMotionRef.current
@@ -821,6 +1001,15 @@ function Galaxy3D({
     }
 
     const animate = (now: number) => {
+      if (!reducedMotionRef.current) {
+        dustGroup.rotation.y = (now / ROTATION_PERIOD_MS) * Math.PI * 2
+        for (const sprite of nebulaSprites) {
+          sprite.material.rotation =
+            (now / ROTATION_PERIOD_MS) * Math.PI * 2 * 0.4
+        }
+      }
+      parallaxYaw += (pointerParallax.x * 0.05 - parallaxYaw) * 0.04
+      parallaxPitch += (pointerParallax.y * 0.03 - parallaxPitch) * 0.04
       updateCamera(now)
       updateVisualState(now)
       renderer.render(scene, camera)
@@ -828,7 +1017,9 @@ function Galaxy3D({
         projectLabels()
         lastLabelUpdate = now
       }
-      frame = window.requestAnimationFrame(animate)
+      if (!document.hidden && isVisible) {
+        frame = window.requestAnimationFrame(animate)
+      }
     }
 
     const motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -850,6 +1041,11 @@ function Galaxy3D({
         : null
     }
     const onPointerMove = (event: PointerEvent) => {
+      const bounds = renderer.domElement.getBoundingClientRect()
+      pointerParallax = {
+        x: ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+        y: ((event.clientY - bounds.top) / bounds.height) * 2 - 1,
+      }
       if (isDragging) {
         const dx = event.clientX - lastPointer.x
         const dy = event.clientY - lastPointer.y
@@ -888,6 +1084,27 @@ function Galaxy3D({
       )
     }
 
+    let isVisible = true
+    const intersectionObserver = new IntersectionObserver(
+      ([entry]) => {
+        const wasVisible = isVisible
+        isVisible = entry.isIntersecting
+        if (isVisible && !wasVisible && !document.hidden) {
+          frame = window.requestAnimationFrame(animate)
+        }
+      },
+      { threshold: 0.05 },
+    )
+    intersectionObserver.observe(host)
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        window.cancelAnimationFrame(frame)
+      } else if (isVisible) {
+        frame = window.requestAnimationFrame(animate)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
     const resizeObserver = new ResizeObserver(resize)
     resizeObserver.observe(host)
     resize()
@@ -902,6 +1119,8 @@ function Galaxy3D({
     return () => {
       window.cancelAnimationFrame(frame)
       resizeObserver.disconnect()
+      intersectionObserver.disconnect()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       motionMedia.removeEventListener('change', onMotionChange)
       renderer.domElement.removeEventListener('pointermove', onPointerMove)
       renderer.domElement.removeEventListener('pointerdown', onPointerDown)
@@ -926,7 +1145,7 @@ function Galaxy3D({
       renderer.dispose()
       host.removeChild(renderer.domElement)
     }
-  }, [model, onHover, onSelect])
+  }, [model, dustField, nebulaRegions, onHover, onSelect])
 
   return (
     <div ref={hostRef} className="absolute inset-0 overflow-hidden">
@@ -1013,6 +1232,8 @@ export function MindGraphCard() {
     () => buildGalaxyModel(graphQuery.data),
     [graphQuery.data],
   )
+  const dustField = useMemo(() => buildDustField(), [])
+  const nebulaRegions = useMemo(() => buildNebulaRegions(model), [model])
   const selectedBody = selectedId
     ? (model.bodyById.get(selectedId) ?? null)
     : null
@@ -1112,6 +1333,8 @@ export function MindGraphCard() {
           <div className="nova-galaxy-field relative mt-3 h-[58vh] min-h-[360px] flex-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] lg:h-[70vh] lg:min-h-[560px]">
             <Galaxy3D
               model={model}
+              dustField={dustField}
+              nebulaRegions={nebulaRegions}
               selectedBody={selectedBody}
               hoveredBody={hoveredBody}
               disabledArms={disabledArms}
