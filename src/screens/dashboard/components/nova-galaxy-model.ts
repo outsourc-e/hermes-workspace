@@ -135,20 +135,25 @@ export function focusBodyForNavigation(
   return model.systemByBodyId.get(body.id)?.planet ?? body
 }
 
+// Canon galaxy tints ONLY: neon blues + ambers (deep navy / neon blues /
+// amber glows). The previous palette here (mustard/rust/rose/olive and a
+// GREEN default) was the hidden second color system that kept repainting
+// every ember with pre-canon colors no matter what the theme passes fixed.
+// nova-galaxy-model-v2.test.ts now tripwires this function.
 export function folderTintFor(folder: string): string {
   const key = folder.trim().toLowerCase()
   if (key === 'agents/claude' || key.startsWith('agents/claude/'))
-    return '#D7A84A'
-  if (key === 'agents/gpt' || key.startsWith('agents/gpt/')) return '#B46B37'
-  if (key === 'agents/kimi' || key.startsWith('agents/kimi/')) return '#B66A73'
-  if (key === 'knowledge' || key.startsWith('knowledge/')) return '#BFA35A'
-  if (key === 'inbox' || key.startsWith('inbox/')) return '#6F819D'
-  if (key.includes('claude')) return '#D7A84A'
-  if (key.includes('gpt') || key.includes('codex')) return '#B46B37'
-  if (key.includes('kimi') || key.includes('nova')) return '#B66A73'
-  if (key.includes('knowledge') || key.includes('notes')) return '#BFA35A'
-  if (key.includes('inbox') || key.includes('triage')) return '#6F819D'
-  return '#7D9573'
+    return '#FFB347'
+  if (key === 'agents/gpt' || key.startsWith('agents/gpt/')) return '#FF8C1A'
+  if (key === 'agents/kimi' || key.startsWith('agents/kimi/')) return '#63C7FF'
+  if (key === 'knowledge' || key.startsWith('knowledge/')) return '#9DDCFF'
+  if (key === 'inbox' || key.startsWith('inbox/')) return '#2E7FD9'
+  if (key.includes('claude')) return '#FFB347'
+  if (key.includes('gpt') || key.includes('codex')) return '#FF8C1A'
+  if (key.includes('kimi') || key.includes('nova')) return '#63C7FF'
+  if (key.includes('knowledge') || key.includes('notes')) return '#9DDCFF'
+  if (key.includes('inbox') || key.includes('triage')) return '#2E7FD9'
+  return '#9DDCFF'
 }
 
 export function focusDistanceForSystem(
@@ -323,13 +328,14 @@ type Vec3 = { x: number; y: number; z: number }
 
 const FIELD_ARM_ID = 'field-stars'
 
+// Fallback arm tints — same canon family as folderTintFor (blues + ambers).
 const FOLDER_TINTS = [
-  '#D7A84A',
-  '#B46B37',
-  '#B66A73',
-  '#BFA35A',
-  '#6F819D',
-  '#7D9573',
+  '#FFB347',
+  '#FF8C1A',
+  '#63C7FF',
+  '#9DDCFF',
+  '#2E7FD9',
+  '#FFD27A',
 ]
 
 const ARM_DEPTH_BIAS = [-18, 14, -8, 22, -24, 10]

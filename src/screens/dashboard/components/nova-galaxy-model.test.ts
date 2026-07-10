@@ -152,12 +152,12 @@ describe('buildGalaxyModel', () => {
 
 describe('folderTintFor', () => {
   it('maps known operational folders to distinct system colors', () => {
-    expect(folderTintFor('agents/claude')).toBe('#D7A84A')
-    expect(folderTintFor('agents/gpt')).toBe('#B46B37')
-    expect(folderTintFor('agents/kimi')).toBe('#B66A73')
-    expect(folderTintFor('knowledge')).toBe('#BFA35A')
-    expect(folderTintFor('inbox')).toBe('#6F819D')
-    expect(folderTintFor('misc-projects')).toBe('#7D9573')
+    expect(folderTintFor('agents/claude')).toBe('#FFB347')
+    expect(folderTintFor('agents/gpt')).toBe('#FF8C1A')
+    expect(folderTintFor('agents/kimi')).toBe('#63C7FF')
+    expect(folderTintFor('knowledge')).toBe('#9DDCFF')
+    expect(folderTintFor('inbox')).toBe('#2E7FD9')
+    expect(folderTintFor('misc-projects')).toBe('#9DDCFF')
   })
 })
 
@@ -269,7 +269,7 @@ describe('selectLabelCandidates / resolveProjectedLabels', () => {
         {
           id: leaf.id,
           kind: 'tag',
-          body: leaf as CelestialBody,
+          body: leaf,
           x: 104,
           y: 102,
           scale: 0.8,

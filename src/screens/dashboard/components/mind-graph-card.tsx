@@ -458,7 +458,9 @@ function Galaxy3D({
     coreLight.position.set(-10, 12, 24)
     const fill = new THREE.PointLight('#163456', 0.58, 180)
     fill.position.set(34, -16, -30)
-    const rim = new THREE.DirectionalLight('#7D9573', 0.35)
+    // Rim stays in the canon family — the old #7D9573 green rim light
+    // washed every ember with the pre-canon tint.
+    const rim = new THREE.DirectionalLight('#2E7FD9', 0.35)
     rim.position.set(18, 8, -40)
     scene.add(ambient, key, coreLight, fill, rim)
 

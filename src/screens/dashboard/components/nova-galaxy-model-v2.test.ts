@@ -3,6 +3,7 @@ import {
   HUB_DEGREE_THRESHOLD,
   clusterHue,
   emberSize,
+  folderTintFor,
   gaussianFrom,
   isHub,
   mulberry32,
@@ -119,5 +120,39 @@ describe('emberSize + isHub', () => {
     expect(isHub(5)).toBe(false)
     expect(isHub(6)).toBe(true)
     expect(isHub(20)).toBe(true)
+  })
+})
+
+describe('galaxy tint tripwire — canon blues/ambers only', () => {
+  const CANON = new Set([
+    '#FFB347',
+    '#FF8C1A',
+    '#FFD27A',
+    '#63C7FF',
+    '#9DDCFF',
+    '#2E7FD9',
+  ])
+  const FOLDERS = [
+    'agents/claude',
+    'agents/gpt',
+    'agents/kimi',
+    'knowledge',
+    'inbox',
+    'field stars',
+    'totally-unknown-folder',
+    'random/deep/path',
+  ]
+
+  it('folderTintFor returns only canon blues/ambers for every folder shape', () => {
+    for (const folder of FOLDERS) {
+      const tint = folderTintFor(folder)
+      expect(CANON.has(tint), `folderTintFor("${folder}") returned off-canon tint ${tint}`).toBe(true)
+    }
+  })
+
+  it('the unknown-folder default is never green or rose', () => {
+    const tint = folderTintFor('zzz-not-a-real-folder')
+    expect(tint).not.toBe('#7D9573')
+    expect(CANON.has(tint)).toBe(true)
   })
 })
