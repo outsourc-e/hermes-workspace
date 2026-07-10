@@ -1600,3 +1600,42 @@ code {
    Tailwind oklch values and .system dark mode overrides.
    ═══════════════════════════════════════════════════════════════════ */
 @import './scifi-theme.css';
+
+/* ═══════════════════════════════════════════════════════════════════
+   NOVA COCKPIT FULL-VIEWPORT SKIN — active only while the Mission
+   Control dashboard route is mounted (dashboard-screen sets
+   data-nova-cockpit on <html>). Per the binding spec: once inside
+   Mission Control, EVERYTHING in view is Nova navy/amber — no mixed
+   skin. This must beat every [data-theme='...'] block above (html +
+   attribute = higher specificity) so the shell (sidebar, pills, top
+   bar) cannot stay green/teal around the cockpit.
+   Keep these values in sync with NOVA_COCKPIT_TOKENS
+   (src/screens/dashboard/lib/nova-cockpit-theme.ts).
+   ═══════════════════════════════════════════════════════════════════ */
+html[data-nova-cockpit='true'] {
+  --theme-bg: #050b16;
+  --theme-sidebar: #071426;
+  --theme-panel: #0a1b33;
+  --theme-card: #0d203b;
+  --theme-card2: #10284a;
+  --theme-elevated: #153a66;
+  --theme-border: rgba(255, 179, 71, 0.16);
+  --theme-border-subtle: rgba(255, 210, 122, 0.1);
+  --theme-text: #ffd27a;
+  --theme-text-strong: #fff1cc;
+  --theme-muted: rgba(212, 190, 160, 0.55);
+  --theme-glass: rgba(5, 11, 22, 0.88);
+  --theme-focus: #ffd27a;
+  --theme-accent: #ff8c1a;
+  --theme-accent-secondary: #ffb347;
+  --theme-accent-subtle: rgba(255, 140, 26, 0.1);
+  --theme-accent-border: rgba(255, 140, 26, 0.42);
+  --theme-active: #ff8c1a;
+  --theme-link: #ffb347;
+  --theme-success: #ffd27a;
+  --theme-warning: #ffb347;
+  --theme-danger: #ff6b4a;
+  --theme-stripe: rgba(255, 179, 71, 0.05);
+  --theme-header-bg: rgba(5, 11, 22, 0.94);
+  --theme-header-border: rgba(255, 179, 71, 0.16);
+}
