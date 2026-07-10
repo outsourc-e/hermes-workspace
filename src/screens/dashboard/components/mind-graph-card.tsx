@@ -548,10 +548,14 @@ function Galaxy3D({
     const dust = new THREE.Points(
       dustGeometry,
       new THREE.PointsMaterial({
-        size: 0.22,
+        // Soft-sprite texture + larger size: at overview distance (~96) the
+        // untextured 0.22 points were sub-pixel and the spiral read as empty
+        // space. Dust-forward means the arms must visibly carry the scene.
+        map: createStarTexture(),
+        size: 0.72,
         vertexColors: true,
         transparent: true,
-        opacity: 0.42,
+        opacity: 0.62,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       }),

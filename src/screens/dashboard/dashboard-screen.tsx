@@ -983,7 +983,10 @@ export function DashboardScreen() {
   return (
     <div
       data-nova-mission-control="true"
-      className="min-h-full"
+      // min-h uses dvh, not min-h-full: the scroll parent is not h-full, so
+      // percentage min-height collapses and the Hermes shell background
+      // (teal on some shell themes) bleeds into the cockpit below the cards.
+      className="min-h-[100dvh]"
       style={NOVA_COCKPIT_STYLE}
     >
       {/* Quiet-tier decorative cards (operator_tip, achievements,
