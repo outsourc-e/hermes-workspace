@@ -1562,7 +1562,7 @@ export function MindGraphCard() {
               onSelect={handleSelect}
             />
             <div className="absolute left-2 right-2 top-2 z-20 flex flex-wrap items-center gap-1.5 sm:left-3 sm:right-3 sm:top-3 sm:gap-2">
-              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.72)] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)] backdrop-blur-sm">
+              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)] backdrop-blur-sm">
                 auto-sync 45s
               </div>
               {model.arms.slice(0, 7).map((arm) => {
@@ -1572,7 +1572,7 @@ export function MindGraphCard() {
                     type="button"
                     key={arm.id}
                     onClick={() => toggleArm(arm)}
-                    className={`rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] transition-colors sm:text-[10px] sm:tracking-[0.12em] ${disabled ? 'border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.58)] text-[var(--theme-muted-2)]' : 'border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] text-[var(--theme-accent-secondary)]'}`}
+                    className={`rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] transition-colors sm:text-[10px] sm:tracking-[0.12em] ${disabled ? 'border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] text-[var(--theme-muted-2)]' : 'border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] text-[var(--theme-accent-secondary)]'}`}
                     aria-pressed={!disabled}
                   >
                     {arm.name}
@@ -1582,13 +1582,13 @@ export function MindGraphCard() {
               <button
                 type="button"
                 onClick={() => setThisWeekOnly((current) => !current)}
-                className={`rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] transition-colors sm:text-[10px] sm:tracking-[0.12em] ${thisWeekOnly ? 'border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] text-[var(--theme-accent-secondary)]' : 'border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.58)] text-[var(--theme-muted-2)]'}`}
+                className={`rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] transition-colors sm:text-[10px] sm:tracking-[0.12em] ${thisWeekOnly ? 'border-[var(--theme-border)] bg-[var(--theme-accent-subtle)] text-[var(--theme-accent-secondary)]' : 'border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] text-[var(--theme-muted-2)]'}`}
                 aria-pressed={thisWeekOnly}
               >
                 this week
               </button>
               <div className="relative order-last w-full sm:order-none sm:ml-auto sm:w-auto sm:min-w-[180px]">
-                <label className="flex w-full min-w-0 items-center rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.72)] px-2 py-1 backdrop-blur-sm">
+                <label className="flex w-full min-w-0 items-center rounded-lg border border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] px-2 py-1 backdrop-blur-sm">
                   <span className="sr-only">Search galaxy notes</span>
                   <input
                     value={searchTerm}
@@ -1679,16 +1679,16 @@ export function MindGraphCard() {
         </div>
 
         <aside className="relative z-10 grid w-full grid-cols-1 gap-3 md:grid-cols-2 xl:flex xl:w-72 xl:flex-col">
-          <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">
+          <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 p-3">
             <div className="nova-label">Obsidian reflection</div>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.52)] p-3">
+              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] p-3">
                 <div className="nova-label">bodies</div>
                 <div className="nova-metric mt-1 text-xl">
                   {model.totals.bodies}
                 </div>
               </div>
-              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.52)] p-3">
+              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] p-3">
                 <div className="nova-label">systems</div>
                 <div className="nova-metric mt-1 text-xl">
                   {model.totals.systems}
@@ -1696,13 +1696,13 @@ export function MindGraphCard() {
               </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.38)] px-3 py-2">
+              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] px-3 py-2">
                 <div className="nova-label">links</div>
                 <div className="nova-metric mt-1 text-sm">
                   {model.totals.links}
                 </div>
               </div>
-              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.38)] px-3 py-2">
+              <div className="rounded-lg border border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] px-3 py-2">
                 <div className="nova-label">comets</div>
                 <div className="nova-metric mt-1 text-sm">
                   {model.totals.comets}
@@ -1711,9 +1711,9 @@ export function MindGraphCard() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">
+          <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 p-3">
             <div className="nova-label">System inspector</div>
-            <div className="mt-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.54)] px-3 py-2">
+            <div className="mt-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[var(--theme-card)]/60 px-3 py-2">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold text-[var(--theme-text-strong)]">
@@ -1755,7 +1755,7 @@ export function MindGraphCard() {
             </div>
 
             {selectedNotePath ? (
-              <div className="mt-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.54)] px-3 py-2">
+              <div className="mt-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[var(--theme-card)]/60 px-3 py-2">
                 <div className="nova-label">Note (live from vault)</div>
                 {noteQuery.isLoading ? (
                   <p className="mt-2 text-[11px] text-[var(--theme-muted)]">
@@ -1799,7 +1799,7 @@ export function MindGraphCard() {
             ) : null}
           </div>
 
-          <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">
+          <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 p-3">
             <div className="nova-label">Planetary systems</div>
             <div className="mt-2 space-y-2">
               {largestSystems.map((system) => (
@@ -1807,7 +1807,7 @@ export function MindGraphCard() {
                   type="button"
                   key={system.id}
                   onClick={() => setSelectedId(system.planet.id)}
-                  className="w-full rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.48)] px-3 py-2 text-left transition-colors hover:border-[var(--theme-accent-border)] hover:bg-[var(--theme-accent-subtle)]"
+                  className="w-full rounded-lg border border-[var(--theme-border-subtle)] bg-[var(--theme-card)]/55 px-3 py-2 text-left transition-colors hover:border-[var(--theme-accent-border)] hover:bg-[var(--theme-accent-subtle)]"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="nova-fragment text-[var(--theme-accent-secondary)]">
@@ -1826,7 +1826,7 @@ export function MindGraphCard() {
           </div>
 
           {insightsQuery.data?.insights ? (
-            <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">
+            <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 p-3">
               <div className="nova-label">Vault health</div>
               <div className="mt-2 flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
                 <span>{insightsQuery.data.insights.orphans.length} orphans</span>
@@ -1837,7 +1837,7 @@ export function MindGraphCard() {
                 {insightsQuery.data.insights.recommendations.slice(0, 3).map((rec) => (
                   <div
                     key={`${rec.kind}-${rec.title}`}
-                    className="rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.4)] px-2 py-1.5"
+                    className="rounded-lg border border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] px-2 py-1.5"
                   >
                     <div className="truncate font-mono text-[10px] text-[var(--theme-text-soft)]">
                       {rec.title}
@@ -1857,7 +1857,7 @@ export function MindGraphCard() {
           ) : null}
 
           {visibleComets.length > 0 ? (
-            <div className="rounded-xl border border-[var(--theme-border)] bg-[rgba(22,23,42,0.78)] p-3">
+            <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 p-3">
               <div className="nova-label">Passing comets</div>
               <div className="mt-2 space-y-1.5">
                 {visibleComets.map((comet) => (
@@ -1865,7 +1865,7 @@ export function MindGraphCard() {
                     type="button"
                     key={comet.id}
                     onClick={() => setSelectedId(comet.id)}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[rgba(13,14,24,0.4)] px-2 py-1.5 text-left hover:border-[var(--theme-accent-border)]"
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--theme-border-subtle)] bg-[color-mix(in srgb, var(--theme-card) 82%, transparent)] px-2 py-1.5 text-left hover:border-[var(--theme-accent-border)]"
                   >
                     <span className="truncate font-mono text-[10px] text-[var(--theme-text-soft)]">
                       {shortTitle(comet.title)}
