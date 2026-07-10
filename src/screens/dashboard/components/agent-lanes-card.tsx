@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
+import { STATUS_TONE } from '../lib/status-meta'
 import type {
   AgentLane,
   AgentLaneRegistry,
 } from '../../../server/agent-lane-registry'
-import { STATUS_TONE } from '../lib/status-meta'
 
 async function readLanes(): Promise<AgentLaneRegistry> {
   const response = await fetch('/api/agent-lanes')

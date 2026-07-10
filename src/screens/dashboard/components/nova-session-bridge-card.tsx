@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
+import { STATUS_TONE } from '../lib/status-meta'
 import type {
   NovaSessionBridge,
   SessionBridgeSourceState,
 } from '../../../server/nova-session-bridge'
-import { STATUS_TONE } from '../lib/status-meta'
 
 async function readBridge(): Promise<NovaSessionBridge> {
   const response = await fetch('/api/nova-session-bridge')

@@ -76,7 +76,8 @@ function toneClasses(family: ToneFamily): { dot: string; tone: string } {
  */
 export function STATUS_TONE(status: string): StatusTone {
   const known = status as DashboardStatusLiteral
-  const family = FAMILY[known] ?? 'muted'
+  const family =
+    (FAMILY as Record<string, ToneFamily | undefined>)[known] ?? 'muted'
   const classes = toneClasses(family)
   return {
     label: LABEL_OVERRIDE[known] ?? status,

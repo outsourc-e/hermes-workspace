@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { STATUS_TONE } from '../lib/status-meta'
 import type {
   ControlLoopSourceStatus,
   ControlLoopStatus,
@@ -9,7 +10,6 @@ import type {
   ControlLoopRunResult,
   RunnableControlLoopId,
 } from '@/server/control-loop-runner'
-import { STATUS_TONE } from '../lib/status-meta'
 
 const RUNNABLE_LOOP_IDS: ReadonlySet<string> = new Set([
   'cost-route-watch',

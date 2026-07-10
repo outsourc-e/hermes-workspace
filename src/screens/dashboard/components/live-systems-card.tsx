@@ -1,9 +1,9 @@
+import { STATUS_TONE } from '../lib/status-meta'
 import type {
   DashboardLiveSystem,
   DashboardLiveSystemsSection,
   LiveSystemStatus,
 } from '@/server/dashboard-aggregator'
-import { STATUS_TONE } from '../lib/status-meta'
 
 function formatTime(value: string | null): string {
   if (!value) return 'no heartbeat'

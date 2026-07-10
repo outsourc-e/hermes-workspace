@@ -1,9 +1,9 @@
+import { STATUS_TONE } from '../lib/status-meta'
 import type {
   AgentWorkerStatus,
   DashboardAgentWorker,
   DashboardAgentWorkforceSection,
 } from '@/server/dashboard-aggregator'
-import { STATUS_TONE } from '../lib/status-meta'
 
 const WORKER_STATUS_MAP: Record<AgentWorkerStatus, string> = {
   idle: 'idle',
