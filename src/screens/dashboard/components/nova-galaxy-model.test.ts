@@ -222,6 +222,30 @@ describe('selectLabelCandidates / resolveProjectedLabels', () => {
     expect(focusedTags).toBeGreaterThan(overviewTags)
   })
 
+  it('keeps focus labels local instead of flooding every system', () => {
+    const model = buildGalaxyModel(graph())
+    const leaf = model.bodyById.get('a.md') ?? null
+    const selectedSystem = leaf
+      ? model.systemByBodyId.get(leaf.id)
+      : undefined
+    const focused = selectLabelCandidates({
+      model,
+      selectedBody: leaf,
+      hoveredBody: null,
+      searchTerm: '',
+      mode: 'focus',
+    })
+
+    expect(focused.length).toBeLessThanOrEqual(22)
+    const foreignTags = focused.filter(
+      (item) =>
+        item.kind === 'tag' &&
+        item.body.systemId &&
+        item.body.systemId !== selectedSystem?.id,
+    )
+    expect(foreignTags.length).toBe(0)
+  })
+
   it('rejects overlapping lower-priority labels in screen space', () => {
     const model = buildGalaxyModel(graph())
     const core = model.core

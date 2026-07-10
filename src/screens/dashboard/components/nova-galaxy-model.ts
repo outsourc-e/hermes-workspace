@@ -219,14 +219,13 @@ export function selectLabelCandidates(input: {
       )
     }
 
-    const tagBudget =
-      isActive || input.mode === 'focus'
-        ? 14
-        : query
-          ? 8
-          : overviewHub
-            ? 1
-            : 0
+    const tagBudget = isActive
+      ? 12
+      : query
+        ? 6
+        : overviewHub
+          ? 1
+          : 0
     const rankedTags = [...system.tags].sort(
       (a, b) =>
         b.importance - a.importance || a.title.localeCompare(b.title),
@@ -234,30 +233,35 @@ export function selectLabelCandidates(input: {
     let shown = 0
     for (const tag of rankedTags) {
       const matches =
-        !query ||
-        tag.title.toLowerCase().includes(query) ||
-        tag.path.toLowerCase().includes(query) ||
-        tag.folder.toLowerCase().includes(query)
+        Boolean(query) &&
+        (tag.title.toLowerCase().includes(query) ||
+          tag.path.toLowerCase().includes(query) ||
+          tag.folder.toLowerCase().includes(query))
       const selected =
         tag.id === input.selectedBody?.id || tag.id === input.hoveredBody?.id
-      if (!matches && !selected && !isActive && input.mode === 'overview') {
-        if (shown >= tagBudget) continue
-        if (tag.importance < 12 && tag.recencyTier === 'cool') continue
+      // Search matches and explicit selection always win; otherwise stay
+      // inside the local budget so focus mode does not open the whole vault.
+      if (!selected && !matches && tagBudget === 0) continue
+      if (!selected && !matches && shown >= tagBudget) continue
+      if (
+        !selected &&
+        !matches &&
+        !isActive &&
+        overviewHub &&
+        tag.importance < 12 &&
+        tag.recencyTier === 'cool'
+      ) {
+        continue
       }
-      if (!matches && !selected && !isActive && !overviewHub) continue
-      if (!matches && !selected && shown >= tagBudget) continue
       push(
         tag,
         'tag',
-        (selected ? 70 : isActive ? 40 : 12) +
+        (selected ? 70 : isActive ? 40 : matches ? 30 : 12) +
           tag.importance +
           (tag.recencyTier === 'hot' ? 8 : 0),
       )
-      shown += 1
-      if (!selected && shown >= tagBudget) {
-        // keep scanning only for explicit matches/selection
-        if (!query) break
-      }
+      if (!selected) shown += 1
+      if (!selected && !matches && shown >= tagBudget) break
     }
   }
 
