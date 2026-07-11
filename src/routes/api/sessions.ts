@@ -20,6 +20,7 @@ import {
   listLocalSessions,
   updateLocalSessionTitle,
 } from '../../server/local-session-store'
+import { dashboardFetch } from '../../server/gateway-capabilities'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -226,19 +227,61 @@ export const Route = createFileRoute('/api/sessions')({
           }
 
           if (capabilities.dashboard.available && !capabilities.enhancedChat) {
-            return json({
-              ok: true,
-              sessionKey,
-              entry: {
-                key: sessionKey,
-                id: sessionKey,
-                title: label || sessionKey,
-                label: label || sessionKey,
-                derivedTitle: label || sessionKey,
-                updatedAt: Date.now(),
-              },
-              updated: false,
-            })
+            // Persist the rename through the dashboard session API instead of
+            // reporting a fake success. This branch previously returned
+            // `ok: true, updated: false` without saving anything, so any
+            // rename in dashboard-without-enhancedChat mode silently vanished
+            // and the session kept its raw first-message title on the native
+            // dashboard. PATCH /api/sessions/{id} resolves friendly ids too.
+            try {
+              const res = await dashboardFetch(
+                `/api/sessions/${encodeURIComponent(sessionKey)}`,
+                {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title: label ?? '' }),
+                },
+              )
+              const data = (await res.json().catch(() => ({}))) as Record<
+                string,
+                unknown
+              >
+              if (!res.ok) {
+                return json(
+                  {
+                    ok: false,
+                    error:
+                      typeof data.detail === 'string'
+                        ? data.detail
+                        : 'Rename failed',
+                  },
+                  { status: res.status },
+                )
+              }
+              const savedTitle =
+                typeof data.title === 'string' && data.title
+                  ? data.title
+                  : label || sessionKey
+              return json({
+                ok: true,
+                sessionKey,
+                entry: {
+                  key: sessionKey,
+                  id: sessionKey,
+                  title: savedTitle,
+                  label: savedTitle,
+                  derivedTitle: savedTitle,
+                  updatedAt: Date.now(),
+                },
+                updated: true,
+                source: 'dashboard',
+              })
+            } catch {
+              return json(
+                { ok: false, error: 'Agent dashboard unreachable' },
+                { status: 502 },
+              )
+            }
           }
 
           const session = await updateSession(sessionKey, {
