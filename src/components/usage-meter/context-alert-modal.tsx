@@ -121,7 +121,7 @@ function ContextAlertModalComponent({
               )}
               <Recommendation
                 icon="🗜️"
-                text="Enable auto-compaction in Settings → Config to automatically manage context"
+                text="Auto-compaction is enabled in config.yaml (compression.enabled) — older messages are summarized automatically. Type /compress to compact now."
               />
               <Recommendation
                 icon="📋"
