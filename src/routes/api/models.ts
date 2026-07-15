@@ -176,6 +176,16 @@ function readClaudeDefaultModel(): ModelEntry | null {
         (config.provider as string) ||
         'unknown'
     }
+    // Hermes Agent schema: models.default.{provider,model}
+    if (!modelId) {
+      const modelsField = config.models
+      if (modelsField && typeof modelsField === 'object') {
+        const modelsObj = modelsField as Record<string, unknown>
+        const defaultBlock = asRecord(modelsObj.default)
+        modelId = readString(defaultBlock.model)
+        provider = readString(defaultBlock.provider) || 'unknown'
+      }
+    }
     if (!modelId) return null
     return { id: modelId, name: modelId, provider }
   } catch {
@@ -325,9 +335,24 @@ function readClaudeConfigCatalog(): Array<ModelEntry> {
       seen.add(entry.id)
     }
 
-    const providers = asRecord(config.providers)
-    for (const [providerId, value] of Object.entries(providers)) {
-      const providerBlock = asRecord(value)
+    // Normalize providers to a uniform list — handles both map (Workspace)
+    // and array (Hermes Agent) schemas.
+    const providersList: Array<{ id: string; block: Record<string, unknown> }> = []
+    const providersRaw = config.providers
+    if (Array.isArray(providersRaw)) {
+      for (const value of providersRaw) {
+        const providerBlock = asRecord(value)
+        const providerId = readString(providerBlock.name) || readString(providerBlock.id) || 'unknown'
+        providersList.push({ id: providerId, block: providerBlock })
+      }
+    } else {
+      const providersMap = asRecord(providersRaw)
+      for (const [providerId, value] of Object.entries(providersMap)) {
+        providersList.push({ id: providerId, block: asRecord(value) })
+      }
+    }
+
+    for (const { id: providerId, block: providerBlock } of providersList) {
       const providerModels = providerBlock.models
       if (Array.isArray(providerModels)) {
         for (const modelEntry of providerModels) {
