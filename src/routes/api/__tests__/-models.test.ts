@@ -127,4 +127,55 @@ describe('models route', () => {
     expect(json.models[0].id).toBe('nest-model')
     expect(json.models[0].provider).toBe('anthropic')
   })
+
+  it('reads Hermes Agent models.default syntax from config', async () => {
+    const envHome = '/mock/profiles/hermes'
+    process.env.CLAUDE_HOME = envHome
+
+    const configYaml =
+      'models:\n  default:\n    provider: deepseek\n    model: deepseek-chat\n'
+    existsSync.mockImplementation((p: string) => p === `${envHome}/config.yaml`)
+    readFileSync.mockImplementation((p: string) => {
+      if (p === `${envHome}/config.yaml`) return configYaml
+      return ''
+    })
+
+    const get = await getHandler()
+    const request = new Request('http://localhost/api/models')
+    const res = await get({ request })
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.ok).toBe(true)
+    expect(json.models[0].id).toBe('deepseek-chat')
+    expect(json.models[0].provider).toBe('deepseek')
+  })
+
+  it('reads Hermes Agent array-style providers from config', async () => {
+    const envHome = '/mock/profiles/hermes'
+    process.env.CLAUDE_HOME = envHome
+
+    const configYaml =
+      'providers:\n' +
+      '  - name: deepseek\n' +
+      '    base_url: https://api.deepseek.com/v1\n' +
+      '    models:\n' +
+      '      - deepseek-chat\n' +
+      '      - deepseek-coder\n'
+    existsSync.mockImplementation((p: string) => p === `${envHome}/config.yaml`)
+    readFileSync.mockImplementation((p: string) => {
+      if (p === `${envHome}/config.yaml`) return configYaml
+      return ''
+    })
+
+    const get = await getHandler()
+    const request = new Request('http://localhost/api/models')
+    const res = await get({ request })
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.ok).toBe(true)
+    const ids = json.models.map((m: any) => m.id)
+    expect(ids).toContain('deepseek-chat')
+    expect(ids).toContain('deepseek-coder')
+    expect(json.models.find((m: any) => m.id === 'deepseek-chat').provider).toBe('deepseek')
+  })
 })
