@@ -29,7 +29,8 @@
     "telegram-approved-implementation-build-plan": "./bin/telegram-approved-implementation-build-plan",
     "telegram-code-edit-approval-packet": "./bin/telegram-code-edit-approval-packet",
     "telegram-source-code-edit-lane": "./bin/telegram-source-code-edit-lane",
-    "kanban-triage-shadow": "./bin/kanban-triage-shadow"
+    "kanban-triage-shadow": "./bin/kanban-triage-shadow",
+    "kanban-autonomy-store": "./bin/kanban-autonomy-store"
   },
   "main": "electron/main.cjs",
   "scripts": {

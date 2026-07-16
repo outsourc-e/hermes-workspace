@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+import { realpathSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runCli } from '../scripts/kanban-autonomy-store.mjs';
+
+function isDirectInvocation() {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(path.resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') return false;
+    throw error;
+  }
+}
+
+if (isDirectInvocation()) await runCli();

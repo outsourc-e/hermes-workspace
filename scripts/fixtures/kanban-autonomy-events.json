@@ -1,0 +1,103 @@
+{
+  "schema": "kanban_autonomy_fixture_events.v1",
+  "synthetic_only": true,
+  "hashes": {
+    "snapshot": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "approval": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "tasks": [
+    {
+      "boardSlug": "fixture-board",
+      "kanbanCardId": "fixture-refurbed-tool",
+      "cardSnapshotHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sourceIdentityHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "policyVersion": "fixture-policy.v1",
+      "authorityCeiling": "A1",
+      "idempotencyKey": "fixture-task-create-1",
+      "createdAt": "2026-07-11T00:00:00Z"
+    },
+    {
+      "boardSlug": "fixture-board",
+      "kanbanCardId": "fixture-second-card",
+      "cardSnapshotHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sourceIdentityHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "policyVersion": "fixture-policy.v1",
+      "authorityCeiling": "A0",
+      "idempotencyKey": "fixture-task-create-2",
+      "createdAt": "2026-07-11T00:00:00Z"
+    }
+  ],
+  "flows": {
+    "normal": ["TASK_CREATED", "CARD_ELIGIBILITY_EVALUATED", "CARD_SCORED", "RESEARCH_STARTED", "RESEARCH_COMPLETED", "PLAN_CREATED", "APPROVAL_REQUESTED"],
+    "approval_granted": ["APPROVAL_GRANTED"],
+    "approval_rejected": ["APPROVAL_REJECTED"],
+    "blocked_resumed": ["TASK_BLOCKED", "TASK_RESUMED"],
+    "completed": ["TASK_COMPLETED"]
+  },
+  "event_payloads": {
+    "TASK_CREATED": {
+      "task_id": "kt_41f6e0a595ff5d66b1704bfd",
+      "board_slug_hash": "sha256:1bcff408a0db8103692610d9b11232571aa7515c6b0e0f012d724ea88fcebbaa",
+      "kanban_card_id_hash": "sha256:e4a743e39307bb733b8a41b6879ce926e3debd90858851718e7782126eb05c63",
+      "source_identity_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "initial_card_snapshot_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authority_ceiling": "A1",
+      "creation_idempotency_key_hash": "sha256:2052b9e46ee7a7eeba810a63075f189e4be13dee08f6f51617a521894ec92b9a",
+      "policy_version": "fixture-policy.v1"
+    },
+    "CARD_ELIGIBILITY_EVALUATED": {
+      "card_snapshot_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "eligibility_policy_version": "fixture-eligibility.v1",
+      "eligible": true,
+      "reason_codes": []
+    },
+    "CARD_SCORED": {
+      "card_snapshot_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scoring_policy_version": "fixture-scoring.v1",
+      "score_basis_points": 7200,
+      "explanation_codes": ["FIXTURE"]
+    },
+    "RESEARCH_STARTED": {
+      "research_run_id_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "research_policy_version": "fixture-research.v1"
+    },
+    "RESEARCH_COMPLETED": {
+      "research_run_id_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "report_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "outcome": "completed"
+    },
+    "PLAN_CREATED": {
+      "plan_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plan_version": "fixture-plan.v1",
+      "next_safe_action": "request_approval",
+      "proposed_authority": "A1"
+    },
+    "APPROVAL_REQUESTED": {
+      "approval_id_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "approval_status": "requested",
+      "requested_authority": "A1",
+      "requested_action": "build_fixture"
+    },
+    "APPROVAL_GRANTED": { "approval_id_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "approval_status": "granted" },
+    "APPROVAL_REJECTED": { "approval_id_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "approval_status": "rejected" },
+    "TASK_BLOCKED": { "blocker_code": "SYNTHETIC_BLOCKER", "retryable": true },
+    "TASK_PAUSED": { "pause_reason_code": "SYNTHETIC_PAUSE" },
+    "TASK_RESUMED": { "resume_reason_code": "SYNTHETIC_RESUME" },
+    "TASK_COMPLETED": {
+      "completion_outcome": "completed",
+      "result_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  },
+  "cases": [
+    { "name": "duplicate_creation_request", "expected": "created=false" },
+    { "name": "duplicate_event_idempotency_request", "expected": "appended=false" },
+    { "name": "idempotency_conflict", "expected": "EVENT_IDEMPOTENCY_CONFLICT" },
+    { "name": "authority_escalation_attempt", "attempted_level": "A2", "ceiling": "A1", "expected": "AUTHORITY_CEILING_EXCEEDED" },
+    { "name": "invalid_transition", "from": "created", "event_type": "PLAN_CREATED", "expected": "INVALID_EVENT_TRANSITION" },
+    { "name": "corrupt_previous_hash", "expected_finding": "PREVIOUS_EVENT_HASH_MISMATCH" },
+    { "name": "corrupt_payload_hash", "expected_finding": "PAYLOAD_HASH_MISMATCH" },
+    { "name": "missing_sequence", "expected_finding": "MISSING_OR_DUPLICATE_SEQUENCE" },
+    { "name": "two_cards_same_task_link_identity", "expected": "TASK_CREATION_IDEMPOTENCY_CONFLICT" }
+  ]
+}
