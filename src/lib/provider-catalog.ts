@@ -97,6 +97,38 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
     ),
   },
   {
+    id: 'atlascloud',
+    name: 'Atlas Cloud',
+    description: 'OpenAI-compatible model access through the Atlas Cloud API.',
+    authTypes: ['api-key'],
+    docsUrl: 'https://www.atlascloud.ai/docs',
+    configExample: JSON.stringify(
+      {
+        auth: {
+          profiles: {
+            'atlascloud:default': {
+              provider: 'atlascloud',
+              apiKey: 'ATLASCLOUD_API_KEY',
+            },
+          },
+        },
+        custom_providers: [
+          {
+            name: 'atlascloud',
+            base_url: 'https://api.atlascloud.ai/v1',
+            api_mode: 'openai',
+          },
+        ],
+        model: {
+          provider: 'atlascloud',
+          default: 'qwen/qwen3.5-flash',
+        },
+      },
+      null,
+      2,
+    ),
+  },
+  {
     id: 'minimax',
     name: 'MiniMax',
     description: 'MiniMax foundation models and multimodal APIs.',
