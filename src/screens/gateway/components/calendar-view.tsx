@@ -14,7 +14,7 @@ export type CalendarViewProps = {
 type CalendarMode = 'month' | 'week' | 'day'
 
 type ParsedCronSchedule = {
-  kind: 'daily' | 'weekly' | 'monthly'
+  kind: 'daily' | 'weekly' | 'monthly' | 'one-shot'
   hour: number
   minute: number
   weekdays: number[]
@@ -182,6 +182,18 @@ function parseSchedule(schedule: string, fallbackDate: Date): ParsedCronSchedule
     }
   }
 
+  // One-shot / once-only schedules (e.g. "once at 2026-07-21 08:00")
+  if (text.includes('once')) {
+    const dateFromTimestamp = new Date(fallbackDate)
+    return {
+      kind: 'one-shot',
+      hour: dateFromTimestamp.getHours(),
+      minute: dateFromTimestamp.getMinutes(),
+      weekdays: [],
+      monthDay: dateFromTimestamp.getDate(),
+    }
+  }
+
   return {
     kind: 'daily',
     hour: fallbackTime.hour,
@@ -242,8 +254,13 @@ export function CalendarView({ cronJobs, missionRuns, onSelectEvent }: CalendarV
       for (let day = new Date(rangeStart); day < rangeEnd; day = addDays(day, 1)) {
         let include = false
         if (parsed.kind === 'daily') include = true
-        if (parsed.kind === 'weekly') include = parsed.weekdays.includes(day.getDay())
-        if (parsed.kind === 'monthly') include = day.getDate() === parsed.monthDay
+        else if (parsed.kind === 'weekly') include = parsed.weekdays.includes(day.getDay())
+        else if (parsed.kind === 'monthly') include = day.getDate() === parsed.monthDay
+        else if (parsed.kind === 'one-shot') {
+          // One-shot: include only on the exact nextRunAt day
+          const runDate = startOfDay(fallbackDate)
+          include = isSameDay(day, runDate)
+        }
         if (!include) continue
 
         const eventDate = new Date(day)
