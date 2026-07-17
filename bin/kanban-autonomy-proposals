@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+import { realpathSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+import { runCli } from '../scripts/kanban-autonomy-proposals.mjs';
+
+function isDirectEntry(argvEntry, moduleUrl) {
+  if (typeof argvEntry !== 'string'
+    || !(argvEntry === 'kanban-autonomy-proposals'
+      || argvEntry.endsWith('/kanban-autonomy-proposals'))) return false;
+  try {
+    return pathToFileURL(realpathSync(argvEntry)).href === moduleUrl;
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') return false;
+    throw error;
+  }
+}
+
+if (isDirectEntry(process.argv[1], import.meta.url)) await runCli();

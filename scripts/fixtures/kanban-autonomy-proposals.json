@@ -1,0 +1,32 @@
+{
+  "schema": "kan_aut_shadow_event_proposals_fixture.v1",
+  "synthetic_only": true,
+  "description": "Hand-authored synthetic-only proposal-adapter cases; no runtime output or database content.",
+  "cases": [
+    {"name":"valid_eligible","selected_card_id":"synthetic-eligible","authority_ceiling":"A0"},
+    {"name":"valid_explicit_ineligible","selected_card_id":"synthetic-ineligible","authority_ceiling":"A0"},
+    {"name":"malformed_request_schema","request_schema":"kan_aut_shadow_event_proposal_request.invalid"},
+    {"name":"unknown_shadow_schema","shadow_schema":"kan_aut_triage_shadow_preview.invalid"},
+    {"name":"unknown_policy","eligibility_policy_version":"kanban_triage_eligibility.invalid"},
+    {"name":"missing_candidate_id","selected_card_id":"synthetic-missing"},
+    {"name":"duplicate_candidate_id","duplicate_card_id":"synthetic-eligible"},
+    {"name":"winner_not_selected","winner_card_id":"synthetic-eligible","selected_card_id":"synthetic-ineligible"},
+    {"name":"true_side_effect_rejected","side_effect":"database_write"}
+  ],
+  "expected": {
+    "eligible_task_id": "kt_d4ebb1a7d886d230c5d8115c",
+    "ineligible_task_id": "kt_6ad1132f07c2bedae881d1a8",
+    "eligible_create_idempotency_key": "kan4a-create-task-df29e259958c1d8d254949964e3cb968effa3f75d696c11351568875f6a23975",
+    "eligible_eligibility_idempotency_key": "kan4a-card-eligibility-evaluated-7fbb5d1aff719b5a8317b22d6c72a831702c5887ded1e46a8afadebccd45c143",
+    "eligible_score_idempotency_key": "kan4a-card-scored-4129ab68562669180f5b4717e52034ec0a19eba99ed3563d65cc4584e4887825"
+  },
+  "safety": {
+    "contains_real_task_data": false,
+    "contains_customer_data": false,
+    "contains_approval_content": false,
+    "contains_chat_data": false,
+    "contains_credentials": false,
+    "contains_live_paths": false,
+    "contains_database_contents": false
+  }
+}

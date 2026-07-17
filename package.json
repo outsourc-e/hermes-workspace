@@ -30,7 +30,8 @@
     "telegram-code-edit-approval-packet": "./bin/telegram-code-edit-approval-packet",
     "telegram-source-code-edit-lane": "./bin/telegram-source-code-edit-lane",
     "kanban-triage-shadow": "./bin/kanban-triage-shadow",
-    "kanban-autonomy-store": "./bin/kanban-autonomy-store"
+    "kanban-autonomy-store": "./bin/kanban-autonomy-store",
+    "kanban-autonomy-proposals": "./bin/kanban-autonomy-proposals"
   },
   "main": "electron/main.cjs",
   "scripts": {
