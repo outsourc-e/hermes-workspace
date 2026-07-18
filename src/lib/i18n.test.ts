@@ -57,7 +57,9 @@ describe('i18n translations', () => {
   })
 
   it('exposes readable locale labels for contributor-targeted languages', () => {
-    expect(LOCALE_LABELS.zh).toBe('中文')
+    // zh was disambiguated to 简体 when zh-TW (繁體) was added in #248.
+    expect(LOCALE_LABELS.zh).toBe('中文（简体）')
+    expect(LOCALE_LABELS['zh-TW']).toBe('繁體中文')
     expect(LOCALE_LABELS.ru).toBe('Русский')
   })
 })

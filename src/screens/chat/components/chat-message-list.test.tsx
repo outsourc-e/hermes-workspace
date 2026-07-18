@@ -47,6 +47,45 @@ describe('buildDisplayEntries', () => {
     expect(entries.map((entry) => entry.message.id)).toEqual(['u1', 'a1'])
     expect(entries[1].attachedToolMessages).toHaveLength(0)
   })
+
+  it('routes a toolResult to the pending tool-only turn, not the earlier text reply', () => {
+    const entries = buildDisplayEntries([
+      textMessage('u1', 'user', 'show issues'),
+      textMessage('a1', 'assistant', 'Open issues: 2'),
+      toolOnlyAssistant('a2'),
+      {
+        id: 't1',
+        role: 'toolResult',
+        toolCallId: 'a2-tool',
+        toolName: 'terminal',
+        content: [{ type: 'text', text: 'ok' }],
+        timestamp: 3,
+      } as ChatMessage,
+    ])
+
+    // t1 belongs to the pending a2 turn — it must not leak onto a1.
+    expect(entries.map((entry) => entry.message.id)).toEqual(['u1', 'a1'])
+    expect(entries[1].attachedToolMessages).toHaveLength(0)
+  })
+
+  it('still attaches a pending tool-only turn and its result to the next assistant text', () => {
+    const entries = buildDisplayEntries([
+      textMessage('u1', 'user', 'show issues'),
+      toolOnlyAssistant('a1'),
+      {
+        id: 't1',
+        role: 'toolResult',
+        toolCallId: 'a1-tool',
+        toolName: 'terminal',
+        content: [{ type: 'text', text: 'ok' }],
+        timestamp: 3,
+      } as ChatMessage,
+      textMessage('a2', 'assistant', 'Open issues: 2'),
+    ])
+
+    expect(entries.map((entry) => entry.message.id)).toEqual(['u1', 'a2'])
+    expect(entries[1].attachedToolMessages.map((m) => m.id)).toEqual(['a1', 't1'])
+  })
 })
 
 describe('getTrailingToolOnlyTurnSummary', () => {

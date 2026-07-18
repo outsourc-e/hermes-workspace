@@ -11,9 +11,13 @@ vi.mock('../../server/auth-middleware', () => ({
   isAuthenticated: () => true,
 }))
 
+// Mutable capability state — tests flip `config` instead of vi.doMock/doUnmock,
+// because vi.doUnmock would also strip this module-level mock for later tests.
+const capabilitiesState = vi.hoisted(() => ({ config: true }))
+
 vi.mock('../../server/gateway-capabilities', () => ({
   ensureGatewayProbed: vi.fn(),
-  getCapabilities: () => ({ config: true }),
+  getCapabilities: () => ({ ...capabilitiesState }),
 }))
 
 vi.mock('../../server/local-provider-discovery', () => ({
@@ -132,19 +136,19 @@ describe('canonical /api/hermes-config route', () => {
   })
 
   it('PATCH returns 503 when the gateway capability is unavailable', async () => {
-    vi.doMock('../../server/gateway-capabilities', () => ({
-      ensureGatewayProbed: vi.fn(),
-      getCapabilities: () => ({ config: false }),
-    }))
-    const handlers = await loadHandlers('./hermes-config')
-    const res = await handlers.PATCH({
-      request: new Request('http://localhost/api/hermes-config', {
-        method: 'PATCH',
-        body: JSON.stringify({ action: 'set-api-key', envKey: 'X', value: 'y' }),
-      }),
-    })
-    expect(res.status).toBe(503)
-    vi.doUnmock('../../server/gateway-capabilities')
+    capabilitiesState.config = false
+    try {
+      const handlers = await loadHandlers('./hermes-config')
+      const res = await handlers.PATCH({
+        request: new Request('http://localhost/api/hermes-config', {
+          method: 'PATCH',
+          body: JSON.stringify({ action: 'set-api-key', envKey: 'X', value: 'y' }),
+        }),
+      })
+      expect(res.status).toBe(503)
+    } finally {
+      capabilitiesState.config = true
+    }
   })
 })
 

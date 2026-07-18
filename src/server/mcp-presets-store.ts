@@ -1,8 +1,10 @@
 /**
  * MCP preset catalog store — Phase 2 file-backed catalog.
  *
- * Resolves `~/.hermes/mcp-presets.json` (override via `HERMES_HOME`) and
- * exposes `readPresets()` returning a normalized payload + provenance.
+ * Resolves `mcp-presets.json` under the workspace state dir (see
+ * `workspace-state-dir.ts`: `HERMES_WORKSPACE_STATE_DIR` → `HERMES_HOME/workspace`
+ * → `~/.hermes/workspace`) and exposes `readPresets()` returning a normalized
+ * payload + provenance.
  *
  * Bootstrapping: when the user file is missing, the seed bundled at
  * `assets/mcp-presets.seed.json` is copied via tmp+rename so concurrent

@@ -438,6 +438,9 @@ const config = defineConfig(({ mode, command }) => {
         '**/dist/**',
         '**/skills-bundle/**',
         '**/.{idea,git,cache,output,temp}/**',
+        // Playwright specs (need @playwright/test + a running server) — run
+        // via the Playwright runner, never via vitest.
+        'e2e/**',
       ],
       // Force vitest to run React through its own transform pipeline so ESM
       // `import` and CJS `require('react')` share a single module instance.
