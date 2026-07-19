@@ -106,14 +106,21 @@ export function presetsFilePath(): string {
 export function seedAssetPath(): string {
   const override = process.env.MCP_PRESETS_SEED_PATH?.trim()
   if (override) return override
-  // Walk up from this module to find the repo root that owns `assets/`.
-  const here = fileURLToPath(new URL('.', import.meta.url))
   // Try a few candidates; first match wins.
-  const candidates = [
-    pathResolve(here, '../../assets/mcp-presets.seed.json'),
-    pathResolve(here, '../../../assets/mcp-presets.seed.json'),
-    pathResolve(process.cwd(), 'assets/mcp-presets.seed.json'),
-  ]
+  const candidates: Array<string> = []
+  try {
+    // Walk up from this module to find the repo root that owns `assets/`.
+    // Unavailable in the esbuild CJS desktop bundle, where import.meta.url is
+    // undefined and `new URL()` throws — fall through to the cwd candidate.
+    const here = fileURLToPath(new URL('.', import.meta.url))
+    candidates.push(
+      pathResolve(here, '../../assets/mcp-presets.seed.json'),
+      pathResolve(here, '../../../assets/mcp-presets.seed.json'),
+    )
+  } catch {
+    // bundled runtime — cwd candidate below covers it
+  }
+  candidates.push(pathResolve(process.cwd(), 'assets/mcp-presets.seed.json'))
   for (const c of candidates) {
     if (existsSync(c)) return c
   }

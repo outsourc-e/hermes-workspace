@@ -46,12 +46,23 @@ const DETACH_TTL_MS = (() => {
 
 const sessions = new Map<string, TerminalSession>()
 
-// Resolve path to pty-helper.py relative to this file
+// Resolve path to pty-helper.py. Dev runs from src/server (next to this
+// file); the desktop bundle runs from electron/server-bundle.cjs where
+// __dirname points at electron/, but vite copies the helper to
+// dist/server/assets/ which ships in the app at <cwd>/dist/server/assets.
 const __dirname_resolved =
   typeof __dirname !== 'undefined'
     ? __dirname
     : dirname(fileURLToPath(import.meta.url))
-const PTY_HELPER = resolve(__dirname_resolved, 'pty-helper.py')
+const PTY_HELPER_CANDIDATES = [
+  resolve(__dirname_resolved, 'pty-helper.py'),
+  resolve(__dirname_resolved, 'assets', 'pty-helper.py'),
+  resolve(process.cwd(), 'dist/server/assets/pty-helper.py'),
+  resolve(process.cwd(), 'src/server/pty-helper.py'),
+]
+const PTY_HELPER =
+  PTY_HELPER_CANDIDATES.find((candidate) => existsSync(candidate)) ??
+  PTY_HELPER_CANDIDATES[0]
 
 export function createTerminalSession(params: {
   command?: Array<string>

@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
+import { runtimeStateDir } from './runtime-state-dir'
 
 export const INLINE_TOOL_OUTPUT_LIMIT = 4_000
-const DATA_DIR = join(process.cwd(), '.runtime', 'tool-artifacts')
+const DATA_DIR = join(runtimeStateDir(), 'tool-artifacts')
 const INDEX_FILE = join(DATA_DIR, 'index.json')
 const PREVIEW_LIMIT = 1_000
 
