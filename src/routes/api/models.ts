@@ -19,6 +19,7 @@ import {
 const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
 const MODELS_PATH = path.join(CLAUDE_HOME, 'models.json')
 const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
+const AGENT_MODEL_CATALOG_PATH = path.join(CLAUDE_HOME, 'cache', 'model_catalog.json')
 
 type ModelEntry = {
   provider?: string
@@ -104,6 +105,47 @@ function readClaudeModelsJson(): Array<ModelEntry> {
         }
       })
       .filter((entry): entry is ModelEntry => entry !== null)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Read the hermes-agent model-picker catalog cache
+ * (`$HERMES_HOME/cache/model_catalog.json`). This is the same catalog the
+ * agent CLI (`hermes model`) and the Hermes desktop dashboard present, so
+ * merging it keeps the Workspace picker aligned with the full provider
+ * universe (Nous Portal, OpenRouter, …) instead of only the active model
+ * advertised on /v1/models.
+ *
+ * Shape: `{ providers: { <id>: { metadata?, models: [{ id, name?, … }] } } }`.
+ * Missing or malformed file → empty list (capability degrades silently).
+ */
+export function readAgentModelCatalog(
+  catalogPath: string = AGENT_MODEL_CATALOG_PATH,
+): Array<ModelEntry> {
+  try {
+    if (!fs.existsSync(catalogPath)) return []
+    const parsed = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'))
+    const providers = asRecord(asRecord(parsed).providers)
+    const out: Array<ModelEntry> = []
+    for (const [providerId, blockRaw] of Object.entries(providers)) {
+      const block = asRecord(blockRaw)
+      const models = Array.isArray(block.models) ? block.models : []
+      for (const entryRaw of models) {
+        const entry = asRecord(entryRaw)
+        const id =
+          readString(entry.id) ||
+          (typeof entryRaw === 'string' ? entryRaw.trim() : '')
+        if (!id) continue
+        out.push({
+          id,
+          name: readString(entry.name) || id,
+          provider: providerId,
+        })
+      }
+    }
+    return out
   } catch {
     return []
   }
@@ -447,6 +489,15 @@ export const Route = createFileRoute('/api/models')({
             const hermesModels = await fetchClaudeModels()
             models = mergeModelEntries(models, hermesModels)
             source = source === 'models.json' ? 'models.json+hermes-agent' : 'hermes-agent'
+          }
+
+          // Merge the agent's own model-picker catalog cache so the picker
+          // offers the same provider universe as `hermes model` / the desktop
+          // dashboard (Nous Portal, OpenRouter, …), not just the active model.
+          const agentCatalogModels = readAgentModelCatalog()
+          if (agentCatalogModels.length > 0) {
+            models = mergeModelEntries(models, agentCatalogModels)
+            source = `${source}+agent-catalog`
           }
 
           // Merge live OpenAI-compatible catalogs from base_url entries that

@@ -4,7 +4,25 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.expanduser("~/hermes-agent"))
+
+def _agent_root() -> str:
+    """Resolve the hermes-agent checkout that provides tools.skills_hub.
+
+    Priority: HERMES_AGENT_ROOT env, $HERMES_HOME/hermes-agent, the standard
+    ~/.hermes/hermes-agent install, then the legacy ~/hermes-agent location.
+    """
+    candidates = [os.environ.get("HERMES_AGENT_ROOT", "")]
+    hermes_home = os.environ.get("HERMES_HOME", "").strip() or os.path.expanduser("~/.hermes")
+    candidates.append(os.path.join(hermes_home, "hermes-agent"))
+    candidates.append(os.path.expanduser("~/.hermes/hermes-agent"))
+    candidates.append(os.path.expanduser("~/hermes-agent"))
+    for root in candidates:
+        if root and os.path.isfile(os.path.join(root, "tools", "skills_hub.py")):
+            return root
+    return os.path.expanduser("~/hermes-agent")
+
+
+sys.path.insert(0, _agent_root())
 
 from tools.skills_hub import GitHubAuth, create_source_router, unified_search
 

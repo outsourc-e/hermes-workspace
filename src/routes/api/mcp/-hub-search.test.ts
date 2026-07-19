@@ -65,28 +65,34 @@ describe('GET /api/mcp/hub-search — auth', () => {
 })
 
 describe('GET /api/mcp/hub-search — query parsing', () => {
-  it('passes q, source, limit to unifiedSearch', async () => {
+  it('passes q, source, limit, offset to unifiedSearch', async () => {
     mockUnifiedSearch.mockResolvedValue({ results: [], source: 'mcp-get', total: 0 })
-    await callGet('http://localhost/api/mcp/hub-search?q=github&source=mcp-get&limit=5')
-    expect(mockUnifiedSearch).toHaveBeenCalledWith('github', 'mcp-get', 5)
+    await callGet('http://localhost/api/mcp/hub-search?q=github&source=mcp-get&limit=5&offset=10')
+    expect(mockUnifiedSearch).toHaveBeenCalledWith('github', 'mcp-get', 5, 10)
   })
 
   it('uses defaults when params absent', async () => {
     mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
     await callGet('http://localhost/api/mcp/hub-search')
-    expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 20)
+    expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 20, 0)
   })
 
-  it('clamps limit to 100', async () => {
+  it('clamps limit to 500', async () => {
     mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
     await callGet('http://localhost/api/mcp/hub-search?limit=9999')
-    expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 100)
+    expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 500, 0)
+  })
+
+  it('clamps negative offset to 0', async () => {
+    mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
+    await callGet('http://localhost/api/mcp/hub-search?offset=-5')
+    expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 20, 0)
   })
 
   it('defaults invalid source to all', async () => {
     mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
     await callGet('http://localhost/api/mcp/hub-search?source=invalid')
-    expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 20)
+    expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 20, 0)
   })
 })
 

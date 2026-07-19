@@ -8,6 +8,7 @@ import {
 } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { runtimeStateDir } from './runtime-state-dir'
 
 type ProductId = 'workspace' | 'agent'
 type InstallKind = 'git' | 'desktop' | 'docker' | 'unknown'
@@ -71,13 +72,13 @@ export type ApplyUpdateResult = {
 }
 
 function pendingNotesPath(): string {
-  return join(process.cwd(), '.runtime', 'pending-update-release-notes.json')
+  return join(runtimeStateDir(), 'pending-update-release-notes.json')
 }
 
 function persistPendingReleaseNotes(sections: Array<ReleaseNoteSection>): void {
   if (!sections.length) return
   const path = pendingNotesPath()
-  mkdirSync(join(process.cwd(), '.runtime'), { recursive: true })
+  mkdirSync(runtimeStateDir(), { recursive: true })
   writeFileSync(
     path,
     `${JSON.stringify({ sections, updatedAt: Date.now() }, null, 2)}\n`,

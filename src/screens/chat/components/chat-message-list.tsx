@@ -532,11 +532,16 @@ export function buildDisplayEntries(
     }
 
     if (message.role === 'tool' || message.role === 'toolResult') {
+      // A pending tool-only assistant turn owns its results — check it before
+      // the previous entry, or the result leaks onto the earlier text reply
+      // while its own call is held back.
+      if (pendingAssistantToolMessages.length > 0) {
+        pendingAssistantToolMessages.push(message)
+        return
+      }
       const previousEntry = entries[entries.length - 1]
       if (previousEntry?.message.role === 'assistant') {
         previousEntry.attachedToolMessages.push(message)
-      } else if (pendingAssistantToolMessages.length > 0) {
-        pendingAssistantToolMessages.push(message)
       }
       return
     }
@@ -555,14 +560,64 @@ export function buildDisplayEntries(
     entries.push(entry)
   })
 
-  if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
-    if (previousEntry?.message.role === 'assistant') {
-      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
-    }
-  }
+  // Trailing tool-only assistant messages (a persisted turn that never reached
+  // its final text) are intentionally NOT attached to the previous text reply —
+  // they belong to a different turn. getTrailingToolOnlyTurnSummary surfaces
+  // them instead.
 
   return entries
+}
+
+export type TrailingToolOnlyTurnSummary = {
+  count: number
+  toolNames: Array<string>
+  hasFinalAssistantText: boolean
+}
+
+/**
+ * Summarize a trailing run of persisted tool-only assistant messages (and
+ * their tool results) at the end of a thread. These messages are hidden by
+ * buildDisplayEntries; this summary lets the UI disclose that hidden trailing
+ * tool activity exists. Returns null when the thread ends with renderable
+ * (non tool-only) content.
+ */
+export function getTrailingToolOnlyTurnSummary(
+  messages: Array<ChatMessage>,
+): TrailingToolOnlyTurnSummary | null {
+  let index = messages.length - 1
+  let count = 0
+  const toolNames = new Set<string>()
+
+  while (index >= 0) {
+    const message = messages[index]
+    if (isAssistantToolCallOnlyMessage(message)) {
+      count += 1
+      for (const call of getToolCallsFromMessage(message)) {
+        if (call.name) toolNames.add(call.name)
+      }
+      index -= 1
+      continue
+    }
+    if (message.role === 'tool' || message.role === 'toolResult') {
+      count += 1
+      const toolName = (message as { toolName?: unknown }).toolName
+      if (typeof toolName === 'string' && toolName.length > 0) {
+        toolNames.add(toolName)
+      }
+      index -= 1
+      continue
+    }
+    break
+  }
+
+  if (count === 0) return null
+
+  const previous = messages[index]
+  const hasFinalAssistantText =
+    previous?.role === 'assistant' &&
+    textFromMessage(previous).trim().length > 0
+
+  return { count, toolNames: [...toolNames], hasFinalAssistantText }
 }
 
 function escapeAttributeSelector(value: string): string {

@@ -3,13 +3,14 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import {
   __resetHubSourcesCacheForTests,
@@ -26,9 +27,17 @@ import {
 let homeDir: string
 let originalHermesHome: string | undefined
 
+// The store resolves the user file under the workspace state dir
+// (HERMES_HOME/workspace since #439); always go through hubSourcesFilePath()
+// so tests track the store's own path contract.
+function userFilePath(): string {
+  const path = hubSourcesFilePath()
+  mkdirSync(dirname(path), { recursive: true })
+  return path
+}
+
 function writeSourcesFile(payload: unknown): void {
-  const path = join(homeDir, 'mcp-hub-sources.json')
-  writeFileSync(path, typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2))
+  writeFileSync(userFilePath(), typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2))
 }
 
 const VALID_USER_SOURCE = {
@@ -86,12 +95,12 @@ describe('readHubSources', () => {
 
   it('returns source=invalid for malformed JSON, preserves file', async () => {
     writeSourcesFile('not-json{{{{')
-    const before = readFileSync(join(homeDir, 'mcp-hub-sources.json'), 'utf8')
+    const before = readFileSync(hubSourcesFilePath(), 'utf8')
     const result = await readHubSources()
     expect(result.source).toBe('invalid')
     expect(result.error).toBeTruthy()
     // File is preserved
-    const after = readFileSync(join(homeDir, 'mcp-hub-sources.json'), 'utf8')
+    const after = readFileSync(hubSourcesFilePath(), 'utf8')
     expect(after).toBe(before)
   })
 

@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
@@ -133,6 +135,19 @@ async function searchBundledSkills(
   }
 }
 
+/**
+ * Prefer the hermes-agent venv interpreter — tools.skills_hub depends on
+ * packages (httpx, …) installed there, not in the system python3.
+ */
+function resolveSkillsHubPython(): string {
+  const hermesHome =
+    process.env.HERMES_HOME?.trim() ||
+    process.env.CLAUDE_HOME?.trim() ||
+    path.join(os.homedir(), '.hermes')
+  const venvPython = path.join(hermesHome, 'hermes-agent', 'venv', 'bin', 'python')
+  return existsSync(venvPython) ? venvPython : 'python3'
+}
+
 async function searchPythonSkillsHub(
   query: string,
   limit: number,
@@ -140,7 +155,7 @@ async function searchPythonSkillsHub(
 ): Promise<SkillSearchPayload> {
   const scriptPath = path.join(process.cwd(), 'scripts/skills-search.py')
   const { stdout } = await execFileAsync(
-    'python3',
+    resolveSkillsHubPython(),
     [scriptPath, query, String(limit), source],
     {
       timeout: 30_000,

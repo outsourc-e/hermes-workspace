@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { runtimeStateDir } from './runtime-state-dir'
 
-const DATA_DIR = join(process.cwd(), '.runtime')
+const DATA_DIR = runtimeStateDir()
 const SESSIONS_FILE = join(DATA_DIR, 'local-sessions.json')
 const MAX_MESSAGES_PER_SESSION = 500
 

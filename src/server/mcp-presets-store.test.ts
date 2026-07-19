@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import {
   __resetPresetsCacheForTests,
@@ -51,9 +51,17 @@ function writeSeed(payload: unknown): void {
   writeFileSync(seedFile, JSON.stringify(payload))
 }
 
+// The store resolves the user catalog under the workspace state dir
+// (HERMES_HOME/workspace since #439); always go through presetsFilePath()
+// so tests track the store's own path contract.
+function userFilePath(): string {
+  const path = presetsFilePath()
+  mkdirSync(dirname(path), { recursive: true })
+  return path
+}
+
 function writeUserFile(payload: unknown): void {
-  const path = join(homeDir, 'mcp-presets.json')
-  writeFileSync(path, typeof payload === 'string' ? payload : JSON.stringify(payload))
+  writeFileSync(userFilePath(), typeof payload === 'string' ? payload : JSON.stringify(payload))
 }
 
 beforeEach(() => {
@@ -125,7 +133,7 @@ describe('readPresets', () => {
   })
 
   it('returns source=invalid for malformed user JSON and preserves the file unchanged', async () => {
-    const path = join(homeDir, 'mcp-presets.json')
+    const path = userFilePath()
     const corrupt = '{this is not valid json'
     writeUserFile(corrupt)
     const result = await readPresets()
@@ -264,7 +272,9 @@ describe('readPresets', () => {
     try {
       const result = await readPresets()
       expect(result.source).toBe('seed')
-      expect(existsSync(join(altHome, 'mcp-presets.json'))).toBe(true)
+      // Assert the literal expected location (not presetsFilePath(), which
+      // would be tautological) to independently pin the #439 contract.
+      expect(existsSync(join(altHome, 'workspace', 'mcp-presets.json'))).toBe(true)
     } finally {
       rmSync(altHome, { recursive: true, force: true })
       process.env.HERMES_HOME = homeDir
@@ -286,7 +296,7 @@ describe('readPresets', () => {
   it('returns source=invalid when user file exists but is permission-denied (EACCES)', async () => {
     // Skip on platforms where chmod doesn't restrict root
     if (process.getuid?.() === 0) return
-    const path = join(homeDir, 'mcp-presets.json')
+    const path = userFilePath()
     writeFileSync(path, JSON.stringify(VALID_SEED))
     chmodSync(path, 0o000)
     __resetPresetsCacheForTests()
@@ -301,7 +311,7 @@ describe('readPresets', () => {
   })
 
   it('returns source=invalid when user file path is a dangling symlink', async () => {
-    const path = join(homeDir, 'mcp-presets.json')
+    const path = userFilePath()
     const nonexistent = join(homeDir, 'does-not-exist.json')
     symlinkSync(nonexistent, path)
     __resetPresetsCacheForTests()
@@ -313,7 +323,7 @@ describe('readPresets', () => {
 
   // MED-5: cache detects same-size same-mtime edits via inode/ctime
   it('cache invalidates on same-size same-mtime edit (detects via ctime/inode)', async () => {
-    const path = join(homeDir, 'mcp-presets.json')
+    const path = userFilePath()
     const base = JSON.stringify(VALID_SEED)
     writeFileSync(path, base)
     const r1 = await readPresets()
@@ -347,7 +357,7 @@ describe('readPresets', () => {
 
   // MED-6: category allowlist
   it('rejects preset with unknown category', async () => {
-    writeFileSync(join(homeDir, 'mcp-presets.json'), JSON.stringify({
+    writeFileSync(userFilePath(), JSON.stringify({
       version: 1,
       presets: [{ ...VALID_SEED.presets[0], category: 'RandomCategory' }],
     }))
@@ -362,7 +372,7 @@ describe('readPresets', () => {
   it('defaults category to Custom when missing', async () => {
     const presetWithoutCategory = { ...VALID_SEED.presets[0] } as Record<string, unknown>
     delete presetWithoutCategory.category
-    writeFileSync(join(homeDir, 'mcp-presets.json'), JSON.stringify({
+    writeFileSync(userFilePath(), JSON.stringify({
       version: 1,
       presets: [presetWithoutCategory],
     }))

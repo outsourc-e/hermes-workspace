@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { SWARM_CANONICAL_REPO } from './swarm-environment'
+import { runtimeStateDir } from './runtime-state-dir'
 import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 
 export type SwarmMissionAssignmentState = 'queued' | 'dispatched' | 'checkpointed' | 'blocked' | 'needs_input' | 'reviewing' | 'done' | 'cancelled'
@@ -62,7 +62,7 @@ type SwarmMissionStore = {
   missions: Array<SwarmMission>
 }
 
-export const SWARM_MISSIONS_PATH = join(SWARM_CANONICAL_REPO, '.runtime', 'swarm-missions.json')
+export const SWARM_MISSIONS_PATH = join(runtimeStateDir(), 'swarm-missions.json')
 
 function now(): number {
   return Date.now()

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { SWARM_CANONICAL_REPO } from './swarm-environment'
+import { runtimeStateDir } from './runtime-state-dir'
 
 export type SwarmControlMode = 'auto' | 'manual'
 
@@ -9,7 +9,7 @@ export type SwarmModeState = {
   updatedAt: string
 }
 
-export const SWARM_MODE_PATH = join(SWARM_CANONICAL_REPO, '.runtime', 'swarm-mode.json')
+export const SWARM_MODE_PATH = join(runtimeStateDir(), 'swarm-mode.json')
 
 function nowIso(): string {
   return new Date().toISOString()

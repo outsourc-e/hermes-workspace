@@ -17,6 +17,11 @@ import { join } from 'node:path'
 
 let tmpDir: string
 
+// Cache lives under the workspace state dir (HERMES_HOME/workspace since #439).
+function cacheDirFor(home: string): string {
+  return join(home, 'workspace', 'cache')
+}
+
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'mcp-tools-cache-test-'))
   process.env.HERMES_HOME = tmpDir
@@ -76,7 +81,7 @@ describe('write → read roundtrip', () => {
 describe('corrupt file → empty cache', () => {
   it('ignores corrupt JSON and starts with empty cache', async () => {
     // Write corrupt file before module load
-    const cacheDir = join(tmpDir, 'cache')
+    const cacheDir = cacheDirFor(tmpDir)
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(join(cacheDir, 'mcp-tools.json'), '{ not valid json !!!', 'utf8')
 
@@ -94,7 +99,7 @@ describe('corrupt file → empty cache', () => {
   })
 
   it('ignores wrong schema (version != 1)', async () => {
-    const cacheDir = join(tmpDir, 'cache')
+    const cacheDir = cacheDirFor(tmpDir)
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(
       join(cacheDir, 'mcp-tools.json'),
@@ -164,7 +169,7 @@ describe('HERMES_HOME override for path resolution', () => {
     vi.resetModules()
 
     const mod = await loadCache()
-    expect(mod.cacheFilePath()).toBe(join(customHome, 'cache', 'mcp-tools.json'))
+    expect(mod.cacheFilePath()).toBe(join(cacheDirFor(customHome), 'mcp-tools.json'))
 
     mod.setProbe('server-x', {
       status: 'failed',
