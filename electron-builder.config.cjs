@@ -16,6 +16,7 @@ module.exports = {
     'electron/server-bundle.cjs',
     'assets/**/*',
     'public/**/*',
+    'scripts/skills-search.py',
     'package.json',
     '!**/puppeteer-extra-plugin-stealth/**/*',
     '!**/playwright-extra/**/*',
