@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
 const { join } = require('path')
-const { existsSync } = require('fs')
+const fs = require('fs')
+const { existsSync } = fs
 const { spawn, execSync } = require('child_process')
 const http = require('http')
 let autoUpdater = null
@@ -162,7 +163,8 @@ function checkHttp(url, timeoutMs = 2500) {
 
 function isHermesInstalled() {
   try {
-    execSync('which hermes || where hermes', {
+    const cmd = process.platform === 'win32' ? 'where hermes' : 'which hermes'
+    execSync(cmd, {
       timeout: 5000,
       stdio: 'ignore',
       shell: true,
@@ -171,6 +173,10 @@ function isHermesInstalled() {
   } catch {
     return false
   }
+}
+
+function getTempDir() {
+  return process.env.TEMP || process.env.TMP || (process.platform === 'win32' ? 'C:\\Windows\\Temp' : '/tmp')
 }
 
 async function getBootstrapStatus() {
@@ -184,16 +190,35 @@ async function getBootstrapStatus() {
   }
 }
 
-function spawnDetached(command) {
-  const child = spawn('bash', ['-lc', command], {
-    detached: true,
-    stdio: 'ignore',
-    env: {
-      ...process.env,
-      HERMES_WORKSPACE_DESKTOP: '1',
-      API_SERVER_ENABLED: process.env.API_SERVER_ENABLED || 'true',
-    },
-  })
+function spawnDetached(command, label) {
+  const logDir = getTempDir()
+  const logFile = join(logDir, `hermes-workspace-${label}.log`)
+
+  let child
+  if (process.platform === 'win32') {
+    const logFd = fs.openSync(logFile, 'a')
+    child = spawn('cmd', ['/c', command], {
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+      env: {
+        ...process.env,
+        HERMES_WORKSPACE_DESKTOP: '1',
+        API_SERVER_ENABLED: process.env.API_SERVER_ENABLED || 'true',
+      },
+      windowsHide: true,
+    })
+    fs.closeSync(logFd)
+  } else {
+    child = spawn('bash', ['-lc', `nohup ${command} >> '${logFile}' 2>&1 &`], {
+      detached: true,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        HERMES_WORKSPACE_DESKTOP: '1',
+        API_SERVER_ENABLED: process.env.API_SERVER_ENABLED || 'true',
+      },
+    })
+  }
   child.unref()
   return child
 }
@@ -202,7 +227,13 @@ async function installHermesInBackground() {
   if (installProcess) {
     return { started: false, reason: 'already-running' }
   }
-  installProcess = spawn('bash', ['-lc', HERMES_INSTALL_SCRIPT], {
+  // Windows: pip install (no curl|bash). macOS/Linux: use install script.
+  const installCmd = process.platform === 'win32'
+    ? 'pip install hermes-agent'
+    : HERMES_INSTALL_SCRIPT
+  const shell = process.platform === 'win32' ? 'cmd' : 'bash'
+  const args = process.platform === 'win32' ? ['/c', installCmd] : ['-lc', installCmd]
+  installProcess = spawn(shell, args, {
     detached: false,
     stdio: 'ignore',
     env: { ...process.env },
@@ -224,12 +255,13 @@ async function ensureHermesBackend() {
   }
 
   if (!gatewayReachable) {
-    spawnDetached('hermes gateway run >/tmp/hermes-workspace-gateway.log 2>&1')
+    spawnDetached('hermes gateway run', 'gateway')
   }
   if (!dashboardReachable) {
-    spawnDetached(
-      'hermes dashboard --no-open >/tmp/hermes-workspace-dashboard.log 2>&1',
-    )
+    const dashboardCmd = process.platform === 'win32'
+      ? 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
+      : 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
+    spawnDetached(dashboardCmd, 'dashboard')
   }
 
   return {
@@ -359,7 +391,7 @@ ipcMain.handle('desktop:install-hermes', async () =>
 )
 ipcMain.handle('desktop:start-backend', async () => ensureHermesBackend())
 ipcMain.handle('desktop:open-logs', async () => {
-  shell.openPath('/tmp')
+  shell.openPath(getTempDir())
   return { ok: true }
 })
 ipcMain.handle('desktop:update-check', async () => checkForAppUpdates())

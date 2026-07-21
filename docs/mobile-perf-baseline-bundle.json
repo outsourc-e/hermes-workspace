@@ -1,0 +1,78 @@
+{
+  "total_js_bytes": 14003142,
+  "total_js_gzip": 2831059,
+  "largest": [
+    {
+      "file": "main-DHShlhpC.js",
+      "bytes": 2525142,
+      "gzip": 647051
+    },
+    {
+      "file": "emacs-lisp-C9XAeP06.js",
+      "bytes": 779854,
+      "gzip": 196414
+    },
+    {
+      "file": "cpp-CofmeUqb.js",
+      "bytes": 626081,
+      "gzip": 43704
+    },
+    {
+      "file": "wasm-CG6Dc4jp.js",
+      "bytes": 622336,
+      "gzip": 230448
+    },
+    {
+      "file": "dashboard-BuJPrYqy.js",
+      "bytes": 538826,
+      "gzip": 135066
+    },
+    {
+      "file": "xterm-C6W2vAtw.js",
+      "bytes": 282970,
+      "gzip": 69549
+    },
+    {
+      "file": "swarm2-screen-Bnuaujuc.js",
+      "bytes": 272606,
+      "gzip": 49628
+    },
+    {
+      "file": "wolfram-lXgVvXCa.js",
+      "bytes": 262391,
+      "gzip": 77016
+    },
+    {
+      "file": "vue-vine-CQOfvN7w.js",
+      "bytes": 190051,
+      "gzip": 17573
+    },
+    {
+      "file": "angular-ts-BwZT4LLn.js",
+      "bytes": 183820,
+      "gzip": 16241
+    },
+    {
+      "file": "typescript-BPQ3VLAy.js",
+      "bytes": 181080,
+      "gzip": 15662
+    },
+    {
+      "file": "jsx-g9-lgVsj.js",
+      "bytes": 177792,
+      "gzip": 16195
+    }
+  ],
+  "playground_related": [
+    {
+      "file": "main-DHShlhpC.js",
+      "bytes": 2525142,
+      "gzip": 647051
+    },
+    {
+      "file": "playground-DOVh9SKy.js",
+      "bytes": 37637,
+      "gzip": 7121
+    }
+  ]
+}

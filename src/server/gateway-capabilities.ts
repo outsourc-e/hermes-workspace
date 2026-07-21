@@ -19,25 +19,22 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { getStateDir } from './workspace-state-dir'
 
 type WorkspaceOverrides = {
   claudeApiUrl?: string
   claudeDashboardUrl?: string
 }
 
-function hermesHome(): string {
-  return process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
-}
-
 function overridesPath(): string {
-  return path.join(hermesHome(), 'workspace-overrides.json')
+  return path.join(getStateDir(), 'workspace-overrides.json')
 }
 
 function readOverrides(): WorkspaceOverrides {
   try {
     const raw = fs.readFileSync(overridesPath(), 'utf-8')
-    const parsed = JSON.parse(raw) as WorkspaceOverrides
-    return parsed && typeof parsed === 'object' ? parsed : {}
+    const parsed = JSON.parse(raw) as unknown
+    return parsed !== null && typeof parsed === 'object' ? (parsed as WorkspaceOverrides) : {}
   } catch {
     return {}
   }
@@ -139,6 +136,9 @@ export function getResolvedUrls(): {
 export const CLAUDE_UPGRADE_INSTRUCTIONS =
   'For full features, install Hermes Agent from source (`git clone https://github.com/NousResearch/hermes-agent && cd hermes-agent && pip install -e .`), then start the gateway on :8642 (`hermes gateway run`). For the extended APIs (Sessions, Skills, Config, Jobs) also start the dashboard on :9119 (`hermes dashboard`).'
 
+export const DASHBOARD_REQUIRED_INSTRUCTIONS =
+  'Hermes gateway core APIs are healthy, but dashboard-backed APIs are unavailable. Start the dashboard on :9119 (`hermes dashboard`) or point HERMES_DASHBOARD_URL at the running dashboard service.'
+
 export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Hermes backend does not support the sessions API. ${CLAUDE_UPGRADE_INSTRUCTIONS}`
 
 const PROBE_TIMEOUT_MS = 3_000
@@ -155,7 +155,7 @@ function effectiveProbeTtl(caps: { health: boolean; chatCompletions: boolean }):
   return PROBE_TTL_DISCONNECTED_MS
 }
 const DASHBOARD_TOKEN_REGEX =
-  /window\.__(?:CLAUDE|HERMES)_SESSION_TOKEN__\s*=\s*["'](.+?)["']/
+  /window\._+(?:CLAUDE|HERMES)_+SESSION_+TOKEN__+\s*=\s*["']([^"']+)["']/
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -262,77 +262,60 @@ let dashboardTokenCache = ''
 export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
 
 /**
- * Optional explicit bearer token for dashboard API calls.
- *
- * Preferred over scraping the dashboard's root HTML for an inline token
- * (the legacy path, which creates a brittle trust boundary — see #124).
- * When set, the workspace uses this directly and never parses HTML.
- *
- * NOTE: do NOT fall back to CLAUDE_API_TOKEN here. The gateway and the
- * upstream Hermes Agent dashboard use independent token schemes — the gateway
- * accepts a long-lived bearer (CLAUDE_API_TOKEN), while the dashboard
- * issues an ephemeral session token at boot (web_server.py:_SESSION_TOKEN).
- * Treating them as interchangeable wedges the workspace into 401 loops on
- * /api/sessions, /api/skills, etc. against the official dashboard. If
- * CLAUDE_DASHBOARD_TOKEN isn't set, leave this empty and let
- * fetchDashboardToken() fall through to the HTML-scrape legacy path.
+ * Dashboard API auth uses the ephemeral session token injected into the
+ * dashboard root HTML at startup. Do not reuse gateway bearer tokens here and
+ * do not trust a manually copied dashboard token env var — it goes stale every
+ * time the dashboard restarts.
  */
-const DASHBOARD_BEARER_TOKEN = process.env.HERMES_DASHBOARD_TOKEN || process.env.CLAUDE_DASHBOARD_TOKEN || ''
-
 function authHeaders(): Record<string, string> {
   return BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 }
 
-let loggedHtmlScrapeFallback = false
-
 /**
- * Resolve a bearer token for dashboard API calls.
- *
- * Lookup order:
- *   1.  CLAUDE_DASHBOARD_TOKEN / CLAUDE_API_TOKEN env (preferred)
- *   2.  Inline token injected into the dashboard's root HTML (legacy
- *      fallback — logs a deprecation warning; to be removed once all
- *      supported dashboards expose a first-class token endpoint). See #124.
+ * Resolve the current dashboard session token by scraping the dashboard root
+ * HTML. The dashboard injects a fresh ephemeral token at boot, so cached or
+ * manually copied env tokens become invalid after restarts.
  */
 export async function fetchDashboardToken(options?: {
   force?: boolean
 }): Promise<string> {
   const force = options?.force === true
 
-  // Prefer the explicit service-to-service token — no HTML scrape at all.
-  if (DASHBOARD_BEARER_TOKEN) {
-    dashboardTokenCache = DASHBOARD_BEARER_TOKEN
-    return DASHBOARD_BEARER_TOKEN
-  }
-
   if (!force && dashboardTokenCache) return dashboardTokenCache
   if (!force && dashboardTokenPromise) return dashboardTokenPromise
 
   dashboardTokenPromise = (async () => {
-    if (!loggedHtmlScrapeFallback) {
-      loggedHtmlScrapeFallback = true
-      console.warn(
-        '[gateway] CLAUDE_DASHBOARD_TOKEN is not set — falling back to the legacy ' +
-          'HTML-scrape token flow. This fallback will be removed in a future release. ' +
-          'Set CLAUDE_DASHBOARD_TOKEN (or CLAUDE_API_TOKEN) to a dashboard bearer ' +
-          'token to migrate. See #124.',
-      )
-    }
     // Dashboard injects the session token inline on `/` (root), not on
     // `/index.html` which serves the raw Vite-built HTML without the token.
-    const res = await fetch(`${CLAUDE_DASHBOARD_URL}/`, {
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    })
-    if (!res.ok) {
-      throw new Error(`Dashboard index failed: ${res.status}`)
+    // When the dashboard requires auth (302 → /auth/login) or the login page
+    // is broken (500), return empty string so protected API calls degrade
+    // gracefully — the caller already handles 401/non-ok via safeJson.
+    try {
+      const res = await fetch(`${CLAUDE_DASHBOARD_URL}/`, {
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
+      if (!res.ok) {
+        console.warn(
+          `[gateway] Dashboard index returned ${res.status} — token unavailable`,
+        )
+        return ''
+      }
+      const html = await res.text()
+      const token = html.match(DASHBOARD_TOKEN_REGEX)?.[1]?.trim() || ''
+      if (!token) {
+        console.warn(
+          '[gateway] Dashboard session token not found in root HTML',
+        )
+        return ''
+      }
+      dashboardTokenCache = token
+      return token
+    } catch (err) {
+      console.warn(
+        `[gateway] Failed to fetch dashboard token: ${err instanceof Error ? err.message : err}`,
+      )
+      return ''
     }
-    const html = await res.text()
-    const token = html.match(DASHBOARD_TOKEN_REGEX)?.[1]?.trim() || ''
-    if (!token) {
-      throw new Error('Dashboard session token not found in root HTML')
-    }
-    dashboardTokenCache = token
-    return token
   })()
 
   try {
@@ -487,7 +470,24 @@ async function probeChatCompletions(): Promise<boolean> {
     if (getRes.status === 405) return true
     if (getRes.ok) return true
     if (getRes.status === 400 || getRes.status === 422) return true
-    if (getRes.status === 404) return false
+    if (getRes.status === 404) {
+      // Some OpenAI-compatible backends (e.g. `hermes proxy`) only route POST
+      // for /v1/chat/completions and return 404 — not 405 — for GET. Confirm
+      // the endpoint exists with a lightweight POST: an empty body triggers a
+      // validation error (400/422) on a real endpoint and 404 on an absent one.
+      // No tokens are spent because the request fails validation before inference.
+      try {
+        const postRes = await fetch(`${CLAUDE_API}/v1/chat/completions`, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: '{}',
+          signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        })
+        return postRes.status !== 404
+      } catch {
+        return false
+      }
+    }
     return true
   } catch {
     return false
@@ -621,7 +621,15 @@ async function probeConductor(dashboardAvailable: boolean): Promise<boolean> {
     if (res.status === 404 || res.status === 405) return false
     // 401 means the path exists but the auth token isn't accepted yet —
     // treat as available so token-gated setups don't hide the feature.
-    return true
+    if (res.status === 401) return true
+
+    const contentType = res.headers.get('content-type') ?? ''
+    // Vite/TanStack's SPA fallback returns HTTP 200 + text/html for missing
+    // API routes. Do not mark Conductor available unless the dashboard gives
+    // us a JSON API response; otherwise /api/conductor-spawn tries to POST to
+    // the dashboard and the user sees "Method Not Allowed".
+    if (!contentType.toLowerCase().includes('application/json')) return false
+    return res.ok
   } catch {
     return false
   }
@@ -667,10 +675,44 @@ const OPTIONAL_APIS = new Set([
   'mcpFallback',
 ])
 
+const DASHBOARD_BACKED_APIS = new Set([
+  'sessions',
+  'skills',
+  'config',
+  'jobs',
+  'mcp',
+  'mcpFallback',
+  'conductor',
+  'kanban',
+])
+
+export function getCapabilityWarningMessage(
+  next: GatewayCapabilities,
+  criticalMissing: string[],
+): string | null {
+  if (criticalMissing.length === 0 || (!next.health && !next.dashboard.available)) {
+    return null
+  }
+
+  const dashboardBackedMissing = criticalMissing.filter((key) =>
+    DASHBOARD_BACKED_APIS.has(key),
+  )
+  if (
+    !next.dashboard.available &&
+    next.chatCompletions &&
+    dashboardBackedMissing.length === criticalMissing.length
+  ) {
+    return `[gateway] ${DASHBOARD_REQUIRED_INSTRUCTIONS}`
+  }
+
+  return `[gateway] Missing Hermes APIs detected. ${CLAUDE_UPGRADE_INSTRUCTIONS}`
+}
+
 function logCapabilities(next: GatewayCapabilities): void {
   const core: Array<string> = []
   const enhanced: Array<string> = []
   const missing: Array<string> = []
+  const optionalMissing: Array<string> = []
 
   const coreKeys: Array<keyof CoreCapabilities> = [
     'health',
@@ -690,25 +732,28 @@ function logCapabilities(next: GatewayCapabilities): void {
   ]
 
   for (const key of coreKeys) {
-    ;(next[key] ? core : missing).push(key)
+    if (next[key]) core.push(key)
+    else if (OPTIONAL_APIS.has(key)) optionalMissing.push(key)
+    else missing.push(key)
   }
   for (const key of enhancedKeys) {
-    ;(next[key] ? enhanced : missing).push(key)
+    if (next[key]) enhanced.push(key)
+    else if (OPTIONAL_APIS.has(key)) optionalMissing.push(key)
+    else missing.push(key)
   }
   if (next.dashboard.available) core.push('dashboard')
-  else missing.push('dashboard')
+  else optionalMissing.push('dashboard')
 
   const mode = getGatewayMode()
-  const summary = `[gateway] gateway=${CLAUDE_API} dashboard=${next.dashboard.url} mode=${mode} core=[${core.join(', ')}] enhanced=[${enhanced.join(', ')}] missing=[${missing.join(', ')}]`
+  const summary = `[gateway] gateway=${CLAUDE_API} dashboard=${next.dashboard.url} mode=${mode} core=[${core.join(', ')}] enhanced=[${enhanced.join(', ')}] missing=[${missing.join(', ')}] optional=[${optionalMissing.join(', ')}]`
   if (summary === lastLoggedSummary) return
   lastLoggedSummary = summary
   console.log(summary)
 
   const criticalMissing = missing.filter((key) => !OPTIONAL_APIS.has(key))
-  if (criticalMissing.length > 0 && (next.health || next.dashboard.available)) {
-    console.warn(
-      `[gateway] Missing Hermes APIs detected. ${CLAUDE_UPGRADE_INSTRUCTIONS}`,
-    )
+  const warning = getCapabilityWarningMessage(next, criticalMissing)
+  if (warning) {
+    console.warn(warning)
   }
 }
 
@@ -745,7 +790,15 @@ async function autoDetectGatewayUrl(): Promise<void> {
 }
 
 async function autoDetectDashboardUrl(): Promise<void> {
-  if (process.env.CLAUDE_DASHBOARD_URL) return
+  // Mirror autoDetectGatewayUrl: skip discovery when the dashboard URL was set
+  // explicitly. HERMES_DASHBOARD_URL is the documented primary var (see the
+  // resolution order at the top of this file); CLAUDE_DASHBOARD_URL is the
+  // legacy alias. Probing only the hard-coded :9119 candidate when
+  // HERMES_DASHBOARD_URL points elsewhere lets a co-located dashboard on the
+  // default port silently override the operator's explicit choice — e.g. in a
+  // multi-user setup it attaches to another user's dashboard and leaks their
+  // session list. Honor both vars so an explicit setting always wins.
+  if (process.env.HERMES_DASHBOARD_URL || process.env.CLAUDE_DASHBOARD_URL) return
 
   const candidates = ['http://127.0.0.1:9119']
   for (const candidate of candidates) {

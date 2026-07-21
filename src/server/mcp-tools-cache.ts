@@ -22,9 +22,9 @@ import {
   unlinkSync,
   writeSync,
 } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
+import { getStateDir } from './workspace-state-dir'
 
 export interface CachedProbe {
   status: 'connected' | 'failed' | 'unknown'
@@ -58,16 +58,8 @@ function getTtlMs(): number {
   return DEFAULT_TTL_MS
 }
 
-function hermesHome(): string {
-  const override = process.env.HERMES_HOME?.trim()
-  if (override) return override
-  const claudeHome = process.env.CLAUDE_HOME?.trim()
-  if (claudeHome) return claudeHome
-  return join(homedir(), '.hermes')
-}
-
 export function cacheFilePath(): string {
-  return join(hermesHome(), 'cache', 'mcp-tools.json')
+  return join(getStateDir(), 'cache', 'mcp-tools.json')
 }
 
 // ---------------------------------------------------------------------------

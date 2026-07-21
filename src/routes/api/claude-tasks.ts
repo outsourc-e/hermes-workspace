@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { createTask, listTasks } from '../../server/tasks-store'
-import type { TaskColumn, TaskPriority } from '../../server/tasks-store'
+import { createClaudeTask, listClaudeTasks } from '../../server/claude-tasks-backend'
+import type { TaskColumn, TaskPriority } from '../../server/claude-tasks-backend'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -16,6 +16,7 @@ function isTaskColumn(value: unknown): value is TaskColumn {
     value === 'todo' ||
     value === 'in_progress' ||
     value === 'review' ||
+    value === 'blocked' ||
     value === 'done'
   )
 }
@@ -33,7 +34,7 @@ export const Route = createFileRoute('/api/claude-tasks')({
         }
 
         const url = new URL(request.url)
-        const tasks = listTasks({
+        const tasks = await listClaudeTasks({
           column: url.searchParams.get('column'),
           assignee: url.searchParams.get('assignee'),
           priority: url.searchParams.get('priority'),
@@ -54,8 +55,7 @@ export const Route = createFileRoute('/api/claude-tasks')({
             return jsonResponse({ error: 'title is required' }, 400)
           }
 
-          const task = createTask({
-            id: typeof body.id === 'string' ? body.id : undefined,
+          const task = await createClaudeTask({
             title: body.title,
             description: typeof body.description === 'string' ? body.description : '',
             column: isTaskColumn(body.column) ? body.column : undefined,
@@ -63,7 +63,6 @@ export const Route = createFileRoute('/api/claude-tasks')({
             assignee: typeof body.assignee === 'string' ? body.assignee : null,
             tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : [],
             due_date: typeof body.due_date === 'string' ? body.due_date : null,
-            position: typeof body.position === 'number' ? body.position : 0,
             created_by: typeof body.created_by === 'string' ? body.created_by : 'user',
           })
 

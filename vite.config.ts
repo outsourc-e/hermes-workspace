@@ -1,8 +1,7 @@
 import { URL, fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import net from 'node:net'
 import { resolve, dirname } from 'node:path'
 import os from 'node:os'
@@ -12,7 +11,7 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 // nitro plugin removed (tanstackStart handles server runtime)
-import { defineConfig, loadEnv, type Plugin, type ViteDevServer } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 import { shouldAutoStartWorkspaceCompanions } from './src/lib/workspace-companion-policy'
 
@@ -21,16 +20,18 @@ import { shouldAutoStartWorkspaceCompanions } from './src/lib/workspace-companio
 // ---------------------------------------------------------------------------
 
 /** Resolve the hermes-agent directory using a priority-ordered fallback chain:
- *  1. CLAUDE_AGENT_PATH env var (explicit override)
- *  2. ../hermes-agent  — sibling clone (standard README setup)
- *  3. ../../hermes-agent — one level up (monorepo / nested workspace)
+ *  1. HERMES_AGENT_PATH env var (explicit override)
+ *  2. CLAUDE_AGENT_PATH env var (legacy override)
+ *  3. ../hermes-agent  — sibling clone (standard README setup)
+ *  4. ../../hermes-agent — one level up (monorepo / nested workspace)
  *  Returns null if none found.
  */
 function resolveClaudeAgentDir(env: Record<string, string>): string | null {
   const candidates: string[] = []
 
-  if (env.CLAUDE_AGENT_PATH?.trim()) {
-    candidates.push(env.CLAUDE_AGENT_PATH.trim())
+  const explicitAgentPath = env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
+  if (explicitAgentPath) {
+    candidates.push(explicitAgentPath)
   }
 
   // Resolve relative to the workspace root (parent of hermes-workspace/)
@@ -48,10 +49,12 @@ function resolveClaudeAgentDir(env: Record<string, string>): string | null {
   return null
 }
 
-/** Find the `claude` CLI binary installed by Nous's installer. */
+/** Find the Hermes CLI binary used to start the local gateway. */
 function resolveClaudeBinary(): string | null {
   const candidates = [
-    '/Users/mac/.hermes/hermes-agent-venv/bin/hermes',
+    process.env.HERMES_CLI_BIN || '',
+    resolve(os.homedir(), '.hermes', 'hermes-agent-venv', 'bin', 'hermes'),
+    resolve(os.homedir(), '.hermes', 'hermes-agent', 'venv', 'bin', 'hermes'),
     resolve(os.homedir(), '.claude', 'bin', 'claude'),
     resolve(os.homedir(), '.local', 'bin', 'claude'),
   ]
@@ -85,44 +88,17 @@ async function isClaudeAgentHealthy(port = 8642): Promise<boolean> {
   }
 }
 
-function hashFileContents(path: string): string | null {
-  try {
-    return createHash('sha1').update(readFileSync(path)).digest('hex')
-  } catch {
-    return null
-  }
-}
-
-function suppressUnchangedGeneratedRouteTreeReloads(): Plugin {
-  const generatedRouteTreePath = resolve('src/routeTree.gen.ts')
-  let lastRouteTreeHash = hashFileContents(generatedRouteTreePath)
-
-  return {
-    name: 'workspace-suppress-unchanged-route-tree-reloads',
-    configureServer(server: ViteDevServer) {
-      const watcher = server.watcher
-      const originalEmit = watcher.emit.bind(watcher) as (...args: Array<unknown>) => boolean
-      watcher.emit = ((eventName: string | symbol, ...args: Array<unknown>) => {
-        const filePath = args[0]
-        if (
-          eventName === 'change'
-          && typeof filePath === 'string'
-          && resolve(filePath) === generatedRouteTreePath
-        ) {
-          const nextHash = hashFileContents(generatedRouteTreePath)
-          if (nextHash && nextHash === lastRouteTreeHash) {
-            return false
-          }
-          lastRouteTreeHash = nextHash
-        }
-        return originalEmit(eventName, ...args)
-      }) as typeof watcher.emit
-    },
-  }
-}
-
 const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  // Bridge loadEnv into process.env for server-side SSR runtime code that
+  // reads env vars directly from process.env (e.g. getBearerToken() in
+  // openai-compat-api.ts reads process.env.HERMES_API_TOKEN). Without this,
+  // Vite's loadEnv only populates the local `env` object — not process.env.
+  for (const key of Object.keys(env)) {
+    if (!(key in process.env)) {
+      process.env[key] = env[key]
+    }
+  }
   const autoStartWorkspaceCompanions = shouldAutoStartWorkspaceCompanions({
     command,
     mode,
@@ -197,7 +173,7 @@ const config = defineConfig(({ mode, command }) => {
         '[hermes-agent] Could not find hermes-agent installation.\n' +
           '  Run the installer:\n' +
           '    curl -fsSL https://hermes-workspace.com/install.sh | bash\n' +
-          '  Or set CLAUDE_AGENT_PATH in .env to point at your hermes-agent clone.',
+          '  Or set HERMES_AGENT_PATH (or legacy CLAUDE_AGENT_PATH) in .env to point at your hermes-agent clone.',
       )
       return
     }
@@ -467,6 +443,9 @@ const config = defineConfig(({ mode, command }) => {
       exclude: [
         '**/node_modules/**',
         '**/dist/**',
+        'e2e/**',
+        'tests/e2e/**',
+        '**/playwright-report/**',
         '**/skills-bundle/**',
         '**/.{idea,git,cache,output,temp}/**',
       ],
@@ -511,6 +490,19 @@ const config = defineConfig(({ mode, command }) => {
       ],
     },
     server: {
+      // Cross-origin isolation so the embedded HermesWorld WebGL client keeps
+      // SharedArrayBuffer multithreading (matches the standalone web client at
+      // play.hermes-world.ai). Without these, the iframe silently drops to a
+      // single thread → render+physics+netcode contend on one thread → inflated
+      // ping / worse frame pacing even though network RTT is identical.
+      // COEP 'credentialless' enables isolation WITHOUT requiring CORP headers
+      // on every cross-origin asset (fonts/images); the web client already sends
+      // cross-origin-resource-policy: cross-origin so the iframe still embeds.
+      // Same-origin agent API (/ws-claude, /api/claude-proxy) is unaffected.
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+      },
       // Force IPv4 — 'localhost' resolves to ::1 (IPv6) on Windows, breaking connectivity
       host: '0.0.0.0',
       // Port precedence:
@@ -518,6 +510,9 @@ const config = defineConfig(({ mode, command }) => {
       //   2. $PORT env var (for containers, reverse proxies, WhatsApp bridge collisions, etc. — see #96)
       //   3. default 3000 (matches README/docs/docker-compose expectations)
       port: process.env.PORT ? Number(process.env.PORT) : 3000,
+      // Managed Workspace launchers expect a stable port. Fail loudly instead
+      // of silently hopping to 3001+ so launchctl/service health matches the
+      // actual listening socket.
       strictPort: true,
       allowedHosts: true,
       watch: {
@@ -595,7 +590,6 @@ const config = defineConfig(({ mode, command }) => {
         projects: ['./tsconfig.json'],
       }),
       tailwindcss(),
-      suppressUnchangedGeneratedRouteTreeReloads(),
       tanstackStart(),
       viteReact(),
       {
@@ -604,6 +598,50 @@ const config = defineConfig(({ mode, command }) => {
           if (command !== 'serve') return
         },
         configureServer(server) {
+          // Cross-origin isolation headers on EVERY response so the embedded
+          // HermesWorld WebGL client keeps SharedArrayBuffer multithreading
+          // (matches play.hermes-world.ai). Injected via middleware because the
+          // TanStack Start SSR handler owns the HTML response and overrides
+          // vite's server.headers. COEP 'credentialless' avoids requiring CORP
+          // on every cross-origin asset; same-origin agent API is unaffected.
+          server.middlewares.use((_req, res, next) => {
+            res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+            res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless')
+            next()
+          })
+          // Content Security Policy as a real HTTP response header. Sending
+          // it here (not as a `<meta>` tag) keeps the policy authoritative
+          // when an edge proxy mutates the response body — e.g. Cloudflare's
+          // JS Challenge injecting a per-request nonce into the served HTML
+          // when a browser request trips the "impersonate browsers" WAF rule.
+          // Without this, the inline-style source expression
+          // `style-src ' 'nonce-...'; self` gets concatenated onto our meta
+          // tag and chromium rejects every script and stylesheet with a
+          // mangled-CSP error. See the parallel logic in server-entry.js
+          // for production.
+          server.middlewares.use((_req, res, next) => {
+            // KEEP IN SYNC with src/lib/csp.ts and server-entry.js
+            res.setHeader(
+              'Content-Security-Policy',
+              [
+                "default-src 'self'",
+                "base-uri 'self'",
+                "object-src 'none'",
+                "form-action 'self'",
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+                "img-src 'self' data: blob: https:",
+                "font-src 'self' data: https://fonts.gstatic.com",
+                "connect-src 'self' ws: wss: http: https:",
+                "worker-src 'self' blob:",
+                "media-src 'self' blob: data:",
+                "frame-src 'self' http: https:",
+              ].join('; '),
+            )
+            res.setHeader('X-Content-Type-Options', 'nosniff')
+            res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            next()
+          })
           server.middlewares.use(async (req, res, next) => {
             const requestPath = req.url?.split('?')[0]
             if (req.method === 'GET' && requestPath === '/api/healthcheck') {
@@ -686,14 +724,19 @@ const config = defineConfig(({ mode, command }) => {
             }
           })
 
-          // Auto-start hermes-agent only for an explicitly opted-in dev serve.
-          if (autoStartWorkspaceCompanions) {
+          // Auto-start hermes-agent when dev server launches.
+          // Skip when launchd manages the gateway (HERMES_WORKSPACE_AUTO_START_AGENT=false)
+          // to avoid SIGTERM cycle on close that nukes the launchd-managed process.
+          const autoStartAgent =
+            autoStartWorkspaceCompanions &&
+            process.env.HERMES_WORKSPACE_AUTO_START_AGENT !== 'false'
+          if (command === 'serve' && autoStartAgent) {
             void startClaudeAgent()
           }
 
-          // Shutdown hermes-agent when dev server stops
+          // Shutdown hermes-agent when dev server stops — only if we spawned it.
           server.httpServer?.on('close', () => {
-            if (claudeAgentChild) {
+            if (claudeAgentChild && autoStartAgent) {
               console.log('[hermes-agent] Stopping...')
               claudeAgentChild.kill('SIGTERM')
               claudeAgentChild = null
@@ -702,6 +745,7 @@ const config = defineConfig(({ mode, command }) => {
           })
 
           if (
+            command !== 'serve' ||
             !autoStartWorkspaceCompanions ||
             workspaceDaemonStarted ||
             workspaceDaemonStarting

@@ -1,18 +1,17 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProfilesDir } from '../../server/claude-paths'
-import {  newestCheckpointFromMessages, readRuntimeJson } from '../../server/swarm-checkpoints'
+import { newestCheckpointFromMessages, readRuntimeJson, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { getSwarmProfilePath, listSwarmWorkerIds } from '../../server/swarm-foundation'
 import { appendMissionContinuation, markMissionAssignmentsReviewedByWorker, recordMissionCheckpoint } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import { publishSwarmActionPrompt, publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { applySwarmModeToLoopFlags, readSwarmMode } from '../../server/swarm-mode'
-import { readSwarmRoster } from '../../server/swarm-roster'
-import type {ParsedSwarmCheckpoint} from '../../server/swarm-checkpoints';
+import { isSwarmWorkerId, readSwarmRoster } from '../../server/swarm-roster'
 
 type LoopRequest = {
   workerIds?: unknown
@@ -39,7 +38,7 @@ function validWorkerIds(value: unknown): Array<string> {
   return value
     .filter((item): item is string => typeof item === 'string')
     .map((item) => item.trim())
-    .filter((item) => /^swarm\d+$/i.test(item))
+    .filter((item) => isSwarmWorkerId(item))
 }
 
 function timestampFromRuntime(value: unknown): number | null {
@@ -231,7 +230,8 @@ function chooseByRole(workerIds: Array<string>, pattern: RegExp): string | null 
 }
 
 function chooseReviewer(workerIds: Array<string>, requested: unknown): string | null {
-  if (typeof requested === 'string' && /^swarm\d+$/i.test(requested.trim())) return requested.trim()
+  if (typeof requested === 'string' && isSwarmWorkerId(requested)) return requested.trim()
+  if (workerIds.includes('reviewer')) return 'reviewer'
   if (workerIds.includes('swarm6')) return 'swarm6'
   return chooseByRole(workerIds, /review|qa|critic/i)
 }

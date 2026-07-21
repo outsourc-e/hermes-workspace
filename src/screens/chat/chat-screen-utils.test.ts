@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { advanceStickyStreamingText } from './chat-screen-utils'
+import {
+  advanceStickyStreamingText,
+  createResponseWaitSnapshot,
+  isTerminalActiveRunStatus,
+  shouldClearWaitingForAssistantMessage,
+} from './chat-screen-utils'
 
 describe('advanceStickyStreamingText', () => {
   it('preserves the last non-empty streaming text when a tool phase temporarily reports empty text', () => {
@@ -48,5 +53,43 @@ describe('advanceStickyStreamingText', () => {
     })
 
     expect(next).toEqual({ runId: null, text: '' })
+  })
+})
+
+describe('response wait detection', () => {
+  it('treats persisted complete runs as terminal', () => {
+    expect(isTerminalActiveRunStatus('complete')).toBe(true)
+    expect(isTerminalActiveRunStatus('completed')).toBe(true)
+    expect(isTerminalActiveRunStatus('active')).toBe(false)
+  })
+
+  it('clears waiting when a new assistant message appears after the send snapshot', () => {
+    const snapshot = createResponseWaitSnapshot([
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'remember that i like cheesecake' }],
+      },
+    ])
+
+    expect(
+      shouldClearWaitingForAssistantMessage(
+        [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'remember that i like cheesecake' },
+            ],
+          },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'text', text: 'Remembered: you like cheesecake.' },
+            ],
+            id: 'assistant-1',
+          },
+        ],
+        snapshot,
+      ),
+    ).toBe(true)
   })
 })

@@ -58,8 +58,9 @@ export function resolveClaudeAgentDir(
 ): string | null {
   const candidates: Array<string> = []
 
-  if (env.CLAUDE_AGENT_PATH?.trim()) {
-    candidates.push(env.CLAUDE_AGENT_PATH.trim())
+  const explicitAgentPath = env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
+  if (explicitAgentPath) {
+    candidates.push(explicitAgentPath)
   }
 
   const workspaceRoot = dirname(resolve('.'))
@@ -80,6 +81,8 @@ export function resolveClaudeAgentDir(
 /** Find the `claude` CLI binary installed by Nous's installer (or on PATH). */
 export function resolveClaudeBinary(): string | null {
   const candidates = [
+    resolve(homedir(), '.local', 'bin', 'hermes'),
+    resolve(homedir(), '.hermes', 'bin', 'hermes'),
     resolve(homedir(), '.claude', 'bin', 'claude'),
     resolve(homedir(), '.local', 'bin', 'claude'),
   ]

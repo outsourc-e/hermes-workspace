@@ -42,4 +42,34 @@ describe('Swarm2 Kanban backend presentation', () => {
       toastBody: 'Using local Swarm board JSON store.',
     })
   })
+
+  it('does not deep-link remote users to a loopback Hermes Dashboard URL', () => {
+    expect(getKanbanBackendPresentation({
+      id: 'hermes-proxy',
+      label: 'Hermes Dashboard kanban',
+      detected: true,
+      writable: true,
+      details: 'Synced through Workspace proxy',
+      path: 'http://127.0.0.1:9119',
+    })).toMatchObject({
+      badgeLabel: 'Synced • Hermes',
+      badgeTone: 'hermes-proxy',
+      dashboardUrl: undefined,
+    })
+  })
+
+  it('deep-links to Hermes Dashboard only when the configured URL is remotely reachable', () => {
+    expect(getKanbanBackendPresentation({
+      id: 'hermes-proxy',
+      label: 'Hermes Dashboard kanban',
+      detected: true,
+      writable: true,
+      details: 'Synced through Workspace proxy',
+      path: 'http://100.113.68.47:9119',
+    })).toMatchObject({
+      badgeLabel: 'Synced • Hermes',
+      badgeTone: 'hermes-proxy',
+      dashboardUrl: 'http://100.113.68.47:9119/kanban',
+    })
+  })
 })

@@ -26,7 +26,7 @@ describe('Goblin Analytics shell', () => {
     expect(source).toContain("data-goblin-focus-mode={goblinFocusMode ? 'true' : 'false'}")
     expect(routeSource).toContain('const goblinFocusMode = isTruthyWarRoomFlag(routeSearch.goblinOps) || isTruthyWarRoomFlag(routeSearch.goblinFocus)')
     expect(routeSource).toContain('goblinFocusMode={goblinFocusMode}')
-    expect(rootSource).toContain('isTruthyWarRoomFlag(routeSearch.goblinOps)')
+    expect(rootSource).toContain('const isWarRoomRoute')
     expect(source).toContain('<GoblinAnalyticsShell />')
     expect(source).toContain('Goblin intelligence room · read-only · no Etsy writes or supplier messages')
 

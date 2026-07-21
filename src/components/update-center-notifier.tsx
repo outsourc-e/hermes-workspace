@@ -75,7 +75,7 @@ function shortSha(value: string | null | undefined): string {
 }
 
 function productDismissKey(product: ProductUpdateStatus): string {
-  return `${product.id}:${product.latestHead ?? product.version ?? 'unknown'}`
+  return `${product.id}:${product.latestHead ?? product.version}`
 }
 
 function notesId(sections: Array<ReleaseNoteSection>): string {
@@ -87,23 +87,29 @@ function notesId(sections: Array<ReleaseNoteSection>): string {
 
 function storeNotes(sections: Array<ReleaseNoteSection>): Notes | null {
   if (!sections.length) return null
-  const notes = { id: notesId(sections), sections, updatedAt: Date.now() }
-  localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
-  localStorage.removeItem(NOTES_SEEN_KEY)
-  return notes
-}
-
-function readNotes(): Notes | null {
+  const id = notesId(sections)
+  const notes = { id, sections, updatedAt: Date.now() }
+  // Only clear the "seen" marker when the release-notes payload actually
+  // changed. Without this guard the modal pops up on every page refresh
+  // because /api/update/status returns the same pendingReleaseNotes on every
+  // poll, useEffect fires, and we used to drop the seen marker every time.
+  // See #356.
+  let existingId: string | null = null
   try {
     const raw = localStorage.getItem(NOTES_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Notes
-    if (!parsed?.id || !Array.isArray(parsed.sections)) return null
-    if (localStorage.getItem(NOTES_SEEN_KEY) === parsed.id) return null
-    return parsed
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<Notes>
+      existingId = typeof parsed.id === 'string' ? parsed.id : null
+    }
   } catch {
-    return null
+    existingId = null
   }
+  if (existingId !== id) {
+    localStorage.removeItem(NOTES_SEEN_KEY)
+  }
+  localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
+  if (localStorage.getItem(NOTES_SEEN_KEY) === id) return null
+  return notes
 }
 
 export function UpdateCenterNotifier() {
@@ -126,7 +132,9 @@ export function UpdateCenterNotifier() {
         values.add(localStorage.getItem(key) || '')
     }
     setDismissed(values)
-    setNotes(readNotes())
+    // Do not open historical release notes on startup. Successful in-app
+    // updates still call setNotes immediately after apply, but a routine
+    // status poll should not interrupt users with stale "what changed" copy.
   }, [])
 
   const { data } = useQuery({
@@ -150,7 +158,13 @@ export function UpdateCenterNotifier() {
   const visibleProducts = useMemo(() => {
     const products = data ? [data.products.workspace, data.products.agent] : []
     return products.filter((product) => {
+      // Product decision: only show the top-of-app update banner when a
+      // one-click update is actually safe. Dirty checkouts, non-main branches,
+      // and blocked/conflicting states still exist, but they belong in an
+      // advanced update center view rather than a disruptive banner. See
+      // Eric feedback 2026-05-04.
       if (!product.updateAvailable) return false
+      if (!product.canUpdate) return false
       if (phases[product.id] === 'done') return false
       return !dismissed.has(productDismissKey(product))
     })
@@ -506,4 +520,9 @@ function ReleaseNotes({
       </motion.div>
     </AnimatePresence>
   )
+}
+
+export const __updateReleaseNotesStorageForTests = {
+  NOTES_SEEN_KEY,
+  storeNotes,
 }

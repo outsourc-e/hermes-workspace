@@ -16,10 +16,17 @@ const KnowledgeBrowserScreen = lazy(async () => {
   return { default: module.KnowledgeBrowserScreen }
 })
 
+const ExternalMemoryBrowserScreen = lazy(async () => {
+  const module = await import('@/screens/memory/external-memory-browser-screen')
+  return { default: module.ExternalMemoryBrowserScreen }
+})
+
 export const Route = createFileRoute('/memory')({
   ssr: false,
   component: function MemoryRoute() {
-    const [tab, setTab] = useState<'memory' | 'knowledge'>('memory')
+    const [tab, setTab] = useState<'memory' | 'knowledge' | 'external'>(
+      'memory',
+    )
     const memoryAvailable = useFeatureAvailable('memory')
 
     usePageTitle('Memory')
@@ -28,7 +35,9 @@ export const Route = createFileRoute('/memory')({
       <div className="flex h-full min-h-0 flex-col">
         <Tabs
           value={tab}
-          onValueChange={(value) => setTab(value as 'memory' | 'knowledge')}
+          onValueChange={(value) =>
+            setTab(value as 'memory' | 'knowledge' | 'external')
+          }
           className="h-full min-h-0 gap-0"
         >
           <div className="border-b border-primary-200 px-3 pt-3 dark:border-neutral-800 md:px-4 md:pt-4">
@@ -38,6 +47,7 @@ export const Route = createFileRoute('/memory')({
             >
               <TabsTab value="memory">Memory</TabsTab>
               <TabsTab value="knowledge">Knowledge</TabsTab>
+              <TabsTab value="external">External providers</TabsTab>
             </TabsList>
           </div>
 
@@ -68,6 +78,18 @@ export const Route = createFileRoute('/memory')({
                 }
               >
                 <KnowledgeBrowserScreen />
+              </Suspense>
+            ) : null}
+          </TabsPanel>
+
+          <TabsPanel value="external" className="min-h-0 flex-1">
+            {tab === 'external' ? (
+              <Suspense
+                fallback={
+                  <RouteLoadingState label="Loading external memory providers..." />
+                }
+              >
+                <ExternalMemoryBrowserScreen />
               </Suspense>
             ) : null}
           </TabsPanel>

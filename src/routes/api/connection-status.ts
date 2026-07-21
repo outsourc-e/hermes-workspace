@@ -92,7 +92,9 @@ export const Route = createFileRoute('/api/connection-status')({
         } else if (chatReady && modelConfigured) {
           status = 'connected'
           label = 'Connected'
-          detail = 'Core chat is ready on this backend.'
+          detail = caps.dashboard.available
+            ? 'Core chat is ready on this backend.'
+            : 'Core chat is ready. Start `hermes dashboard` to enable Sessions, Skills, Config, and Jobs.'
         } else {
           status = 'partial'
           label = 'Partial'
@@ -127,6 +129,7 @@ export const Route = createFileRoute('/api/connection-status')({
             config: caps.config,
             jobs: caps.jobs,
             mcp: caps.mcp,
+            mcpFallback: caps.mcpFallback,
             conductor: caps.conductor,
             kanban: caps.kanban,
             enhancedChat: caps.enhancedChat,

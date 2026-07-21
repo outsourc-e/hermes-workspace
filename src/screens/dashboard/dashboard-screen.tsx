@@ -1,3 +1,14 @@
+import {
+  BubbleChatAddIcon,
+  CheckmarkCircle02Icon,
+  ConsoleIcon,
+  Edit02Icon,
+  Moon02Icon,
+  PuzzleIcon,
+  Settings02Icon,
+  Sun02Icon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
@@ -10,52 +21,36 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  BubbleChatAddIcon,
-  CheckmarkCircle02Icon,
-  ConsoleIcon,
-  Edit02Icon,
-  Moon02Icon,
-  PuzzleIcon,
-  Settings02Icon,
-  Sun02Icon,
-} from '@hugeicons/core-free-icons'
-import { OpsStrip } from './components/ops-strip'
 import { AchievementsCard } from './components/achievements-card'
-import { HeroMetrics } from './components/hero-metrics'
-import {
-  AnalyticsChartCard
-
-} from './components/analytics-chart-card'
-import { TopModelsCard } from './components/top-models-card'
-import { LogsTailCard } from './components/logs-tail-card'
-import {
-
-  SessionsIntelligenceCard
-} from './components/sessions-intelligence-card'
-import { SkillsUsageCard } from './components/skills-usage-card'
-import { TokenMixHourCard } from './components/token-mix-hour-card'
 import { ActiveModelKpi } from './components/active-model-kpi'
+import { AnalyticsChartCard } from './components/analytics-chart-card'
 import { AttentionMarquee } from './components/attention-marquee'
 import { CacheEfficiencyCard } from './components/cache-efficiency-card'
-import { ProviderMixCard } from './components/provider-mix-card'
-import { VelocityCard } from './components/velocity-card'
 import { CostLedgerCard } from './components/cost-ledger-card'
-import { OperatorTipCard } from './components/operator-tip-card'
-import { WidgetShell } from './components/widget-shell'
 import { EditModePanel } from './components/edit-mode-panel'
+import { HeroMetrics } from './components/hero-metrics'
+import { LogsTailCard } from './components/logs-tail-card'
+import { OperatorTipCard } from './components/operator-tip-card'
+import { OpsStrip } from './components/ops-strip'
+import { ProviderMixCard } from './components/provider-mix-card'
+import { SessionsIntelligenceCard } from './components/sessions-intelligence-card'
+import { SkillsUsageCard } from './components/skills-usage-card'
+import { TokenMixHourCard } from './components/token-mix-hour-card'
+import { TopModelsCard } from './components/top-models-card'
+import { VelocityCard } from './components/velocity-card'
+import { WidgetShell } from './components/widget-shell'
+import { normalizeDashboardSessionsPayload } from './lib/sessions-query'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
-import type {SessionRowData} from './components/sessions-intelligence-card';
-import type {AnalyticsPeriod} from './components/analytics-chart-card';
-import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import type { SessionRowData } from './components/sessions-intelligence-card'
+import type { AnalyticsPeriod } from './components/analytics-chart-card'
 import type { ReactNode } from 'react'
 import type { ClaudeSession } from '@/server/claude-api'
+import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { getUnavailableReason } from '@/lib/feature-gates'
-import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
-import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
 // `IconSvgObject` isn't exported from @hugeicons/react; reuse the
 // inferred type from a real icon import for prop typing.
@@ -392,6 +387,7 @@ function SkillsWidget({
   onOpen: () => void
   usage: DashboardOverview['skillsUsage']
 }) {
+  const skillsAvailable = useFeatureAvailable('skills')
   const skillsQuery = useQuery({
     queryKey: ['claude-skills'],
     queryFn: async () => {
@@ -401,9 +397,19 @@ function SkillsWidget({
       return (data?.skills ?? []) as Array<Record<string, unknown>>
     },
     staleTime: 30_000,
+    enabled: skillsAvailable,
   })
 
   const skills = skillsQuery.data ?? []
+
+  if (!skillsAvailable) {
+    return (
+      <UnavailableWidget
+        title="Skills"
+        description={getUnavailableReason('skills')}
+      />
+    )
+  }
 
   // Summary view per Hermes Agent feedback: 'don’t enumerate, summarise.'
   // Prefer real usage signal from /api/analytics/usage when present
@@ -411,14 +417,10 @@ function SkillsWidget({
   const installed = skills.length
   const enabled = skills.filter((s) => s.enabled !== false).length
   const usedThisWindow = usage?.distinctSkills ?? null
-  const topUsed = usage?.topSkills?.[0]
+  const topUsed = usage?.topSkills[0]
   const topInstalled =
-    skills.find((s) => s.enabled !== false) ?? skills[0]
-  const topName = topUsed?.skill
-    ? topUsed.skill
-    : topInstalled
-      ? String(topInstalled.name ?? '—')
-      : '—'
+    skills.find((s) => s.enabled !== false) ?? skills.at(0)
+  const topName = topUsed?.skill ?? String(topInstalled?.name ?? '—')
 
   return (
     <button
@@ -626,167 +628,11 @@ function SessionRow({
   )
 }
 
-// ── Workspace Health Dashboard ───────────────────────────────────
-
-type WorkspaceHealthState = 'pass' | 'warn' | 'fail' | 'blocked' | 'unknown'
-
-type WorkspaceHealthPayload = {
-  ok: boolean
-  observedAt: number
-  latestGateDir?: string | null
-  overall: WorkspaceHealthState
-  counts: Record<WorkspaceHealthState, number>
-  quality: {
-    freshness: 'fresh' | 'stale' | 'missing'
-    reason: string | null
-    runId: string | null
-    runFinishedAt: number | null
-    ageMs: number | null
-    repoMatches: boolean | null
-    warningBudget: { baseline: number; current: number | null } | null
-    artifactPath: string
-  }
-  checks: Array<{
-    id: string
-    label: string
-    state: WorkspaceHealthState
-    reportedState?: 'pass' | 'warn' | 'fail'
-    source: 'git' | 'quality-run'
-    detail: string
-    command: string
-    exitCode: number | null
-    durationMs: number
-    artifactPath: string
-    warnings?: number
-    errors?: number
-  }>
-}
-
-const workspaceHealthTone: Record<WorkspaceHealthState, { label: string; className: string }> = {
-  pass: { label: 'GREEN', className: 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' },
-  warn: { label: 'YELLOW', className: 'border-amber-400/45 bg-amber-500/10 text-amber-100' },
-  fail: { label: 'RED', className: 'border-red-400/50 bg-red-500/10 text-red-100' },
-  blocked: { label: 'BLOCKED', className: 'border-sky-400/45 bg-sky-500/10 text-sky-100' },
-  unknown: { label: 'UNKNOWN', className: 'border-neutral-400/35 bg-neutral-500/10 text-neutral-200' },
-}
-
-function formatHealthAge(ageMs: number | null): string {
-  if (ageMs === null) return 'no run'
-  if (ageMs < 60_000) return 'less than a minute ago'
-  if (ageMs < 3_600_000) return `${Math.floor(ageMs / 60_000)}m ago`
-  return `${Math.floor(ageMs / 3_600_000)}h ago`
-}
-
-function WorkspaceHealthCard() {
-  const healthQuery = useQuery<WorkspaceHealthPayload>({
-    queryKey: ['workspace-health'],
-    queryFn: async () => {
-      const res = await fetch('/api/workspace-health')
-      if (!res.ok) throw new Error(`workspace health ${res.status}`)
-      return (await res.json()) as WorkspaceHealthPayload
-    },
-    staleTime: 5_000,
-    refetchInterval: 45_000,
-  })
-  // React Query keeps the previous payload after a refetch error. Do not let
-  // that cached payload preserve a stale green state on screen.
-  const payload = healthQuery.isError ? null : (healthQuery.data ?? null)
-  const checks = payload?.checks ?? []
-  const overall = payload?.overall ?? 'unknown'
-  const tone = workspaceHealthTone[overall]
-  const quality = payload?.quality ?? null
-  const freshness = quality?.freshness ?? 'missing'
-  const freshnessLabel =
-    freshness === 'fresh' ? 'FRESH' : freshness === 'stale' ? 'STALE' : 'NO RUN'
-  const freshnessClass =
-    freshness === 'fresh'
-      ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100'
-      : freshness === 'stale'
-        ? 'border-amber-400/45 bg-amber-500/10 text-amber-100'
-        : 'border-neutral-400/35 bg-neutral-500/10 text-neutral-200'
-  const lastGate = payload?.latestGateDir?.split('/').at(-1) ?? 'no gate yet'
-  const runTime = quality?.runFinishedAt
-    ? new Date(quality.runFinishedAt).toLocaleString()
-    : 'No completed QA run'
-
-  return (
-    <section
-      className="rounded-2xl border p-4 shadow-sm"
-      style={{
-        borderColor: 'color-mix(in srgb, var(--theme-border) 82%, var(--theme-accent))',
-        background: 'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 94%, var(--theme-accent) 6%), var(--theme-card))',
-        color: 'var(--theme-text)',
-      }}
-      data-workspace-health-card="v2"
-      aria-label="Workspace health dashboard"
-    >
-      <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--theme-muted)' }}>Workspace Health</p>
-          <h2 className="text-lg font-bold tracking-tight">Current-run gates, honest blockers</h2>
-          <p className="mt-1 max-w-3xl text-xs leading-5" style={{ color: 'var(--theme-muted)' }}>
-            Green is valid only while the saved QA fingerprint matches the live worktree. Warning debt, stale evidence, and failed readback stay visible.
-          </p>
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--theme-muted)' }}>
-            Run: {runTime} · {formatHealthAge(quality?.ageMs ?? null)} · observed {payload?.observedAt ? new Date(payload.observedAt).toLocaleTimeString() : 'now'}
-          </p>
-          {quality?.reason ? (
-            <p className="mt-1 text-[11px] text-amber-200">{quality.reason}</p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={cn('rounded-full border px-3 py-1 text-xs font-black tracking-[0.12em]', tone.className)}>{tone.label}</span>
-          <span className={cn('rounded-full border px-3 py-1 text-xs font-black tracking-[0.12em]', freshnessClass)}>{freshnessLabel}</span>
-          <span className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-muted)' }}>{lastGate}</span>
-        </div>
-      </div>
-
-      {healthQuery.isError ? (
-        <div className="rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-100" data-health-state="unknown">
-          Workspace health readback failed. Cached green evidence is hidden: {healthQuery.error instanceof Error ? healthQuery.error.message : 'unknown error'}
-        </div>
-      ) : (
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {checks.length ? checks.map((check) => {
-            const checkTone = workspaceHealthTone[check.state]
-            return (
-              <article key={check.id} className="min-h-[112px] rounded-xl border p-3" style={{ borderColor: 'var(--theme-border)', background: 'color-mix(in srgb, var(--theme-card) 92%, transparent)' }} data-health-state={check.state}>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-bold">{check.label}</h3>
-                  <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-black', checkTone.className)}>{checkTone.label}</span>
-                </div>
-                <p className="text-xs leading-5" style={{ color: 'var(--theme-muted)' }}>{check.detail}</p>
-                <details className="mt-2 rounded-lg border px-2 py-1.5 text-[11px]" style={{ borderColor: 'var(--theme-border)' }}>
-                  <summary className="cursor-pointer font-semibold">Evidence</summary>
-                  <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1" style={{ color: 'var(--theme-muted)' }}>
-                    <dt>Source</dt><dd>{check.source}</dd>
-                    <dt>Exit</dt><dd>{check.exitCode ?? 'not run'}</dd>
-                    <dt>Duration</dt><dd>{check.durationMs ? `${check.durationMs}ms` : 'live readback'}</dd>
-                    {typeof check.errors === 'number' ? <><dt>Errors</dt><dd>{check.errors}</dd></> : null}
-                    {typeof check.warnings === 'number' ? <><dt>Warnings</dt><dd>{check.warnings}</dd></> : null}
-                    {check.reportedState ? <><dt>Last report</dt><dd>{check.reportedState}</dd></> : null}
-                  </dl>
-                  {check.command ? <code className="mt-2 block overflow-x-auto rounded bg-black/20 px-2 py-1">{check.command}</code> : null}
-                  {check.artifactPath ? <p className="mt-1 truncate" title={check.artifactPath}>Artifact: {check.artifactPath.split('/').at(-1)}</p> : null}
-                </details>
-              </article>
-            )
-          }) : (
-            <div className="rounded-xl border p-3 text-sm" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-muted)' }}>
-              Loading workspace health…
-            </div>
-          )}
-        </div>
-      )}
-    </section>
-  )
-}
-
 // ── Main Dashboard ───────────────────────────────────────────────
 
 export function DashboardScreen() {
   const navigate = useNavigate()
-  const sessionsAvailable = useFeatureAvailable('sessions')
+  const skillsAvailable = useFeatureAvailable('skills')
   const sessionsQuery = useQuery({
     // Use a dedicated query key — NOT chatQueryKeys.sessions — to avoid
     // cache collisions with the chat sidebar which fetches fewer sessions
@@ -794,23 +640,32 @@ export function DashboardScreen() {
     // Also use the workspace proxy (/api/sessions) rather than the server-side
     // listSessions() — the latter calls the gateway via CLAUDE_API which is
     // only available server-side and returns nothing when called from the client.
+    // Do not gate this direct proof behind /api/gateway-status. That probe can
+    // be stale/loading while /api/sessions already works, which made the
+    // dashboard show a bogus “Enhanced API required” warning even though
+    // sessions were healthy.
     queryKey: ['dashboard', 'sessions'],
     queryFn: async () => {
       const res = await fetch('/api/sessions?limit=200&offset=0')
-      if (!res.ok) return [] as Array<Record<string, unknown>>
-      const data = (await res.json()) as {
-        sessions?: Array<Record<string, unknown>>
+      if (!res.ok) {
+        throw new Error(`Sessions API returned HTTP ${res.status}`)
       }
-      return data.sessions ?? []
+      const data = await res.json()
+      return normalizeDashboardSessionsPayload(data)
     },
     staleTime: 10_000,
     refetchInterval: 30_000,
-    enabled: sessionsAvailable,
+    retry: 1,
   })
+
+  const sessionsResult = sessionsQuery.data
 
   // Raw rows from the sessions endpoint. Used both for hero stats
   // (count/tokens) and for the SessionsIntelligenceCard below.
-  const rawSessions = (sessionsQuery.data ?? [])
+  const rawSessions = sessionsResult?.sessions ?? []
+  const sessionsUnavailable = Boolean(sessionsResult?.unavailable)
+  const sessionsUnavailableMessage =
+    sessionsResult?.message ?? getUnavailableReason('sessions')
 
   // Adapter shape kept for the legacy fallbacks that still reference
   // ClaudeSession (HeroMetrics fallback path, etc.).
@@ -921,6 +776,7 @@ export function DashboardScreen() {
       return data.skills?.length ?? 0
     },
     staleTime: 60_000,
+    enabled: skillsAvailable,
   })
   const skillsInstalled = skillsCountQuery.data ?? 0
 
@@ -1071,7 +927,7 @@ export function DashboardScreen() {
         {/* Action row: hierarchy per Hermes Agent review.
            New Chat is primary (full button + accent), Terminal +
            Skills are secondary, Settings collapses to icon-only. */}
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 lg:max-w-xl">
+        <div className="flex w-full flex-wrap items-center gap-2 lg:justify-end lg:max-w-xl">
           <button
             type="button"
             onClick={() =>
@@ -1080,7 +936,7 @@ export function DashboardScreen() {
                 params: { sessionKey: 'new' },
               })
             }
-            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-3.5 py-2 text-sm font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.02] active:scale-[0.99]"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.02] active:scale-[0.99] sm:px-3.5 sm:py-2 sm:text-sm"
             style={{
               background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentSecondary})`,
               color: 'var(--theme-on-accent, white)',
@@ -1111,6 +967,7 @@ export function DashboardScreen() {
             label="Skills"
             icon={PuzzleIcon}
             onClick={() => navigate({ to: '/skills' })}
+            disabled={!skillsAvailable}
           />
           {/* Edit toggle: enters "layout edit mode" where each widget
               shows an X button and a banner appears for re-adding
@@ -1167,7 +1024,7 @@ export function DashboardScreen() {
            concern by giving the ticker its own visual chamber
            (warning gradient, separated border) so it doesn't blend
            into the gateway/version/cron line below it. */}
-      {(overview?.incidents?.length ?? 0) > 0 ? (
+      {(overview?.incidents.length ?? 0) > 0 ? (
         <AttentionMarquee overview={overview ?? null} />
       ) : null}
 
@@ -1175,10 +1032,9 @@ export function DashboardScreen() {
       <OpsStrip
         status={overview?.status ?? null}
         cron={overview?.cron ?? null}
+        kanban={overview?.kanban ?? null}
         platforms={overview?.platforms ?? []}
       />
-
-      <WorkspaceHealthCard />
 
       {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
       <HeroMetrics
@@ -1286,13 +1142,17 @@ export function DashboardScreen() {
           {layout.isVisible('sessions_intelligence') ? (
             <div className="flex min-h-0 flex-1 flex-col">
               <WidgetShell id="sessions_intelligence" layout={layout}>
-                {sessionsAvailable ? (
-                  <SessionsIntelligenceCard sessions={sessionRows} />
-                ) : (
+                {sessionsQuery.isError || sessionsUnavailable ? (
                   <UnavailableWidget
                     title="Recent Sessions"
-                    description={getUnavailableReason('sessions')}
+                    description={
+                      sessionsQuery.isError
+                        ? getUnavailableReason('sessions')
+                        : sessionsUnavailableMessage
+                    }
                   />
+                ) : (
+                  <SessionsIntelligenceCard sessions={sessionRows} />
                 )}
               </WidgetShell>
             </div>

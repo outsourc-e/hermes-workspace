@@ -221,6 +221,26 @@ function canResetToRemote(repoPath: string, remoteRef: string): boolean {
   return Boolean(git(['rev-parse', '--verify', remoteRef], repoPath, 10_000))
 }
 
+function branchDivergence(repoPath: string, remoteRef: string): { ahead: number; behind: number } | null {
+  const raw = git(['rev-list', '--left-right', '--count', `HEAD...${remoteRef}`], repoPath, 10_000)
+  if (!raw) return null
+  const [aheadRaw, behindRaw] = raw.split(/\s+/)
+  const ahead = Number(aheadRaw)
+  const behind = Number(behindRaw)
+  if (!Number.isFinite(ahead) || !Number.isFinite(behind)) return null
+  return { ahead, behind }
+}
+
+export function updateAvailableFromDivergence(
+  divergence: { ahead: number; behind: number } | null,
+  headsDiffer: boolean,
+): boolean {
+  // A local checkout can legitimately be ahead of origin because it carries
+  // hotfixes or unpublished commits. That is not an available upstream update.
+  // Only remote-ahead or diverged histories should surface as updateable.
+  return divergence ? divergence.behind > 0 : headsDiffer
+}
+
 function syncRepoToRemote(repoPath: string, remoteRef: string): string {
   if (canFastForward(repoPath, remoteRef)) {
     return execOrThrow('git', ['merge', '--ff-only', remoteRef], {
@@ -338,10 +358,11 @@ export function readWorkspaceUpdateStatus(
   const latestHead =
     repoMatches && supportedBranch ? remoteHead(gitRepo, 'origin') : null
   const dirty = isDirty(gitRepo)
-  const updateAvailable = Boolean(
-    supportedBranch && currentHead && latestHead && currentHead !== latestHead,
-  )
   const remoteRef = `origin/${branch || 'main'}`
+  const divergence = latestHead ? branchDivergence(gitRepo, remoteRef) : null
+  const updateAvailable = Boolean(
+    supportedBranch && currentHead && latestHead && updateAvailableFromDivergence(divergence, currentHead !== latestHead),
+  )
   const canSync = updateAvailable ? canResetToRemote(gitRepo, remoteRef) : true
   const ff = updateAvailable ? canFastForward(gitRepo, remoteRef) : true
   const canUpdate = Boolean(
@@ -443,8 +464,9 @@ export function readAgentUpdateStatus(): ProductUpdateStatus {
   const latestHead = repoMatches ? remoteHead(repoPath, 'origin') : null
   const remoteRef = repoMatches ? `origin/${branch || 'main'}` : null
   const dirty = isDirty(repoPath)
+  const divergence = remoteRef ? branchDivergence(repoPath, remoteRef) : null
   const updateAvailable = Boolean(
-    currentHead && latestHead && currentHead !== latestHead && remoteRef,
+    currentHead && latestHead && remoteRef && updateAvailableFromDivergence(divergence, currentHead !== latestHead),
   )
   const canSync = remoteRef ? canResetToRemote(repoPath, remoteRef) : false
   const ff = remoteRef ? canFastForward(repoPath, remoteRef) : false

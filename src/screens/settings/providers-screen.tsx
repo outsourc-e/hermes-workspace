@@ -57,6 +57,7 @@ const KNOWN_PROVIDER_PREFIXES = [
   'anthropic',
   'openai',
   'openai-codex',
+  'google',
   'nous',
   'ollama',
   'atomic-chat',
@@ -260,10 +261,10 @@ const SETTINGS: Array<SettingDefinition> = [
   {
     id: 'primary-model',
     tab: 'models',
-    path: 'agents.defaults.model.primary',
+    path: 'model.default',
     label: 'Default model',
     description:
-      'Primary model used for new agents unless a specific agent overrides it.',
+      'Backend default model used when a chat does not select a per-session override.',
     kind: 'text',
     placeholder: 'provider/model',
   },
@@ -767,7 +768,12 @@ function SettingCard(props: {
   )
 }
 
-type ModelProviderOption = 'custom' | 'openrouter' | 'anthropic' | 'openai'
+type ModelProviderOption =
+  | 'custom'
+  | 'openrouter'
+  | 'anthropic'
+  | 'openai'
+  | 'google'
 
 type ModelConfigDraft = {
   provider: ModelProviderOption
@@ -785,6 +791,7 @@ const MODEL_PROVIDER_OPTIONS: Array<SelectOption> = [
   { label: 'OpenRouter', value: 'openrouter' },
   { label: 'Anthropic', value: 'anthropic' },
   { label: 'OpenAI', value: 'openai' },
+  { label: 'Google (Gemini)', value: 'google' },
 ]
 
 const MODEL_PRESETS = [

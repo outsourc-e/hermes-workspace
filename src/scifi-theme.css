@@ -1,11 +1,13 @@
 /* ════════════════════════════════════════════════════════════════════
-   SciFi Theme — inspired by cyberpunk HUD aesthetic
-   Dark:  deep navy #060b18 background, cyan neon #00f0ff accent
-   Light: cold steel #eef1f5, deep navy text, cyan accent
-   ═══════════════════════════════════════════════════════════════════ */
+  SciFi Theme — inspired by cyberpunk HUD aesthetic
+  Dark:  deep navy #060b18 background, cyan neon #00f0ff accent
+  Light: cold steel #eef1f5, deep navy text, cyan accent
+  ═══════════════════════════════════════════════════════════════════ */
 
 /* ── SciFi Dark ─────────────────────────────────────────────────────── */
 [data-theme='scifi'] {
+  color-scheme: dark !important;
+
   --theme-bg: #060b18;
   --theme-sidebar: #0a1628;
   --theme-panel: #0d1b2a;
@@ -53,6 +55,8 @@
 
 /* ── SciFi Light ────────────────────────────────────────────────────── */
 [data-theme='scifi-light'] {
+  color-scheme: light !important;
+
   --theme-bg: #eef1f5;
   --theme-sidebar: #e4e9ef;
   --theme-panel: #e8ecf2;
@@ -118,28 +122,27 @@
 
 /* ── SciFi Tailwind primary token remaps — dark ─────────────────────── */
 [data-theme='scifi'] {
-  --color-primary-50: var(--theme-panel);
-  --color-primary-100: var(--theme-card);
-  --color-primary-200: var(--theme-border);
-  --color-primary-300: var(--theme-border-subtle);
-  --color-primary-400: var(--theme-muted);
-  --color-primary-500: var(--theme-muted);
-  --color-primary-600: var(--theme-muted);
-  --color-primary-700: var(--theme-text);
-  --color-primary-800: var(--theme-text);
-  --color-primary-900: var(--theme-text);
-  --color-primary-950: var(--theme-text);
-  --color-surface: var(--theme-bg);
-  --color-surface-deep: var(--theme-bg);
-  --color-ink: var(--theme-text);
-  --color-accent-400: var(--theme-accent-secondary);
-  --color-accent-500: var(--theme-accent);
-  --color-accent-600: var(--theme-accent);
+  --color-primary-50: var(--theme-panel) !important;
+  --color-primary-100: var(--theme-card) !important;
+  --color-primary-200: var(--theme-border-subtle) !important;
+  --color-primary-300: var(--theme-border) !important;
+  --color-primary-400: var(--theme-muted) !important;
+  --color-primary-500: var(--theme-muted) !important;
+  --color-primary-600: var(--theme-muted) !important;
+  --color-primary-700: var(--theme-text) !important;
+  --color-primary-800: var(--theme-text) !important;
+  --color-primary-900: var(--theme-text) !important;
+  --color-primary-950: var(--theme-text) !important;
+  --color-surface: var(--theme-bg) !important;
+  --color-surface-deep: var(--theme-bg) !important;
+  --color-ink: var(--theme-text) !important;
+  --color-accent-400: var(--theme-accent-secondary) !important;
+  --color-accent-500: var(--theme-accent) !important;
+  --color-accent-600: var(--theme-accent) !important;
 }
 
 /* ── SciFi Tailwind primary token remaps — light ────────────────────── */
 [data-theme='scifi-light'] {
-  color-scheme: light !important;
   --color-primary-50: var(--theme-card) !important;
   --color-primary-100: var(--theme-card2) !important;
   --color-primary-200: var(--theme-border) !important;
@@ -157,6 +160,7 @@
   --color-accent-400: var(--theme-accent-secondary) !important;
   --color-accent-500: var(--theme-accent) !important;
   --color-accent-600: var(--theme-accent) !important;
+  --color-white: var(--theme-card) !important;
 }
 
 /* ── SciFi dark: cyan glow on focus rings ───────────────────────────── */
@@ -174,4 +178,218 @@
 [data-theme='scifi'] a:hover,
 [data-theme='scifi'] button:hover {
   text-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}
+
+/* ── SciFi dark: amber → teal remap ────────────────────────────────── */
+/* Amber is used for warning/alert tones (usage meter, badges, etc.).
+   In SciFi dark, pale yellow breaks the cyberpunk aesthetic and creates
+   unreadable combos (light text on pale bg). Remap all amber tokens to
+   cyan/teal variants that fit the theme.
+   bg-amber-100 used for selected menu items must be visible on dark bg
+   with good contrast for text-amber-800 labels. */
+[data-theme='scifi'] {
+  --color-amber-50: #071e2b !important;
+  --color-amber-100: #0f3547 !important;
+  --color-amber-200: #164d66 !important;
+  --color-amber-300: #1e6e8a !important;
+  --color-amber-400: #2690b3 !important;
+  --color-amber-500: #00bcd4 !important;
+  --color-amber-600: #00d4e8 !important;
+  --color-amber-700: #33e0f2 !important;
+  --color-amber-800: #ccf7ff !important;
+  --color-amber-900: #e0fbff !important;
+  --color-amber-950: #ebfcff !important;
+}
+
+/* ── SciFi dark: red → crimson remap ──────────────────────────────── */
+/* Red tones for danger/error states. Keep them red but darker to fit
+   the dark HUD aesthetic. bg-red-100 must be visible on --theme-panel. */
+[data-theme='scifi'] {
+  --color-red-50: #1a0a0a !important;
+  --color-red-100: #3d1111 !important;
+  --color-red-200: #5c1a1a !important;
+  --color-red-300: #8a2525 !important;
+  --color-red-400: #b83030 !important;
+  --color-red-500: #ef4444 !important;
+  --color-red-600: #f87171 !important;
+  --color-red-700: #fca5a5 !important;
+  --color-red-800: #fee2e2 !important;
+  --color-red-900: #fef2f2 !important;
+  --color-red-950: #fff5f5 !important;
+}
+
+/* ── SciFi dark: emerald → neon-green remap ─────────────────────── */
+/* Emerald/green for success states. Fit the cyberpunk palette. */
+[data-theme='scifi'] {
+  --color-emerald-50: #0a1a14 !important;
+  --color-emerald-100: #0f3326 !important;
+  --color-emerald-200: #15523a !important;
+  --color-emerald-300: #1c7a52 !important;
+  --color-emerald-400: #23a86b !important;
+  --color-emerald-500: #64ffda !important;
+  --color-emerald-600: #7cffd8 !important;
+  --color-emerald-700: #a3ffe0 !important;
+  --color-emerald-800: #ccfff0 !important;
+  --color-emerald-900: #e0fff6 !important;
+  --color-emerald-950: #ebfff8 !important;
+}
+
+/* ── SciFi dark: yellow → amber-warm remap ─────────────────────────── */
+/* Yellow is used for mid-range progress bars and warning indicators.
+   Remap to warm amber/orange tones to differentiate from amber (teal)
+   while staying within the cyberpunk palette. */
+[data-theme='scifi'] {
+  --color-yellow-50: #1a150a !important;
+  --color-yellow-100: #2e2510 !important;
+  --color-yellow-200: #4a3a18 !important;
+  --color-yellow-300: #6b5520 !important;
+  --color-yellow-400: #8a7028 !important;
+  --color-yellow-500: #d4930a !important;
+  --color-yellow-600: #e5a020 !important;
+  --color-yellow-700: #f0b840 !important;
+  --color-yellow-800: #fad480 !important;
+  --color-yellow-900: #fde8b0 !important;
+  --color-yellow-950: #fef3d8 !important;
+}
+
+/* ── SciFi dark: neutral → dark slate remap ──────────────────────── */
+/* Neutral is used for secondary badges and subtle UI elements.
+   Remap to dark navy/slate tones that blend with the HUD.
+   !important required because Tailwind v4 defines these as oklch in @layer theme. */
+[data-theme='scifi'] {
+  --color-neutral-50: #e8f4f8 !important;
+  --color-neutral-100: #d0e8ef !important;
+  --color-neutral-200: #a8cdd9 !important;
+  --color-neutral-300: #7ab4cc !important;
+  --color-neutral-400: #4d94b3 !important;
+  --color-neutral-500: #2a6d8a !important;
+  --color-neutral-600: #1e5a73 !important;
+  --color-neutral-700: #16475c !important;
+  --color-neutral-800: #0f3547 !important;
+  --color-neutral-900: #0a2035 !important;
+  --color-neutral-950: #060e18 !important;
+  /* ── white → dark background in SciFi dark ── */
+  /* Components like chat-controls popover use bg-white / dark:bg-neutral-900.
+     In SciFi dark, white must become the panel background color. */
+  --color-white: #0d1b2a !important;
+}
+
+/* ── SciFi dark: selected menu items — force bg/text on inline-styled MenuItem ─ */
+/* MenuItem sets color: var(--theme-text) and background via onMouseEnter/Leave
+   inline styles, which override Tailwind classes like bg-amber-100 text-amber-800.
+   In SciFi dark, selected items need a visible teal background with bright text. */
+[data-theme='scifi'] .bg-amber-100 {
+  background-color: var(--color-amber-100) !important;
+  color: var(--color-amber-800) !important;
+}
+[data-theme='scifi'] .bg-amber-100 .text-amber-800 {
+  color: var(--color-amber-800) !important;
+}
+[data-theme='scifi'] .bg-amber-100 .text-amber-600 {
+  color: var(--color-amber-600) !important;
+}
+[data-theme='scifi'] .bg-amber-100 .text-primary-600 {
+  color: var(--color-amber-600) !important;
+}
+[data-theme='scifi'] .bg-amber-100 .text-primary-300 {
+  color: var(--color-amber-700) !important;
+}
+
+/* ── SciFi dark: active tab indicator in Usage Details dialog ──── */
+/* Tabs "Session / Providers" use bg-primary-100 for the active tab
+   inside a bg-primary-50 container. In SciFi dark, primary-50 (#0d1b2a)
+   and primary-100 (#112240) are too similar — the active tab is invisible.
+   Target .bg-primary-50 > button to scope to tab containers only. */
+[data-theme='scifi'] .bg-primary-50 > button.bg-primary-100 {
+  background-color: rgba(0, 240, 255, 0.15) !important;
+  color: var(--theme-accent) !important;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.2) !important;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.3) !important;
+}
+
+/* ── SciFi light: amber → teal remap ──────────────────────────────── */
+/* Same rationale: replace yellow/amber with teal to match the cold
+   steel + cyan accent palette of scifi-light. */
+[data-theme='scifi-light'] {
+  --color-amber-50: #e8f4f6 !important;
+  --color-amber-100: #d0e8ec !important;
+  --color-amber-200: #b0d8e0 !important;
+  --color-amber-300: #80c4d0 !important;
+  --color-amber-400: #4da8b8 !important;
+  --color-amber-500: #0097a7 !important;
+  --color-amber-600: #00838f !important;
+  --color-amber-700: #006974 !important;
+  --color-amber-800: #004d57 !important;
+  --color-amber-900: #003a42 !important;
+  --color-amber-950: #002930 !important;
+  --color-yellow-50: #f5f0e0 !important;
+  --color-yellow-100: #ebe0c0 !important;
+  --color-yellow-200: #d8c890 !important;
+  --color-yellow-300: #c4a860 !important;
+  --color-yellow-400: #a88a30 !important;
+  --color-yellow-500: #8a7020 !important;
+  --color-yellow-600: #6b5518 !important;
+  --color-yellow-700: #4a3a10 !important;
+  --color-yellow-800: #2e2510 !important;
+  --color-yellow-900: #1a150a !important;
+  --color-yellow-950: #100d08 !important;
+  --color-red-50: #fde8e8 !important;
+  --color-red-100: #fbd0d0 !important;
+  --color-red-200: #f5a8a8 !important;
+  --color-red-300: #ef8080 !important;
+  --color-red-400: #e05050 !important;
+  --color-red-500: #c62828 !important;
+  --color-red-600: #b71c1c !important;
+  --color-red-700: #8e1515 !important;
+  --color-red-800: #6b1010 !important;
+  --color-red-900: #4a0a0a !important;
+  --color-red-950: #300606 !important;
+  --color-emerald-50: #e8f5ee !important;
+  --color-emerald-100: #d0ebda !important;
+  --color-emerald-200: #b0d8be !important;
+  --color-emerald-300: #80c498 !important;
+  --color-emerald-400: #4da870 !important;
+  --color-emerald-500: #2e7d52 !important;
+  --color-emerald-600: #256b45 !important;
+  --color-emerald-700: #1a5a37 !important;
+  --color-emerald-800: #0f4428 !important;
+  --color-emerald-900: #0a3018 !important;
+  --color-emerald-950: #061f10 !important;
+  --color-neutral-50: #f4f6f9 !important;
+  --color-neutral-100: #e4e9ef !important;
+  --color-neutral-200: #c4cdd8 !important;
+  --color-neutral-300: #a0b0c0 !important;
+  --color-neutral-400: #7088a0 !important;
+  --color-neutral-500: #5a6a7e !important;
+  --color-neutral-600: #4a5a6e !important;
+  --color-neutral-700: #3a4a5e !important;
+  --color-neutral-800: #2a3a4e !important;
+  --color-neutral-900: #1a2a3e !important;
+  --color-neutral-950: #0a1628 !important;
+}
+
+/* ── SciFi light: selected menu items — force bg/text on inline-styled MenuItem ─ */
+[data-theme='scifi-light'] .bg-amber-100 {
+  background-color: var(--color-amber-100) !important;
+  color: var(--color-amber-800) !important;
+}
+[data-theme='scifi-light'] .bg-amber-100 .text-amber-800 {
+  color: var(--color-amber-800) !important;
+}
+[data-theme='scifi-light'] .bg-amber-100 .text-amber-600 {
+  color: var(--color-amber-600) !important;
+}
+[data-theme='scifi-light'] .bg-amber-100 .text-primary-600 {
+  color: var(--color-amber-600) !important;
+}
+[data-theme='scifi-light'] .bg-amber-100 .text-primary-300 {
+  color: var(--color-amber-700) !important;
+}
+
+/* ── SciFi light: active tab indicator ──────────────────────────── */
+[data-theme='scifi-light'] .bg-primary-50 > button.bg-primary-100 {
+  background-color: rgba(0, 151, 167, 0.15) !important;
+  color: var(--theme-accent) !important;
+  box-shadow: 0 0 6px rgba(0, 151, 167, 0.2) !important;
+  text-shadow: none !important;
 }

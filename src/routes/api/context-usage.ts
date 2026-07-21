@@ -12,7 +12,11 @@ export const Route = createFileRoute('/api/context-usage')({
         }
 
         const url = new URL(request.url)
-        const sessionId = url.searchParams.get('sessionId')?.trim() || ''
+        const sessionId =
+          url.searchParams.get('sessionId')?.trim() ||
+          url.searchParams.get('sessionKey')?.trim() ||
+          ''
+
         const snapshot = await readContextUsage(sessionId)
         return json(snapshot)
       },

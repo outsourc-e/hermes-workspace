@@ -10,6 +10,8 @@ export type ProfileSummary = {
   exists: boolean
   model?: string
   provider?: string
+  description?: string
+  systemPrompt?: string
   skillCount: number
   sessionCount: number
   hasEnv: boolean
@@ -21,6 +23,8 @@ export type ProfileDetail = {
   path: string
   active: boolean
   config: Record<string, unknown>
+  description: string
+  systemPrompt: string
   envPath?: string
   hasEnv: boolean
   sessionsDir?: string
@@ -64,6 +68,10 @@ function getActiveProfilePath(): string {
   return path.join(getClaudeRoot(), 'active_profile')
 }
 
+function stickyActiveProfileEnabled(): boolean {
+  return process.env.HERMES_WORKSPACE_STICKY_PROFILE !== '0'
+}
+
 /**
  * Validate a profile name that will be *written* to disk. The 'default'
  * profile is reserved — callers must not create or mutate it via the UI.
@@ -76,7 +84,7 @@ function validateProfileName(name: string): string {
 }
 
 /**
- * Validate a profile name that will only be *read* (e.g. \`cloneFrom\` source).
+ * Validate a profile name that will only be *read* (e.g. `cloneFrom` source).
  * Any existing profile name is allowed, including 'default'.
  */
 function validateProfileIdentifier(name: string): string {
@@ -149,6 +157,210 @@ function latestMtime(paths: Array<string>): string | undefined {
   return latest > 0 ? new Date(latest).toISOString() : undefined
 }
 
+function extractDescription(config: Record<string, unknown>): string {
+  const direct = config.description
+  if (typeof direct === 'string') return direct.trim()
+
+  const metadata = config.metadata
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+    const nested = (metadata as Record<string, unknown>).description
+    if (typeof nested === 'string') return nested.trim()
+  }
+
+  return ''
+}
+
+function extractSystemPrompt(
+  config: Record<string, unknown>,
+  profilePath: string,
+): string {
+  const configured = config.system_prompt
+  if (typeof configured === 'string' && configured.trim()) {
+    return configured.trim()
+  }
+
+  const soulPath = path.join(profilePath, 'SOUL.md')
+  if (!fs.existsSync(soulPath)) return ''
+
+  try {
+    return safeReadText(soulPath).trim()
+  } catch {
+    return ''
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard API fallback for split-host deployments
+// ---------------------------------------------------------------------------
+
+function getDashboardUrl(): string | undefined {
+  const url = process.env.HERMES_DASHBOARD_URL?.trim()
+  return url || undefined
+}
+
+function getDashboardToken(): string | undefined {
+  return (
+    process.env.HERMES_API_TOKEN?.trim() ||
+    process.env.CLAUDE_API_TOKEN?.trim() ||
+    process.env.CLAUDE_DASHBOARD_TOKEN?.trim() ||
+    undefined
+  )
+}
+
+async function fetchDashboardProfiles(): Promise<{
+  profiles: Array<ProfileSummary>
+  activeProfile: string
+} | null> {
+  const dashboardUrl = getDashboardUrl()
+  if (!dashboardUrl) return null
+
+  try {
+    const token = getDashboardToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(`${dashboardUrl}/api/profiles`, {
+      headers,
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!response.ok) return null
+
+    const data = (await response.json()) as {
+      profiles?: Array<{
+        name: string
+        model?: string
+        provider?: string
+        description?: string
+        is_default?: boolean
+        skill_count?: number
+        session_count?: number
+        has_env?: boolean
+        updated_at?: string
+      }>
+    }
+
+    if (!data.profiles || !Array.isArray(data.profiles)) return null
+
+    const activeProfile =
+      data.profiles.find((p) => p.is_default)?.name || 'default'
+
+    const profiles: Array<ProfileSummary> = data.profiles.map((p) => ({
+      name: p.name,
+      path: p.is_default
+        ? getClaudeRoot()
+        : path.join(getProfilesRoot(), p.name),
+      active: p.name === activeProfile,
+      exists: true,
+      model: p.model,
+      provider: p.provider,
+      description: p.description,
+      skillCount: p.skill_count ?? 0,
+      sessionCount: p.session_count ?? 0,
+      hasEnv: p.has_env ?? false,
+      updatedAt: p.updated_at,
+    }))
+
+    profiles.sort((a, b) => {
+      if (a.active && !b.active) return -1
+      if (!a.active && b.active) return 1
+      return Date.parse(b.updatedAt || '') - Date.parse(a.updatedAt || '')
+    })
+
+    return { profiles, activeProfile }
+  } catch (error) {
+    // Dashboard unreachable or returned unexpected data — fall back to filesystem
+    return null
+  }
+}
+
+/**
+ * List profiles with dashboard API fallback for split-host deployments.
+ * When HERMES_DASHBOARD_URL is set and reachable, fetches from the dashboard
+ * API. Falls back to filesystem reads for colocated deployments.
+ */
+export async function listProfilesWithFallback(): Promise<{
+  profiles: Array<ProfileSummary>
+  activeProfile: string
+}> {
+  // Try dashboard first for split-host deployments
+  const dashboardResult = await fetchDashboardProfiles()
+  if (dashboardResult) return dashboardResult
+
+  // Fall back to filesystem (colocated deployment)
+  return {
+    profiles: listProfiles(),
+    activeProfile: getActiveProfileName(),
+  }
+}
+
+/**
+ * Read a single profile with dashboard API fallback for split-host deployments.
+ */
+export async function readProfileWithFallback(
+  name: string,
+): Promise<ProfileDetail> {
+  // Try filesystem first (fast path for colocated deployments)
+  const normalized = name.trim() || 'default'
+  const profilePath =
+    normalized === 'default'
+      ? getClaudeRoot()
+      : path.join(getProfilesRoot(), validateProfileIdentifier(normalized))
+
+  if (fs.existsSync(profilePath)) {
+    return readProfile(normalized)
+  }
+
+  // Filesystem miss — try dashboard API for split-host deployments
+  const dashboardUrl = getDashboardUrl()
+  if (dashboardUrl) {
+    try {
+      const token = getDashboardToken()
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const response = await fetch(`${dashboardUrl}/api/profiles`, {
+        headers,
+        signal: AbortSignal.timeout(5000),
+      })
+      if (response.ok) {
+        const data = (await response.json()) as {
+          profiles?: Array<{
+            name: string
+            model?: string
+            provider?: string
+            description?: string
+            is_default?: boolean
+          }>
+        }
+        const match = data.profiles?.find(
+          (p) => p.name === normalized || (normalized === 'default' && p.is_default),
+        )
+        if (match) {
+          const active = getActiveProfileName()
+          return {
+            name: match.name,
+            path: match.is_default
+              ? getClaudeRoot()
+              : path.join(getProfilesRoot(), match.name),
+            active: match.name === active,
+            config: {
+              ...(match.model ? { model: match.model } : {}),
+              ...(match.provider ? { provider: match.provider } : {}),
+            },
+            description: match.description || '',
+            systemPrompt: '',
+            hasEnv: false,
+          }
+        }
+      }
+    } catch {
+      // Dashboard unreachable — fall through to error
+    }
+  }
+
+  throw new Error('Profile not found')
+}
+
 export function getActiveProfileName(): string {
   const activePath = getActiveProfilePath()
   if (!fs.existsSync(activePath)) return 'default'
@@ -175,6 +387,7 @@ export function listProfiles(): Array<ProfileSummary> {
 
     for (const entry of entries) {
       const name = entry.name
+      if (name === 'default') continue
       const profilePath = path.join(profilesRoot, name)
       if (!entry.isDirectory()) {
         if (!entry.isSymbolicLink()) continue
@@ -220,6 +433,8 @@ export function listProfiles(): Array<ProfileSummary> {
         exists: true,
         model: modelName,
         provider: providerName,
+        description: extractDescription(config) || undefined,
+        systemPrompt: extractSystemPrompt(config, profilePath) || undefined,
         skillCount,
         sessionCount,
         hasEnv: fs.existsSync(envPath),
@@ -260,6 +475,8 @@ export function listProfiles(): Array<ProfileSummary> {
     exists: true,
     model: defaultModel,
     provider: defaultProvider,
+    description: extractDescription(config) || undefined,
+    systemPrompt: extractSystemPrompt(config, root) || undefined,
     skillCount: countFilesRecursive(
       path.join(root, 'skills'),
       (full) => path.basename(full) === 'SKILL.md',
@@ -291,11 +508,14 @@ export function readProfile(name: string): ProfileDetail {
   const envPath = path.join(profilePath, '.env')
   const sessionsDir = path.join(profilePath, 'sessions')
   const skillsDir = path.join(profilePath, 'skills')
+  const config = readYamlConfig(configPath)
   return {
     name: normalized,
     path: profilePath,
     active: normalized === active,
-    config: readYamlConfig(configPath),
+    config,
+    description: extractDescription(config),
+    systemPrompt: extractSystemPrompt(config, profilePath),
     envPath: fs.existsSync(envPath) ? envPath : undefined,
     hasEnv: fs.existsSync(envPath),
     sessionsDir: fs.existsSync(sessionsDir) ? sessionsDir : undefined,
@@ -308,15 +528,19 @@ export function setActiveProfile(name: string): void {
   if (!trimmed) throw new Error('Profile name is required')
   // "default" means clear the active_profile file (revert to default)
   if (trimmed === 'default') {
-    const activePath = getActiveProfilePath()
-    if (fs.existsSync(activePath)) fs.unlinkSync(activePath)
+    if (stickyActiveProfileEnabled()) {
+      const activePath = getActiveProfilePath()
+      if (fs.existsSync(activePath)) fs.unlinkSync(activePath)
+    }
     return
   }
   const normalized = validateProfileName(trimmed)
   const profilePath = path.join(getProfilesRoot(), normalized)
   if (!fs.existsSync(profilePath)) throw new Error('Profile not found')
-  fs.mkdirSync(getClaudeRoot(), { recursive: true })
-  fs.writeFileSync(getActiveProfilePath(), `${normalized}\n`, 'utf-8')
+  if (stickyActiveProfileEnabled()) {
+    fs.mkdirSync(getClaudeRoot(), { recursive: true })
+    fs.writeFileSync(getActiveProfilePath(), `${normalized}\n`, 'utf-8')
+  }
   console.warn(
     `[profiles] Active profile set to "${normalized}". Restart the Hermes Agent gateway for this profile switch to take effect.`,
   )
@@ -445,7 +669,7 @@ export function renameProfile(oldName: string, newName: string): ProfileDetail {
   if (!fs.existsSync(fromPath)) throw new Error('Profile not found')
   if (fs.existsSync(toPath)) throw new Error('Target profile already exists')
   fs.renameSync(fromPath, toPath)
-  if (getActiveProfileName() === from) {
+  if (stickyActiveProfileEnabled() && getActiveProfileName() === from) {
     fs.writeFileSync(getActiveProfilePath(), `${to}\n`, 'utf-8')
   }
   return readProfile(to)

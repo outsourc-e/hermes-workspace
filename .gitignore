@@ -1,3 +1,8 @@
+# Nix build outputs
+result
+result-*
+.direnv/
+
 # Dependencies
 node_modules
 .pnp
@@ -11,6 +16,7 @@ build
 .vinxi
 .nitro
 .tanstack
+.vite
 
 # Environment variables
 .env
@@ -145,6 +151,7 @@ skills-bundle/
 # Local agent artifacts (audit dumps, temporary playwright scripts)
 .hermes/
 .env.bak-*
+pr-triage-20260505-*/
 
 # Generated reports and asset-production archives
 # Runtime-ready assets belong under public/war-room; raw/proof/zip copies stay in the external asset archive.

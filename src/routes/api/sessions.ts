@@ -13,8 +13,13 @@ import {
   toSessionSummary,
   updateSession,
 } from '../../server/claude-api'
-import { deleteLocalSession, getLocalSession, listLocalSessions } from '../../server/local-session-store'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
+import {
+  deleteLocalSession,
+  getLocalSession,
+  listLocalSessions,
+  updateLocalSessionTitle,
+} from '../../server/local-session-store'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -25,45 +30,48 @@ export const Route = createFileRoute('/api/sessions')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         const capabilities = await ensureGatewayProbed()
-        const localSessions = listLocalSessions()
-        const localGatewayShape = localSessions.map((ls) => ({
-          key: ls.id,
-          id: ls.id,
-          title: ls.title || 'Local Chat',
-          startedAt: ls.createdAt,
-          updatedAt: ls.updatedAt,
-          message_count: ls.messageCount,
-          model: ls.model,
-          source: 'local',
-        }))
-
         if (!capabilities.sessions) {
           return json({
             ok: true,
-            sessions: localGatewayShape,
-            source: localGatewayShape.length ? 'local-only' : 'unavailable',
-            message: localGatewayShape.length ? undefined : SESSIONS_API_UNAVAILABLE_MESSAGE,
+            sessions: [],
+            source: 'unavailable',
+            message: SESSIONS_API_UNAVAILABLE_MESSAGE,
           })
         }
 
         try {
           const sessions = await listSessions(50, 0)
-          const gatewaySessions = Array.isArray(sessions) ? sessions.map(toSessionSummary) : []
+          const gatewaySessions = sessions.map(toSessionSummary)
 
           // Merge local portable sessions (Ollama, Atomic Chat, etc.)
+          const localSessions = listLocalSessions()
           const gatewayIds = new Set(gatewaySessions.map((s: any) => s.key || s.id))
-          for (const ls of localGatewayShape) {
-            if (!gatewayIds.has(ls.id)) gatewaySessions.push(ls as any)
+          for (const ls of localSessions) {
+            if (!gatewayIds.has(ls.id)) {
+              gatewaySessions.push({
+                key: ls.id,
+                id: ls.id,
+                friendlyId: ls.id,
+                title: ls.title || 'Local Chat',
+                label: ls.title || 'Local Chat',
+                derivedTitle: ls.title || 'Local Chat',
+                startedAt: ls.createdAt,
+                updatedAt: ls.updatedAt,
+                message_count: ls.messageCount,
+                model: ls.model,
+                source: 'local',
+              } as any)
+            }
           }
 
-          return json({ ok: true, sessions: gatewaySessions, source: 'gateway' })
+          return json({ sessions: gatewaySessions })
         } catch (err) {
-          return json({
-            ok: true,
-            sessions: localGatewayShape,
-            source: 'local-with-gateway-error',
-            warning: err instanceof Error ? err.message : String(err),
-          })
+          return json(
+            {
+              error: err instanceof Error ? err.message : String(err),
+            },
+            { status: 500 },
+          )
         }
       },
       POST: async ({ request }) => {
@@ -191,6 +199,30 @@ export const Route = createFileRoute('/api/sessions')({
               { ok: false, error: 'sessionKey required' },
               { status: 400 },
             )
+          }
+
+          const localSession = getLocalSession(sessionKey)
+          if (localSession) {
+            if (label) updateLocalSessionTitle(sessionKey, label)
+            return json({
+              ok: true,
+              sessionKey,
+              friendlyId: rawFriendlyId || sessionKey,
+              entry: {
+                key: sessionKey,
+                id: sessionKey,
+                title: label || sessionKey,
+                label: label || sessionKey,
+                derivedTitle: label || sessionKey,
+                startedAt: localSession.createdAt,
+                updatedAt: Date.now(),
+                message_count: localSession.messageCount,
+                model: localSession.model,
+                source: 'local',
+              },
+              updated: true,
+              source: 'local',
+            })
           }
 
           if (capabilities.dashboard.available && !capabilities.enhancedChat) {

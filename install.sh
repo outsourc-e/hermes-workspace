@@ -51,6 +51,20 @@ ensure_path() {
   esac
 }
 
+pnpm_cmd() {
+  if command -v pnpm &>/dev/null; then
+    pnpm "$@"
+    return
+  fi
+  if command -v corepack &>/dev/null && corepack pnpm --version &>/dev/null; then
+    corepack pnpm "$@"
+    return
+  fi
+  red "pnpm is not available in this shell."
+  red "Try opening a new shell, or install pnpm manually: https://pnpm.io/installation"
+  exit 1
+}
+
 ensure_env_key() {
   local file="$1"
   local key="$2"
@@ -104,9 +118,15 @@ green "  curl ✓"
 
 if ! command -v pnpm &>/dev/null; then
   yellow "  pnpm not found — installing via corepack…"
-  corepack enable 2>/dev/null || npm install -g pnpm
+  if command -v corepack &>/dev/null; then
+    corepack enable 2>/dev/null || true
+    corepack prepare pnpm@latest --activate 2>/dev/null || true
+  fi
+  if ! command -v pnpm &>/dev/null && ! (command -v corepack &>/dev/null && corepack pnpm --version &>/dev/null); then
+    npm install -g pnpm
+  fi
 fi
-green "  pnpm $(pnpm --version) ✓"
+green "  pnpm $(pnpm_cmd --version) ✓"
 
 # ─── install hermes-agent (delegate to Nous upstream installer) ──────────
 # hermes-agent is NOT on PyPI. It installs from source via Nous's own
@@ -193,7 +213,7 @@ if [[ -f "$HERMES_ENV_PATH" ]]; then
 fi
 
 cyan "→ Installing npm deps (pnpm install)…"
-pnpm install --silent
+pnpm_cmd install --silent
 green "  deps installed ✓"
 
 # ─── seed Hermes skills (Conductor needs workspace-dispatch) ─────────────
@@ -211,6 +231,47 @@ if [[ -d "$INSTALL_DIR/skills" ]]; then
     ln -sf "$skill_path" "$target" 2>/dev/null && \
       green "  linked $skill_name ✓" || true
   done
+fi
+
+# ─── macOS LaunchAgent (plist) ───────────────────────────────────────────
+# Best-effort convenience for local macOS installs. This keeps the source of
+# truth in-repo and makes sure launchd runs server-entry.js (the thin HTTP
+# wrapper), not dist/server/server.js directly.
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  cyan "→ Installing macOS LaunchAgent (com.hermes.workspace)…"
+
+  PLIST_TEMPLATE="$INSTALL_DIR/macos/com.hermes.workspace.plist.template"
+  PLIST_DEST="$HOME/Library/LaunchAgents/com.hermes.workspace.plist"
+  mkdir -p "$HOME/Library/LaunchAgents"
+
+  NODE_BIN="$(command -v node)"
+  HERMES_PORT="${PORT:-3000}"
+  HERMES_API_GATEWAY="http://127.0.0.1:${GATEWAY_PORT}"
+  TOKEN=""
+
+  if [[ -f "$HOME/.hermes/.env" ]]; then
+    TOKEN="$(grep -E '^(HERMES_API_TOKEN|CLAUDE_API_TOKEN)=' "$HOME/.hermes/.env" | head -1 | cut -d= -f2- | tr -d '"' || true)"
+  fi
+  if [[ -z "$TOKEN" && -f "$INSTALL_DIR/.env" ]]; then
+    TOKEN="$(grep -E '^(HERMES_API_TOKEN|CLAUDE_API_TOKEN)=' "$INSTALL_DIR/.env" | head -1 | cut -d= -f2- | tr -d '"' || true)"
+  fi
+
+  sed \
+    -e "s|{{NODE_BIN}}|${NODE_BIN}|g" \
+    -e "s|{{INSTALL_DIR}}|${INSTALL_DIR}|g" \
+    -e "s|{{PORT}}|${HERMES_PORT}|g" \
+    -e "s|{{HERMES_API_URL}}|${HERMES_API_GATEWAY}|g" \
+    -e "s|{{HERMES_API_TOKEN}}|${TOKEN}|g" \
+    "$PLIST_TEMPLATE" > "$PLIST_DEST"
+
+  launchctl unload "$PLIST_DEST" 2>/dev/null || true
+  if launchctl load -w "$PLIST_DEST" 2>/dev/null; then
+    green "  LaunchAgent loaded ✓ (com.hermes.workspace)"
+  else
+    yellow "  Could not load LaunchAgent now — it will still be available for next login."
+  fi
+  green "  Plist installed: $PLIST_DEST ✓"
 fi
 
 # ─── done ─────────────────────────────────────────────────────────────────

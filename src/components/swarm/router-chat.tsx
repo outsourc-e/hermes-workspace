@@ -150,33 +150,21 @@ export function RouterChat({
     )
   }
 
-  const approvedWorkerIds = new Set(['chatgptheavy', 'workerkimi', 'swarm1', 'swarm6', 'swarm11', 'swarm12'])
-
-  const eligibleWorkers = members
-    .filter((m) => {
-      const id = m.id.toLowerCase()
-      const text = [m.role, m.model, m.specialty, m.mission, m.lastSessionTitle].filter(Boolean).join(' ').toLowerCase()
-      if (!m.id.trim()) return false
-      if (!approvedWorkerIds.has(id)) return false
-      if (id === 'workspace' || id.includes('dashboard')) return false
-      if (/claude|anthropic/.test(`${id} ${text}`)) return false
-      return true
-    })
-    .map((m) => ({
-      id: m.id,
-      role: m.role,
-      model: m.model,
-      specialty: m.specialty,
-      mission: m.mission || m.lastSessionTitle || undefined,
-      skills: m.skills ?? [],
-      capabilities: m.capabilities ?? [],
-      notes: [
-        m.specialty,
-        m.mission || m.lastSessionTitle,
-        m.skills?.length ? `skills=${m.skills.join(',')}` : '',
-        `${m.sessionCount} sess · ${m.totalTokens} tok`,
-      ].filter(Boolean).join(' · '),
-    }))
+  const eligibleWorkers = members.map((m) => ({
+    id: m.id,
+    role: m.role,
+    model: m.model,
+    specialty: m.specialty,
+    mission: m.mission || m.lastSessionTitle || undefined,
+    skills: m.skills ?? [],
+    capabilities: m.capabilities ?? [],
+    notes: [
+      m.specialty,
+      m.mission || m.lastSessionTitle,
+      m.skills?.length ? `skills=${m.skills.join(',')}` : '',
+      `${m.sessionCount} sess · ${m.totalTokens} tok`,
+    ].filter(Boolean).join(' · '),
+  }))
 
   async function autoDecompose(): Promise<Array<Assignment> | null> {
     if (!prompt.trim()) return null
@@ -190,6 +178,7 @@ export function RouterChat({
           prompt: prompt.trim(),
           workers: eligibleWorkers,
         }),
+        signal: AbortSignal.timeout(120_000),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -220,7 +209,7 @@ export function RouterChat({
       if (assignments.length === 0) {
         const nextAssignments = await autoDecompose()
         if (!nextAssignments || nextAssignments.length === 0) return
-        return
+        plan = nextAssignments
       } else {
         plan = assignments
       }
@@ -252,11 +241,10 @@ export function RouterChat({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           assignments: plan,
-          timeoutSeconds: 120,
+          timeoutSeconds: 300,
           waitForCheckpoint: false,
-          allowAsync: false,
-          checkpointPollSeconds: 5,
         }),
+        signal: AbortSignal.timeout(60_000),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -422,17 +410,13 @@ export function RouterChat({
                   />
                   {dispatching || decomposing
                     ? mode === 'auto'
-                      ? assignments.length === 0
-                        ? 'Planning…'
-                        : 'Dispatching…'
+                      ? 'Routing…'
                       : 'Sending…'
                     : mode === 'manual'
                       ? `Send to ${selectedId ?? '—'}`
                       : mode === 'broadcast'
                         ? `Broadcast to ${roomIds.length || members.length}`
-                        : assignments.length === 0
-                          ? 'Route plan only'
-                          : `Dispatch ${assignments.length} planned task${assignments.length === 1 ? '' : 's'}`}
+                        : 'Route mission'}
                 </button>
               </div>
             </div>
@@ -456,7 +440,7 @@ export function RouterChat({
             {assignments.length === 0 ? (
               <div className="text-[12px] text-[var(--theme-muted-2)]">
                 {mode === 'auto'
-                  ? 'Click “Route plan only” to preview proposed workers first. Nothing is dispatched until you click the Dispatch button after the plan appears.'
+                  ? 'Hit Auto decompose to see proposed routing here.'
                   : mode === 'manual'
                     ? 'Single target dispatch.'
                     : 'Broadcast — no per-target plan needed.'}

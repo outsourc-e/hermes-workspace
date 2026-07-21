@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hermes-world",
+  "compatibility_date": "2026-05-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "HERMES_PUBLIC_DEPLOY": "1",
+    "VITE_PLAYGROUND_STATS_URL": "https://hermes-playground-ws.myaurora-agi.workers.dev/stats"
+  }
+}

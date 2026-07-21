@@ -10,6 +10,7 @@ const SOURCE_GLYPH: Record<DashboardIncident['source'], string> = {
   log: '📜',
   config: '⚙️',
   gateway: '🛰️',
+  kanban: '📋',
 }
 
 const SEVERITY_COLOR: Record<DashboardIncident['severity'], string> = {
@@ -76,7 +77,7 @@ export function AttentionMarquee({
 
       <div
         className="flex min-w-0 flex-1 overflow-hidden whitespace-nowrap"
-        style={{ maskImage: 'linear-gradient(90deg, black 92%, transparent)' }}
+        style={{ maskImage: 'linear-gradient(90deg, black 96%, transparent)' }}
       >
         <div
           className="oc-marquee-track flex shrink-0 items-center gap-6 pl-3 will-change-transform"

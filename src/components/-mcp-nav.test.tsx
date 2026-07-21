@@ -60,7 +60,7 @@ describe('MCP navigation registration', () => {
 
   it('mounts the centralized mobile navigation models in WorkspaceShell', () => {
     const source = sourceOf('src/components/workspace-shell.tsx')
-    expect(source).toContain('MOBILE_NAV_TABS')
-    expect(source).toContain('<MobileHamburgerMenu')
+    expect(source).toContain('<MobileTabBar />')
+    expect(source).toContain('<MobileHamburgerMenu />')
   })
 })

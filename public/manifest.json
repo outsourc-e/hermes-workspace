@@ -1,12 +1,16 @@
 {
   "name": "Hermes Workspace",
   "short_name": "Hermes",
-  "description": "Native web control surface for Hermes Agent",
-  "start_url": "/",
+  "description": "Installable control surface for Hermes Agent chat, tools, files, memory, jobs, and agent workflows.",
+  "id": "/?app=hermes-workspace",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "orientation": "any",
   "background_color": "#0A0E1A",
-  "theme_color": "#6366F1",
-  "categories": ["productivity", "utilities"],
+  "theme_color": "#031A1A",
+  "categories": ["productivity", "utilities", "developer"],
   "icons": [
     {
       "src": "/claude-icon-192.png",

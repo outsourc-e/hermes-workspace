@@ -30,6 +30,70 @@ type SecurityRisk = {
   score: number
 }
 
+type ProfileSummary = {
+  name: string
+  path?: string
+  active?: boolean
+  is_active?: boolean
+  is_default?: boolean
+}
+
+type ProfileListResponse = {
+  profiles: Array<ProfileSummary>
+  activeProfile?: string
+  error?: string
+}
+
+type ProfileSkillRaw = {
+  name: string
+  description?: string
+  category?: string | null
+  path?: string
+  enabled?: boolean
+}
+
+type ProfileSkillsResponse = {
+  profile: string
+  items: Array<ProfileSkillRaw>
+  error?: string
+}
+
+function titleCaseCategory(raw: string | null | undefined): string {
+  const value = (raw || '').trim()
+  if (!value) return 'Productivity'
+  return value
+    .split(/[-_/]/)
+    .map((word) =>
+      word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : '',
+    )
+    .filter(Boolean)
+    .join(' ')
+}
+
+function normalizeProfileSkill(raw: ProfileSkillRaw): SkillSummary {
+  const name = (raw.name || '').trim()
+  return {
+    id: name,
+    slug: name,
+    name,
+    description: raw.description || '',
+    author: '',
+    triggers: [],
+    tags: [],
+    homepage: null,
+    category: titleCaseCategory(raw.category),
+    icon: '✨',
+    content: '',
+    fileCount: 0,
+    sourcePath: raw.path || '',
+    installed: true,
+    enabled: raw.enabled !== false,
+    featuredGroup: undefined,
+    security: { level: 'safe', flags: [], score: 0 },
+    origin: 'marketplace',
+  }
+}
+
 type SkillSummary = {
   id: string
   slug: string
@@ -140,6 +204,43 @@ export function SkillsScreen() {
   const [actionSkillId, setActionSkillId] = useState<string | null>(null)
   const [selectedSkill, setSelectedSkill] = useState<SkillSummary | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [selectedProfile, setSelectedProfile] = useState<string>('')
+
+  const profilesQuery = useQuery({
+    queryKey: ['skills-profiles-list'],
+    queryFn: async function fetchProfiles(): Promise<ProfileListResponse> {
+      const response = await fetch('/api/profiles/list')
+      const payload = (await response.json()) as ProfileListResponse
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to load profiles')
+      }
+      return payload
+    },
+    staleTime: 60_000,
+  })
+
+  const profiles = profilesQuery.data?.profiles ?? []
+  // Treat the profile that the workspace is bound to (active_profile file) as
+  // the dashboard's `is_active`. They derive from the same on-disk source.
+  const activeProfileName = useMemo(() => {
+    const fromActiveFlag = profiles.find((p) => p.active || p.is_active)
+    if (fromActiveFlag) return fromActiveFlag.name
+    const explicit = profilesQuery.data?.activeProfile
+    if (explicit) return explicit
+    const defaultProfile = profiles.find((p) => p.is_default)
+    return defaultProfile?.name ?? profiles[0]?.name ?? ''
+  }, [profiles, profilesQuery.data?.activeProfile])
+
+  // Pick a sensible default once profiles arrive — match the dashboard's
+  // pattern (active first, then default, then any).
+  useEffect(() => {
+    if (!profiles.length || selectedProfile) return
+    setSelectedProfile(activeProfileName || profiles[0]!.name)
+  }, [profiles, activeProfileName, selectedProfile])
+
+  const effectiveProfile = selectedProfile || activeProfileName
+  const isOnActiveProfile =
+    !effectiveProfile || effectiveProfile === activeProfileName
 
   useEffect(() => {
     if (tab !== 'marketplace') return
@@ -153,9 +254,66 @@ export function SkillsScreen() {
     }
   }, [searchInput, tab])
 
+  // When viewing a non-active profile, the marketplace/featured tabs don't
+  // apply — the dashboard's per-profile endpoint only enumerates installed
+  // skills inside that profile's own skills/ dir. Snap back to 'installed'
+  // so the page stays consistent when the user changes profile.
+  useEffect(() => {
+    if (!isOnActiveProfile && tab !== 'installed') {
+      setTab('installed')
+      setPage(1)
+    }
+  }, [isOnActiveProfile, tab])
+
   const skillsQuery = useQuery({
-    queryKey: ['skills-browser', tab, searchInput, category, origin, page, sort],
+    queryKey: [
+      'skills-browser',
+      tab,
+      searchInput,
+      category,
+      origin,
+      page,
+      sort,
+      isOnActiveProfile ? '__active__' : effectiveProfile,
+    ],
+    enabled: isOnActiveProfile || Boolean(effectiveProfile),
     queryFn: async function fetchSkills(): Promise<SkillsApiResponse> {
+      if (!isOnActiveProfile) {
+        const response = await fetch(
+          `/api/profiles/skills?name=${encodeURIComponent(effectiveProfile)}`,
+        )
+        const payload = (await response.json()) as ProfileSkillsResponse & {
+          error?: string
+        }
+        if (!response.ok) {
+          throw new Error(payload.error || 'Failed to fetch profile skills')
+        }
+        const normalized = (payload.items || []).map(normalizeProfileSkill)
+        const lowered = searchInput.trim().toLowerCase()
+        const filtered = normalized.filter((skill) => {
+          if (category !== 'All' && skill.category !== category) return false
+          if (!lowered) return true
+          return [skill.name, skill.description, skill.category]
+            .join('\n')
+            .toLowerCase()
+            .includes(lowered)
+        })
+        const sorted = [...filtered].sort((a, b) => {
+          if (sort === 'category') {
+            const compare = a.category.localeCompare(b.category)
+            if (compare !== 0) return compare
+          }
+          return a.name.localeCompare(b.name)
+        })
+        const total = sorted.length
+        const start = (page - 1) * PAGE_LIMIT
+        const skills = sorted.slice(start, start + PAGE_LIMIT)
+        const categorySet = Array.from(
+          new Set(['All', ...normalized.map((skill) => skill.category)]),
+        )
+        return { skills, total, page, categories: categorySet }
+      }
+
       const params = new URLSearchParams()
       params.set('tab', tab)
       params.set('search', searchInput)
@@ -341,25 +499,48 @@ export function SkillsScreen() {
     setActionError(null)
     setActionSkillId(payload.skillId)
 
+    // Install/uninstall on a non-active profile would silently target the
+    // dashboard's bound profile (the only one the legacy /api/skills routes
+    // can edit). The dashboard's per-profile endpoint only supports toggle.
+    if (action !== 'toggle' && !isOnActiveProfile) {
+      setActionError(
+        `Install/uninstall is only available on the active profile. Switch the profile dropdown to "${activeProfileName || 'default'}" to manage installs.`,
+      )
+      setActionSkillId(null)
+      return
+    }
+
     try {
-      const endpoint =
-        action === 'install'
+      const routeProfileToggle =
+        action === 'toggle' && !isOnActiveProfile && Boolean(effectiveProfile)
+
+      const endpoint = routeProfileToggle
+        ? '/api/profiles/toggle-skill'
+        : action === 'install'
           ? '/api/skills/install'
           : action === 'uninstall'
             ? '/api/skills/uninstall'
             : '/api/skills/toggle'
 
       const response = await fetch(endpoint, {
-        method: 'POST',
+        method: routeProfileToggle ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          skillId: payload.skillId,
-          name: payload.skillId,
-          identifier: payload.skillId,
-          enabled: payload.enabled,
-          source: payload.source,
-        }),
+        body: JSON.stringify(
+          routeProfileToggle
+            ? {
+                profile: effectiveProfile,
+                name: payload.skillId,
+                enabled: payload.enabled,
+              }
+            : {
+                action,
+                skillId: payload.skillId,
+                name: payload.skillId,
+                identifier: payload.skillId,
+                enabled: payload.enabled,
+                source: payload.source,
+              },
+        ),
       })
 
       const data = (await response.json()) as {
@@ -478,6 +659,31 @@ export function SkillsScreen() {
         <section className="rounded-2xl border border-primary-200 bg-primary-50/80 p-3 backdrop-blur-xl sm:p-4">
           <Tabs value={tab} onValueChange={handleTabChange}>
             <div className="flex flex-wrap items-center gap-2">
+              {profiles.length > 1 ? (
+                <label className="flex h-9 items-center gap-2 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-xs text-primary-500">
+                  <span className="font-medium uppercase tracking-wider text-[10px]">
+                    Profile
+                  </span>
+                  <select
+                    value={effectiveProfile}
+                    onChange={(event) => {
+                      setSelectedProfile(event.target.value)
+                      setPage(1)
+                    }}
+                    className="h-7 rounded-md border border-primary-200 bg-primary-50/70 px-2 text-xs text-ink outline-none"
+                    aria-label="Profile"
+                  >
+                    {profiles.map((profile) => (
+                      <option key={profile.name} value={profile.name}>
+                        {profile.name === activeProfileName
+                          ? `${profile.name} (active)`
+                          : profile.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
               <input
                 value={searchInput}
                 onChange={(event) => handleSearchChange(event.target.value)}
@@ -505,7 +711,7 @@ export function SkillsScreen() {
                 </select>
               ) : null}
 
-              {tab === 'installed' ? (
+              {tab === 'installed' && isOnActiveProfile ? (
                 <select
                   value={origin}
                   onChange={(event) => handleOriginChange(event.target.value)}
@@ -540,9 +746,11 @@ export function SkillsScreen() {
                 <TabsTab value="installed" className="min-w-[110px]">
                   Installed
                 </TabsTab>
-                <TabsTab value="marketplace" className="min-w-[120px]">
-                  Marketplace
-                </TabsTab>
+                {isOnActiveProfile ? (
+                  <TabsTab value="marketplace" className="min-w-[120px]">
+                    Marketplace
+                  </TabsTab>
+                ) : null}
               </TabsList>
             </div>
 

@@ -7,14 +7,14 @@
 
 **Your AI agent's command center — chat, files, memory, skills, and terminal in one place.**
 
-[![Version](https://img.shields.io/badge/version-2.1.3-2557b7.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.3.0-2557b7.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-6366F1.svg)](CONTRIBUTING.md)
 
 > Not a chat wrapper. A complete workspace — orchestrate agents, browse memory, manage skills, and control everything from one interface.
 
-> **v2 — zero-fork.** Clone, don't fork. Runs on vanilla [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) installed via Nous's own installer. Chat, sessions, memory, skills, jobs, MCP, terminal, dashboard, Agent View, and Operations are all in vanilla parity. **Conductor** currently requires an additional dashboard plugin not in upstream yet — the UI shows a clear placeholder when that endpoint isn't available ([#262](https://github.com/outsourc-e/hermes-workspace/issues/262)). Everything else works with zero patches.
+> **v2 — zero-fork.** Clone, don't fork. Runs on vanilla [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) installed via Nous's own installer. Chat, sessions, memory, skills, jobs, MCP, terminal, dashboard, Agent View, and Operations are all in vanilla parity. **Conductor** uses the dashboard mission API when available and falls back to Workspace-native Swarm dispatch (`mode: native-swarm`) when the dashboard endpoint is absent, preserving zero-fork behavior ([#262](https://github.com/outsourc-e/hermes-workspace/issues/262)).
 
 ![Hermes Workspace](./docs/screenshots/splash.png)
 
@@ -48,7 +48,7 @@ Start here: [docs/swarm/](./docs/swarm/)
 - 🔌 **MCP** — Full /mcp page (catalog + marketplace + sources), or fallback to local config CRUD
 - 📁 **Files + Terminal** — Full workspace file browser with Monaco; cross-platform PTY terminal
 - 🎮 **Operations** — Multi-agent dashboard with profile presets (Sage/Trader/Builder/Scribe/Ops) and 'Needs setup' detection
-- 📡 **Conductor** — Mission dispatch + decomposition (requires upstream dashboard plugin, see [#262](https://github.com/outsourc-e/hermes-workspace/issues/262))
+- 📡 **Conductor** — Mission dispatch + decomposition with dashboard-backed missions when available and Workspace-native Swarm fallback otherwise
 - 👥 **Agent View** — Live agent panel in chat with avatar, queue, history, usage meter
 - 🐝 **Swarm Mode** — Persistent tmux-backed Hermes Agent workers with role-based dispatch
 - 🗄️ **Dashboard** — Aggregated overview: sessions, model mix, cost ledger, attention card, ops strip
@@ -138,6 +138,15 @@ Verify both services before opening the workspace:
 
 - `curl http://127.0.0.1:8642/health` should return ok.
 - `curl http://127.0.0.1:9119/api/status` should return dashboard metadata.
+- `curl http://127.0.0.1:3000/api/sessions` (after the workspace boots) should return a sessions payload or an empty list.
+
+If `/api/sessions` is already returning data, **do not start another gateway just because the UI still says Offline** — refresh or reprobe the Workspace UI first.
+
+If your default model is `gpt-5.4` / `openai-codex`, make sure Codex CLI auth is live before testing chat:
+
+```bash
+codex login
+```
 
 Then start the workspace and complete onboarding — it should detect the gateway + dashboard pair and unlock the enhanced panes automatically.
 
@@ -205,6 +214,17 @@ pnpm dev                   # Starts on http://localhost:3000
 
 > **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes Agent APIs, advanced features appear automatically.
 
+#### Run without an open terminal
+
+After `pnpm build`, install Workspace as a user-level launchd/systemd service:
+
+```bash
+chmod +x scripts/install-dashboard-service.sh
+scripts/install-dashboard-service.sh
+```
+
+See [`docs/dashboard-service.md`](docs/dashboard-service.md) for macOS launchd, Linux systemd, logs, overrides, and uninstall steps.
+
 #### Environment Variables
 
 ```env
@@ -213,8 +233,7 @@ HERMES_API_URL=http://127.0.0.1:8642
 
 # Optional: provider keys the Hermes Agent gateway can read at runtime.
 # You only need the key(s) for whichever provider(s) you actually use.
-# ANTHROPIC_API_KEY=***         # Anthropic
-# OPENAI_API_KEY=sk-...                # GPT / o-series
+# OPENAI_API_KEY=sk-...                # GPT / o-series / OpenAI-compatible
 # OPENROUTER_API_KEY=sk-or-v1-...      # OpenRouter (incl. free models)
 # GOOGLE_API_KEY=AIza...               # Gemini
 # (Ollama / LM Studio / local servers don't need a key)
@@ -310,6 +329,96 @@ All workspace features unlock automatically once both services are reachable —
 
 ---
 
+## 🤝 Pair an Agent with the Workspace
+
+Workspace is the UI. **Hermes Agent** is the brain. They talk over two HTTP services on localhost (or any reachable network).
+
+```
+┌───────────────┐         :8642 gateway          ┌────────────────┐
+│   Workspace    │ ─────────────────────▶ │  Hermes Agent  │
+│   :3000 (UI)   │ ◀───────────────────── │  CLI / brain   │
+└───────────────┘         :9119 dashboard        └────────────────┘
+```
+
+### Two services, three commands
+
+```bash
+hermes gateway run     # terminal 1 · :8642 · chat, models, streaming, jobs
+hermes dashboard       # terminal 2 · :9119 · sessions, skills, config, MCP
+cd ~/hermes-workspace && pnpm dev   # terminal 3 · :3000 · the UI
+```
+
+> **Tip:** `pnpm start:all` starts gateway + dashboard + workspace in one shot if you've installed via the one-liner.
+
+### Windows (PowerShell + WSL) one-command startup
+
+If you use Hermes Workspace from Windows with the agent running in WSL, use the helper script in this repo:
+
+```powershell
+# from the repo root
+.\scripts\start-hermes-workspace.ps1
+```
+
+To force a clean relaunch of the tmux session:
+
+```powershell
+.\scripts\start-hermes-workspace.ps1 -Restart
+```
+
+Optional parameters:
+- `-Distro <name>` to target a non-default WSL distro
+- `-WorkspacePath </path/in/wsl>` if your clone is not at `~/hermes-workspace`
+- `-SessionName <name>` to use a custom tmux session name
+
+### Verify the pairing
+
+```bash
+curl http://127.0.0.1:8642/health        # → {"status":"ok","platform":"hermes-agent"}
+curl http://127.0.0.1:9119/api/status    # → {"status":"ok", ...}
+```
+
+Both must return `200`. If either fails, the workspace will fall back to **portable mode** (chat works, sessions/skills/memory show "Not Available").
+
+### `.env` settings the workspace cares about
+
+```env
+# Required: where the gateway is
+HERMES_API_URL=http://127.0.0.1:8642
+
+# Recommended: where the dashboard is (unlocks sessions/skills/config/MCP/jobs)
+HERMES_DASHBOARD_URL=http://127.0.0.1:9119
+
+# Only if your gateway was started with API_SERVER_KEY=... — paste the same value:
+# HERMES_API_TOKEN=***
+
+# Optional: password-protect the web UI itself
+# HERMES_PASSWORD=***
+```
+
+### Common pairing scenarios
+
+| Scenario | Set this |
+|---|---|
+| Workspace + gateway on the same machine | `HERMES_API_URL=http://127.0.0.1:8642`, `HERMES_DASHBOARD_URL=http://127.0.0.1:9119` |
+| Gateway on a remote server (Tailscale / VPN) | Set both URLs to the reachable IP (e.g. `http://100.x.y.z:8642`) and add `API_SERVER_HOST=0.0.0.0` to the gateway's `~/.hermes/.env` |
+| Already-running `hermes-agent` from upstream installer | Just set `HERMES_API_URL` + `HERMES_DASHBOARD_URL` and skip the one-liner installer |
+| Multiple agent profiles | Profiles live under `~/.hermes/profiles/<name>` — the dashboard switches between them at runtime; workspace follows automatically |
+
+### Live re-pairing (no restart)
+
+If you've already started the workspace, change either URL from **Settings → Connection** without restarting. Values persist to `~/.hermes/workspace-overrides.json` and gateway capabilities are reprobed on save.
+
+### Troubleshooting
+
+- **`Could not reach Hermes gateway on 8645, 8642, or 8643`** — gateway isn't running, or `HERMES_API_URL` points somewhere unreachable. Run `hermes gateway run` and re-check.
+- **Workspace shows "portable mode" / extended APIs missing** — dashboard isn't running. Start `hermes dashboard` in another terminal and refresh.
+- **Sessions probe says unavailable / UI claims Offline but pairing should be live** — verify `curl http://localhost:3000/api/sessions` before starting another gateway. If it returns sessions (or an empty array), the backend pairing is alive and the UI needs a refresh/reprobe.
+- **Chat send fails on `gpt-5.4` / Codex** — Codex CLI auth is stale. Run `codex login`, then retry the chat without starting another gateway.
+- **`Unauthorized` on every API call** — gateway has `API_SERVER_KEY` set but workspace is missing `HERMES_API_TOKEN`. Match them.
+- **`Could not connect` from your phone over Tailscale** — gateway is bound to loopback. Set `API_SERVER_HOST=0.0.0.0` in `~/.hermes/.env` and restart it.
+
+---
+
 ## 🐳 Docker Quickstart
 
 [![Open in GitHub Codespaces](https://img.shields.io/badge/GitHub%20Codespaces-Open-181717?logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=outsourc-e/hermes-workspace)
@@ -320,7 +429,7 @@ The Docker setup runs both the **Hermes Agent gateway** and **Hermes Workspace**
 
 - **Docker**
 - **Docker Compose**
-- **Anthropic API Key** — [Get one here](https://console.anthropic.com/settings/keys) (required for the agent gateway)
+- **A configured Hermes Agent model provider** — run `hermes setup` / `hermes model`, or provide a key for whichever provider you use. This workspace does not require Anthropic.
 
 ### Step 1: Configure Environment
 
@@ -334,8 +443,7 @@ Edit `.env` and add **at least one** LLM provider key — whichever provider you
 
 ```env
 # Pick one (or more). You do NOT need all of these.
-# ANTHROPIC_API_KEY=***         # Anthropic
-# OPENAI_API_KEY=sk-...                # GPT / o-series
+# OPENAI_API_KEY=sk-...                # GPT / o-series / OpenAI-compatible
 # OPENROUTER_API_KEY=sk-or-v1-...      # OpenRouter (free models available)
 # GOOGLE_API_KEY=AIza...               # Gemini
 ```
@@ -364,6 +472,57 @@ legacy-named `claude-data` Docker volume, so containers can be recreated without
 Open `http://localhost:3000` and complete the onboarding.
 
 > **Verify:** Check the Docker logs for `[gateway] Connected to Hermes Agent` — this confirms the workspace successfully connected to the agent.
+
+### Remote Access (LAN / Tailscale / VPN)
+
+The default compose file binds ports to `127.0.0.1` (localhost only). To access the workspace from other devices on your network, you need to:
+
+**1. Publish ports without the loopback restriction.** Create a `docker-compose.override.yml`:
+
+```yaml
+services:
+  hermes-agent:
+    ports:
+      - '8642:8642'
+  hermes-workspace:
+    ports:
+      - '3000:3000'
+```
+
+**2. Add these env vars to `.env`:**
+
+```env
+# Required: workspace session password (the workspace refuses to start on 0.0.0.0 without it)
+HERMES_PASSWORD=your-strong-secret-here
+
+# Required for plain-HTTP LAN access (browsers drop Secure cookies over http://)
+COOKIE_SECURE=0
+
+# Recommended: gateway auth token (prevents unauthenticated API access on your LAN)
+API_SERVER_KEY=***
+
+# If the gateway refuses to start with "No user allowlists configured":
+GATEWAY_ALLOW_ALL_USERS=true
+```
+
+**3. Restart the stack:**
+
+```bash
+docker compose down && docker compose up -d
+```
+
+> **HTTPS behind a reverse proxy?** If you terminate TLS at a reverse proxy (Traefik, Nginx, Caddy, Tailscale Funnel), set `COOKIE_SECURE=1` instead and add `TRUST_PROXY=1` so IP classification works correctly.
+
+### Troubleshooting Docker
+
+| Symptom | Fix |
+|---|---|
+| `[workspace] refusing to start — HERMES_PASSWORD is unset` | Add `HERMES_PASSWORD=<secret>` to `.env` |
+| Login silently fails (no error, page reloads) | Add `COOKIE_SECURE=0` for HTTP, or `COOKIE_SECURE=1` + HTTPS |
+| `[Api_Server] Refusing to start: binding to 0.0.0.0 requires API_SERVER_KEY` | Add `API_SERVER_KEY=*** to `.env` |
+| `No user allowlists configured. All unauthorized users will be denied.` | Add `GATEWAY_ALLOW_ALL_USERS=true` to `.env` |
+| `CLAUDE_DASHBOARD_TOKEN is not set` warning | Set `CLAUDE_DASHBOARD_TOKEN` to the same value as `API_SERVER_KEY` |
+| 500 Internal Server Error on login after setting all the above | Clear browser cookies for the workspace domain, then retry |
 
 ### Building from source
 
@@ -586,7 +745,7 @@ Verify: `curl http://localhost:8642/health` should return `{"status": "ok"}`.
 
 v2+ runs on vanilla `hermes-agent`. **No fork required.** The upstream ships every endpoint the workspace needs for chat, sessions, memory, skills, config, jobs, MCP, terminal, and Agent View.
 
-**One known exception:** **Conductor** uses a dashboard plugin that hasn't landed upstream yet. When the workspace detects the missing endpoint, the Conductor screen shows a clear "Upstream not ready" placeholder with a link to [issue #262](https://github.com/outsourc-e/hermes-workspace/issues/262) instead of failing mid-action. Everything else works.
+**Conductor note:** when the dashboard mission API is available, Workspace uses it directly. When that endpoint is absent, Workspace uses its native Swarm fallback and returns `mode: native-swarm`. The fallback dispatches through Workspace Swarm workers, keeps status available through `/api/conductor-spawn?missionId=...`, and cancels through `/api/conductor-stop`.
 
 If you're pinned to an older `hermes-agent` version and missing core endpoints, the workspace will degrade gracefully to **portable mode** with basic chat — upgrade upstream to restore full features.
 
@@ -598,7 +757,7 @@ If using Docker Compose and getting auth errors:
 
    ```bash
    grep -E '_API_KEY' .env
-   # Should show one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, GOOGLE_API_KEY, ...
+   # Should show one of: OPENAI_API_KEY, OPENROUTER_API_KEY, GOOGLE_API_KEY, or another provider key you intentionally use.
    ```
 
    (hermes-agent reads whichever key matches the provider configured in `~/.hermes/config.yaml`.)
@@ -661,13 +820,13 @@ The Docker setup runs both automatically — no action needed if using `docker c
 | Mobile PWA + Tailscale | Install as native-feeling app on any device |
 | Themes | Hermes / Nous / Bronze / Slate / Mono (light + dark) |
 | Capability gates | Graceful 'upstream not ready' placeholders |
-| Multi-provider | Anthropic, OpenAI, OpenRouter, Google, Ollama, LM Studio, vLLM, Atomic Chat |
+| Multi-provider | OpenAI/OpenAI-compatible, OpenRouter, Google, Ollama, LM Studio, vLLM, Atomic Chat, and other Hermes-supported providers |
 
 ### In progress 🔨
 
 | Feature | Status |
 |---|---|
-| Conductor missions | Workspace UI is shipped; awaiting upstream dashboard plugin (see [#262](https://github.com/outsourc-e/hermes-workspace/issues/262)) |
+| Conductor missions | Workspace UI is shipped; uses dashboard mission API when available and Workspace-native Swarm fallback otherwise (see [#262](https://github.com/outsourc-e/hermes-workspace/issues/262)) |
 | Native Desktop App (Electron) | Spec'd; PWA install path works today |
 
 ### Coming 🔜

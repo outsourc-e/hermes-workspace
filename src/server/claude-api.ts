@@ -24,7 +24,6 @@ import {
   searchSessions as searchDashboardSessions,
   updateSession as updateDashboardSession,
 } from './claude-dashboard-api'
-import { normalizeSessionMessageList } from './session-message-normalize'
 
 const _authHeaders = (): Record<string, string> =>
   BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
@@ -131,15 +130,18 @@ export async function listSessions(
   offset = 0,
 ): Promise<Array<ClaudeSession>> {
   if (getCapabilities().dashboard.available) {
-    const resp = await listDashboardSessions(limit, offset) as { sessions?: Array<ClaudeSession>; items?: Array<ClaudeSession>; data?: Array<ClaudeSession> } | Array<ClaudeSession>
-    if (Array.isArray(resp)) return resp
-    return (Array.isArray(resp.sessions) ? resp.sessions : Array.isArray(resp.items) ? resp.items : Array.isArray(resp.data) ? resp.data : [])
+    const resp = await listDashboardSessions(limit, offset)
+    return resp.sessions as Array<ClaudeSession>
   }
-  const resp = await claudeGet<{ items?: Array<ClaudeSession>; sessions?: Array<ClaudeSession>; data?: Array<ClaudeSession>; total?: number } | Array<ClaudeSession>>(
-    `/api/sessions?limit=${limit}&offset=${offset}`,
-  )
-  if (Array.isArray(resp)) return resp
-  return Array.isArray(resp.items) ? resp.items : Array.isArray(resp.sessions) ? resp.sessions : Array.isArray(resp.data) ? resp.data : []
+  const resp = await claudeGet<{
+    items?: Array<ClaudeSession>
+    data?: Array<ClaudeSession>
+    total?: number
+  }>(`/api/sessions?limit=${limit}&offset=${offset}`)
+  // The gateway (OpenAI-compat) returns { object: 'list', data: [...] }, while the
+  // dashboard / older gateway shape uses { items: [...] }. Accept either, and never
+  // return undefined (callers .map over this).
+  return resp.items ?? resp.data ?? []
 }
 
 export async function getSession(sessionId: string): Promise<ClaudeSession> {
@@ -195,13 +197,19 @@ export async function getMessages(
   sessionId: string,
 ): Promise<Array<ClaudeMessage>> {
   if (getCapabilities().dashboard.available) {
-    const response = await getDashboardSessionMessages(sessionId)
-    return normalizeSessionMessageList<ClaudeMessage>(response)
+    const resp = await getDashboardSessionMessages(sessionId)
+    return resp.messages as Array<ClaudeMessage>
   }
-  const response = await claudeGet<unknown>(
-    `/api/sessions/${sessionId}/messages`,
-  )
-  return normalizeSessionMessageList<ClaudeMessage>(response)
+  const resp = await claudeGet<{
+    items?: Array<ClaudeMessage>
+    data?: Array<ClaudeMessage>
+    messages?: Array<ClaudeMessage>
+    total?: number
+  }>(`/api/sessions/${sessionId}/messages`)
+  // Gateway (OpenAI-compat) returns { object: 'list', data: [...] }; dashboard / older
+  // shape uses { items: [...] }; some message endpoints use { messages: [...] }.
+  // Accept any, and never return undefined (callers read .length / .map / .slice).
+  return resp.items ?? resp.data ?? resp.messages ?? []
 }
 
 export async function searchSessions(
@@ -499,12 +507,32 @@ export async function getSkillCategories(): Promise<unknown> {
 // ── Config ───────────────────────────────────────────────────────
 
 export async function getConfig(): Promise<ClaudeConfig> {
+  if (getCapabilities().dashboard.available) {
+    const res = await dashboardFetch('/api/config')
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`Hermes dashboard /api/config: ${res.status} ${body}`)
+    }
+    return res.json() as Promise<ClaudeConfig>
+  }
   return claudeGet<ClaudeConfig>('/api/config')
 }
 
 export async function patchConfig(
   patch: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
+  if (getCapabilities().dashboard.available) {
+    const res = await dashboardFetch('/api/config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`Hermes dashboard PATCH /api/config: ${res.status} ${body}`)
+    }
+    return res.json() as Promise<Record<string, unknown>>
+  }
   return claudePatch<Record<string, unknown>>('/api/config', patch)
 }
 

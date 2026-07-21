@@ -28,6 +28,8 @@ import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
 
 const SWARM_ROOM_STORAGE_KEY = 'claude-swarm-room-v1'
+const WORKER_ID_PATTERN = /^(swarm\d+|[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/i
+const isWorkerId = (id: string) => WORKER_ID_PATTERN.test(id)
 
 type WorkerHealth = { workerId: string; recentAuthErrors: number }
 type HealthData = { workspaceModel: string | null; workers: Array<WorkerHealth>; summary: { totalWorkers: number; totalAuthErrors24h: number; distinctProviders: Array<string> } }
@@ -123,7 +125,7 @@ export function SwarmScreen() {
 
   const swarmMembers = useMemo(() => {
     return [...crew]
-      .filter((member) => /^swarm\d+$/i.test(member.id))
+      .filter((member) => isWorkerId(member.id))
       .sort((a, b) => {
         const aSwarm = /^swarm\d+$/i.test(a.id)
         const bSwarm = /^swarm\d+$/i.test(b.id)
@@ -268,6 +270,15 @@ export function SwarmScreen() {
           >
             <HugeiconsIcon icon={RefreshIcon} size={11} className={isFetching ? 'animate-spin' : ''} />
             Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => setMissionOpen(true)}
+            disabled={!selectedId}
+            className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-400/20 disabled:opacity-50"
+          >
+            <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} />
+            Route to {selectedId ?? 'agent'}
           </button>
           <button
             type="button"

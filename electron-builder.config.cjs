@@ -38,7 +38,8 @@ module.exports = {
     ],
   },
   win: {
-    target: [{ target: 'nsis', arch: ['x64'] }],
+    target: ['portable', 'nsis'],
+    executableName: 'hermes-workspace',
   },
   nsis: {
     oneClick: true,
@@ -54,4 +55,5 @@ module.exports = {
   },
   asar: false,
   compression: 'maximum',
+  artifactName: 'hermes-workspace-setup-${version}.${ext}',
 }

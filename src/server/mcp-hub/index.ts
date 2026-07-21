@@ -42,7 +42,7 @@ async function getInstalledNames(): Promise<Set<string>> {
     // Config may be wrapped in { config: {...} } shape
     const root =
       config && typeof config === 'object' && 'config' in config
-        ? (config).config
+        ? config.config
         : config
 
     const mcp =
@@ -83,14 +83,23 @@ async function fetchWithTimeout<T>(
 async function fetchSource(source: HubSource): Promise<SourceResult> {
   if (source === 'local') {
     const res = await fetchLocalFile()
-    return { entries: res.entries, warnings: res.warnings, sourceLabel: 'local' }
+    return {
+      entries: res.entries,
+      warnings: res.warnings,
+      sourceLabel: 'local',
+    }
   }
   if (source === 'mcp-get') {
     const res = await fetchWithTimeout(
       (signal) => fetchMcpGet(signal),
       PER_SOURCE_TIMEOUT_MS,
     )
-    return { entries: res.entries, warnings: res.warnings, degraded: res.degraded, sourceLabel: 'mcp-get' }
+    return {
+      entries: res.entries,
+      warnings: res.warnings,
+      degraded: res.degraded,
+      sourceLabel: 'mcp-get',
+    }
   }
   return { entries: [], sourceLabel: source }
 }
@@ -147,6 +156,7 @@ export async function unifiedSearch(
   query: string,
   sources: SearchSource = 'all',
   limit = 20,
+  offset = 0,
 ): Promise<UnifiedSearchResult> {
   // Load user-defined sources at runtime (Phase 3.2)
   let userSources: Array<UserSourceSpec> = []
@@ -164,7 +174,8 @@ export async function unifiedSearch(
 
   // Fetch all sources in parallel; tolerate individual failures
   const builtinPromises = builtinSourcesToQuery.map((s) => fetchSource(s))
-  const userPromises = sources === 'all' ? userSources.map((s) => fetchUserSource(s)) : []
+  const userPromises =
+    sources === 'all' ? userSources.map((s) => fetchUserSource(s)) : []
 
   const allPromises = [...builtinPromises, ...userPromises]
   const allSourceLabels = [
@@ -183,7 +194,10 @@ export async function unifiedSearch(
     const sourceId = allSourceLabels[i]
 
     if (settled.status === 'rejected') {
-      const reason = settled.reason instanceof Error ? settled.reason.message : String(settled.reason)
+      const reason =
+        settled.reason instanceof Error
+          ? settled.reason.message
+          : String(settled.reason)
       warnings.push(`${sourceId}: failed — ${reason}`)
       continue
     }
@@ -209,7 +223,9 @@ export async function unifiedSearch(
       allEntries.push(...localRes.entries)
       warnings.push('all remote sources failed — local-file fallback used')
     } catch (err) {
-      warnings.push(`local-file fallback also failed: ${err instanceof Error ? err.message : String(err)}`)
+      warnings.push(
+        `local-file fallback also failed: ${err instanceof Error ? err.message : String(err)}`,
+      )
     }
   }
 
@@ -243,7 +259,7 @@ export async function unifiedSearch(
     .filter(Boolean)
     .join(',')
 
-  const limited = filtered.slice(0, limit)
+  const limited = filtered.slice(offset, offset + limit)
 
   return {
     results: limited,

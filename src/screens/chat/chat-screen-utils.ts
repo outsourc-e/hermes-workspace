@@ -5,6 +5,57 @@ export type StickyStreamingTextState = {
   text: string
 }
 
+export type ResponseWaitSnapshot = {
+  messageCount: number
+  lastAssistantId: string | null
+}
+
+export function isTerminalActiveRunStatus(status: unknown): boolean {
+  return (
+    typeof status === 'string' &&
+    ['complete', 'completed', 'failed', 'cancelled', 'error'].includes(status)
+  )
+}
+
+function assistantMessageIdentity(message: ChatMessage): string {
+  return String(
+    message.__optimisticId ??
+      message.id ??
+      message.messageId ??
+      message.__realtimeSequence ??
+      '',
+  )
+}
+
+export function createResponseWaitSnapshot(
+  messages: Array<ChatMessage>,
+): ResponseWaitSnapshot {
+  const last = messages[messages.length - 1]
+  return {
+    messageCount: messages.length,
+    lastAssistantId:
+      last?.role === 'assistant' ? assistantMessageIdentity(last) : null,
+  }
+}
+
+export function shouldClearWaitingForAssistantMessage(
+  messages: Array<ChatMessage>,
+  snapshot: ResponseWaitSnapshot,
+): boolean {
+  const last = messages[messages.length - 1]
+  if (!last || last.role !== 'assistant') return false
+  if (last.__streamingStatus === 'streaming') return false
+
+  if (messages.length > snapshot.messageCount) return true
+
+  const currentId = assistantMessageIdentity(last)
+  if (currentId.length > 0 && currentId !== (snapshot.lastAssistantId ?? '')) {
+    return true
+  }
+
+  return snapshot.lastAssistantId === null
+}
+
 export function advanceStickyStreamingText(params: {
   isStreaming: boolean
   runId: string | null

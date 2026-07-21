@@ -3,7 +3,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-export const SWARM_KANBAN_LANES = ['backlog', 'ready', 'running', 'review', 'blocked', 'done'] as const
+export const SWARM_KANBAN_LANES = ['backlog', 'todo', 'ready', 'running', 'review', 'blocked', 'done'] as const
 export type SwarmKanbanLane = (typeof SWARM_KANBAN_LANES)[number]
 
 export type SwarmKanbanCard = {
@@ -13,12 +13,17 @@ export type SwarmKanbanCard = {
   acceptanceCriteria: Array<string>
   assignedWorker: string | null
   reviewer: string | null
-  status: SwarmKanbanLane
+  status: SwarmKanbanLane | string
   missionId: string | null
   reportPath: string | null
   createdBy: string
   createdAt: number
   updatedAt: number
+  parents?: Array<string>
+  children?: Array<string>
+  latestRun?: { summary?: string | null; outcome?: string | null; status?: string | null } | null
+  tags?: Array<string>
+  source?: string
 }
 
 type SwarmKanbanFile = { cards: Array<SwarmKanbanCard> }
@@ -40,6 +45,9 @@ export type CreateSwarmKanbanCardInput = {
   missionId?: string | null
   reportPath?: string | null
   createdBy?: string | null
+  parents?: Array<string>
+  tags?: Array<string>
+  idempotencyKey?: string | null
 }
 
 export type UpdateSwarmKanbanCardInput = Partial<Omit<CreateSwarmKanbanCardInput, 'createdBy'>>
@@ -72,7 +80,6 @@ function writeKanbanFile(data: SwarmKanbanFile): void {
 }
 
 function normalizeStatus(value: unknown): SwarmKanbanLane {
-  if (value === 'todo') return 'ready'
   if (value === 'in_progress' || value === 'doing') return 'running'
   return SWARM_KANBAN_LANES.includes(value as SwarmKanbanLane) ? (value as SwarmKanbanLane) : 'backlog'
 }
@@ -80,6 +87,12 @@ function normalizeStatus(value: unknown): SwarmKanbanLane {
 function normalizeCriteria(value: unknown): Array<string> {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
   if (typeof value === 'string') return value.split('\n').map((item) => item.trim()).filter(Boolean)
+  return []
+}
+
+function normalizeTags(value: unknown): Array<string> {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
+  if (typeof value === 'string') return value.split(',').map((item) => item.trim()).filter(Boolean)
   return []
 }
 
@@ -102,6 +115,11 @@ function normalizeCard(card: (Partial<Omit<SwarmKanbanCard, 'status'>> & { id?: 
     createdBy: typeof card.createdBy === 'string' && card.createdBy ? card.createdBy : 'swarm2-kanban',
     createdAt: typeof card.createdAt === 'number' ? card.createdAt : now,
     updatedAt: typeof card.updatedAt === 'number' ? card.updatedAt : now,
+    parents: normalizeTags(card.parents),
+    children: normalizeTags(card.children),
+    latestRun: card.latestRun ?? null,
+    tags: normalizeTags(card.tags),
+    source: typeof card.source === 'string' ? card.source : undefined,
   }
 }
 
@@ -130,6 +148,8 @@ export function createSwarmKanbanCard(input: CreateSwarmKanbanCardInput): SwarmK
     createdBy: input.createdBy ?? 'swarm2-kanban',
     createdAt: now,
     updatedAt: now,
+    parents: input.parents,
+    tags: input.tags,
   })
   file.cards.push(card)
   writeKanbanFile(file)

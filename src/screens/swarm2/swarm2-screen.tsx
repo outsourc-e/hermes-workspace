@@ -65,7 +65,7 @@ const SWARM2_OPERATION_THEME: CSSProperties = {
 
 export const SWARM2_INFORMATION_HIERARCHY = [
   'Status header: online workers, active room, refresh state, view switch.',
-  'Aurora/orchestrator hub card: top-center primary routing hub with aggregate state and router affordance.',
+  'Orchestrator hub card (Aurora): top-center primary routing hub with aggregate state and router affordance.',
   'Visible routing wires: subdued connection lines from the orchestrator to every worker, highlighted for selected and wired room nodes.',
   'Operations-style worker node cards: role, state, current task, last useful signal, direct inline chat/action affordances.',
   'Minimal attention rail: only auth, worker availability, room count, selected runtime metadata.',
@@ -163,6 +163,7 @@ type RuntimeEntry = {
   lastRealResult?: string | null
   blockedReason?: string | null
   checkpointStatus?: string | null
+  state?: string | null
   needsHuman?: boolean | null
   assignedTaskCount?: number | null
   cronJobCount?: number | null
@@ -886,6 +887,8 @@ function ControlPlaneStage({
                       cardRef={setWorkerRef(member.id)}
                       member={member}
                       currentTask={runtime?.currentTask ?? null}
+                      checkpointStatus={runtime?.checkpointStatus ?? null}
+                      runtimeState={runtime?.state ?? null}
                       recentLines={recentLines(runtime)}
                       recentOutputAt={runtime?.lastOutputAt ?? runtime?.lastSessionStartedAt ?? null}
                       recentSummary={cleanSwarmLabel(runtime?.lastRealSummary ?? runtime?.lastRealResult ?? runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? '', '', 220) || null}

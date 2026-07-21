@@ -108,6 +108,7 @@ export async function sendChatUnified(
       temperature: options.temperature,
       signal: options.signal,
       stream: false,
+      sessionId: options.sessionId,
     })
   }
 
@@ -134,6 +135,7 @@ export async function streamChatUnified(
       temperature: options.temperature,
       signal: options.signal,
       stream: true,
+      sessionId: options.sessionId,
     })
     // Adapt StreamChunkType to plain string for legacy callers
     async function* toStringStream() {

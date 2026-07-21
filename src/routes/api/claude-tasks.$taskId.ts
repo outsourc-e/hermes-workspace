@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { deleteTask, getTask, moveTask, updateTask } from '../../server/tasks-store'
-import type { TaskColumn, TaskPriority } from '../../server/tasks-store'
+import { getClaudeTask, moveClaudeTask, updateClaudeTask } from '../../server/claude-tasks-backend'
+import type { TaskColumn, TaskPriority } from '../../server/claude-tasks-backend'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -16,6 +16,7 @@ function isTaskColumn(value: unknown): value is TaskColumn {
     value === 'todo' ||
     value === 'in_progress' ||
     value === 'review' ||
+    value === 'blocked' ||
     value === 'done'
   )
 }
@@ -32,7 +33,7 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
 
-        const task = getTask(params.taskId)
+        const task = await getClaudeTask(params.taskId)
         if (!task) return jsonResponse({ error: 'Task not found' }, 404)
         return jsonResponse({ task })
       },
@@ -44,7 +45,7 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
 
         try {
           const body = (await request.json()) as Record<string, unknown>
-          const task = updateTask(params.taskId, {
+          const task = await updateClaudeTask(params.taskId, {
             title: typeof body.title === 'string' ? body.title : undefined,
             description: typeof body.description === 'string' ? body.description : undefined,
             column: isTaskColumn(body.column) ? body.column : undefined,
@@ -52,7 +53,6 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
             assignee: body.assignee === null || typeof body.assignee === 'string' ? body.assignee : undefined,
             tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : undefined,
             due_date: body.due_date === null || typeof body.due_date === 'string' ? body.due_date : undefined,
-            position: typeof body.position === 'number' ? body.position : undefined,
           })
 
           if (!task) return jsonResponse({ error: 'Task not found' }, 404)
@@ -62,14 +62,12 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
         }
       },
 
-      DELETE: async ({ request, params }) => {
+      DELETE: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
 
-        const deleted = deleteTask(params.taskId)
-        if (!deleted) return jsonResponse({ error: 'Task not found' }, 404)
-        return jsonResponse({ ok: true })
+        return jsonResponse({ error: 'Delete is not supported by the shared Agent Kanban backend' }, 405)
       },
 
       POST: async ({ request, params }) => {
@@ -85,10 +83,10 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
 
         try {
           const body = (await request.json()) as Record<string, unknown>
-          if (typeof body.column !== 'string') {
+          if (!isTaskColumn(body.column)) {
             return jsonResponse({ error: 'column is required' }, 400)
           }
-          const task = moveTask(params.taskId, body.column as TaskColumn)
+          const task = await moveClaudeTask(params.taskId, body.column)
           if (!task) return jsonResponse({ error: 'Task not found' }, 404)
           return jsonResponse({ task })
         } catch {

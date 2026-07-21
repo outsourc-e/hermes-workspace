@@ -4,23 +4,21 @@ import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { getClaudeRoot, getWorkspaceClaudeHome } from './claude-paths'
 import {
-
   SWARM_KANBAN_FILE,
-
-
+  type CreateSwarmKanbanCardInput,
   createSwarmKanbanCard,
   listSwarmKanbanCards,
-  updateSwarmKanbanCard
+  type SwarmKanbanCard,
+  updateSwarmKanbanCard,
+  type UpdateSwarmKanbanCardInput,
 } from './swarm-kanban-store'
 import { CLAUDE_DASHBOARD_URL, getCapabilities } from './gateway-capabilities'
 import {
-
-  createDashboardKanbanTask,
   fetchDashboardKanbanBoard,
-  updateDashboardKanbanTask
+  createDashboardKanbanTask,
+  updateDashboardKanbanTask,
+  type DashboardKanbanTask,
 } from './kanban-dashboard-proxy'
-import type {CreateSwarmKanbanCardInput, SwarmKanbanCard, UpdateSwarmKanbanCardInput} from './swarm-kanban-store';
-import type {DashboardKanbanTask} from './kanban-dashboard-proxy';
 
 export type KanbanBackendId = 'local' | 'claude' | 'hermes-proxy'
 
@@ -34,13 +32,13 @@ export type KanbanBackendMeta = {
 }
 
 type KanbanBackend = {
-  meta: () => KanbanBackendMeta
-  list: () => Array<SwarmKanbanCard> | Promise<Array<SwarmKanbanCard>>
-  create: (input: CreateSwarmKanbanCardInput) => SwarmKanbanCard | Promise<SwarmKanbanCard>
-  update: (
+  meta(): KanbanBackendMeta
+  list(): SwarmKanbanCard[] | Promise<SwarmKanbanCard[]>
+  create(input: CreateSwarmKanbanCardInput): SwarmKanbanCard | Promise<SwarmKanbanCard>
+  update(
     cardId: string,
     updates: UpdateSwarmKanbanCardInput,
-  ) => SwarmKanbanCard | null | Promise<SwarmKanbanCard | null>
+  ): SwarmKanbanCard | null | Promise<SwarmKanbanCard | null>
 }
 
 // Map upstream Hermes kanban statuses (triage/todo/ready/running/done/blocked
@@ -52,7 +50,9 @@ function mapDashboardStatusToLane(
 ): SwarmKanbanCard['status'] {
   switch ((status ?? '').toLowerCase()) {
     case 'triage':
+      return 'backlog'
     case 'todo':
+      return 'todo'
     case 'queued':
       return 'backlog'
     case 'ready':
@@ -129,6 +129,11 @@ type ClaudeTaskRow = {
   assignee?: string | null
   created_at?: number | string | null
   updated_at?: number | string | null
+  parents_json?: string | null
+  children_json?: string | null
+  latest_run_summary?: string | null
+  latest_run_outcome?: string | null
+  latest_run_status?: string | null
 }
 
 type ClaudeDetection = {
@@ -213,23 +218,34 @@ function runSqlite(dbPath: string, sql: string): string {
   }).trim()
 }
 
-function readClaudeTasks(): Array<ClaudeTaskRow> {
+function claudeTaskProjection(): string {
+  return [
+    'tasks.id,',
+    'tasks.title,',
+    'tasks.body,',
+    'tasks.status,',
+    'tasks.assignee,',
+    'tasks.created_at,',
+    'coalesce(tasks.last_heartbeat_at, tasks.completed_at, tasks.started_at, tasks.created_at) as updated_at,',
+    "coalesce((select json_group_array(parent_id) from task_links where child_id = tasks.id), '[]') as parents_json,",
+    "coalesce((select json_group_array(child_id) from task_links where parent_id = tasks.id), '[]') as children_json,",
+    '(select summary from task_runs where task_id = tasks.id order by started_at desc, id desc limit 1) as latest_run_summary,',
+    '(select outcome from task_runs where task_id = tasks.id order by started_at desc, id desc limit 1) as latest_run_outcome,',
+    '(select status from task_runs where task_id = tasks.id order by started_at desc, id desc limit 1) as latest_run_status',
+  ].join(' ')
+}
+
+function readClaudeTasks(): ClaudeTaskRow[] {
   const detection = detectClaudeKanban()
   if (!detection.available) return []
   const query = [
     'select',
-    'id,',
-    'title,',
-    'body,',
-    'status,',
-    'assignee,',
-    'created_at,',
-    'coalesce(last_heartbeat_at, completed_at, started_at, created_at) as updated_at',
+    claudeTaskProjection(),
     'from tasks',
-    'order by created_at desc, id desc;',
+    'order by tasks.created_at desc, tasks.id desc;',
   ].join(' ')
   const raw = runSqlite(detection.dbPath, query)
-  const parsed = raw ? (JSON.parse(raw) as Array<ClaudeTaskRow>) : []
+  const parsed = raw ? (JSON.parse(raw) as ClaudeTaskRow[]) : []
   return Array.isArray(parsed) ? parsed : []
 }
 
@@ -238,9 +254,9 @@ function readClaudeTask(taskId: string): ClaudeTaskRow | null {
   if (!detection.available) return null
   const raw = runSqlite(
     detection.dbPath,
-    `select id, title, body, status, assignee, created_at, coalesce(last_heartbeat_at, completed_at, started_at, created_at) as updated_at from tasks where id = ${sqliteQuote(taskId)} limit 1;`,
+    `select ${claudeTaskProjection()} from tasks where id = ${sqliteQuote(taskId)} limit 1;`,
   )
-  const parsed = raw ? (JSON.parse(raw) as Array<ClaudeTaskRow>) : []
+  const parsed = raw ? (JSON.parse(raw) as ClaudeTaskRow[]) : []
   return Array.isArray(parsed) && parsed[0] ? parsed[0] : null
 }
 
@@ -257,12 +273,26 @@ function normalizeTimestamp(value: unknown): number {
   return Date.now()
 }
 
+function parseJsonStringArray(value: string | null | undefined): string[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map((item) => item.trim())
+      : []
+  } catch {
+    return []
+  }
+}
+
 function mapClaudeStatus(status: string | null | undefined): SwarmKanbanCard['status'] {
-  switch ((status ?? '').toLowerCase()) {
+  const normalized = (status ?? '').toLowerCase()
+  switch (normalized) {
     case 'queued':
-    case 'todo':
     case 'triage':
       return 'backlog'
+    case 'todo':
+      return 'todo'
     case 'ready':
       return 'ready'
     case 'running':
@@ -286,6 +316,8 @@ function mapBoardStatus(status: SwarmKanbanCard['status'] | null | undefined): s
   switch (status) {
     case 'backlog':
       return 'queued'
+    case 'todo':
+      return 'todo'
     case 'ready':
       return 'ready'
     case 'running':
@@ -301,9 +333,45 @@ function mapBoardStatus(status: SwarmKanbanCard['status'] | null | undefined): s
   }
 }
 
+function validateNativeParents(dbPath: string, parentIds: string[]): Map<string, string> {
+  const uniqueParentIds = [...new Set(parentIds.map((parentId) => parentId.trim()).filter(Boolean))]
+  if (uniqueParentIds.length === 0) return new Map()
+  const raw = runSqlite(
+    dbPath,
+    `select id, status from tasks where id in (${uniqueParentIds.map(sqliteQuote).join(', ')});`,
+  )
+  const parsed = raw ? (JSON.parse(raw) as Array<{ id?: string; status?: string | null }>) : []
+  const statuses = new Map<string, string>()
+  for (const row of parsed) {
+    if (typeof row.id === 'string') statuses.set(row.id, row.status ?? '')
+  }
+  const missing = uniqueParentIds.filter((parentId) => !statuses.has(parentId))
+  if (missing.length > 0) throw new Error(`Cannot create Hermes task with missing parent(s): ${missing.join(', ')}`)
+  return statuses
+}
+
+function deriveNativeCreateStatus(
+  requestedStatus: SwarmKanbanCard['status'] | null | undefined,
+  parentStatuses: Map<string, string>,
+): string {
+  const requested = mapBoardStatus(requestedStatus ?? 'backlog')
+  if (parentStatuses.size === 0) return requested === 'queued' ? 'todo' : requested
+  const allParentsDone = [...parentStatuses.values()].every((status) => ['done', 'complete', 'completed'].includes(status.toLowerCase()))
+  if (!allParentsDone && ['queued', 'todo', 'ready'].includes(requested)) return 'todo'
+  if (allParentsDone && requested === 'queued') return 'ready'
+  return requested
+}
+
 function claudeTaskToCard(task: ClaudeTaskRow): SwarmKanbanCard {
   const createdAt = normalizeTimestamp(task.created_at)
   const updatedAt = normalizeTimestamp(task.updated_at ?? task.created_at)
+  const latestRun = task.latest_run_summary || task.latest_run_outcome || task.latest_run_status
+    ? {
+        summary: task.latest_run_summary ?? undefined,
+        outcome: task.latest_run_outcome ?? undefined,
+        status: task.latest_run_status ?? undefined,
+      }
+    : undefined
   return {
     id: task.id,
     title: task.title,
@@ -317,6 +385,10 @@ function claudeTaskToCard(task: ClaudeTaskRow): SwarmKanbanCard {
     createdBy: 'claude-kanban',
     createdAt,
     updatedAt,
+    parents: parseJsonStringArray(task.parents_json),
+    children: parseJsonStringArray(task.children_json),
+    latestRun,
+    source: 'native-kanban',
   }
 }
 
@@ -363,11 +435,30 @@ const claudeBackend: KanbanBackend = {
     const detection = detectClaudeKanban()
     if (!detection.available) throw new Error(detection.reason ?? 'Hermes Kanban not detected')
     const nowSeconds = Math.floor(Date.now() / 1000)
+    const parentIds = Array.isArray(input.parents)
+      ? input.parents.filter((parentId): parentId is string => typeof parentId === 'string' && parentId.trim().length > 0)
+      : []
+    const idempotencyKey = typeof input.idempotencyKey === 'string' && input.idempotencyKey.trim().length > 0
+      ? input.idempotencyKey.trim()
+      : null
+    if (idempotencyKey) {
+      const existing = runSqlite(
+        detection.dbPath,
+        `select ${claudeTaskProjection()} from tasks where idempotency_key = ${sqliteQuote(idempotencyKey)} and status != 'archived' order by created_at desc, id desc limit 1;`,
+      )
+      const parsed = existing ? (JSON.parse(existing) as ClaudeTaskRow[]) : []
+      if (Array.isArray(parsed) && parsed[0]) return claudeTaskToCard(parsed[0])
+    }
+    const parentStatuses = validateNativeParents(detection.dbPath, parentIds)
     const taskId = `t_${randomUUID().replace(/-/g, '').slice(0, 8)}`
-    const status = mapBoardStatus(input.status ?? 'backlog')
+    const status = deriveNativeCreateStatus(input.status ?? 'backlog', parentStatuses)
+    const linkStatements = parentIds.map(
+      (parentId) => `insert or ignore into task_links (parent_id, child_id) values (${sqliteQuote(parentId.trim())}, ${sqliteQuote(taskId)});`,
+    )
     const statements = [
+      'begin immediate;',
       'insert into tasks (',
-      'id, title, body, assignee, status, priority, created_by, created_at, workspace_kind, workspace_path',
+      'id, title, body, assignee, status, priority, created_by, created_at, workspace_kind, workspace_path, idempotency_key',
       ') values (',
       [
         sqliteQuote(taskId),
@@ -380,8 +471,11 @@ const claudeBackend: KanbanBackend = {
         String(nowSeconds),
         sqliteQuote('scratch'),
         sqliteQuote(path.join(detection.workspacePath, 'workspaces', taskId)),
+        idempotencyKey ? sqliteQuote(idempotencyKey) : 'NULL',
       ].join(', '),
       ');',
+      ...linkStatements,
+      'commit;',
     ].join(' ')
     runSqlite(detection.dbPath, statements)
     const created = readClaudeTask(taskId)
@@ -391,7 +485,7 @@ const claudeBackend: KanbanBackend = {
   update(cardId, updates) {
     const detection = detectClaudeKanban()
     if (!detection.available) return null
-    const assignments: Array<string> = []
+    const assignments: string[] = []
     if (typeof updates.title === 'string' && updates.title.trim()) assignments.push(`title = ${sqliteQuote(updates.title.trim())}`)
     if (typeof updates.spec === 'string') assignments.push(`body = ${sqliteQuote(updates.spec)}`)
     if (updates.assignedWorker !== undefined) assignments.push(`assignee = ${updates.assignedWorker?.trim() ? sqliteQuote(updates.assignedWorker.trim()) : 'NULL'}`)
@@ -434,7 +528,7 @@ const dashboardProxyBackend: KanbanBackend = {
   },
   async list() {
     const board = await fetchDashboardKanbanBoard()
-    const cards: Array<SwarmKanbanCard> = []
+    const cards: SwarmKanbanCard[] = []
     for (const column of board.columns) {
       for (const task of column.tasks) {
         cards.push(dashboardTaskToCard(task))
@@ -517,7 +611,7 @@ export function getKanbanBackendMeta(): KanbanBackendMeta {
   return resolveKanbanBackend().meta()
 }
 
-export async function listKanbanCards(): Promise<Array<SwarmKanbanCard>> {
+export async function listKanbanCards(): Promise<SwarmKanbanCard[]> {
   return Promise.resolve(resolveKanbanBackend().list())
 }
 

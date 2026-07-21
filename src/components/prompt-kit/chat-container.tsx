@@ -48,13 +48,21 @@ function ChatContainerRoot({
     if (!element) return
 
     const handleScroll = () => {
-      // Track stick-to-bottom internally based on actual scroll position
+      // Track stick-to-bottom internally based on actual scroll position.
+      // Bug #552: previously we only released stick-to-bottom when the user
+      // both scrolled up AND was already >200px from bottom. That meant any
+      // upward scroll within the bottom 200px did nothing — and during heavy
+      // streaming the ResizeObserver immediately yanked the viewport back to
+      // the bottom on the next content growth, producing the "can't scroll up"
+      // tug-of-war. Fix: ANY user-initiated upward scroll releases stick. Only
+      // re-stick when the user has stopped scrolling up AND is right at the
+      // bottom (≤NEAR_BOTTOM_THRESHOLD).
       const distFromBottom =
         element.scrollHeight - element.scrollTop - element.clientHeight
       const wasScrollingUp = element.scrollTop < lastScrollTopRef.current - 5
       lastScrollTopRef.current = element.scrollTop
 
-      if (wasScrollingUp && distFromBottom > NEAR_BOTTOM_THRESHOLD) {
+      if (wasScrollingUp) {
         stickToBottomRef.current = false
       } else if (distFromBottom <= NEAR_BOTTOM_THRESHOLD) {
         stickToBottomRef.current = true

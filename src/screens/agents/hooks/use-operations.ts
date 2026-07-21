@@ -17,6 +17,8 @@ type ClaudeProfileSummary = {
   exists: boolean
   model?: string
   provider?: string
+  description?: string
+  systemPrompt?: string
   skillCount: number
   sessionCount: number
   hasEnv: boolean
@@ -29,6 +31,8 @@ export type GatewayConfigAgent = {
   model: string
   workspace?: string
   agentDir?: string
+  description?: string
+  systemPrompt?: string
 }
 
 export type OperationsAgentMeta = {
@@ -207,6 +211,8 @@ function normalizeAgentList(input: unknown): Array<GatewayConfigAgent> {
       model: readString(row.model),
       workspace: readString(row.workspace) || undefined,
       agentDir: readString(row.agentDir) || undefined,
+      description: readString(row.description) || undefined,
+      systemPrompt: readString(row.systemPrompt) || undefined,
     })
   }
 
@@ -246,6 +252,8 @@ async function fetchOperationsConfig(): Promise<ConfigPayload> {
     model: profile.model || '',
     workspace: profile.path,
     agentDir: profile.path,
+    description: profile.description || '',
+    systemPrompt: profile.systemPrompt || '',
   }))
   // Default-profile model becomes the operations defaultModel suggestion
   const defaultModel = profiles.find((p) => p.name === 'default')?.model || ''
@@ -308,12 +316,18 @@ async function deleteClaudeProfile(name: string) {
   }
 }
 
-function loadAgentMeta(agentId: string): OperationsAgentMeta {
+function loadAgentMeta(
+  agentId: string,
+  fallback?: Partial<Pick<OperationsAgentMeta, 'description' | 'systemPrompt'>>,
+): OperationsAgentMeta {
+  const fallbackDescription = readString(fallback?.description)
+  const fallbackSystemPrompt = readString(fallback?.systemPrompt)
+
   if (typeof window === 'undefined') {
     return {
       emoji: createFallbackEmoji(agentId),
-      description: '',
-      systemPrompt: '',
+      description: fallbackDescription,
+      systemPrompt: fallbackSystemPrompt,
       color: createFallbackColor(agentId),
       createdAt: new Date().toISOString(),
     }
@@ -324,8 +338,8 @@ function loadAgentMeta(agentId: string): OperationsAgentMeta {
     if (!raw) {
       return {
         emoji: createFallbackEmoji(agentId),
-        description: '',
-        systemPrompt: '',
+        description: fallbackDescription,
+        systemPrompt: fallbackSystemPrompt,
         color: createFallbackColor(agentId),
         createdAt: new Date().toISOString(),
       }
@@ -334,16 +348,16 @@ function loadAgentMeta(agentId: string): OperationsAgentMeta {
     const parsed = JSON.parse(raw) as Partial<OperationsAgentMeta>
     return {
       emoji: readString(parsed.emoji) || createFallbackEmoji(agentId),
-      description: readString(parsed.description),
-      systemPrompt: readString(parsed.systemPrompt),
+      description: readString(parsed.description) || fallbackDescription,
+      systemPrompt: readString(parsed.systemPrompt) || fallbackSystemPrompt,
       color: readString(parsed.color) || createFallbackColor(agentId),
       createdAt: readString(parsed.createdAt) || new Date().toISOString(),
     }
   } catch {
     return {
       emoji: createFallbackEmoji(agentId),
-      description: '',
-      systemPrompt: '',
+      description: fallbackDescription,
+      systemPrompt: fallbackSystemPrompt,
       color: createFallbackColor(agentId),
       createdAt: new Date().toISOString(),
     }
@@ -550,7 +564,10 @@ export function useOperations() {
     const cronJobs = cronJobsQuery.data ?? []
 
     return configAgents.map((agent) => {
-      const meta = loadAgentMeta(agent.id)
+      const meta = loadAgentMeta(agent.id, {
+        description: agent.description,
+        systemPrompt: agent.systemPrompt,
+      })
       const agentSessions = getAgentSessions(agent.id, sessions)
       const latestSession = agentSessions[0] ?? null
       const jobs = getAgentJobs(agent.id, cronJobs)

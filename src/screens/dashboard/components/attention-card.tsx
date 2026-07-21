@@ -2,6 +2,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertCircleIcon,
+  CheckListIcon,
   CheckmarkCircle02Icon,
   ConsoleIcon,
   Settings02Icon,
@@ -18,6 +19,7 @@ const SOURCE_ICON: Record<DashboardIncident['source'], typeof AlertCircleIcon> =
   log: ConsoleIcon,
   config: Settings02Icon,
   gateway: AlertCircleIcon,
+  kanban: CheckListIcon,
 }
 
 /**

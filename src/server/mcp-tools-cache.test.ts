@@ -76,7 +76,7 @@ describe('write → read roundtrip', () => {
 describe('corrupt file → empty cache', () => {
   it('ignores corrupt JSON and starts with empty cache', async () => {
     // Write corrupt file before module load
-    const cacheDir = join(tmpDir, 'cache')
+    const cacheDir = join(tmpDir, 'workspace', 'cache')
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(join(cacheDir, 'mcp-tools.json'), '{ not valid json !!!', 'utf8')
 
@@ -89,7 +89,7 @@ describe('corrupt file → empty cache', () => {
   })
 
   it('ignores wrong schema (version != 1)', async () => {
-    const cacheDir = join(tmpDir, 'cache')
+    const cacheDir = join(tmpDir, 'workspace', 'cache')
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(
       join(cacheDir, 'mcp-tools.json'),
@@ -159,7 +159,9 @@ describe('HERMES_HOME override for path resolution', () => {
     vi.resetModules()
 
     const mod = await loadCache()
-    expect(mod.cacheFilePath()).toBe(join(customHome, 'cache', 'mcp-tools.json'))
+    expect(mod.cacheFilePath()).toBe(
+      join(customHome, 'workspace', 'cache', 'mcp-tools.json'),
+    )
 
     mod.setProbe('server-x', {
       status: 'failed',

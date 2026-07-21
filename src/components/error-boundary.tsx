@@ -12,6 +12,39 @@ type ErrorBoundaryProps = {
 
 type ErrorBoundaryState = {
   error: Error | null
+  recovering: boolean
+}
+
+const REACT_DOM_RECOVERY_KEY = 'hermes-react-dom-recovery-at'
+const REACT_DOM_RECOVERY_TTL_MS = 30_000
+
+function isReactDomReconciliationError(error: Error): boolean {
+  const message = `${error.name}: ${error.message}`
+  return (
+    message.includes('Failed to execute') &&
+    (message.includes('insertBefore') || message.includes('removeChild')) &&
+    message.includes('not a child of this node')
+  )
+}
+
+async function clearStaleRuntimeCaches(): Promise<void> {
+  if (typeof window === 'undefined') return
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(registrations.map((registration) => registration.update()))
+    }
+  } catch {
+    // Best-effort only. Recovery should not fail because SW APIs are blocked.
+  }
+  try {
+    if ('caches' in window) {
+      const keys = await window.caches.keys()
+      await Promise.all(keys.map((key) => window.caches.delete(key)))
+    }
+  } catch {
+    // Best-effort only.
+  }
 }
 
 export class ErrorBoundary extends Component<
@@ -20,14 +53,31 @@ export class ErrorBoundary extends Component<
 > {
   state: ErrorBoundaryState = {
     error: null,
+    recovering: false,
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { error }
+    return { error, recovering: false }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Unhandled UI error', error, errorInfo)
+
+    if (typeof window === 'undefined' || !isReactDomReconciliationError(error)) {
+      return
+    }
+
+    const previous = Number(window.sessionStorage.getItem(REACT_DOM_RECOVERY_KEY) ?? '0')
+    const alreadyRetried = Number.isFinite(previous)
+      ? Date.now() - previous < REACT_DOM_RECOVERY_TTL_MS
+      : false
+    if (alreadyRetried) return
+
+    window.sessionStorage.setItem(REACT_DOM_RECOVERY_KEY, String(Date.now()))
+    this.setState({ recovering: true })
+    void clearStaleRuntimeCaches().finally(() => {
+      window.location.reload()
+    })
   }
 
   reloadPage() {
@@ -36,12 +86,14 @@ export class ErrorBoundary extends Component<
   }
 
   render() {
-    if (!this.state.error) return this.props.children
+    const error = this.state.error
+    if (!error) return this.props.children
 
     const title = this.props.title ?? 'Something went wrong'
-    const description =
-      this.props.description ??
-      'The chat encountered an unexpected issue. Reload to try again.'
+    const description = this.state.recovering
+      ? 'Recovering from a stale DOM/runtime mismatch. The page will reload automatically.'
+      : (this.props.description ??
+        'The chat encountered an unexpected issue. Reload to try again.')
 
     return (
       <div
@@ -57,13 +109,11 @@ export class ErrorBoundary extends Component<
           <p className="mt-2 text-pretty text-sm text-primary-700">
             {description}
           </p>
-          {this.state.error ? (
-            <pre className="mt-3 max-h-32 overflow-auto rounded bg-red-50 p-2 text-left text-[10px] text-red-800">
-              {this.state.error.message}
-              {'\n'}
-              {this.state.error.stack?.split('\n').slice(0, 5).join('\n')}
-            </pre>
-          ) : null}
+          <pre className="mt-3 max-h-32 overflow-auto rounded bg-red-50 p-2 text-left text-[10px] text-red-800">
+            {error.message}
+            {'\n'}
+            {error.stack?.split('\n').slice(0, 5).join('\n')}
+          </pre>
           <div className="mt-5 flex justify-center">
             <Button onClick={() => this.reloadPage()}>Reload</Button>
           </div>

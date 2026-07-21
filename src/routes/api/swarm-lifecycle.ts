@@ -9,6 +9,7 @@ import {
   requestWorkerHandoff,
 } from '../../server/swarm-lifecycle'
 import { listSwarmWorkerIds } from '../../server/swarm-foundation'
+import { isSwarmWorkerId } from '../../server/swarm-roster'
 
 type LifecyclePost = {
   action?: unknown
@@ -16,7 +17,7 @@ type LifecyclePost = {
 }
 
 function validWorkerId(value: unknown): string | null {
-  return typeof value === 'string' && /^swarm\d+$/i.test(value.trim()) ? value.trim() : null
+  return isSwarmWorkerId(value) ? value.trim() : null
 }
 
 export const Route = createFileRoute('/api/swarm-lifecycle')({

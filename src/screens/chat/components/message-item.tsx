@@ -12,12 +12,18 @@ import {
   shouldAutoExpandHermesActivityCard,
 } from './streaming-activity-ui'
 import { TuiActivityCard } from './tui-activity-card'
-import type { ChatAttachment, ChatMessage, ToolCallContent } from '../types'
+import type { ChatAttachment, ChatMessage, SelectionCardContent, ToolCallContent } from '../types'
 import type { ToolPart } from '@/components/prompt-kit/tool'
 import { AssistantAvatar, UserAvatar } from '@/components/avatars'
 import { CodeBlock } from '@/components/prompt-kit/code-block'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { Message, MessageContent } from '@/components/prompt-kit/message'
+import {
+  DialogClose,
+  DialogContent,
+  DialogRoot,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -30,6 +36,7 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
+import { CHAT_SUBMIT_SELECTION_EVENT } from '@/screens/chat/chat-events'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -145,6 +152,93 @@ type MessageItemProps = {
   isLastAssistant?: boolean
 }
 
+function dispatchSelectionCardReply(text: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent(CHAT_SUBMIT_SELECTION_EVENT, { detail: { text } }),
+  )
+}
+
+function InteractiveSelectionCard({ card }: { card: SelectionCardContent }) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const mode = card.mode ?? 'single'
+  const options = Array.isArray(card.options) ? card.options : []
+  const isMulti = mode === 'multi'
+
+  function toggle(value: string) {
+    setSelected((prev) => {
+      const next = new Set(isMulti ? prev : [])
+      if (next.has(value)) next.delete(value)
+      else next.add(value)
+      return next
+    })
+  }
+
+  function submit(value?: string) {
+    const values = value ? [value] : [...selected]
+    if (values.length === 0) return
+    dispatchSelectionCardReply(values.join(', '))
+  }
+
+  return (
+    <div className="my-2 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-sm">
+      <div className="border-b border-[var(--theme-border)] px-3 py-2">
+        <div className="text-sm font-semibold text-[var(--theme-text)]">
+          {card.title || 'Choose an option'}
+        </div>
+        {card.body ? (
+          <div className="mt-1 text-xs text-[var(--theme-muted)]">{card.body}</div>
+        ) : null}
+      </div>
+      <div className="space-y-1.5 p-2">
+        {options.map((option, index) => {
+          const value = option.value || option.label
+          const id = option.id || value || String(index)
+          const isSelected = selected.has(value)
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => (isMulti ? toggle(value) : submit(value))}
+              className={cn(
+                'flex w-full items-start gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors',
+                isSelected
+                  ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-text)]'
+                  : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]',
+              )}
+            >
+              <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-current text-[10px]">
+                {isSelected ? '✓' : isMulti ? '' : index + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block font-medium">{option.label}</span>
+                {option.description ? (
+                  <span className="mt-0.5 block text-xs opacity-70">
+                    {option.description}
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      {isMulti || mode === 'confirm' ? (
+        <div className="flex items-center justify-between border-t border-[var(--theme-border)] px-3 py-2 text-xs text-[var(--theme-muted)]">
+          <span>{selected.size} selected</span>
+          <button
+            type="button"
+            onClick={() => submit()}
+            disabled={selected.size === 0}
+            className="rounded-full bg-[var(--theme-accent)] px-3 py-1.5 font-semibold text-primary-950 disabled:opacity-50"
+          >
+            {card.submitLabel || 'Send choice'}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 type InlineToolSection = {
   key: string
   type: string
@@ -161,10 +255,12 @@ type InlineToolSection = {
 
 export type InlineRenderPlanItem =
   | { kind: 'text'; text: string }
+  | { kind: 'selection-card'; card: SelectionCardContent }
   | { kind: 'tool'; section: InlineToolSection }
 
 export type CompactInlineRenderPlanItem =
   | { kind: 'text'; text: string }
+  | { kind: 'selection-card'; card: SelectionCardContent }
   | { kind: 'tools'; sections: Array<InlineToolSection> }
 
 export function buildInlineToolRenderPlan(
@@ -198,6 +294,11 @@ export function buildInlineToolRenderPlan(
         usedKeys.add(matchingSection.key)
         plan.push({ kind: 'tool', section: matchingSection })
       }
+      continue
+    }
+
+    if (part.type === 'selectionCard') {
+      plan.push({ kind: 'selection-card', card: part })
     }
   }
 
@@ -1362,6 +1463,160 @@ function MarkdownMessageCard({ content }: { content: string }) {
   )
 }
 
+type InlineArtifact = {
+  type: string
+  title: string
+  content: string
+}
+
+type InlineArtifactParseResult = {
+  cleanedText: string
+  artifacts: Array<InlineArtifact>
+}
+
+function parseArtifactAttributes(rawAttributes: string): Record<string, string> {
+  const attributes: Record<string, string> = {}
+  const attributeRegex = /(\w+)=(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g
+
+  for (const match of rawAttributes.matchAll(attributeRegex)) {
+    const key = (match[1] || '').trim().toLowerCase()
+    const value = (match[2] || match[3] || match[4] || '').trim()
+    if (key) {
+      attributes[key] = value
+    }
+  }
+
+  return attributes
+}
+
+export function parseInlineArtifacts(text: string): InlineArtifactParseResult {
+  const artifacts: Array<InlineArtifact> = []
+  const cleanedText = text.replace(
+    /<artifact\b([^>]*)>([\s\S]*?)<\/artifact>/gi,
+    (_, rawAttributes: string, rawContent: string) => {
+      const attributes = parseArtifactAttributes(rawAttributes || '')
+      const content = typeof rawContent === 'string' ? rawContent.trim() : ''
+      if (!content) return ''
+      artifacts.push({
+        type: (attributes.type || 'html').trim().toLowerCase(),
+        title: (attributes.title || 'Artifact').trim() || 'Artifact',
+        content,
+      })
+      return ''
+    },
+  )
+
+  return {
+    cleanedText: cleanedText.replace(/\n{3,}/g, '\n\n').trim(),
+    artifacts,
+  }
+}
+
+function summarizeArtifactContent(artifact: InlineArtifact): string {
+  const singleLine = artifact.content.replace(/\s+/g, ' ').trim()
+  if (singleLine.length <= 140) return singleLine
+  return `${singleLine.slice(0, 137)}…`
+}
+
+function artifactLanguage(type: string): string {
+  if (type === 'js' || type === 'javascript') return 'javascript'
+  if (type === 'ts' || type === 'typescript') return 'typescript'
+  if (type === 'md') return 'markdown'
+  if (type === 'py') return 'python'
+  return type
+}
+
+function ArtifactPreviewBody({ artifact }: { artifact: InlineArtifact }) {
+  if (artifact.type === 'html' || artifact.type === 'svg') {
+    return (
+      <iframe
+        title={artifact.title}
+        sandbox="allow-scripts"
+        srcDoc={artifact.content}
+        className="h-[60vh] w-full rounded-lg border"
+        style={{
+          borderColor: 'var(--theme-border)',
+          background: 'white',
+        }}
+      />
+    )
+  }
+
+  if (artifact.type === 'markdown' || artifact.type === 'md') {
+    return (
+      <div
+        className="max-h-[60vh] overflow-auto rounded-lg border p-4"
+        style={{ borderColor: 'var(--theme-border)' }}
+      >
+        <Markdown className="text-sm">{artifact.content}</Markdown>
+      </div>
+    )
+  }
+
+  return (
+    <CodeBlock
+      content={artifact.content}
+      language={artifactLanguage(artifact.type)}
+      className="my-0 max-h-[60vh] overflow-auto"
+    />
+  )
+}
+
+function InlineArtifactCard({ artifact }: { artifact: InlineArtifact }) {
+  const [open, setOpen] = useState(false)
+  const summary = summarizeArtifactContent(artifact)
+
+  return (
+    <>
+      <div
+        className="rounded-xl border p-3"
+        style={{
+          borderColor: 'var(--chat-assistant-border)',
+          background: 'color-mix(in srgb, var(--chat-assistant-bg) 85%, white 15%)',
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true">🧩</span>
+              <span className="truncate text-sm font-semibold">{artifact.title}</span>
+              <span
+                className="rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
+                style={{
+                  background: 'var(--theme-card2)',
+                  color: 'var(--theme-muted)',
+                }}
+              >
+                {artifact.type}
+              </span>
+            </div>
+            {summary ? (
+              <p className="mt-2 text-xs opacity-80">{summary}</p>
+            ) : null}
+          </div>
+          <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+            Open
+          </Button>
+        </div>
+      </div>
+      <DialogRoot open={open} onOpenChange={setOpen}>
+        <DialogContent className="w-[min(1100px,96vw)] max-h-[92vh]">
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--theme-border)' }}>
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base">{artifact.title}</DialogTitle>
+              <div className="text-xs uppercase tracking-wide opacity-70">{artifact.type}</div>
+            </div>
+            <DialogClose>Close</DialogClose>
+          </div>
+          <div className="p-4">
+            <ArtifactPreviewBody artifact={artifact} />
+          </div>
+        </DialogContent>
+      </DialogRoot>
+    </>
+  )
+}
+
 const TOOL_ICONS: Record<string, string> = {
   exec: '\u2699',
   terminal: '\u2699',
@@ -1915,9 +2170,16 @@ function MessageItemComponent({
     () => detectAssistantCorruptionWarning(role, assistantDisplayText),
     [role, assistantDisplayText],
   )
-  const standaloneMarkdownDocument = useMemo(
-    () => extractStandaloneMarkdownFence(assistantDisplayText),
+  const parsedInlineArtifacts = useMemo(
+    () => parseInlineArtifacts(assistantDisplayText),
     [assistantDisplayText],
+  )
+  const standaloneMarkdownDocument = useMemo(
+    () =>
+      parsedInlineArtifacts.artifacts.length === 0
+        ? extractStandaloneMarkdownFence(parsedInlineArtifacts.cleanedText)
+        : null,
+    [parsedInlineArtifacts],
   )
 
   useEffect(() => {
@@ -2034,11 +2296,23 @@ function MessageItemComponent({
       .filter((img) => img.src.length > 0)
   }, [message.content])
   const hasInlineImages = inlineImages.length > 0
+  const selectionCards = useMemo(
+    () =>
+      (Array.isArray(message.content) ? message.content : []).filter(
+        (part): part is SelectionCardContent => part.type === 'selectionCard',
+      ),
+    [message.content],
+  )
+  const hasSelectionCards = selectionCards.length > 0
 
   const hasText = displayText.length > 0
+  const hasRenderableAssistantText =
+    parsedInlineArtifacts.cleanedText.length > 0 ||
+    parsedInlineArtifacts.artifacts.length > 0
   const hasRevealedText = effectiveIsStreaming
-    ? assistantDisplayText.length > 0
-    : hasText
+    ? parsedInlineArtifacts.cleanedText.length > 0 ||
+      parsedInlineArtifacts.artifacts.length > 0
+    : hasRenderableAssistantText
   const canRetryMessage =
     isUser && (hasText || hasAttachments || hasInlineImages)
 
@@ -2222,6 +2496,7 @@ function MessageItemComponent({
     hasText ||
     hasAttachments ||
     hasInlineImages ||
+    hasSelectionCards ||
     (effectiveIsStreaming && hasRevealedText)
 
   // 'queued' = delivered to server, waiting for response (busy/backlogged)
@@ -2323,7 +2598,7 @@ function MessageItemComponent({
       }
       className={cn(
         'group relative flex flex-col',
-        hasText || hasAttachments ? 'gap-0.5 md:gap-1' : 'gap-0',
+        hasText || hasAttachments || hasSelectionCards ? 'gap-0.5 md:gap-1' : 'gap-0',
         wrapperClassName,
         isUser ? 'items-end' : 'items-start',
         !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',
@@ -2332,21 +2607,29 @@ function MessageItemComponent({
       {/* Grouped tool card above the assistant bubble. Only show once there
           is real assistant text in the bubble. While streaming with no text,
           the legacy ThinkingBubble in chat-message-list owns the visual and
-          renders its own branched TuiActivityCard so we don't double up. */}
+          renders its own branched TuiActivityCard so we don't double up.
+          When done streaming, show a compact tool-count chip instead of
+          the full expandable card. */}
       {!isUser &&
       finalToolSections.length > 0 &&
       (hasText || !effectiveIsStreaming) ? (
         <div className="w-full max-w-[var(--chat-content-max-width)] flex">
           <div className="w-6 shrink-0" aria-hidden />
           <div className="min-w-0 flex-1">
-            <TuiActivityCard
-              toolSections={finalToolSections}
-              thinking={null}
-              isStreaming={effectiveIsStreaming}
-              expandAll={expandAllToolSections}
-              formatLabel={formatToolDisplayLabel}
-              formatArg={keyArgLabel}
-            />
+            {effectiveIsStreaming ? (
+              <TuiActivityCard
+                toolSections={finalToolSections}
+                thinking={null}
+                isStreaming={effectiveIsStreaming}
+                expandAll={expandAllToolSections}
+                formatLabel={formatToolDisplayLabel}
+                formatArg={keyArgLabel}
+              />
+            ) : (
+              <span className="inline-block text-[11px] text-primary-400 dark:text-primary-500 py-0.5 opacity-60">
+                {finalToolSections.length} tool{finalToolSections.length !== 1 ? 's' : ''} used
+              </span>
+            )}
           </div>
         </div>
       ) : null}
@@ -2510,6 +2793,16 @@ function MessageItemComponent({
                 ))}
               </div>
             )}
+            {hasSelectionCards ? (
+              <div className="flex flex-col gap-2">
+                {selectionCards.map((card, index) => (
+                  <InteractiveSelectionCard
+                    key={card.id || `${wrapperDataMessageId ?? 'selection'}-${index}`}
+                    card={card}
+                  />
+                ))}
+              </div>
+            ) : null}
             {hasText &&
               (isUser ? (
                 <span className="text-pretty">{displayText}</span>
@@ -2534,7 +2827,7 @@ function MessageItemComponent({
                   ) : null}
                   {standaloneMarkdownDocument ? (
                     <MarkdownMessageCard content={standaloneMarkdownDocument} />
-                  ) : (
+                  ) : parsedInlineArtifacts.cleanedText ? (
                     <MessageContent
                       markdown
                       className={cn(
@@ -2542,12 +2835,22 @@ function MessageItemComponent({
                         effectiveIsStreaming && 'chat-streaming-content',
                       )}
                     >
-                      {assistantDisplayText}
+                      {parsedInlineArtifacts.cleanedText}
                     </MessageContent>
-                  )}
-                  {effectiveIsStreaming && (
+                  ) : null}
+                  {parsedInlineArtifacts.artifacts.length > 0 ? (
+                    <div className="mt-3 flex flex-col gap-3">
+                      {parsedInlineArtifacts.artifacts.map((artifact, index) => (
+                        <InlineArtifactCard
+                          key={`${artifact.title}-${artifact.type}-${index}`}
+                          artifact={artifact}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  {effectiveIsStreaming && parsedInlineArtifacts.cleanedText ? (
                     <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent-500 align-text-bottom" />
-                  )}
+                  ) : null}
                 </div>
               ) : null)}
             {/* Sent indicator — message delivered, waiting for response */}

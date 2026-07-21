@@ -5,7 +5,6 @@ export type SettingsNavId =
   | 'connection'
   | 'claude'
   | 'agent'
-  | 'routing'
   | 'voice'
   | 'display'
   | 'appearance'
@@ -19,7 +18,6 @@ export const SETTINGS_NAV_ITEMS: Array<NavItem> = [
   { id: 'connection', label: 'Connection' },
   { id: 'claude', label: 'Model & Provider' },
   { id: 'agent', label: 'Agent Behavior' },
-  { id: 'routing', label: 'Smart Routing' },
   { id: 'voice', label: 'Voice' },
   { id: 'display', label: 'Display' },
   { id: 'appearance', label: 'Appearance' },

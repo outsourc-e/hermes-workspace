@@ -7,6 +7,38 @@ import server from './dist/server/server.js'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLIENT_DIR = join(__dirname, 'dist', 'client')
 
+// Content Security Policy — emitted as an HTTP response header on EVERY
+// response so the policy survives any edge body transformations (e.g.
+// Cloudflare's JS Challenge inserting a `<meta http-equiv="Content-Security-Policy">`
+// with a per-request nonce into the served HTML when a request trips the
+// "impersonate browsers" rule).
+//
+// KEEP IN SYNC with `src/lib/csp.ts` (single source of truth) and
+// `src/routes/__root.tsx` APP_CSP (which emits the same policy as `<meta>`).
+// If you change the directives here, change them in all three places.
+const APP_CSP_HEADERS = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self' ws: wss: http: https:",
+  "worker-src 'self' blob:",
+  "media-src 'self' blob: data:",
+  "frame-src 'self' http: https:",
+].join('; ')
+
+const ALWAYS_HEADERS = {
+  'Content-Security-Policy': APP_CSP_HEADERS,
+  // Tighten later if/when CSP moves to nonce-based — the dash prefix
+  // makes adding/removing trivial without searching the codebase.
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+}
+
 const port = parseInt(process.env.PORT || '3000', 10)
 // Default HOST to localhost-only. Operators who want the workspace reachable
 // on a LAN / Tailscale / public surface must opt in explicitly with
@@ -26,7 +58,9 @@ if (isNonLoopbackHost(host)) {
   // Honor HERMES_PASSWORD (current name) with CLAUDE_PASSWORD as a back-compat
   // fallback for deployments configured pre-rename.
   const password = (
-    process.env.HERMES_PASSWORD || process.env.CLAUDE_PASSWORD || ''
+    process.env.HERMES_PASSWORD ||
+    process.env.CLAUDE_PASSWORD ||
+    ''
   ).trim()
   if (!password) {
     console.error(
@@ -46,7 +80,11 @@ if (isNonLoopbackHost(host)) {
     )
       .trim()
       .toLowerCase()
-    if (allowInsecure !== '1' && allowInsecure !== 'true' && allowInsecure !== 'yes') {
+    if (
+      allowInsecure !== '1' &&
+      allowInsecure !== 'true' &&
+      allowInsecure !== 'yes'
+    ) {
       process.exit(1)
     }
     console.warn(
@@ -58,23 +96,13 @@ if (isNonLoopbackHost(host)) {
   // sets the Secure flag on session cookies, which browsers silently drop
   // over http://.  Operators must set COOKIE_SECURE=0 for plain-HTTP LAN
   // deployments.  See #149.
-  const cookieSecureOverride = (process.env.COOKIE_SECURE || '').trim().toLowerCase()
-  const cookieSecureExplicit = cookieSecureOverride === '0' || cookieSecureOverride === 'false' || cookieSecureOverride === 'no'
-  if (!cookieSecureExplicit && process.env.NODE_ENV === 'production') {
-    console.warn(
-      '\n[workspace] warning: plain-HTTP LAN deployment detected.\n' +
-        '  NODE_ENV=production enables the Secure flag on session cookies.\n' +
-        '  Browsers silently drop Secure cookies over http://, so login will fail.\n' +
-        '  Add COOKIE_SECURE=0 to your .env to fix this.  See #149.\n',
-    )
-  }
-
-  // Warn when serving over plain HTTP with a password: NODE_ENV=production
-  // sets the Secure flag on session cookies, which browsers silently drop
-  // over http://.  Operators must set COOKIE_SECURE=0 for plain-HTTP LAN
-  // deployments.  See #149.
-  const cookieSecureOverride = (process.env.COOKIE_SECURE || '').trim().toLowerCase()
-  const cookieSecureExplicit = cookieSecureOverride === '0' || cookieSecureOverride === 'false' || cookieSecureOverride === 'no'
+  const cookieSecureOverride = (process.env.COOKIE_SECURE || '')
+    .trim()
+    .toLowerCase()
+  const cookieSecureExplicit =
+    cookieSecureOverride === '0' ||
+    cookieSecureOverride === 'false' ||
+    cookieSecureOverride === 'no'
   if (!cookieSecureExplicit && process.env.NODE_ENV === 'production') {
     console.warn(
       '\n[workspace] warning: plain-HTTP LAN deployment detected.\n' +
@@ -117,6 +145,27 @@ async function tryServeStatic(req, res) {
 
   // Prevent directory traversal
   if (pathname.includes('..')) return false
+
+  // Asset requests should never fall through to the SSR handler. If a browser
+  // asks for a stale hashed JS/CSS chunk after a deploy or branch switch,
+  // returning the HTML shell with 200 text/html makes the SPA fail as a black
+  // screen. Return a real 404 instead so clients reload/recover correctly and
+  // health checks can detect the broken asset reference.
+  if (pathname.startsWith('/assets/')) {
+    const filePath = join(CLIENT_DIR, pathname)
+    if (!filePath.startsWith(CLIENT_DIR)) return false
+    try {
+      const fileStat = await stat(filePath)
+      if (!fileStat.isFile()) throw new Error('not a file')
+    } catch {
+      res.writeHead(404, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      })
+      res.end('Asset not found')
+      return true
+    }
+  }
 
   const filePath = join(CLIENT_DIR, pathname)
 
@@ -186,10 +235,32 @@ async function requestHandler(req, res) {
   try {
     const response = await server.fetch(request)
 
-    res.writeHead(
-      response.status,
-      Object.fromEntries(response.headers.entries()),
-    )
+    // Merge ALWAYS_HEADERS on top of the SSR-emitted headers. These MUST
+    // win — sending them here means the policy is observable even if the
+    // body got replaced by an edge-side JS Challenge or WAF response page.
+    const headers = Object.fromEntries(response.headers.entries())
+    for (const [name, value] of Object.entries(ALWAYS_HEADERS)) {
+      if (typeof value === 'string') headers[name] = value
+    }
+
+    // /api/* responses must NEVER be cacheable by intermediaries — the SPA
+    // uses /api/auth-check, /api/connection-status, etc. to decide whether
+    // to show the password form. Cloudflare's Browser Cache TTL default
+    // (7200s) is applied to any GET that doesn't say `no-store`, which
+    // caused the auth-check response to be served stale from the edge
+    // for ~2h after a fresh login, trapping the user in a password loop.
+    // Strip any Cache-Control/Pragma/Expires on API responses so the
+    // edge never reuses them. Hash-named assets keep their immutable
+    // header (set above in tryServeStatic) and are unaffected here
+    // because static assets short-circuit before this branch.
+    const reqPathname = new URL(request.url).pathname
+    if (reqPathname.startsWith('/api/')) {
+      headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+      headers['Pragma'] = 'no-cache'
+      headers['Expires'] = '0'
+    }
+
+    res.writeHead(response.status, headers)
 
     if (response.body) {
       const reader = response.body.getReader()

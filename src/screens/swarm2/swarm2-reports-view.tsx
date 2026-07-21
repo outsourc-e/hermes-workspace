@@ -160,7 +160,13 @@ function splitChangedFiles(value: string | null | undefined): Array<RuntimeArtif
 function stateForAssignment(assignment: MissionAssignment): Exclude<ReportState, 'all'> {
   const checkpoint = assignment.checkpoint
   const statusText = `${assignment.state ?? ''} ${checkpoint?.stateLabel ?? ''} ${checkpoint?.checkpointStatus ?? ''}`.toLowerCase()
-  if (statusText.includes('blocked') || statusText.includes('needs_input') || checkpoint?.blocker) return 'blocked'
+  if (
+    statusText.includes('blocked') ||
+    statusText.includes('needs_input') ||
+    (checkpoint?.blocker && checkpoint.blocker !== 'none')
+  ) {
+    return 'blocked'
+  }
   if (assignment.reviewRequired && ['checkpointed', 'reviewing'].includes(assignment.state ?? '')) return 'needs_review'
   if (['done', 'complete'].includes(assignment.state ?? '') || statusText.includes('handoff') || statusText.includes('done')) return 'ready'
   return 'in_progress'

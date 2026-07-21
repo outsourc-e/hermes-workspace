@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -62,7 +63,7 @@ export function createTerminalSession(params: {
   const emitter = new EventEmitter()
   const sessionId = randomUUID()
 
-  const home = process.env.HOME ?? homedir() ?? '/tmp'
+  const home = process.env.HOME || homedir() || '/tmp'
   const defaultShell =
     process.platform === 'win32'
       ? 'powershell.exe'
@@ -75,6 +76,9 @@ export function createTerminalSession(params: {
   let cwd = params.cwd ?? home
   if (cwd.startsWith('~')) {
     cwd = cwd.replace('~', home)
+  }
+  if (!existsSync(cwd)) {
+    cwd = home
   }
 
   const cols = params.cols ?? 80
@@ -104,11 +108,11 @@ export function createTerminalSession(params: {
     }
   }
 
-  // Spawn Python PTY helper
-  const proc: ChildProcess = spawn(
-    'python3',
-    [PTY_HELPER, cwd, String(cols), String(rows), '--', ...command],
-    {
+  // Spawn shell directly on Windows, else use Python PTY helper for POSIX
+  let proc: ChildProcess
+  if (process.platform === 'win32') {
+    proc = spawn(command[0], command.slice(1), {
+      cwd,
       env: {
         ...process.env,
         ...params.env,
@@ -118,8 +122,24 @@ export function createTerminalSession(params: {
         LINES: String(rows),
       } as Record<string, string>,
       stdio: ['pipe', 'pipe', 'pipe'],
-    },
-  )
+    })
+  } else {
+    proc = spawn(
+      'python3',
+      [PTY_HELPER, cwd, String(cols), String(rows), '--', ...command],
+      {
+        env: {
+          ...process.env,
+          ...params.env,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          COLUMNS: String(cols),
+          LINES: String(rows),
+        } as Record<string, string>,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    )
+  }
 
   proc.stdout?.on('data', (data: Buffer) => {
     pushEvent({

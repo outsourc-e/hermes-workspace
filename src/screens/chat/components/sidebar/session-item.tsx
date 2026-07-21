@@ -83,6 +83,9 @@ function getSessionDisplayTitle(
   const derivedTitle = normalizeTitleValue(session.derivedTitle)
   if (derivedTitle) return derivedTitle
 
+  const title = normalizeTitleValue(session.title)
+  if (title) return title
+
   if (isGenerating) return 'Naming…'
   const shortId = getSessionShortId(session)
   return shortId ? `Session ${shortId}` : 'Session'

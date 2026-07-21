@@ -104,6 +104,68 @@ describe('swarm-missions', () => {
     expect(existsSync(mod.SWARM_MISSIONS_PATH)).toBe(true)
   })
 
+  it('does not infer review-required from dispatch/checkpoint wording alone', async () => {
+    const mod = await loadModule()
+    const mission = mod.createOrUpdateMission({
+      missionId: 'mission-dispatch-smoke-review',
+      title: 'Diagnostic dispatch smoke',
+      assignments: [{
+        workerId: 'builder',
+        task: 'Diagnostic smoke only. Return RESULT: workspace swarm dispatch API smoke passed.',
+        rationale: 'diagnostic dispatch smoke',
+      }],
+    })
+
+    expect(mission.assignments[0]?.reviewRequired).toBe(false)
+
+    const updated = mod.recordMissionCheckpoint({
+      missionId: mission.id,
+      assignmentId: mission.assignments[0]?.id,
+      workerId: 'builder',
+      checkpoint: {
+        stateLabel: 'DONE',
+        runtimeState: 'idle',
+        checkpointStatus: 'done',
+        filesChanged: 'none',
+        commandsRun: 'none',
+        result: 'workspace swarm dispatch API smoke passed',
+        blocker: null,
+        nextAction: 'none',
+        raw: 'STATE: DONE\nFILES_CHANGED: none\nCOMMANDS_RUN: none\nRESULT: workspace swarm dispatch API smoke passed\nBLOCKER: none\nNEXT_ACTION: none',
+      },
+      source: 'swarm-dispatch',
+    })
+
+    expect(updated?.state).toBe('complete')
+  })
+
+  it('records dispatch failures as blocked mission assignments', async () => {
+    const mod = await loadModule()
+    const mission = mod.createOrUpdateMission({
+      missionId: 'mission-dispatch-failure',
+      title: 'Dispatch failure test',
+      assignments: [{ workerId: 'builder', task: 'Probe runtime health', reviewRequired: false }],
+    })
+    mod.markMissionAssignmentDispatched({ missionId: mission.id, workerId: 'builder', task: 'Probe runtime health' })
+
+    const blocked = mod.recordMissionAssignmentBlocked({
+      missionId: mission.id,
+      assignmentId: mission.assignments[0]?.id,
+      workerId: 'builder',
+      reason: 'No fresh checkpoint before poll timeout.',
+      source: 'swarm-dispatch',
+    })
+
+    expect(blocked?.mission.state).toBe('blocked')
+    expect(blocked?.assignment.state).toBe('blocked')
+    expect(blocked?.assignment.checkpoint).toMatchObject({
+      stateLabel: 'BLOCKED',
+      checkpointStatus: 'blocked',
+      blocker: 'No fresh checkpoint before poll timeout.',
+    })
+    expect(blocked?.mission.events.at(-1)?.type).toBe('blocked')
+  })
+
   it('keeps dependent work queued until review-required assignments are reviewed', async () => {
     const mod = await loadModule()
     const mission = mod.createOrUpdateMission({
@@ -153,6 +215,78 @@ describe('swarm-missions', () => {
       reviewedBy: 'swarm11',
     })
     expect(mod.readyQueuedAssignments(mission.id).map((assignment) => assignment.id)).toEqual([finalAction.id])
+  })
+
+  it('cancels active missions without accepting stale checkpoints afterward', async () => {
+    const mod = await loadModule()
+    const mission = mod.createOrUpdateMission({
+      missionId: 'mission-cancel-1',
+      title: 'Cancel test',
+      assignments: [
+        { workerId: 'swarm2', task: 'Active backend task', reviewRequired: false },
+        { workerId: 'swarm5', task: 'Queued builder task', reviewRequired: false },
+      ],
+    })
+    mod.markMissionAssignmentDispatched({ missionId: mission.id, workerId: 'swarm2', task: 'Active backend task' })
+
+    const cancelled = mod.cancelSwarmMission({
+      missionId: mission.id,
+      actor: 'test',
+      reason: 'User cancelled bad swarm run',
+    })
+
+    expect(cancelled?.mission.state).toBe('cancelled')
+    expect(cancelled?.cancelledAssignmentIds).toHaveLength(2)
+    expect(cancelled?.mission.assignments.map((assignment) => assignment.state)).toEqual(['cancelled', 'cancelled'])
+    expect(cancelled?.mission.events.at(-1)?.type).toBe('mission_cancelled')
+
+    const staleCheckpoint = mod.recordMissionCheckpoint({
+      missionId: mission.id,
+      assignmentId: mission.assignments[0]?.id,
+      workerId: 'swarm2',
+      checkpoint: {
+        stateLabel: 'DONE',
+        runtimeState: 'idle',
+        checkpointStatus: 'done',
+        filesChanged: 'none',
+        commandsRun: 'none',
+        result: 'Stale checkpoint after cancel',
+        blocker: null,
+        nextAction: 'none',
+        raw: 'STATE: DONE\nRESULT: stale',
+      },
+      source: 'stale-worker',
+    })
+
+    expect(staleCheckpoint?._ignoredReason).toContain('cancelled')
+    const persisted = mod.getSwarmMission(mission.id)
+    expect(persisted?.state).toBe('cancelled')
+    expect(persisted?.assignments[0]?.state).toBe('cancelled')
+    expect(persisted?.events.filter((event) => event.type === 'checkpoint')).toHaveLength(0)
+  })
+
+  it('cancels a single assignment and leaves unaffected work active', async () => {
+    const mod = await loadModule()
+    const mission = mod.createOrUpdateMission({
+      missionId: 'mission-cancel-assignment',
+      title: 'Assignment cancel test',
+      assignments: [
+        { workerId: 'swarm2', task: 'Cancel this', reviewRequired: false },
+        { workerId: 'swarm5', task: 'Keep this queued', reviewRequired: false },
+      ],
+    })
+
+    const cancelled = mod.cancelSwarmAssignment({
+      missionId: mission.id,
+      assignmentId: mission.assignments[0]?.id,
+      actor: 'test',
+      reason: 'Only one bad lane',
+    })
+
+    expect(cancelled?.assignment?.state).toBe('cancelled')
+    expect(cancelled?.mission.state).toBe('planning')
+    expect(cancelled?.mission.assignments.map((assignment) => assignment.state)).toEqual(['cancelled', 'queued'])
+    expect(cancelled?.mission.events.at(-1)?.type).toBe('assignment_cancelled')
   })
 
   it('archives stale executing missions when all assignments are terminal', async () => {

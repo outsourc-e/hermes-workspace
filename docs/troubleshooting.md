@@ -13,8 +13,8 @@ Common setup issues and how to fix them.
 **Fix:**
 
 ```bash
-# Find your claude env file
-claude config env-path
+# Find your Hermes env file
+hermes config env-path
 # Usually: ~/.hermes/.env
 
 # Check for the key
@@ -43,13 +43,21 @@ After fixing, restart the gateway: `hermes gateway run --replace`
 
 **Checklist (in order):**
 
-1. Is the gateway running? `pgrep -af "claude.*gateway"`
+1. Is the gateway running? `hermes gateway status` or `pgrep -af "hermes.*gateway"`
 2. Is port 8642 bound? `curl -sf http://127.0.0.1:8642/health`
 3. Is Workspace `.env` correct? `grep HERMES_API_URL ~/hermes-workspace/.env`
    - Should be: `HERMES_API_URL=http://127.0.0.1:8642`
 4. Restart Workspace: `pnpm dev`
 
 If the gateway is running and healthy but Workspace still disconnects, check for port conflicts (another process on 8642) or firewall rules.
+
+Before starting a second gateway, verify the workspace probe directly:
+
+```bash
+curl http://127.0.0.1:3000/api/sessions
+```
+
+If that returns sessions (or an empty list), the backend pairing is already alive and the UI needs a refresh/reprobe — **do not start another gateway**.
 
 ---
 
@@ -73,7 +81,43 @@ hermes gateway run --replace
 
 ---
 
-## 4. WSL: Gateway health check times out on first boot
+## 4. Dashboard not running (sessions / skills / jobs missing)
+
+**Symptom:** Chat works, but Sessions/Skills/Jobs stay offline or `/api/sessions` says the backend does not support the sessions API.
+
+**Cause:** `hermes dashboard` is not running on port 9119.
+
+**Fix:**
+
+```bash
+hermes dashboard
+curl -sf http://127.0.0.1:9119/ && echo "dashboard ok"
+```
+
+Workspace needs both:
+
+- `hermes gateway run` on `:8642`
+- `hermes dashboard` on `:9119`
+
+---
+
+## 5. Codex / GPT-5.4 chat fails with missing access token
+
+**Symptom:** Sending chat through Workspace fails with an error like `Codex auth is missing access_token`.
+
+**Cause:** The default model is `gpt-5.4` / `openai-codex`, but the local Codex CLI login is stale or missing.
+
+**Fix:**
+
+```bash
+codex login
+```
+
+Then retry the chat. Do not restart the gateway unless auth still fails after re-login.
+
+---
+
+## 6. WSL: Gateway health check times out on first boot
 
 **Symptom:** Workspace starts, checks the gateway, reports "disconnected". But if you wait 15 seconds and refresh, it works.
 
@@ -92,7 +136,7 @@ cd ~/hermes-workspace && pnpm dev
 
 ---
 
-## 5. Dev server crashes immediately after boot
+## 7. Dev server crashes immediately after boot
 
 **Symptom:** `pnpm dev` starts, shows the Vite banner, then crashes with ELIFECYCLE or a stack trace.
 
@@ -105,7 +149,7 @@ cd ~/hermes-workspace && pnpm dev
 
 ---
 
-## 6. "No compatible backend detected" in onboarding
+## 8. "No compatible backend detected" in onboarding
 
 **Symptom:** Clicked "Connect Backend", health check runs, shows error.
 
@@ -122,10 +166,10 @@ This means the Vite SSR server tried `GET /api/gateway-status` which internally 
 If nothing above helps, run this and share the output:
 
 ```bash
-echo "=== claude version ===" && claude --version 2>&1
-echo "=== claude env path ===" && claude config env-path 2>&1
-echo "=== claude env (redacted) ===" && grep -E "^(API_SERVER|CLAUDE_)" "$(claude config env-path 2>/dev/null || echo ~/.hermes/.env)" 2>&1
-echo "=== gateway process ===" && pgrep -af "claude.*gateway" 2>&1 || echo "not running"
+echo "=== hermes version ===" && hermes --version 2>&1
+echo "=== hermes env path ===" && hermes config env-path 2>&1
+echo "=== hermes env (redacted) ===" && grep -E "^(API_SERVER|HERMES_|CLAUDE_)" "$(hermes config env-path 2>/dev/null || echo ~/.hermes/.env)" 2>&1
+echo "=== gateway process ===" && pgrep -af "hermes.*gateway" 2>&1 || echo "not running"
 echo "=== port 8642 ===" && (ss -tlnp 2>/dev/null || lsof -iTCP:8642 -sTCP:LISTEN 2>/dev/null) | grep 8642 || echo "not bound"
 echo "=== health check ===" && curl -sf http://127.0.0.1:8642/health 2>&1 || echo "not reachable"
 echo "=== workspace .env ===" && grep CLAUDE ~/hermes-workspace/.env 2>&1 || echo "no .env"

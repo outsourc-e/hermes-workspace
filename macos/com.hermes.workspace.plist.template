@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.hermes.workspace</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>{{NODE_BIN}}</string>
+      <!-- server-entry.js is the real runtime entrypoint. It wraps the built
+           server with static asset serving and the loopback binding behavior
+           Workspace expects. Pointing launchd at dist/server/server.js skips
+           that wrapper and breaks the app. -->
+      <string>{{INSTALL_DIR}}/server-entry.js</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>{{INSTALL_DIR}}</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>HOST</key>
+      <string>127.0.0.1</string>
+      <key>PORT</key>
+      <string>{{PORT}}</string>
+      <key>HERMES_API_URL</key>
+      <string>{{HERMES_API_URL}}</string>
+      <key>CLAUDE_API_URL</key>
+      <string>{{HERMES_API_URL}}</string>
+      <key>HERMES_API_TOKEN</key>
+      <string>{{HERMES_API_TOKEN}}</string>
+      <key>CLAUDE_API_TOKEN</key>
+      <string>{{HERMES_API_TOKEN}}</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+      <key>SuccessfulExit</key>
+      <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/hermes-workspace.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/hermes-workspace.err.log</string>
+  </dict>
+</plist>

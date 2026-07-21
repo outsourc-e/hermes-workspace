@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  unregisterServiceWorkers,
+  registerAppServiceWorker,
   wrapInlineScript,
 } from './__root'
 
@@ -12,18 +12,18 @@ describe('root runtime guards', () => {
     expect(wrapped).toContain("console.error('Inline bootstrap script failed'")
   })
 
-  it('swallows getRegistrations rejections', async () => {
-    const getRegistrations = vi.fn().mockRejectedValue(new Error('boom'))
-    const unregister = vi.fn()
+  it('clears old caches and registers the network-only PWA service worker', async () => {
+    const register = vi.fn().mockResolvedValue(undefined)
+    const deleteCache = vi.fn().mockResolvedValue(true)
 
     await expect(
-      unregisterServiceWorkers({
-        serviceWorker: { getRegistrations },
-        cachesApi: { keys: vi.fn().mockResolvedValue(['stale']), delete: unregister },
+      registerAppServiceWorker({
+        serviceWorker: { register },
+        cachesApi: { keys: vi.fn().mockResolvedValue(['stale']), delete: deleteCache },
       }),
     ).resolves.toBeUndefined()
 
-    expect(getRegistrations).toHaveBeenCalledTimes(1)
-    expect(unregister).toHaveBeenCalledWith('stale')
+    expect(deleteCache).toHaveBeenCalledWith('stale')
+    expect(register).toHaveBeenCalledWith('/sw.js', { scope: '/' })
   })
 })

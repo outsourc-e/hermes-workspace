@@ -9,6 +9,7 @@ export type CrewPlatformInfo = {
 export type CrewMember = {
   id: string
   displayName: string
+  humanLabel?: string
   role: string
   specialty?: string
   mission?: string

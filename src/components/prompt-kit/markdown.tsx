@@ -1,17 +1,48 @@
 import { marked } from 'marked'
 import { createContext, memo, useContext, useId, useMemo, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
-import rehypeKatex from 'rehype-katex'
-import 'katex/dist/katex.min.css'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
 import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
-import remarkMath from 'remark-math'
 import { CodeBlock } from './code-block'
 import type { Components } from 'react-markdown'
 import { cn } from '@/lib/utils'
 
-export const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkMath]
-export const MARKDOWN_REHYPE_PLUGINS = [rehypeKatex]
+/**
+ * Rewrite Workspace-local `MEDIA:<path>` tokens emitted by Hermes Agent to the
+ * authenticated media endpoint. Messaging bridges intercept MEDIA tags before
+ * rendering; the web chat sees raw markdown/HTML and needs this client-side
+ * rewrite so browsers can load the file through Workspace instead of trying to
+ * resolve a local filesystem path directly.
+ */
+export function rewriteLocalMediaSources(content: string): string {
+  const rewritePath = (rawPath: string): string | null => {
+    const path = rawPath.trim()
+    if (!path || /^https?:\/\//i.test(path)) return null
+    return `/api/media?path=${encodeURIComponent(path)}`
+  }
+
+  const markdownImage = /(!\[[^\]]*\]\()MEDIA:([^\)\s]+)(\))/g
+  const withMarkdownImages = content.replace(
+    markdownImage,
+    (_match, prefix: string, mediaPath: string, suffix: string) => {
+      const rewritten = rewritePath(mediaPath)
+      return rewritten ? `${prefix}${rewritten}${suffix}` : `${prefix}MEDIA:${mediaPath}${suffix}`
+    },
+  )
+
+  const htmlImage = /(<img\b[^>]*\bsrc=)(["'])MEDIA:([^"']+)\2/gi
+  return withMarkdownImages.replace(
+    htmlImage,
+    (_match, prefix: string, quote: string, mediaPath: string) => {
+      const rewritten = rewritePath(mediaPath)
+      return rewritten
+        ? `${prefix}${quote}${rewritten}${quote}`
+        : `${prefix}${quote}MEDIA:${mediaPath}${quote}`
+    },
+  )
+}
 
 export type MarkdownProps = {
   children: string
@@ -185,6 +216,9 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     return <li className="leading-relaxed">{children}</li>
   },
   a: function AComponent({ children, href }) {
+    if (!href) {
+      return <span className="text-primary-950">{children}</span>
+    }
     return (
       <a
         href={href}
@@ -195,6 +229,12 @@ const INITIAL_COMPONENTS: Partial<Components> = {
         {children}
       </a>
     )
+  },
+  img: function ImgComponent({ src, alt, ...props }) {
+    if (!src) {
+      return null
+    }
+    return <img src={src} alt={alt ?? ''} {...props} />
   },
   blockquote: function BlockquoteComponent({ children }) {
     return (
@@ -305,6 +345,101 @@ const INITIAL_COMPONENTS: Partial<Components> = {
   },
 }
 
+const HTML_SANITIZE_SCHEMA = {
+  tagNames: [
+    'a',
+    'abbr',
+    'article',
+    'b',
+    'bdi',
+    'blockquote',
+    'br',
+    'caption',
+    'center',
+    'cite',
+    'code',
+    'col',
+    'colgroup',
+    'data',
+    'dd',
+    'del',
+    'details',
+    'dfn',
+    'div',
+    'dl',
+    'dt',
+    'em',
+    'figcaption',
+    'figure',
+    'footer',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'header',
+    'hgroup',
+    'hr',
+    'i',
+    'img',
+    'ins',
+    'kbd',
+    'li',
+    'main',
+    'mark',
+    'nav',
+    'ol',
+    'p',
+    'pre',
+    'q',
+    'rp',
+    'rt',
+    'ruby',
+    's',
+    'samp',
+    'section',
+    'small',
+    'span',
+    'strong',
+    'sub',
+    'summary',
+    'sup',
+    'table',
+    'tbody',
+    'td',
+    'tfoot',
+    'th',
+    'thead',
+    'time',
+    'tr',
+    'u',
+    'ul',
+    'var',
+    'wbr',
+  ],
+  attributes: {
+    '*': ['className', 'class', 'title', 'lang', 'dir'],
+    a: ['href', 'target', 'rel', 'download'],
+    img: ['src', 'alt', 'width', 'height', 'loading'],
+    td: ['colspan', 'rowspan', 'headers'],
+    th: ['colspan', 'rowspan', 'headers', 'scope'],
+    col: ['span'],
+    colgroup: ['span'],
+    ol: ['start', 'type'],
+    li: ['value'],
+    details: ['open'],
+    time: ['datetime'],
+    data: ['value'],
+    del: ['datetime'],
+    ins: ['datetime'],
+  },
+  protocols: {
+    a: { href: ['http', 'https', 'mailto', 'tel'] },
+    img: { src: ['http', 'https', 'data'] },
+  },
+}
+
 const MemoizedMarkdownBlock = memo(
   function MarkdownBlock({
     content,
@@ -315,8 +450,8 @@ const MemoizedMarkdownBlock = memo(
   }) {
     return (
       <ReactMarkdown
-        remarkPlugins={MARKDOWN_REMARK_PLUGINS}
-        rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, HTML_SANITIZE_SCHEMA]]}
         components={components}
       >
         {content}
@@ -338,7 +473,10 @@ function MarkdownComponent({
 }: MarkdownProps) {
   const generatedId = useId()
   const blockId = id ?? generatedId
-  const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children])
+  const blocks = useMemo(
+    () => parseMarkdownIntoBlocks(rewriteLocalMediaSources(children)),
+    [children],
+  )
 
   return (
     <div

@@ -66,6 +66,15 @@ export const WORKSPACE_ROUTE_REGISTRY = [
     surfaces: ['desktop', 'mobile-menu', 'mobile-tabs'],
   },
   {
+    id: 'hermes-world',
+    label: 'HermesWorld',
+    to: '/hermes-world',
+    section: 'primary',
+    owner: 'labs',
+    visibility: 'secondary',
+    surfaces: ['mobile-menu'],
+  },
+  {
     id: 'tasks',
     label: 'Work',
     to: '/tasks',
@@ -165,6 +174,15 @@ export const WORKSPACE_ROUTE_REGISTRY = [
     owner: 'agents',
     visibility: 'advanced',
     surfaces: ['desktop', 'mobile-menu'],
+  },
+  {
+    id: 'echo-studio',
+    label: 'Echo Studio',
+    to: '/echo-studio',
+    section: 'advanced',
+    owner: 'labs',
+    visibility: 'advanced',
+    surfaces: ['mobile-menu'],
   },
   {
     id: 'jobs',

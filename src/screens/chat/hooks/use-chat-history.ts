@@ -181,8 +181,14 @@ function getAttachmentSignature(message: ChatMessage): string {
 function isOptimisticUserMessage(message: ChatMessage): boolean {
   if (message.role !== 'user') return false
   const raw = message as Record<string, unknown>
+  const status = normalizeMessageValue(raw.status)
+  // Once the server confirms (status 'sent' or 'done'), the message is no
+  // longer optimistic — stop re-persisting it as pending. Fixes #506 where
+  // __optimisticId was never cleared, causing confirmed messages to keep
+  // being treated as pending and duplicated in the transcript.
+  if (status === 'sent' || status === 'done') return false
   return (
-    normalizeMessageValue(raw.status) === 'sending' ||
+    status === 'sending' ||
     normalizeMessageValue(raw.__optimisticId).length > 0
   )
 }
@@ -696,11 +702,19 @@ function mergeOptimisticHistoryMessages(
     }
 
     // Preserve unconfirmed optimistic messages regardless of age.
+    // Also preserve confirmed-sent messages that have a clientId but no
+    // server id yet — they were acknowledged by SSE (onStarted) but
+    // haven't been echoed by the server. Periodic refetches will drop
+    // them otherwise (the "user message disappears" bug).
     const isSending =
       optimisticMessage.status === 'sending' ||
       Boolean(optimisticMessage.__optimisticId)
+    const isSentButUnechoed =
+      optimisticMessage.status === 'sent' &&
+      Boolean(getMessageClientId(optimisticMessage)) &&
+      !optimisticMessage.id
 
-    if (isSending) {
+    if (isSending || isSentButUnechoed) {
       merged.push(optimisticMessage)
     }
   }

@@ -35,12 +35,16 @@ import type {
   SlashCommandMenuHandle,
 } from '@/components/slash-command-menu'
 import {
+  DEFAULT_SLASH_COMMANDS,
+  SlashCommandMenu,
+  mergeSlashCommands,
+} from '@/components/slash-command-menu'
+import {
   PromptInput,
   PromptInputAction,
   PromptInputActions,
   PromptInputTextarea,
 } from '@/components/prompt-kit/prompt-input'
-import { SlashCommandMenu } from '@/components/slash-command-menu'
 import { useSettings } from '@/hooks/use-settings'
 import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -57,6 +61,7 @@ import {
   emitSearchModalEvent,
 } from '@/hooks/use-search-modal'
 import { setLocalModelOverride } from '@/screens/chat/local-model-override'
+import { formatModelName } from '@/lib/format-model-name'
 
 type ChatComposerAttachment = {
   id: string
@@ -159,6 +164,10 @@ type WorkspaceDetectionResponse = {
   last?: string
 }
 
+type ClaudeConfigApiResponse = {
+  config?: Record<string, unknown>
+}
+
 type ModelInfoApiResponse = {
   gatewayMode?: string | null
   supportsRuntimeSwitching?: boolean | null
@@ -205,6 +214,39 @@ type ClaudeAvailableModelsResponse = {
   provider: string
   models: Array<{ id: string; description: string }>
   providers: Array<ClaudeProviderOption>
+}
+
+type InstalledSkillSummary = {
+  id: string
+  name: string
+  description: string
+  installed: boolean
+  enabled: boolean
+}
+
+async function fetchInstalledSkills(): Promise<Array<InstalledSkillSummary>> {
+  const response = await fetch('/api/skills?tab=installed&limit=120')
+  if (!response.ok) {
+    throw new Error(`Skills request failed (${response.status})`)
+  }
+
+  const payload = (await response.json()) as {
+    skills?: Array<Record<string, unknown>>
+    ok?: boolean
+  }
+  const skills = Array.isArray(payload.skills) ? payload.skills : []
+
+  return skills
+    .map((entry) => {
+      const id = readModelText(entry.id) || readModelText(entry.slug) || readModelText(entry.name)
+      if (!id) return null
+      const name = readModelText(entry.name) || id
+      const description = readModelText(entry.description)
+      const installed = entry.installed !== false
+      const enabled = entry.enabled !== false
+      return { id, name, description, installed, enabled }
+    })
+    .filter((entry): entry is InstalledSkillSummary => entry !== null)
 }
 
 async function fetchModels(): Promise<{
@@ -524,6 +566,43 @@ function getResolvedModelKey(model: string, provider?: string): string {
   return `${normalizedProvider}/${normalizedModel}`
 }
 
+/**
+ * Checks whether a model entry matches the current model string.
+ *
+ * The current model can arrive in several formats depending on the source:
+ *   - "provider/model-id"  (from session-status API, persisted session model)
+ *   - "model-id"           (bare ID from config or old data)
+ *
+ * The entry always has { id, provider } from the models catalog.
+ *
+ * We match if:
+ *   1. The current model equals the entry ID exactly (bare match), or
+ *   2. The current model ends with "/<entry.id>" (provider-prefixed match), or
+ *   3. The resolved key from entry (provider/id) equals the current model.
+ */
+function isCurrentModel(
+  currentModel: string,
+  entryId: string,
+  entryProvider: string,
+): boolean {
+  const cm = currentModel.trim()
+  const eid = entryId.trim()
+  const eprov = entryProvider.trim()
+  if (!cm || !eid) return false
+
+  // Exact match (bare ID)
+  if (cm === eid) return true
+
+  // Current model is "something/<entryId>"
+  if (cm.endsWith(`/${eid}`)) return true
+
+  // Resolved entry key matches current model exactly
+  const resolved = eprov ? `${eprov}/${eid}` : eid
+  if (resolved === cm) return true
+
+  return false
+}
+
 function isCanvasSupported(): boolean {
   if (typeof document === 'undefined') return false
   try {
@@ -680,12 +759,15 @@ async function readResponseError(response: Response): Promise<string> {
   }
 }
 
-async function fetchCurrentModelFromStatus(): Promise<string> {
+async function fetchCurrentModelFromStatus(sessionKey?: string): Promise<string> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), 7000)
 
   try {
-    const response = await fetch('/api/session-status', {
+    const query = sessionKey?.trim()
+      ? `?sessionKey=${encodeURIComponent(sessionKey.trim())}`
+      : ''
+    const response = await fetch(`/api/session-status${query}`, {
       signal: controller.signal,
     })
     if (!response.ok) {
@@ -922,9 +1004,21 @@ function ChatComposerComponent({
     },
   })
   const currentModelQuery = useQuery({
-    queryKey: ['claude', 'session-status-model'],
-    queryFn: fetchCurrentModelFromStatus,
+    queryKey: ['claude', 'session-status-model', sessionKey || 'main'],
+    queryFn: () => fetchCurrentModelFromStatus(sessionKey),
     refetchInterval: 30_000,
+    retry: false,
+  })
+  const sttConfigQuery = useQuery({
+    queryKey: ['claude', 'config', 'stt'],
+    queryFn: async () => {
+      const response = await fetch('/api/claude-config')
+      if (!response.ok) {
+        throw new Error(`Config request failed (${response.status})`)
+      }
+      return (await response.json()) as ClaudeConfigApiResponse
+    },
+    staleTime: 60_000,
     retry: false,
   })
   const gatewayModeQuery = useQuery({
@@ -949,6 +1043,12 @@ function ChatComposerComponent({
     queryFn: fetchProfiles,
     retry: false,
     staleTime: 15_000,
+  })
+  const installedSkillsQuery = useQuery({
+    queryKey: ['chat', 'composer', 'installed-skills'],
+    queryFn: fetchInstalledSkills,
+    retry: false,
+    staleTime: 60_000,
   })
   const workspaceContextQuery = useQuery({
     queryKey: ['workspace', 'composer-context'],
@@ -1614,6 +1714,35 @@ function ChatComposerComponent({
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
     : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
+  const [serverCommands, setServerCommands] = useState<Array<SlashCommandDefinition>>([])
+
+  useEffect(() => {
+    fetch('/api/commands')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data: { commands?: Array<{ command: string; description: string }> }) => {
+        setServerCommands(data.commands ?? [])
+      })
+      .catch(() => {
+        // fall back to DEFAULT_SLASH_COMMANDS only
+      })
+  }, [])
+
+  const slashCommands = useMemo(
+    () =>
+      mergeSlashCommands(
+        mergeSlashCommands(DEFAULT_SLASH_COMMANDS, serverCommands),
+        (installedSkillsQuery.data ?? [])
+          .filter((skill) => skill.installed && skill.enabled)
+          .map((skill) => ({
+            command: `/${skill.id}`,
+            description: skill.description || `Run ${skill.name}`,
+          })),
+      ),
+    [serverCommands, installedSkillsQuery.data],
+  )
   const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
   const isSlashMenuOpen =
     slashCommandQuery !== null && !disabled && !isSlashMenuDismissed
@@ -1625,18 +1754,66 @@ function ChatComposerComponent({
   const _isWebSearchActive = webSearchEnabled ?? isWebSearchMode
   void _isWebSearchActive // retained for future use / external prop
 
+  const sttConfig =
+    (sttConfigQuery.data?.config?.stt as Record<string, unknown> | undefined) || {}
+  const sttProvider =
+    typeof sttConfig.provider === 'string' ? sttConfig.provider.trim() : 'local'
+  const useRemoteStt = sttProvider === 'groq' || sttProvider === 'openai'
+
+  const appendTextToDraft = useCallback(
+    (text: string, separator = ' ') => {
+      const normalized = text.trim()
+      if (!normalized) return
+      setValue((prev) => {
+        const next = prev.trim().length > 0 ? `${prev}${separator}${normalized}` : normalized
+        persistDraft(next)
+        return next
+      })
+    },
+    [persistDraft],
+  )
+
+  const transcribeVoiceBlob = useCallback(
+    async (blob: Blob) => {
+      if (!useRemoteStt) {
+        throw new Error('Remote STT is not enabled for this profile.')
+      }
+
+      const form = new FormData()
+      const extension = blob.type.includes('mp4') ? 'mp4' : 'webm'
+      form.set('file', blob, `voice-input.${extension}`)
+
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: form,
+      })
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean
+        text?: string
+        error?: string
+      }
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || `Transcription failed (${response.status})`)
+      }
+      return typeof payload.text === 'string' ? payload.text : ''
+    },
+    [useRemoteStt],
+  )
+
   // Voice input (tap = speech-to-text)
   const voiceInput = useVoiceInput({
+    transcribe: useRemoteStt ? transcribeVoiceBlob : undefined,
     onResult: useCallback(
       (text: string) => {
-        if (!text.trim()) return
-        setValue((prev) => {
-          const next = prev.trim().length > 0 ? `${prev} ${text}` : text
-          persistDraft(next)
-          return next
-        })
+        appendTextToDraft(text)
       },
-      [persistDraft],
+      [appendTextToDraft],
+    ),
+    onError: useCallback(
+      (error: string) => {
+        toast(error || 'Voice transcription failed', { type: 'error' })
+      },
+      [],
     ),
   })
 
@@ -1662,18 +1839,27 @@ function ChatComposerComponent({
               previewUrl: '',
             },
           ])
-          // Auto-add duration caption to message
-          setValue((prev) => {
-            const caption = `🎤 Voice note (${secs}s)`
-            const next =
-              prev.trim().length > 0 ? `${prev}\n${caption}` : caption
-            persistDraft(next)
-            return next
-          })
+          appendTextToDraft(`🎤 Voice note (${secs}s)`, '\n')
+          if (useRemoteStt) {
+            void transcribeVoiceBlob(blob)
+              .then((text) => {
+                if (text.trim()) {
+                  appendTextToDraft(`Transcript: ${text.trim()}`, '\n')
+                }
+              })
+              .catch((error) => {
+                toast(
+                  error instanceof Error
+                    ? error.message
+                    : 'Voice note transcription failed',
+                  { type: 'error' },
+                )
+              })
+          }
         }
         reader.readAsDataURL(blob)
       },
-      [persistDraft],
+      [appendTextToDraft, transcribeVoiceBlob, useRemoteStt],
     ),
   })
 
@@ -2005,6 +2191,7 @@ function ChatComposerComponent({
           ref={slashMenuRef}
           open={isSlashMenuOpen}
           query={slashCommandQuery ?? ''}
+          commands={slashCommands}
           onSelect={handleSelectSlashCommand}
         />
 
@@ -2422,9 +2609,11 @@ function ChatComposerComponent({
                             unpinnedGroups.set(entry.provider, group)
                           }
                           const renderEntry = (entry: (typeof parsed)[0]) => {
-                            const isActive =
-                              entry.id === currentModel ||
-                              `${defaultProvider}/${entry.id}` === currentModel
+                            const isActive = isCurrentModel(
+                              persistedSessionModel || currentModel,
+                              entry.id,
+                              entry.provider,
+                            )
                             return (
                               <div
                                 key={entry.id}
@@ -2614,9 +2803,9 @@ function ChatComposerComponent({
                         setIsThinkingMenuOpen(false)
                         setIsModelMenuOpen(false)
                       }}
-                      className="inline-flex h-8 items-center gap-1 rounded-full bg-primary-100/70 px-2 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
-                      title="Chat controls"
-                      aria-label="Chat controls"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary-100/70 px-2 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
+                      title={`Chat controls · ${modelButtonLabel}`}
+                      aria-label={`Chat controls, current model: ${modelButtonLabel}`}
                     >
                       <svg
                         width="13"
@@ -2636,6 +2825,7 @@ function ChatComposerComponent({
                         <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" />
                         <circle cx="11" cy="18" r="2" fill="currentColor" stroke="none" />
                       </svg>
+                      <span className="max-w-[5rem] truncate sm:max-w-[8rem] md:max-w-[10rem]">{formatModelName(modelButtonLabel)}</span>
                       <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
                     </button>
                     {isControlsMenuOpen ? (
@@ -2878,7 +3068,11 @@ function ChatComposerComponent({
                                         unpinnedGroups.set(entry.provider, group)
                                       }
                                       const renderEntry = (entry: (typeof parsed)[0]) => {
-                                        const isActive = entry.id === currentModel || `${defaultProvider}/${entry.id}` === currentModel
+                                        const isActive = isCurrentModel(
+                                          persistedSessionModel || currentModel,
+                                          entry.id,
+                                          entry.provider,
+                                        )
                                         return (
                                           <div key={entry.id} className="group relative flex items-center">
                                             <button

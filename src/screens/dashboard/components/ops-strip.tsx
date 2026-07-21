@@ -84,10 +84,12 @@ function formatNextRun(iso: string | null): {
 export function OpsStrip({
   status,
   cron,
+  kanban,
   platforms,
 }: {
   status: DashboardOverview['status']
   cron: DashboardOverview['cron']
+  kanban: DashboardOverview['kanban']
   platforms: DashboardOverview['platforms']
 }) {
   const navigate = useNavigate()
@@ -113,7 +115,7 @@ export function OpsStrip({
       style={{ borderColor: 'var(--theme-border)' }}
     >
       {/* Gateway block: state + version + active agents */}
-      <div className="flex items-center gap-3 text-[11px]">
+      <div className="flex flex-wrap items-center gap-3 text-[11px]">
         <span className="flex items-center gap-2">
           <span
             className={cn(
@@ -215,6 +217,42 @@ export function OpsStrip({
               </span>
             ))}
           </div>
+        ) : null}
+
+        {kanban ? (
+          <button
+            type="button"
+            onClick={() => navigate({ to: '/swarm2' })}
+            className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80"
+            style={{
+              borderColor:
+                kanban.blocked > 0
+                  ? 'color-mix(in srgb, var(--theme-warning) 35%, transparent)'
+                  : 'var(--theme-border)',
+              background:
+                kanban.blocked > 0
+                  ? 'color-mix(in srgb, var(--theme-warning) 10%, transparent)'
+                  : 'transparent',
+              color: 'var(--theme-muted)',
+            }}
+            title="Open Kanban board"
+          >
+            <span>board</span>
+            <span style={{ color: 'var(--theme-text)' }}>{kanban.total}</span>
+            {kanban.ready > 0 ? (
+              <span style={{ color: 'var(--theme-text)' }}>· {kanban.ready} ready</span>
+            ) : null}
+            {kanban.running > 0 ? (
+              <span style={{ color: 'var(--theme-success)' }}>
+                · {kanban.running} running
+              </span>
+            ) : null}
+            {kanban.blocked > 0 ? (
+              <span style={{ color: 'var(--theme-warning)' }}>
+                · {kanban.blocked} blocked
+              </span>
+            ) : null}
+          </button>
         ) : null}
 
         {cron ? (() => {

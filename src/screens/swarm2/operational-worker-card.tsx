@@ -73,10 +73,32 @@ function roleFromId(id: string): string {
   }
 }
 
-function deriveWorkerState(member: CrewMember, currentTask: string | null): WorkerState {
+function deriveWorkerState(
+  member: CrewMember,
+  currentTask: string | null,
+  checkpointStatus?: string | null,
+  runtimeState?: string | null,
+): WorkerState {
   const status = getOnlineStatus(member)
   if (status === 'offline') return 'offline'
+
+  // Authoritative runtime state takes precedence over the title heuristic.
+  // SwarmCheckpointStatus: 'none' | 'in_progress' | 'done' | 'blocked' | 'handoff' | 'needs_input'
+  // SwarmWorkerState: 'idle' | 'executing' | 'thinking' | 'writing' | 'waiting' | 'blocked' | 'syncing' | 'reviewing' | 'offline'
+  const cs = checkpointStatus ?? null
+  const rs = runtimeState ?? null
+
+  // Terminal-done: a finished worker renders as Idle (there is no 'done' WorkerState).
+  if (cs === 'done' || cs === 'handoff' || rs === 'idle') return 'idle'
+  // Blocked from either authoritative source.
+  if (cs === 'blocked' || rs === 'blocked') return 'error'
+  // Needs human input / waiting.
+  if (cs === 'needs_input' || rs === 'waiting') return 'waiting'
+
   if (!currentTask) return 'idle'
+
+  // Safety: a set, non-in-progress checkpoint must never render as active.
+  if (cs && cs !== 'none' && cs !== 'in_progress') return 'idle'
 
   const lc = currentTask.toLowerCase()
   if (lc.includes('review')) return 'reviewing'
@@ -192,6 +214,8 @@ const AVATAR_OPTIONS = ['','🤖','🧠','🛠️','📊','🧪','📝','⚙️'
 export type OperationalWorkerCardProps = {
   member: CrewMember
   currentTask?: string | null
+  checkpointStatus?: string | null
+  runtimeState?: string | null
   recentLines?: Array<string>
   recentOutputAt?: number | null
   recentSummary?: string | null
@@ -209,6 +233,8 @@ export type OperationalWorkerCardProps = {
 export function OperationalWorkerCard({
   member,
   currentTask = null,
+  checkpointStatus = null,
+  runtimeState = null,
   recentOutputAt = null,
   recentSummary = null,
   artifacts = [],
@@ -229,7 +255,7 @@ export function OperationalWorkerCard({
   const [draftModel, setDraftModel] = useState('')
   const [draftAvatar, setDraftAvatar] = useState('')
   const [taskComposerOpen, setTaskComposerOpen] = useState(false)
-  const state = deriveWorkerState(member, currentTask)
+  const state = deriveWorkerState(member, currentTask, checkpointStatus, runtimeState)
   const status = statusStyles(state)
   const role = settings.role || member.role || roleFromId(member.id)
   const displayName = settings.displayName || member.displayName || member.id
@@ -351,8 +377,12 @@ export function OperationalWorkerCard({
     >
       {!settingsOpen ? (
       <>
-      <div className="relative flex min-h-8 items-center">
-        <div className="absolute left-0 flex max-w-[10rem] flex-wrap items-center gap-1 text-[10px] text-[var(--theme-muted)]/85">
+      {/* Below md the three header groups wrap into two rows (name on top, pills +
+          role below) instead of the absolute-positioned single-row layout, which
+          physically overlaps the centered name on narrow cards (left+right groups
+          can claim 19rem). */}
+      <div className="relative flex min-h-8 flex-wrap items-center gap-y-1 md:flex-nowrap">
+        <div className="order-2 flex max-w-[10rem] flex-wrap items-center gap-1 text-[10px] text-[var(--theme-muted)]/85 md:absolute md:left-0 md:order-none">
           <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-1.5 py-0.5">
             {modelLabel}
           </span>
@@ -360,7 +390,7 @@ export function OperationalWorkerCard({
             {projectBranch || projectName || (hasPreview ? 'preview' : 'main')}
           </span>
         </div>
-        <div className="flex w-full justify-center px-28">
+        <div className="order-1 flex w-full justify-center px-2 md:order-none md:px-28">
           <h3 className="min-w-0 text-center text-sm font-semibold text-[var(--theme-text)]">
             <span className="inline-flex max-w-full items-center justify-center gap-2">
               {avatarGlyph ? <span>{avatarGlyph}</span> : null}
@@ -387,9 +417,9 @@ export function OperationalWorkerCard({
           </h3>
         </div>
 
-        <div className="absolute right-0 flex max-w-[9rem] items-center gap-1">
+        <div className="order-3 ml-auto flex min-w-0 max-w-[9rem] items-center gap-1 md:absolute md:right-0 md:order-none md:ml-0">
           <span
-            className="truncate rounded-full border border-[var(--theme-accent)]/30 bg-[var(--theme-accent-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]"
+            className="min-w-0 truncate rounded-full border border-[var(--theme-accent)]/30 bg-[var(--theme-accent-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]"
             title={role}
           >
             {role}
@@ -552,10 +582,11 @@ export function OperationalWorkerCard({
         <button
           type="button"
           onClick={onOpenTasks}
+          title={`Route work to ${member.displayName || member.id}`}
           className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
         >
           <HugeiconsIcon icon={CheckListIcon} size={11} />
-          Route work
+          Route to agent
         </button>
         <button
           type="button"

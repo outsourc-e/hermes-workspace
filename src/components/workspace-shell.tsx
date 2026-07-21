@@ -21,8 +21,7 @@ import {
   useState,
 } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import type {AuthStatus} from '@/lib/claude-auth';
-import {  fetchClaudeAuthStatus } from '@/lib/claude-auth'
+import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
@@ -30,10 +29,16 @@ import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-import { ChatPanel } from '@/components/chat-panel'
+// Lazy: ChatPanel statically imports ChatScreen and with it the chat
+// markdown pipeline; keeping it out of the eager entry means non-chat
+// routes stop paying for chat at first paint. The chat route itself
+// already lazy-loads ChatScreen through its own boundary.
+const ChatPanel = lazy(() =>
+  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
+)
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
-import { MOBILE_NAV_TABS } from '@/components/mobile-tab-bar'
+import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { MobilePageHeader } from '@/components/mobile-page-header'
 
@@ -43,8 +48,6 @@ import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
-import { isTruthyWarRoomFlag } from '@/lib/war-room/living-v3/route-flags'
-import { getWorkspacePageTitle } from '@/lib/workspace-navigation'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 
 const TerminalWorkspace = lazy(() =>
@@ -65,7 +68,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
-  const routeSearch = useRouterState({
+  const search = useRouterState({
     select: (state) => state.location.search as Record<string, unknown>,
   })
   const isElectron = useMemo(
@@ -89,17 +92,27 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(max-width: 767px)').matches
   })
-  const [warRoomNavigationOpen, setWarRoomNavigationOpen] = useState(false)
 
   // Slide transition direction tracking (mobile only)
   const [slideClass, setSlideClass] = useState<string>('')
   const prevTabIndexRef = useRef<number>(-1)
 
-  // Keep slide direction aligned with the canonical mobile-tab order.
-  const getTabIndex = useCallback(
-    (path: string): number => MOBILE_NAV_TABS.findIndex((tab) => tab.match(path)),
-    [],
-  )
+  // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
+  const getTabIndex = useCallback((path: string): number => {
+    if (path === '/dashboard') return 0
+    if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
+    if (path.startsWith('/files')) return 2
+    if (path.startsWith('/terminal')) return 3
+    if (path.startsWith('/jobs')) return 4
+    if (path === '/swarm' || path.startsWith('/swarm2')) return 5
+    if (path.startsWith('/echo-studio')) return 5
+    if (path.startsWith('/memory')) return 6
+    if (path.startsWith('/skills')) return 7
+    if (path.startsWith('/mcp')) return 8
+    if (path.startsWith('/profiles')) return 9
+    if (path.startsWith('/settings')) return 10
+    return -1
+  }, [])
 
   const isClient = typeof window !== 'undefined'
   // Both SSR and client start with the same value to avoid hydration mismatch.
@@ -160,20 +173,38 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, [connectionVerified])
 
   // Derive active session from URL
-  const mobilePageTitle = getWorkspacePageTitle(pathname)
+  const mobilePageTitle = (() => {
+    if (pathname.startsWith('/terminal')) return 'Terminal'
+    if (pathname.startsWith('/files')) return 'Files'
+    if (pathname.startsWith('/jobs')) return 'Jobs'
+    if (pathname.startsWith('/conductor')) return 'Conductor'
+    if (pathname.startsWith('/operations')) return 'Operations'
+    if (pathname.startsWith('/swarm2') || pathname === '/swarm') return 'Swarm'
+    if (pathname.startsWith('/echo-studio')) return 'Echo Studio'
+    if (pathname.startsWith('/memory')) return 'Memory'
+    if (pathname.startsWith('/skills')) return 'Skills'
+    if (pathname.startsWith('/mcp')) return 'MCP'
+    if (pathname.startsWith('/profiles')) return 'Profiles'
+    if (pathname.startsWith('/settings')) return 'Settings'
+    if (pathname.startsWith('/debug')) return 'Debug'
+    if (pathname.startsWith('/activity')) return 'Activity'
+    return null
+  })()
 
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
-  const isOnWarRoomRoute = pathname.startsWith('/war-room')
-  const isWarRoomFocusMode = isOnWarRoomRoute && (
-    isTruthyWarRoomFlag(routeSearch.etsyOps)
-    || isTruthyWarRoomFlag(routeSearch.livingV3)
-  )
-  const hideChatSidebar = (isOnChatRoute && chatFocusMode) || (isWarRoomFocusMode && !warRoomNavigationOpen)
+  const isOnPlaygroundRoute = pathname === '/playground' || pathname.startsWith('/playground/')
+  const isOnHermesWorldLandingRoute = pathname === '/hermes-world' || pathname.startsWith('/hermes-world/') || pathname === '/world' || pathname.startsWith('/world/')
+  const isOnWarRoomRoute = pathname === '/war-room' || pathname.startsWith('/war-room/')
+  const isEmbeddedSurface =
+    search?.embed === '1' || search?.embed === 'true' || search?.mode === 'embed'
+  const isChromeFreeSurface =
+    isEmbeddedSurface || isOnHermesWorldLandingRoute || isOnWarRoomRoute
+  const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
-    !isMobile && !isOnChatRoute && !sidebarCollapsed && !isWarRoomFocusMode
+    !isChromeFreeSurface && !isMobile && !isOnChatRoute && !sidebarCollapsed
 
   const isNewChat = activeFriendlyId === 'new'
 
@@ -232,10 +263,6 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     setSidebarCollapsed(true)
   }, [isMobile, pathname, setSidebarCollapsed])
 
-  useEffect(() => {
-    setWarRoomNavigationOpen(false)
-  }, [pathname, routeSearch.etsyOps, routeSearch.livingV3])
-
   // Slide transitions on mobile tab navigation
   useEffect(() => {
     if (!isMobile) return
@@ -270,6 +297,13 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     return () =>
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
   }, [isMobile, setSidebarCollapsed, toggleSidebar])
+
+  // Public/launch surfaces should behave like normal web pages, not app-shell panes.
+  // This keeps /hermes-world and /world scrollable at the document level and avoids
+  // local-only workspace chrome for X/GitHub traffic.
+  if (isChromeFreeSurface) {
+    return <>{children}</>
+  }
 
   // Show login screen if auth is required and not authenticated
   if (authState.authRequired && !authState.authenticated) {
@@ -318,12 +352,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         <div
           className={cn(
             'grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden',
-            hideChatSidebar ? 'md:grid-cols-1' : 'md:grid-cols-[auto_1fr]',
+            hideChatSidebar || isChromeFreeSurface ? 'md:grid-cols-1' : 'md:grid-cols-[auto_1fr]',
           )}
         >
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
-          {!isMobile && !hideChatSidebar && (
+          {!isChromeFreeSurface && !isMobile && !hideChatSidebar && (
             <div className="relative z-30">
               <ChatSidebar
                 sessions={sessions}
@@ -351,10 +385,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               'h-full min-h-0 min-w-0 overflow-x-hidden bg-[var(--theme-bg)] relative',
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
               isMobile && !isOnChatRoute
-                ? 'pb-[calc(var(--tabbar-h,0px)+0.5rem)]'
+                ? 'pb-[calc(var(--tabbar-h,80px)+0.5rem)]'
                 : !isMobile &&
+                    !isChromeFreeSurface &&
                     !isOnChatRoute &&
-                    !isWarRoomFocusMode &&
                     settings.showSystemMetricsFooter
                   ? 'pb-7'
                   : '',
@@ -366,7 +400,13 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               className="flex flex-col"
               style={{
                 position: 'absolute',
-                inset: 0,
+                top: 0,
+                left: 0,
+                right: 0,
+                // inset:0 would extend through main's tab-bar padding (abspos resolves
+                // against the padding box), putting the mobile input bar behind the
+                // fixed tab bar. --tabbar-h is live: 0px whenever the bar hides.
+                bottom: isMobile ? 'var(--tabbar-h, 80px)' : 0,
                 visibility: isOnTerminalRoute ? 'visible' : 'hidden',
                 pointerEvents: isOnTerminalRoute ? 'auto' : 'none',
                 zIndex: isOnTerminalRoute ? 1 : -1,
@@ -391,7 +431,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
             <div
               className={[
-                'page-transition h-full flex flex-col',
+                'page-transition flex flex-col',
+                isChromeFreeSurface ? 'min-h-full' : 'h-full',
                 slideClass,
                 isOnTerminalRoute ? 'hidden' : '',
               ]
@@ -399,6 +440,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 .join(' ')}
             >
               {isMobile &&
+                !isChromeFreeSurface &&
                 !isOnChatRoute &&
                 !isOnTerminalRoute &&
                 mobilePageTitle && <MobilePageHeader title={mobilePageTitle} />}
@@ -406,37 +448,16 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             </div>
           </main>
 
-          {/* Chat panel — visible on non-chat, non-War-Room desktop routes. */}
-          {!isOnChatRoute && !isOnWarRoomRoute && !isMobile && <ChatPanel />}
+          {/* Chat panel — visible on non-chat routes (but not in HermesWorld, which has its own in-game chat) */}
+          {!isOnChatRoute && !isOnPlaygroundRoute && !isChromeFreeSurface && !isMobile && (
+            <Suspense fallback={null}>
+              <ChatPanel />
+            </Suspense>
+          )}
         </div>
 
-        {!isMobile && isWarRoomFocusMode && hideChatSidebar ? (
-          <button
-            type="button"
-            aria-label="Open workspace navigation"
-            aria-expanded={false}
-            onClick={() => setWarRoomNavigationOpen(true)}
-            className="workspace-shell__focus-nav-toggle fixed left-3 top-[calc(var(--titlebar-h,0px)+0.75rem)] z-50 inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary-300/40 bg-[var(--theme-card)]/95 px-3.5 text-sm font-semibold text-[var(--theme-text)] shadow-xl backdrop-blur-xl"
-          >
-            <span aria-hidden="true">☰</span>
-            <span>Workspace</span>
-          </button>
-        ) : null}
-
-        {!isMobile && isWarRoomFocusMode && warRoomNavigationOpen ? (
-          <button
-            type="button"
-            aria-label="Hide workspace navigation"
-            aria-expanded={true}
-            onClick={() => setWarRoomNavigationOpen(false)}
-            className="workspace-shell__focus-nav-toggle fixed left-[306px] top-[calc(var(--titlebar-h,0px)+0.75rem)] z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-primary-300/40 bg-[var(--theme-card)]/95 text-lg font-semibold text-[var(--theme-text)] shadow-xl backdrop-blur-xl"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        ) : null}
-
-        {/* Floating chat toggle — visible on non-chat, non-War-Room desktop routes. */}
-        {!isOnChatRoute && !isOnWarRoomRoute && !isMobile && <ChatPanelToggle />}
+        {/* Floating chat toggle — visible on non-chat routes (but not in HermesWorld) */}
+        {!isChromeFreeSurface && !isOnChatRoute && !isOnPlaygroundRoute && !isMobile && <ChatPanelToggle />}
 
         {showDesktopSidebarBackdrop ? (
           <button
@@ -452,11 +473,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         ) : null}
       </div>
 
-      <MobileHamburgerMenu />
-      {!isMobile && !isOnChatRoute && !isWarRoomFocusMode && settings.showSystemMetricsFooter ? (
+      {!isChromeFreeSurface ? <MobileHamburgerMenu /> : null}
+      {!isChromeFreeSurface ? <MobileTabBar /> : null}
+      {!isChromeFreeSurface && !isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
         <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
       ) : null}
-      <CommandPalette pathname={pathname} sessions={sessions} />
+      {!isChromeFreeSurface ? <CommandPalette pathname={pathname} sessions={sessions} /> : null}
     </>
   )
 }

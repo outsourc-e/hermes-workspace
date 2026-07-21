@@ -5,6 +5,7 @@ import { useChatStore } from '../../../stores/chat-store'
 import { appendHistoryMessage, chatQueryKeys } from '../chat-queries'
 import { toast } from '../../../components/ui/toast'
 import { textFromMessage } from '../utils'
+import { snapshotOptimisticUserMessages } from './optimistic-message-reinject'
 import type { ChatMessage } from '../types'
 import type { StreamingState } from '../../../stores/chat-store'
 
@@ -324,31 +325,132 @@ export function useRealtimeChatHistory({
             const prevCount =
               (prevData?.messages as Array<unknown> | undefined)?.length ?? 0
 
-            // Refetch immediately — done event message is already in realtime store
-            queryClient.invalidateQueries({ queryKey: key }).then(() => {
-              clearCompletedStreaming()
+            // Snapshot optimistic user messages before refetch so they
+            // survive the cache replacement. Re-injected after refetch.
+            const reInjectOptimistic = snapshotOptimisticUserMessages(
+              queryClient,
+              effectiveFriendlyId,
+              effectiveSessionKey,
+            )
 
-              // Check for compaction — significant message count drop
-              const newData =
-                queryClient.getQueryData<Record<string, unknown>>(key)
-              const newCount =
-                (newData?.messages as Array<unknown> | undefined)?.length ?? 0
-              if (
-                prevCount > 10 &&
-                newCount > 0 &&
-                newCount < prevCount * 0.6
-              ) {
-                onCompactionEnd?.()
-                toast(
-                  'Context compacted — older messages were summarized to free up space',
-                  {
-                    type: 'info',
-                    icon: '🗜️',
-                    duration: 8000,
+            // Issue #441 fix: Directly merge realtime buffer into history cache
+            // INSTEAD of invalidateQueries. The old approach caused a race:
+            // invalidateQueries → refetch (async) → merge runs with stale data
+            // → duplicates appear briefly → refetch completes → fixed.
+            //
+            // New approach: merge realtime messages into the cache synchronously,
+            // then clear the realtime buffer in the same tick. A background
+            // refetch runs after for consistency but doesn't block rendering.
+            const store = useChatStore.getState()
+            const realtimeMessages =
+              store.realtimeMessages.get(effectiveSessionKey) ?? []
+            const historyMessages = prevData?.messages as
+              | Array<unknown>
+              | undefined
+
+            if (realtimeMessages.length > 0 && Array.isArray(historyMessages)) {
+              // Deduplicate: remove any realtime messages already in history
+              const historyTexts = new Set(
+                historyMessages.map((m: unknown) => {
+                  const raw = m as Record<string, unknown>
+                  const content = raw.content ?? raw.text ?? ''
+                  return `${raw.role ?? ''}:${JSON.stringify(content)}`
+                }),
+              )
+              const dedupedRealtime = realtimeMessages.filter((m: unknown) => {
+                const raw = m as Record<string, unknown>
+                const content = raw.content ?? raw.text ?? ''
+                const sig = `${raw.role ?? ''}:${JSON.stringify(content)}`
+                return !historyTexts.has(sig)
+              })
+
+              if (dedupedRealtime.length > 0) {
+                const merged = [...historyMessages, ...dedupedRealtime].sort(
+                  (a: unknown, b: unknown) => {
+                    const aTs = (a as Record<string, unknown>).createdAt as
+                      | number
+                      | undefined
+                    const bTs = (b as Record<string, unknown>).createdAt as
+                      | number
+                      | undefined
+                    if (typeof aTs === 'number' && typeof bTs === 'number')
+                      return aTs - bTs
+                    return 0
                   },
                 )
+                queryClient.setQueryData(key, {
+                  ...(prevData ?? {}),
+                  messages: merged,
+                })
               }
+            }
+
+            // Capture the just-completed assistant message from the realtime
+            // buffer BEFORE clearing it. After compaction the refetched history
+            // may be shorter and miss this message entirely. Fixes #505.
+            const completedAssistant =
+              realtimeMessages.length > 0
+                ? (() => {
+                    const last = realtimeMessages[realtimeMessages.length - 1] as
+                      | Record<string, unknown>
+                      | undefined
+                    return last?.role === 'assistant' ? last : null
+                  })()
+                : null
+
+            // Clear realtime buffer immediately — no more stale data in render
+            store.clearRealtimeBuffer(effectiveSessionKey)
+            clearCompletedStreaming()
+
+            // Background refetch for long-term consistency — doesn't block render
+            queryClient.invalidateQueries({ queryKey: key, refetchType: 'all' }).then(() => {
+              // Re-inject the completed assistant message if compaction dropped it
+              if (completedAssistant) {
+                const refetchData =
+                  queryClient.getQueryData<Record<string, unknown>>(key)
+                const refetchedMessages =
+                  (refetchData?.messages as Array<Record<string, unknown>>) ?? []
+                const assistantTail = (completedAssistant.content ?? completedAssistant.text ?? '')
+                  .toString()
+                  .slice(-64)
+                const alreadyPresent = refetchedMessages.some(
+                  (m) =>
+                    m.role === 'assistant' &&
+                    ((m.content ?? m.text ?? '') as string).toString().slice(-64) === assistantTail,
+                )
+                if (!alreadyPresent) {
+                  appendHistoryMessage(
+                    queryClient,
+                    effectiveFriendlyId,
+                    effectiveSessionKey,
+                    completedAssistant as unknown as ChatMessage,
+                  )
+                }
+              }
+              // Re-inject optimistic user messages that the server hasn't echoed yet
+              reInjectOptimistic()
             })
+
+            // Check for compaction — significant message count drop
+            const newData =
+              queryClient.getQueryData<Record<string, unknown>>(key)
+            const newCount =
+              (newData?.messages as Array<unknown> | undefined)?.length ?? 0
+            if (
+              prevCount > 10 &&
+              newCount > 0 &&
+              newCount < prevCount * 0.6
+            ) {
+              onCompactionEnd?.()
+              toast(
+                'Context compacted — older messages were summarized to free up space',
+                {
+                  type: 'info',
+                  icon: '🗜️',
+                  duration: 8000,
+                },
+              )
+            }
           }
         }
       },

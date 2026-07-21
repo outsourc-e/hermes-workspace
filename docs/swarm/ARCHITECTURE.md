@@ -17,7 +17,7 @@ Swarm Mode is built around a durable loop: intent enters through Aurora, dispatc
     │ translates intent into SwarmBrief
     ▼
 ┌────────────────────────────┐
-│ swarm3 / Orchestrator      │
+│ Orchestrator                │
 │ routing, drift, escalation │
 └───┬────────────────────────┘
     │ dispatches by role + standing mission
@@ -109,8 +109,8 @@ The notification router lives in `src/server/swarm-notifications.ts`.
 Current behavior:
 
 - Checkpoints route to the orchestrator worker by default.
-- The default orchestrator worker is `swarm3`.
-- The tmux target is `swarm-swarm3`.
+- The default orchestrator worker is `orchestrator`.
+- The tmux target is `swarm-orchestrator`.
 - Duplicate raw checkpoints are suppressed via `runtime.json`.
 - `NEEDS_INPUT` escalates to the main session.
 - If the orchestrator tmux session is unreachable, the checkpoint escalates to the main session.

@@ -15,43 +15,34 @@ import {
   Menu01Icon,
   PuzzleIcon,
   Rocket01Icon,
-  Search01Icon,
   Settings01Icon,
   UserGroupIcon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { useEffect, useState } from 'react'
-import type { WorkspaceRouteId } from '@/lib/workspace-navigation'
+import { cn } from '@/lib/utils'
+import { hapticTap } from '@/lib/haptics'
+import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
 import {
   selectChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import { hapticTap } from '@/lib/haptics'
-import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
+import { useSettingsStore } from '@/hooks/use-settings'
+import type { WorkspaceRouteId } from '@/lib/workspace-navigation'
 import {
   getWorkspaceNavigationItems,
-  getWorkspaceNavigationSections,
   matchesWorkspaceRoute,
 } from '@/lib/workspace-navigation'
-import { cn } from '@/lib/utils'
 
-type MobileNavItem = {
-  id: string
-  label: string
-  icon: typeof Chat01Icon
-  to: string
-  search?: Record<string, unknown>
-  match: (pathname: string) => boolean
-}
-
-const MOBILE_MENU_ICONS: Partial<
+const MOBILE_HAMBURGER_ICONS: Partial<
   Record<WorkspaceRouteId, typeof Chat01Icon>
 > = {
   'war-room': Castle02Icon,
+  'hermes-world': Castle02Icon,
   tasks: CheckListIcon,
   chat: Chat01Icon,
   swarm: UserGroupIcon,
-  'product-research': Search01Icon,
+  'product-research': Building01Icon,
   'product-intelligence': Building01Icon,
   files: File01Icon,
   memory: BrainIcon,
@@ -59,39 +50,28 @@ const MOBILE_MENU_ICONS: Partial<
   dashboard: DashboardSquare01Icon,
   operations: UserMultipleIcon,
   conductor: Rocket01Icon,
+  'echo-studio': Rocket01Icon,
   jobs: Clock01Icon,
   terminal: CommandLineIcon,
   mcp: McpServerIcon,
   profiles: UserGroupIcon,
 }
 
-function toMobileNavItem(route: {
-  id: string
-  label: string
-  to: string
-  search?: Readonly<Record<string, unknown>>
-}): MobileNavItem {
+export const MOBILE_HAMBURGER_NAV_ITEMS = getWorkspaceNavigationItems(
+  'mobile-menu',
+).map((route) => {
   const id = route.id as WorkspaceRouteId
-  const icon = MOBILE_MENU_ICONS[id]
+  const icon = MOBILE_HAMBURGER_ICONS[id]
   if (!icon) throw new Error(`Missing mobile menu icon for ${route.id}`)
   return {
-    id: route.id,
+    id,
     label: route.label,
     icon,
     to: route.to,
     search: route.search ? { ...route.search } : undefined,
     match: (pathname: string) => matchesWorkspaceRoute(id, pathname),
   }
-}
-
-export const MOBILE_HAMBURGER_NAV_ITEMS: Array<MobileNavItem> =
-  getWorkspaceNavigationItems('mobile-menu').map(toMobileNavItem)
-
-export const MOBILE_HAMBURGER_NAV_SECTIONS =
-  getWorkspaceNavigationSections('mobile-menu').map((section) => ({
-    ...section,
-    items: section.items.map(toMobileNavItem),
-  }))
+})
 
 /** Shared drawer state — used by both the trigger button and the drawer itself */
 let _setOpen: ((v: boolean) => void) | null = null
@@ -121,45 +101,6 @@ export function HamburgerTrigger({ className }: { className?: string }) {
   )
 }
 
-function MobileMenuItemButton({
-  item,
-  active,
-  onSelect,
-}: {
-  item: MobileNavItem
-  active: boolean
-  onSelect: (to: string, search?: Record<string, unknown>) => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(item.to, item.search)}
-      className={cn(
-        'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left',
-        'transition-all duration-150 active:scale-[0.98]',
-      )}
-      style={
-        active
-          ? {
-              background:
-                'var(--theme-accent-subtle, color-mix(in srgb, var(--theme-accent, #6366f1) 12%, transparent))',
-              color: 'var(--theme-accent, var(--color-accent, #6366f1))',
-            }
-          : {
-              color: 'var(--theme-muted, var(--color-ink-muted, #555))',
-            }
-      }
-    >
-      <HugeiconsIcon
-        icon={item.icon}
-        size={20}
-        strokeWidth={active ? 2 : 1.6}
-      />
-      <span className="text-[15px] font-medium">{item.label}</span>
-    </button>
-  )
-}
-
 /** Mount once in WorkspaceShell — renders the drawer + backdrop */
 export function MobileHamburgerMenu() {
   const [open, setOpen] = useState(false)
@@ -176,6 +117,12 @@ export function MobileHamburgerMenu() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
+  const echoStudioEnabled = useSettingsStore(
+    (state) => state.settings.experimentalEchoStudio,
+  )
+  const visibleNavItems = MOBILE_HAMBURGER_NAV_ITEMS.filter(
+    (item) => item.id !== 'echo-studio' || echoStudioEnabled,
+  )
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
@@ -212,11 +159,6 @@ export function MobileHamburgerMenu() {
 
       {/* Slide-over drawer */}
       <div
-        role="dialog"
-        aria-label="Mobile navigation"
-        aria-modal="true"
-        aria-hidden={!open}
-        {...(!open ? { inert: true } : {})}
         className={cn(
           'fixed top-0 left-0 bottom-0 z-[96] w-72 md:hidden',
           'shadow-2xl',
@@ -266,40 +208,40 @@ export function MobileHamburgerMenu() {
           </button>
         </div>
 
-        {/* Canonical navigation — Advanced stays collapsed by default. */}
-        <nav className="flex flex-1 flex-col gap-3 overflow-y-auto px-3 py-4">
-          {MOBILE_HAMBURGER_NAV_SECTIONS.map((section) => {
-            const content = (
-              <div className="flex flex-col gap-1">
-                {section.items.map((item) => (
-                  <MobileMenuItemButton
-                    key={item.id}
-                    item={item}
-                    active={item.match(pathname)}
-                    onSelect={handleNav}
-                  />
-                ))}
-              </div>
-            )
-
-            if (section.id === 'advanced') {
-              return (
-                <details key={section.id} className="group rounded-xl">
-                  <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted,var(--color-ink-muted,#777))]">
-                    Advanced
-                  </summary>
-                  {content}
-                </details>
-              )
-            }
-
+        {/* Nav items */}
+        <nav className="flex flex-col gap-1 px-3 pt-4 flex-1">
+          {visibleNavItems.map((item) => {
+            const isActive = item.match(pathname)
             return (
-              <section key={section.id} aria-label={section.label}>
-                <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted,var(--color-ink-muted,#777))]">
-                  {section.label}
-                </div>
-                {content}
-              </section>
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNav(item.to, item.search)}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-3 rounded-xl text-left w-full',
+                  'transition-all duration-150 active:scale-[0.98]',
+                )}
+                style={
+                  isActive
+                    ? {
+                        background:
+                          'var(--theme-accent-subtle, color-mix(in srgb, var(--theme-accent, #6366f1) 12%, transparent))',
+                        color:
+                          'var(--theme-accent, var(--color-accent, #6366f1))',
+                      }
+                    : {
+                        color:
+                          'var(--theme-muted, var(--color-ink-muted, #555))',
+                      }
+                }
+              >
+                <HugeiconsIcon
+                  icon={item.icon}
+                  size={20}
+                  strokeWidth={isActive ? 2 : 1.6}
+                />
+                <span className="text-[15px] font-medium">{item.label}</span>
+              </button>
             )
           })}
         </nav>

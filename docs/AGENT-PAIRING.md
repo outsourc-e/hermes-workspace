@@ -1,8 +1,9 @@
-# Agent Pairing Guide — Workspace ↔ Claude Gateway
+# Agent Pairing Guide — Workspace ↔ Hermes Agent
 
 > **Audience:** AI agents helping users set up Hermes Workspace.
-> Run these steps in order. Each step has a verification command — don't
-> skip to the next until the check passes.
+> Run these steps in order. Each step has a verification command. Do not skip
+> ahead, and do not start a second gateway until the current one fails the
+> checks below.
 
 ## Architecture (30-second version)
 
@@ -15,15 +16,22 @@
 └─────────────────┘                        └──────────────────┘
 ```
 
-Workspace talks to the gateway over HTTP. No WebSocket. No magic.
-If `curl http://127.0.0.1:8642/health` returns JSON, they can pair.
+Workspace talks to Hermes Agent over HTTP. No WebSocket. No magic.
+
+A fully paired local setup has two services:
+
+- `hermes gateway run` on **:8642** for chat, models, and streaming
+- `hermes dashboard` on **:9119** for sessions, skills, config, and jobs
+
+If `curl http://127.0.0.1:8642/health` and `curl http://127.0.0.1:9119/` both
+return successfully, they can pair.
 
 ---
 
 ## Step 1 — Is hermes-agent installed?
 
 ```bash
-claude --version
+hermes --version
 ```
 
 **Pass:** prints `Hermes Agent vX.Y.Z`.
@@ -39,7 +47,7 @@ curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scri
 After install, restart your shell or run:
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
-claude --version
+hermes --version
 ```
 
 ---
@@ -47,15 +55,15 @@ claude --version
 ## Step 2 — Is the API server enabled?
 
 The gateway exposes an HTTP API on port 8642, but only if `API_SERVER_ENABLED=true`
-is set in the claude env file.
+is set in the Hermes env file.
 
 ```bash
 # Find the env file
-CLAUDE_ENV="$(claude config env-path 2>/dev/null || echo "$HOME/.claude/.env")"
-echo "Claude env file: $CLAUDE_ENV"
+HERMES_ENV="$(hermes config env-path 2>/dev/null || echo "$HOME/.hermes/.env")"
+echo "Hermes env file: $HERMES_ENV"
 
 # Check for the key
-grep -i "API_SERVER" "$CLAUDE_ENV" 2>/dev/null || echo "NO API_SERVER KEYS FOUND"
+grep -i "API_SERVER" "$HERMES_ENV" 2>/dev/null || echo "NO API_SERVER KEYS FOUND"
 ```
 
 **Pass:** output includes `API_SERVER_ENABLED=true` (with underscores).
@@ -78,16 +86,16 @@ API_SERVER_HOST=127.0.0.1
 ### Fix
 
 ```bash
-CLAUDE_ENV="$(claude config env-path 2>/dev/null || echo "$HOME/.claude/.env")"
-mkdir -p "$(dirname "$CLAUDE_ENV")"
+HERMES_ENV="$(hermes config env-path 2>/dev/null || echo "$HOME/.hermes/.env")"
+mkdir -p "$(dirname "$HERMES_ENV")"
 
 # Remove any typo'd versions first
-sed -i.bak '/^APISERVERENABLED/d; /^APISERVERHOST/d; /^APISERVERKEY/d; /^APISERVERPORT/d' "$CLAUDE_ENV" 2>/dev/null || true
+sed -i.bak '/^APISERVERENABLED/d; /^APISERVERHOST/d; /^APISERVERKEY/d; /^APISERVERPORT/d' "$HERMES_ENV" 2>/dev/null || true
 
 # Write correct keys (idempotent — updates existing or appends)
-grep -q '^API_SERVER_ENABLED=' "$CLAUDE_ENV" 2>/dev/null && \
-  sed -i.bak 's/^API_SERVER_ENABLED=.*/API_SERVER_ENABLED=true/' "$CLAUDE_ENV" || \
-  echo 'API_SERVER_ENABLED=true' >> "$CLAUDE_ENV"
+grep -q '^API_SERVER_ENABLED=' "$HERMES_ENV" 2>/dev/null && \
+  sed -i.bak 's/^API_SERVER_ENABLED=.*/API_SERVER_ENABLED=true/' "$HERMES_ENV" || \
+  echo 'API_SERVER_ENABLED=true' >> "$HERMES_ENV"
 ```
 
 **Do NOT set `API_SERVER_HOST=0.0.0.0`** unless the user explicitly wants
@@ -100,7 +108,7 @@ correct for local Workspace.
 ## Step 3 — Is the gateway process running?
 
 ```bash
-pgrep -af "claude.*gateway" || echo "NOT RUNNING"
+pgrep -af "hermes.*gateway" || echo "NOT RUNNING"
 ```
 
 **Pass:** shows a `hermes gateway run` (or similar) process.
@@ -117,7 +125,7 @@ hermes gateway install   # creates the service
 systemctl --user start claude-gateway
 ```
 
-**First run:** claude may prompt for initial setup (provider, model). Complete
+**First run:** Hermes may prompt for initial setup (provider, model). Complete
 the interactive setup before continuing.
 
 ---
@@ -148,6 +156,20 @@ ss -tlnp | grep 8642   # Linux
 # Kill the stale process, then restart gateway
 ```
 
+## Step 4b — Is the dashboard running on 9119?
+
+```bash
+curl -sf http://127.0.0.1:9119/ && echo "DASHBOARD OK" || echo "DASHBOARD NOT REACHABLE"
+```
+
+**Pass:** returns HTTP 200 (HTML or JSON is fine).
+
+### Fix
+
+```bash
+hermes dashboard
+```
+
 ---
 
 ## Step 5 — Is Workspace pointed at the gateway?
@@ -159,10 +181,19 @@ cat .env | grep HERMES_API_URL
 
 **Pass:** `HERMES_API_URL=http://127.0.0.1:8642`
 
+Also set the dashboard URL:
+
+```bash
+grep HERMES_DASHBOARD_URL .env
+```
+
+**Pass:** `HERMES_DASHBOARD_URL=http://127.0.0.1:9119`
+
 **Fail or missing:**
 ```bash
 # In the hermes-workspace directory
 echo 'HERMES_API_URL=http://127.0.0.1:8642' >> .env
+echo 'HERMES_DASHBOARD_URL=http://127.0.0.1:9119' >> .env
 ```
 
 If `.env` doesn't exist:
@@ -189,6 +220,17 @@ pnpm dev
 **`mode=enhanced-fork`** = paired successfully. Sessions, memory, skills all
 available.
 
+### Critical verification before starting another gateway
+
+```bash
+curl -sf http://127.0.0.1:8642/health
+curl -sf http://127.0.0.1:3000/api/sessions | jq '.sessions | length' 2>/dev/null || curl -sf http://127.0.0.1:3000/api/sessions
+```
+
+If `/api/sessions` returns sessions (or an empty array) the pairing is alive.
+**Do not start another gateway just because the UI still says Offline** —
+refresh or reprobe the workspace UI first.
+
 **`mode=disconnected`** = pairing failed. Go back to Step 4.
 
 ---
@@ -210,14 +252,14 @@ Open `http://localhost:3000` (or whatever port Vite reports).
 For users who just want it to work — run this entire block:
 
 ```bash
-# 1. Find claude env
-CLAUDE_ENV="$(claude config env-path 2>/dev/null || echo "$HOME/.claude/.env")"
-mkdir -p "$(dirname "$CLAUDE_ENV")"
+# 1. Find Hermes env
+HERMES_ENV="$(hermes config env-path 2>/dev/null || echo "$HOME/.hermes/.env")"
+mkdir -p "$(dirname "$HERMES_ENV")"
 
 # 2. Enable API server (idempotent)
-grep -q '^API_SERVER_ENABLED=' "$CLAUDE_ENV" 2>/dev/null && \
-  sed -i.bak 's/^API_SERVER_ENABLED=.*/API_SERVER_ENABLED=true/' "$CLAUDE_ENV" || \
-  echo 'API_SERVER_ENABLED=true' >> "$CLAUDE_ENV"
+grep -q '^API_SERVER_ENABLED=' "$HERMES_ENV" 2>/dev/null && \
+  sed -i.bak 's/^API_SERVER_ENABLED=.*/API_SERVER_ENABLED=true/' "$HERMES_ENV" || \
+  echo 'API_SERVER_ENABLED=true' >> "$HERMES_ENV"
 
 # 3. Clean up common typos
 sed -i.bak '/^APISERVERENABLED/d; /^APISERVERHOST/d' "$CLAUDE_ENV" 2>/dev/null || true

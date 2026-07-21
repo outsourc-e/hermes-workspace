@@ -21,9 +21,9 @@ import {
   unlinkSync,
   writeSync,
 } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
+import { getStateDir } from './workspace-state-dir'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -99,12 +99,8 @@ const KNOWN_TOP_FIELDS = new Set(['version', 'sources'])
 // Path helpers
 // ---------------------------------------------------------------------------
 
-function hermesHome(): string {
-  return process.env.HERMES_HOME?.trim() || process.env.CLAUDE_HOME?.trim() || join(homedir(), '.hermes')
-}
-
 export function hubSourcesFilePath(): string {
-  return join(hermesHome(), 'mcp-hub-sources.json')
+  return join(getStateDir(), 'mcp-hub-sources.json')
 }
 
 // ---------------------------------------------------------------------------
