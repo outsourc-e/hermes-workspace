@@ -26,8 +26,10 @@ describe('Living War Room V3 runtime', () => {
       'ares',
       'aphrodite',
       'hermes',
+      'goblin',
       'heimdall',
       'terra',
+      'poseidon',
       'julius',
       'alexander',
       'napoleon',
@@ -44,6 +46,7 @@ describe('Living War Room V3 runtime', () => {
     expect(snapshots.find((snapshot) => snapshot.agentId === 'ares')?.clipPath).toContain('/war-room/living-v3/agents/ares/')
     expect(snapshots.find((snapshot) => snapshot.agentId === 'aphrodite')?.clipPath).toContain('/war-room/living-v3/agents/aphrodite/')
     expect(snapshots.find((snapshot) => snapshot.agentId === 'hermes')?.clipPath).toContain('/war-room/living-v3/agents/hermes/')
+    expect(snapshots.find((snapshot) => snapshot.agentId === 'poseidon')?.clipPath).toContain('/war-room/living-v3/agents/poseidon/')
     expect(snapshots
       .filter((snapshot) => ['julius', 'alexander', 'napoleon', 'saladin', 'genghis', 'hannibal'].includes(snapshot.agentId))
       .every((snapshot) => snapshot.clipPath.includes('/war-room/living-v3/generals-council/') && snapshot.roomId === 'council-strategists')).toBe(true)
@@ -234,6 +237,24 @@ describe('Living War Room V3 runtime', () => {
 
     expect(frame0.animationState.startsWith('walk-')).toBe(true)
     expect(frame1.spriteFrameIndex).toBe((frame0.spriteFrameIndex + 1) % frame0.spriteFrameCount)
+  })
+
+  it('uses the dominant axis for shallow diagonal walking so sprites do not look backwards', () => {
+    const startMs = 0
+    const state = assignLivingV3Task({ epochMs: startMs, tasks: [], alerts: [], approvals: [] }, {
+      agentId: 'hermes',
+      kind: 'move',
+      label: 'mostly east walking test',
+      roomId: 'olympus-command',
+      from: { roomId: 'olympus-command', point: { x: 16, y: 50 } },
+      target: { x: 84, y: 54 },
+      badge: 'idle',
+    }, startMs)
+    const task = state.tasks[0]
+    const snapshot = buildLivingV3AgentSnapshot(LIVING_V3_WORLD_CONFIG, state, 'hermes', Math.round(task.travelDurationMs * 0.45))
+
+    expect(snapshot.direction).toBe('east')
+    expect(snapshot.animationState).toBe('walk-east')
   })
 
   it('exposes a Hermes-ready setAgentState adapter without seating work outside rest', () => {

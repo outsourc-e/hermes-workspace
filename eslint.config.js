@@ -14,7 +14,6 @@ const ignoredPaths = [
   'electron/server-bundle.cjs',
   'generated-candidates/**',
   'node_modules/**',
-  'playground-ws-worker/**',
   'public/**',
   'scripts/**',
   'server-entry.js',

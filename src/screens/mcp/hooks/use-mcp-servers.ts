@@ -21,10 +21,20 @@ export function useMcpServers(params: UseMcpServersParams) {
       const body = (await res.json()) as Partial<McpListResponse> & {
         ok?: boolean
         code?: string
+        error?: string
+        message?: string
+      }
+      if (body.ok === false || body.code === 'capability_unavailable') {
+        throw new Error(
+          body.error || body.message || 'MCP capability is unavailable.',
+        )
+      }
+      if (!Array.isArray(body.servers)) {
+        throw new Error('MCP list returned an invalid payload.')
       }
       return {
-        servers: body.servers ?? [],
-        total: body.total ?? 0,
+        servers: body.servers,
+        total: body.total ?? body.servers.length,
         categories: body.categories ?? ['All'],
       }
     },

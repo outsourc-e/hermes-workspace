@@ -392,7 +392,6 @@ function SkillsWidget({
   onOpen: () => void
   usage: DashboardOverview['skillsUsage']
 }) {
-  const skillsAvailable = useFeatureAvailable('skills')
   const skillsQuery = useQuery({
     queryKey: ['claude-skills'],
     queryFn: async () => {
@@ -402,19 +401,9 @@ function SkillsWidget({
       return (data?.skills ?? []) as Array<Record<string, unknown>>
     },
     staleTime: 30_000,
-    enabled: skillsAvailable,
   })
 
   const skills = skillsQuery.data ?? []
-
-  if (!skillsAvailable) {
-    return (
-      <UnavailableWidget
-        title="Skills"
-        description={getUnavailableReason('skills')}
-      />
-    )
-  }
 
   // Summary view per Hermes Agent feedback: 'don’t enumerate, summarise.'
   // Prefer real usage signal from /api/analytics/usage when present
@@ -643,16 +632,33 @@ type WorkspaceHealthState = 'pass' | 'warn' | 'fail' | 'blocked' | 'unknown'
 
 type WorkspaceHealthPayload = {
   ok: boolean
-  checkedAt: number
+  observedAt: number
   latestGateDir?: string | null
   overall: WorkspaceHealthState
   counts: Record<WorkspaceHealthState, number>
+  quality: {
+    freshness: 'fresh' | 'stale' | 'missing'
+    reason: string | null
+    runId: string | null
+    runFinishedAt: number | null
+    ageMs: number | null
+    repoMatches: boolean | null
+    warningBudget: { baseline: number; current: number | null } | null
+    artifactPath: string
+  }
   checks: Array<{
     id: string
     label: string
     state: WorkspaceHealthState
+    reportedState?: 'pass' | 'warn' | 'fail'
+    source: 'git' | 'quality-run'
     detail: string
-    artifactPath?: string
+    command: string
+    exitCode: number | null
+    durationMs: number
+    artifactPath: string
+    warnings?: number
+    errors?: number
   }>
 }
 
@@ -662,6 +668,13 @@ const workspaceHealthTone: Record<WorkspaceHealthState, { label: string; classNa
   fail: { label: 'RED', className: 'border-red-400/50 bg-red-500/10 text-red-100' },
   blocked: { label: 'BLOCKED', className: 'border-sky-400/45 bg-sky-500/10 text-sky-100' },
   unknown: { label: 'UNKNOWN', className: 'border-neutral-400/35 bg-neutral-500/10 text-neutral-200' },
+}
+
+function formatHealthAge(ageMs: number | null): string {
+  if (ageMs === null) return 'no run'
+  if (ageMs < 60_000) return 'less than a minute ago'
+  if (ageMs < 3_600_000) return `${Math.floor(ageMs / 60_000)}m ago`
+  return `${Math.floor(ageMs / 3_600_000)}h ago`
 }
 
 function WorkspaceHealthCard() {
@@ -675,11 +688,26 @@ function WorkspaceHealthCard() {
     staleTime: 5_000,
     refetchInterval: 45_000,
   })
-  const payload = healthQuery.data ?? null
+  // React Query keeps the previous payload after a refetch error. Do not let
+  // that cached payload preserve a stale green state on screen.
+  const payload = healthQuery.isError ? null : (healthQuery.data ?? null)
   const checks = payload?.checks ?? []
   const overall = payload?.overall ?? 'unknown'
   const tone = workspaceHealthTone[overall]
+  const quality = payload?.quality ?? null
+  const freshness = quality?.freshness ?? 'missing'
+  const freshnessLabel =
+    freshness === 'fresh' ? 'FRESH' : freshness === 'stale' ? 'STALE' : 'NO RUN'
+  const freshnessClass =
+    freshness === 'fresh'
+      ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100'
+      : freshness === 'stale'
+        ? 'border-amber-400/45 bg-amber-500/10 text-amber-100'
+        : 'border-neutral-400/35 bg-neutral-500/10 text-neutral-200'
   const lastGate = payload?.latestGateDir?.split('/').at(-1) ?? 'no gate yet'
+  const runTime = quality?.runFinishedAt
+    ? new Date(quality.runFinishedAt).toLocaleString()
+    : 'No completed QA run'
 
   return (
     <section
@@ -689,26 +717,33 @@ function WorkspaceHealthCard() {
         background: 'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 94%, var(--theme-accent) 6%), var(--theme-card))',
         color: 'var(--theme-text)',
       }}
-      data-workspace-health-card="v1"
+      data-workspace-health-card="v2"
       aria-label="Workspace health dashboard"
     >
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--theme-muted)' }}>Workspace Health</p>
-          <h2 className="text-lg font-bold tracking-tight">Real gates, honest blockers</h2>
+          <h2 className="text-lg font-bold tracking-tight">Current-run gates, honest blockers</h2>
           <p className="mt-1 max-w-3xl text-xs leading-5" style={{ color: 'var(--theme-muted)' }}>
-            Reads git live and the latest saved gate artifacts. Warnings are not hidden: dirty repo, blocked hardware, and approval-gated Etsy actions stay visible.
+            Green is valid only while the saved QA fingerprint matches the live worktree. Warning debt, stale evidence, and failed readback stay visible.
           </p>
+          <p className="mt-1 text-[11px]" style={{ color: 'var(--theme-muted)' }}>
+            Run: {runTime} · {formatHealthAge(quality?.ageMs ?? null)} · observed {payload?.observedAt ? new Date(payload.observedAt).toLocaleTimeString() : 'now'}
+          </p>
+          {quality?.reason ? (
+            <p className="mt-1 text-[11px] text-amber-200">{quality.reason}</p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className={cn('rounded-full border px-3 py-1 text-xs font-black tracking-[0.12em]', tone.className)}>{tone.label}</span>
+          <span className={cn('rounded-full border px-3 py-1 text-xs font-black tracking-[0.12em]', freshnessClass)}>{freshnessLabel}</span>
           <span className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-muted)' }}>{lastGate}</span>
         </div>
       </div>
 
       {healthQuery.isError ? (
-        <div className="rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-100">
-          Workspace health API failed: {healthQuery.error instanceof Error ? healthQuery.error.message : 'unknown error'}
+        <div className="rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-100" data-health-state="unknown">
+          Workspace health readback failed. Cached green evidence is hidden: {healthQuery.error instanceof Error ? healthQuery.error.message : 'unknown error'}
         </div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -721,6 +756,19 @@ function WorkspaceHealthCard() {
                   <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-black', checkTone.className)}>{checkTone.label}</span>
                 </div>
                 <p className="text-xs leading-5" style={{ color: 'var(--theme-muted)' }}>{check.detail}</p>
+                <details className="mt-2 rounded-lg border px-2 py-1.5 text-[11px]" style={{ borderColor: 'var(--theme-border)' }}>
+                  <summary className="cursor-pointer font-semibold">Evidence</summary>
+                  <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1" style={{ color: 'var(--theme-muted)' }}>
+                    <dt>Source</dt><dd>{check.source}</dd>
+                    <dt>Exit</dt><dd>{check.exitCode ?? 'not run'}</dd>
+                    <dt>Duration</dt><dd>{check.durationMs ? `${check.durationMs}ms` : 'live readback'}</dd>
+                    {typeof check.errors === 'number' ? <><dt>Errors</dt><dd>{check.errors}</dd></> : null}
+                    {typeof check.warnings === 'number' ? <><dt>Warnings</dt><dd>{check.warnings}</dd></> : null}
+                    {check.reportedState ? <><dt>Last report</dt><dd>{check.reportedState}</dd></> : null}
+                  </dl>
+                  {check.command ? <code className="mt-2 block overflow-x-auto rounded bg-black/20 px-2 py-1">{check.command}</code> : null}
+                  {check.artifactPath ? <p className="mt-1 truncate" title={check.artifactPath}>Artifact: {check.artifactPath.split('/').at(-1)}</p> : null}
+                </details>
               </article>
             )
           }) : (
@@ -739,7 +787,6 @@ function WorkspaceHealthCard() {
 export function DashboardScreen() {
   const navigate = useNavigate()
   const sessionsAvailable = useFeatureAvailable('sessions')
-  const skillsAvailable = useFeatureAvailable('skills')
   const sessionsQuery = useQuery({
     // Use a dedicated query key — NOT chatQueryKeys.sessions — to avoid
     // cache collisions with the chat sidebar which fetches fewer sessions
@@ -874,7 +921,6 @@ export function DashboardScreen() {
       return data.skills?.length ?? 0
     },
     staleTime: 60_000,
-    enabled: skillsAvailable,
   })
   const skillsInstalled = skillsCountQuery.data ?? 0
 
@@ -1065,7 +1111,6 @@ export function DashboardScreen() {
             label="Skills"
             icon={PuzzleIcon}
             onClick={() => navigate({ to: '/skills' })}
-            disabled={!skillsAvailable}
           />
           {/* Edit toggle: enters "layout edit mode" where each widget
               shows an X button and a banner appears for re-adding

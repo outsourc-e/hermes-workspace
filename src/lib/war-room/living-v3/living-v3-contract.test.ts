@@ -7,9 +7,7 @@ import {
   LIVING_V3_APPROVED_ETSY_ART_ROOT,
   LIVING_V3_ASSET_ROOT,
   LIVING_V3_WORLD_CONFIG,
-
-
-
+  livingV3AgentById,
   livingV3PointInsideRect
 } from './living-v3-contract'
 import { createInitialLivingV3HermesState } from './hermes-adapter'
@@ -100,7 +98,7 @@ describe('Living War Room V3 contract', () => {
     expect(LIVING_V3_WORLD_CONFIG.bridges.every((bridge) => bridge.assetPath.includes(`${LIVING_V3_ASSET_ROOT}/bridges/`))).toBe(true)
     expect(LIVING_V3_WORLD_CONFIG.stations.filter((station) => station.roomId === 'merchant-harbor').every((station) => station.assetPath.includes(`${LIVING_V3_APPROVED_ETSY_ART_ROOT}/stations/`))).toBe(true)
     for (const agent of LIVING_V3_WORLD_CONFIG.agents) {
-      if (['ares', 'aphrodite', 'hermes', 'terra'].includes(agent.id)) {
+      if (['ares', 'aphrodite', 'hermes', 'terra', 'poseidon'].includes(agent.id)) {
         expect(agent.portraitPath).toContain(`${LIVING_V3_ASSET_ROOT}/agents/${agent.id}/portrait.png`)
       } else if (agent.visualStatus === 'council-room-general') {
         expect(agent.portraitPath).toContain(`${LIVING_V3_ASSET_ROOT}/generals-council/`)
@@ -137,6 +135,7 @@ describe('Living War Room V3 contract', () => {
       ['ares', 'etsy-market-lab'],
       ['aphrodite', 'etsy-market-lab'],
       ['hermes', 'olympus-command'],
+      ['goblin', 'agora-opportunity'],
       ['julius', 'council-strategists'],
       ['alexander', 'council-strategists'],
       ['napoleon', 'council-strategists'],
@@ -144,6 +143,7 @@ describe('Living War Room V3 contract', () => {
       ['genghis', 'council-strategists'],
       ['hannibal', 'council-strategists'],
       ['terra', 'terra-forge'],
+      ['poseidon', 'atlantis-vault'],
       ['loki', 'etsy-market-lab'],
       ['thor', 'etsy-market-lab'],
       ['odin', 'etsy-market-lab'],
@@ -197,6 +197,35 @@ describe('Living War Room V3 contract', () => {
     expect(hermes?.visualStatus).toBe('primary-roaming-companion')
     expect(hermes?.portraitPath).toContain(`${LIVING_V3_ASSET_ROOT}/agents/hermes/portrait.png`)
     expect(hermes?.clips.idle.assetPath).toContain(`${LIVING_V3_ASSET_ROOT}/agents/hermes/idle.png`)
+    const goblin = LIVING_V3_WORLD_CONFIG.agents.find((agent) => agent.id === 'goblin')
+    expect(goblin).toMatchObject({
+      label: 'Goblin',
+      home: { roomId: 'agora-opportunity', point: { x: 50, y: 68 } },
+      primaryStationIds: ['agora-intake'],
+      visualStatus: 'temporary-approved-sprite',
+    })
+    expect(goblin?.role).toContain('Opportunity Packet')
+    expect(goblin?.assetFolder).toContain('/agents/athena-market-strategist')
+    expect(existsSync(publicPath(goblin!.portraitPath))).toBe(true)
+    expect(Object.values(goblin!.clips).every((clip) => clip.frameCount === 8)).toBe(true)
+    const poseidon = LIVING_V3_WORLD_CONFIG.agents.find((agent) => agent.id === 'poseidon')
+    expect(poseidon).toMatchObject({
+      label: 'Poseidon',
+      home: { roomId: 'atlantis-vault', point: { x: 50, y: 68 } },
+      primaryStationIds: ['atlantis-index'],
+      visualStatus: 'poseidon-sea-pet-runtime-final',
+    })
+    expect(poseidon?.role).toContain('He centralizes visibility; he does not own every worker action')
+    expect(poseidon?.portraitPath).toContain(`${LIVING_V3_ASSET_ROOT}/agents/poseidon/portrait.png`)
+    expect(poseidon?.clips.idle.assetPath).toContain(`${LIVING_V3_ASSET_ROOT}/agents/poseidon/idle.png`)
+    expect(poseidon?.clips['work-standing'].assetPath).toContain(`${LIVING_V3_ASSET_ROOT}/agents/poseidon/work-standing.png`)
+    expect(poseidon?.clips['walk-north-east'].assetPath).toContain(`${LIVING_V3_ASSET_ROOT}/agents/poseidon/walk-north-east.png`)
+    expect(poseidon?.clips.sit.assetPath).toContain(`${LIVING_V3_ASSET_ROOT}/agents/poseidon/wait-approval.png`)
+    expect(Object.values(poseidon!.clips).every((clip) => clip.frameCount === 8)).toBe(true)
+    expect(existsSync(publicPath(poseidon!.portraitPath))).toBe(true)
+    expect(existsSync(publicPath(poseidon!.clips.idle.assetPath))).toBe(true)
+    expect(existsSync(publicPath(poseidon!.clips['work-standing'].assetPath))).toBe(true)
+    expect(existsSync(publicPath(poseidon!.clips['walk-north-east'].assetPath))).toBe(true)
     for (const agentId of ETSY_MARKET_LAB_RESIDENT_AGENT_IDS) {
       const agent = LIVING_V3_WORLD_CONFIG.agents.find((candidate) => candidate.id === agentId)
       expect(agent?.home.roomId).toBe('etsy-market-lab')
@@ -230,6 +259,17 @@ describe('Living War Room V3 contract', () => {
     expect(WAR_ROOM_STATION_MANIFESTS.find((manifest) => manifest.stationId === 'etsy-odin-draft-approval')?.defaultAgentId).not.toBe('julius')
   })
 
+  it('preserves retired body IDs and assets only as historical hidden placeholders', () => {
+    for (const agentId of ['merchant-scout', 'atlantis-archivist', 'treasury-guardian', 'signal-runner'] as const) {
+      const agent = livingV3AgentById(agentId)
+      expect(agent?.role).toContain('Retired historical visual placeholder')
+      expect(agent?.role).toContain('never route new work')
+      expect(agent?.portraitPath).toBeTruthy()
+      expect(agent?.clips.idle.assetPath).toBeTruthy()
+      expect(LIVING_V3_WORLD_CONFIG.agents.some((visible) => visible.id === agentId)).toBe(false)
+    }
+  })
+
   it('starts Etsy Market Lab with visible resident agents in the room status snapshot', () => {
     const state = createInitialLivingV3HermesState(10_000)
     const snapshots = buildLivingV3AgentSnapshots(state, 10_500)
@@ -240,6 +280,23 @@ describe('Living War Room V3 contract', () => {
     expect(etsyResidents.map((snapshot) => snapshot.agentId)).toEqual(expect.arrayContaining(ETSY_MARKET_LAB_RESIDENT_AGENT_IDS))
     expect(etsyResidents.every((snapshot) => snapshot.roomId === 'etsy-market-lab')).toBe(true)
     expect(etsyStatus?.activeAgents).toBeGreaterThanOrEqual(3)
+  })
+
+  it('starts Poseidon in Atlantis Vault as a data-backed room manager, not a global bottleneck', () => {
+    const state = createInitialLivingV3HermesState(10_000)
+    const snapshots = buildLivingV3AgentSnapshots(state, 12_500)
+    const atlantisStatus = buildLivingV3RoomStatuses(state, snapshots).find((status) => status.roomId === 'atlantis-vault')
+    const poseidon = snapshots.find((snapshot) => snapshot.agentId === 'poseidon')
+
+    expect(poseidon).toMatchObject({
+      roomId: 'atlantis-vault',
+      activity: 'working',
+      badge: 'active-task',
+      packetLabel: 'Vault index',
+    })
+    expect(poseidon?.label).toContain('DB and Obsidian catalog health')
+    expect(atlantisStatus?.activeTasks).toBe(1)
+    expect(atlantisStatus?.activeAgents).toBeGreaterThanOrEqual(1)
   })
 
   it('maps every Etsy Market Lab station to a distinct workbench app id', () => {

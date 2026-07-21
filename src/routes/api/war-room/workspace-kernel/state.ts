@@ -1,13 +1,18 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { WORKSPACE_KERNEL_SAFETY,   buildKernelAgentDisplayStates } from '../../../../lib/workspace-kernel'
+import { WORKSPACE_KERNEL_SAFETY, buildKernelAgentDisplayStates } from '../../../../lib/workspace-kernel'
+import type { WorkspaceKernelTelemetrySnapshot, WorkspaceRun } from '../../../../lib/workspace-kernel'
 import {
   loadWorkspaceKernelState,
   prepareWorkspaceKernelPersistedState,
   saveWorkspaceKernelState,
 } from '../../../../lib/workspace-kernel/store'
+import {
+  type WorkspaceCorePersistenceSnapshot,
+  mergeWorkspaceKernelStateWithSupabase,
+  persistWorkspaceKernelRunsToSupabase,
+} from '../../../../server/workspace-core-db'
 import { isAuthenticated } from '../../../../server/auth-middleware'
-import type {WorkspaceKernelTelemetrySnapshot, WorkspaceRun} from '../../../../lib/workspace-kernel';
 
 const noStoreHeaders = { 'cache-control': 'no-store' }
 
@@ -32,20 +37,24 @@ function telemetryFromBody(body: unknown): WorkspaceKernelTelemetrySnapshot | un
     : undefined
 }
 
-function responsePayload(state: Awaited<ReturnType<typeof loadWorkspaceKernelState>>) {
+function responsePayload(
+  state: Awaited<ReturnType<typeof loadWorkspaceKernelState>>,
+  persistence?: WorkspaceCorePersistenceSnapshot,
+) {
   return {
     ok: true,
     stateVersion: state.stateVersion,
     result: state,
     state,
     displayStates: buildKernelAgentDisplayStates(state),
-    localOnly: true,
+    localOnly: persistence?.provider !== 'supabase',
     usageAllowed: false,
     workerSpawnAllowed: false,
     externalRequestsAllowed: false,
     liveActionsAllowed: false,
     lockedActions: state.telemetry ? [`last telemetry: ${state.telemetry.artifactKind}`] : [],
     safety: WORKSPACE_KERNEL_SAFETY,
+    persistence,
   }
 }
 
@@ -56,8 +65,9 @@ export const Route = createFileRoute('/api/war-room/workspace-kernel/state')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: noStoreHeaders })
         }
-        const state = await loadWorkspaceKernelState()
-        return json(responsePayload(state), { headers: noStoreHeaders })
+        const localState = await loadWorkspaceKernelState()
+        const merged = await mergeWorkspaceKernelStateWithSupabase(localState)
+        return json(responsePayload(merged.state, merged.persistence), { headers: noStoreHeaders })
       },
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
@@ -69,14 +79,17 @@ export const Route = createFileRoute('/api/war-room/workspace-kernel/state')({
         } catch {
           return json({ ok: false, error: 'Invalid JSON' }, { status: 400, headers: noStoreHeaders })
         }
-        const previous = await loadWorkspaceKernelState()
+        const previousLocal = await loadWorkspaceKernelState()
+        const previousMirror = await mergeWorkspaceKernelStateWithSupabase(previousLocal)
+        const previous = previousMirror.state
         const nextState = prepareWorkspaceKernelPersistedState({
           previous,
           runs: runsFromBody(body),
           telemetry: telemetryFromBody(body),
         })
         const saved = await saveWorkspaceKernelState(nextState)
-        return json(responsePayload(saved), { headers: noStoreHeaders })
+        const persistence = await persistWorkspaceKernelRunsToSupabase(runsFromBody(body), telemetryFromBody(body))
+        return json(responsePayload(saved, persistence), { headers: noStoreHeaders })
       },
     },
   },

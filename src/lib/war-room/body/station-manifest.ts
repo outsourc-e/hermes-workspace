@@ -29,7 +29,7 @@ export type StationToolManifest = {
   allowedIntents: Array<AgentIntent['type']>
   lockedActions: Array<string>
   approvalRequired: boolean
-  defaultAgentId: WarRoomAgentId
+  defaultAgentId?: WarRoomAgentId
   cockpitType: CockpitType
 }
 
@@ -93,7 +93,7 @@ export const WAR_ROOM_STATION_MANIFESTS: Array<StationToolManifest> = [
     allowedIntents: ['say', 'move_to_station', 'work_at_station', 'request_approval', 'raise_alert'],
     lockedActions: LIVE_LOCKED_ACTIONS,
     approvalRequired: false,
-    defaultAgentId: 'athena',
+    defaultAgentId: 'goblin',
     cockpitType: 'opportunity',
   },
   {
@@ -262,7 +262,7 @@ export const WAR_ROOM_STATION_MANIFESTS: Array<StationToolManifest> = [
     allowedIntents: ['say', 'move_to_station', 'work_at_station', 'request_approval', 'raise_alert'],
     lockedActions: LIVE_LOCKED_ACTIONS,
     approvalRequired: true,
-    defaultAgentId: 'merchant-scout',
+    defaultAgentId: 'loki',
     cockpitType: 'merchant',
   },
   {
@@ -275,7 +275,7 @@ export const WAR_ROOM_STATION_MANIFESTS: Array<StationToolManifest> = [
     allowedIntents: ['say', 'move_to_station', 'work_at_station', 'carry_packet'],
     lockedActions: LIVE_LOCKED_ACTIONS,
     approvalRequired: false,
-    defaultAgentId: 'atlantis-archivist',
+    defaultAgentId: 'poseidon',
     cockpitType: 'archive',
   },
   {
@@ -288,7 +288,7 @@ export const WAR_ROOM_STATION_MANIFESTS: Array<StationToolManifest> = [
     allowedIntents: ['say', 'move_to_station', 'work_at_station', 'request_approval', 'raise_alert'],
     lockedActions: LIVE_LOCKED_ACTIONS,
     approvalRequired: true,
-    defaultAgentId: 'treasury-guardian',
+
     cockpitType: 'treasury',
   },
   {
@@ -340,7 +340,7 @@ export const WAR_ROOM_STATION_MANIFESTS: Array<StationToolManifest> = [
     allowedIntents: ['say', 'move_to_station', 'carry_packet', 'request_approval', 'raise_alert'],
     lockedActions: LIVE_LOCKED_ACTIONS,
     approvalRequired: true,
-    defaultAgentId: 'signal-runner',
+    defaultAgentId: 'heimdall',
     cockpitType: 'gateway',
   },
   {

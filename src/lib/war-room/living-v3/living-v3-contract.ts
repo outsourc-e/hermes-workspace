@@ -17,6 +17,7 @@ export type LivingV3AgentId =
   | 'ares'
   | 'aphrodite'
   | 'hermes'
+  | 'goblin'
   | 'athena'
   | 'oracle'
   | 'heimdall'
@@ -27,6 +28,7 @@ export type LivingV3AgentId =
   | 'terra'
   | 'merchant-scout'
   | 'atlantis-archivist'
+  | 'poseidon'
   | 'treasury-guardian'
   | 'roster-keeper'
   | 'daedalus'
@@ -139,7 +141,7 @@ export type LivingV3AgentDefinition = {
   assetFolder: string
   portraitPath: string
   clips: Record<LivingV3AnimationState, { assetPath: string; frameCount: number }>
-  visualStatus?: 'temporary-approved-sprite' | 'norse-operator-runtime-final' | 'terra-earth-pet-runtime-final' | 'ambient-companion' | 'primary-roaming-companion' | 'council-room-general'
+  visualStatus?: 'temporary-approved-sprite' | 'norse-operator-runtime-final' | 'terra-earth-pet-runtime-final' | 'poseidon-sea-pet-runtime-final' | 'ambient-companion' | 'primary-roaming-companion' | 'council-room-general'
 }
 
 export type LivingV3CorridorDefinition = {
@@ -221,7 +223,7 @@ function clip(agent: LivingV3AgentId, state: LivingV3AnimationState) {
 }
 
 type LivingV3ApprovedSpriteAgentId = 'athena' | 'hephaestus' | 'julius'
-type LivingV3ExpandedAgentId = Extract<LivingV3AgentId, 'ares' | 'aphrodite' | 'hermes' | 'terra'>
+type LivingV3ExpandedAgentId = Extract<LivingV3AgentId, 'ares' | 'aphrodite' | 'hermes' | 'terra' | 'poseidon'>
 
 const approvedEtsyAgentFolders: Record<LivingV3ApprovedSpriteAgentId, string> = {
   athena: 'athena-market-strategist',
@@ -1036,6 +1038,18 @@ export const LIVING_V3_WORLD_CONFIG: LivingV3WorldConfig = {
       ...expandedAgentAssets('hermes'),
     },
     {
+      id: 'goblin',
+      label: 'Goblin',
+      shortLabel: 'GOB',
+      role: 'Goblin Analytics lead for opportunity discovery, comparative research, candidate ranking, and evidence-linked Opportunity Packet preparation.',
+      persona: 'Sharp, skeptical, and profit-aware. Goblin hunts for unusual but defensible opportunities, exposes weak evidence, and never confuses a promising signal with a proven claim.',
+      accent: '#9fe870',
+      home: { roomId: 'agora-opportunity', point: { x: 50, y: 68 } },
+      primaryStationIds: ['agora-intake'],
+      visualStatus: 'temporary-approved-sprite',
+      ...borrowedAgentAssets('athena'),
+    },
+    {
       id: 'heimdall',
       label: 'Heimdall',
       shortLabel: 'HMD',
@@ -1057,6 +1071,18 @@ export const LIVING_V3_WORLD_CONFIG: LivingV3WorldConfig = {
       primaryStationIds: ['terra-modeling-studio', 'terra-model-hunt', 'terra-printer-control'],
       visualStatus: 'terra-earth-pet-runtime-final',
       ...expandedAgentAssets('terra'),
+    },
+    {
+      id: 'poseidon',
+      label: 'Poseidon',
+      shortLabel: 'POS',
+      role: 'Atlantis Vault room manager for DB, Obsidian, evidence shelves, and library health. He centralizes visibility; he does not own every worker action.',
+      persona: 'Calm, strict, and library-minded. Poseidon keeps DB and Obsidian maps honest, flags drift or trash, and routes workers to their own shelves instead of becoming a bottleneck.',
+      accent: '#55d6ff',
+      home: { roomId: 'atlantis-vault', point: { x: 50, y: 68 } },
+      primaryStationIds: ['atlantis-index'],
+      visualStatus: 'poseidon-sea-pet-runtime-final',
+      ...expandedAgentAssets('poseidon'),
     },
     {
       id: 'julius',
@@ -1207,7 +1233,7 @@ export const LIVING_V3_HIDDEN_AGENT_DEFINITIONS: Array<LivingV3AgentDefinition> 
     id: 'merchant-scout',
     label: 'Harbor Scout',
     shortLabel: 'HRB',
-    role: 'Hidden planned worker profile. Not rendered until a dedicated approved visual pass exists.',
+    role: 'Retired historical visual placeholder. Preserved for old events and assets; never route new work here.',
     persona: 'Street-smart merchant scout. Checks evidence before any shop action.',
     accent: '#f1c36f',
     home: { roomId: 'merchant-harbor', point: { x: 50, y: 72 } },
@@ -1218,7 +1244,7 @@ export const LIVING_V3_HIDDEN_AGENT_DEFINITIONS: Array<LivingV3AgentDefinition> 
     id: 'atlantis-archivist',
     label: 'Atlantis Archivist',
     shortLabel: 'ATL',
-    role: 'Hidden planned worker profile. Not rendered until a dedicated approved visual pass exists.',
+    role: 'Retired historical visual placeholder. Preserved for old events and assets; never route new work here.',
     persona: 'Patient and exact. Nothing gets remembered without a source.',
     accent: '#72e0d4',
     home: { roomId: 'atlantis-vault', point: { x: 50, y: 72 } },
@@ -1229,7 +1255,7 @@ export const LIVING_V3_HIDDEN_AGENT_DEFINITIONS: Array<LivingV3AgentDefinition> 
     id: 'treasury-guardian',
     label: 'Treasury Guardian',
     shortLabel: 'TRS',
-    role: 'Hidden planned worker profile. Not rendered until a dedicated approved visual pass exists.',
+    role: 'Retired historical visual placeholder. Preserved for old events and assets; never route new work here.',
     persona: 'Protective and numbers-first. Locks spend until the case is clear.',
     accent: '#ffc75f',
     home: { roomId: 'treasury-commerce', point: { x: 50, y: 72 } },
@@ -1262,7 +1288,7 @@ export const LIVING_V3_HIDDEN_AGENT_DEFINITIONS: Array<LivingV3AgentDefinition> 
     id: 'signal-runner',
     label: 'Signal Runner',
     shortLabel: 'SIG',
-    role: 'Hidden planned worker profile. Not rendered until a dedicated approved visual pass exists.',
+    role: 'Retired historical visual placeholder. Preserved for old events and assets; never route new work here.',
     persona: 'Concise and responsive. Carries messages but never sends live actions alone.',
     accent: '#8bd8ff',
     home: { roomId: 'gateway-cockpit', point: { x: 50, y: 72 } },

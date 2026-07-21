@@ -207,6 +207,7 @@ export type WarRoomEventType =
   | 'etsy.scout.request.created'
   | 'etsy.candidates.ready'
   | 'etsy.candidate.selected'
+  | 'etsy.candidate.rejected'
   | 'etsy.shotlab.packet.created'
   | 'etsy.seo.packet.created'
   | 'etsy.draft.payload.created'

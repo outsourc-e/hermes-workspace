@@ -9,6 +9,7 @@ describe('Workspace tools-first registry', () => {
   it('seeds the Batch 1 tool contracts with locked live actions', () => {
     expect(WORKSPACE_TOOL_REGISTRY.map((tool) => tool.id)).toEqual([
       'command-room-manager',
+      'etsy-research-lab',
       'smart-intake-v2',
       'etsy-sheet-intake',
       'etsy-product-gallery',
@@ -27,6 +28,21 @@ describe('Workspace tools-first registry', () => {
     expect(recommendation.toolId).toBe('smart-intake-v2')
     expect(recommendation.safety.usageAllowed).toBe(false)
     expect(recommendation.safety.workerSpawnAllowed).toBe(false)
+  })
+
+  it('routes product, shop, and meta-analysis research into the Research Lab', () => {
+    const recommendation = recommendWorkspaceTool('מחקר חנות עמוק ומטא אנליזה של כמה חנויות Etsy')
+    expect(recommendation.decision).toBe('use_existing_tool')
+    expect(recommendation.toolId).toBe('etsy-research-lab')
+
+    const route = routeWorkspaceToolIntent('Deep shop research with a comparative meta analysis', 321)
+    expect(route.target).toMatchObject({
+      roomId: 'etsy-market-lab',
+      stationId: 'etsy-loki-product-hunt',
+      surfaceId: 'etsy-scout',
+      action: 'open_odin_scout',
+    })
+    expect(route.stationHandoff.status).toBe('ready')
   })
 
   it('routes sheet/product requests to the existing Sheet Intake surface', () => {

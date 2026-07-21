@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { runControlledCouncilFollowUp, runControlledCouncilRound } from './controlled-council-runner'
+import { CONTROLLED_COUNCIL_AGENT_IDS } from './controlled-athena-runner'
 
 let tempDirs: Array<string> = []
 let oldVaultDir: string | undefined
@@ -24,7 +25,7 @@ function createFakeHermes(dir: string, options: { exitAfterJson?: boolean } = {}
   const fakeHermes = path.join(dir, 'hermes-fake.js')
   writeFileSync(fakeHermes, `#!/usr/bin/env node
 const prompt = process.argv[process.argv.indexOf('-q') + 1] || ''
-const phase = prompt.includes('single-follow-up') ? 'single-follow-up' : prompt.includes('peer-vote') ? 'peer-vote' : 'opinion'
+const phase = prompt.includes('single-follow-up') ? 'single-follow-up' : prompt.includes('synthesis') ? 'synthesis' : prompt.includes('council-turn') ? 'council-turn' : prompt.includes('peer-vote') ? 'peer-vote' : 'opinion'
 console.log(JSON.stringify({
   agentId: 'council-hannibal',
   status: 'completed_local_only',
@@ -35,6 +36,7 @@ console.log(JSON.stringify({
   council: {
     generalId: 'hannibal',
     phase,
+    chatSummary: 'תקציר קצר: לשמור עומק בפרטי ולא להציף את הצ׳אט.',
     opinion: 'הפלנק: אם מציגים הכל בבת אחת, DLV יאבד נוחות. צריך תקציר פשוט ו-drill-down.',
     vote: 'neutral',
     voteReason: 'בעד רק אם הממשק נשאר נוח ולא מזייף תשובות.',
@@ -90,6 +92,9 @@ describe('controlled council runner', () => {
     expect(result.contextPacket.sourceNotes.some((note) => note.relativePath.includes('Council of Strategists') && note.status === 'loaded')).toBe(true)
     expect(result.openingTurns).toHaveLength(1)
     expect(result.openingTurns[0]).toMatchObject({ generalId: 'hannibal', status: 'completed_local_only', vote: 'neutral' })
+    expect(result.openingTurns[0].chatSummary).toBe('תקציר קצר: לשמור עומק בפרטי ולא להציף את הצ׳אט.')
+    expect(result.openingTurns[0].opinion).toContain('הפלנק')
+    expect(result.openingTurns[0].independentRunId).toContain('council-hannibal-turn-1')
     expect(result.stats).toMatchObject({ completed: 1, neutral: 1, consensus: 'neutral' })
     expect(result.recommendation).toMatchObject({
       title: 'Command Room / Mission Control',
@@ -99,6 +104,36 @@ describe('controlled council runner', () => {
     expect(result.decisionPacket.verdict).toBe('Command Room / Mission Control')
     expect(result.decisionPacket.recommendation.title).toBe('Command Room / Mission Control')
     expect(result.lockedActions).toEqual(expect.arrayContaining(['fake council responses', 'uncontrolled worker fan-out']))
+  })
+
+  it('runs five independent advisors, a discussion pass, and Julius as chair synthesis', async () => {
+    const result = await runControlledCouncilRound({
+      topic: 'תוודא שכל חבר במועצה עובד לבד ומחזיר תשובה קצרה בצ׳אט.',
+      agentIds: CONTROLLED_COUNCIL_AGENT_IDS,
+      includePeerVote: true,
+      timeoutMs: 5_000,
+    })
+
+    const nonChairIds = CONTROLLED_COUNCIL_AGENT_IDS.filter((agentId) => agentId !== 'council-julius')
+    expect(result.openingTurns).toHaveLength(nonChairIds.length)
+    expect(result.voteTurns).toHaveLength(nonChairIds.length + 1)
+    expect(new Set(result.openingTurns.map((turn) => turn.agentId))).toEqual(new Set(nonChairIds))
+    expect(new Set(result.openingTurns.map((turn) => turn.generalId)).size).toBe(nonChairIds.length)
+    expect(new Set(result.openingTurns.map((turn) => turn.independentRunId)).size).toBe(nonChairIds.length)
+    for (const turn of result.openingTurns) {
+      expect(turn.status).toBe('completed_local_only')
+      expect(turn.phase).toBe('opinion')
+      expect(turn.independentRunId).toContain(turn.agentId)
+      expect(turn.independentRunId).toContain('turn')
+      expect(turn.chatSummary.length).toBeLessThanOrEqual(220)
+      expect(turn.opinion.length).toBeGreaterThan(turn.chatSummary.length)
+    }
+    const discussionTurns = result.voteTurns.filter((turn) => turn.phase === 'council-turn')
+    const chairTurn = result.voteTurns.find((turn) => turn.agentId === 'council-julius')
+    expect(discussionTurns).toHaveLength(nonChairIds.length)
+    expect(chairTurn).toMatchObject({ generalId: 'julius', phase: 'synthesis', status: 'completed_local_only' })
+    expect(chairTurn?.independentRunId).toContain('chair-synthesis')
+    expect(result.stats.completed).toBe(nonChairIds.length + 1)
   })
 
   it('runs a single-general follow-up through the same no-fake path', async () => {
@@ -113,6 +148,8 @@ describe('controlled council runner', () => {
     expect(result.ok).toBe(true)
     expect(result.noFakeResponses).toBe(true)
     expect(result.turn).toMatchObject({ generalId: 'hannibal', phase: 'single-follow-up', status: 'completed_local_only' })
+    expect(result.turn.chatSummary).toBe('תקציר קצר: לשמור עומק בפרטי ולא להציף את הצ׳אט.')
+    expect(result.turn.independentRunId).toContain('council-hannibal')
     expect(result.turn.peerReadback.join(' ')).toContain('peer')
   })
 

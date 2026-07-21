@@ -112,7 +112,8 @@ export const Route = createFileRoute('/api/history')({
           }
           let messages: Awaited<ReturnType<typeof getMessages>> = []
           try {
-            messages = await getMessages(sessionKey)
+            const fetchedMessages = await getMessages(sessionKey)
+            messages = Array.isArray(fetchedMessages) ? fetchedMessages : []
           } catch {
             messages = []
           }

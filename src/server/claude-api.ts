@@ -24,6 +24,7 @@ import {
   searchSessions as searchDashboardSessions,
   updateSession as updateDashboardSession,
 } from './claude-dashboard-api'
+import { normalizeSessionMessageList } from './session-message-normalize'
 
 const _authHeaders = (): Record<string, string> =>
   BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
@@ -194,13 +195,13 @@ export async function getMessages(
   sessionId: string,
 ): Promise<Array<ClaudeMessage>> {
   if (getCapabilities().dashboard.available) {
-    const resp = await getDashboardSessionMessages(sessionId)
-    return resp.messages as Array<ClaudeMessage>
+    const response = await getDashboardSessionMessages(sessionId)
+    return normalizeSessionMessageList<ClaudeMessage>(response)
   }
-  const resp = await claudeGet<{ items: Array<ClaudeMessage>; total: number }>(
+  const response = await claudeGet<unknown>(
     `/api/sessions/${sessionId}/messages`,
   )
-  return resp.items
+  return normalizeSessionMessageList<ClaudeMessage>(response)
 }
 
 export async function searchSessions(

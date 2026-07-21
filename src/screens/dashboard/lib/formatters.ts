@@ -14,7 +14,8 @@
  *   "openrouter/google/gemini-2.5-flash" → "Gemini 2.5 Flash"
  *   "openai/gpt-5.3-codex"       → "Codex 5.3"
  *   "delivery-mirror"            → "Mirror"
- *   "kimi-k2.5"                  → "Kimi K2.5"
+ *   "kimi-k3"                    → "Kimi K3"
+ *   "kimi-k2.7-code"             → "Kimi K2.7 Code"
  */
 export function formatModelName(raw: string): string {
   if (!raw) return '—'
@@ -64,7 +65,13 @@ export function formatModelName(raw: string): string {
     return stripped.replace(/gpt-/gi, 'GPT-')
   }
   if (lower === 'delivery-mirror') return 'Mirror'
-  if (lower.includes('kimi')) return 'Kimi K2.5'
+  if (lower.includes('kimi')) {
+    const version = stripped
+      .replace(/^kimi[- _]?/i, '')
+      .replace(/[-_]/g, ' ')
+      .replace(/\b[a-z]/g, (c) => c.toUpperCase())
+    return version ? `Kimi ${version}` : 'Kimi'
+  }
 
   // Fallback: clean up dashes/underscores and title-case
   return stripped

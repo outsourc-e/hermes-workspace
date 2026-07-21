@@ -1374,16 +1374,16 @@
   position: relative;
   z-index: 1;
   grid-column: 1 / -1;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  gap: 8px;
+  align-items: stretch;
+  justify-content: stretch;
   min-width: 0;
   border-top: 1px solid color-mix(in srgb, var(--prep-tool) 20%, transparent);
   padding-top: 8px;
 }
 
-.etsy-prep__tool-card footer b {
+.etsy-prep__tool-card footer > b {
   width: fit-content;
   border-radius: var(--prep-radius-pill);
   background: color-mix(in srgb, var(--prep-tool) 12%, #ffffff);
@@ -1393,7 +1393,7 @@
   padding: 5px 8px;
 }
 
-.etsy-prep__tool-card footer small {
+.etsy-prep__tool-card footer > small {
   color: var(--prep-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.64rem;
@@ -3159,6 +3159,65 @@
   opacity: 1;
 }
 
+.etsy-prep__research-handoff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+  border: 1px solid rgba(127, 224, 191, 0.36);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(23, 63, 53, 0.78), rgba(9, 25, 31, 0.88));
+  color: #eafff8;
+  box-shadow: 0 12px 28px rgba(3, 21, 16, 0.18);
+}
+
+.etsy-prep__research-handoff > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.etsy-prep__research-handoff > div:last-child {
+  justify-items: end;
+  text-align: end;
+}
+
+.etsy-prep__research-handoff p,
+.etsy-prep__research-handoff h3 {
+  margin: 0;
+}
+
+.etsy-prep__research-handoff p {
+  color: var(--prep-green);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .12em;
+}
+
+.etsy-prep__research-handoff h3,
+.etsy-prep__research-handoff b,
+.etsy-prep__research-handoff span,
+.etsy-prep__research-handoff small {
+  overflow-wrap: anywhere;
+}
+
+.etsy-prep__research-handoff span,
+.etsy-prep__research-handoff small {
+  color: rgba(234, 255, 248, 0.68);
+}
+
+@media (max-width: 720px) {
+  .etsy-prep__research-handoff {
+    grid-template-columns: 1fr;
+  }
+
+  .etsy-prep__research-handoff > div:last-child {
+    justify-items: start;
+    text-align: start;
+  }
+}
+
 .etsy-prep--visual-board .etsy-prep__product-heart {
   position: relative;
   min-height: clamp(360px, 48vw, 640px);
@@ -4111,5 +4170,315 @@ html body .etsy-prep--visual-board .etsy-prep__empty-gallery small {
   .etsy-prep--visual-board .etsy-prep__command-steps,
   .etsy-prep--visual-board .etsy-prep__table-access {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Product Prep Cockpit 2026-07-05: active artifact, next action, radar, and candidate comparison. */
+.etsy-prep--visual-board .etsy-prep__cockpit {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.25fr) minmax(210px, .55fr) minmax(280px, .95fr) minmax(260px, .85fr);
+  gap: 10px;
+  align-items: stretch;
+  border: 1px solid #cdd9d0;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(27, 122, 95, .14), transparent 34%),
+    linear-gradient(135deg, #ffffff, #f1f6f1);
+  box-shadow: 0 16px 34px rgba(30, 45, 34, .08);
+  padding: 10px;
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact,
+.etsy-prep--visual-board .etsy-prep__next-action,
+.etsy-prep--visual-board .etsy-prep__metric-radar,
+.etsy-prep--visual-board .etsy-prep__comparison-table {
+  border: 1px solid #d8ded8;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .92);
+  color: #18211c;
+  box-shadow: 0 10px 24px rgba(30, 45, 34, .07);
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 176px;
+  padding: 12px;
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact-media {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact-media .etsy-prep__product-photo,
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact-media .etsy-prep__asset-badge {
+  min-height: 112px !important;
+  width: 112px;
+  height: 112px;
+  border: 1px solid #d6ded6;
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact-media > span {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  border: 1px solid rgba(27, 122, 95, .32);
+  border-radius: 999px;
+  background: #e8f5ef;
+  color: #145b48 !important;
+  font-size: 10px;
+  font-weight: 950;
+  padding: 6px 8px;
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact p,
+.etsy-prep--visual-board .etsy-prep__next-action p,
+.etsy-prep--visual-board .etsy-prep__comparison-head span,
+.etsy-prep--visual-board .etsy-prep__metric-radar span {
+  margin: 0;
+  color: #526059 !important;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em !important;
+  text-transform: uppercase;
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact h2,
+.etsy-prep--visual-board .etsy-prep__next-action h3 {
+  margin: 4px 0;
+  color: #18211c !important;
+  letter-spacing: -.05em;
+  line-height: .96;
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact h2 {
+  font-size: clamp(24px, 2.25vw, 38px);
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-artifact > div:nth-child(2) > span,
+.etsy-prep--visual-board .etsy-prep__next-action > span,
+.etsy-prep--visual-board .etsy-prep__next-action small {
+  color: #526059 !important;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-locks {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.etsy-prep--visual-board .etsy-prep__cockpit-locks span {
+  border: 1px solid #d8ded8;
+  border-radius: 999px;
+  background: #f3f5f2;
+  color: #526059 !important;
+  font-size: 11px;
+  font-weight: 850;
+  padding: 5px 8px;
+}
+
+.etsy-prep--visual-board .etsy-prep__next-action {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  padding: 12px;
+}
+
+.etsy-prep--visual-board .etsy-prep__next-action[data-etsy-next-action='ready'] {
+  border-color: rgba(27, 122, 95, .38);
+  background: linear-gradient(145deg, #ffffff, #eaf7f1);
+}
+
+.etsy-prep--visual-board .etsy-prep__next-action button {
+  min-height: 42px;
+  border: 1px solid #1b7a5f;
+  border-radius: 12px;
+  background: #1b7a5f;
+  color: #ffffff;
+  font-weight: 950;
+}
+
+.etsy-prep--visual-board .etsy-prep__next-action button:disabled {
+  border-color: #d9ded9;
+  background: #e7ebe7;
+  color: #58645e;
+}
+
+.etsy-prep--visual-board .etsy-prep__metric-radar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.etsy-prep--visual-board .etsy-prep__metric-radar article {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-height: 96px;
+  border: 1px solid #e0e5e0;
+  border-radius: 16px;
+  background: #fbfcfa;
+  text-align: center;
+}
+
+.etsy-prep--visual-board .etsy-prep__metric-dial {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #ffffff 56%, transparent 57%),
+    conic-gradient(#1b7a5f var(--prep-metric), #e2e8e2 0);
+}
+
+.etsy-prep--visual-board .etsy-prep__metric-radar article[data-metric-tone='warn'] .etsy-prep__metric-dial {
+  background: radial-gradient(circle, #ffffff 56%, transparent 57%), conic-gradient(#c9862f var(--prep-metric), #e2e8e2 0);
+}
+
+.etsy-prep--visual-board .etsy-prep__metric-radar article[data-metric-tone='bad'] .etsy-prep__metric-dial {
+  background: radial-gradient(circle, #ffffff 56%, transparent 57%), conic-gradient(#9f3f3f var(--prep-metric), #e2e8e2 0);
+}
+
+.etsy-prep--visual-board .etsy-prep__metric-dial b {
+  color: #18211c !important;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.etsy-prep--visual-board .etsy-prep__metric-radar small,
+.etsy-prep--visual-board .etsy-prep__comparison-table small {
+  color: #526059 !important;
+  font-size: 11px;
+}
+
+.etsy-prep--visual-board .etsy-prep__comparison-table {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 10px;
+}
+
+.etsy-prep--visual-board .etsy-prep__comparison-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.etsy-prep--visual-board .etsy-prep__comparison-head b {
+  color: #18211c !important;
+  font-size: 14px;
+}
+
+.etsy-prep--visual-board .etsy-prep__comparison-table > button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px 74px 60px;
+  gap: 8px;
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid #d8ded8;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #18211c;
+  padding: 8px;
+  text-align: left;
+}
+
+.etsy-prep--visual-board .etsy-prep__comparison-table > button.is-selected {
+  border-color: rgba(27, 122, 95, .42);
+  background: rgba(27, 122, 95, .08);
+}
+
+.etsy-prep--visual-board .etsy-prep__comparison-table > button span {
+  overflow: hidden;
+  color: #18211c !important;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.etsy-prep--visual-board .etsy-prep__comparison-table > button b {
+  color: #145b48 !important;
+  font-size: 13px;
+  text-align: right;
+}
+
+.etsy-prep--visual-board .etsy-prep__comparison-table > button em {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1b7a5f var(--prep-row-score), #cfd8cf 0);
+  overflow: hidden;
+}
+
+.etsy-prep--visual-board .etsy-prep__comparison-table > button em::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(47, 121, 168, .55) var(--prep-row-proof), transparent 0);
+  mix-blend-mode: multiply;
+}
+
+@media (max-width: 1180px) {
+  .etsy-prep--visual-board .etsy-prep__cockpit {
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, .8fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .etsy-prep--visual-board .etsy-prep__cockpit,
+  .etsy-prep--visual-board .etsy-prep__cockpit-artifact {
+    grid-template-columns: 1fr;
+  }
+}
+
+.etsy-prep--visual-board .etsy-prep__visual-product-card--more {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 220px;
+  border-style: dashed;
+  text-align: center;
+  opacity: 0.82;
+}
+
+.etsy-prep--visual-board .etsy-prep__visual-product-card--more b {
+  color: #eff8ef !important;
+  font-size: 2rem;
+}
+
+.etsy-prep--visual-board .etsy-prep__visual-product-card--more span,
+.etsy-prep--visual-board .etsy-prep__visual-product-card--more small {
+  max-width: 18ch;
+  color: rgba(239, 248, 239, 0.68) !important;
+}
+
+.etsy-prep--visual-board .etsy-prep__product-heart,
+.etsy-prep--visual-board .etsy-prep__station-portals,
+.etsy-prep--visual-board .etsy-prep__command-center,
+.etsy-prep--visual-board .etsy-prep__debug {
+  contain: layout paint;
+}
+
+@supports (content-visibility: auto) {
+  .etsy-prep--visual-board .etsy-prep__product-heart,
+  .etsy-prep--visual-board .etsy-prep__station-portals,
+  .etsy-prep--visual-board .etsy-prep__command-center,
+  .etsy-prep--visual-board .etsy-prep__debug {
+    content-visibility: auto;
+    contain-intrinsic-size: 520px;
   }
 }

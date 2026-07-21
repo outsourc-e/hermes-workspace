@@ -76,6 +76,7 @@ export type WorkspaceStationActionRouterResult = {
 
 const TOOL_HINTS: Record<WorkspaceToolId, string> = {
   'command-room-manager': 'Command Room Manager route this local workspace task',
+  'etsy-research-lab': 'Research Lab product shop store market research meta analysis selectable depth verified atlas',
   'smart-intake-v2': 'Smart Intake V2 mixed AliExpress Google Drive Google Sheet local images freeform prompt',
   'etsy-sheet-intake': 'Import CSV TSV JSON sheet product gallery dossiers',
   'etsy-product-gallery': 'Open product gallery choose selected product dossier',
@@ -228,7 +229,7 @@ function routeFor(event: WorkspaceStationActionEvent) {
 }
 
 function movementAgentFor(route: WorkspaceToolRoute): LivingV3AgentId {
-  if (route.target.stationId) return etsyMarketLabStationOperatorId(route.target.stationId) ?? 'hermes'
+  if (route.target.stationId) return etsyMarketLabStationOperatorId(route.target.stationId)
   return 'hermes'
 }
 

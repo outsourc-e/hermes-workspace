@@ -699,7 +699,7 @@ export async function runEtsyLiveScoutBackend(input: {
   const artifact = createLiveArtifact(kernelRun, liveRun, startedAtMs + 3)
   kernelRun = attachWorkspaceArtifact({ runs: [kernelRun] }, kernelRun.runId, artifact).runs[0]
   kernelRun = liveRun.status === 'completed'
-    ? completeWorkspaceRun({ runs: [kernelRun] }, kernelRun.runId, `${artifact.summary} Live actions remain locked.`, startedAtMs + 4).runs[0]
+    ? completeWorkspaceRun({ runs: [kernelRun] }, kernelRun.runId, `${artifact.summary} Live actions remain locked.`, startedAtMs + 4).run ?? kernelRun
     : blockWorkspaceRun({ runs: [kernelRun] }, kernelRun.runId, artifact.summary, startedAtMs + 4).runs[0]
 
   const telemetry = workspaceKernelTelemetryFromRun(kernelRun, {

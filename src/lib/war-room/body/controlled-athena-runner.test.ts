@@ -19,6 +19,7 @@ import {
   normalizeControlledAthenaOutput,
   normalizeControlledSmartIntakeContext,
   runControlledAgentOneShot,
+  sanitizeControlledRunnerError,
 } from './controlled-athena-runner'
 import { liveAgentContextPacket } from './live-agent-context-packets'
 
@@ -41,7 +42,11 @@ describe('controlled agent runner helpers', () => {
         expect(prompt).toContain('Google OAuth/private read/write')
         expect(prompt).toContain('worker fan-out')
       } else if (String(agentId).startsWith('council-')) {
-        expect(prompt).toContain('one equal AI advisor')
+        if (agentId === 'council-julius') {
+          expect(prompt).toContain('Council Chair')
+        } else {
+          expect(prompt).toContain('independent AI advisor')
+        }
         expect(prompt).toContain('OBSIDIAN / SECOND BRAIN CONTEXT PACKET')
         expect(prompt).toContain('OTHER GENERAL OPINIONS')
         expect(prompt).toContain('Do not edit files')
@@ -69,6 +74,12 @@ describe('controlled agent runner helpers', () => {
     expect(terraPrompt).toContain('obsidian-terra-forge-v1')
     expect(terraPrompt).toContain('Do not use the words "local-only" or "read-only" in the Hebrew answer')
 
+    const goblinPrompt = buildLiveAgentChatPrompt('goblin', 'live-policy-goblin', 'מצא הזדמנויות חדשות')
+    expect(goblinPrompt).toContain('Goblin owns opportunity discovery')
+    expect(goblinPrompt).toContain('Opportunity Packet')
+    expect(goblinPrompt).toContain('obsidian-goblin-analytics-v1')
+    expect(goblinPrompt).toContain('Etsy Market Lab - Product Tracker Index.md')
+
     const odinPrompt = buildLiveAgentChatPrompt('odin', 'live-policy-odin', 'האם הדראפט מוכן?')
     expect(odinPrompt).toContain('01 Projects/War Room/Etsy Market Lab - מקור אמת נוכחי.md')
     expect(odinPrompt).toContain('obsidian-odin-draft-approval-v1')
@@ -86,6 +97,7 @@ describe('controlled agent runner helpers', () => {
 
   it('maps approved animated Workspace agents to real Hermes profile ids and leaves deferred companions alone', () => {
     expect(liveAgentHermesProfileId('terra')).toBe('terra')
+    expect(liveAgentHermesProfileId('goblin')).toBe('goblin')
     expect(liveAgentHermesProfileId('hermes')).toBe('default')
     expect(liveAgentHermesProfileId('loki')).toBe('loki')
     expect(liveAgentHermesProfileId('thor')).toBe('thor')
@@ -334,13 +346,15 @@ describe('controlled agent runner helpers', () => {
     expect(result.usage.reportedCost).toContain('$0.0001')
     expect(result.usage.commandPreview).toContain('--profile default')
     expect(result.usage.commandPreview).toContain('--max-turns 1')
-    expect(result.usage.commandPreview).toContain('-t none')
+    expect(result.usage.commandPreview).not.toContain('-t none')
     const args = JSON.parse(readFileSync(argsFile, 'utf8')) as Array<string>
     expect(args.slice(0, 3)).toEqual(['--profile', 'default', 'chat'])
-    expect(args).toEqual(expect.arrayContaining(['chat', '-Q', '--ignore-rules', '--max-turns', '1', '-t', 'none']))
+    expect(args).toEqual(expect.arrayContaining(['chat', '-Q', '--ignore-rules', '--max-turns', '1']))
+    expect(args).not.toContain('-t')
+    expect(args).not.toContain('none')
   })
 
-  it('runs a bounded fake Smart Intake Hermes CLI one-shot with toolsets none', async () => {
+  it('runs a bounded fake Smart Intake Hermes CLI one-shot without invalid toolset override', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'war-room-fake-smart-intake-'))
     const fakeHermes = path.join(dir, 'hermes-fake.js')
     const argsFile = path.join(dir, 'args.json')
@@ -365,9 +379,36 @@ describe('controlled agent runner helpers', () => {
     expect(result.output.blockedActions).toEqual(expect.arrayContaining([...CONTROLLED_SMART_INTAKE_REQUIRED_BLOCKED_ACTIONS]))
     expect(result.usage.commandPreview).toContain('--source war-room-controlled-smart-intake')
     expect(result.usage.commandPreview).toContain('--profile loki')
-    expect(result.usage.commandPreview).toContain('-t none')
+    expect(result.usage.commandPreview).not.toContain('-t none')
     const args = JSON.parse(readFileSync(argsFile, 'utf8')) as Array<string>
     expect(args.slice(0, 3)).toEqual(['--profile', 'loki', 'chat'])
-    expect(args).toEqual(expect.arrayContaining(['chat', '-Q', '--ignore-rules', '--max-turns', '1', '-t', 'none']))
+    expect(args).toEqual(expect.arrayContaining(['chat', '-Q', '--ignore-rules', '--max-turns', '1']))
+    expect(args).not.toContain('-t')
+    expect(args).not.toContain('none')
+  })
+
+  it('hides raw Hermes command and prompt text from runner errors', async () => {
+    const raw = 'Hannibal. Command failed: /Users/mac/.hermes/hermes-agent/venv/bin/hermes --profile hannibal chat -Q --ignore-rules --max-turns 1 -t none -q You are Hannibal. IMPORTANT IDENTITY RULES: Return JSON only'
+    expect(sanitizeControlledRunnerError(raw)).toContain('Technical command/prompt details are hidden')
+    expect(sanitizeControlledRunnerError(raw)).not.toContain('--profile')
+    expect(sanitizeControlledRunnerError(raw)).not.toContain('IMPORTANT IDENTITY RULES')
+
+    const dir = mkdtempSync(path.join(tmpdir(), 'war-room-fake-raw-error-'))
+    const fakeHermes = path.join(dir, 'hermes-fake.js')
+    writeFileSync(fakeHermes, `#!/usr/bin/env node\nconsole.error(${JSON.stringify(raw)})\nprocess.exit(1)\n`, 'utf8')
+    chmodSync(fakeHermes, 0o755)
+
+    const result = await runControlledAgentOneShot({
+      agentId: 'council-hannibal',
+      runId: 'raw-error-run-1',
+      hermesCliPath: fakeHermes,
+      timeoutMs: 5_000,
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('Expected raw runner error to fail')
+    expect(result.error).toContain('Technical command/prompt details are hidden')
+    expect(result.error).not.toContain('--profile')
+    expect(result.error).not.toContain('IMPORTANT IDENTITY RULES')
   })
 })

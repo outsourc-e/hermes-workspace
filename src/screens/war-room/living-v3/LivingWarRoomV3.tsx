@@ -1,4 +1,4 @@
-import {     useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   LIVING_V3_ASSET_ROOT,
   LIVING_V3_WORLD_CONFIG,
@@ -64,6 +64,7 @@ import {
   setEtsySearchMode,
   setEtsySupplierFilter,
   stageEtsySheetRowLocally,
+  syncEtsyPipelineToExternalProduct,
   toggleEtsyTruthField,
   updateEtsyQaItemStatus,
   visibleEtsySupplierLeads
@@ -89,6 +90,7 @@ import {
   createShotLabHandoffLocal,
   etsyRoomStageLabels,
   prepareProductScoutPacketLocal,
+  rejectEtsyCandidateLocal,
   requestDlvApprovalLocal,
   selectEtsyCandidateLocal
 } from '../../../lib/war-room/living-v3/etsy-room-contracts'
@@ -137,7 +139,7 @@ import {
   attachWorkspaceArtifact,
   buildEtsyKernelStageTimeline,
   buildKernelAgentDisplayStates,
-  buildWorkspaceMissionSpine,
+  buildWorkspacePacketMissionRail,
   createCouncilHandoffWorkspaceRun,
   createSmartIntakeMissionKernelRun,
   createWorkspaceAction,
@@ -147,6 +149,7 @@ import {
   getWorkspaceBlueprintById,
   kernelAgentDisplayStateToLivingTask,
   latestWorkspaceMissionRun,
+  parseWorkspacePacketMissionResults,
   requestWorkspaceApproval,
   routeWorkspaceActionToBlueprint,
   syncEtsyPipelineToWorkspaceRun,
@@ -157,7 +160,8 @@ import {
   workspaceRunToLivingV3Task,
   workspaceRunToStationAction
 } from '../../../lib/workspace-kernel'
-import type {KernelAgentDisplayState, WorkspaceAgentMindProfile, WorkspaceArtifactKind, WorkspaceContextPacket, WorkspaceEvent, WorkspaceKernelPersistedState, WorkspaceKernelTelemetrySnapshot, WorkspaceMissionSpineStep, WorkspaceRun} from '../../../lib/workspace-kernel';
+import type {KernelAgentDisplayState, WorkspaceAgentMindProfile, WorkspaceArtifactKind, WorkspaceContextPacket, WorkspaceEvent, WorkspaceKernelPersistedState, WorkspaceKernelTelemetrySnapshot, WorkspacePacketMissionRailItem, WorkspacePacketMissionResult, WorkspaceRun} from '../../../lib/workspace-kernel';
+import type {WorkspaceCoreOpsNotification} from '../../../lib/workspace-core-ops';
 import { buildWorkspaceCoreOpsSnapshot } from '../../../lib/workspace-core-ops'
 import { bidiClassNameFor, textDirectionFor } from '../../../lib/war-room/living-v3/bidi-text'
 import { livingV3AdapterStateFromBodyRuntime } from '../../../lib/war-room/body/living-v3-body-adapter'
@@ -184,12 +188,24 @@ import {
   useWarRoomState
 } from '../../../hooks/use-war-room-body'
 import type {ControlledAgentUiResult, ControlledUiAgentId, EtsyLiveScoutClientResult, LiveAgentChatUiResult} from '../../../hooks/use-war-room-body';
+import { AgentWorkbenchPanel } from './AgentWorkbenchPanel'
+import { AtlantisVaultSurface } from './AtlantisVaultSurface'
+import { HermesCommandCockpit } from './HermesCommandCockpit'
 import { CouncilChamberSurface  } from './CouncilChamberSurface'
 import { GoblinAnalyticsShell } from './GoblinAnalyticsShell'
+import { OracleWorkbench } from './OracleWorkbench'
+import { PacketHandoffRail } from './PacketHandoffRail'
+import type { PacketHandoffRailStatus } from './PacketHandoffRail'
+import { StationWorkbenchHeader } from './StationWorkbenchHeader'
+import { TerraModelPrintStudio } from './TerraModelPrintStudio'
 import { WorkspaceCoreOpsPanel } from './WorkspaceCoreOpsPanel'
+import { WorkspacePipelineWorkbench } from './WorkspacePipelineWorkbench'
+import { WorkspaceStationCta } from './WorkspaceStationCta'
+import type {WorkspaceCoreOpsApprovalDecision, WorkspaceCoreOpsPersistenceView} from './WorkspaceCoreOpsPanel';
 import type {CouncilDecisionHandoff} from './CouncilChamberSurface';
-import { type EtsyPrepChatMemorySnippet, EtsyProductPrepWorkbench } from './EtsyProductPrepWorkbench'
-import type {EtsyRoomState} from '../../../lib/war-room/living-v3/etsy-room-contracts';
+import { EtsyProductPrepWorkbench } from './EtsyProductPrepWorkbench'
+import type {EtsyPrepChatMemorySnippet} from './EtsyProductPrepWorkbench';
+import type {EtsyProductCandidate as EtsyRoomProductCandidate, EtsyRoomState} from '../../../lib/war-room/living-v3/etsy-room-contracts';
 import type {OracleAluraKeywordResult, OracleAluraSearchResult, OracleAluraSourceMode, OracleSignalPacket} from '../../../lib/war-room/living-v3/oracle-alura';
 import type {EtsyPipelineState, EtsyProductCandidate, EtsyProductSearchMode, EtsyQaStatus, EtsySupplierFilter, EtsySupplierLead, EtsyTruthField} from '../../../lib/war-room/living-v3/etsy-pipeline';
 import type {EtsyMarketLabStationId} from '../../../lib/war-room/living-v3/etsy-station-apps';
@@ -199,6 +215,9 @@ import type {LivingV3AgentId, LivingV3BadgeKind, LivingV3CameraState, LivingV3Ro
 import type {CSSProperties, FormEvent, PointerEvent, ReactNode} from 'react';
 import type { AgentIntent } from '../../../lib/war-room/body/domain'
 import './living-war-room-v3.css'
+import './hermes-command-cockpit.css'
+import './terra-model-print-studio.css'
+import './etsy-desktop-canonical.css'
 
 export type BodyRuntimeMode = 'local-adapter' | 'body-runtime'
 
@@ -253,8 +272,10 @@ const LIVING_V3_MESSAGES_LIMIT = 200
 const LIVING_V3_AGENT_VISIBLE_MESSAGES = 40
 const LIVING_V3_AGENT_WINDOW_LAYOUT_STORAGE_KEY = 'war-room-living-v3-agent-window-layout-v1'
 const LIVING_V3_NAV_DEBUG_STORAGE_KEY = 'war-room-living-v3-navigation-debug-v1'
-const DEFAULT_AGENT_WINDOW_LAYOUT: AgentWindowLayout = { x: 960, y: 180, w: 390, h: 560 }
-const MIN_AGENT_WINDOW_SIZE = { w: 320, h: 320 }
+const DEFAULT_AGENT_WINDOW_LAYOUT: AgentWindowLayout = { x: 820, y: 110, w: 520, h: 680 }
+const MIN_AGENT_WINDOW_SIZE = { w: 440, h: 460 }
+const LIVING_V3_ACTIVE_CLOCK_MS = 66
+const LIVING_V3_BACKGROUND_CLOCK_MS = 1500
 const hiddenPrimaryAgentIds = new Set<LivingV3AgentId>(['ares', 'aphrodite', 'heimdall'])
 
 const LEGACY_ETSY_DEMO_SEEDS = [
@@ -317,19 +338,19 @@ function isFiniteLayout(value: unknown): value is AgentWindowLayout {
 }
 
 function defaultAgentWindowLayout(viewport = INITIAL_VIEWPORT): AgentWindowLayout {
+  const clampedDefault = clampAgentWindowLayout(DEFAULT_AGENT_WINDOW_LAYOUT, viewport)
   return {
-    x: Math.max(16, viewport.w - DEFAULT_AGENT_WINDOW_LAYOUT.w - 28),
-    y: Math.max(86, viewport.h - DEFAULT_AGENT_WINDOW_LAYOUT.h - 24),
-    w: DEFAULT_AGENT_WINDOW_LAYOUT.w,
-    h: Math.min(DEFAULT_AGENT_WINDOW_LAYOUT.h, Math.max(MIN_AGENT_WINDOW_SIZE.h, viewport.h - 110)),
+    ...clampedDefault,
+    x: Math.max(16, viewport.w - clampedDefault.w - 28),
+    y: Math.max(86, viewport.h - clampedDefault.h - 24),
   }
 }
 
 function clampAgentWindowLayout(layout: AgentWindowLayout, viewport = INITIAL_VIEWPORT): AgentWindowLayout {
-  const maxW = Math.max(MIN_AGENT_WINDOW_SIZE.w, viewport.w - 32)
-  const maxH = Math.max(MIN_AGENT_WINDOW_SIZE.h, viewport.h - 92)
-  const w = Math.max(MIN_AGENT_WINDOW_SIZE.w, Math.min(maxW, layout.w))
-  const h = Math.max(MIN_AGENT_WINDOW_SIZE.h, Math.min(maxH, layout.h))
+  const maxW = Math.max(320, viewport.w - 32)
+  const maxH = Math.max(360, viewport.h - 92)
+  const w = Math.min(maxW, Math.max(Math.min(MIN_AGENT_WINDOW_SIZE.w, maxW), layout.w))
+  const h = Math.min(maxH, Math.max(Math.min(MIN_AGENT_WINDOW_SIZE.h, maxH), layout.h))
   return {
     x: Math.max(12, Math.min(Math.max(12, viewport.w - w - 12), layout.x)),
     y: Math.max(72, Math.min(Math.max(72, viewport.h - h - 12), layout.y)),
@@ -427,7 +448,7 @@ const ORACLE_PRODUCT_GATE_LABELS = ['Etsy live', 'Active', 'Alura', 'AliTools', 
 
 const badgeLabels: Record<LivingV3BadgeKind, string> = {
   'active-task': '*',
-  approval: 'L',
+  approval: '✓',
   blocked: 'X',
   alert: '!',
   sleeping: 'Z',
@@ -635,6 +656,7 @@ function commandAgentVisualStatusLabel(agentId: LivingV3AgentId, rowHasControlle
   if (agent.primaryStationIds.length > 0) return 'station control'
   if (agent.visualStatus === 'ambient-companion') return 'ambient only'
   if (agent.visualStatus === 'council-room-general') return 'council advisor'
+  if (agent.visualStatus === 'poseidon-sea-pet-runtime-final') return 'Atlantis Vault manager'
   return agent.visualStatus?.replace(/-/g, ' ') ?? 'visual agent'
 }
 
@@ -711,6 +733,18 @@ function etsyOperatorPacketLabel(status: string) {
   return 'Local packet'
 }
 
+function etsyEvidenceLabel(value: string | null | undefined) {
+  if (!value) return 'Not linked yet'
+  if (value === 'fallback-mock' || value === 'fallback-local-mock') return 'Local fallback'
+  if (value === 'missing-evidence') return 'Evidence missing'
+  if (value === 'partial-local') return 'Partial local proof'
+  if (value === 'verified-local') return 'Source linked'
+  if (value === 'live-readonly-research') return 'Live read-only research'
+  if (value === 'local-user-input') return 'Manual input'
+  if (value === 'sheet-intake-local') return 'Sheet intake'
+  return value.replace(/[-_]+/g, ' ')
+}
+
 function isCouncilRoomGeneralAgent(agentId: LivingV3AgentId) {
   return livingV3AgentById(agentId)?.visualStatus === 'council-room-general'
 }
@@ -775,87 +809,140 @@ function formatMetric(value: number | null | undefined, fallback = 'missing evid
 }
 
 function OracleAluraLocalSearchApp({ state, handlers }: { state: OracleSearchUiState; handlers: OracleSearchHandlers }) {
+  const resultCount = state.result?.keywordResults.length ?? 0
+  const selectedResult = state.result?.keywordResults.find((result) => result.id === state.selectedKeywordId) ?? state.result?.keywordResults[0] ?? null
+  const nextOracleAction = state.loading
+    ? 'Reading local evidence…'
+    : selectedResult
+      ? `Send ${selectedResult.keyword} into the Etsy prep room`
+      : 'Search an Etsy niche, then pass the best signal to Loki'
+
   return (
-    <div className="living-v3__oracle-shell" data-station-app="oracle-alura-local-search">
-      <div className="living-v3__oracle-badge">Oracle Search</div>
-
-      <div className="living-v3__oracle-fastbar" data-oracle-product-skill="etsy-live-shop-first-green-gate-v1" aria-label="Oracle product gates">
-        <b>Heimdall</b>
-        <div>
-          {ORACLE_PRODUCT_GATE_LABELS.map((gate) => <span key={gate}>{gate}</span>)}
+    <div
+      className="living-v3__oracle-shell"
+      data-station-app="oracle-alura-local-search"
+      data-oracle-workbench="action-v2"
+      data-oracle-product-scout="workbench-v1"
+      data-live-actions-locked="true"
+    >
+      <section className="living-v3__oracle-signal-deck" aria-label="Oracle signal search console">
+        <div className="living-v3__oracle-signal-copy">
+          <span>Oracle signal scout</span>
+          <h3>{(selectedResult?.keyword ?? state.query) || 'Search local product evidence'}</h3>
+          <p>{nextOracleAction}</p>
         </div>
-        <small>PS backup</small>
-      </div>
+        <form
+          className="living-v3__oracle-searchbar"
+          onSubmit={(event) => {
+            event.preventDefault()
+            handlers.runSearch()
+          }}
+        >
+          <label>
+            <span>Signal / niche</span>
+            <input
+              value={state.query}
+              onChange={(event) => handlers.updateQuery(event.target.value)}
+              placeholder="ceramic cup, bow necklace, gift idea…"
+              aria-label="Oracle product search text"
+            />
+          </label>
+          <label>
+            <span>Evidence source</span>
+            <select value={state.sourceMode} onChange={(event) => handlers.updateSourceMode(event.target.value as OracleAluraSourceMode)}>
+              {Object.entries(oracleAluraSourceModeLabels).map(([mode, label]) => (
+                <option key={mode} value={mode}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <LocalOnlyButton className="living-v3__oracle-primary" disabled={state.loading} disabledReason="Oracle is reading local evidence." onClick={handlers.runSearch}>
+            {state.loading ? 'Searching…' : 'Search evidence'}
+          </LocalOnlyButton>
+        </form>
+        <div className="living-v3__oracle-kpis" aria-label="Oracle local status">
+          <span><b>{resultCount}</b>signals</span>
+          <span><b>{selectedResult ? formatMetric(selectedResult.metrics.keywordScore, 'n/a') : '—'}</b>score</span>
+          <span><b>{oracleAluraSourceModeLabels[state.sourceMode]}</b>local cache</span>
+          <span><b>Locked</b>no live write</span>
+        </div>
+      </section>
 
-      <div className="living-v3__oracle-toolbar">
-        <label>
-          <span>Search</span>
-          <input
-            value={state.query}
-            onChange={(event) => handlers.updateQuery(event.target.value)}
-            placeholder="niche / keyword / idea"
-            aria-label="Oracle product search text"
-          />
-        </label>
-        <label>
-          <span>Source</span>
-          <select value={state.sourceMode} onChange={(event) => handlers.updateSourceMode(event.target.value as OracleAluraSourceMode)}>
-            {Object.entries(oracleAluraSourceModeLabels).map(([mode, label]) => (
-              <option key={mode} value={mode}>{label}</option>
-            ))}
-          </select>
-        </label>
-        <LocalOnlyButton className="living-v3__etsy-primary" disabled={state.loading} onClick={handlers.runSearch}>
-          {state.loading ? 'Searching...' : 'Search'}
-        </LocalOnlyButton>
-      </div>
+      <section className="living-v3__oracle-workbench" aria-label="Oracle results workbench">
+        <article className="living-v3__oracle-selected-card" data-has-signal={selectedResult ? 'true' : 'false'}>
+          <span>Selected signal</span>
+          <h3>{selectedResult?.keyword ?? 'No signal selected yet'}</h3>
+          <p>{selectedResult ? `${selectedResult.sourceLabel} · ${selectedResult.confidence}% confidence` : 'Run a local evidence search. The best signal can be sent to Etsy as a local packet.'}</p>
+          <dl className="living-v3__oracle-metrics living-v3__oracle-metrics--selected">
+            <div><dt>Score</dt><dd>{formatMetric(selectedResult?.metrics.keywordScore, 'n/a')}</dd></div>
+            <div><dt>Volume</dt><dd>{formatMetric(selectedResult?.metrics.searchVolume, 'missing')}</dd></div>
+            <div><dt>Sales</dt><dd>{formatMetric(selectedResult?.metrics.sales, 'missing')}</dd></div>
+            <div><dt>Missing</dt><dd>{selectedResult?.missingFields.length ?? '—'}</dd></div>
+          </dl>
+          <LocalOnlyButton
+            className="living-v3__oracle-primary living-v3__oracle-primary--handoff"
+            disabled={!selectedResult || !state.result}
+            disabledReason="Search and choose a signal before sending a local Etsy packet."
+            onClick={selectedResult && state.result ? () => handlers.sendSignalToEtsy(state.result!, selectedResult) : undefined}
+          >
+            Send selected to Etsy
+          </LocalOnlyButton>
+        </article>
 
-      <details className="living-v3__oracle-source-box living-v3__oracle-proof">
-        <summary>Proof</summary>
-        <span>Mode: {oracleAluraSourceModeLabels[state.sourceMode]}</span>
-        <span>Files: {state.result?.sourceFilesUsed.join(', ') || 'none yet'}</span>
-        {state.result?.warning && <span>Warning: {state.result.warning}</span>}
-        {state.error && <span>Error: {state.error}</span>}
-      </details>
-
-      <div className="living-v3__oracle-results">
-        {state.result && !state.result.keywordResults.length && (
-          <EtsyEmptyState>No match.</EtsyEmptyState>
-        )}
-        {state.result?.keywordResults.map((result) => (
-          <article key={result.id} className={`living-v3__oracle-card ${state.selectedKeywordId === result.id ? 'is-selected' : ''}`}>
+        <section className="living-v3__oracle-results-panel" aria-label="Oracle signal results">
+          <div className="living-v3__oracle-results-head">
             <div>
-              <h3>{result.keyword}</h3>
-              <p>{result.sourceLabel}</p>
-              <div className="living-v3__etsy-evidence-badges">
-                <small>{result.dataOrigin}</small>
-                <small>{result.rawSourceFile}</small>
-                <small>{result.confidence}% confidence</small>
-              </div>
+              <span>Signal results</span>
+              <h3>{state.result ? `${resultCount} local matches` : 'Waiting for search'}</h3>
             </div>
-            <dl className="living-v3__oracle-metrics">
-              <div><dt>Score</dt><dd>{formatMetric(result.metrics.keywordScore)}</dd></div>
-              <div><dt>Volume</dt><dd>{formatMetric(result.metrics.searchVolume)}</dd></div>
-              <div><dt>Sales</dt><dd>{formatMetric(result.metrics.sales)}</dd></div>
-              <div><dt>Avg sales</dt><dd>{formatMetric(result.metrics.avgSales)}</dd></div>
-              <div><dt>Competition</dt><dd>{formatMetric(result.metrics.competition)}</dd></div>
-              <div><dt>Avg price</dt><dd>{formatMetric(result.metrics.avgPrice)}</dd></div>
-            </dl>
-            <details className="living-v3__oracle-card-proof">
+            <details className="living-v3__oracle-source-box living-v3__oracle-proof">
               <summary>Proof</summary>
-              <span>Missing: {result.missingFields.join(', ') || 'none'}</span>
-              <span>Evidence: {result.evidenceIds.slice(0, 3).join(', ') || 'none'}</span>
+              <span>Mode: {oracleAluraSourceModeLabels[state.sourceMode]}</span>
+              <span>Files: {state.result?.sourceFilesUsed.join(', ') || 'none yet'}</span>
+              {state.result?.warning && <span>Warning: {state.result.warning}</span>}
+              {state.error && <span>Error: {state.error}</span>}
             </details>
-            <LocalOnlyButton className="living-v3__etsy-primary" onClick={() => state.result && handlers.sendSignalToEtsy(state.result, result)}>
-              Send
-            </LocalOnlyButton>
-          </article>
-        ))}
-      </div>
+          </div>
+          <div className="living-v3__oracle-results">
+            {state.result && !state.result.keywordResults.length && (
+              <EtsyEmptyState>No match.</EtsyEmptyState>
+            )}
+            {!state.result && (
+              <EtsyEmptyState>Search local evidence to show Oracle signals.</EtsyEmptyState>
+            )}
+            {state.result?.keywordResults.map((result) => (
+              <article key={result.id} className={`living-v3__oracle-card ${state.selectedKeywordId === result.id ? 'is-selected' : ''}`}>
+                <div>
+                  <h3>{result.keyword}</h3>
+                  <p>{result.sourceLabel}</p>
+                  <div className="living-v3__etsy-evidence-badges">
+                    <small>{result.dataOrigin}</small>
+                    <small>{result.rawSourceFile}</small>
+                    <small>{result.confidence}% confidence</small>
+                  </div>
+                </div>
+                <dl className="living-v3__oracle-metrics">
+                  <div><dt>Score</dt><dd>{formatMetric(result.metrics.keywordScore)}</dd></div>
+                  <div><dt>Volume</dt><dd>{formatMetric(result.metrics.searchVolume)}</dd></div>
+                  <div><dt>Sales</dt><dd>{formatMetric(result.metrics.sales)}</dd></div>
+                  <div><dt>Comp</dt><dd>{formatMetric(result.metrics.competition)}</dd></div>
+                </dl>
+                <details className="living-v3__oracle-card-proof">
+                  <summary>Proof</summary>
+                  <span>Missing: {result.missingFields.join(', ') || 'none'}</span>
+                  <span>Evidence: {result.evidenceIds.slice(0, 3).join(', ') || 'none'}</span>
+                </details>
+                <LocalOnlyButton className="living-v3__oracle-primary" onClick={() => state.result && handlers.sendSignalToEtsy(state.result, result)}>
+                  Send signal to Etsy
+                </LocalOnlyButton>
+              </article>
+            ))}
+          </div>
+        </section>
+      </section>
 
       {state.result?.listingResults.length ? (
         <details className="living-v3__oracle-listings">
-          <summary>Proof</summary>
+          <summary>Sources</summary>
           {state.result.listingResults.slice(0, 4).map((listing) => (
             <span key={listing.id}>{listing.keyword}: {listing.title}</span>
           ))}
@@ -872,8 +959,8 @@ function OracleAluraLocalSearchApp({ state, handlers }: { state: OracleSearchUiS
 }
 
 
-type TerraForgeStationId = Extract<LivingV3StationId, 'terra-modeling-studio' | 'terra-model-hunt' | 'terra-printer-control'>
 
+type TerraForgeStationId = Extract<LivingV3StationId, 'terra-modeling-studio' | 'terra-model-hunt' | 'terra-printer-control'>
 const TERRA_FORGE_STATION_IDS: ReadonlyArray<TerraForgeStationId> = ['terra-modeling-studio', 'terra-model-hunt', 'terra-printer-control']
 
 function isTerraForgeStationId(stationId: LivingV3StationId | undefined): stationId is TerraForgeStationId {
@@ -1020,6 +1107,7 @@ type TerraDiscoveredPrinterClient = {
   firmwareVersion?: string
   serialNumber?: string
   cameraUrl?: string
+  cameraRequestMode?: 'configured-url' | 'elegoo-mqtt-on-demand' | 'unavailable'
   source: 'elegoo-slicer'
 }
 
@@ -1034,6 +1122,7 @@ type TerraPrinterStatusResponse = {
   cameraUrl?: string
   snapshotUrl?: string
   statusUrl?: string
+  cameraRequestMode?: 'configured-url' | 'elegoo-mqtt-on-demand' | 'unavailable'
   source: 'env' | 'config-file' | 'elegoo-slicer' | 'default'
   configPath?: string
   host?: string
@@ -1292,7 +1381,7 @@ const initialTerraWorkbenchState: TerraWorkbenchUiState = {
   flowCalibration: false,
   bedLeveling: false,
   timelapse: false,
-  capturePrint: true,
+  capturePrint: false,
   agentPrompt: '',
 }
 
@@ -1431,7 +1520,7 @@ function terraProgressLabel(status: TerraPrinterStatusResponse | null) {
 function terraConnectionLabel(status: TerraPrinterStatusResponse | null) {
   if (!status) return 'Checking…'
   if (status.state === 'ready') return 'Live'
-  if (status.configured) return 'Needs connection'
+  if (status.configured) return 'Discovered'
   return 'Setup needed'
 }
 
@@ -1752,7 +1841,7 @@ function TerraInternetModelSearchPanel({
       </div>
 
       <details className="living-v3__terra-proof living-v3__terra-compact-proof">
-        <summary>Search proof / locks</summary>
+        <summary>Search locks / readback</summary>
         <span>skill: {result?.skillBasis ?? 'free-trending-printable-model-discovery'}</span>
         <span>filters: free · aiGenerated=false · popular · {result?.filters.publishedDateLimitDays ?? 60} days</span>
         {(result?.lockedActions ?? ['download_model_file', 'slice_model', 'printer_upload', 'printer_start']).map((item) => <span key={item}>locked: {item}</span>)}
@@ -1775,11 +1864,11 @@ function TerraPrinterPanel({
   onRefresh: () => void
 }) {
   const manualFrameRequested = frameNonce > 0
-  const imageUrl = manualFrameRequested && status?.state === 'ready' && status?.cameraUrl
+  const imageUrl = manualFrameRequested
+    && (status?.state === 'ready' || status?.state === 'configured')
+    && status.cameraRequestMode !== 'unavailable'
     ? `/api/war-room/terra-printer-frame?ts=${frameNonce}`
-    : manualFrameRequested && status?.state === 'ready'
-      ? status?.snapshotUrl
-      : undefined
+    : undefined
   const metrics = status?.metrics ?? {}
   const liveLabel = terraConnectionLabel(status)
   return (
@@ -1922,11 +2011,11 @@ function TerraPrintQaAgentPanel({
   onRunQa: (options?: { auto?: boolean; runKey?: string }) => void
 }) {
   const manualFrameRequested = frameNonce > 0
-  const imageUrl = manualFrameRequested && status?.state === 'ready' && status?.cameraUrl
+  const imageUrl = manualFrameRequested
+    && (status?.state === 'ready' || status?.state === 'configured')
+    && status.cameraRequestMode !== 'unavailable'
     ? `/api/war-room/terra-printer-frame?qa=${frameNonce}`
-    : manualFrameRequested && status?.state === 'ready'
-      ? status?.snapshotUrl
-      : undefined
+    : undefined
   const canInspectFrame = Boolean(imageUrl)
   const lifecycle = status?.metrics.printLifecycle ?? 'unknown'
   const isComplete = lifecycle === 'completed' || (terraProgressValue(status) ?? 0) >= 99.5
@@ -2014,6 +2103,7 @@ function TerraForgeStationSurface({
   onRefreshModelAssets,
   printerFrameNonce,
   onRefreshPrinter,
+  onRequestPrinterFrame,
 }: {
   station: LivingV3StationDefinition
   modelAssets: TerraModelAssetsResponse | null
@@ -2025,6 +2115,7 @@ function TerraForgeStationSurface({
   printerFrameNonce: number
   onRefreshModelAssets: () => void
   onRefreshPrinter: () => void
+  onRequestPrinterFrame?: () => void
 }) {
   const config = TERRA_FORGE_TOOL_CONFIG[station.id as TerraForgeStationId]
   if (!config) return null
@@ -2043,9 +2134,29 @@ function TerraForgeStationSurface({
           <span>{config.eyebrow}</span>
           <input placeholder={config.placeholder} aria-label={`${station.label} input`} />
         </label>
-        <LocalOnlyButton className="living-v3__terra-primary" disabled disabledReason="Use the Terra full workbench for the live workflow">
-          {config.primaryAction}
-        </LocalOnlyButton>
+        <WorkspaceStationCta
+          actionId={`terra.${config.toolId}`}
+          label={config.primaryAction}
+          sublabel="Locked until real sender + approval + readback are wired"
+          status="locked"
+          ownerAgentId="terra"
+          ownerLabel="Terra"
+          targetRoomId="terra-forge"
+          targetStationId={station.id as TerraForgeStationId}
+          targetToolLabel={config.title}
+          motionSignal="blocked-at-gate"
+          position="standard-dock-right"
+          disabled
+          secondaryActions={[
+            {
+              id: isPrinter ? 'refresh-printer' : 'refresh-model-assets',
+              label: isPrinter ? 'Refresh printer' : 'Refresh models',
+              onClick: isPrinter ? onRefreshPrinter : onRefreshModelAssets,
+            },
+          ]}
+          proofSummary="Terra can prepare/read local assets here. Printer/model side effects stay locked until approval and readback exist."
+          proofItems={[config.safety, ...config.proof.slice(0, 2)]}
+        />
       </div>
 
       <div className="living-v3__terra-cards">
@@ -2064,7 +2175,7 @@ function TerraForgeStationSurface({
           loading={printerLoading}
           error={printerError}
           frameNonce={printerFrameNonce}
-          onRefresh={onRefreshPrinter}
+          onRefresh={onRequestPrinterFrame ?? onRefreshPrinter}
         />
       ) : (
         <TerraAssetLibrary
@@ -2076,7 +2187,7 @@ function TerraForgeStationSurface({
       )}
 
       <details className="living-v3__terra-proof">
-        <summary>Proof / skills</summary>
+        <summary>Skills / readback</summary>
         {config.proof.map((item) => <span key={item}>{item}</span>)}
       </details>
     </div>
@@ -2089,56 +2200,6 @@ function terraDefaultProfile(profiles: Array<TerraSlicerProfileClient>, selected
 
 function TerraStatePill({ state }: { state: TerraWorkflowStepClient['state'] }) {
   return <span className={`living-v3__terra-state-pill is-${state}`}>{state}</span>
-}
-
-function TerraWorkflowRail({ workflow }: { workflow: Array<TerraWorkflowStepClient> }) {
-  const ready = workflow.filter((step) => step.state === 'ready' || step.state === 'available')
-  const needsConnection = workflow.filter((step) => step.state === 'blocked' || step.state === 'unknown')
-  const approval = workflow.filter((step) => step.state === 'locked')
-  const nextStep = workflow.find((step) => step.state === 'blocked') ?? workflow.find((step) => step.state === 'locked') ?? workflow.find((step) => step.state === 'ready')
-  return (
-    <section className="living-v3__terra-workflow-rail" aria-label="Terra workflow summary">
-      <article className="living-v3__terra-next-card">
-        <span>Next</span>
-        <b>{nextStep?.label ?? 'Ready'}</b>
-        <small>{nextStep?.state === 'blocked' || nextStep?.state === 'unknown' ? 'Needs live connection' : nextStep?.state === 'locked' ? 'Needs DLV approval' : 'Available now'}</small>
-      </article>
-      <div className="living-v3__terra-workflow-counts">
-        <span><b>{ready.length}</b> ready</span>
-        <span><b>{needsConnection.length}</b> need live</span>
-        <span><b>{approval.length}</b> approval</span>
-      </div>
-      <details className="living-v3__terra-proof living-v3__terra-compact-proof">
-        <summary>Full checklist</summary>
-        {workflow.map((step, index) => (
-          <span key={step.id}>{index + 1}. {step.label} · {step.state}</span>
-        ))}
-      </details>
-    </section>
-  )
-}
-
-type TerraFeatureDockItem = {
-  id: string
-  label: string
-  value: string
-  state: 'ready' | 'needs-live' | 'approval' | 'setup'
-  tab: TerraWorkbenchTab
-  action: string
-}
-
-function TerraFeatureDock({ items, activeTab, onSelectTab }: { items: Array<TerraFeatureDockItem>; activeTab: TerraWorkbenchTab; onSelectTab: (tab: TerraWorkbenchTab) => void }) {
-  return (
-    <section className="living-v3__terra-feature-dock" aria-label="Terra quick feature launcher">
-      {items.map((item) => (
-        <button key={item.id} type="button" className={`is-${item.state} ${activeTab === item.tab ? 'is-active' : ''}`} onClick={() => onSelectTab(item.tab)}>
-          <span>{item.label}</span>
-          <b>{item.value}</b>
-          <em>{item.action}</em>
-        </button>
-      ))}
-    </section>
-  )
 }
 
 function TerraProfileSelect({
@@ -2244,11 +2305,11 @@ function TerraForgePrimaryWorkspace({
   capabilitiesError,
   state,
   onUpdateState,
-  onClose,
   onSwitchRoom,
   onSelectStation,
   onRefreshModelAssets,
   onRefreshPrinter,
+  onRequestPrinterFrame,
   onRefreshCapabilities,
   onRunInternetModelSearch,
   onStageInternetCandidate,
@@ -2269,11 +2330,11 @@ function TerraForgePrimaryWorkspace({
   capabilitiesError: string | null
   state: TerraWorkbenchUiState
   onUpdateState: (patch: Partial<TerraWorkbenchUiState>) => void
-  onClose: () => void
   onSwitchRoom: (roomId: LivingV3RoomId) => void
   onSelectStation: (stationId: TerraForgeStationId) => void
   onRefreshModelAssets: () => void
   onRefreshPrinter: () => void
+  onRequestPrinterFrame: () => void
   onRefreshCapabilities: () => void
   onRunInternetModelSearch: () => void
   onStageInternetCandidate: (candidate: TerraInternetModelCandidateClient) => void
@@ -2306,68 +2367,130 @@ function TerraForgePrimaryWorkspace({
       ? `${state.internetSearch?.candidates.length ?? 0} web candidates · ${modelAssets?.totalMatches ?? capabilities?.modelLibrary.totalMatches ?? 0} local 3MF files`
       : 'Select a model, machine profile, process, filament, calibration, and capture settings'
   const canPlanSlice = Boolean(selectedAsset && machineProfile && processProfile && filamentProfile && capabilities?.slicer.cliAvailable)
-  const tabs: Array<{ id: TerraWorkbenchTab; label: string; hint: string }> = [
-    { id: 'web-search', label: 'Model Hunt', hint: state.internetSearchStatus === 'running' ? 'searching' : `${state.internetSearch?.candidates.length ?? 0} web` },
-    { id: 'library', label: 'Local Library', hint: `${modelAssets?.totalMatches ?? capabilities?.modelLibrary.totalMatches ?? 0} models` },
-    { id: 'prepare', label: 'Prepare', hint: selectedAsset?.name ?? 'choose model' },
-    { id: 'slice', label: 'Slice', hint: capabilities?.slicer.cliAvailable ? 'CLI ready' : 'CLI blocked' },
-    { id: 'printer', label: 'Printer', hint: livePrinterStatus?.state ?? 'checking' },
-    { id: 'agent', label: 'Agent / Memory', hint: capabilities?.obsidian.exists ? 'Obsidian ready' : 'vault missing' },
-  ]
   const lifecycle = livePrinterStatus?.metrics.printLifecycle ?? 'unknown'
   const completionKey = `${livePrinterStatus?.metrics.jobName ?? selectedAsset?.name ?? 'unknown-job'}:${selectedAsset?.id ?? 'no-model'}:${Math.round(terraProgressValue(livePrinterStatus) ?? 0)}:${lifecycle}`
-  const progressVisible = terraProgressValue(livePrinterStatus) !== undefined || lifecycle !== 'unknown'
-  const cameraVisible = Boolean((livePrinterStatus?.state === 'ready') && (livePrinterStatus?.cameraUrl || livePrinterStatus?.snapshotUrl))
-  const featureDockItems: Array<TerraFeatureDockItem> = [
-    {
-      id: 'web-model-hunt',
-      label: 'Web Hunt',
-      value: state.internetSearchStatus === 'running' ? 'Searching' : `${state.internetSearch?.candidates.length ?? 0} found`,
-      state: state.internetSearchStatus === 'blocked' || state.internetSearchStatus === 'failed' ? 'needs-live' : 'ready',
-      tab: 'web-search',
-      action: 'Search',
-    },
-    {
-      id: 'models',
-      label: 'Models',
-      value: selectedAsset ? selectedAsset.name : `${assets.length} found`,
-      state: selectedAsset ? 'ready' : 'setup',
-      tab: selectedAsset ? 'prepare' : 'library',
-      action: selectedAsset ? 'Prepare' : 'Choose',
-    },
-    {
-      id: 'slice',
-      label: 'Slicer',
-      value: canPlanSlice ? 'Ready' : 'Needs setup',
-      state: canPlanSlice ? 'ready' : 'setup',
-      tab: canPlanSlice ? 'slice' : 'prepare',
-      action: canPlanSlice ? 'Build' : 'Configure',
-    },
-    {
-      id: 'monitor',
-      label: 'Print meter',
-      value: progressVisible ? terraProgressLabel(livePrinterStatus) : 'No live source',
-      state: progressVisible ? 'ready' : 'needs-live',
-      tab: 'printer',
-      action: 'Open',
-    },
-    {
-      id: 'qa',
-      label: 'Camera',
-      value: cameraVisible ? 'Live' : 'Unavailable',
-      state: cameraVisible ? 'ready' : 'needs-live',
-      tab: 'printer',
-      action: cameraVisible ? 'Inspect' : 'View',
-    },
-    {
-      id: 'agent',
-      label: 'Terra Agent',
-      value: terraAgentProfile ? `${readyTerraSkills.length}/${terraAgentProfile.skills.length} skills` : capabilities?.obsidian.exists ? 'Ready' : 'Needs vault',
-      state: capabilities?.obsidian.exists && readyTerraSkills.length > 0 ? 'ready' : 'setup',
-      tab: 'agent',
-      action: 'Open',
-    },
+  const runTerraPrimaryAction = () => {
+    if (selectedStation.id === 'terra-model-hunt') {
+      onRunInternetModelSearch()
+      return
+    }
+    if (selectedStation.id === 'terra-printer-control') {
+      onRefreshPrinter()
+      return
+    }
+    if (canPlanSlice) {
+      onBuildSlicePlan({
+        modelPath: selectedAsset?.path,
+        machineProfilePath: machineProfile?.path,
+        processProfilePath: processProfile?.path,
+        filamentProfilePath: filamentProfile?.path,
+        flowCalibration: state.flowCalibration,
+        bedLeveling: state.bedLeveling,
+        timelapse: state.timelapse,
+        capturePrint: state.capturePrint,
+      })
+      return
+    }
+    onRefreshModelAssets()
+  }
+
+  const activeArtifactImage = selectedAsset?.preview.dataUrl ?? stagedInternetCandidate?.imageUrl
+  const activeArtifactName = selectedAsset?.name ?? stagedInternetCandidate?.title ?? 'Choose a model'
+  const activeArtifactMeta = selectedAsset?.displayPath ?? stagedInternetCandidate?.sourceUrl ?? 'Start with Library or Web Hunt'
+  const forgePipeline = [
+    { id: 'idea', label: 'Find', state: state.internetSearch?.candidates.length || selectedAsset || stagedInternetCandidate ? 'ready' : 'waiting', value: state.internetSearch?.candidates.length ? `${state.internetSearch.candidates.length} sources` : stagedInternetCandidate ? 'shortlisted' : 'start hunt', tab: 'web-search' as TerraWorkbenchTab, action: 'Search' },
+    { id: 'model', label: 'Model', state: selectedAsset ? 'ready' : stagedInternetCandidate ? 'waiting' : 'blocked', value: selectedAsset ? 'selected model' : stagedInternetCandidate ? 'candidate ready' : 'choose model', tab: selectedAsset ? 'prepare' as TerraWorkbenchTab : 'library' as TerraWorkbenchTab, action: selectedAsset ? 'Prepare' : 'Choose' },
+    { id: 'qa', label: 'Mesh', state: selectedAsset?.preview.dataUrl ? 'ready' : selectedAsset ? 'waiting' : 'blocked', value: selectedAsset?.preview.kind ?? 'needs preview', tab: 'prepare' as TerraWorkbenchTab, action: 'Check' },
+    { id: 'slicer', label: 'Slice', state: canPlanSlice ? 'ready' : 'blocked', value: capabilities?.slicer.cliAvailable ? 'CLI ready' : 'setup needed', tab: canPlanSlice ? 'slice' as TerraWorkbenchTab : 'prepare' as TerraWorkbenchTab, action: canPlanSlice ? 'Build' : 'Setup' },
+    { id: 'printer', label: 'Printer', state: livePrinterStatus?.state === 'ready' ? 'ready' : livePrinterStatus?.configured ? 'waiting' : 'blocked', value: livePrinterStatus?.state === 'unreachable' ? 'offline' : livePrinterStatus?.state ?? 'checking', tab: 'printer' as TerraWorkbenchTab, action: 'Open' },
+    { id: 'gate', label: 'Gate', state: state.qaRun?.visual ? 'ready' : 'locked', value: state.qaRun?.visual?.verdict ?? 'locked', tab: 'printer' as TerraWorkbenchTab, action: 'Inspect' },
   ]
+  const forgePrimaryActions = [
+    { id: 'choose', label: selectedAsset ? 'Change model' : 'Choose model', hint: activeArtifactName, disabled: false, run: () => onUpdateState({ tab: selectedAsset ? 'library' : 'web-search' }) },
+    { id: 'prepare', label: 'Profiles', hint: machineProfile && processProfile && filamentProfile ? 'Ready' : 'Pick machine/process/filament', disabled: false, run: () => onUpdateState({ tab: 'prepare' }) },
+    { id: 'slice', label: canPlanSlice ? 'Build dry-run' : 'Setup slice', hint: canPlanSlice ? 'No printer start' : 'Needs model + profiles', disabled: false, run: () => (canPlanSlice ? runTerraPrimaryAction() : onUpdateState({ tab: 'prepare' })) },
+    { id: 'printer', label: 'Printer readback', hint: livePrinterStatus?.state ?? 'checking', disabled: false, run: () => onUpdateState({ tab: 'printer' }) },
+    { id: 'locked', label: 'Printer start locked', hint: 'Approval + sender missing', disabled: true, run: () => undefined },
+  ]
+  const forgeReadbackCards = [
+    { label: 'Model', value: activeArtifactName, meta: activeArtifactMeta },
+    { label: 'Machine', value: machineProfile?.name ?? 'none', meta: machineProfile?.displayPath ?? 'profile missing' },
+    { label: 'Process', value: processProfile?.name ?? 'none', meta: processProfile?.displayPath ?? 'profile missing' },
+    { label: 'Filament', value: filamentProfile?.name ?? 'none', meta: filamentProfile?.displayPath ?? 'profile missing' },
+    { label: 'Output', value: state.slicePlan?.outputFile.split('/').pop() ?? 'not staged', meta: state.slicePlan?.note ?? 'dry-run plan only' },
+  ]
+  const manualCameraFrameRequested = printerFrameNonce > 0
+  const canRequestCameraFrame = Boolean(
+    (livePrinterStatus?.state === 'ready' || livePrinterStatus?.state === 'configured')
+      && livePrinterStatus.cameraRequestMode !== 'unavailable',
+  )
+  const cameraFrameSrc = manualCameraFrameRequested && (livePrinterStatus?.state === 'ready' || livePrinterStatus?.state === 'configured')
+    && livePrinterStatus.cameraRequestMode !== 'unavailable'
+    ? `/api/war-room/terra-printer-frame?studio=${printerFrameNonce}`
+    : undefined
+  const materialOptions = filaments.slice(0, 8).map((profile) => ({
+    id: profile.id,
+    label: profile.name,
+    material: profile.material ?? 'unknown material',
+    color: profile.color,
+    note: profile.default ? 'default profile' : profile.source,
+    active: profile.id === filamentProfile?.id,
+    onSelect: () => onUpdateState({ selectedFilamentProfileId: profile.id, receipt: `Filament/color changed locally to ${profile.name}. Printer filament change is still approval-gated.` }),
+  }))
+  const forgeProduction = {
+    camera: {
+      title: cameraFrameSrc ? 'Printer camera readback' : canRequestCameraFrame ? 'Camera is disconnected' : 'Camera unavailable',
+      status: printerLoading
+        ? 'Checking printer status only…'
+        : cameraFrameSrc
+          ? 'A real frame was requested through the verified printer route. Failures stay visible; no substitute image is used.'
+          : canRequestCameraFrame
+            ? 'Choose Connect camera to request one verified frame from the printer. Nothing runs in the background.'
+            : livePrinterStatus?.message ?? 'Waiting for printer readback',
+      liveLabel: cameraFrameSrc ? 'FRAME REQUESTED' : canRequestCameraFrame ? 'CAMERA IDLE' : 'NO CAMERA',
+      imageSrc: cameraFrameSrc,
+      actionLabel: printerLoading ? 'Checking…' : cameraFrameSrc ? 'Reload camera' : 'Connect camera',
+      actionDisabled: !canRequestCameraFrame || printerLoading,
+      inspectLabel: 'Inspect camera frame',
+      inspectDisabled: !canRequestCameraFrame || state.qaRun?.status === 'running',
+      onRefresh: onRequestPrinterFrame,
+      onInspect: () => onRunPrintQa({ auto: false }),
+    },
+    printer: {
+      name: livePrinterStatus?.name ?? 'Elegoo printer',
+      connection: terraConnectionLabel(livePrinterStatus),
+      progress: terraProgressLabel(livePrinterStatus),
+      temps: `${formatTerraMetric(livePrinterStatus?.metrics.bedTempC, '°')} / ${formatTerraMetric(livePrinterStatus?.metrics.nozzleTempC, '°')}`,
+      lifecycle,
+      jobName: livePrinterStatus?.metrics.jobName ?? 'no active job',
+      controls: [
+        { id: 'refresh-readback', label: 'Refresh status', hint: 'status only; camera opens separately', disabled: printerLoading, tone: 'safe' as const, run: onRefreshPrinter },
+        { id: 'stage-approval', label: 'Approval gate', hint: 'stage print-control request only', disabled: false, tone: 'warn' as const, run: () => onStageReceipt('Printer control request staged locally. Live pause/resume/cancel/heat/start remain locked until explicit approval + sender readback.') },
+        { id: 'pause', label: 'Pause', hint: 'locked: no live sender', disabled: true, tone: 'warn' as const, run: () => undefined },
+        { id: 'resume', label: 'Resume', hint: 'locked: approval required', disabled: true, tone: 'safe' as const, run: () => undefined },
+        { id: 'cancel', label: 'Cancel', hint: 'danger locked', disabled: true, tone: 'danger' as const, run: () => undefined },
+        { id: 'heat', label: 'Heat / cool', hint: 'temperature write locked', disabled: true, tone: 'danger' as const, run: () => undefined },
+        { id: 'upload-start', label: 'Upload / start', hint: 'blocked until QA approval', disabled: true, tone: 'danger' as const, run: () => undefined },
+        { id: 'filament-change', label: 'Filament change', hint: 'color profile only for now', disabled: true, tone: 'warn' as const, run: () => undefined },
+      ],
+    },
+    material: {
+      selectedLabel: filamentProfile?.name ?? 'Choose filament/color',
+      selectedMaterial: filamentProfile?.material ?? 'No filament selected',
+      color: filamentProfile?.color,
+      supportNote: capabilities?.slicer.machine.supportsFilamentChange ? 'Printer profile supports filament change; live action locked.' : 'Local color/profile only until printer sender exists.',
+      options: materialOptions.length > 0 ? materialOptions : [{
+        id: 'missing-filament-profile',
+        label: 'No filament profiles',
+        material: 'Run slicer capability scan',
+        color: '#9ca36f',
+        note: 'profiles missing',
+        active: true,
+        disabled: true,
+        onSelect: () => undefined,
+      }],
+    },
+  }
 
   useEffect(() => {
     const complete = lifecycle === 'completed' || (terraProgressValue(livePrinterStatus) ?? 0) >= 99.5
@@ -2380,6 +2503,8 @@ function TerraForgePrimaryWorkspace({
       className="living-v3__terra-workspace-mode"
       aria-label="Terra Forge full professional workbench"
       data-terra-workspace-mode="primary"
+      data-terra-primary-ui="camera-workbench-v9"
+      data-terra-ui-rework="terra-camera-workbench-v9"
       data-selected-station-id={selectedStation.id}
       data-terra-printer-state={livePrinterStatus?.state ?? 'loading'}
       data-terra-slicer-cli={capabilities?.slicer.cliAvailable ? 'ready' : 'blocked'}
@@ -2392,12 +2517,6 @@ function TerraForgePrimaryWorkspace({
           <h2>{workspaceTitle}</h2>
           <span>{workspaceSubtitle}</span>
         </div>
-        <div className="living-v3__terra-workspace-stats">
-          <span><b>{modelAssets?.totalMatches ?? capabilities?.modelLibrary.totalMatches ?? 0}</b> models</span>
-          <span><b>{capabilities?.slicer.profileCounts.filaments ?? 0}</b> filaments</span>
-          <span><b>{capabilities?.slicer.version ?? '--'}</b> slicer</span>
-          <span><b>{livePrinterStatus?.state ?? '...'}</b> printer</span>
-        </div>
         <div className="living-v3__terra-workspace-actions">
           <WarRoomQuickSwitch
             value={selectedStation.roomId}
@@ -2405,41 +2524,40 @@ function TerraForgePrimaryWorkspace({
             onSwitch={onSwitchRoom}
           />
           <TerraHealthBeacon health={health} />
-          <button type="button" onClick={() => { onRefreshModelAssets(); onRefreshPrinter(); onRefreshCapabilities() }}>Refresh</button>
-          <button type="button" onClick={onClose}>Back to room</button>
         </div>
       </header>
 
-      <nav className="living-v3__terra-workspace-tabs" aria-label="Terra workbench tabs">
-        {tabs.map((tab) => (
-          <button key={tab.id} type="button" className={state.tab === tab.id ? 'is-active' : ''} onClick={() => onUpdateState({ tab: tab.id })}>
-            <b>{tab.label}</b>
-            <span>{tab.hint}</span>
-          </button>
-        ))}
-      </nav>
+      <TerraModelPrintStudio
+        model={{ title: activeArtifactName, meta: activeArtifactMeta, src: activeArtifactImage }}
+        specs={[
+          { label: 'Machine', value: machineProfile?.name ?? 'not selected', tone: machineProfile ? 'ready' : 'waiting' },
+          { label: 'Material', value: filamentProfile?.material ?? filamentProfile?.name ?? 'not selected', tone: filamentProfile ? 'ready' : 'waiting' },
+          {
+            label: 'Print envelope',
+            value: capabilities?.slicer.machine.bedSizeMm
+              ? `${capabilities.slicer.machine.bedSizeMm[0]} × ${capabilities.slicer.machine.bedSizeMm[1]} × ${capabilities.slicer.machine.zHeightMm ?? '—'} mm`
+              : 'not detected',
+            tone: capabilities?.slicer.machine.bedSizeMm ? 'ready' : 'waiting',
+          },
+          { label: 'Output', value: state.slicePlan?.outputFile.split('/').pop() ?? 'not staged', tone: state.slicePlan ? 'ready' : 'locked' },
+        ]}
+        steps={forgePipeline.map((step) => ({ ...step, state: step.state as 'ready' | 'waiting' | 'blocked' | 'locked', onClick: () => onUpdateState({ tab: step.tab }) }))}
+        actions={forgePrimaryActions}
+        readback={forgeReadbackCards}
+        production={forgeProduction}
+      />
 
-      <TerraFeatureDock items={featureDockItems} activeTab={state.tab} onSelectTab={(tab) => onUpdateState({ tab })} />
+      {(capabilitiesError || state.receipt) && (
+        <div className="living-v3__terra-inline-status" role="status">
+          {capabilitiesError && <span>{capabilitiesError}</span>}
+          {state.receipt && <span>{state.receipt}</span>}
+        </div>
+      )}
 
-      <aside className="living-v3__terra-station-switcher" aria-label="Terra station switcher">
-        {TERRA_FORGE_STATION_IDS.map((stationId) => {
-          const station = livingV3StationById(stationId)
-          return station ? (
-            <button key={station.id} type="button" className={selectedStation.id === station.id ? 'is-active' : ''} onClick={() => onSelectStation(station.id as TerraForgeStationId)}>
-              {station.label}
-            </button>
-          ) : null
-        })}
-      </aside>
-
-      <div className="living-v3__terra-workspace-body">
-        <aside className="living-v3__terra-workspace-rail">
-          <TerraWorkflowRail workflow={capabilities?.workflow ?? []} />
-          {capabilitiesError && <p className="living-v3__terra-error">{capabilitiesError}</p>}
-          {state.receipt && <div className="living-v3__terra-action-receipt" role="status">{state.receipt}</div>}
-        </aside>
-
-        <main className="living-v3__terra-workspace-main">
+      <details className="living-v3__terra-advanced-drawer" data-terra-legacy-controls="collapsed">
+        <summary>Advanced controls / proof</summary>
+        <div className="living-v3__terra-workspace-body">
+          <main className="living-v3__terra-workspace-main">
           {state.tab === 'web-search' && (
             <TerraInternetModelSearchPanel
               query={state.internetQuery}
@@ -2579,7 +2697,7 @@ function TerraForgePrimaryWorkspace({
               <details className="living-v3__terra-machine-actions living-v3__terra-compact-proof">
                 <summary>
                   <b>Machine actions</b>
-                  <span>No dummy buttons: commands appear only after a real sender + approval path is wired.</span>
+                  <span>Controls appear only after a real sender + approval path is wired.</span>
                 </summary>
                 <div className="living-v3__terra-action-lock-list">
                   {(livePrinterStatus?.lockedActions ?? ['pause', 'resume', 'cancel', 'heat', 'upload', 'start_print']).map((action) => (
@@ -2644,8 +2762,9 @@ function TerraForgePrimaryWorkspace({
               </details>
             </section>
           )}
-        </main>
-      </div>
+          </main>
+        </div>
+      </details>
     </section>
   )
 }
@@ -2940,13 +3059,13 @@ function CandidateCard({
           {candidate.tags.slice(0, 4).map((tag, index) => <small key={`${tag}-${index}`}>{tag}</small>)}
         </div>
         <div className="living-v3__etsy-evidence-badges" aria-label={`${candidate.title} evidence summary`}>
-          <small>{candidate.dataOrigin}</small>
-          <small>{candidate.evidenceQuality}</small>
+          <small>{etsyEvidenceLabel(candidate.dataOrigin)}</small>
+          <small>{etsyEvidenceLabel(candidate.evidenceQuality)}</small>
           <small>{candidate.evidenceCount} evidence</small>
           <small>{candidate.confidence}% confidence</small>
         </div>
         <p className="living-v3__etsy-source-line">
-          Sources: {candidate.sourceRecordIds.slice(0, 3).join(', ') || 'fallback local mock — no evidence match'}
+          Sources: {candidate.sourceRecordIds.slice(0, 3).join(', ') || 'local fallback — no evidence match'}
         </p>
       </div>
       <div className="living-v3__etsy-card-actions">
@@ -3155,13 +3274,47 @@ function etsyStationLibraryMeta(stationId: LivingV3StationDefinition['id']) {
   }
 }
 
+function syncEtsyPipelineToRoomCandidate(state: EtsyPipelineState, candidate: EtsyRoomProductCandidate) {
+  return syncEtsyPipelineToExternalProduct(state, {
+    candidateId: candidate.candidateId,
+    packetId: candidate.packetId,
+    title: candidate.title,
+    niche: candidate.niche,
+    signal: `${candidate.evidenceIds.length} evidence refs; ${candidate.missingFields.length} missing fields`,
+    sourceRecordIds: candidate.sourceRecordIds,
+    evidenceIds: candidate.evidenceIds,
+    evidenceQuality: candidate.dataOrigin === 'fallback-local-mock'
+      ? 'fallback-local-mock'
+      : candidate.evidenceIds.length === 0
+        ? 'missing-evidence'
+        : candidate.missingFields.length
+          ? 'partial-local'
+          : 'verified-local',
+    dataOrigin: candidate.dataOrigin === 'fallback-local-mock'
+      ? 'fallback-mock'
+      : candidate.dataOrigin === 'oracle-local-alura'
+        ? 'alura-cache'
+        : candidate.dataOrigin === 'live-readonly-research'
+          ? 'product-intelligence'
+          : 'local-product-research',
+    confidence: candidate.score ?? 0,
+    sourceLabels: [candidate.sourceType],
+  })
+}
+
 function etsyStationReadyState(stationId: EtsyMarketLabStationId, pipeline: EtsyPipelineState, roomState: EtsyRoomState) {
   const hasSearch = Boolean(roomState.scoutPacket || pipeline.searchPacket || roomState.candidates.length || pipeline.candidates.length)
-  const hasProduct = Boolean(roomState.selectedProductPacket || activeEtsyProductCandidate(pipeline))
-  const hasTruth = Boolean(pipeline.productTruthPacket || roomState.selectedProductPacket)
+  const activeProduct = activeEtsyProductCandidate(pipeline)
+  const activeLead = activeEtsySupplierLead(pipeline)
+  const hasProduct = Boolean(roomState.selectedProductPacket || activeProduct)
+  const hasLead = Boolean(activeLead)
+  const hasTruth = Boolean(pipeline.productTruthPacket)
+  const canStartTruth = Boolean(activeProduct || activeLead || pipeline.productTruthPacket)
   const hasShotLab = Boolean(roomState.shotLabHandoffPacket)
   const hasSeo = Boolean(roomState.seoPacket || pipeline.metricPacket)
-  const hasQa = Boolean(pipeline.visualQaReport || pipeline.qaItems.length)
+  const hasQaCards = pipeline.qaItems.length > 0
+  const hasQaReport = Boolean(pipeline.visualQaReport)
+  const hasDraftInputs = hasSeo && hasShotLab
   const hasDraft = Boolean(roomState.draftPayload || roomState.approvalPacket || pipeline.draftPacket)
   switch (stationId) {
     case 'etsy-loki-product-hunt':
@@ -3169,15 +3322,18 @@ function etsyStationReadyState(stationId: EtsyMarketLabStationId, pipeline: Etsy
     case 'etsy-thor-seo-metrics':
       return { state: hasSeo ? 'done' : hasProduct ? 'ready' : 'locked', label: hasSeo ? 'SEO ready' : hasProduct ? 'ready' : 'needs product' }
     case 'etsy-loki-source-leads':
-      return { state: hasProduct ? 'ready' : 'locked', label: hasProduct ? 'compare' : 'needs product' }
+      return { state: hasLead ? 'done' : hasProduct ? 'ready' : 'locked', label: hasLead ? 'lead chosen' : hasProduct ? 'add leads' : 'needs product' }
     case 'etsy-thor-source-truth':
-      return { state: hasTruth ? 'done' : hasProduct ? 'ready' : 'locked', label: hasTruth ? 'truth ready' : hasProduct ? 'check proof' : 'needs source' }
+      return { state: hasTruth ? 'done' : canStartTruth ? 'ready' : 'locked', label: hasTruth ? 'truth ready' : canStartTruth ? 'check proof' : hasProduct ? 'needs source lead' : 'needs product' }
     case 'etsy-thor-shotlab-prep':
       return { state: hasShotLab ? 'done' : hasProduct ? 'ready' : 'locked', label: hasShotLab ? 'brief ready' : hasProduct ? 'plan media' : 'needs product' }
     case 'etsy-thor-qa-review':
-      return { state: hasQa ? 'ready' : hasTruth || hasShotLab ? 'ready' : 'locked', label: hasQa ? 'QA cards' : hasTruth || hasShotLab ? 'inspect' : 'needs truth' }
+      return { state: hasQaReport ? 'done' : hasQaCards ? 'ready' : 'locked', label: hasQaReport ? 'report ready' : hasQaCards ? 'inspect' : 'needs QA cards' }
     case 'etsy-odin-draft-approval':
-      return { state: hasDraft ? 'done' : hasSeo || hasShotLab ? 'ready' : 'locked', label: hasDraft ? 'draft ready' : hasSeo || hasShotLab ? 'package' : 'needs packets' }
+      return {
+        state: hasDraft ? 'done' : hasDraftInputs ? 'ready' : 'locked',
+        label: hasDraft ? 'draft ready' : hasDraftInputs ? 'package' : !hasSeo && !hasShotLab ? 'needs packets' : !hasSeo ? 'needs SEO' : 'needs ShotLab',
+      }
     default:
       return { state: 'locked', label: 'local' }
   }
@@ -3204,11 +3360,12 @@ function EtsyStationInteractionDeck({
   const readyCount = [
     Boolean(roomState.scoutPacket || pipeline.searchPacket),
     hasProduct,
-    Boolean(pipeline.productTruthPacket || roomState.selectedProductPacket),
+    Boolean(pipeline.productTruthPacket),
     Boolean(roomState.shotLabHandoffPacket || roomState.seoPacket),
     Boolean(roomState.draftPayload || roomState.approvalPacket),
   ].filter(Boolean).length
   const flowSteps = ['Find', 'Prove', 'Prepare', 'Draft', 'Approve']
+  const stationReady = etsyStationReadyState(selectedStation.id as EtsyMarketLabStationId, pipeline, roomState)
   return (
     <section
       className="living-v3__etsy-station-deck living-v3__etsy-station-deck--tool-room"
@@ -3254,6 +3411,25 @@ function EtsyStationInteractionDeck({
         })}
       </div>
 
+      <section className="living-v3__etsy-station-quickline" aria-label={`${meta.label} local work state`}>
+        <div>
+          <span>Product</span>
+          <b>{productTitle}</b>
+        </div>
+        <div>
+          <span>Stage</span>
+          <b>{stationReady.label}</b>
+        </div>
+        <div>
+          <span>Packet</span>
+          <b>{packetId || 'not created'}</b>
+        </div>
+        <div>
+          <span>Next</span>
+          <b>{nextAction}</b>
+        </div>
+      </section>
+
       <div className="living-v3__etsy-station-deck-body">
         {mode === 'work' && (
           <>
@@ -3293,8 +3469,7 @@ function EtsyMarketLabPrimaryWorkspace({
   operatorStatus,
   stationSurface,
   stationReceipt,
-  onClose,
-  onSwitchRoom,
+  onOpenOpportunityResearch,
   onSelectStation,
   onResetPipeline,
 }: {
@@ -3305,8 +3480,7 @@ function EtsyMarketLabPrimaryWorkspace({
   operatorStatus: string
   stationSurface: ReactNode
   stationReceipt?: string
-  onClose: () => void
-  onSwitchRoom: (roomId: LivingV3RoomId) => void
+  onOpenOpportunityResearch: () => void
   onSelectStation: (stationId: EtsyMarketLabStationId) => void
   onResetPipeline: () => void
 }) {
@@ -3317,61 +3491,39 @@ function EtsyMarketLabPrimaryWorkspace({
   const stationMeta = etsyStationLibraryMeta(selectedStation.id)
   const stageLabel = etsyRoomStageLabels[roomState.stage] ?? etsyPipelineStageLabel(pipeline.stage)
   const receipt = roomState.lastReceipt ?? pipeline.lastReceipt ?? stationReceipt ?? 'No run yet'
-  const capabilityTruth = [
-    {
-      label: 'Product Search',
-      state: 'partial',
-      detail: 'Local packets and Oracle handoff are visible; full live marketplace/supplier run is not complete here yet.',
-    },
-    {
-      label: 'Google Sheets',
-      state: 'missing',
-      detail: 'Google OAuth is not connected in Hermes, so Sheet writeback stays locked.',
-    },
-    {
-      label: 'ShotLab',
-      state: 'locked',
-      detail: 'The workspace can stage a handoff packet; paid/live generation is still approval-locked.',
-    },
-    {
-      label: 'SEO Metrics',
-      state: 'partial',
-      detail: 'SEO packets are local; live Vol/Comp/Score coverage is not guaranteed yet.',
-    },
-  ]
-
+  const stationReady = etsyStationReadyState(selectedStation.id as EtsyMarketLabStationId, pipeline, roomState)
+  const activeArtifact = currentProduct
+  const activeNextAction = nextAction
   return (
     <section
-      className="living-v3__etsy-workspace-mode living-v3__etsy-workspace-mode--workbench-os"
-      aria-label="Etsy Market Lab Workbench OS"
+      className="living-v3__etsy-workspace-mode living-v3__etsy-workspace-mode--canonical-desktop"
+      aria-label="Etsy Market Lab execution workspace"
       data-etsy-workspace-mode="primary"
-      data-workbench-os="phase2-v1"
+      data-etsy-desktop-ui="single-frame-v1"
+      data-room-ownership="etsy-execution-only"
+      data-research-lab-primary="moved-to-goblin"
       data-selected-station-id={selectedStation.id}
       data-etsy-packet-id={packetId}
       data-etsy-stage={roomState.stage}
       style={styleVars({ '--etsy-station-accent': stationMeta.accent })}
     >
-      <header className="living-v3__workbench-appbar" aria-label="Workbench command bar">
-        <div className="living-v3__workbench-title">
-          <button className="living-v3__etsy-workspace-close" type="button" onClick={onClose} aria-label="Exit tool to Etsy Market Lab room">Map</button>
-          <div>
-            <p>Hermes Workbench OS</p>
-            <h2>{stationMeta.label}</h2>
-          </div>
+      <header className="living-v3__etsy-desktop-appbar">
+        <div className="living-v3__etsy-desktop-title">
+          <span>{stationMeta.toolNoun}</span>
+          <h2>{stationMeta.label}</h2>
+          <small>{stationReady.label} · {stageLabel}</small>
         </div>
-        <div className="living-v3__workbench-status" aria-label="Workbench status">
-          <WarRoomQuickSwitch
-            value={selectedStation.roomId}
-            label="Switch War Room from Etsy Workbench"
-            onSwitch={onSwitchRoom}
-          />
-          <span>{stageLabel}</span>
-          <span>{nextAction}</span>
-          <span>Local-only</span>
+        <div className="living-v3__etsy-desktop-context">
+          <span><b>Product</b>{activeArtifact}</span>
+          <span><b>Next</b>{activeNextAction}</span>
+          <span className="is-locked">Local only · live actions locked</span>
+          <button type="button" data-open-research-lab="goblin-opportunity-room" onClick={onOpenOpportunityResearch}>
+            Open Goblin Research
+          </button>
         </div>
       </header>
 
-      <nav className="living-v3__workbench-rail" aria-label="Etsy Market Lab tools">
+      <nav className="living-v3__etsy-desktop-rail" aria-label="Etsy execution stages">
         {ETSY_MARKET_LAB_STATION_IDS.map((stationId) => {
           const station = livingV3StationById(stationId)
           const meta = etsyStationLibraryMeta(stationId)
@@ -3382,8 +3534,9 @@ function EtsyMarketLabPrimaryWorkspace({
               className={selectedStation.id === stationId ? 'is-active' : ''}
               type="button"
               aria-label={`${meta.label}: ${readiness.label}`}
+              data-etsy-stage-link={stationId}
               data-station-ready-state={readiness.state}
-              style={styleVars({ '--etsy-station-accent': meta.accent })}
+              style={styleVars({ '--etsy-stage-accent': meta.accent })}
               onClick={() => onSelectStation(stationId)}
             >
               <b aria-hidden="true">{meta.sigil}</b>
@@ -3394,7 +3547,7 @@ function EtsyMarketLabPrimaryWorkspace({
         })}
       </nav>
 
-      <main className="living-v3__workbench-canvas" aria-label="Active Etsy artifact workbench">
+      <main className="living-v3__etsy-desktop-canvas" aria-label={`${stationMeta.label} workbench`}>
         {stationSurface}
         {stationReceipt && selectedStation.id !== 'etsy-loki-product-hunt' && (
           <div
@@ -3407,63 +3560,23 @@ function EtsyMarketLabPrimaryWorkspace({
         )}
       </main>
 
-      <aside className="living-v3__workbench-inspector" aria-label="Workbench inspector">
-        <section className="living-v3__workbench-card living-v3__workbench-card--primary">
-          <p>Active artifact</p>
-          <h3>{currentProduct}</h3>
-          <span>{stationMeta.summary}</span>
-        </section>
-
-        <section className="living-v3__workbench-card">
-          <p>Next action</p>
-          <h3>{nextAction}</h3>
-          <span>{stationMeta.hint}</span>
-        </section>
-
-        <section className="living-v3__workbench-capability-card" aria-label="Workspace capability truth" data-capability-truth="v1">
-          <p>Capability truth</p>
-          <h3>What works here now</h3>
-          <div>
-            {capabilityTruth.map((item) => (
-              <span key={item.label} className={`is-${item.state}`}>
-                <b>{item.label}</b>
-                <small>{item.detail}</small>
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <section className="living-v3__workbench-map-card" aria-label="War Room context minimap">
-          <p>Map context</p>
-          <div>
-            <span>Oracle</span>
-            <i />
-            <b>Etsy</b>
-            <i />
-            <span>Approval</span>
-          </div>
-          <small>{operatorLabel} · {operatorStatus}</small>
-        </section>
-
-        <details className="living-v3__workbench-details" data-etsy-context-collapsed="true">
-          <summary>Context</summary>
-          <span>{stageLabel}</span>
-          <span>{receipt}</span>
-        </details>
-
-        <details
-          className="living-v3__workbench-details living-v3__workbench-details--proof"
-          data-debug-proof-collapsed={proofOpen ? 'false' : 'true'}
-          onToggle={(event) => setProofOpen(event.currentTarget.open)}
-        >
-          <summary>Proof / Debug</summary>
-          <span><b>Packet</b>{packetId || 'none'}</span>
-          <span><b>Live actions</b>locked</span>
-          <span><b>Usage</b>usageAllowed:false</span>
-          <span><b>Workers</b>workerSpawnAllowed:false</span>
+      <details
+        className="living-v3__etsy-desktop-proof"
+        data-etsy-context-collapsed={proofOpen ? 'false' : 'true'}
+        onToggle={(event) => setProofOpen(event.currentTarget.open)}
+      >
+        <summary>
+          <span>Context & proof</span>
+          <small>{operatorLabel} · {operatorStatus} · {packetId || 'no packet'}</small>
+        </summary>
+        <div className="living-v3__etsy-desktop-proof-grid">
+          <article><span>Product</span><b>{activeArtifact}</b></article>
+          <article><span>Next action</span><b>{activeNextAction}</b></article>
+          <article><span>Receipt</span><b>{receipt}</b></article>
+          <article><span>Boundaries</span><b>Research in Goblin · media in ShotLab · publish locked</b></article>
           <button type="button" onClick={onResetPipeline}>Reset local pipeline</button>
-        </details>
-      </aside>
+        </div>
+      </details>
     </section>
   )
 }
@@ -3492,6 +3605,7 @@ type WorkspaceKernelApiPayload = {
   externalRequestsAllowed?: false
   liveActionsAllowed?: false
   writebackAllowed?: false
+  persistence?: WorkspaceCoreOpsPersistenceView
   error?: string
 }
 
@@ -3546,7 +3660,9 @@ function CommandRoomManagerSurface({
   kernelRuns,
   kernelEvents,
   kernelDisplayStates,
-  missionSpine,
+  missionPacketRail,
+  missionPacketRailStatus,
+  missionPacketRailReadback,
   missionAgentMinds,
   missionRun,
   kernelStoreStatus,
@@ -3581,7 +3697,9 @@ function CommandRoomManagerSurface({
   kernelRuns: Array<WorkspaceRun>
   kernelEvents: Array<WorkspaceEvent>
   kernelDisplayStates: Array<KernelAgentDisplayState>
-  missionSpine: Array<WorkspaceMissionSpineStep>
+  missionPacketRail: Array<WorkspacePacketMissionRailItem>
+  missionPacketRailStatus: PacketHandoffRailStatus
+  missionPacketRailReadback?: string
   missionAgentMinds: Array<WorkspaceAgentMindProfile>
   missionRun: WorkspaceRun | null
   kernelStoreStatus: string
@@ -3634,6 +3752,7 @@ function CommandRoomManagerSurface({
     if (activeAgentId) setLocalActiveAgentId(activeAgentId)
   }, [activeAgentId])
   const activeRosterRow = agentRoster.find((agent) => agent.agentId === (localActiveAgentId ?? activeAgentId)) ?? agentRoster.find((agent) => agent.statusTone === 'active' || agent.statusTone === 'approval') ?? agentRoster[0]
+  const commandActionAgentLabel = agentRoster.find((agent) => agent.agentId === actionRun.assignedAgentId)?.label ?? actionRun.assignedAgentId
   function selectAgentInCommandRoster(agentId: LivingV3AgentId) {
     setLocalActiveAgentId(agentId)
   }
@@ -3663,7 +3782,7 @@ function CommandRoomManagerSurface({
     actionStatusLabel[actionRun.status],
     actionRoomLabel,
     actionStationLabel,
-    activeRosterRow ? activeRosterRow.label : undefined,
+    commandActionAgentLabel,
   ].filter(Boolean).join(' · ')
   return (
     <div
@@ -3684,205 +3803,143 @@ function CommandRoomManagerSurface({
         data-command-action-room={actionRun.targetRoomId ?? ''}
         data-command-action-station={actionRun.targetStationId ?? ''}
       >
-        <div className="living-v3__hermes-command-head">
-          <div className="living-v3__hermes-command-avatar" aria-hidden="true">☤</div>
-          <div>
-            <span>Hermes Command</span>
-            <h3>מה עושים עכשיו?</h3>
-          </div>
-          <div className="living-v3__manager-safety" title={controlTitle}>
-            <b>מצב בטוח</b>
-            <span>{frozen ? 'אין פעולה חיצונית בלי אישור' : 'מצב ידני'}</span>
-          </div>
-        </div>
-        <div className="living-v3__command-desk" data-command-desk-layout="action-v1">
-          <div className="living-v3__command-primary">
-            <label className="living-v3__manager-router living-v3__manager-router--chat living-v3__command-input-card">
-              <span>בקשה <kbd>⌘ K</kbd></span>
-              <textarea
-                value={prompt}
-                onChange={(event) => onPromptChange(event.target.value)}
-                dir="auto"
-                placeholder="כתוב להרמס מה אתה רוצה לעשות בוורקספייס…"
+        <div className="living-v3__command-desk" data-command-desk-layout="action-v2">
+          <HermesCommandCockpit
+            prompt={prompt}
+            onPromptChange={onPromptChange}
+            onRun={onAskHermesCommand}
+            canRun={canAskHermes}
+            runStatus={actionRun.status}
+            runLabel={hermesCommandRun.label}
+            frozen={frozen}
+            controlTitle={controlTitle}
+            focusMeta={commandFocusMeta}
+            focusTitle={commandFocusTitle}
+            focusBody={commandFocusBody}
+            focusNext={commandFocusNext}
+            actionIntent={actionRun.intent}
+            actionCapability={actionRun.capability}
+            assignedAgentId={actionRun.assignedAgentId}
+            targetRoomId={actionRun.targetRoomId}
+            targetStationId={actionRun.targetStationId}
+            hasHermesAnswer={Boolean(hermesCommandAnswer)}
+            sourceDetails={(
+            <>
+              <PacketHandoffRail
+                items={missionPacketRail}
+                status={missionPacketRailStatus}
+                runId={missionRun?.runId}
+                readback={missionPacketRailReadback}
               />
-            </label>
-            <div className="living-v3__command-primary-actions">
-              <button
-                type="button"
-                className="living-v3__command-hero-send living-v3__command-send"
-                onClick={onAskHermesCommand}
-                disabled={!canAskHermes || hermesCommandRun.status === 'running' || !prompt.trim()}
-                title={canAskHermes ? hermesCommandRun.label : 'Open with bodyRuntime=1 to talk to Hermes Command'}
-              >
-                <span>Hermes</span>
-                <b>{hermesCommandRun.status === 'running' ? 'בודק…' : 'הרץ בקשה'}</b>
-              </button>
-              <span className="living-v3__command-action-note">תוצאה, תוצר או חסימה בטוחה יופיעו כאן.</span>
-            </div>
-            <details className="living-v3__command-details">
-              <summary>Proof</summary>
-              <section
-                className="living-v3__mission-spine"
-                data-workspace-mission-spine="v1"
-                data-workspace-mission-run-id={missionRun?.runId ?? ''}
-                data-workspace-mission-blueprint={missionRun?.blueprintId ?? ''}
-                data-workspace-mission-room={missionRun?.ownerRoomId ?? ''}
-                aria-label="Workspace mission spine"
-              >
-              <div className="living-v3__mission-spine-head">
-                <span>Mission Spine</span>
-                <b>{missionRun?.actionSummary ?? (prompt.trim() ? 'Draft mission' : 'No mission staged')}</b>
-                <small>{missionRun ? `${missionRun.status} · ${missionRun.stage}` : 'Council → Hermes → worker when staged'}</small>
-              </div>
-              <div className="living-v3__mission-spine-steps">
-                {missionSpine.map((step) => (
-                  <button
-                    key={step.stepId}
-                    type="button"
-                    className={`is-${step.status}`}
-                    data-mission-spine-step={step.stepId}
-                    data-mission-spine-status={step.status}
-                    title={step.summary}
-                    onClick={() => step.roomId && onKernelOpen(missionRun?.runId ?? '')}
-                    disabled={!missionRun || !step.roomId}
-                  >
-                    <span>{step.label}</span>
-                    <b>{step.status}</b>
-                    <small>{step.ownerAgentId ?? step.roomId ?? step.dataSource}</small>
-                  </button>
-                ))}
-              </div>
-              <div className="living-v3__mission-minds" aria-label="Separated agent minds">
-                {missionAgentMinds.map((mind) => (
-                  <article
-                    key={mind.mindId}
-                    data-agent-mind={mind.mindId}
-                    data-agent-mind-scope={mind.contextScope}
-                    data-agent-mind-room={mind.roomId}
-                    title={`${mind.focus}. ${mind.isolationRule}`}
-                  >
-                    <span>{mind.label}</span>
-                    <b>{mind.agentId}</b>
-                    <small>{mind.domain}</small>
-                    <em>{mind.contextScope} · {mind.obsidianAnchors.length} vault anchor{mind.obsidianAnchors.length === 1 ? '' : 's'}</em>
-                  </article>
-                ))}
-              </div>
-            </section>
-            </details>
-            <section
-              className={`living-v3__command-focus-canvas is-${actionRun.status}`}
-              role="status"
-              data-command-focus-canvas="text-driven-v2"
-              data-command-action-card="natural-v1"
-              data-command-action-status={actionRun.status}
-              data-command-action-intent={actionRun.intent}
-              data-command-action-capability={actionRun.capability}
-              data-command-action-agent={actionRun.assignedAgentId}
-              data-command-action-room={actionRun.targetRoomId ?? ''}
-              data-command-action-station={actionRun.targetStationId ?? ''}
-              data-hermes-command-answer={hermesCommandAnswer ? 'true' : 'false'}
-            >
-              <span>{commandFocusMeta}</span>
-              <h4 className={bidiClassNameFor(actionRun.prompt || prompt)} dir={textDirectionFor(actionRun.prompt || prompt)}>
-                {commandFocusTitle}
-              </h4>
-              <p className={bidiClassNameFor(commandFocusBody)} dir={textDirectionFor(commandFocusBody)}>{commandFocusBody}</p>
-              {commandHasPrompt && (
-                <blockquote className={bidiClassNameFor(actionRun.prompt || prompt)} dir={textDirectionFor(actionRun.prompt || prompt)}>
-                  {actionRun.prompt || prompt.trim()}
-                </blockquote>
-              )}
-              <small className={bidiClassNameFor(commandFocusNext)} dir={textDirectionFor(commandFocusNext)}>{commandFocusNext}</small>
-              {actionRun.missingCapabilityTitle && (
-                <details className="living-v3__command-build-plan">
-                  <summary>{actionRun.missingCapabilityTitle === 'Missing Workspace action capability' ? 'חסרה יכולת Workspace' : actionRun.missingCapabilityTitle}</summary>
-                  {(actionRun.buildPlan ?? []).slice(0, 4).map((step) => <small key={step}>{step}</small>)}
-                </details>
-              )}
-            </section>
-          </div>
-          <div className="living-v3__command-side-stack">
-            <section
-              className="living-v3__agent-control-tool"
-              data-hermes-agent-control-tool="status-control-v1"
-              data-agent-control-count={agentRoster.length}
-              data-agent-control-online-count={onlineAgentCount}
-              data-agent-control-controlled-profile-count={controlledProfileCount}
-              data-agent-control-active-agent={activeRosterRow?.agentId ?? ''}
-              aria-label="Hermes agent status and control"
-            >
-              <div className="living-v3__agent-control-head">
-                <div>
-                  <span>Agent Control</span>
-                  <b>Roster</b>
+              <details className="living-v3__command-details">
+                <summary>Sources</summary>
+                <div className="living-v3__mission-minds" aria-label="Separated agent minds">
+                  {missionAgentMinds.map((mind) => (
+                    <article
+                      key={mind.mindId}
+                      data-agent-mind={mind.mindId}
+                      data-agent-mind-scope={mind.contextScope}
+                      data-agent-mind-room={mind.roomId}
+                      title={`${mind.focus}. ${mind.isolationRule}`}
+                    >
+                      <span>{mind.label}</span>
+                      <b>{mind.agentId}</b>
+                      <small>{mind.domain}</small>
+                      <em>{mind.contextScope} · {mind.obsidianAnchors.length} vault anchor{mind.obsidianAnchors.length === 1 ? '' : 's'}</em>
+                    </article>
+                  ))}
                 </div>
-                <small>{onlineAgentCount}/{agentRoster.length} active · {controlledProfileCount} backend profile{controlledProfileCount === 1 ? '' : 's'}</small>
-              </div>
-              <div className="living-v3__agent-control-active">
-                <span>Now selected</span>
-                <b>{activeRosterRow ? `${activeRosterRow.label} · ${activeRosterRow.activityLabel}` : 'No agent selected'}</b>
-                <small>{activeRosterRow ? `${activeRosterRow.roomLabel}${activeRosterRow.primaryStationLabel ? ` / ${activeRosterRow.primaryStationLabel}` : ''}` : 'Pick an agent below'}</small>
-                {activeRosterRow && (
-                  <div className="living-v3__agent-control-active-actions">
-                    <button type="button" data-agent-control-talk={activeRosterRow.agentId} onClick={() => onTalkAgent(activeRosterRow.agentId)}>Talk</button>
-                    <button type="button" data-agent-control-focus={activeRosterRow.agentId} onClick={() => onFocusAgent(activeRosterRow.agentId)}>Focus</button>
-                    <button
-                      type="button"
-                      data-agent-control-work={activeRosterRow.agentId}
-                      onClick={() => onAssignAgentPrimaryStation(activeRosterRow.agentId)}
-                      disabled={!activeRosterRow.primaryStationId}
-                      title={activeRosterRow.primaryStationLabel ? `Send to ${activeRosterRow.primaryStationLabel}` : 'This agent has no assigned station yet'}
-                    >
-                      Work
-                    </button>
-                    <button type="button" data-agent-control-rest={activeRosterRow.agentId} onClick={() => onRestAgent(activeRosterRow.agentId)}>Rest</button>
-                    {activeRosterRow.controlledProfiles.map((profile) => (
-                      <button
-                        key={profile.agentId}
-                        type="button"
-                        data-agent-control-run={profile.agentId}
-                        className={`is-${profile.runState.status}`}
-                        onClick={() => onRunControlledAgent(profile.agentId, `Operator launched ${profile.label} from Hermes Agent Control.`)}
-                        disabled={!canAskHermes || profile.runState.status === 'running'}
-                        title={canAskHermes ? profile.runState.label : 'Open with bodyRuntime=1 to run this backend profile'}
-                      >
-                        Run
-                      </button>
-                    ))}
+              </details>
+            </>
+            )}
+          />
+          <div className="living-v3__command-side-stack">
+            <details className="living-v3__command-debug-drawer" data-command-debug-drawer="collapsed-v1">
+              <summary>
+                <span>Agent team</span>
+                <b>{onlineAgentCount}/{agentRoster.length}</b>
+              </summary>
+              <section
+                className="living-v3__agent-control-tool"
+                data-hermes-agent-control-tool="status-control-v1"
+                data-agent-control-count={agentRoster.length}
+                data-agent-control-online-count={onlineAgentCount}
+                data-agent-control-controlled-profile-count={controlledProfileCount}
+                data-agent-control-active-agent={activeRosterRow?.agentId ?? ''}
+                aria-label="Hermes agent status and control"
+              >
+                <div className="living-v3__agent-control-head">
+                  <div>
+                    <span>Agent Control</span>
+                    <b>Roster</b>
                   </div>
-                )}
-              </div>
-              <div className="living-v3__agent-control-list" aria-label="All War Room agents">
-                {agentRoster.map((agent) => (
-                  <article
-                    key={agent.agentId}
-                    className={`living-v3__agent-control-card is-${agent.statusTone} ${agent.agentId === activeRosterRow?.agentId ? 'is-selected' : ''}`}
-                    style={{ '--agent-accent': agent.accent } as CSSProperties}
-                    data-agent-control-card={agent.agentId}
-                    data-agent-control-status={agent.statusTone}
-                    data-agent-control-room={agent.roomId}
-                    data-agent-control-primary-station={agent.primaryStationId ?? ''}
-                    data-agent-control-backend-profiles={agent.controlledProfiles.map((profile) => profile.agentId).join(',')}
-                  >
-                    <button
-                      type="button"
-                      className="living-v3__agent-control-row-main"
-                      data-agent-control-focus={agent.agentId}
-                      onClick={() => selectAgentInCommandRoster(agent.agentId)}
+                  <small>{onlineAgentCount}/{agentRoster.length} active · {controlledProfileCount} backend profile{controlledProfileCount === 1 ? '' : 's'}</small>
+                </div>
+                <div className="living-v3__agent-control-active">
+                  <span>Now selected</span>
+                  <b>{activeRosterRow ? `${activeRosterRow.label} · ${activeRosterRow.activityLabel}` : 'No agent selected'}</b>
+                  <small>{activeRosterRow ? `${activeRosterRow.roomLabel}${activeRosterRow.primaryStationLabel ? ` / ${activeRosterRow.primaryStationLabel}` : ''}` : 'Pick an agent below'}</small>
+                  {activeRosterRow && (
+                    <div className="living-v3__agent-control-active-actions">
+                      <button type="button" data-agent-control-talk={activeRosterRow.agentId} onClick={() => onTalkAgent(activeRosterRow.agentId)}>Talk</button>
+                      <button type="button" data-agent-control-focus={activeRosterRow.agentId} onClick={() => onFocusAgent(activeRosterRow.agentId)}>Focus</button>
+                      <button
+                        type="button"
+                        data-agent-control-work={activeRosterRow.agentId}
+                        onClick={() => onAssignAgentPrimaryStation(activeRosterRow.agentId)}
+                        disabled={!activeRosterRow.primaryStationId}
+                        title={activeRosterRow.primaryStationLabel ? `Send to ${activeRosterRow.primaryStationLabel}` : 'This agent has no assigned station yet'}
+                      >
+                        Work
+                      </button>
+                      <button type="button" data-agent-control-rest={activeRosterRow.agentId} onClick={() => onRestAgent(activeRosterRow.agentId)}>Rest</button>
+                      {activeRosterRow.controlledProfiles.map((profile) => (
+                        <button
+                          key={profile.agentId}
+                          type="button"
+                          data-agent-control-run={profile.agentId}
+                          className={`is-${profile.runState.status}`}
+                          onClick={() => onRunControlledAgent(profile.agentId, `Operator launched ${profile.label} from Hermes Agent Control.`)}
+                          disabled={!canAskHermes || profile.runState.status === 'running'}
+                          title={canAskHermes ? profile.runState.label : 'Open with bodyRuntime=1 to run this backend profile'}
+                        >
+                          Run
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="living-v3__agent-control-list" aria-label="All War Room agents">
+                  {agentRoster.map((agent) => (
+                    <article
+                      key={agent.agentId}
+                      className={`living-v3__agent-control-card is-${agent.statusTone} ${agent.agentId === activeRosterRow?.agentId ? 'is-selected' : ''}`}
+                      style={{ '--agent-accent': agent.accent } as CSSProperties}
+                      data-agent-control-card={agent.agentId}
+                      data-agent-control-status={agent.statusTone}
+                      data-agent-control-room={agent.roomId}
+                      data-agent-control-primary-station={agent.primaryStationId ?? ''}
+                      data-agent-control-backend-profiles={agent.controlledProfiles.map((profile) => profile.agentId).join(',')}
                     >
-                      <span className="living-v3__agent-control-dot" aria-hidden="true" />
-                      <span className="living-v3__agent-control-row-name">
-                        <b>{agent.shortLabel}</b>
-                        <small>{agent.label}</small>
-                      </span>
-                      <span className="living-v3__agent-control-row-status">{agent.activityLabel}</span>
-                      <span className="living-v3__agent-control-row-place">{agent.roomLabel}{agent.primaryStationLabel ? ` / ${agent.primaryStationLabel}` : ''}</span>
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </section>
+                      <button
+                        type="button"
+                        className="living-v3__agent-control-row-main"
+                        data-agent-control-focus={agent.agentId}
+                        onClick={() => selectAgentInCommandRoster(agent.agentId)}
+                      >
+                        <span className="living-v3__agent-control-dot" aria-hidden="true" />
+                        <span className="living-v3__agent-control-row-name">
+                          <b>{agent.shortLabel}</b>
+                          <small>{agent.label}</small>
+                        </span>
+                        <span className="living-v3__agent-control-row-status">{agent.activityLabel}</span>
+                        <span className="living-v3__agent-control-row-place">{agent.roomLabel}{agent.primaryStationLabel ? ` / ${agent.primaryStationLabel}` : ''}</span>
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </details>
             <details className="living-v3__command-secondary-tools">
               <summary>Quick tools</summary>
               <aside className="living-v3__command-toolbelt" data-command-toolbelt="v3" aria-label="Hermes Command tools">
@@ -3913,15 +3970,6 @@ function CommandRoomManagerSurface({
           </div>
         </div>
       </section>
-      <details className="living-v3__manager-proof">
-        <summary>Local proof</summary>
-        <div className="living-v3__manager-proof-grid">
-          <LocalOnlyButton onClick={onRoute}>Route typed intent locally</LocalOnlyButton>
-          <LocalOnlyButton onClick={onStationAction}>Apply Hermes Action Bridge V3 locally</LocalOnlyButton>
-          <LocalOnlyButton onClick={onAttachObsidianContext}>Attach Obsidian Context Packet locally</LocalOnlyButton>
-          <span>Local only. No live calls, no uncontrolled worker fan-out.</span>
-        </div>
-      </details>
       {(contextPacket || contextStatus) && (
         <details
           className="living-v3__manager-context-result"
@@ -3948,7 +3996,7 @@ function CommandRoomManagerSurface({
         </details>
       )}
       <details className="living-v3__manager-advanced" data-command-advanced-collapsed="true">
-        <summary>Advanced routing / kernel proof</summary>
+        <summary>Technical details</summary>
         <div className="living-v3__manager-advanced-body">
           <div className="living-v3__manager-recommendation" data-tool-recommendation={recommendation.decision} data-tool-target={recommendation.toolId ?? ''}>
         <span>Recommendation</span>
@@ -4578,9 +4626,10 @@ type SimpleProductSourceDetail = {
   tags?: Array<string>
 }
 
-function simpleProductSourceDetails(candidate: EtsyRoomState['candidates'][number]): Array<SimpleProductSourceDetail> {
+function simpleProductSourceDetails(candidate?: EtsyRoomState['candidates'][number]): Array<SimpleProductSourceDetail> {
+  if (!candidate) return []
   if (candidate.sourceDetails?.length) return candidate.sourceDetails
-  return candidate.sourceRecordIds
+  return (candidate.sourceRecordIds ?? [])
     .filter((source) => /^https?:\/\//i.test(source))
     .map((url): SimpleProductSourceDetail => {
       const kind = simpleProductSourceKindFromUrl(url)
@@ -4601,7 +4650,7 @@ function simpleProductHost(url: string) {
   }
 }
 
-function simpleProductPrimaryImage(candidate: EtsyRoomState['candidates'][number], preferredKind?: 'etsy' | 'supplier') {
+function simpleProductPrimaryImage(candidate?: EtsyRoomState['candidates'][number], preferredKind?: 'etsy' | 'supplier') {
   const details = simpleProductSourceDetails(candidate)
   return details.find((detail) => (!preferredKind || detail.kind === preferredKind) && detail.imageUrl)?.imageUrl
     ?? details.find((detail) => detail.imageUrl)?.imageUrl
@@ -4688,13 +4737,14 @@ function SimpleProductConsole({
   roomState: EtsyRoomState
   handlers: EtsyPipelineHandlers
 }) {
-  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [targetShop, setTargetShop] = useState('DolaroBoutique')
   const inputValue = pipeline.searchInput || handlers.smartIntake.input
-  const liveResults = roomState.candidates.filter((candidate) =>
+  const liveResults = useMemo(() => roomState.candidates.filter((candidate) =>
     candidate.dataOrigin === 'live-readonly-research'
     && !isLegacyEtsyDemoTitle(candidate.title)
-  )
+  ), [roomState.candidates])
+  const visibleLiveResults = useMemo(() => liveResults.slice(0, 6), [liveResults])
+  const hiddenLiveResultCount = Math.max(0, liveResults.length - visibleLiveResults.length)
   const selectedRoomCandidate = roomState.selectedCandidateId
     ? roomState.candidates.find((candidate) => candidate.candidateId === roomState.selectedCandidateId)
     : undefined
@@ -4748,21 +4798,33 @@ function SimpleProductConsole({
     { id: 'seo', label: 'SEO', ready: seoReady, text: seoReady ? 'SEO מוכן' : 'תגיות/כותרת ממתינות' },
     { id: 'draft', label: 'דראפט', ready: approvalReady, text: approvalReady ? 'אישור מוכן' : 'נעול' },
   ]
-
-  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const simpleReadinessPercent = Math.max(0, Math.min(100,
+    (approvalReady ? 100 : draftReady ? 84 : seoReady ? 68 : shotLabReady ? 52 : hasSelectedProduct ? 34 : liveResults.length ? 18 : 6)
+      - Math.min(24, supplierNeeds.length * 4),
+  ))
+  const simpleProofPercent = Math.max(0, Math.min(100, evidenceIds.length * 22 + sourceLinks.length * 12))
+  const simpleDemandPercent = Math.max(0, Math.min(100, selectedRoomCandidate?.score ?? liveResults[0]?.score ?? 0))
+  const simpleSeoPercent = Math.max(0, Math.min(100, roomState.seoPacket?.metrics.score ?? selectedRoomCandidate?.score ?? 0))
+  const simpleCockpitMetrics = [
+    { id: 'evidence', label: 'מקור', value: simpleProofPercent, detail: evidenceIds.length ? `${evidenceIds.length} evidence` : 'pending' },
+    { id: 'demand', label: 'ביקוש', value: simpleDemandPercent, detail: liveResults.length ? `${liveResults.length} products` : 'search first' },
+    { id: 'readiness', label: 'דראפט', value: simpleReadinessPercent, detail: approvalReady ? 'approval gate' : draftReady ? 'draft local' : 'locked' },
+    { id: 'seo', label: 'SEO', value: simpleSeoPercent, detail: seoReady ? `${roomState.seoPacket?.tagCandidates.length ?? 0} tags` : 'not written' },
+  ]
+  const runProductSearch = () => {
     if (!canSearch) return
     handlers.updateSearchInput(inputValue)
     handlers.updateSmartIntakeInput(inputValue)
     handlers.runLiveScout({ keepSurface: true })
   }
 
-  const chooseCandidate = (candidateId: string) => {
-    handlers.selectCandidate(candidateId)
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    runProductSearch()
   }
 
-  const scrollToApproval = () => {
-    document.getElementById('product-approval-in-screen')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const chooseCandidate = (candidateId: string) => {
+    handlers.selectCandidate(candidateId)
   }
 
   const runNextDraftStep = () => {
@@ -4785,7 +4847,7 @@ function SimpleProductConsole({
   const draftStepLabel = !hasSelectedProduct
     ? 'בחר מוצר קודם'
     : !shotLabReady
-      ? 'הכן ShotLab'
+      ? 'הכן לשוטלאב'
       : !seoReady
         ? 'כתוב כותרת/תיאור/תגים'
         : !draftReady
@@ -4804,53 +4866,92 @@ function SimpleProductConsole({
 
   return (
     <div className="living-v3__simple-product-console" data-simple-product-console="v1" data-product-command-shell="v2" data-internet-search-default="true" dir="rtl">
+      {roomState.researchMissionPacket && (
+        <section className="living-v3__research-mission-handoff" data-research-mission-handoff="staged" role="status">
+          <div>
+            <p>RESEARCH MISSION STAGED</p>
+            <h3><bdi dir="auto">{roomState.researchMissionPacket.target}</bdi></h3>
+            <span>{roomState.researchMissionPacket.depth} · {roomState.researchMissionPacket.modules.length} modules · המחקר החיצוני עדיין לא התחיל</span>
+          </div>
+          <div>
+            <b><bdi dir="ltr">{roomState.researchMissionPacket.missionId}</bdi></b>
+            <small>נשמר מקומית · בדוק לפני כל הרצה חיצונית</small>
+          </div>
+        </section>
+      )}
       <section className="living-v3__simple-product-hero" aria-label="חיפוש מוצר באינטרנט">
-        <div>
-          <span>חדר מוצר</span>
-          <h3>חיפוש מוצר, ספק, מדיה, תגיות ודראפט</h3>
-          <p>החיפוש רץ באינטרנט ומחזיר מתחרים/ספקים למסך הזה. לא שולח אותך למסך אחר.</p>
-        </div>
         <form onSubmit={submitSearch} className="living-v3__simple-product-search">
           <label>
-            <span>מה לחפש באינטרנט?</span>
+            <span>אטסי</span>
             <textarea
               value={inputValue}
               onChange={(event) => {
                 handlers.updateSearchInput(event.target.value)
                 handlers.updateSmartIntakeInput(event.target.value)
               }}
-              placeholder="לדוגמה: מוצר קרמיקה אחד שמוכר יותר מ־40 יחידות חודשיות ושאתה מוצא לו ספק באליאקספרס שהוא מאה אחוז זה"
+              placeholder="מה לחפש? למשל: כוס קרמיקה עם ספק זהה ותמונות מקור"
               dir="auto"
             />
           </label>
-          <button type="submit" disabled={!canSearch}>{searchRunning ? 'מחפש באינטרנט…' : 'חפש באינטרנט והצג כאן'}</button>
+          <button className="living-v3__simple-product-primary" type="submit" disabled={!canSearch}>
+            {searchRunning ? 'מחפש…' : 'חפש'}
+          </button>
+          <span className="living-v3__simple-product-status">{searchStatus}</span>
           {liveBlocked && (
             <small className="living-v3__simple-product-error">
-              {liveResults.length
-                ? 'החיפוש החי לא התעדכן עכשיו; מוצגות התוצאות האחרונות עם תמונות וקישורים.'
-                : 'החיפוש החי כרגע נחסם או איטי. לא מוצג מוצר מזויף במקום תוצאה אמיתית.'}
+              {liveResults.length ? 'מוצגות התוצאות האחרונות.' : 'החיפוש נחסם או לא החזיר תוצאות.'}
             </small>
           )}
         </form>
       </section>
 
-      <section className="living-v3__product-workbench-steps" aria-label="Product workflow status">
+      <section className="living-v3__product-progress-strip" aria-label="מצב עבודה">
         {pipelineSteps.map((step) => (
-          <article key={step.id} data-state={step.ready ? 'ready' : 'waiting'}>
-            <b>{step.label}</b>
-            <span>{step.text}</span>
-          </article>
+          <span key={step.id} data-step-id={step.id} data-state={step.ready ? 'ready' : step.id === 'search' && searchRunning ? 'active' : 'waiting'}>
+            {step.label}
+          </span>
         ))}
+      </section>
+
+      <section className="living-v3__product-cockpit" data-etsy-product-prep-cockpit="v1" data-etsy-primary-cockpit="v1" aria-label="Etsy product prep cockpit">
+        <article className="living-v3__product-cockpit-artifact" data-product-artifact-state={hasSelectedProduct ? 'selected' : liveResults.length ? 'candidate' : 'empty'}>
+          <div className="living-v3__product-cockpit-media">
+            <SimpleProductImage imageUrl={selectedImageUrl ?? simpleProductPrimaryImage(liveResults[0])} label={`${selectedTitle ?? liveResults[0]?.title ?? 'Product'} cockpit image`} />
+          </div>
+          <div>
+            <p>מוצר</p>
+            <h3>{selectedTitle ?? liveResults[0]?.title ?? 'אין מוצר נבחר'}</h3>
+            <span>{hasSelectedProduct ? selectedDecision : liveResults.length ? 'בחר מוצר אחד.' : 'התוצאות יופיעו כאן.'}</span>
+          </div>
+          <div className="living-v3__product-cockpit-locks">
+            <span>Live נעול</span>
+            <span>ספק נעול</span>
+          </div>
+        </article>
+
+        <div className="living-v3__product-cockpit-pills" data-etsy-readiness-radar="v1" aria-label="מצב מוצר">
+          {simpleCockpitMetrics.slice(0, 3).map((metric) => (
+            <span key={metric.id} data-cockpit-metric={metric.id}>
+              <b>{metric.label}</b>{metric.value}
+            </span>
+          ))}
+        </div>
+
+        <article className="living-v3__product-cockpit-next" data-etsy-next-action={hasSelectedProduct && !approvalReady ? 'ready' : 'blocked'}>
+          <p>הבא</p>
+          <h3>{draftStepLabel}</h3>
+          <button type="button" onClick={runNextDraftStep} disabled={!hasSelectedProduct || approvalReady}>{draftStepLabel}</button>
+        </article>
       </section>
 
       <section className="living-v3__product-workbench" aria-label="Product research workbench" data-product-grade-ui="v1">
         <div className="living-v3__product-results-board">
           <div className="living-v3__product-board-head">
             <div>
-              <span>תוצאות מוצר חיות</span>
-              <h3>{liveResults.length ? `${liveResults.length} מוצרים עם מקור` : 'התוצאות יופיעו כאן'}</h3>
+              <span>תוצאות</span>
+              <h3>{liveResults.length ? `${Math.min(liveResults.length, visibleLiveResults.length)} מוצרים` : 'אין תוצאות'}</h3>
             </div>
-            <small>{searchStatus}</small>
+            <small>{hiddenLiveResultCount ? `${searchStatus} · עוד ${hiddenLiveResultCount} שמורים` : searchStatus}</small>
           </div>
 
           {searchRunning && (
@@ -4863,7 +4964,7 @@ function SimpleProductConsole({
             </div>
           )}
 
-          {liveResults.length ? liveResults.map((candidate) => {
+          {visibleLiveResults.length ? visibleLiveResults.map((candidate) => {
             const sources = simpleProductSourceDetails(candidate)
             const etsySource = sources.find((source) => source.kind === 'etsy')
             const supplierSource = sources.find((source) => source.kind === 'supplier')
@@ -4938,7 +5039,7 @@ function SimpleProductConsole({
                       {candidate.selected ? 'נבחר' : 'בחר מוצר'}
                     </button>
                     <details>
-                      <summary>הוכחות</summary>
+                      <summary>מקורות</summary>
                       <small>חסר: {candidate.missingFields.slice(0, 4).join(', ') || 'לא מוצג'}</small>
                       <small>מקורות: {candidate.evidenceIds.slice(0, 3).join(', ')}</small>
                     </details>
@@ -4948,8 +5049,8 @@ function SimpleProductConsole({
             )
           }) : (
             <div className="living-v3__product-empty-state">
-              <b>אין עדיין כרטיסי מוצר</b>
-              <span>כתוב בריף מוצר אחד. הכרטיס צריך להחזיר תמונות, Etsy, ספק ומה חסר.</span>
+              <b>אין תוצאות</b>
+              <span>כתוב חיפוש ולחץ חפש.</span>
             </div>
           )}
         </div>
@@ -4965,8 +5066,8 @@ function SimpleProductConsole({
           </div>
 
           <div className="living-v3__product-dossier-links">
-            {selectedEtsySource ? <a href={selectedEtsySource.url} target="_blank" rel="noreferrer">פתח מתחרה</a> : <span>חסר מתחרה</span>}
-            {selectedSupplierSource ? <a href={selectedSupplierSource.url} target="_blank" rel="noreferrer">פתח ספק</a> : <span>חסר ספק</span>}
+            {selectedEtsySource ? <a className="living-v3__product-link--etsy" href={selectedEtsySource.url} target="_blank" rel="noreferrer">פתח מתחרה</a> : <span className="living-v3__product-link--missing">חסר מתחרה</span>}
+            {selectedSupplierSource ? <a className="living-v3__product-link--supplier" href={selectedSupplierSource.url} target="_blank" rel="noreferrer">פתח ספק</a> : <span className="living-v3__product-link--missing">חסר ספק</span>}
           </div>
 
           <div className="living-v3__product-dossier-metrics" aria-label="סיכום מוצר שנבחר">
@@ -4995,8 +5096,12 @@ function SimpleProductConsole({
           </div>
 
           <div className="living-v3__product-next-action">
-            <button type="button" disabled={!hasSelectedProduct || approvalReady} onClick={runNextDraftStep}>{draftStepLabel}</button>
-            <button type="button" disabled={!draftReady || approvalReady} onClick={handlers.createDraftApprovalPacket}>בקש דראפט ל־{targetShop}</button>
+            <button className="living-v3__simple-product-primary" type="button" onClick={runNextDraftStep} disabled={!hasSelectedProduct || approvalReady}>
+              {draftStepLabel}
+            </button>
+            <button className="living-v3__simple-product-secondary" type="button" onClick={handlers.createDraftApprovalPacket} disabled={!draftReady || approvalReady}>
+              בקש אישור
+            </button>
           </div>
 
           <label className="living-v3__product-shop-select">
@@ -5014,7 +5119,7 @@ function SimpleProductConsole({
           </div>
 
           <details className="living-v3__product-proof-drawer">
-            <summary>הוכחות, טבלאות ופעולות נעולות</summary>
+            <summary>מקורות, טבלאות ופעולות נעולות</summary>
             <div>
               {tableLinks.map((link) => (
                 <a
@@ -5036,49 +5141,6 @@ function SimpleProductConsole({
         </aside>
       </section>
 
-      <details
-        className="living-v3__simple-product-advanced"
-        open={advancedOpen || handlers.etsyToolSurface !== 'simple'}
-        onToggle={(event) => setAdvancedOpen((event.currentTarget as HTMLDetailsElement).open)}
-      >
-        <summary>כלים טכניים מוסתרים</summary>
-        <div className="living-v3__simple-product-advanced-tabs">
-          <button type="button" className={handlers.etsyToolSurface === 'smart-intake' ? 'is-active' : ''} onClick={() => handlers.setEtsyToolSurface('smart-intake')}>Smart Intake</button>
-          <button type="button" className={handlers.etsyToolSurface === 'sheet-intake' ? 'is-active' : ''} onClick={() => handlers.setEtsyToolSurface('sheet-intake')}>Tables</button>
-          <button type="button" className={handlers.etsyToolSurface === 'scout' ? 'is-active' : ''} onClick={() => handlers.setEtsyToolSurface('scout')}>Draft board</button>
-        </div>
-        {handlers.etsyToolSurface === 'smart-intake' && <SmartIntakeWorkbench state={handlers.smartIntake} handlers={handlers} />}
-        {handlers.etsyToolSurface === 'sheet-intake' && <EtsySheetIntakeTool state={handlers.sheetIntake} handlers={handlers} />}
-        {handlers.etsyToolSurface === 'scout' && (
-          <EtsyProductPrepWorkbench
-            pipeline={pipeline}
-            roomState={roomState}
-            liveScout={handlers.liveScout}
-            evidenceLoading={handlers.evidenceLoading}
-            chatMemory={handlers.chatMemory}
-            actions={{
-              updateSearchInput: handlers.updateSearchInput,
-              updateSearchMode: handlers.updateSearchMode,
-              createSearchPacket: handlers.createSearchPacket,
-              prepareScoutPacket: handlers.prepareScoutPacket,
-              runScoutWorker: handlers.runScoutWorker,
-              runLiveScout: handlers.runLiveScout,
-              selectCandidate: handlers.selectCandidate,
-              addCandidateToVisualBoard: handlers.addCandidateToVisualBoard,
-              rejectCandidate: handlers.rejectCandidate,
-              setShotLabPreset: handlers.setShotLabPreset,
-              setShotLabImageCount: handlers.setShotLabImageCount,
-              setShotLabSourceImageRequirements: handlers.setShotLabSourceImageRequirements,
-              setShotLabVariantNotes: handlers.setShotLabVariantNotes,
-              createShotLabHandoffPacket: handlers.createShotLabHandoffPacket,
-              createSeoPacket: handlers.createSeoPacket,
-              createDraftPayload: handlers.createDraftPayload,
-              createDraftApprovalPacket: handlers.createDraftApprovalPacket,
-              resetPipeline: handlers.resetPipeline,
-            }}
-          />
-        )}
-      </details>
     </div>
   )
 }
@@ -5504,8 +5566,8 @@ function renderEtsyStationApp(stationId: LivingV3StationDefinition['id'], pipeli
             <div className="living-v3__etsy-action-pair">
               <LocalOnlyButton
                 className="living-v3__etsy-primary"
-                disabled={!hasSeoPacket}
-                disabledReason="Create an SEO packet before creating the local draft preview."
+                disabled={!(hasSeoPacket && hasShotLabPacket)}
+                disabledReason="Create both SEO and ShotLab handoff packets before creating the local draft preview."
                 onClick={handlers.createDraftPayload}
               >
                 Create Draft Preview
@@ -5635,6 +5697,14 @@ export function LivingWarRoomV3({
         ? fitLivingV3RoomCamera('agora-opportunity', INITIAL_VIEWPORT)
       : fitLivingV3MapCamera(INITIAL_VIEWPORT),
   )
+  const cameraRef = useRef<LivingV3CameraState>(camera)
+  const viewportRef = useRef(INITIAL_VIEWPORT)
+  const stagePointerFrameRef = useRef<number | null>(null)
+  const pendingStagePointerRef = useRef<{ pointerId: number; clientX: number; clientY: number } | null>(null)
+  const stageWheelFrameRef = useRef<number | null>(null)
+  const pendingStageWheelRef = useRef<{ clientX: number; clientY: number; deltaY: number } | null>(null)
+  const agentWindowFrameRef = useRef<number | null>(null)
+  const pendingAgentWindowPointerRef = useRef<{ clientX: number; clientY: number } | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [adapterState, setAdapterState] = useState(() => createInitialLivingV3HermesState(Date.now() - INITIAL_OFFSET_MS))
   const [selection, setSelection] = useState<LivingV3Selection>(() =>
@@ -5701,7 +5771,7 @@ export function LivingWarRoomV3({
     setEtsyRoomState(initialRoom)
     setStationActionReceipts((current) => ({
       ...current,
-      'etsy-loki-product-hunt': 'Legacy demo product cleared. Search in Oracle to send real product cards.',
+      'etsy-loki-product-hunt': 'Old local seed cleared. Search in Oracle to send real product cards.',
     }))
     try {
       window.localStorage.removeItem(ETSY_PIPELINE_STORAGE_KEY)
@@ -5782,7 +5852,11 @@ export function LivingWarRoomV3({
   const [workspaceKernelDisplayStates, setWorkspaceKernelDisplayStates] = useState<Array<KernelAgentDisplayState>>([])
   const [workspaceKernelTelemetry, setWorkspaceKernelTelemetry] = useState<WorkspaceKernelTelemetrySnapshot | null>(null)
   const [workspaceKernelStoreStatus, setWorkspaceKernelStoreStatus] = useState('loading')
+  const [workspaceKernelPersistence, setWorkspaceKernelPersistence] = useState<WorkspaceCoreOpsPersistenceView | null>(null)
   const [workspaceKernelStateVersion, setWorkspaceKernelStateVersion] = useState<string | undefined>(undefined)
+  const [workspacePacketMissionResults, setWorkspacePacketMissionResults] = useState<Array<WorkspacePacketMissionResult>>([])
+  const [workspacePacketMissionStatus, setWorkspacePacketMissionStatus] = useState<PacketHandoffRailStatus>('idle')
+  const [workspacePacketMissionReadback, setWorkspacePacketMissionReadback] = useState<string | undefined>(undefined)
   const [obsidianContextPacket, setObsidianContextPacket] = useState<WorkspaceContextPacket | null>(null)
   const [obsidianContextStatus, setObsidianContextStatus] = useState<string | null>(null)
   const [etsyToolSurface, setEtsyToolSurface] = useState<EtsyToolSurface>('simple')
@@ -6087,18 +6161,66 @@ export function LivingWarRoomV3({
     ?? agentControlState.reason
   const agentControlIsFrozen = agentControlState.frozen || agentControlState.mode === 'frozen' || Boolean(agentControlError)
   const missionRun = useMemo(() => latestWorkspaceMissionRun(workspaceKernelRuns), [workspaceKernelRuns])
-  const missionSpine = useMemo(() => buildWorkspaceMissionSpine({
-    runs: workspaceKernelRuns,
-    prompt: managerPrompt,
-    hermesStatus: hermesCommandRun.label,
-  }), [workspaceKernelRuns, managerPrompt, hermesCommandRun.label])
+  const missionPacketRail = useMemo(
+    () => buildWorkspacePacketMissionRail(workspacePacketMissionResults),
+    [workspacePacketMissionResults],
+  )
+  useEffect(() => {
+    const runId = missionRun?.runId
+    if (!runId) {
+      setWorkspacePacketMissionResults([])
+      setWorkspacePacketMissionStatus('idle')
+      setWorkspacePacketMissionReadback(undefined)
+      return
+    }
+    const controller = new AbortController()
+    setWorkspacePacketMissionStatus('loading')
+    setWorkspacePacketMissionReadback(`Reading persisted Packets for ${runId}.`)
+    void (async () => {
+      try {
+        const response = await fetch(`/api/war-room/workspace-kernel/packets?runId=${encodeURIComponent(runId)}`, {
+          method: 'GET',
+          cache: 'no-store',
+          credentials: 'same-origin',
+          signal: controller.signal,
+        })
+        const payload = await response.json() as {
+          ok?: boolean
+          error?: string
+          result?: { packets?: unknown }
+        }
+        if (!response.ok || payload.ok !== true || !Array.isArray(payload.result?.packets)) {
+          throw new Error(payload.error ?? `Packet store returned HTTP ${response.status}.`)
+        }
+        const parsed = parseWorkspacePacketMissionResults(payload.result.packets)
+        if (parsed.length !== payload.result.packets.length) {
+          throw new Error('Packet store returned a malformed Packet mission projection.')
+        }
+        if (controller.signal.aborted) return
+        setWorkspacePacketMissionResults(parsed)
+        setWorkspacePacketMissionStatus('ready')
+        setWorkspacePacketMissionReadback(`Local Packet store · ${parsed.length} verified Packet${parsed.length === 1 ? '' : 's'}.`)
+      } catch (error) {
+        if (controller.signal.aborted) return
+        setWorkspacePacketMissionResults([])
+        setWorkspacePacketMissionStatus('error')
+        setWorkspacePacketMissionReadback(error instanceof Error ? error.message : 'Packet rail unavailable.')
+      }
+    })()
+    return () => controller.abort()
+  }, [missionRun?.runId, workspaceKernelStateVersion])
   const missionAgentMinds = useMemo(() => workspaceAgentMindsForRun(missionRun), [missionRun])
   const workspaceCoreOpsSnapshot = useMemo(() => buildWorkspaceCoreOpsSnapshot({
     runs: workspaceKernelRuns,
     events: workspaceKernelEvents,
     telemetry: workspaceKernelTelemetry ?? undefined,
     stateVersion: workspaceKernelStateVersion,
-  }, { nowMs }), [workspaceKernelRuns, workspaceKernelEvents, workspaceKernelTelemetry, workspaceKernelStateVersion, nowMs])
+  }, {
+    nowMs,
+    source: workspaceKernelPersistence?.provider === 'supabase' && workspaceKernelPersistence.status === 'connected'
+      ? 'workspace-kernel-supabase-mirror'
+      : 'workspace-kernel-local-state',
+  }), [workspaceKernelRuns, workspaceKernelEvents, workspaceKernelTelemetry, workspaceKernelStateVersion, workspaceKernelPersistence?.provider, workspaceKernelPersistence?.status, nowMs])
 
   function applyOracleSignalPacketFromBridge(packet: OracleSignalPacket, receipt = `Oracle event bridge delivered ${packet.selectedKeyword} to Etsy Market Lab.`) {
     if (processedOracleSignalPacketsRef.current.has(packet.packetId)) return
@@ -6130,13 +6252,61 @@ export function LivingWarRoomV3({
   }
 
   useEffect(() => {
-    const interval = window.setInterval(() => setNowMs(Date.now()), 50)
-    return () => window.clearInterval(interval)
+    cameraRef.current = camera
+  }, [camera])
+
+  useEffect(() => {
+    viewportRef.current = viewport
+  }, [viewport])
+
+  useEffect(() => () => {
+    if (stagePointerFrameRef.current !== null) window.cancelAnimationFrame(stagePointerFrameRef.current)
+    if (stageWheelFrameRef.current !== null) window.cancelAnimationFrame(stageWheelFrameRef.current)
+    if (agentWindowFrameRef.current !== null) window.cancelAnimationFrame(agentWindowFrameRef.current)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    let timeoutId: number | null = null
+    const schedule = () => {
+      if (cancelled) return
+      const delay = document.visibilityState === 'visible' ? LIVING_V3_ACTIVE_CLOCK_MS : LIVING_V3_BACKGROUND_CLOCK_MS
+      timeoutId = window.setTimeout(tick, delay)
+    }
+    const tick = () => {
+      setNowMs(Date.now())
+      schedule()
+    }
+    const handleVisibilityChange = () => setNowMs(Date.now())
+    schedule()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      cancelled = true
+      if (timeoutId !== null) window.clearTimeout(timeoutId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   useEffect(() => {
     void refreshWorkspaceKernelStateFromStore()
   }, [])
+
+  useEffect(() => {
+    const selectedRoomCandidate = etsyRoomState.candidates.find((candidate) => candidate.candidateId === etsyRoomState.selectedCandidateId)
+    if (!selectedRoomCandidate) return
+    setEtsyPipeline((current) => {
+      const alreadyScoped = current.selectedCandidateId === selectedRoomCandidate.candidateId
+        && (!current.searchPacket || current.searchPacket.packetId === selectedRoomCandidate.packetId)
+        && (!current.metricPacket || current.metricPacket.candidateId === selectedRoomCandidate.candidateId)
+        && current.supplierLeads.every((lead) => lead.candidateId === selectedRoomCandidate.candidateId)
+        && (!current.productTruthPacket || current.productTruthPacket.candidateId === selectedRoomCandidate.candidateId)
+        && current.qaItems.every((item) => item.candidateId === selectedRoomCandidate.candidateId)
+        && (!current.visualQaReport || current.visualQaReport.candidateId === selectedRoomCandidate.candidateId)
+        && (!current.draftPacket || current.draftPacket.candidateId === selectedRoomCandidate.candidateId)
+        && (!current.draftApprovalPacket || current.draftApprovalPacket.candidateId === selectedRoomCandidate.candidateId)
+      return alreadyScoped ? current : syncEtsyPipelineToRoomCandidate(current, selectedRoomCandidate)
+    })
+  }, [etsyRoomState.candidates, etsyRoomState.selectedCandidateId])
 
   useEffect(() => {
     try {
@@ -6216,14 +6386,15 @@ export function LivingWarRoomV3({
     const listener = (event: globalThis.WheelEvent) => handleStageWheel(event)
     element.addEventListener('wheel', listener, { passive: false })
     return () => element.removeEventListener('wheel', listener)
-  })
+  }, [])
 
   useLayoutEffect(() => {
     const element = stageRef.current
     if (!element) return
     const updateViewport = () => {
       const rect = element.getBoundingClientRect()
-      setViewport({ w: Math.max(320, rect.width), h: Math.max(320, rect.height) })
+      const nextViewport = { w: Math.max(320, rect.width), h: Math.max(320, rect.height) }
+      setViewport((current) => (current.w === nextViewport.w && current.h === nextViewport.h ? current : nextViewport))
     }
     updateViewport()
     const observer = new ResizeObserver(updateViewport)
@@ -6259,22 +6430,39 @@ export function LivingWarRoomV3({
   const selectedStationUsesEtsyWorkspace = selectedStationIsEtsy
   const selectedStationUsesCouncilWorkspace = selectedStation?.id === 'council-table'
   const selectedStationIsOracle = selectedStation?.id === 'oracle-signal-basin'
+  const selectedStationUsesOracleWorkspace = selectedStationIsOracle
   const selectedStationIsGoblin = selectedStation?.id === 'agora-intake'
   const selectedStationUsesGoblinWorkspace = selectedStationIsGoblin
+  const selectedStationIsAtlantis = selectedStation?.id === 'atlantis-index'
+  const selectedStationUsesAtlantisWorkspace = selectedStationIsAtlantis
   const selectedStationIsTerra = isTerraForgeStationId(selectedStation?.id)
   const selectedStationUsesTerraWorkspace = selectedStationIsTerra
-  const selectedStationIsCommandManager = selectedStation?.id === 'command-table' || selectedStation?.id === 'mission-router'
+  const selectedStationUsesGatewayLayer = selectedStation?.id === 'gateway-console'
+  const selectedStationUsesPrimaryWorkspace = Boolean(selectedStation && (
+    selectedStationUsesEtsyWorkspace
+    || selectedStationUsesGoblinWorkspace
+    || selectedStationUsesAtlantisWorkspace
+    || selectedStationUsesTerraWorkspace
+    || selectedStationUsesCouncilWorkspace
+    || selectedStationUsesOracleWorkspace
+  ))
+  const selectedStationSuppressesGlobalOverlays = selectedStationUsesPrimaryWorkspace || selectedStationUsesGatewayLayer
+  const selectedStationIsCommandManager = selectedStation?.id === 'command-table' || selectedStation?.id === 'mission-router' || selectedStation?.id === 'approval-dais'
   const commandFocusModeActive = selectedStationIsCommandManager
   const selectedEtsyOperatorId = selectedStationIsEtsy && selectedStation ? etsyMarketLabStationOperatorId(selectedStation.id) : null
   const selectedEtsyOperator = selectedEtsyOperatorId ? livingV3AgentById(selectedEtsyOperatorId) : null
   const selectedEtsyOperatorSnapshot = selectedEtsyOperatorId ? getAgentSnapshot(snapshots, selectedEtsyOperatorId) : null
   const selectedSnapshot = selectedAgent ? getAgentSnapshot(snapshots, selectedAgent.id) : null
   const selectedAgentWindowLayout = selectedAgent ? currentAgentWindowLayout(selectedAgent.id) : null
-  const selectedMessages = selectedAgent ? messages.filter((message) => message.agentId === selectedAgent.id).slice(-LIVING_V3_AGENT_VISIBLE_MESSAGES) : []
+  const selectedMessages = useMemo(() => (
+    selectedAgent ? messages.filter((message) => message.agentId === selectedAgent.id).slice(-LIVING_V3_AGENT_VISIBLE_MESSAGES) : []
+  ), [messages, selectedAgent?.id])
   const focusedRoom = camera.focusedRoomId ? livingV3RoomById(camera.focusedRoomId) : null
   const focusedRoomStatus = focusedRoom ? roomStatuses.find((status) => status.roomId === focusedRoom.id) : null
-  const visibleSnapshots = snapshots.filter((snapshot) => !hiddenPrimaryAgentIds.has(snapshot.agentId))
-  const focusedRoomSnapshots = focusedRoom ? visibleSnapshots.filter((snapshot) => snapshot.roomId === focusedRoom.id) : []
+  const visibleSnapshots = useMemo(() => snapshots.filter((snapshot) => !hiddenPrimaryAgentIds.has(snapshot.agentId)), [snapshots])
+  const focusedRoomSnapshots = useMemo(() => (
+    focusedRoom ? visibleSnapshots.filter((snapshot) => snapshot.roomId === focusedRoom.id) : []
+  ), [focusedRoom?.id, visibleSnapshots])
   const commandAgentControlRoster = useMemo<Array<CommandAgentControlRow>>(() => {
     const lastMessageByAgent = messages.reduce<Partial<Record<LivingV3AgentId, string>>>((current, message) => ({
       ...current,
@@ -6321,13 +6509,13 @@ export function LivingWarRoomV3({
     .slice(-7)
     .reverse(),
   [bodyEvents])
-  const localEtsyRoomReadback = etsyRoomState.events.slice(-5).reverse()
+  const localEtsyRoomReadback = useMemo(() => etsyRoomState.events.slice(-5).reverse(), [etsyRoomState.events])
 
-  const worldStyle = styleVars({
+  const worldStyle = useMemo(() => styleVars({
     width: `${LIVING_V3_WORLD_CONFIG.worldSize.w}px`,
     height: `${LIVING_V3_WORLD_CONFIG.worldSize.h}px`,
     transform: `translate(${viewport.w / 2 - camera.center.x * camera.scale}px, ${viewport.h / 2 - camera.center.y * camera.scale}px) scale(${camera.scale})`,
-  })
+  }), [camera.center.x, camera.center.y, camera.scale, viewport.h, viewport.w])
 
   async function refreshBodyRuntime() {
     if (!bodyRuntimeEnabled) return
@@ -6370,7 +6558,12 @@ export function LivingWarRoomV3({
     setWorkspaceKernelDisplayStates(displayStates)
     setWorkspaceKernelTelemetry(payload.telemetry ?? state.telemetry ?? null)
     setWorkspaceKernelStateVersion(payload.stateVersion ?? state.stateVersion)
-    setWorkspaceKernelStoreStatus('ready')
+    setWorkspaceKernelPersistence(payload.persistence ?? null)
+    setWorkspaceKernelStoreStatus(payload.persistence?.provider === 'supabase' && payload.persistence.status === 'connected'
+      ? `Supabase · ${payload.persistence.runCount ?? state.runs.length} runs · ${payload.persistence.approvalCount ?? state.runs.reduce((count, run) => count + run.approvals.length, 0)} approvals`
+      : payload.persistence?.status === 'error'
+        ? 'Supabase fallback: local store'
+        : 'local store')
     const contextPacket = payload.packet ?? latestObsidianContextPacketFromState(state)
     if (contextPacket) {
       setObsidianContextPacket(contextPacket)
@@ -6421,14 +6614,21 @@ export function LivingWarRoomV3({
 
   function focusMap() {
     suppressClickRef.current = false
-    setCamera(fitLivingV3MapCamera(viewport))
+    const nextCamera = fitLivingV3MapCamera(viewportRef.current)
+    cameraRef.current = nextCamera
+    setCamera(nextCamera)
     setSelection(null)
   }
 
   function focusRoom(roomId: LivingV3RoomId, nextSelection: LivingV3Selection = null) {
     suppressClickRef.current = false
-    setCamera(fitLivingV3RoomCamera(roomId, viewport))
-    setSelection(nextSelection)
+    const nextCamera = fitLivingV3RoomCamera(roomId, viewportRef.current)
+    const canonicalSelection = roomId === 'council-strategists' && nextSelection === null
+      ? { kind: 'station' as const, id: 'council-table' as const }
+      : nextSelection
+    cameraRef.current = nextCamera
+    setCamera(nextCamera)
+    setSelection(canonicalSelection)
   }
 
   function openAgentControlChat(agentId: LivingV3AgentId) {
@@ -6465,69 +6665,112 @@ export function LivingWarRoomV3({
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      startCenter: camera.center,
+      startCenter: cameraRef.current.center,
       moved: false,
     }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  function handleStagePointerMove(event: PointerEvent<HTMLDivElement>) {
+  function applyStagePointerMove(pointerId: number, clientX: number, clientY: number) {
     const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-    const dx = event.clientX - drag.startX
-    const dy = event.clientY - drag.startY
+    if (!drag || drag.pointerId !== pointerId) return
+    const dx = clientX - drag.startX
+    const dy = clientY - drag.startY
     if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true
-    setCamera((current) =>
-      clampLivingV3Camera({
+    setCamera((current) => {
+      const next = clampLivingV3Camera({
         ...current,
         mode: current.focusedRoomId ? 'room' : 'free',
         center: {
           x: drag.startCenter.x - dx / current.scale,
           y: drag.startCenter.y - dy / current.scale,
         },
-      }, viewport, LIVING_V3_WORLD_CONFIG.worldSize),
-    )
+      }, viewportRef.current, LIVING_V3_WORLD_CONFIG.worldSize)
+      cameraRef.current = next
+      return next
+    })
+  }
+
+  function handleStagePointerMove(event: PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    pendingStagePointerRef.current = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY }
+    if (stagePointerFrameRef.current !== null) return
+    stagePointerFrameRef.current = window.requestAnimationFrame(() => {
+      stagePointerFrameRef.current = null
+      const pending = pendingStagePointerRef.current
+      pendingStagePointerRef.current = null
+      if (pending) applyStagePointerMove(pending.pointerId, pending.clientX, pending.clientY)
+    })
   }
 
   function handleStagePointerUp(event: PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
+    if (stagePointerFrameRef.current !== null) {
+      window.cancelAnimationFrame(stagePointerFrameRef.current)
+      stagePointerFrameRef.current = null
+      pendingStagePointerRef.current = null
+    }
+    applyStagePointerMove(event.pointerId, event.clientX, event.clientY)
     suppressClickRef.current = drag.moved
     dragRef.current = null
     event.currentTarget.releasePointerCapture(event.pointerId)
   }
 
-  function handleStageWheel(event: globalThis.WheelEvent) {
-    event.preventDefault()
+  function applyStageWheel(input: { clientX: number; clientY: number; deltaY: number }) {
     const element = stageRef.current
     if (!element) return
+    const cameraSnapshot = cameraRef.current
+    const viewportSnapshot = viewportRef.current
     const rect = element.getBoundingClientRect()
-    const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top }
-    const viewportCenter = { x: viewport.w / 2, y: viewport.h / 2 }
+    const screen = { x: input.clientX - rect.left, y: input.clientY - rect.top }
+    const viewportCenter = { x: viewportSnapshot.w / 2, y: viewportSnapshot.h / 2 }
     const worldPoint = {
-      x: camera.center.x + (screen.x - viewportCenter.x) / camera.scale,
-      y: camera.center.y + (screen.y - viewportCenter.y) / camera.scale,
+      x: cameraSnapshot.center.x + (screen.x - viewportCenter.x) / cameraSnapshot.scale,
+      y: cameraSnapshot.center.y + (screen.y - viewportCenter.y) / cameraSnapshot.scale,
     }
-    const nextScale = Math.max(0.36, Math.min(2.25, camera.scale * Math.exp(-event.deltaY * 0.0013)))
-    const focusedRoomId = nextScale < 0.68 ? null : camera.focusedRoomId
-    setCamera(
-      clampLivingV3Camera({
-        center: {
-          x: worldPoint.x - (screen.x - viewportCenter.x) / nextScale,
-          y: worldPoint.y - (screen.y - viewportCenter.y) / nextScale,
-        },
-        scale: nextScale,
-        mode: focusedRoomId ? 'room' : nextScale < 0.65 ? 'map' : 'free',
-        focusedRoomId,
-      }, viewport, LIVING_V3_WORLD_CONFIG.worldSize),
-    )
+    const nextScale = Math.max(0.36, Math.min(2.25, cameraSnapshot.scale * Math.exp(-input.deltaY * 0.0013)))
+    const focusedRoomId = nextScale < 0.68 ? null : cameraSnapshot.focusedRoomId
+    const next = clampLivingV3Camera({
+      center: {
+        x: worldPoint.x - (screen.x - viewportCenter.x) / nextScale,
+        y: worldPoint.y - (screen.y - viewportCenter.y) / nextScale,
+      },
+      scale: nextScale,
+      mode: focusedRoomId ? 'room' : nextScale < 0.65 ? 'map' : 'free',
+      focusedRoomId,
+    }, viewportSnapshot, LIVING_V3_WORLD_CONFIG.worldSize)
+    cameraRef.current = next
+    setCamera(next)
+  }
+
+  function handleStageWheel(event: globalThis.WheelEvent) {
+    const target = event.target as HTMLElement | null
+    if (target?.closest('textarea, input, select, [data-scroll-surface="true"], .council-chamber, .workspace-core-ops-panel, .etsy-prep, .living-v3__drawer, .living-v3__hud')) {
+      return
+    }
+    event.preventDefault()
+    const existing = pendingStageWheelRef.current
+    pendingStageWheelRef.current = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      deltaY: (existing?.deltaY ?? 0) + event.deltaY,
+    }
+    if (stageWheelFrameRef.current !== null) return
+    stageWheelFrameRef.current = window.requestAnimationFrame(() => {
+      stageWheelFrameRef.current = null
+      const pending = pendingStageWheelRef.current
+      pendingStageWheelRef.current = null
+      if (pending) applyStageWheel(pending)
+    })
   }
 
   function currentAgentWindowLayout(agentId: LivingV3AgentId) {
-    return clampAgentWindowLayout(agentWindowLayouts[agentId] ?? defaultAgentWindowLayout(viewport), viewport)
+    return clampAgentWindowLayout(agentWindowLayouts[agentId] ?? defaultAgentWindowLayout(viewportRef.current), viewportRef.current)
   }
 
-  function updateAgentWindowLayoutFromPointer(clientX: number, clientY: number) {
+  function applyAgentWindowLayoutFromPointer(clientX: number, clientY: number) {
     const action = agentWindowActionRef.current
     if (!action) return
     const dx = clientX - action.startClientX
@@ -6537,8 +6780,28 @@ export function LivingWarRoomV3({
       : { ...action.startLayout, w: action.startLayout.w + dx, h: action.startLayout.h + dy }
     setAgentWindowLayouts((current) => ({
       ...current,
-      [action.agentId]: clampAgentWindowLayout(next, viewport),
+      [action.agentId]: clampAgentWindowLayout(next, viewportRef.current),
     }))
+  }
+
+  function updateAgentWindowLayoutFromPointer(clientX: number, clientY: number) {
+    pendingAgentWindowPointerRef.current = { clientX, clientY }
+    if (agentWindowFrameRef.current !== null) return
+    agentWindowFrameRef.current = window.requestAnimationFrame(() => {
+      agentWindowFrameRef.current = null
+      const pending = pendingAgentWindowPointerRef.current
+      pendingAgentWindowPointerRef.current = null
+      if (pending) applyAgentWindowLayoutFromPointer(pending.clientX, pending.clientY)
+    })
+  }
+
+  function flushAgentWindowLayoutFromPointer(clientX: number, clientY: number) {
+    if (agentWindowFrameRef.current !== null) {
+      window.cancelAnimationFrame(agentWindowFrameRef.current)
+      agentWindowFrameRef.current = null
+      pendingAgentWindowPointerRef.current = null
+    }
+    applyAgentWindowLayoutFromPointer(clientX, clientY)
   }
 
   function beginAgentWindowLayoutAction(event: PointerEvent<HTMLElement>, agentId: LivingV3AgentId, mode: AgentWindowLayoutAction['mode']) {
@@ -6582,7 +6845,7 @@ export function LivingWarRoomV3({
   useEffect(() => {
     const move = (event: globalThis.PointerEvent) => updateAgentWindowLayoutFromPointer(event.clientX, event.clientY)
     const up = (event: globalThis.PointerEvent) => {
-      updateAgentWindowLayoutFromPointer(event.clientX, event.clientY)
+      flushAgentWindowLayoutFromPointer(event.clientX, event.clientY)
       agentWindowActionRef.current = null
     }
     window.addEventListener('pointermove', move)
@@ -6593,7 +6856,7 @@ export function LivingWarRoomV3({
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
     }
-  }, [viewport])
+  }, [])
 
   function sendAgentMessage(agentId: LivingV3AgentId, event?: FormEvent) {
     event?.preventDefault()
@@ -7252,13 +7515,16 @@ export function LivingWarRoomV3({
     },
     evidenceLoading: false,
     selectCandidate: (candidateId) => {
-      const roomHasCandidate = etsyRoomState.candidates.some((candidate) => candidate.candidateId === candidateId)
-      if (roomHasCandidate) {
+      const roomCandidate = etsyRoomState.candidates.find((candidate) => candidate.candidateId === candidateId)
+      if (roomCandidate) {
         applyEtsyRoomAction(
           'etsy-loki-product-hunt',
           'Select candidate',
           (current) => selectEtsyCandidateLocal(current, candidateId),
           { type: 'select_etsy_candidate_local', candidateId },
+        )
+        applyEtsyPipelineAction('etsy-loki-product-hunt', 'Synchronize product scope', (current) =>
+          syncEtsyPipelineToRoomCandidate(current, roomCandidate),
         )
         return
       }
@@ -7272,9 +7538,21 @@ export function LivingWarRoomV3({
     sendCandidateToThoth: (candidateId) => applyEtsyPipelineAction('etsy-loki-product-hunt', 'Send to SEO', (current) =>
       sendEtsyCandidateToThoth(current, candidateId),
     ),
-    rejectCandidate: (candidateId) => applyEtsyPipelineAction('etsy-loki-product-hunt', 'Reject', (current) =>
-      rejectEtsyCandidate(current, candidateId),
-    ),
+    rejectCandidate: (candidateId) => {
+      const roomHasCandidate = etsyRoomState.candidates.some((candidate) => candidate.candidateId === candidateId)
+      if (roomHasCandidate) {
+        applyEtsyRoomAction(
+          'etsy-loki-product-hunt',
+          'Reject and delete local candidate',
+          (current) => rejectEtsyCandidateLocal(current, candidateId),
+          { type: 'reject_etsy_candidate_local', candidateId },
+        )
+        return
+      }
+      applyEtsyPipelineAction('etsy-loki-product-hunt', 'Reject and delete local candidate', (current) =>
+        rejectEtsyCandidate(current, candidateId),
+      )
+    },
     stageSheetRow: () => {
       if (!etsyRoomState.seoPacket) {
         recordEtsyStationAction('etsy-thor-seo-metrics', 'Stage Sheet Row blocked', 'Create an SEO packet before staging a local sheet row.')
@@ -7567,6 +7845,32 @@ export function LivingWarRoomV3({
       } catch (error) {
         setBodyActionError(error instanceof Error ? error.message : String(error))
         applyLocalFallback()
+      }
+    })()
+  }
+
+  function decideWorkspaceCoreOpsApproval(notification: WorkspaceCoreOpsNotification, decision: WorkspaceCoreOpsApprovalDecision) {
+    if (!notification.approvalId) return
+    void (async () => {
+      try {
+        setWorkspaceKernelStoreStatus(decision === 'approved' ? 'recording approval' : 'recording cancellation')
+        const response = await fetch('/api/war-room/workspace-kernel/resolve-run', {
+          method: 'POST',
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: decision === 'approved' ? 'approved' : 'rejected',
+            approvalId: notification.approvalId,
+            reason: decision === 'approved'
+              ? 'Operator approved from Workspace Notifications. Live execution remains locked until a specific sender is connected.'
+              : 'Operator cancelled from Workspace Notifications. No live action was executed.',
+          }),
+        })
+        const payload = await response.json() as WorkspaceKernelApiPayload
+        applyWorkspaceKernelApiPayload(payload)
+      } catch (error) {
+        setWorkspaceKernelStoreStatus(error instanceof Error ? error.message : 'kernel approval update failed')
       }
     })()
   }
@@ -8367,15 +8671,18 @@ export function LivingWarRoomV3({
 
   return (
     <section
-      className={`living-v3 living-v3--${camera.focusedRoomId ? 'room' : 'map'} living-v3--zoom-${zoomLevel} ${etsyFocusMode ? 'living-v3--etsy-focus-mode' : ''} ${goblinFocusMode ? 'living-v3--goblin-focus-mode' : ''} ${selectedStationUsesEtsyWorkspace ? 'living-v3--etsy-primary-workspace' : ''} ${selectedStationUsesGoblinWorkspace ? 'living-v3--goblin-primary-workspace' : ''} ${selectedStationUsesTerraWorkspace ? 'living-v3--terra-primary-workspace' : ''} ${selectedStationUsesCouncilWorkspace ? 'living-v3--council-primary-workspace' : ''} ${commandFocusModeActive ? 'living-v3--command-focus-mode' : ''} ${councilCleanStageActive ? 'living-v3--council-clean-stage' : ''} ${navigationDebugOpen ? 'living-v3--navigation-debug' : ''}`}
+      className={`living-v3 living-v3--${camera.focusedRoomId ? 'room' : 'map'} living-v3--zoom-${zoomLevel} ${etsyFocusMode ? 'living-v3--etsy-focus-mode' : ''} ${goblinFocusMode ? 'living-v3--goblin-focus-mode' : ''} ${selectedStationUsesEtsyWorkspace ? 'living-v3--etsy-primary-workspace' : ''} ${selectedStationUsesGoblinWorkspace ? 'living-v3--goblin-primary-workspace' : ''} ${selectedStationUsesAtlantisWorkspace ? 'living-v3--atlantis-primary-workspace' : ''} ${selectedStationUsesTerraWorkspace ? 'living-v3--terra-primary-workspace' : ''} ${selectedStationUsesCouncilWorkspace ? 'living-v3--council-primary-workspace' : ''} ${selectedStationUsesOracleWorkspace ? 'living-v3--oracle-primary-workspace' : ''} ${selectedStationUsesGatewayLayer ? 'living-v3--gateway-active-layer' : ''} ${commandFocusModeActive ? 'living-v3--command-focus-mode' : ''} ${councilCleanStageActive ? 'living-v3--council-clean-stage' : ''} ${navigationDebugOpen ? 'living-v3--navigation-debug' : ''}`}
       data-living-v3-root
       data-zoom-level={zoomLevel}
       data-etsy-focus-mode={etsyFocusMode ? 'true' : 'false'}
       data-goblin-focus-mode={goblinFocusMode ? 'true' : 'false'}
       data-etsy-primary-workspace-active={selectedStationUsesEtsyWorkspace ? 'true' : 'false'}
       data-goblin-primary-workspace-active={selectedStationUsesGoblinWorkspace ? 'true' : 'false'}
+      data-atlantis-primary-workspace-active={selectedStationUsesAtlantisWorkspace ? 'true' : 'false'}
       data-terra-primary-workspace-active={selectedStationUsesTerraWorkspace ? 'true' : 'false'}
       data-council-primary-workspace-active={selectedStationUsesCouncilWorkspace ? 'true' : 'false'}
+      data-oracle-primary-workspace-active={selectedStationUsesOracleWorkspace ? 'true' : 'false'}
+      data-gateway-active-layer={selectedStationUsesGatewayLayer ? 'true' : 'false'}
       data-council-clean-stage={councilCleanStageActive ? 'true' : 'false'}
       data-command-focus-mode={commandFocusModeActive ? 'true' : 'false'}
       data-navigation-debug={navigationDebugOpen ? 'true' : 'false'}
@@ -8399,7 +8706,7 @@ export function LivingWarRoomV3({
       ))}
           </select>
           <span className="living-v3__safety-pill" title={agentControlTitle}>
-            {agentControlIsFrozen ? 'Safe / frozen' : 'Manual control'}
+            {agentControlIsFrozen ? 'Standby' : 'Manual control'}
           </span>
         </div>
         {!councilCleanStageActive && !commandFocusModeActive && (
@@ -8417,10 +8724,10 @@ export function LivingWarRoomV3({
               className="living-v3__agent-control-toggle"
               type="button"
               onClick={toggleAgentConnectionControl}
-              aria-label={agentControlIsFrozen ? 'Prepare safe agent connection' : 'Freeze agents and stop usage'}
-              title={agentControlIsFrozen ? 'Safe mode / prepare connection' : 'Freeze agents / stop usage'}
+              aria-label={agentControlIsFrozen ? 'Prepare agent connection' : 'Freeze agents and stop usage'}
+              title={agentControlIsFrozen ? 'Prepare connection' : 'Freeze agents / stop usage'}
             >
-              {agentControlIsFrozen ? 'Safe mode' : 'Freeze'}
+              {agentControlIsFrozen ? 'Prepare' : 'Freeze'}
             </button>
             <details className="living-v3__system-menu">
               <summary aria-label="Open proof and system tools">⚙︎</summary>
@@ -8479,11 +8786,25 @@ export function LivingWarRoomV3({
         )}
       </header>
 
-      {!councilCleanStageActive && !commandFocusModeActive && !selectedStationUsesGoblinWorkspace && (
+      {selectedStation && (
+        <button
+          className="living-v3__workspace-close-x"
+          type="button"
+          onClick={focusMap}
+          aria-label={`Close ${selectedStation.label} tool`}
+          title="Close tool"
+        >
+          ×
+        </button>
+      )}
+
+      {!councilCleanStageActive && !commandFocusModeActive && !selectedStationSuppressesGlobalOverlays && !selectedStationUsesGoblinWorkspace && !selectedStationUsesAtlantisWorkspace && (
         <WorkspaceCoreOpsPanel
           snapshot={workspaceCoreOpsSnapshot}
           storeStatus={workspaceKernelStoreStatus}
+          persistence={workspaceKernelPersistence}
           onOpenRoom={focusRoom}
+          onApprovalDecision={decideWorkspaceCoreOpsApproval}
         />
       )}
 
@@ -8557,7 +8878,7 @@ export function LivingWarRoomV3({
             )
           })}
 
-          {navigationDebugOpen && navigationDebugSnapshots.length > 0 && (
+          {navigationDebugOpen && !selectedStationSuppressesGlobalOverlays && navigationDebugSnapshots.length > 0 && (
             <svg
               className="living-v3__nav-debug-overlay"
               viewBox={`0 0 ${LIVING_V3_WORLD_CONFIG.worldSize.w} ${LIVING_V3_WORLD_CONFIG.worldSize.h}`}
@@ -8609,6 +8930,8 @@ export function LivingWarRoomV3({
                 <button
                   className={`living-v3__station ${activeTask ? 'is-active' : ''} ${alert ? 'has-alert' : ''}`}
                   type="button"
+                  data-room-id={station.roomId}
+                  data-station-id={station.id}
                   style={{
                     left: rect.x + (rect.w - scaledWidth) / 2,
                     top: rect.y + (rect.h - scaledHeight) / 2,
@@ -8635,13 +8958,13 @@ export function LivingWarRoomV3({
                   style={{ left: operatorWorld.x, top: operatorWorld.y }}
                   title={`${station.label} operator spot`}
                 />
-                {(activeTask || alert || station.badge === 'approval') && (
+                {(activeTask || alert) && (
                   <span
-                    className={`living-v3__station-badge living-v3__badge--${alert?.badge ?? activeTask?.badge ?? station.badge}`}
+                    className={`living-v3__station-badge living-v3__badge--${alert?.badge ?? activeTask?.badge}`}
                     style={{ left: rect.x + rect.w - 8, top: rect.y - 10 }}
                     title={alert?.label ?? activeTask?.label ?? station.role}
                   >
-                    {badgeLabels[alert?.badge ?? activeTask?.badge ?? station.badge]}
+                    {badgeLabels[alert?.badge ?? activeTask?.badge ?? 'active-task']}
                   </span>
                 )}
               </div>
@@ -8655,6 +8978,10 @@ export function LivingWarRoomV3({
               <button
                 key={snapshot.agentId}
                 className={`living-v3__agent living-v3__agent--${snapshot.activity} living-v3__agent--${snapshot.agentId} ${selection?.kind === 'agent' && selection.id === snapshot.agentId ? 'is-selected' : ''}`}
+                data-agent-id={snapshot.agentId}
+                data-agent-activity={snapshot.activity}
+                data-agent-direction={snapshot.direction}
+                data-agent-animation-state={snapshot.animationState}
                 type="button"
                 style={{
                   left: snapshot.world.x,
@@ -8684,7 +9011,7 @@ export function LivingWarRoomV3({
         </div>
       </div>
 
-      {focusedRoom && !councilCleanStageActive && !commandFocusModeActive && (
+      {focusedRoom && !councilCleanStageActive && !commandFocusModeActive && !selectedStationSuppressesGlobalOverlays && (
         <div className="living-v3__room-edge" aria-label="Focused room controls">
           <button type="button" onClick={focusMap}>Map</button>
           <div>
@@ -8724,8 +9051,9 @@ export function LivingWarRoomV3({
         </div>
       )}
 
-      {!councilCleanStageActive && !commandFocusModeActive && (visualAdapterState.alerts.length > 0 || visualAdapterState.approvals.length > 0) && (
-        <div className="living-v3__alert-stack" aria-label="Living V3 alerts">
+      {!councilCleanStageActive && !commandFocusModeActive && !selectedStationSuppressesGlobalOverlays && (visualAdapterState.alerts.length > 0 || visualAdapterState.approvals.length > 0) && (
+        <details className="living-v3__alert-stack living-v3__alert-stack--debug" aria-label="Living V3 alerts" data-alert-stack-debug="collapsed-v1">
+          <summary>System alerts · {visualAdapterState.alerts.length + visualAdapterState.approvals.length}</summary>
           {visualAdapterState.alerts.slice(0, 3).map((alert) => (
             <button key={alert.id} type="button" aria-label={alert.label} title={alert.label} onClick={() => {
               if (alert.stationId) focusRoom(alert.roomId, { kind: 'station', id: alert.stationId })
@@ -8744,10 +9072,10 @@ export function LivingWarRoomV3({
               </button>
             )
           })}
-        </div>
+        </details>
       )}
 
-      {navigationDebugOpen && !councilCleanStageActive && (
+      {navigationDebugOpen && !councilCleanStageActive && !selectedStationSuppressesGlobalOverlays && (
         <div className="living-v3__nav-debug-panel" aria-label="Movement route debug">
           <b>Movement Debug</b>
           <span>{navigationDoors.length} dynamic doors · {LIVING_V3_WORLD_CONFIG.bridges.length} bridges</span>
@@ -8763,7 +9091,7 @@ export function LivingWarRoomV3({
         </div>
       )}
 
-      {navigationDebugOpen && workspaceKernelTelemetry && !selectedStationUsesEtsyWorkspace && !selectedStationUsesTerraWorkspace && !councilCleanStageActive && (
+      {navigationDebugOpen && workspaceKernelTelemetry && !selectedStationSuppressesGlobalOverlays && !selectedStationUsesEtsyWorkspace && !selectedStationUsesTerraWorkspace && !councilCleanStageActive && (
         <div
           className="living-v3__kernel-telemetry-strip"
           aria-label="Persistent workspace kernel telemetry"
@@ -8787,7 +9115,7 @@ export function LivingWarRoomV3({
         </div>
       )}
 
-      {navigationDebugOpen && !selectedStationUsesEtsyWorkspace && !selectedStationUsesTerraWorkspace && !councilCleanStageActive && ((bodyRuntimeEnabled && oracleBridgeReadback.length > 0) || localEtsyRoomReadback.length > 0 || managerStationActionResult) && (
+      {navigationDebugOpen && !selectedStationSuppressesGlobalOverlays && !selectedStationUsesEtsyWorkspace && !selectedStationUsesTerraWorkspace && !councilCleanStageActive && ((bodyRuntimeEnabled && oracleBridgeReadback.length > 0) || localEtsyRoomReadback.length > 0 || managerStationActionResult) && (
         <div className="living-v3__event-readback" aria-label="Living V3 event readback">
           <b>Body Event Bridge</b>
           {oracleBridgeReadback.map((event) => (
@@ -8838,8 +9166,7 @@ export function LivingWarRoomV3({
           operatorStatus={activityLabels[selectedEtsyOperatorSnapshot?.activity ?? 'idle']}
           stationSurface={renderEtsyStationApp(selectedStation.id, etsyPipeline, etsyPipelineHandlers)}
           stationReceipt={stationActionReceipts[selectedStation.id]}
-          onClose={() => focusRoom(selectedStation.roomId)}
-          onSwitchRoom={(roomId) => focusRoom(roomId)}
+          onOpenOpportunityResearch={() => focusRoom('agora-opportunity', { kind: 'station', id: 'agora-intake' })}
           onResetPipeline={etsyPipelineHandlers.resetPipeline}
           onSelectStation={etsyPipelineHandlers.goToStation}
         />
@@ -8860,7 +9187,6 @@ export function LivingWarRoomV3({
           capabilitiesError={terraCapabilitiesError}
           state={terraWorkbench}
           onUpdateState={updateTerraWorkbench}
-          onClose={() => focusRoom(selectedStation.roomId)}
           onSwitchRoom={(roomId) => focusRoom(roomId)}
           onSelectStation={(stationId) => {
             setTerraWorkbench((current) => ({ ...current, tab: terraWorkbenchTabForStation(stationId), receipt: undefined }))
@@ -8868,7 +9194,8 @@ export function LivingWarRoomV3({
             focusRoom('terra-forge', { kind: 'station', id: stationId })
           }}
           onRefreshModelAssets={() => { void refreshTerraModelAssets() }}
-          onRefreshPrinter={() => { void refreshTerraPrinterStatus(); setTerraPrinterFrameNonce(Date.now()) }}
+          onRefreshPrinter={() => { void refreshTerraPrinterStatus() }}
+          onRequestPrinterFrame={() => { setTerraPrinterFrameNonce(Date.now()); void refreshTerraPrinterStatus() }}
           onRefreshCapabilities={() => { void refreshTerraCapabilities() }}
           onRunInternetModelSearch={() => { void runTerraInternetModelSearch() }}
           onStageInternetCandidate={stageTerraInternetCandidate}
@@ -8878,14 +9205,43 @@ export function LivingWarRoomV3({
         />
       )}
 
+      {selectedStationUsesOracleWorkspace && selectedStation && (
+        <OracleWorkbench
+          resultCount={oracleSearch.result?.keywordResults.length ?? 0}
+          selectedKeyword={oracleSearch.result?.keywordResults.find((result) => result.id === oracleSearch.selectedKeywordId)?.keyword
+            ?? oracleSearch.result?.keywordResults[0]?.keyword}
+          sourceModeLabel={oracleAluraSourceModeLabels[oracleSearch.sourceMode]}
+          receipt={stationActionReceipts[selectedStation.id]}
+        >
+          <OracleAluraLocalSearchApp state={oracleSearch} handlers={oracleSearchHandlers} />
+        </OracleWorkbench>
+      )}
+
       {selectedStationUsesGoblinWorkspace && selectedStation && (
         <GoblinAnalyticsShell
           variant="primary"
           onClose={() => focusRoom(selectedStation.roomId)}
+          onMissionStaged={(result) => {
+            setEtsyRoomState({
+              ...etsyRoomState,
+              researchMissionPacket: result.packet,
+              lastReceipt: result.readback,
+              run: {
+                ...etsyRoomState.run,
+                updatedAtMs: Date.now(),
+              },
+            })
+          }}
+        />
+      )}
+
+      {selectedStationUsesAtlantisWorkspace && selectedStation && (
+        <AtlantisVaultSurface
+          variant="primary"
           navigationSlot={(
             <WarRoomQuickSwitch
               value={selectedStation.roomId}
-              label="Switch War Room from Goblin Workbench"
+              label="Switch War Room from Atlantis Vault"
               onSwitch={(roomId) => focusRoom(roomId)}
             />
           )}
@@ -8894,119 +9250,64 @@ export function LivingWarRoomV3({
 
       {selectedStationUsesCouncilWorkspace && (
         <CouncilChamberSurface
-          onClose={() => focusRoom('council-strategists')}
           onTransferToHermes={transferCouncilDecisionToHermes}
-          navigationSlot={(
-            <WarRoomQuickSwitch
-              value="council-strategists"
-              label="Switch War Room from Council"
-              onSwitch={(roomId) => focusRoom(roomId)}
-            />
-          )}
         />
       )}
 
-      {(selectedAgent && selectedSnapshot) || (selectedStation && !selectedStationUsesEtsyWorkspace && !selectedStationUsesGoblinWorkspace && !selectedStationUsesTerraWorkspace && !selectedStationUsesCouncilWorkspace) ? (
+      {(selectedAgent && selectedSnapshot) || (selectedStation && !selectedStationUsesEtsyWorkspace && !selectedStationUsesGoblinWorkspace && !selectedStationUsesAtlantisWorkspace && !selectedStationUsesTerraWorkspace && !selectedStationUsesCouncilWorkspace && !selectedStationUsesOracleWorkspace) ? (
         <aside
-          className={`living-v3__drawer ${selectedAgent ? 'living-v3__drawer--agent-window' : ''} ${selectedStationIsEtsy ? 'living-v3__drawer--etsy-app' : selectedStationIsOracle ? 'living-v3__drawer--oracle-app' : selectedStationIsGoblin ? 'living-v3__drawer--goblin-app' : selectedStationIsTerra ? 'living-v3__drawer--terra-app' : selectedStationIsCommandManager ? 'living-v3__drawer--manager' : ''}`}
+          className={`living-v3__drawer ${selectedAgent ? 'living-v3__drawer--agent-window' : ''} ${selectedStationIsEtsy ? 'living-v3__drawer--etsy-app' : selectedStationIsOracle ? 'living-v3__drawer--oracle-app' : selectedStationIsGoblin ? 'living-v3__drawer--goblin-app' : selectedStationIsAtlantis ? 'living-v3__drawer--atlantis-app' : selectedStationIsTerra ? 'living-v3__drawer--terra-app' : selectedStationIsCommandManager ? 'living-v3__drawer--manager' : selectedStationUsesGatewayLayer ? 'living-v3__drawer--gateway-app' : ''}`}
           style={selectedAgentWindowLayout ? agentWindowLayoutStyle(selectedAgentWindowLayout) : undefined}
           data-agent-window-layout={selectedAgent ? 'persistent-draggable-resizable' : undefined}
           aria-label="Living V3 detail drawer"
         >
-          {selectedAgent && selectedAgentWindowLayout && (
-            <div
-              className="living-v3__agent-window-bar"
-              onPointerDown={(event) => beginAgentWindowLayoutAction(event, selectedAgent.id, 'move')}
-              role="button"
-              tabIndex={0}
-              aria-label={`Move ${selectedAgent.label} window`}
-            >
-              <span>Drag</span>
-              <small>{Math.round(selectedAgentWindowLayout.w)}×{Math.round(selectedAgentWindowLayout.h)}</small>
-            </div>
-          )}
-          <button className="living-v3__drawer-close" type="button" onClick={() => setSelection(null)}>x</button>
-          {selectedAgent && selectedSnapshot && (
-            <>
-              <div className="living-v3__drawer-head">
-                <img src={selectedAgent.portraitPath} alt="" />
-                <div>
-                  <p>{selectedAgent.shortLabel}</p>
-                  <h2>{selectedAgent.label}</h2>
-                  <span>{selectedSnapshot.activity} · {livingV3RoomById(selectedSnapshot.roomId)?.label}</span>
-                  {selectedAgent.visualStatus === 'temporary-approved-sprite' && (
-                    <small className="living-v3__temp-visual">TEMP VISUAL</small>
-                  )}
-                </div>
-              </div>
-              <div className="living-v3__drawer-block">
-                <label>Persona</label>
-                <p>{selectedAgent.persona}</p>
-              </div>
-              <div className="living-v3__drawer-block">
-                <label>Current packet</label>
-                <p>{selectedSnapshot.label}</p>
-              </div>
-              <div className="living-v3__agent-chat">
-                {selectedMessages.map((message) => (
-                  <p
-                    key={message.id}
-                    className={`${message.from === 'operator' ? 'from-operator' : message.from === 'receipt' ? 'from-receipt' : 'from-agent'} ${bidiClassNameFor(message.text)}`}
-                    dir={textDirectionFor(message.text)}
-                  >
-                    {message.text}
-                  </p>
-                ))}
-              </div>
-              <form className="living-v3__chat-form" onSubmit={(event) => sendAgentMessage(selectedAgent.id, event)}>
-                <input
-                  value={drafts[selectedAgent.id] ?? ''}
-                  onChange={(event) => setDrafts((current) => ({ ...current, [selectedAgent.id]: event.target.value }))}
-                  placeholder={`Message ${selectedAgent.label}`}
-                  dir="auto"
-                />
-                <button type="submit">Ask</button>
-              </form>
-              <div className="living-v3__drawer-actions">
-                {selectedAgent.primaryStationIds.map((stationId) => {
-                  const station = livingV3StationById(stationId)
-                  return station ? (
-                    <button key={station.id} type="button" onClick={() => assignStation(selectedAgent.id, station.id)}>
-                      {station.label}
-                    </button>
-                  ) : null
-                })}
-                <button type="button" onClick={() => {
-                  void (async () => {
-                    const ok = await tryBodyIntent({ type: 'rest', agentId: selectedAgent.id, correlationId: `ui-agent-rest-${selectedAgent.id}-${Date.now()}` })
-                    if (!ok) setAdapterState((state) => moveLivingV3AgentToRoom(state, selectedAgent.id, 'pantheon-quarters'))
-                  })()
-                }}>
-                  Pantheon Quarters
-                </button>
-                <button type="button" onClick={() => fitAgentWindowLayout(selectedAgent.id)}>
-                  Fit Wide
-                </button>
-                <button type="button" onClick={() => resetAgentWindowLayout(selectedAgent.id)}>
-                  Reset Window
-                </button>
-              </div>
-              <span
-                className="living-v3__agent-window-resize"
-                onPointerDown={(event) => beginAgentWindowLayoutAction(event, selectedAgent.id, 'resize')}
-                role="separator"
-                aria-label={`Resize ${selectedAgent.label} window`}
-              />
-            </>
+          {selectedAgent && selectedSnapshot && selectedAgentWindowLayout && (
+            <AgentWorkbenchPanel
+              agent={selectedAgent}
+              snapshot={selectedSnapshot}
+              roomLabel={livingV3RoomById(selectedSnapshot.roomId)?.label ?? selectedSnapshot.roomId}
+              windowSizeLabel={`${Math.round(selectedAgentWindowLayout.w)}×${Math.round(selectedAgentWindowLayout.h)}`}
+              messages={selectedMessages}
+              draft={drafts[selectedAgent.id] ?? ''}
+              stations={selectedAgent.primaryStationIds.flatMap((stationId) => {
+                const station = livingV3StationById(stationId)
+                return station ? [{ id: station.id, label: station.label }] : []
+              })}
+              onDraftChange={(value) => setDrafts((current) => ({ ...current, [selectedAgent.id]: value }))}
+              onSubmit={(event) => sendAgentMessage(selectedAgent.id, event)}
+              onAssignStation={(stationId) => assignStation(selectedAgent.id, stationId)}
+              onRest={() => {
+                void (async () => {
+                  const ok = await tryBodyIntent({ type: 'rest', agentId: selectedAgent.id, correlationId: `ui-agent-rest-${selectedAgent.id}-${Date.now()}` })
+                  if (!ok) setAdapterState((state) => moveLivingV3AgentToRoom(state, selectedAgent.id, 'pantheon-quarters'))
+                })()
+              }}
+              onFitWindow={() => fitAgentWindowLayout(selectedAgent.id)}
+              onResetWindow={() => resetAgentWindowLayout(selectedAgent.id)}
+              onClose={() => setSelection(null)}
+              onBeginMove={(event) => beginAgentWindowLayoutAction(event, selectedAgent.id, 'move')}
+              onBeginResize={(event) => beginAgentWindowLayoutAction(event, selectedAgent.id, 'resize')}
+            />
           )}
 
           {selectedStation && (
             <>
-              <div className="living-v3__drawer-title">
-                <p>Station</p>
-                <h2>{selectedStation.label}</h2>
-                <span>{selectedStation.role}</span>
-              </div>
+              <StationWorkbenchHeader
+                roomLabel={livingV3RoomById(selectedStation.roomId)?.label ?? selectedStation.roomId}
+                stationLabel={selectedStation.label}
+                role={selectedStation.role}
+                modeLabel={selectedStationIsCommandManager
+                  ? 'Command workbench'
+                  : selectedStationUsesGatewayLayer
+                    ? 'Gateway workbench'
+                    : selectedStationIsOracle
+                      ? 'Oracle signal workbench'
+                      : 'Station workbench'}
+                localOnly={!selectedStationUsesGatewayLayer || !bodyRuntimeEnabled}
+                hasReadback={selectedStationIsEtsy
+                  ? Boolean(etsyRoomState.lastReceipt ?? etsyPipeline.lastReceipt)
+                  : false}
+              />
               {selectedStationIsEtsy ? (
                 <div
                   className="living-v3__etsy-shell"
@@ -9083,7 +9384,8 @@ export function LivingWarRoomV3({
                   printerError={terraPrinterError}
                   onRefreshModelAssets={() => { void refreshTerraModelAssets() }}
                   printerFrameNonce={terraPrinterFrameNonce}
-                  onRefreshPrinter={() => { void refreshTerraPrinterStatus(); setTerraPrinterFrameNonce(Date.now()) }}
+                  onRefreshPrinter={() => { void refreshTerraPrinterStatus() }}
+                  onRequestPrinterFrame={() => { setTerraPrinterFrameNonce(Date.now()); void refreshTerraPrinterStatus() }}
                 />
               ) : selectedStationIsCommandManager ? (
                 <CommandRoomManagerSurface
@@ -9105,7 +9407,9 @@ export function LivingWarRoomV3({
                   kernelRuns={workspaceKernelRuns}
                   kernelEvents={workspaceKernelEvents}
                   kernelDisplayStates={workspaceKernelDisplayStates}
-                  missionSpine={missionSpine}
+                  missionPacketRail={missionPacketRail}
+                  missionPacketRailStatus={workspacePacketMissionStatus}
+                  missionPacketRailReadback={workspacePacketMissionReadback}
                   missionAgentMinds={missionAgentMinds}
                   missionRun={missionRun}
                   kernelStoreStatus={workspaceKernelStoreStatus}
@@ -9122,26 +9426,98 @@ export function LivingWarRoomV3({
                   onRestAgent={restAgentFromCommandControl}
                   onRunControlledAgent={activateControlledAgentRun}
                 />
+              ) : selectedStationUsesGatewayLayer ? (
+                <section
+                  className="living-v3__gateway-approval-gate"
+                  data-gateway-approval-gate="locked-v1"
+                  data-gateway-action-surface="agent-readback-v1"
+                  data-live-actions-allowed="false"
+                  data-generic-send-agent="removed"
+                  aria-label="Gateway locked approval workbench"
+                >
+                  <div className="living-v3__gateway-gate-hero">
+                    <div>
+                      <label>Approval gate</label>
+                      <h3>Choose the external action, then stage readback for DLV</h3>
+                      <p>Discord, supplier messages, Etsy edits, and remote commands are visible here as agent work routes — but every external side effect stays locked until explicit approval and readback.</p>
+                    </div>
+                    <WorkspaceStationCta
+                      actionId="gateway.stage-approval-readback"
+                      label="Stage approval packet"
+                      sublabel="Open Command with a locked readback plan — no live send"
+                      status="needs-approval"
+                      ownerAgentId="hermes"
+                      ownerLabel="Hermes Gateway"
+                      targetRoomId="gateway-cockpit"
+                      targetStationId="gateway-console"
+                      targetToolLabel="Gateway approval console"
+                      motionSignal="blocked-at-gate"
+                      position="standard-dock-right"
+                      onPrimaryAction={() => focusRoom('olympus-command', { kind: 'station', id: 'command-table' })}
+                      proofSummary="Gateway exposes action routes only. Live Discord/Etsy/supplier/printer writes remain locked."
+                      proofItems={['Readback required', 'No silent live send', 'Operator approval before side effect']}
+                    />
+                  </div>
+                  <WorkspacePipelineWorkbench
+                    id="gateway-external-action-gate"
+                    eyebrow="Pipeline OS · Gateway"
+                    title="Request → Readback → Approval → Delivery"
+                    subtitle="Every external route is shown as a teachable gate: what came in, what packet will be sent, which approval is missing, and what side effect remains locked."
+                    activeArtifact={{ label: 'Active gateway artifact', title: 'Approval packet', meta: 'No live delivery without DLV readback', emptyLabel: 'GATE' }}
+                    steps={[
+                      { id: 'incoming', label: 'Incoming', status: 'ready', value: 'request', detail: 'Operator/chat/API request is captured as a local packet.' },
+                      { id: 'route', label: 'Route', status: 'active', value: 'choose executor', detail: 'Pick Discord, Etsy, supplier, ShotLab, printer, or DB route.' },
+                      { id: 'readback', label: 'Readback', status: 'waiting', value: 'stage packet', detail: 'Show target, payload, cost/account risk, and exact side effect.' },
+                      { id: 'approval', label: 'Approval', status: 'locked', value: 'DLV gate', detail: 'External action waits for explicit approval.' },
+                      { id: 'delivery', label: 'Delivery', status: 'locked', value: 'sender missing', detail: 'Live sender/adapter remains disconnected here.' },
+                    ]}
+                    inputMedia={[{ id: 'request-card', label: 'Request card', meta: 'current Workspace command / chat handoff', tone: 'ready' }]}
+                    outputMedia={[{ id: 'approval-card', label: 'Approval card', meta: 'readback packet staged locally', tone: 'waiting' }, { id: 'delivery-receipt', label: 'Delivery receipt', meta: 'appears only after approved sender runs', tone: 'locked' }]}
+                    filters={[
+                      { id: 'discord', label: 'Discord', value: 'locked', active: false },
+                      { id: 'etsy', label: 'Etsy', value: 'locked', active: false },
+                      { id: 'supplier', label: 'Supplier', value: 'locked', active: false },
+                      { id: 'printer', label: 'Printer', value: 'locked', active: false },
+                    ]}
+                    actions={[{ id: 'stage-readback', label: 'Stage readback', detail: 'open Command route', onClick: () => focusRoom('olympus-command', { kind: 'station', id: 'command-table' }) }]}
+                    locks={['No Discord send', 'No Etsy publish/edit', 'No supplier message/payment', 'No printer command']}
+                    readback={<span>Gateway only prepares approval/readback packets. It does not execute live sends from this workbench.</span>}
+                    accent="#7dd3fc"
+                  />
+                  <div className="living-v3__gateway-gate-grid" aria-label="Locked external action routes">
+                    {[
+                      ['Discord delivery', 'Draft message / media / channel target', 'Locked: send, pin, moderate'],
+                      ['Etsy shop action', 'Draft listing edit / publish packet', 'Locked: create draft, publish, renew, customer message'],
+                      ['Supplier or ShotLab', 'Stage message, source evidence, cost note', 'Locked: paid generation, purchase, supplier send'],
+                      ['Printer / remote command', 'Read status and prepare command', 'Locked: heat, move, start, delete job'],
+                    ].map(([label, readback, lock]) => (
+                      <article key={label}>
+                        <span>{label}</span>
+                        <b>{readback}</b>
+                        <small>{lock}</small>
+                      </article>
+                    ))}
+                  </div>
+                </section>
               ) : (
                 <>
-                  <div className="living-v3__drawer-block">
-                    <label>Operator spot</label>
-                    <p>Agents stand outside the tool bounds and work facing the station.</p>
+                  <div className="living-v3__drawer-block living-v3__drawer-block--dormant" data-station-dormant="true">
+                    <label>Not an active workbench yet</label>
+                    <h3>{selectedStation.label}</h3>
+                    <p>This station is visible on the map, but it is not one of the cleaned active Workspace surfaces yet. No fake workflow is shown here.</p>
                   </div>
-                  <div className="living-v3__drawer-block">
-                    <label>Local media</label>
-                    <p>No real product images are mapped in V3 yet. The empty state is real and does not invent products.</p>
-                  </div>
+                  <details className="living-v3__station-debug-actions" data-station-debug-actions="collapsed-v1">
+                    <summary>Debug actions</summary>
+                    <p>Use only if we need to inspect agent movement or station wiring.</p>
+                    <div className="living-v3__drawer-actions">
+                      {stationAssignableAgents(selectedStation).map((agent) => (
+                        <button key={agent.id} type="button" onClick={() => assignStation(agent.id, selectedStation.id)}>
+                          Send {agent.label}
+                        </button>
+                      ))}
+                    </div>
+                  </details>
                 </>
-              )}
-              {!selectedStationIsEtsy && !selectedStationIsOracle && !selectedStationIsGoblin && !selectedStationIsTerra && !selectedStationIsCommandManager && (
-                <div className="living-v3__drawer-actions">
-                  {stationAssignableAgents(selectedStation).map((agent) => (
-                    <button key={agent.id} type="button" onClick={() => assignStation(agent.id, selectedStation.id)}>
-                      Send {agent.label}
-                    </button>
-                  ))}
-                </div>
               )}
             </>
           )}

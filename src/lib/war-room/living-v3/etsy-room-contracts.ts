@@ -1,6 +1,7 @@
 import type { OracleSignalPacket } from './oracle-alura'
 import type { EtsySheetIntakeNormalizedProduct } from './etsy-sheet-intake'
 import type { EtsyLiveResearchRun, EtsyLiveSourceDetail } from './etsy-live-research'
+import type { ResearchMissionPacket } from './research-atlas-contract'
 import type { SmartIntakeMission, SmartIntakeProductMatch } from './smart-intake-v2'
 
 export type EtsyRoomStationId =
@@ -39,6 +40,7 @@ export type EtsyRoomEventType =
   | 'etsy.scout.request.created'
   | 'etsy.candidates.ready'
   | 'etsy.candidate.selected'
+  | 'etsy.candidate.rejected'
   | 'etsy.shotlab.packet.created'
   | 'etsy.seo.packet.created'
   | 'etsy.draft.payload.created'
@@ -108,6 +110,8 @@ export type EtsyProductCandidate = {
   dataOrigin: EtsyRoomDataOrigin
   sourceRecordIds: Array<string>
   sourceDetails?: Array<EtsyLiveSourceDetail>
+  imageRefs: Array<string>
+  thumbnailRef?: string
   evidenceIds: Array<string>
   missingFields: Array<string>
   riskNotes: Array<string>
@@ -120,6 +124,8 @@ export type EtsyScoutWorkerCandidateInput = {
   niche: string
   score?: number | null
   sourceUrls?: Array<string>
+  imageRefs?: Array<string>
+  thumbnailRef?: string
   evidence?: Array<string>
   missingFields?: Array<string>
   riskNotes?: Array<string>
@@ -130,6 +136,8 @@ export type EtsySelectedProductPacket = EtsyBaseRoomPacket & {
   selectedProductTitle: string
   selectedCandidateId: string
   sourcePacketId: string
+  imageRefs: Array<string>
+  thumbnailRef?: string
   evidenceSummary: string
   riskFlags: Array<string>
 }
@@ -137,6 +145,8 @@ export type EtsySelectedProductPacket = EtsyBaseRoomPacket & {
 export type EtsyShotLabHandoffPacket = EtsyBaseRoomPacket & {
   kind: 'shotlab_handoff'
   selectedProductTitle: string
+  imageRefs: Array<string>
+  thumbnailRef?: string
   sourceImagesRequired: Array<string>
   imageCount: number
   preset: 'Boutique Premium' | 'Minimalist Zen' | 'Earthy Organic'
@@ -150,6 +160,8 @@ export type EtsyShotLabHandoffPacket = EtsyBaseRoomPacket & {
 export type EtsySeoPacket = EtsyBaseRoomPacket & {
   kind: 'seo_packet'
   selectedProductTitle: string
+  imageRefs: Array<string>
+  thumbnailRef?: string
   titleCandidates: Array<string>
   tagCandidates: Array<string>
   descriptionOutline: Array<string>
@@ -166,6 +178,8 @@ export type EtsySeoPacket = EtsyBaseRoomPacket & {
 export type EtsyDraftPayload = EtsyBaseRoomPacket & {
   kind: 'draft_payload'
   title: string
+  imageRefs: Array<string>
+  thumbnailRef?: string
   description: string
   tags: Array<string>
   attributes: Record<string, string>
@@ -186,6 +200,8 @@ export type EtsyApprovalPacket = EtsyBaseRoomPacket & {
   kind: 'approval_packet'
   approvalStatus: 'waiting_operator'
   selectedProductTitle: string
+  imageRefs: Array<string>
+  thumbnailRef?: string
   evidenceQuality: string
   shotLabReadiness: string
   seoReadiness: string
@@ -207,6 +223,7 @@ export type EtsyRoomState = {
   seoPacket?: EtsySeoPacket
   draftPayload?: EtsyDraftPayload
   approvalPacket?: EtsyApprovalPacket
+  researchMissionPacket?: ResearchMissionPacket
   events: Array<EtsyRoomEvent>
   allowedNow: Array<string>
   lockedActions: Array<string>
@@ -247,6 +264,13 @@ export type SelectEtsyCandidateLocalIntent = {
   correlationId?: string
 }
 
+export type RejectEtsyCandidateLocalIntent = {
+  type: 'reject_etsy_candidate_local'
+  candidateId: string
+  runId?: string
+  correlationId?: string
+}
+
 export type CreateShotLabHandoffLocalIntent = {
   type: 'create_shotlab_handoff_local'
   preset?: EtsyShotLabHandoffPacket['preset']
@@ -279,6 +303,7 @@ export type EtsyRoomLocalIntent =
   | PrepareProductScoutPacketLocalIntent
   | ApplyProductScoutWorkerPacketLocalIntent
   | SelectEtsyCandidateLocalIntent
+  | RejectEtsyCandidateLocalIntent
   | CreateShotLabHandoffLocalIntent
   | CreateSeoPacketLocalIntent
   | CreateDraftPayloadLocalIntent
@@ -315,6 +340,7 @@ export const ETSY_ROOM_ALLOWED_INTENTS = [
   'prepare_product_scout_packet_local',
   'apply_product_scout_worker_packet_local',
   'select_etsy_candidate_local',
+  'reject_etsy_candidate_local',
   'create_shotlab_handoff_local',
   'create_seo_packet_local',
   'create_draft_payload_local',
@@ -472,6 +498,8 @@ function candidatesFromScout(scout: EtsyProductScoutPacket, signal?: OracleSigna
     sourceType,
     dataOrigin: origin,
     sourceRecordIds,
+    imageRefs: [],
+    thumbnailRef: undefined,
     evidenceIds,
     missingFields: missingBase,
     riskNotes: candidate.riskNotes,
@@ -489,6 +517,26 @@ function cleanList(values: Array<string | null | undefined> | undefined, fallbac
   return cleaned.length ? cleaned : fallback
 }
 
+function firstImageRef(imageRefs: Array<string>, fallback?: string) {
+  return imageRefs[0] ?? fallback
+}
+
+function imageRefsFromSourceDetails(details: Array<EtsyLiveSourceDetail> | undefined, fallback: Array<string> = []) {
+  return cleanList(details?.map((detail) => detail.imageUrl), fallback, 10)
+}
+
+function imageRefsFromSmartIntake(input: {
+  mission: SmartIntakeMission
+  match: SmartIntakeProductMatch
+  selectedImageIds?: Array<string>
+}) {
+  const imageSets = input.mission.imageSets.filter((set) => input.match.imageSetIds.includes(set.imageSetId) || set.matchId === input.match.matchId)
+  const items = imageSets.flatMap((set) => set.items)
+  const selectedIds = new Set(input.selectedImageIds ?? [])
+  const preferred = items.filter((item) => selectedIds.size ? selectedIds.has(item.imageId) : item.selected || imageSets.some((set) => set.bestImageId === item.imageId))
+  return cleanList(preferred.map((item) => item.ref), items.map((item) => item.ref), 12)
+}
+
 function clampScore(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) return null
   return Math.max(0, Math.min(100, Math.round(value)))
@@ -503,6 +551,7 @@ function candidatesFromScoutWorker(input: {
 }): Array<EtsyProductCandidate> {
   return input.candidates.slice(0, 5).map((candidate, index) => {
     const sourceRecordIds = cleanList(candidate.sourceUrls, input.fallbackSourceRecordIds, 6)
+    const imageRefs = cleanList(candidate.imageRefs, candidate.thumbnailRef ? [candidate.thumbnailRef] : [], 8)
     const evidenceIds = cleanList(candidate.evidence, input.fallbackEvidenceIds, 8)
     const missingFields = cleanList(candidate.missingFields, input.fallbackMissingFields, 8)
     return {
@@ -515,6 +564,8 @@ function candidatesFromScoutWorker(input: {
       sourceType: 'Future internet scout',
       dataOrigin: 'future-internet-scout',
       sourceRecordIds,
+      imageRefs,
+      thumbnailRef: firstImageRef(imageRefs, candidate.thumbnailRef),
       evidenceIds,
       missingFields,
       riskNotes: cleanList(candidate.riskNotes, ['No live Etsy/supplier action; verify source truth before handoff.'], 6),
@@ -594,6 +645,8 @@ export function applyEtsyLiveResearchRunToEtsyRoomLocal(
     dataOrigin: 'live-readonly-research' as const,
     sourceRecordIds: cleanList(candidate.sourceUrls, [`etsy-live:${candidate.candidateId}`], 8),
     sourceDetails: candidate.sourceDetails,
+    imageRefs: imageRefsFromSourceDetails(candidate.sourceDetails),
+    thumbnailRef: firstImageRef(imageRefsFromSourceDetails(candidate.sourceDetails)),
     evidenceIds: cleanList(candidate.evidenceIds, [`etsy-live:${candidate.candidateId}`], 10),
     missingFields: cleanList(candidate.missingEvidence, missingFields, 10),
     riskNotes: cleanList(candidate.riskFlags, ['No live action; verify source truth before handoff.'], 10),
@@ -897,6 +950,7 @@ export function applySheetIntakeProductToEtsyRoomLocal(
     'materials proof',
     'variant truth',
   ], 12)
+  const imageRefs = cleanList(input.product.imageRefs, input.product.thumbnailRef ? [input.product.thumbnailRef] : [], 12)
 
   const scoutPacket: EtsyProductScoutPacket = {
     ...basePacket({
@@ -946,6 +1000,8 @@ export function applySheetIntakeProductToEtsyRoomLocal(
     sourceType: 'Sheet intake local',
     dataOrigin: 'sheet-intake-local',
     sourceRecordIds,
+    imageRefs,
+    thumbnailRef: firstImageRef(imageRefs, input.product.thumbnailRef),
     evidenceIds,
     missingFields,
     riskNotes: cleanList([
@@ -1023,6 +1079,7 @@ export function applySmartIntakeMatchToEtsyRoomLocal(
     'source product image proof',
     'SEO demand metrics',
   ], 14)
+  const imageRefs = imageRefsFromSmartIntake(input)
 
   const scoutPacket: EtsyProductScoutPacket = {
     ...basePacket({
@@ -1073,6 +1130,8 @@ export function applySmartIntakeMatchToEtsyRoomLocal(
     sourceType: 'Smart intake local',
     dataOrigin: 'smart-intake-local',
     sourceRecordIds,
+    imageRefs,
+    thumbnailRef: firstImageRef(imageRefs),
     evidenceIds,
     missingFields,
     riskNotes: cleanList(input.match.riskFlags, ['Review Smart Intake dossier before any live handoff.'], 12),
@@ -1148,14 +1207,21 @@ export function selectEtsyCandidateLocal(state: EtsyRoomState, candidateId: stri
     selectedProductTitle: candidate.title,
     selectedCandidateId: candidate.candidateId,
     sourcePacketId: state.scoutPacket.packetId,
+    imageRefs: candidate.imageRefs,
+    thumbnailRef: firstImageRef(candidate.imageRefs, candidate.thumbnailRef),
     evidenceSummary: `${candidate.sourceType}; ${candidate.evidenceIds.length} evidence ids; missing: ${candidate.missingFields.join(', ') || 'none'}`,
     riskFlags: candidate.riskNotes,
   }
+  const switchingCandidate = state.selectedCandidateId !== candidateId
   let next = updateStage({
     ...state,
     candidates: state.candidates.map((item) => ({ ...item, selected: item.candidateId === candidateId })),
     selectedCandidateId: candidateId,
     selectedProductPacket: selectedPacket,
+    shotLabHandoffPacket: switchingCandidate ? undefined : state.shotLabHandoffPacket,
+    seoPacket: switchingCandidate ? undefined : state.seoPacket,
+    draftPayload: switchingCandidate ? undefined : state.draftPayload,
+    approvalPacket: switchingCandidate ? undefined : state.approvalPacket,
     lastReceipt: `Product selected: ${candidate.title}. Next step is source/image proof before ShotLab.`,
   }, 'candidate_selected', nowMs, ['create_shotlab_handoff_local'])
   next = addEvent(next, {
@@ -1166,6 +1232,59 @@ export function selectEtsyCandidateLocal(state: EtsyRoomState, candidateId: stri
     createdAtMs: nowMs,
     readback: `Selected product packet created: ${candidate.title}.`,
     payload: { selectedCandidateId: candidateId, selectedProductTitle: candidate.title },
+  })
+  return next
+}
+
+export function rejectEtsyCandidateLocal(state: EtsyRoomState, candidateId: string, nowMs = Date.now()): EtsyRoomState {
+  const candidate = state.candidates.find((item) => item.candidateId === candidateId)
+  if (!candidate) {
+    return {
+      ...state,
+      lastReceipt: 'Candidate was already removed from the local staging board.',
+    }
+  }
+
+  const remainingCandidates = state.candidates.filter((item) => item.candidateId !== candidateId)
+  const rejectedSelectedCandidate = state.selectedCandidateId === candidateId
+    || state.selectedProductPacket?.selectedCandidateId === candidateId
+  const nextStage: EtsyRoomStage = rejectedSelectedCandidate
+    ? remainingCandidates.length
+      ? 'candidates_ready'
+      : 'scout_request'
+    : state.stage
+  const nextAllowed = rejectedSelectedCandidate
+    ? remainingCandidates.length
+      ? ['select_etsy_candidate_local']
+      : ['prepare_product_scout_packet_local']
+    : state.allowedNow
+
+  let next = updateStage({
+    ...state,
+    run: { ...state.run, updatedAtMs: nowMs },
+    candidates: remainingCandidates.map((item) => ({ ...item, selected: false })),
+    selectedCandidateId: rejectedSelectedCandidate ? undefined : state.selectedCandidateId,
+    selectedProductPacket: rejectedSelectedCandidate ? undefined : state.selectedProductPacket,
+    shotLabHandoffPacket: rejectedSelectedCandidate ? undefined : state.shotLabHandoffPacket,
+    seoPacket: rejectedSelectedCandidate ? undefined : state.seoPacket,
+    draftPayload: rejectedSelectedCandidate ? undefined : state.draftPayload,
+    approvalPacket: rejectedSelectedCandidate ? undefined : state.approvalPacket,
+    lastReceipt: `Rejected candidate was deleted from local staging: ${candidate.title}.`,
+  }, nextStage, nowMs, nextAllowed)
+
+  next = addEvent(next, {
+    type: 'etsy.candidate.rejected',
+    packetId: candidate.packetId,
+    stationId: 'etsy-loki-product-hunt',
+    stage: next.stage,
+    createdAtMs: nowMs,
+    readback: `Candidate deleted from local staging after DLV rejection: ${candidate.title}.`,
+    payload: {
+      candidateId,
+      deletedFromLocalStaging: true,
+      remainingCandidateIds: next.candidates.map((item) => item.candidateId),
+      selectedPacketCleared: rejectedSelectedCandidate,
+    },
   })
   return next
 }
@@ -1202,6 +1321,8 @@ export function createShotLabHandoffLocal(state: EtsyRoomState, input: {
     }),
     kind: 'shotlab_handoff',
     selectedProductTitle: selected.selectedProductTitle,
+    imageRefs: selected.imageRefs,
+    thumbnailRef: firstImageRef(selected.imageRefs, selected.thumbnailRef),
     sourceImagesRequired,
     imageCount: Math.max(1, Math.min(12, input.imageCount ?? state.shotLabDraft.imageCount)),
     preset: input.preset ?? state.shotLabDraft.preset,
@@ -1283,6 +1404,8 @@ export function createSeoPacketLocal(state: EtsyRoomState, nowMs = Date.now()): 
     }),
     kind: 'seo_packet',
     selectedProductTitle: titleBase,
+    imageRefs: selected.imageRefs,
+    thumbnailRef: firstImageRef(selected.imageRefs, selected.thumbnailRef),
     titleCandidates: [
       `${titleBase} for Everyday Gifts`,
       `Minimal ${titleBase} Gift Jewelry`,
@@ -1360,6 +1483,8 @@ export function createDraftPayloadLocal(state: EtsyRoomState, nowMs = Date.now()
     }),
     kind: 'draft_payload',
     title,
+    imageRefs: seo.imageRefs,
+    thumbnailRef: firstImageRef(seo.imageRefs, seo.thumbnailRef),
     description: `${selected.selectedProductTitle} prepared as a local DolaroBoutique draft preview. This copy stays truthful: jewelry only, no lookalikes, no personalized claim unless proven, unknown recycled material = No, unknown stone = No, and no source/SKU/internal facts in customer-facing text.`,
     tags: seo.tagCandidates,
     attributes: {
@@ -1429,6 +1554,8 @@ export function requestDlvApprovalLocal(state: EtsyRoomState, nowMs = Date.now()
     kind: 'approval_packet',
     approvalStatus: 'waiting_operator',
     selectedProductTitle: selected.selectedProductTitle,
+    imageRefs: draft.imageRefs,
+    thumbnailRef: firstImageRef(draft.imageRefs, draft.thumbnailRef),
     evidenceQuality: draft.evidenceIds.length ? 'partial local evidence' : 'missing evidence',
     shotLabReadiness: state.shotLabHandoffPacket ? 'local handoff packet ready; paid generation locked' : 'missing local handoff packet',
     seoReadiness: state.seoPacket ? 'local SEO packet ready; missing metrics explicit' : 'missing local SEO packet',
@@ -1492,6 +1619,8 @@ export function reduceEtsyRoomLocalIntent(state: EtsyRoomState, intent: EtsyRoom
       })
     case 'select_etsy_candidate_local':
       return selectEtsyCandidateLocal(state, intent.candidateId, nowMs)
+    case 'reject_etsy_candidate_local':
+      return rejectEtsyCandidateLocal(state, intent.candidateId, nowMs)
     case 'create_shotlab_handoff_local':
       return createShotLabHandoffLocal(state, {
         preset: intent.preset,

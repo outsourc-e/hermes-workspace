@@ -35,7 +35,7 @@ describe('Living V3 body adapter', () => {
     }, 10_300)
     dispatchWarRoomIntent({
       type: 'raise_alert',
-      agentId: 'merchant-scout',
+      agentId: 'loki',
       severity: 'warning',
       text: 'Supplier evidence missing.',
       correlationId: 'adapter-flow',

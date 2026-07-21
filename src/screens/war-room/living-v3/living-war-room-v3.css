@@ -466,12 +466,18 @@
 .living-v3__agent {
   position: absolute;
   z-index: 26;
-  width: calc(74px * 0.85);
-  height: calc(74px * 0.85);
+  width: calc(74px * 0.92);
+  height: calc(74px * 0.92);
   border: 0;
   background: transparent;
   cursor: pointer;
-  transform: translate(-50%, -54%);
+  transform: translate3d(-50%, -54%, 0);
+}
+
+.living-v3__agent--walking,
+.living-v3__agent--carrying {
+  transition: left 72ms linear, top 72ms linear !important;
+  will-change: left, top;
 }
 
 .living-v3__agent::after {
@@ -536,9 +542,9 @@
 .living-v3__agent--saladin,
 .living-v3__agent--genghis,
 .living-v3__agent--hannibal {
-  width: calc(68px * 0.85);
-  height: calc(74px * 0.85);
-  transform: translate(-50%, -62%);
+  width: calc(68px * 0.9);
+  height: calc(74px * 0.9);
+  transform: translate3d(-50%, -62%, 0);
 }
 
 .living-v3__agent--julius::before,
@@ -690,7 +696,14 @@
   pointer-events: none;
 }
 
-.living-v3--goblin-primary-workspace .living-v3__room-edge {
+.living-v3--goblin-primary-workspace .living-v3__room-edge,
+.living-v3--atlantis-primary-workspace .living-v3__hud,
+.living-v3--atlantis-primary-workspace .living-v3__room-edge,
+.living-v3--atlantis-primary-workspace .living-v3__alert-stack,
+.living-v3--atlantis-primary-workspace .living-v3__kernel-telemetry-strip,
+.living-v3--atlantis-primary-workspace .living-v3__event-readback,
+.living-v3--atlantis-primary-workspace button[aria-label='Live external action gate locked'],
+.living-v3--atlantis-primary-workspace button[aria-label='Live external actions remain locked'] {
   display: none;
 }
 
@@ -712,6 +725,32 @@
 .living-v3__room-edge > button {
   min-width: 46px;
   height: 40px;
+}
+
+html body .living-v3 .living-v3__workspace-close-x {
+  position: fixed;
+  z-index: 220;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(18, 24, 20, 0.16) !important;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  color: #162018 !important;
+  font: 500 24px/1 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  cursor: pointer;
+}
+
+html body .living-v3 .living-v3__workspace-close-x:hover,
+html body .living-v3 .living-v3__workspace-close-x:focus-visible {
+  background: #fff !important;
+  color: #050807 !important;
+  transform: translateY(-1px);
 }
 
 .living-v3__room-edge > div:not(.living-v3__room-agent-strip) {
@@ -826,6 +865,37 @@
   pointer-events: none;
 }
 
+.living-v3__alert-stack--debug {
+  width: max-content;
+  max-width: min(260px, calc(100vw - 32px));
+  border: 1px solid rgba(229, 191, 116, 0.24);
+  border-radius: 999px;
+  background: rgba(5, 13, 18, 0.68);
+  color: rgba(255, 245, 207, 0.74);
+  padding: 0;
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
+}
+
+.living-v3__alert-stack--debug > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 7px 11px;
+  color: rgba(255, 245, 207, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.living-v3__alert-stack--debug > summary::-webkit-details-marker {
+  display: none;
+}
+
+.living-v3__alert-stack--debug[open] {
+  border-radius: 14px;
+  padding-bottom: 7px;
+}
+
 .living-v3__alert-stack button {
   display: grid;
   width: 36px;
@@ -837,6 +907,17 @@
   backdrop-filter: blur(6px);
 }
 
+.living-v3__alert-stack--debug button {
+  width: calc(100% - 14px);
+  height: auto;
+  min-height: 34px;
+  margin: 0 7px 5px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 7px;
+  padding: 6px 8px;
+  text-align: left;
+}
+
 .living-v3__alert-stack b {
   color: var(--v3-alert);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -846,6 +927,15 @@
 
 .living-v3__alert-stack span {
   display: none;
+}
+
+.living-v3__alert-stack--debug[open] span {
+  display: block;
+  overflow: hidden;
+  color: rgba(255, 245, 207, 0.72);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .living-v3__nav-debug-panel {
@@ -1017,8 +1107,8 @@
   bottom: auto;
   display: flex;
   flex-direction: column;
-  min-width: 320px;
-  min-height: 320px;
+  min-width: min(440px, calc(100vw - 32px));
+  min-height: min(460px, calc(100vh - 92px));
   max-width: none;
   max-height: none;
   overflow: hidden;
@@ -1147,6 +1237,98 @@
 .living-v3__drawer-actions button {
   min-height: 38px;
   padding: 8px 10px;
+}
+
+.living-v3__drawer--gateway-app {
+  top: 60px;
+  bottom: 22px;
+  width: min(860px, calc(100vw - 52px));
+  max-height: none;
+  overflow-y: auto;
+}
+
+.living-v3__gateway-approval-gate {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+  border: 1px solid rgba(114, 224, 212, 0.26);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(114, 224, 212, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(6, 22, 24, 0.94), rgba(3, 13, 16, 0.9));
+  padding: 16px;
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.26);
+}
+
+.living-v3__gateway-gate-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.living-v3__gateway-approval-gate label,
+.living-v3__gateway-approval-gate span {
+  color: var(--v3-cyan);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.living-v3__gateway-approval-gate h3,
+.living-v3__gateway-approval-gate p {
+  margin: 0;
+}
+
+.living-v3__gateway-approval-gate h3 {
+  max-width: 680px;
+  color: #fff2c2;
+  font-size: clamp(24px, 3vw, 38px);
+  line-height: .96;
+  letter-spacing: -0.055em;
+}
+
+.living-v3__gateway-approval-gate p {
+  max-width: 700px;
+  color: rgba(255, 236, 199, 0.76);
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
+.living-v3__gateway-gate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.living-v3__gateway-gate-grid article {
+  display: grid;
+  gap: 7px;
+  min-height: 118px;
+  border: 1px solid rgba(114, 224, 212, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.055);
+  padding: 13px;
+}
+
+.living-v3__gateway-gate-grid b,
+.living-v3__gateway-gate-grid small {
+  color: rgba(255, 242, 194, 0.9);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.living-v3__gateway-gate-grid small {
+  color: rgba(255, 236, 199, 0.66);
+}
+
+@media (max-width: 900px) {
+  .living-v3__gateway-gate-hero,
+  .living-v3__gateway-gate-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .living-v3__drawer--etsy-app {
@@ -7480,7 +7662,7 @@
 }
 
 .living-v3--etsy-primary-workspace .living-v3__etsy-primary,
-.living-v3--etsy-primary-workspace button:not(:disabled):not(.living-v3__etsy-workspace-close):not(.living-v3__etsy-station-switcher--tool-wall button) {
+.living-v3--etsy-primary-workspace button:not(:disabled):not(.living-v3__workspace-close-x):not(.living-v3__etsy-workspace-close):not(.living-v3__etsy-station-switcher--tool-wall button) {
   border-color: #1b7a5f !important;
 }
 
@@ -8134,7 +8316,7 @@ html body .living-v3__drawer--oracle-app .living-v3__oracle-metrics dd {
   min-width: 0;
 }
 
-.living-v3__terra-command-row span {
+.living-v3__terra-command-row label > span {
   color: var(--terra-muted);
   font-size: 10px;
   font-weight: 900;
@@ -8304,6 +8486,419 @@ html body .living-v3__drawer--oracle-app .living-v3__oracle-metrics dd {
   }
 }
 
+
+/* Etsy Product Inbox Cockpit 2026-07-05: first-screen artifact, metrics, next action, and candidate comparison. */
+.living-v3__product-cockpit {
+  display: grid;
+  grid-template-columns: minmax(340px, 1.1fr) minmax(210px, .64fr) minmax(210px, .62fr) minmax(320px, 1.04fr);
+  gap: 10px;
+  align-items: stretch;
+  border: 1px solid rgba(43, 130, 98, .24);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(27, 122, 95, .16), transparent 36%),
+    linear-gradient(135deg, #ffffff, #f0f7f2);
+  box-shadow: 0 16px 36px rgba(27, 45, 36, .09);
+  padding: 10px;
+}
+
+.living-v3__product-cockpit-artifact,
+.living-v3__product-cockpit-metrics,
+.living-v3__product-cockpit-next,
+.living-v3__product-cockpit-table {
+  border: 1px solid #d8ded8;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .94);
+  color: #18211c;
+  box-shadow: 0 10px 24px rgba(30, 45, 34, .07);
+}
+
+.living-v3__product-cockpit-artifact {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 170px;
+  padding: 12px;
+}
+
+.living-v3__product-cockpit-media {
+  display: grid;
+  width: 104px;
+  height: 104px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid #d6ded6;
+  border-radius: 22px;
+  background: #eef2ee;
+}
+
+.living-v3__product-cockpit-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.living-v3__product-cockpit-artifact p,
+.living-v3__product-cockpit-next p,
+.living-v3__product-cockpit-table small,
+.living-v3__product-cockpit-metrics span {
+  margin: 0;
+  color: #526059;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.living-v3__product-cockpit-artifact h3,
+.living-v3__product-cockpit-next h3 {
+  margin: 4px 0;
+  color: #18211c;
+  font-size: clamp(21px, 1.8vw, 32px);
+  letter-spacing: -.05em;
+  line-height: .98;
+}
+
+.living-v3__product-cockpit-artifact > div:nth-child(2) > span,
+.living-v3__product-cockpit-next > span,
+.living-v3__product-cockpit-table span,
+.living-v3__product-cockpit-table p {
+  color: #526059;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.living-v3__product-cockpit-locks {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.living-v3__product-cockpit-locks span {
+  border: 1px solid #d8ded8;
+  border-radius: 999px;
+  background: #f3f5f2;
+  color: #526059;
+  font-size: 11px;
+  font-weight: 850;
+  padding: 5px 8px;
+}
+
+.living-v3__product-cockpit-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.living-v3__product-cockpit-metrics article {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-height: 88px;
+  border: 1px solid #e0e5e0;
+  border-radius: 16px;
+  background: #fbfcfa;
+  text-align: center;
+}
+
+.living-v3__product-cockpit-metrics article b {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #ffffff 56%, transparent 57%),
+    conic-gradient(#1b7a5f var(--metric-value), #e2e8e2 0);
+  color: #18211c;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.living-v3__product-cockpit-next {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  padding: 12px;
+}
+
+.living-v3__product-cockpit-next[data-etsy-next-action='ready'] {
+  border-color: rgba(27, 122, 95, .38);
+  background: linear-gradient(145deg, #ffffff, #eaf7f1);
+}
+
+.living-v3__product-cockpit-next button {
+  min-height: 42px;
+  border: 1px solid #1b7a5f;
+  border-radius: 12px;
+  background: #1b7a5f;
+  color: #ffffff;
+  font-weight: 950;
+}
+
+.living-v3__product-cockpit-next button:disabled {
+  border-color: #d9ded9;
+  background: #e7ebe7;
+  color: #58645e;
+}
+
+.living-v3__product-cockpit-table {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 10px;
+}
+
+.living-v3__product-cockpit-table > div,
+.living-v3__product-cockpit-table > button {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #d8ded8;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 8px;
+  text-align: start;
+}
+
+.living-v3__product-cockpit-table > button {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.living-v3__product-cockpit-table > button.is-selected {
+  border-color: rgba(27, 122, 95, .42);
+  background: rgba(27, 122, 95, .08);
+}
+
+.living-v3__product-cockpit-table > button span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #18211c;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.18;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.living-v3__product-cockpit-table > button b,
+.living-v3__product-cockpit-table > div b {
+  color: #145b48;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+@media (max-width: 1180px) {
+  .living-v3__product-cockpit {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .living-v3__product-cockpit,
+  .living-v3__product-cockpit-artifact,
+  .living-v3__product-cockpit-table > button {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Terra Model-to-Print Forge Board 2026-07-05: visual artifact + pipeline + QA + file readback. */
+.living-v3__terra-forge-board {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(320px, 1.15fr) minmax(360px, 1.1fr) minmax(260px, .85fr);
+  gap: 10px;
+  align-items: stretch;
+  border: 1px solid rgba(84, 117, 63, .26);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(72, 122, 54, .18), transparent 34%),
+    linear-gradient(135deg, rgba(255, 253, 245, .98), rgba(235, 244, 230, .96));
+  box-shadow: 0 18px 42px rgba(34, 47, 26, .12);
+  padding: 10px;
+}
+
+.living-v3__terra-forge-preview,
+.living-v3__terra-forge-pipeline,
+.living-v3__terra-forge-qa,
+.living-v3__terra-forge-files {
+  border: 1px solid rgba(92, 120, 71, .24);
+  border-radius: 18px;
+  background: rgba(255, 253, 245, .94);
+  color: #172515;
+  box-shadow: 0 10px 24px rgba(40, 63, 34, .08);
+}
+
+.living-v3__terra-forge-preview {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 188px;
+  padding: 12px;
+}
+
+.living-v3__terra-forge-stage {
+  display: grid;
+  width: 132px;
+  min-height: 132px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(65, 108, 50, .24);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(65, 108, 50, .14), transparent 46%),
+    repeating-linear-gradient(135deg, rgba(65, 108, 50, .08) 0 8px, transparent 8px 16px),
+    #f8faf3;
+}
+
+.living-v3__terra-forge-stage img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.living-v3__terra-forge-stage span {
+  color: #416c32;
+  font-size: 34px;
+  font-weight: 950;
+  letter-spacing: -.08em;
+}
+
+.living-v3__terra-forge-preview p,
+.living-v3__terra-forge-qa p,
+.living-v3__terra-forge-pipeline small,
+.living-v3__terra-forge-files small {
+  margin: 0;
+  color: #5a674f;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.living-v3__terra-forge-preview h3 {
+  margin: 4px 0;
+  color: #172515;
+  font-size: clamp(22px, 2vw, 34px);
+  letter-spacing: -.05em;
+  line-height: .96;
+}
+
+.living-v3__terra-forge-preview > div:nth-child(2) > span,
+.living-v3__terra-forge-qa span,
+.living-v3__terra-forge-files span,
+.living-v3__terra-forge-pipeline span {
+  color: #5a674f;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.living-v3__terra-forge-locks {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.living-v3__terra-forge-locks span {
+  border: 1px solid rgba(65, 108, 50, .18);
+  border-radius: 999px;
+  background: #eef6e9;
+  color: #2f5727;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 5px 8px;
+}
+
+.living-v3__terra-forge-pipeline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.living-v3__terra-forge-pipeline article,
+.living-v3__terra-forge-qa article,
+.living-v3__terra-forge-files article,
+.living-v3__terra-forge-files > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(65, 108, 50, .16);
+  border-radius: 14px;
+  background: #fbfcf7;
+  padding: 9px;
+}
+
+.living-v3__terra-forge-pipeline article[data-forge-state='ready'],
+.living-v3__terra-forge-qa article[data-forge-state='ready'] {
+  border-color: rgba(65, 108, 50, .36);
+  background: rgba(65, 108, 50, .10);
+}
+
+.living-v3__terra-forge-pipeline article[data-forge-state='blocked'],
+.living-v3__terra-forge-pipeline article[data-forge-state='locked'],
+.living-v3__terra-forge-qa article[data-forge-state='blocked'],
+.living-v3__terra-forge-qa article[data-forge-state='locked'] {
+  border-color: rgba(147, 66, 48, .26);
+  background: rgba(147, 66, 48, .08);
+}
+
+.living-v3__terra-forge-pipeline b,
+.living-v3__terra-forge-qa b,
+.living-v3__terra-forge-files b {
+  color: #172515;
+  font-size: 14px;
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+.living-v3__terra-forge-qa {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.living-v3__terra-forge-files {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 1.1fr repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.living-v3__terra-forge-files > div {
+  background: #eef6e9;
+}
+
+@media (max-width: 1180px) {
+  .living-v3__terra-forge-board {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .living-v3__terra-forge-files {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .living-v3__terra-forge-board,
+  .living-v3__terra-forge-preview,
+  .living-v3__terra-forge-pipeline,
+  .living-v3__terra-forge-qa,
+  .living-v3__terra-forge-files {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* Terra Forge real local 3MF library + read-only printer connector pass. */
 .living-v3__terra-panel-head {
@@ -10168,7 +10763,23 @@ html body .living-v3__drawer--oracle-app .living-v3__oracle-metrics dd {
 
 /* Terra natural console: show what is happening now, not a dashboard. */
 .living-v3__terra-workspace-mode {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.living-v3__terra-workspace-header {
+  order: -4;
+}
+
+.living-v3__terra-forge-board {
+  order: -3;
+}
+
+.living-v3__terra-feature-dock {
+  order: -2;
+}
+
+.living-v3__terra-workspace-body {
+  order: 0;
 }
 
 .living-v3__terra-workspace-stats,
@@ -11925,18 +12536,24 @@ body:has(.living-v3--command-focus-mode) button[aria-label='Open workspace navig
 }
 
 .living-v3__workspace-room-switcher {
-  min-height: 32px;
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  align-self: center;
+  flex: 0 0 auto;
   max-width: min(220px, 28vw);
-  border: 1px solid rgba(42, 105, 86, 0.22);
+  border: 1px solid rgba(114, 224, 212, 0.34);
   border-radius: 999px;
-  background: #fffdf8;
-  color: #29443a;
+  background: rgba(6, 22, 30, 0.82);
+  color: #e9fffb;
   cursor: pointer;
   font: inherit;
   font-size: 12px;
   font-weight: 780;
+  line-height: 1;
   padding: 0 30px 0 12px;
   text-overflow: ellipsis;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 26px rgba(0, 0, 0, 0.22);
 }
 
 .living-v3__workspace-room-switcher:focus-visible {
@@ -11955,6 +12572,55 @@ body:has(.living-v3--command-focus-mode) button[aria-label='Open workspace navig
   font-size: 12px;
   font-weight: 760;
   padding: 6px 10px;
+}
+
+.living-v3__workbench-research-launcher {
+  min-height: 44px;
+  display: inline-grid;
+  align-content: center;
+  gap: 1px;
+  border: 1px solid rgba(65, 231, 172, 0.38);
+  border-radius: 12px;
+  background: rgba(7, 31, 29, 0.72);
+  color: #baf7e1;
+  cursor: pointer;
+  padding: 5px 13px;
+  text-align: left;
+  box-shadow: none;
+}
+
+.living-v3__workbench-research-launcher small {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 9px;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.living-v3__workbench-research-launcher:hover {
+  border-color: rgba(117, 255, 215, 0.78);
+  filter: brightness(1.07);
+}
+
+.living-v3__workbench-research-launcher.is-active {
+  border-color: rgba(117, 255, 215, 0.72);
+  background: linear-gradient(135deg, #0b251f, #123d32);
+  box-shadow: 0 0 0 2px rgba(46, 224, 166, 0.16), 0 10px 26px rgba(4, 44, 34, 0.28);
+}
+
+.living-v3__workbench-research-launcher:focus-visible {
+  outline: 2px solid rgba(117, 255, 215, 0.72);
+  outline-offset: 2px;
+}
+
+.living-v3__etsy-workspace-mode--research-lab {
+  display: block;
+  overflow: auto;
+  background: #07110f;
+}
+
+.living-v3__etsy-workspace-mode--research-lab .research-atlas {
+  min-height: 100%;
 }
 
 .living-v3__workbench-rail {
@@ -12027,6 +12693,19 @@ body:has(.living-v3--command-focus-mode) button[aria-label='Open workspace navig
 
 .living-v3__workbench-rail small {
   display: none;
+}
+
+.living-v3__workbench-rail .living-v3__workbench-rail-research {
+  margin-bottom: 5px;
+  border-color: rgba(46, 224, 166, 0.22);
+  background: rgba(46, 224, 166, 0.07);
+}
+
+.living-v3__workbench-rail .living-v3__workbench-rail-research small {
+  display: block;
+  color: #487064;
+  font-size: 9px;
+  font-weight: 760;
 }
 
 .living-v3__workbench-canvas {
@@ -12267,6 +12946,49 @@ body:has(.living-v3__etsy-workspace-mode--workbench-os) button[aria-label='Open 
   }
 }
 
+.living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode--workbench-os[data-primary-workspace-view='research'] {
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-rows: 72px minmax(0, 1fr);
+  grid-template-areas:
+    "appbar appbar"
+    "rail canvas";
+}
+
+.living-v3__etsy-workspace-mode--workbench-os[data-primary-workspace-view='research'] .living-v3__workbench-inspector {
+  display: none;
+}
+
+.living-v3__etsy-workspace-mode--workbench-os[data-primary-workspace-view='research'] .living-v3__workbench-canvas {
+  overflow: auto;
+  background: #07110f;
+  padding: 12px;
+}
+
+.living-v3__etsy-workspace-mode--workbench-os[data-primary-workspace-view='research'] .research-atlas {
+  min-height: 100%;
+}
+
+@media (max-width: 1180px) {
+  .living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode--workbench-os[data-primary-workspace-view='research'] {
+    grid-template-columns: 82px minmax(0, 1fr);
+    grid-template-rows: 72px minmax(0, 1fr);
+    grid-template-areas:
+      "appbar appbar"
+      "rail canvas";
+  }
+}
+
+@media (max-width: 760px) {
+  .living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode--workbench-os[data-primary-workspace-view='research'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "appbar"
+      "rail"
+      "canvas";
+  }
+}
+
 /* Product command shell 2026-07-02: one obvious entry for search, tables, and draft prep. */
 .living-v3__etsy-product-command-shell {
   display: grid;
@@ -12341,6 +13063,9 @@ body:has(.living-v3__etsy-workspace-mode--workbench-os) button[aria-label='Open 
 }
 
 .living-v3__simple-product-console {
+  display: grid;
+  gap: 14px;
+  align-content: start;
   min-height: 100%;
   border: 1px solid rgba(31, 143, 117, 0.16);
   border-radius: 24px;
@@ -12348,6 +13073,14 @@ body:has(.living-v3__etsy-workspace-mode--workbench-os) button[aria-label='Open 
   color: #1b2721;
   box-shadow: 0 20px 50px rgba(25, 35, 29, 0.08);
   padding: 16px;
+}
+
+.living-v3__simple-product-console > .living-v3__product-cockpit {
+  order: -3;
+}
+
+.living-v3__simple-product-console > .living-v3__simple-product-hero {
+  order: -2;
 }
 
 .living-v3__simple-product-hero {
@@ -12409,7 +13142,7 @@ body:has(.living-v3__etsy-workspace-mode--workbench-os) button[aria-label='Open 
   padding: 14px;
 }
 
-.living-v3__simple-product-search button,
+.living-v3__simple-product-search > button,
 .living-v3__simple-product-results button,
 .living-v3__simple-product-actions button {
   min-height: 44px;
@@ -12424,8 +13157,8 @@ body:has(.living-v3__etsy-workspace-mode--workbench-os) button[aria-label='Open 
   padding: 10px 16px;
 }
 
-.living-v3__simple-product-search button:disabled,
-.living-v3__simple-product-actions button:disabled {
+.living-v3__simple-product-search > button:disabled,
+.living-v3__simple-product-actions > button:disabled {
   cursor: not-allowed;
   background: #d7ded9;
   color: #6a746e;
@@ -12749,6 +13482,11 @@ body:has(.living-v3__etsy-workspace-mode--workbench-os) button[aria-label='Open 
   padding: 10px;
 }
 
+.living-v3__simple-product-console[data-product-command-shell='v2'] .living-v3__simple-product-search .workspace-station-cta {
+  justify-self: start;
+  width: min(100%, 360px);
+}
+
 .living-v3__simple-product-console[data-product-command-shell='v2'] .living-v3__simple-product-search textarea {
   min-height: 76px;
   border-radius: 18px;
@@ -12757,8 +13495,8 @@ body:has(.living-v3__etsy-workspace-mode--workbench-os) button[aria-label='Open 
   font-size: 15px;
 }
 
-.living-v3__simple-product-console[data-product-command-shell='v2'] .living-v3__simple-product-search button,
-.living-v3__product-next-action button,
+.living-v3__simple-product-console[data-product-command-shell='v2'] .living-v3__simple-product-search > button,
+.living-v3__product-next-action > button,
 .living-v3__product-card-actions button {
   min-height: 42px;
   border: 0;
@@ -12769,7 +13507,8 @@ body:has(.living-v3__etsy-workspace-mode--workbench-os) button[aria-label='Open 
   cursor: pointer;
 }
 
-.living-v3__simple-product-console[data-product-command-shell='v2'] button:disabled {
+.living-v3__simple-product-console[data-product-command-shell='v2'] > button:disabled,
+.living-v3__simple-product-console[data-product-command-shell='v2'] .living-v3__product-card-actions button:disabled {
   background: #d7ddd8;
   color: #7b8780;
   cursor: not-allowed;
@@ -13190,5 +13929,2270 @@ body:has(.living-v3__etsy-workspace-mode--workbench-os) button[aria-label='Open 
   .living-v3__product-next-action,
   .living-v3__product-proof-drawer > div {
     grid-template-columns: 1fr;
+  }
+}
+
+/* DLV compact Workspace pass: no static Terra status wall; every station carries the artifact thumbnail. */
+.living-v3__terra-forge-board.living-v3__terra-forge-board--compact {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.95fr) minmax(420px, 1.5fr) minmax(250px, 0.85fr);
+  gap: 10px;
+  align-items: stretch;
+  max-height: none;
+  overflow: visible;
+  border: 1px solid rgba(84, 117, 63, 0.2);
+  border-radius: 22px;
+  background: rgba(255, 253, 245, 0.78);
+  box-shadow: 0 12px 28px rgba(34, 47, 26, 0.08);
+  padding: 10px;
+}
+
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-preview,
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-pipeline,
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-qa,
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-files {
+  box-shadow: none;
+}
+
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-preview {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  align-items: center;
+  border-radius: 18px;
+  padding: 10px;
+}
+
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-stage {
+  width: 82px;
+  min-height: 82px;
+  border-radius: 18px;
+}
+
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-stage img {
+  object-fit: cover;
+}
+
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-stage span {
+  font-size: 24px;
+}
+
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-preview h3 {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 3px 0;
+  font-size: clamp(17px, 1.35vw, 24px);
+  line-height: 1;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.living-v3__terra-forge-board--compact .living-v3__terra-forge-preview > div:nth-child(2) > span {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.living-v3__terra-forge-flow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+}
+
+.living-v3__terra-forge-flow button {
+  display: grid;
+  grid-template-rows: 42px minmax(42px, auto) 24px;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgba(65, 108, 50, 0.16);
+  border-radius: 14px;
+  background: #fbfcf7;
+  color: #172515;
+  padding: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.living-v3__terra-forge-flow button[data-forge-state='ready'] {
+  border-color: rgba(65, 108, 50, 0.36);
+  background: #edf7e8;
+}
+
+.living-v3__terra-forge-flow button[data-forge-state='blocked'],
+.living-v3__terra-forge-flow button[data-forge-state='locked'] {
+  border-color: rgba(147, 66, 48, 0.22);
+  background: #fff5ef;
+}
+
+.living-v3__terra-forge-thumb {
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 10px;
+  background: #e7f0df;
+}
+
+.living-v3__terra-forge-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.living-v3__terra-forge-thumb b {
+  color: #416c32;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.living-v3__terra-forge-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.living-v3__terra-forge-copy small,
+.living-v3__terra-forge-flow em {
+  overflow: hidden;
+  color: #5a674f;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.living-v3__terra-forge-copy b {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #172515;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.1;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.living-v3__terra-forge-flow em {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(65, 108, 50, 0.1);
+  color: #2f5727;
+}
+
+.living-v3__terra-forge-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding: 8px;
+}
+
+.living-v3__terra-forge-actions button {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid rgba(65, 108, 50, 0.18);
+  border-radius: 13px;
+  background: #f7fbf4;
+  color: #173018;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.living-v3__terra-forge-actions button:disabled {
+  border-color: rgba(151, 100, 8, 0.22);
+  background: #fff6e0;
+  color: #7a5209;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.living-v3__terra-forge-actions b,
+.living-v3__terra-forge-actions span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.living-v3__terra-forge-actions b {
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.living-v3__terra-forge-actions span {
+  color: #5a674f;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.living-v3__terra-forge-readback {
+  grid-column: 1 / -1;
+  padding: 8px 10px;
+}
+
+.living-v3__terra-forge-readback summary {
+  cursor: pointer;
+  color: #516247;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.living-v3__terra-forge-readback > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@media (max-width: 1180px) {
+  .living-v3__terra-forge-board.living-v3__terra-forge-board--compact {
+    grid-template-columns: 1fr;
+  }
+
+  .living-v3__terra-forge-flow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .living-v3__terra-forge-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .living-v3__terra-forge-flow,
+  .living-v3__terra-forge-actions,
+  .living-v3__terra-forge-readback > div {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* DLV active-room shell pass: preserve the map, but keep active workbenches free of global drawers/debug overlays and fake scroll. */
+.living-v3--etsy-primary-workspace .workspace-core-ops-shell,
+.living-v3--terra-primary-workspace .workspace-core-ops-shell,
+.living-v3--atlantis-primary-workspace .workspace-core-ops-shell,
+.living-v3--council-primary-workspace .workspace-core-ops-shell,
+.living-v3--goblin-primary-workspace .workspace-core-ops-shell,
+.living-v3--gateway-active-layer .workspace-core-ops-shell,
+.living-v3--command-focus-mode .workspace-core-ops-shell,
+.living-v3--etsy-primary-workspace .living-v3__alert-stack,
+.living-v3--terra-primary-workspace .living-v3__alert-stack,
+.living-v3--atlantis-primary-workspace .living-v3__alert-stack,
+.living-v3--council-primary-workspace .living-v3__alert-stack,
+.living-v3--goblin-primary-workspace .living-v3__alert-stack,
+.living-v3--gateway-active-layer .living-v3__alert-stack,
+.living-v3--command-focus-mode .living-v3__alert-stack,
+.living-v3--etsy-primary-workspace .living-v3__nav-debug-panel,
+.living-v3--terra-primary-workspace .living-v3__nav-debug-panel,
+.living-v3--atlantis-primary-workspace .living-v3__nav-debug-panel,
+.living-v3--council-primary-workspace .living-v3__nav-debug-panel,
+.living-v3--goblin-primary-workspace .living-v3__nav-debug-panel,
+.living-v3--gateway-active-layer .living-v3__nav-debug-panel,
+.living-v3--command-focus-mode .living-v3__nav-debug-panel,
+.living-v3--etsy-primary-workspace .living-v3__kernel-telemetry-strip,
+.living-v3--terra-primary-workspace .living-v3__kernel-telemetry-strip,
+.living-v3--atlantis-primary-workspace .living-v3__kernel-telemetry-strip,
+.living-v3--council-primary-workspace .living-v3__kernel-telemetry-strip,
+.living-v3--goblin-primary-workspace .living-v3__kernel-telemetry-strip,
+.living-v3--gateway-active-layer .living-v3__kernel-telemetry-strip,
+.living-v3--command-focus-mode .living-v3__kernel-telemetry-strip,
+.living-v3--etsy-primary-workspace .living-v3__event-readback,
+.living-v3--terra-primary-workspace .living-v3__event-readback,
+.living-v3--atlantis-primary-workspace .living-v3__event-readback,
+.living-v3--council-primary-workspace .living-v3__event-readback,
+.living-v3--goblin-primary-workspace .living-v3__event-readback,
+.living-v3--gateway-active-layer .living-v3__event-readback,
+.living-v3--command-focus-mode .living-v3__event-readback {
+  display: none !important;
+}
+
+.living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode--workbench-os,
+.living-v3--terra-primary-workspace .living-v3__terra-workspace-mode,
+.living-v3--atlantis-primary-workspace .atlantis-vault--primary,
+.living-v3--council-primary-workspace .living-v3__drawer,
+.living-v3--gateway-active-layer .living-v3__drawer--gateway-app,
+.living-v3__drawer--oracle-app {
+  box-sizing: border-box;
+  max-width: 100vw;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+/* The workspace window is the scroll root. Cards/panels grow naturally; no clipped cell scrollbars. */
+.living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode--workbench-os {
+  height: 100dvh;
+  grid-template-rows: 72px max-content;
+  align-content: start;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.living-v3--etsy-primary-workspace .living-v3__workbench-rail,
+.living-v3--etsy-primary-workspace .living-v3__workbench-canvas,
+.living-v3--etsy-primary-workspace .living-v3__workbench-inspector,
+.living-v3--etsy-primary-workspace .living-v3__etsy-workspace-main,
+.living-v3--etsy-primary-workspace .etsy-prep,
+.living-v3--etsy-primary-workspace .living-v3__etsy-app {
+  max-height: none !important;
+  min-height: 0;
+  overflow: visible !important;
+  overscroll-behavior: auto;
+  scrollbar-gutter: auto;
+}
+
+.living-v3--etsy-primary-workspace .living-v3__workbench-rail,
+.living-v3--etsy-primary-workspace .living-v3__workbench-inspector {
+  position: sticky;
+  top: 72px;
+  align-self: start;
+  max-height: calc(100dvh - 72px) !important;
+  overflow: visible !important;
+}
+
+.living-v3--etsy-primary-workspace .living-v3__workbench-canvas {
+  align-self: start;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-workspace-mode {
+  height: auto;
+  max-height: calc(100dvh - 66px);
+  grid-template-rows: max-content max-content max-content max-content;
+  align-content: start;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-workspace-body {
+  display: block;
+  grid-template-columns: minmax(0, 1fr);
+  max-height: none !important;
+  min-height: 0;
+  overflow: visible !important;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-workspace-rail {
+  display: none;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-workspace-main,
+.living-v3--terra-primary-workspace .living-v3__terra-forge-board--compact,
+.living-v3--terra-primary-workspace .living-v3__terra-feature-dock,
+.living-v3--terra-primary-workspace .living-v3__terra-printer-workbench--natural,
+.living-v3--terra-primary-workspace .living-v3__terra-live-now {
+  max-height: none !important;
+  min-height: 0;
+  overflow: visible !important;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-forge-board--compact {
+  grid-template-columns: minmax(260px, .86fr) minmax(460px, 1.52fr) minmax(260px, .88fr);
+  align-items: start;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-forge-flow button {
+  grid-template-rows: 40px minmax(52px, auto) 24px;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-forge-actions b,
+.living-v3--terra-primary-workspace .living-v3__terra-forge-actions span {
+  white-space: normal;
+}
+
+.living-v3--atlantis-primary-workspace .atlantis-vault--primary {
+  grid-template-rows: max-content max-content max-content max-content max-content;
+  align-content: start;
+}
+
+.living-v3--atlantis-primary-workspace .atlantis-vault__grid,
+.living-v3--atlantis-primary-workspace .atlantis-vault__flow-list,
+.living-v3--atlantis-primary-workspace .atlantis-vault__store-list,
+.living-v3--atlantis-primary-workspace .atlantis-vault__note-list,
+.living-v3--atlantis-primary-workspace .atlantis-vault__artifact-list {
+  max-height: none !important;
+  min-height: 0;
+  overflow: visible !important;
+}
+
+.living-v3--atlantis-primary-workspace .atlantis-vault__grid {
+  grid-template-rows: auto auto;
+  align-items: start;
+}
+
+.living-v3--council-primary-workspace .council-chamber {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.living-v3--council-primary-workspace .council-chamber__grid,
+.living-v3--council-primary-workspace .council-chamber__room,
+.living-v3--council-primary-workspace .council-chamber__tool {
+  max-height: none !important;
+  min-height: 0;
+  overflow: visible !important;
+}
+
+.living-v3--council-primary-workspace .council-chamber__grid {
+  align-items: start;
+}
+
+/* Oracle action workbench: replace the Excel-like local table feel with a product-signal console. */
+.living-v3__oracle-shell[data-oracle-workbench='action-v2'] {
+  display: grid;
+  grid-template-rows: auto auto auto auto auto auto;
+  gap: 12px;
+  overflow: visible;
+  border: 1px solid rgba(32, 125, 112, 0.14);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(72, 224, 196, 0.16), transparent 34%),
+    linear-gradient(180deg, #fffef8 0%, #f4f0e5 100%);
+  color: #15241f;
+  padding: 16px;
+  box-shadow: 0 18px 44px rgba(15, 31, 27, 0.1);
+}
+
+.living-v3__oracle-action-hero {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.2fr) minmax(260px, .85fr) minmax(220px, .75fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.living-v3__oracle-action-hero > div,
+.living-v3__oracle-fastbar,
+.living-v3__oracle-toolbar,
+.living-v3__oracle-source-box,
+.living-v3__oracle-listings,
+.living-v3__oracle-card {
+  border: 1px solid rgba(21, 48, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 253, 248, 0.76);
+  box-shadow: none;
+}
+
+.living-v3__oracle-action-hero > div {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+}
+
+.living-v3__oracle-action-hero span,
+.living-v3__oracle-toolbar label span,
+.living-v3__oracle-source-box summary,
+.living-v3__oracle-listings summary {
+  color: #207d70;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.living-v3__oracle-action-hero h3 {
+  margin: 0;
+  color: #15241f;
+  font-size: clamp(28px, 3vw, 44px);
+  letter-spacing: -0.06em;
+  line-height: .96;
+}
+
+.living-v3__oracle-action-hero p {
+  margin: 0;
+  color: #5a6962;
+  font-size: 14px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.living-v3__oracle-action-steps,
+.living-v3__oracle-action-status {
+  align-content: start;
+}
+
+.living-v3__oracle-action-steps span,
+.living-v3__oracle-action-status span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 999px;
+  background: #eef7f1;
+  color: #30443b;
+  padding: 8px 10px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.living-v3__oracle-action-steps b,
+.living-v3__oracle-action-status b {
+  color: #155f54;
+}
+
+.living-v3__oracle-fastbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+}
+
+.living-v3__oracle-fastbar b,
+.living-v3__oracle-fastbar small,
+.living-v3__oracle-card h3,
+.living-v3__oracle-card p,
+.living-v3__oracle-metrics dt,
+.living-v3__oracle-metrics dd {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.living-v3__oracle-fastbar div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.living-v3__oracle-fastbar span {
+  border-radius: 999px;
+  background: #eef7f1;
+  color: #155f54;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.living-v3__oracle-toolbar {
+  grid-template-columns: minmax(240px, 1fr) minmax(180px, .55fr) auto;
+  padding: 12px;
+}
+
+.living-v3__oracle-toolbar input,
+.living-v3__oracle-toolbar select {
+  min-height: 44px;
+  border: 1px solid rgba(21, 48, 38, 0.12);
+  border-radius: 14px;
+  background: #ffffff;
+  color: #15241f;
+  font: inherit;
+  font-weight: 780;
+}
+
+.living-v3__oracle-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-auto-rows: auto;
+  gap: 12px;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.living-v3__oracle-card {
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 14px;
+}
+
+.living-v3__oracle-card h3 {
+  color: #15241f;
+  font-size: 22px;
+  letter-spacing: -0.04em;
+}
+
+.living-v3__oracle-card p,
+.living-v3__oracle-card-proof span,
+.living-v3__oracle-source-box span,
+.living-v3__oracle-listings span {
+  color: #5a6962;
+  white-space: normal;
+}
+
+.living-v3__oracle-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.living-v3__oracle-metrics div {
+  border: 1px solid rgba(21, 48, 38, 0.1);
+  border-radius: 14px;
+  background: #f7faf6;
+}
+
+.living-v3__oracle-metrics dt {
+  color: #6c7b73;
+}
+
+.living-v3__oracle-metrics dd {
+  color: #155f54;
+}
+
+@media (max-width: 1180px) {
+  .living-v3--terra-primary-workspace .living-v3__terra-forge-board--compact,
+  .living-v3__oracle-action-hero,
+  .living-v3__oracle-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode--workbench-os {
+    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-areas:
+      "appbar appbar"
+      "rail canvas"
+      "inspector inspector";
+  }
+
+  .living-v3--etsy-primary-workspace .living-v3__workbench-inspector {
+    position: static;
+    max-height: none !important;
+  }
+}
+
+/* DLV final active Oracle pass: active Oracle is a primary workbench layer, not a generic drawer/table. */
+.living-v3--oracle-primary-workspace .workspace-core-ops-shell,
+.living-v3--oracle-primary-workspace .living-v3__alert-stack,
+.living-v3--oracle-primary-workspace .living-v3__nav-debug-panel,
+.living-v3--oracle-primary-workspace .living-v3__kernel-telemetry-strip,
+.living-v3--oracle-primary-workspace .living-v3__event-readback,
+.living-v3--oracle-primary-workspace .living-v3__room-edge {
+  display: none !important;
+}
+
+.living-v3--oracle-primary-workspace .living-v3__stage {
+  opacity: 0.08;
+  filter: blur(1.5px) saturate(0.32);
+  pointer-events: none;
+}
+
+.living-v3--oracle-primary-workspace .living-v3__drawer--oracle-app {
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  grid-template-rows: max-content minmax(0, 1fr);
+  width: auto;
+  max-width: none;
+  max-height: none;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(72, 224, 196, 0.14), transparent 34%),
+    linear-gradient(180deg, #fffef8 0%, #f4f0e5 100%);
+  color: #15241f;
+  padding: 74px 24px 24px;
+  box-shadow: none;
+}
+
+.living-v3--oracle-primary-workspace .living-v3__drawer--oracle-app .living-v3__drawer-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  max-width: 1180px;
+  margin: 0 auto 12px;
+  border: 1px solid rgba(21, 48, 38, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 253, 248, 0.92);
+  padding: 14px 56px 14px 16px;
+  backdrop-filter: blur(14px);
+}
+
+.living-v3--oracle-primary-workspace .living-v3__drawer--oracle-app .living-v3__drawer-close {
+  top: 18px;
+  right: 24px;
+  z-index: 4;
+  border-radius: 999px;
+}
+
+.living-v3--oracle-primary-workspace .living-v3__oracle-shell[data-oracle-product-scout='workbench-v1'] {
+  width: min(1180px, 100%);
+  max-width: 1180px;
+  margin: 0 auto;
+  min-height: 0;
+  overflow: visible !important;
+}
+
+.living-v3--oracle-primary-workspace .living-v3__oracle-results,
+.living-v3--oracle-primary-workspace .living-v3__oracle-card,
+.living-v3--oracle-primary-workspace .living-v3__oracle-source-box,
+.living-v3--oracle-primary-workspace .living-v3__oracle-listings {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+@media (max-width: 760px) {
+  .living-v3--oracle-primary-workspace .living-v3__drawer--oracle-app {
+    padding: 66px 12px 18px;
+  }
+}
+
+/* Pipeline OS shared surface pass: same teachable input/output/progress contract across active rooms. */
+.living-v3__workbench-canvas .workspace-pipeline,
+.living-v3__simple-product-console .workspace-pipeline,
+.living-v3__terra-forge-board .workspace-pipeline,
+.living-v3__oracle-shell .workspace-pipeline,
+.living-v3__gateway-surface .workspace-pipeline,
+.council-chamber .workspace-pipeline,
+.atlantis-vault .workspace-pipeline {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.living-v3__simple-product-console[data-product-command-shell='v2'] > .workspace-pipeline {
+  order: -1;
+  direction: ltr;
+  text-align: left;
+}
+
+.living-v3__simple-product-console[data-product-command-shell='v2'] > .workspace-pipeline .workspace-pipeline__actions button {
+  text-align: left;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-forge-board--compact > .workspace-pipeline,
+.living-v3--terra-primary-workspace .living-v3__terra-forge-board > .workspace-pipeline,
+.living-v3__etsy-station-deck--tool-room > .workspace-pipeline {
+  grid-column: 1 / -1;
+}
+
+.living-v3--oracle-primary-workspace .living-v3__oracle-shell[data-oracle-product-scout='workbench-v1'] {
+  grid-template-rows: none !important;
+  align-content: start;
+}
+
+.living-v3--oracle-primary-workspace .living-v3__oracle-shell[data-oracle-product-scout='workbench-v1'] > .workspace-pipeline {
+  min-height: auto;
+  overflow: visible;
+}
+
+/* DLV cleanup pass: debug tools are available, but never the main interface. */
+.living-v3__command-quiet-status,
+.living-v3__command-debug-drawer,
+.living-v3__station-debug-actions,
+.living-v3__drawer-block--dormant {
+  border: 1px solid rgba(235, 216, 162, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 245, 207, 0.055);
+  color: rgba(255, 245, 207, 0.78);
+}
+
+.living-v3__command-quiet-status {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.living-v3__command-quiet-status span,
+.living-v3__command-debug-drawer summary span,
+.living-v3__station-debug-actions summary,
+.living-v3__drawer-block--dormant label {
+  color: rgba(114, 224, 212, 0.82);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.living-v3__command-quiet-status b,
+.living-v3__command-debug-drawer summary b,
+.living-v3__drawer-block--dormant h3 {
+  color: #fff5cf;
+  font-weight: 950;
+}
+
+.living-v3__command-quiet-status small,
+.living-v3__drawer-block--dormant p,
+.living-v3__station-debug-actions p {
+  color: rgba(255, 245, 207, 0.62);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.living-v3__command-debug-drawer,
+.living-v3__station-debug-actions {
+  padding: 0;
+}
+
+.living-v3__command-debug-drawer > summary,
+.living-v3__station-debug-actions > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  cursor: pointer;
+  padding: 10px 12px;
+}
+
+.living-v3__command-debug-drawer > .living-v3__agent-control-tool {
+  max-height: min(52vh, 520px);
+  overflow: auto;
+  border: 0;
+  border-top: 1px solid rgba(235, 216, 162, 0.12);
+  border-radius: 0 0 18px 18px;
+  background: rgba(3, 8, 12, 0.72);
+  box-shadow: none;
+}
+
+.living-v3__station-debug-actions > p,
+.living-v3__station-debug-actions > .living-v3__drawer-actions {
+  padding: 0 12px 12px;
+}
+
+.living-v3__drawer-block--dormant {
+  padding: 14px;
+}
+
+.living-v3__drawer-block--dormant h3 {
+  margin: 4px 0;
+  font-size: 20px;
+}
+
+.living-v3__drawer--manager .living-v3__drawer-block--dormant + .living-v3__station-debug-actions {
+  margin-top: 12px;
+}
+
+/* Terra fix: no narrow Pipeline OS column and no nested right-side void. */
+.living-v3--terra-primary-workspace .living-v3__terra-workspace-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-workspace-body {
+  grid-template-columns: minmax(250px, 0.36fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-workspace-main {
+  overflow: visible;
+}
+
+.living-v3--terra-primary-workspace .living-v3__terra-forge-board > .workspace-pipeline,
+.living-v3--terra-primary-workspace .living-v3__terra-forge-board--compact > .workspace-pipeline {
+  width: 100%;
+  margin-top: 14px;
+}
+
+@media (max-width: 980px) {
+  .living-v3--terra-primary-workspace .living-v3__terra-workspace-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* DLV hard cleanup 2026-07-06: dark-only, no instructional card spam in primary work surfaces. */
+.living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode,
+.living-v3__drawer--oracle-app,
+.living-v3__drawer--gateway-app,
+.living-v3--terra-primary-workspace .living-v3__terra-forge-board,
+.living-v3--terra-primary-workspace .living-v3__terra-workspace-mode,
+.living-v3__workbench-inspector {
+  background: linear-gradient(135deg, rgba(3, 10, 13, 0.98), rgba(4, 18, 18, 0.96)) !important;
+  color: #f5f7ef !important;
+  border-color: rgba(117, 255, 215, 0.16) !important;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.055) !important;
+}
+
+.living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode * {
+  color-scheme: dark;
+}
+
+.living-v3--etsy-primary-workspace .living-v3__workbench-appbar {
+  min-height: 52px;
+  padding: 6px 10px;
+  border-color: rgba(117, 255, 215, 0.12);
+  background: rgba(2, 8, 11, 0.74);
+}
+
+.living-v3--etsy-primary-workspace .living-v3__workbench-title p,
+.living-v3--etsy-primary-workspace .living-v3__workbench-status,
+.living-v3--etsy-primary-workspace .living-v3__workbench-status span,
+.living-v3__simple-product-status {
+  display: block !important;
+  color: rgba(222, 245, 232, 0.66) !important;
+  font-size: 12px;
+}
+
+.living-v3--etsy-primary-workspace .living-v3__workbench-title h2,
+.living-v3--etsy-primary-workspace h3,
+.living-v3--etsy-primary-workspace h4,
+.living-v3--etsy-primary-workspace b {
+  color: #f7ffe9 !important;
+}
+
+.living-v3__simple-product-console {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  min-height: 100%;
+  border-color: rgba(65, 231, 172, 0.14) !important;
+  background: radial-gradient(circle at 92% 0%, rgba(46, 224, 166, 0.12), transparent 34%), #050b0d !important;
+  color: #eff8ef !important;
+  box-shadow: none !important;
+  padding: 12px !important;
+}
+
+.living-v3__simple-product-console > .living-v3__simple-product-hero {
+  order: -4;
+}
+
+.living-v3__simple-product-console > .living-v3__product-progress-strip {
+  order: -3;
+}
+
+.living-v3__simple-product-console > .living-v3__product-cockpit {
+  order: -2;
+}
+
+.living-v3__simple-product-hero {
+  display: block !important;
+  border-color: rgba(65, 231, 172, 0.16) !important;
+  background: rgba(7, 18, 20, 0.94) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  padding: 10px !important;
+}
+
+.living-v3__simple-product-search {
+  grid-template-columns: minmax(0, 1fr) minmax(86px, auto) minmax(120px, auto);
+  align-items: end;
+  gap: 10px !important;
+}
+
+.living-v3__simple-product-search label {
+  gap: 5px !important;
+}
+
+.living-v3__simple-product-search label > span,
+.living-v3__product-board-head span,
+.living-v3__product-dossier-head span,
+.living-v3__product-cockpit-artifact p,
+.living-v3__product-cockpit-next p {
+  color: rgba(159, 255, 218, 0.68) !important;
+  font-size: 11px !important;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.living-v3__simple-product-search textarea,
+.living-v3__product-shop-select select,
+.living-v3--etsy-primary-workspace input,
+.living-v3--etsy-primary-workspace textarea,
+.living-v3--etsy-primary-workspace select {
+  min-height: 48px !important;
+  max-height: 82px;
+  border: 1px solid rgba(65, 231, 172, 0.18) !important;
+  border-radius: 14px !important;
+  background: rgba(0, 0, 0, 0.36) !important;
+  color: #f8fff4 !important;
+  box-shadow: none !important;
+  padding: 10px 12px !important;
+}
+
+.living-v3__simple-product-search textarea::placeholder {
+  color: rgba(230, 245, 232, 0.46);
+}
+
+.living-v3__simple-product-primary,
+.living-v3__simple-product-secondary,
+.living-v3__product-cockpit-next button,
+.living-v3__product-card-actions button,
+.living-v3--etsy-primary-workspace .living-v3__etsy-primary {
+  min-height: 42px;
+  border: 1px solid rgba(65, 231, 172, 0.38) !important;
+  border-radius: 14px !important;
+  background: linear-gradient(135deg, #16a878, #0f715c) !important;
+  color: #ffffff !important;
+  font: inherit;
+  font-weight: 880;
+  cursor: pointer;
+  padding: 9px 14px;
+}
+
+.living-v3__simple-product-secondary {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.living-v3__simple-product-primary:disabled,
+.living-v3__simple-product-secondary:disabled,
+.living-v3__product-cockpit-next button:disabled,
+.living-v3--etsy-primary-workspace .living-v3__etsy-primary:disabled {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.075) !important;
+  color: rgba(245, 247, 239, 0.44) !important;
+  cursor: not-allowed;
+}
+
+.living-v3__product-progress-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow: auto;
+  scrollbar-width: none;
+}
+
+.living-v3__product-progress-strip span {
+  min-width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(234, 250, 236, 0.62);
+  font-size: 12px;
+  font-weight: 820;
+  padding: 6px 9px;
+}
+
+.living-v3__product-progress-strip span[data-state='ready'],
+.living-v3__product-progress-strip span[data-state='active'] {
+  border-color: rgba(65, 231, 172, 0.34);
+  background: rgba(65, 231, 172, 0.12);
+  color: #b8ffe5;
+}
+
+.living-v3__product-cockpit {
+  grid-template-columns: minmax(280px, 1fr) minmax(170px, 0.32fr) minmax(190px, 0.34fr) !important;
+  gap: 10px !important;
+  align-items: stretch;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.living-v3__product-cockpit-artifact,
+.living-v3__product-cockpit-pills,
+.living-v3__product-cockpit-next,
+.living-v3__product-results-board,
+.living-v3__product-dossier,
+.living-v3__product-result-card,
+.living-v3__product-empty-state,
+.living-v3__product-dossier-metrics article,
+.living-v3__product-proof-drawer,
+.living-v3__simple-product-advanced {
+  border: 1px solid rgba(255, 255, 255, 0.105) !important;
+  background: rgba(8, 18, 20, 0.9) !important;
+  color: #eff8ef !important;
+  box-shadow: none !important;
+}
+
+.living-v3__product-cockpit-artifact {
+  grid-template-columns: 84px minmax(0, 1fr) auto !important;
+  gap: 10px !important;
+  padding: 10px !important;
+}
+
+.living-v3__product-cockpit-media,
+.living-v3__product-dossier-visual,
+.living-v3__product-media-pair figure {
+  background: rgba(0, 0, 0, 0.34) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.living-v3__product-cockpit-media {
+  width: 84px !important;
+  height: 84px !important;
+}
+
+.living-v3__product-cockpit-artifact h3,
+.living-v3__product-cockpit-next h3,
+.living-v3__product-card-title h4,
+.living-v3__product-card-title b,
+.living-v3__product-dossier-head h3 {
+  margin: 2px 0 !important;
+  line-height: 1.12 !important;
+}
+
+.living-v3__product-cockpit-artifact > div:nth-child(2) > span,
+.living-v3__product-card-body small,
+.living-v3__product-dossier small,
+.living-v3__product-proof-drawer small,
+.living-v3__product-board-head small {
+  color: rgba(230, 245, 232, 0.62) !important;
+}
+
+.living-v3__product-cockpit-pills {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  border-radius: 18px;
+  padding: 10px;
+}
+
+.living-v3__product-cockpit-pills span,
+.living-v3__product-cockpit-locks span,
+.living-v3__product-tag-row span,
+.living-v3__product-blockers span,
+.living-v3__product-dossier-links a,
+.living-v3__product-dossier-links span {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(238, 252, 238, 0.78) !important;
+}
+
+.living-v3__product-cockpit-pills span {
+  display: flex;
+  justify-content: space-between;
+  border-radius: 12px;
+  font-size: 12px;
+  padding: 7px 9px;
+}
+
+.living-v3__product-cockpit-next {
+  padding: 10px !important;
+}
+
+.living-v3__product-workbench {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px) !important;
+  gap: 10px !important;
+}
+
+.living-v3__product-results-board,
+.living-v3__product-dossier {
+  border-radius: 20px !important;
+  padding: 12px !important;
+}
+
+.living-v3__product-result-card {
+  grid-template-columns: minmax(140px, 0.34fr) minmax(0, 1fr) !important;
+  border-radius: 18px !important;
+  padding: 10px !important;
+}
+
+.living-v3__product-result-card.is-selected {
+  border-color: rgba(65, 231, 172, 0.42) !important;
+  background: rgba(65, 231, 172, 0.11) !important;
+}
+
+.living-v3__product-money-grid,
+.living-v3__product-dossier-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+.living-v3__product-money-grid article,
+.living-v3__product-dossier-metrics article,
+.living-v3__product-source-grid a {
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #eff8ef !important;
+}
+
+.living-v3__product-source-grid,
+.living-v3__product-proof-drawer,
+.living-v3__product-shop-select {
+  display: none !important;
+}
+
+.living-v3__product-next-action {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.living-v3__product-proof-drawer,
+.living-v3__simple-product-advanced {
+  margin-top: 8px !important;
+}
+
+.living-v3__product-proof-drawer > summary,
+.living-v3__simple-product-advanced > summary {
+  color: rgba(159, 255, 218, 0.72) !important;
+  font-size: 12px !important;
+}
+
+.living-v3--etsy-primary-workspace .workspace-pipeline__copy span,
+.living-v3--etsy-primary-workspace .workspace-pipeline__steps p,
+.living-v3--etsy-primary-workspace .workspace-pipeline__lane-title b,
+.living-v3--etsy-primary-workspace .workspace-pipeline__lane-title span,
+.living-v3--etsy-primary-workspace .workspace-pipeline__actions span,
+.living-v3--etsy-primary-workspace .workspace-pipeline__readback {
+  display: none !important;
+}
+
+.living-v3__drawer--oracle-app,
+.living-v3__drawer--oracle-app .living-v3__drawer-block,
+.living-v3__drawer--oracle-app .living-v3__oracle-action-hero,
+.living-v3--terra-primary-workspace .living-v3__terra-forge-preview,
+.living-v3--terra-primary-workspace .living-v3__terra-forge-files,
+.living-v3--terra-primary-workspace .living-v3__terra-feature-card,
+.living-v3__workbench-card,
+.living-v3__workbench-capability-card,
+.living-v3__workbench-map-card {
+  background: rgba(8, 18, 20, 0.88) !important;
+  color: #f3f7ec !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+@media (max-width: 900px) {
+  .living-v3__simple-product-search,
+  .living-v3__product-cockpit,
+  .living-v3__product-workbench,
+  .living-v3__product-result-card {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.living-v3--etsy-primary-workspace .living-v3__workbench-canvas,
+.living-v3__etsy-workspace-mode--workbench-os:has([data-simple-product-console='v1']) .living-v3__workbench-canvas {
+  background: #050b0d !important;
+  border-color: rgba(65, 231, 172, 0.12) !important;
+  padding: 10px 14px 16px !important;
+}
+
+.living-v3--etsy-primary-workspace .living-v3__workbench-status select,
+.living-v3--etsy-primary-workspace .living-v3__workbench-status > span {
+  border: 1px solid rgba(65, 231, 172, 0.18) !important;
+  background: rgba(6, 17, 18, 0.92) !important;
+  color: rgba(238, 252, 238, 0.76) !important;
+}
+
+.living-v3__simple-product-search {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.living-v3__simple-product-search textarea {
+  background: rgba(8, 16, 18, 0.94) !important;
+}
+
+html body .living-v3 .living-v3__workspace-close-x {
+  border-color: rgba(65, 231, 172, 0.22) !important;
+  background: rgba(5, 12, 14, 0.94) !important;
+  color: #dfffee !important;
+}
+
+html body .living-v3 .living-v3__workspace-close-x:hover,
+html body .living-v3 .living-v3__workspace-close-x:focus-visible {
+  border-color: rgba(65, 231, 172, 0.42) !important;
+  background: rgba(9, 28, 25, 0.98) !important;
+  color: #ffffff !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__simple-product-search > button {
+  border: 1px solid rgba(65, 231, 172, 0.38) !important;
+  background: linear-gradient(135deg, #16a878, #0f715c) !important;
+  color: #ffffff !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__workbench-status > span {
+  display: none !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-card-title b,
+html body .living-v3--etsy-primary-workspace .living-v3__product-board-head small {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(238, 252, 238, 0.78) !important;
+}
+
+.living-v3--etsy-primary-workspace .living-v3__workbench-title h2 {
+  font-size: 24px !important;
+}
+
+/* Workspace-wide dark quarantine pass: keep the first-class tool rail visible, but quarantine legacy light inspector/status surfaces. */
+html body .living-v3--etsy-primary-workspace .living-v3__workbench-rail {
+  display: grid !important;
+  position: sticky;
+  top: 72px;
+  align-self: start;
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+  border-right: 1px solid rgba(65, 231, 172, 0.12) !important;
+  background: rgba(6, 17, 18, 0.96) !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__workbench-inspector {
+  display: none !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode {
+  grid-template-columns: 92px minmax(0, 1fr) !important;
+  grid-template-areas: "appbar appbar" "rail canvas" !important;
+}
+
+@media (max-width: 1180px) {
+  html body .living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode {
+    grid-template-columns: 82px minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html body .living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto max-content minmax(0, 1fr) !important;
+    grid-template-areas: "appbar" "rail" "canvas" !important;
+  }
+
+  html body .living-v3--etsy-primary-workspace .living-v3__workbench-rail {
+    position: static;
+    max-height: none;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow: visible;
+    border-right: 0 !important;
+    border-bottom: 1px solid rgba(65, 231, 172, 0.12) !important;
+  }
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff {
+  order: -4;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+  border: 1px solid rgba(65, 231, 172, 0.3);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(18, 66, 51, 0.78), rgba(5, 19, 24, 0.94));
+  color: #effff7;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff > div:last-child {
+  justify-items: end;
+  text-align: end;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff p,
+html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff h3 {
+  margin: 0;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff p {
+  color: #7ff0ce;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff span,
+html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff small {
+  color: rgba(235, 255, 246, 0.66);
+  overflow-wrap: anywhere;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff > div:last-child b {
+  max-width: 220px;
+  color: rgba(239, 255, 247, 0.82);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html body .living-v3--etsy-primary-workspace .living-v3__research-mission-handoff > div:last-child {
+    justify-items: start;
+    text-align: start;
+  }
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__workbench-rail button.is-active {
+  border-color: color-mix(in srgb, var(--etsy-station-accent, #2ee0a6) 58%, transparent) !important;
+  background: color-mix(in srgb, var(--etsy-station-accent, #2ee0a6) 14%, rgba(8, 18, 20, 0.92)) !important;
+  color: #f5fff9 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__workbench-rail button,
+html body .living-v3--etsy-primary-workspace .living-v3__workbench-capability-card span,
+html body .living-v3--etsy-primary-workspace .living-v3__workbench-health span,
+html body .living-v3--etsy-primary-workspace .is-partial,
+html body .living-v3--etsy-primary-workspace .is-missing,
+html body .living-v3--etsy-primary-workspace .is-locked,
+html body .living-v3--etsy-primary-workspace .is-active {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(8, 18, 20, 0.9) !important;
+  color: rgba(238, 252, 238, 0.78) !important;
+}
+
+html body .living-v3 .workspace-station-cta__primary,
+html body .living-v3 .workspace-station-cta,
+html body .living-v3--terra-primary-workspace .living-v3__terra-workspace-header,
+html body .living-v3--terra-primary-workspace .living-v3__terra-health-beacon,
+html body .living-v3--terra-primary-workspace .living-v3__terra-station-tabs button,
+html body .living-v3__drawer--oracle-app .living-v3__drawer-title,
+html body .living-v3__drawer--oracle-app .living-v3__oracle-action-hero,
+html body .living-v3__drawer--oracle-app .living-v3__oracle-action-steps,
+html body .living-v3__drawer--oracle-app .living-v3__oracle-action-status {
+  border-color: rgba(65, 231, 172, 0.16) !important;
+  background: rgba(8, 18, 20, 0.92) !important;
+  color: #f3f7ec !important;
+  box-shadow: none !important;
+}
+
+html body .living-v3__drawer--oracle-app .living-v3__oracle-action-steps span,
+html body .living-v3__drawer--oracle-app .living-v3__oracle-action-status span,
+html body .living-v3__drawer--oracle-app .living-v3__oracle-action-hero > div,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-stage,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-pipeline,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-pipeline button,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-thumb,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-action,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-action button,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-actions,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-actions button,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-readback article,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-readback article > div,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-readback > div,
+html body .living-v3--terra-primary-workspace button.is-ready,
+html body .living-v3--terra-primary-workspace button.is-needs-live,
+html body .living-v3--terra-primary-workspace button.is-active,
+html body .living-v3--terra-primary-workspace .living-v3__terra-station-tabs button,
+html body .living-v3--terra-primary-workspace .living-v3__terra-health-beacon span {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(238, 252, 238, 0.78) !important;
+}
+
+html body .living-v3--terra-primary-workspace .living-v3__terra-workspace-title h2,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-board h3,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-board h4,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-board b {
+  color: #f7ffe9 !important;
+}
+
+html body .living-v3--terra-primary-workspace .living-v3__terra-workspace-title p,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-board p,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-board span,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-board small,
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-board button {
+  color: rgba(230, 255, 235, 0.78) !important;
+}
+
+html body .living-v3--terra-primary-workspace .living-v3__terra-forge-board button {
+  font-weight: 860 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-progress-strip span[data-step-id='search'] {
+  border-color: rgba(45, 212, 191, 0.42) !important;
+  background: rgba(20, 184, 166, 0.15) !important;
+  color: #a7fff1 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-progress-strip span[data-step-id='compare'] {
+  border-color: rgba(251, 146, 60, 0.42) !important;
+  background: rgba(249, 115, 22, 0.15) !important;
+  color: #ffd4ad !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-progress-strip span[data-step-id='source'] {
+  border-color: rgba(56, 189, 248, 0.42) !important;
+  background: rgba(14, 165, 233, 0.15) !important;
+  color: #b8edff !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-progress-strip span[data-step-id='seo'] {
+  border-color: rgba(192, 132, 252, 0.44) !important;
+  background: rgba(147, 51, 234, 0.15) !important;
+  color: #ead3ff !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-progress-strip span[data-step-id='draft'] {
+  border-color: rgba(74, 222, 128, 0.42) !important;
+  background: rgba(22, 163, 74, 0.15) !important;
+  color: #bbf7d0 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-progress-strip span[data-step-id='approval'] {
+  border-color: rgba(250, 204, 21, 0.42) !important;
+  background: rgba(202, 138, 4, 0.15) !important;
+  color: #fde68a !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-media-pair figure:first-child figcaption,
+html body .living-v3--etsy-primary-workspace .living-v3__product-link--etsy {
+  border-color: rgba(251, 146, 60, 0.46) !important;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.88), rgba(194, 65, 12, 0.9)) !important;
+  color: #fff7ed !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-media-pair figure:nth-child(2) figcaption,
+html body .living-v3--etsy-primary-workspace .living-v3__product-link--supplier {
+  border-color: rgba(34, 211, 238, 0.44) !important;
+  background: linear-gradient(135deg, rgba(8, 145, 178, 0.9), rgba(14, 116, 144, 0.92)) !important;
+  color: #ecfeff !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-link--missing {
+  border-style: dashed !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(238, 252, 238, 0.62) !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-dossier-links a,
+html body .living-v3--etsy-primary-workspace .living-v3__product-dossier-links span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-radius: 12px !important;
+  padding: 7px 10px !important;
+  font-weight: 880 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__product-image-fallback,
+html body .living-v3--etsy-primary-workspace .living-v3__product-dossier-visual .living-v3__product-image-fallback {
+  border: 1px solid rgba(65, 231, 172, 0.14) !important;
+  background: radial-gradient(circle at 50% 22%, rgba(65, 231, 172, 0.18), transparent 42%), rgba(2, 8, 11, 0.96) !important;
+  color: rgba(238, 252, 238, 0.72) !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-card,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-qa-card,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-draft-canvas,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-check,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-output,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-media-slot,
+html body .living-v3--etsy-primary-workspace textarea,
+html body .living-v3--etsy-primary-workspace input,
+html body .living-v3--etsy-primary-workspace select,
+html body .living-v3__drawer--etsy-app .living-v3__etsy-app,
+html body .living-v3__drawer--etsy-app .living-v3__etsy-card,
+html body .living-v3__drawer--etsy-app .living-v3__etsy-qa-card,
+html body .living-v3__drawer--etsy-app .living-v3__etsy-draft-canvas,
+html body .living-v3__drawer--etsy-app .living-v3__etsy-check,
+html body .living-v3__drawer--etsy-app .living-v3__etsy-output,
+html body .living-v3__drawer--etsy-app .living-v3__etsy-media-slot,
+html body .living-v3__drawer--etsy-app textarea,
+html body .living-v3__drawer--etsy-app input,
+html body .living-v3__drawer--etsy-app select {
+  border-color: rgba(65, 231, 172, 0.14) !important;
+  background: rgba(6, 15, 17, 0.94) !important;
+  color: #eff8ef !important;
+  box-shadow: none !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-thumb,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-media-slot,
+html body .living-v3__drawer--etsy-app .living-v3__etsy-thumb,
+html body .living-v3__drawer--etsy-app .living-v3__etsy-media-slot {
+  background: radial-gradient(circle at 50% 25%, rgba(65, 231, 172, 0.2), transparent 44%), rgba(2, 8, 11, 0.96) !important;
+}
+
+html body .living-v3.living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode .living-v3__workbench-canvas .living-v3__etsy-app.living-v3__etsy-app--library-pass[data-etsy-clean-pass='v1'],
+html body .living-v3.living-v3--etsy-primary-workspace .living-v3__etsy-app.living-v3__etsy-app--library-pass.living-v3__etsy-app--ledger[data-etsy-clean-pass='v1'],
+html body .living-v3.living-v3--etsy-primary-workspace .living-v3__etsy-app.living-v3__etsy-app--library-pass.living-v3__etsy-app--inspection[data-etsy-clean-pass='v1'],
+html body .living-v3.living-v3--etsy-primary-workspace .living-v3__etsy-app.living-v3__etsy-app--library-pass.living-v3__etsy-app--shotlab[data-etsy-clean-pass='v1'] {
+  border-color: rgba(65, 231, 172, 0.14) !important;
+  background: rgba(6, 15, 17, 0.94) !important;
+  background-image: none !important;
+  color: #eff8ef !important;
+  box-shadow: none !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-surface-head,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-surface-panel,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-surface-card {
+  border-color: rgba(65, 231, 172, 0.14) !important;
+  background: rgba(6, 15, 17, 0.94) !important;
+  color: #eff8ef !important;
+  box-shadow: none !important;
+}
+
+/* DLV room-specific repair 2026-07-06: fix Oracle, Atlantis, and Etsy tools without universalizing rooms. */
+html body .living-v3__drawer--oracle-app,
+html body .living-v3--oracle-primary-workspace .living-v3__drawer--oracle-app {
+  width: min(1120px, calc(100vw - 44px)) !important;
+  overflow: auto !important;
+  border-color: rgba(45, 212, 191, 0.2) !important;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(45, 212, 191, 0.16), transparent 34%),
+    radial-gradient(circle at 90% 16%, rgba(14, 165, 233, 0.14), transparent 30%),
+    #031014 !important;
+  color: #eefdf5 !important;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.56) !important;
+}
+
+html body .living-v3__drawer--oracle-app .living-v3__drawer-title {
+  gap: 3px !important;
+  margin-bottom: 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  padding-right: 42px !important;
+}
+
+html body .living-v3__drawer--oracle-app .living-v3__drawer-title p,
+html body .living-v3__drawer--oracle-app .living-v3__drawer-title span {
+  display: none !important;
+}
+
+html body .living-v3__drawer--oracle-app .living-v3__drawer-title h2 {
+  color: #eafff6 !important;
+  font-size: 18px !important;
+  letter-spacing: -0.02em !important;
+}
+
+html body .living-v3__oracle-shell[data-oracle-product-scout='workbench-v1'] {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  border: 1px solid rgba(45, 212, 191, 0.16) !important;
+  border-radius: 26px !important;
+  background: rgba(3, 15, 18, 0.9) !important;
+  background-image: radial-gradient(circle at 88% 0%, rgba(45, 212, 191, 0.11), transparent 32%) !important;
+  box-shadow: none !important;
+  padding: 12px !important;
+}
+
+html body .living-v3__oracle-signal-deck,
+html body .living-v3__oracle-selected-card,
+html body .living-v3__oracle-results-panel,
+html body .living-v3__oracle-card,
+html body .living-v3__oracle-source-box,
+html body .living-v3__oracle-listings {
+  border: 1px solid rgba(45, 212, 191, 0.16) !important;
+  background: rgba(4, 18, 22, 0.92) !important;
+  color: #eefdf5 !important;
+  box-shadow: none !important;
+}
+
+html body .living-v3__oracle-signal-deck {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 0.55fr) minmax(0, 1.45fr) !important;
+  gap: 12px !important;
+  align-items: end !important;
+  border-radius: 22px !important;
+  padding: 12px !important;
+}
+
+html body .living-v3__oracle-signal-copy,
+html body .living-v3__oracle-selected-card,
+html body .living-v3__oracle-results-head > div {
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+html body .living-v3__oracle-signal-copy span,
+html body .living-v3__oracle-selected-card > span,
+html body .living-v3__oracle-results-head span,
+html body .living-v3__oracle-kpis span b,
+html body .living-v3__oracle-searchbar label > span {
+  color: #7ee7cf !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+html body .living-v3__oracle-signal-copy h3,
+html body .living-v3__oracle-selected-card h3,
+html body .living-v3__oracle-results-head h3,
+html body .living-v3__oracle-card h3,
+html body .living-v3__oracle-metrics dd {
+  margin: 0 !important;
+  color: #f3fff8 !important;
+}
+
+html body .living-v3__oracle-signal-copy p,
+html body .living-v3__oracle-selected-card p,
+html body .living-v3__oracle-card p,
+html body .living-v3__oracle-card-proof,
+html body .living-v3__oracle-source-box,
+html body .living-v3__oracle-listings,
+html body .living-v3__oracle-metrics dt,
+html body .living-v3__oracle-kpis span {
+  color: rgba(238, 253, 245, 0.72) !important;
+}
+
+html body .living-v3__oracle-searchbar {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, 0.44fr) minmax(138px, auto) !important;
+  gap: 10px !important;
+  align-items: end !important;
+  min-width: 0 !important;
+}
+
+html body .living-v3__oracle-searchbar label {
+  display: grid !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+}
+
+html body .living-v3__oracle-searchbar input,
+html body .living-v3__oracle-searchbar select,
+html body .living-v3__oracle-metrics div {
+  border: 1px solid rgba(45, 212, 191, 0.2) !important;
+  border-radius: 14px !important;
+  background: rgba(0, 0, 0, 0.34) !important;
+  color: #f6fff9 !important;
+  box-shadow: none !important;
+}
+
+html body .living-v3__oracle-searchbar input,
+html body .living-v3__oracle-searchbar select {
+  min-height: 42px !important;
+  padding: 8px 10px !important;
+}
+
+html body .living-v3__oracle-primary {
+  min-height: 42px !important;
+  border: 1px solid rgba(45, 212, 191, 0.4) !important;
+  border-radius: 14px !important;
+  background: linear-gradient(135deg, #12b981, #0f766e) !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}
+
+html body .living-v3__oracle-primary:disabled {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(238, 253, 245, 0.46) !important;
+}
+
+html body .living-v3__oracle-kpis {
+  grid-column: 1 / -1 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 7px !important;
+}
+
+html body .living-v3__oracle-kpis span,
+html body .living-v3__oracle-card-proof,
+html body .living-v3__oracle-source-box {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  padding: 7px 9px !important;
+}
+
+html body .living-v3__oracle-workbench {
+  display: grid !important;
+  grid-template-columns: minmax(260px, 0.38fr) minmax(0, 1fr) !important;
+  gap: 12px !important;
+  align-items: start !important;
+  min-height: 0 !important;
+}
+
+html body .living-v3__oracle-selected-card,
+html body .living-v3__oracle-results-panel {
+  border-radius: 22px !important;
+  padding: 12px !important;
+}
+
+html body .living-v3__oracle-results-head {
+  display: flex !important;
+  align-items: start !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+html body .living-v3__oracle-results {
+  display: grid !important;
+  gap: 8px !important;
+  max-height: min(52vh, 520px) !important;
+  overflow: auto !important;
+}
+
+html body .living-v3__oracle-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.42fr) auto !important;
+  gap: 10px !important;
+  align-items: center !important;
+  border-radius: 18px !important;
+  padding: 10px !important;
+}
+
+html body .living-v3__oracle-card.is-selected {
+  border-color: rgba(45, 212, 191, 0.42) !important;
+  background: rgba(20, 184, 166, 0.13) !important;
+}
+
+html body .living-v3__oracle-metrics,
+html body .living-v3__oracle-metrics--selected {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+html body .living-v3__oracle-card .living-v3__oracle-primary,
+html body .living-v3__oracle-selected-card .living-v3__oracle-primary--handoff {
+  min-height: 36px !important;
+  padding: 6px 9px !important;
+  white-space: nowrap !important;
+}
+
+html body .living-v3__etsy-tool-strip,
+html body .living-v3__etsy-station-quickline {
+  border: 1px solid rgba(65, 231, 172, 0.16) !important;
+  border-radius: 18px !important;
+  background: rgba(5, 17, 19, 0.92) !important;
+  color: #eff8ef !important;
+  box-shadow: none !important;
+}
+
+html body .living-v3__etsy-tool-strip {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr) !important;
+  gap: 10px !important;
+  align-items: center !important;
+  padding: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+html body .living-v3__etsy-tool-identity {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+html body .living-v3__etsy-tool-identity span,
+html body .living-v3__etsy-tool-identity small,
+html body .living-v3__etsy-station-quickline span {
+  color: rgba(159, 255, 218, 0.68) !important;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+}
+
+html body .living-v3__etsy-tool-identity b,
+html body .living-v3__etsy-station-quickline b {
+  overflow: hidden !important;
+  color: #f7ffe9 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html body .living-v3__etsy-tool-tabs {
+  display: flex !important;
+  gap: 7px !important;
+  overflow: auto !important;
+  scrollbar-width: none !important;
+}
+
+html body .living-v3__etsy-tool-tabs button {
+  display: grid !important;
+  gap: 2px !important;
+  flex: 0 0 auto !important;
+  min-width: 126px !important;
+  border: 1px solid color-mix(in srgb, var(--etsy-station-accent, #41e7ac) 36%, transparent) !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(239, 248, 239, 0.78) !important;
+  text-align: left !important;
+  padding: 8px 10px !important;
+}
+
+html body .living-v3__etsy-tool-tabs button b,
+html body .living-v3__etsy-tool-tabs button span {
+  display: block !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html body .living-v3__etsy-tool-tabs button span {
+  color: rgba(239, 248, 239, 0.66) !important;
+  font-size: 11px !important;
+}
+
+html body .living-v3__etsy-tool-tabs button.is-active {
+  background: color-mix(in srgb, var(--etsy-station-accent, #41e7ac) 22%, rgba(3, 10, 13, 0.9)) !important;
+  color: #ffffff !important;
+}
+
+html body .living-v3__etsy-station-quickline {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 9px !important;
+  margin-bottom: 10px !important;
+}
+
+html body .living-v3__etsy-station-quickline div {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+  padding: 7px 9px !important;
+}
+
+html body .living-v3__etsy-station-deck--tool-room > .workspace-pipeline {
+  display: none !important;
+}
+
+html body .atlantis-vault--primary {
+  gap: 10px !important;
+  padding: 12px !important;
+}
+
+html body .atlantis-vault__header {
+  border-radius: 22px !important;
+  padding: 10px !important;
+  background: linear-gradient(135deg, rgba(8, 31, 43, 0.92), rgba(5, 45, 58, 0.78)) !important;
+}
+
+html body .atlantis-vault__identity {
+  grid-template-columns: 58px minmax(0, 1fr) !important;
+  gap: 10px !important;
+}
+
+html body .atlantis-vault__identity img,
+html body .atlantis-vault__portrait-skeleton {
+  width: 58px !important;
+  height: 58px !important;
+  border-radius: 18px !important;
+}
+
+html body .atlantis-vault__identity h2 {
+  font-size: clamp(1.25rem, 1.7vw, 1.65rem) !important;
+}
+
+html body .atlantis-vault__identity p {
+  max-width: 760px !important;
+}
+
+html body .atlantis-vault__command-deck {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px) !important;
+  gap: 10px !important;
+  padding: 10px !important;
+}
+
+html body .atlantis-vault__ocean-map {
+  grid-template-columns: minmax(210px, 0.82fr) minmax(156px, 0.52fr) !important;
+  min-height: 146px !important;
+  padding: 10px !important;
+}
+
+html body .atlantis-vault__map-copy h3,
+html body .atlantis-vault__brief-stack h3 {
+  font-size: clamp(1.18rem, 1.7vw, 1.7rem) !important;
+  line-height: 1.02 !important;
+}
+
+html body .atlantis-vault__sonar {
+  width: min(18vw, 156px) !important;
+  min-width: 146px !important;
+}
+
+html body .atlantis-vault__sonar > strong {
+  font-size: clamp(1.45rem, 2vw, 2rem) !important;
+}
+
+html body .atlantis-vault__sonar > span {
+  margin-top: 26px !important;
+  font-size: 0.58rem !important;
+}
+
+html body .atlantis-vault__sonar-node {
+  min-width: 0 !important;
+  width: 14px !important;
+  min-height: 0 !important;
+  height: 14px !important;
+  overflow: hidden !important;
+  border-radius: 999px !important;
+  padding: 0 !important;
+}
+
+html body .atlantis-vault__sonar-node b,
+html body .atlantis-vault__sonar-node span {
+  display: none !important;
+}
+
+html body .atlantis-vault__brief-stack article {
+  min-height: 72px !important;
+  padding: 10px !important;
+}
+
+html body .living-v3__drawer--oracle-app .living-v3__oracle-metrics div,
+html body .living-v3--oracle-primary-workspace .living-v3__oracle-metrics div {
+  border-color: rgba(45, 212, 191, 0.18) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: #eefdf5 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--ledger[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--shotlab[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--truth[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--net[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--inspection[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--draft[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--practical[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head {
+  border-color: color-mix(in srgb, var(--etsy-station-accent, #41e7ac) 28%, rgba(255, 255, 255, 0.1)) !important;
+  background: rgba(5, 17, 19, 0.94) !important;
+  color: #eff8ef !important;
+  box-shadow: none !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--ledger[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head p,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--shotlab[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head p,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--truth[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head p,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--net[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head p,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--inspection[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head p,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--draft[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head p,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--practical[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head p {
+  color: color-mix(in srgb, var(--etsy-station-accent, #41e7ac) 72%, #eff8ef) !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--ledger[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head h3,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--shotlab[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head h3,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--truth[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head h3,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--net[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head h3,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--inspection[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head h3,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--draft[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head h3,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app--practical[data-etsy-clean-pass='v1'] .living-v3__etsy-surface-head h3 {
+  color: #f7ffe9 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-surface-head span,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-compact-chips span {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(239, 248, 239, 0.78) !important;
+}
+
+html body .living-v3__drawer--oracle-app .living-v3__oracle-source-box,
+html body .living-v3--oracle-primary-workspace .living-v3__oracle-source-box {
+  border-color: rgba(45, 212, 191, 0.16) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(238, 253, 245, 0.72) !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-work-card,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-metric-cards div,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-media-slots,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-media-slot,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-output,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-check,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-draft-canvas,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-empty,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-empty--interactive,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-blocked-card {
+  border-color: rgba(65, 231, 172, 0.13) !important;
+  background: rgba(7, 18, 20, 0.92) !important;
+  color: #eff8ef !important;
+  box-shadow: none !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-metric-cards div b,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-metric-cards div strong,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-work-card b,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-work-card strong,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-blocked-card h3,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-blocked-card b,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-blocked-card strong {
+  color: #f7ffe9 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-work-card p,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-work-card span,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-media-slot span,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-tag-list span,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-output span,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-check span,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-blocked-card p,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-blocked-card span {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(239, 248, 239, 0.78) !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-empty--interactive > span {
+  border: 1px solid rgba(65, 231, 172, 0.18) !important;
+  background: rgba(65, 231, 172, 0.12) !important;
+  color: #8df4ce !important;
+  box-shadow: none !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-empty--interactive b {
+  color: #f7ffe9 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-empty--interactive small {
+  color: rgba(239, 248, 239, 0.68) !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-media-slot::before,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-media-slot::after {
+  background: radial-gradient(circle at 80% 80%, rgba(65, 231, 172, 0.18), rgba(65, 231, 172, 0.04) 58%, transparent 60%) !important;
+  border: 1px solid rgba(65, 231, 172, 0.12) !important;
+  opacity: 1 !important;
+}
+
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] button:disabled,
+html body .living-v3--etsy-primary-workspace .living-v3__etsy-app[data-etsy-clean-pass='v1'] .living-v3__etsy-primary:disabled {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.075) !important;
+  color: rgba(239, 248, 239, 0.48) !important;
+}
+
+@media (max-width: 980px) {
+  html body .living-v3__oracle-signal-deck,
+  html body .living-v3__oracle-searchbar,
+  html body .living-v3__oracle-workbench,
+  html body .living-v3__oracle-card,
+  html body .living-v3__etsy-tool-strip,
+  html body .living-v3__etsy-station-quickline,
+  html body .atlantis-vault__command-deck,
+  html body .atlantis-vault__ocean-map {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+html body .living-v3__drawer,
+html body .living-v3__hud,
+html body .living-v3__workspace-overlay,
+html body .living-v3__oracle-workbench,
+html body .living-v3__etsy-app,
+html body .living-v3__workbench-canvas,
+html body .atlantis-vault,
+html body .council-chamber {
+  contain: layout paint;
+}
+
+html body .living-v3__world {
+  will-change: transform;
+}
+
+@supports (content-visibility: auto) {
+  html body .living-v3__oracle-workbench,
+  html body .living-v3__etsy-work-card,
+  html body .living-v3__etsy-media-slots,
+  html body .living-v3__etsy-output,
+  html body .living-v3__workbench-details,
+  html body .atlantis-vault__command-deck,
+  html body .atlantis-vault__ocean-map {
+    content-visibility: auto;
+    contain-intrinsic-size: 420px;
+  }
+}
+
+/* Professional Reset: Oracle is a real primary workbench, not a stretched drawer. */
+.living-v3--oracle-primary-workspace .living-v3__stage {
+  opacity: 0.08;
+  filter: blur(1.5px) saturate(0.32);
+  pointer-events: none;
+}
+
+.living-v3--oracle-primary-workspace .living-v3__oracle-workspace-mode {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 344px);
+  grid-template-rows: 72px minmax(0, 1fr);
+  grid-template-areas:
+    "appbar appbar"
+    "canvas inspector";
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: #1f2924;
+  background:
+    radial-gradient(circle at 78% 0%, rgba(112, 77, 190, 0.14), transparent 34%),
+    linear-gradient(180deg, #fbf8f1 0%, #f3efe6 100%);
+  box-shadow: none;
+}
+
+.living-v3__oracle-workspace-canvas {
+  grid-area: canvas;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.living-v3__oracle-workspace-canvas > .living-v3__oracle-app {
+  min-height: 100%;
+  margin: 0;
+}
+
+@media (max-width: 980px) {
+  .living-v3--oracle-primary-workspace .living-v3__oracle-workspace-mode {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "appbar"
+      "canvas"
+      "inspector";
+    overflow: auto;
+  }
+
+  .living-v3--oracle-primary-workspace .living-v3__workbench-appbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .living-v3--oracle-primary-workspace .living-v3__workbench-status {
+    justify-content: flex-start;
+  }
+
+  .living-v3--oracle-primary-workspace .living-v3__workbench-inspector {
+    max-height: none;
+  }
+}
+
+/* Shared contract for the first Professional Reset rooms. */
+[data-professional-workbench='v1'] {
+  isolation: isolate;
+  min-width: 0;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+[data-professional-workbench='v1'] :is(button, select, input, textarea, a):focus-visible {
+  outline: 2px solid rgba(114, 224, 212, 0.82);
+  outline-offset: 2px;
+}
+
+/* Professional Reset Batch 1: reserve the fixed Workspace launcher and close
+   control so the War Room HUD never renders underneath either one. */
+.living-v3 .living-v3__hud--clean {
+  left: 148px;
+  right: 54px;
+}
+
+@media (max-width: 860px) {
+  .living-v3 .living-v3__hud--clean {
+    left: 12px;
+    right: 12px;
+  }
+
+  .living-v3 .living-v3__tabs--clean {
+    flex-wrap: nowrap;
+    max-width: 100%;
+  }
+
+  .living-v3 .living-v3__tabs--clean > button:first-child {
+    flex: 0 0 auto;
+    min-height: 44px;
+  }
+
+  .living-v3 .living-v3__room-picker {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    min-height: 44px;
+    max-width: none;
   }
 }

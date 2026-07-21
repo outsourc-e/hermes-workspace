@@ -383,6 +383,87 @@ export function activeEtsySupplierLead(state: EtsyPipelineState) {
   return state.supplierLeads.find((lead) => lead.leadId === state.selectedSupplierLeadId) ?? state.supplierLeads[0] ?? null
 }
 
+export type EtsyExternalProductSyncInput = {
+  candidateId: string
+  packetId: string
+  title: string
+  niche: string
+  signal: string
+  sourceRecordIds: Array<string>
+  evidenceIds: Array<string>
+  evidenceQuality: EtsyEvidenceQuality
+  dataOrigin: EtsyEvidenceDataOrigin
+  confidence: number
+  sourceLabels: Array<string>
+}
+
+export function syncEtsyPipelineToExternalProduct(state: EtsyPipelineState, input: EtsyExternalProductSyncInput): EtsyPipelineState {
+  const existingCandidate = state.candidates.find((candidate) => candidate.candidateId === input.candidateId)
+  const candidate: EtsyProductCandidate = {
+    candidateId: input.candidateId,
+    packetId: input.packetId,
+    title: input.title,
+    niche: input.niche,
+    signal: input.signal,
+    tone: existingCandidate?.tone ?? '#72e0d4',
+    tags: existingCandidate?.tags ?? [],
+    estimatedPrice: existingCandidate?.estimatedPrice ?? 'not verified',
+    status: 'selected',
+    sourceRecordIds: input.sourceRecordIds,
+    keywordIds: existingCandidate?.keywordIds ?? [],
+    evidenceIds: input.evidenceIds,
+    evidenceQuality: input.evidenceQuality,
+    dataOrigin: input.dataOrigin,
+    confidence: input.confidence,
+    evidenceCount: input.evidenceIds.length,
+    sourceLabels: input.sourceLabels,
+    metricRows: existingCandidate?.metricRows ?? [],
+    supplierLeadDrafts: existingCandidate?.supplierLeadDrafts ?? [],
+  }
+  const supplierLeads = state.supplierLeads.filter((lead) => lead.candidateId === input.candidateId)
+  const selectedSupplierLeadId = supplierLeads.some((lead) => lead.leadId === state.selectedSupplierLeadId)
+    ? state.selectedSupplierLeadId
+    : supplierLeads[0]?.leadId
+  const metricPacket = state.metricPacket?.candidateId === input.candidateId ? state.metricPacket : undefined
+  const productTruthPacket = state.productTruthPacket?.candidateId === input.candidateId ? state.productTruthPacket : undefined
+  const qaItems = state.qaItems.filter((item) => item.candidateId === input.candidateId)
+  const visualQaReport = state.visualQaReport?.candidateId === input.candidateId ? state.visualQaReport : undefined
+  const draftPacket = state.draftPacket?.candidateId === input.candidateId ? state.draftPacket : undefined
+  const draftApprovalPacket = state.draftApprovalPacket?.candidateId === input.candidateId ? state.draftApprovalPacket : undefined
+  const stage: EtsyPipelineStage = draftPacket
+    ? 'draft'
+    : visualQaReport || qaItems.length
+      ? 'qa'
+      : productTruthPacket
+        ? 'product_truth'
+        : supplierLeads.length
+          ? 'suppliers'
+          : metricPacket
+            ? 'metrics'
+            : 'candidates'
+
+  return {
+    ...state,
+    stage,
+    oracleSignalPacket: state.searchPacket?.packetId === input.packetId ? state.oracleSignalPacket : undefined,
+    searchPacket: state.searchPacket?.packetId === input.packetId ? state.searchPacket : undefined,
+    candidates: [candidate, ...state.candidates
+      .filter((item) => item.candidateId !== input.candidateId)
+      .map((item) => ({ ...item, status: item.status === 'selected' ? 'new' : item.status }))],
+    selectedCandidateId: input.candidateId,
+    visualBoardCandidateIds: state.visualBoardCandidateIds.filter((candidateId) => candidateId === input.candidateId),
+    metricPacket,
+    supplierLeads,
+    selectedSupplierLeadId,
+    productTruthPacket,
+    qaItems,
+    visualQaReport,
+    draftPacket,
+    draftApprovalPacket,
+    lastReceipt: `${input.title} synchronized as the only active product scope. Unrelated downstream packets were removed.`,
+  }
+}
+
 export function visibleEtsySupplierLeads(state: EtsyPipelineState) {
   const candidate = ensureCandidate(state)
   if (!candidate) return []
@@ -574,12 +655,22 @@ export function sendEtsyCandidateToThoth(state: EtsyPipelineState, candidateId: 
 
 export function rejectEtsyCandidate(state: EtsyPipelineState, candidateId: string): EtsyPipelineState {
   const candidate = state.candidates.find((item) => item.candidateId === candidateId)
+  const rejectedActiveCandidate = state.selectedCandidateId === candidateId
   return {
     ...state,
-    selectedCandidateId: state.selectedCandidateId === candidateId ? undefined : state.selectedCandidateId,
+    selectedCandidateId: rejectedActiveCandidate ? undefined : state.selectedCandidateId,
+    visualBoardCandidateIds: state.visualBoardCandidateIds.filter((id) => id !== candidateId),
     rejectedCandidateIds: Array.from(new Set([...state.rejectedCandidateIds, candidateId])),
-    candidates: state.candidates.map((item) => item.candidateId === candidateId ? { ...item, status: 'rejected' } : item),
-    lastReceipt: candidate ? `${candidate.title} rejected locally.` : 'Candidate rejected locally.',
+    candidates: state.candidates.filter((item) => item.candidateId !== candidateId),
+    metricPacket: rejectedActiveCandidate && state.metricPacket?.candidateId === candidateId ? undefined : state.metricPacket,
+    supplierLeads: state.supplierLeads.filter((lead) => lead.candidateId !== candidateId),
+    selectedSupplierLeadId: rejectedActiveCandidate ? undefined : state.selectedSupplierLeadId,
+    productTruthPacket: rejectedActiveCandidate && state.productTruthPacket?.candidateId === candidateId ? undefined : state.productTruthPacket,
+    qaItems: state.qaItems.filter((item) => item.candidateId !== candidateId),
+    visualQaReport: rejectedActiveCandidate && state.visualQaReport?.candidateId === candidateId ? undefined : state.visualQaReport,
+    draftPacket: rejectedActiveCandidate && state.draftPacket?.candidateId === candidateId ? undefined : state.draftPacket,
+    draftApprovalPacket: rejectedActiveCandidate && state.draftApprovalPacket?.candidateId === candidateId ? undefined : state.draftApprovalPacket,
+    lastReceipt: candidate ? `${candidate.title} rejected and deleted from local staging.` : 'Candidate was already removed from local staging.',
   }
 }
 
@@ -656,51 +747,7 @@ export function stageEtsySheetRowLocally(state: EtsyPipelineState, nowMs = Date.
 }
 
 export function createEtsySupplierCandidates(candidate: EtsyProductCandidate): Array<EtsySupplierLead> {
-  if (candidate.supplierLeadDrafts.length) return candidate.supplierLeadDrafts
-  return [
-    {
-      leadId: `${candidate.candidateId}-etsy-reference`,
-      candidateId: candidate.candidateId,
-      sourceType: 'Etsy',
-      title: `${candidate.title} reference cluster`,
-      price: '$24.90',
-      matchScore: 82,
-      risk: 'Do not copy listing language or images',
-      saved: false,
-      sourceRecordIds: candidate.sourceRecordIds,
-      evidenceIds: candidate.evidenceIds,
-      evidenceQuality: candidate.evidenceQuality,
-      dataOrigin: candidate.dataOrigin,
-    },
-    {
-      leadId: `${candidate.candidateId}-ali-source`,
-      candidateId: candidate.candidateId,
-      sourceType: 'AliExpress',
-      title: `${candidate.title} source lead`,
-      price: '$3.40',
-      matchScore: 74,
-      risk: 'Photo proof and variant match required',
-      saved: false,
-      sourceRecordIds: candidate.sourceRecordIds,
-      evidenceIds: candidate.evidenceIds,
-      evidenceQuality: candidate.evidenceQuality,
-      dataOrigin: candidate.dataOrigin,
-    },
-    {
-      leadId: `${candidate.candidateId}-alibaba-bulk`,
-      candidateId: candidate.candidateId,
-      sourceType: 'Alibaba',
-      title: `${candidate.title} bulk supplier lead`,
-      price: '$1.12+',
-      matchScore: 68,
-      risk: 'MOQ, finish variance, and shipping evidence needed',
-      saved: false,
-      sourceRecordIds: candidate.sourceRecordIds,
-      evidenceIds: candidate.evidenceIds,
-      evidenceQuality: candidate.evidenceQuality,
-      dataOrigin: candidate.dataOrigin,
-    },
-  ]
+  return candidate.supplierLeadDrafts
 }
 
 export function saveEtsySupplierLead(state: EtsyPipelineState, lead: EtsySupplierLead, nowMs = Date.now()): EtsyPipelineState {

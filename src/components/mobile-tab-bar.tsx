@@ -1,17 +1,10 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  BrainIcon,
-  Building01Icon,
+  Castle02Icon,
   Chat01Icon,
-  Clock01Icon,
-  CommandLineIcon,
-  DashboardSquare01Icon,
+  CheckListIcon,
   File01Icon,
-  McpServerIcon,
-  PuzzleIcon,
-  Rocket01Icon,
-  Settings01Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
 import {
@@ -22,9 +15,14 @@ import {
   useState,
 } from 'react'
 import type { TouchEvent } from 'react'
-import { cn } from '@/lib/utils'
-import { hapticTap } from '@/lib/haptics'
+import type { WorkspaceRouteId } from '@/lib/workspace-navigation'
 import { useSettings } from '@/hooks/use-settings'
+import { hapticTap } from '@/lib/haptics'
+import {
+  getWorkspaceNavigationItems,
+  matchesWorkspaceRoute,
+} from '@/lib/workspace-navigation'
+import { cn } from '@/lib/utils'
 
 /** Height constant for consistent bottom insets on mobile routes with tab bar */
 export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 80px)'
@@ -42,96 +40,33 @@ type TabItem = {
   label: string
   icon: typeof Chat01Icon
   to: string
+  search?: Record<string, unknown>
   match: (path: string) => boolean
 }
 
-export const MOBILE_NAV_TABS: Array<TabItem> = [
-  {
-    id: 'dashboard',
-    label: 'Home',
-    icon: DashboardSquare01Icon,
-    to: '/dashboard',
-    match: (p) => p === '/dashboard',
-  },
-  {
-    id: 'chat',
-    label: 'Chat',
-    icon: Chat01Icon,
-    to: '/chat/main',
-    match: (p) => p.startsWith('/chat') || p === '/new',
-  },
-  {
-    id: 'playground',
-    label: 'Play',
-    icon: Rocket01Icon,
-    to: '/playground',
-    match: (p) => p.startsWith('/playground'),
-  },
-  {
-    id: 'files',
-    label: 'Files',
-    icon: File01Icon,
-    to: '/files',
-    match: (p) => p.startsWith('/files'),
-  },
-  {
-    id: 'terminal',
-    label: 'Terminal',
-    icon: CommandLineIcon,
-    to: '/terminal',
-    match: (p) => p.startsWith('/terminal'),
-  },
-  {
-    id: 'jobs',
-    label: 'Jobs',
-    icon: Clock01Icon,
-    to: '/jobs',
-    match: (p) => p.startsWith('/jobs'),
-  },
-  {
-    id: 'swarm',
-    label: 'Swarm',
-    icon: UserGroupIcon,
-    to: '/swarm',
-    match: (p) => p === '/swarm' || p.startsWith('/swarm2'),
-  },
+const MOBILE_TAB_ICONS: Partial<Record<WorkspaceRouteId, typeof Chat01Icon>> = {
+  'war-room': Castle02Icon,
+  tasks: CheckListIcon,
+  chat: Chat01Icon,
+  swarm: UserGroupIcon,
+  files: File01Icon,
+}
 
-  {
-    id: 'memory',
-    label: 'Memory',
-    icon: BrainIcon,
-    to: '/memory',
-    match: (p) => p.startsWith('/memory'),
-  },
-  {
-    id: 'skills',
-    label: 'Skills',
-    icon: PuzzleIcon,
-    to: '/skills',
-    match: (p) => p.startsWith('/skills'),
-  },
-  {
-    id: 'mcp',
-    label: 'MCP',
-    icon: McpServerIcon,
-    to: '/mcp',
-    match: (p) => p.startsWith('/mcp'),
-  },
-  {
-    id: 'profiles',
-    label: 'Profiles',
-    icon: UserGroupIcon,
-    to: '/profiles',
-    match: (p) => p.startsWith('/profiles'),
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: Settings01Icon,
-    to: '/settings',
-    match: (p) => p.startsWith('/settings'),
-  },
-]
+export const MOBILE_NAV_TABS: Array<TabItem> = getWorkspaceNavigationItems(
+  'mobile-tabs',
+).map((route) => {
+  const id = route.id as WorkspaceRouteId
+  const icon = MOBILE_TAB_ICONS[id]
+  if (!icon) throw new Error(`Missing mobile tab icon for ${route.id}`)
+  return {
+    id: route.id,
+    label: route.label,
+    icon,
+    to: route.to,
+    search: route.search ? { ...route.search } : undefined,
+    match: (pathname: string) => matchesWorkspaceRoute(id, pathname),
+  }
+})
 
 export function MobileTabBar() {
   const navigate = useNavigate()
@@ -192,7 +127,10 @@ export function MobileTabBar() {
         nextIdx < MOBILE_NAV_TABS.length
       ) {
         hapticTap()
-        void navigate({ to: MOBILE_NAV_TABS[nextIdx].to })
+        void navigate({
+          to: MOBILE_NAV_TABS[nextIdx].to,
+          search: MOBILE_NAV_TABS[nextIdx].search as never,
+        })
       }
     },
     [navigate, pathname],
@@ -290,7 +228,7 @@ export function MobileTabBar() {
                   // Don't fire navigate if this was a drag swipe
                   if (!isDragging) {
                     hapticTap()
-                    void navigate({ to: tab.to })
+                    void navigate({ to: tab.to, search: tab.search as never })
                   }
                 }}
                 aria-current={isActive ? 'page' : undefined}

@@ -19,7 +19,6 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfilesRouteImport } from './routes/profiles'
 import { Route as ProductResearchRouteImport } from './routes/product-research'
 import { Route as ProductIntelligenceRouteImport } from './routes/product-intelligence'
-import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -75,7 +74,6 @@ import { Route as ApiProductResearchRouteImport } from './routes/api/product-res
 import { Route as ApiProductIntelligenceRouteImport } from './routes/api/product-intelligence'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
-import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-npc'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
@@ -114,6 +112,7 @@ import { Route as ApiWarRoomTerraAssetsRouteImport } from './routes/api/war-room
 import { Route as ApiWarRoomTasksRouteImport } from './routes/api/war-room/tasks'
 import { Route as ApiWarRoomStationActionRouterRouteImport } from './routes/api/war-room/station-action-router'
 import { Route as ApiWarRoomStateRouteImport } from './routes/api/war-room/state'
+import { Route as ApiWarRoomResearchAtlasRouteImport } from './routes/api/war-room/research-atlas'
 import { Route as ApiWarRoomOracleAluraSearchRouteImport } from './routes/api/war-room/oracle-alura-search'
 import { Route as ApiWarRoomIntentsRouteImport } from './routes/api/war-room/intents'
 import { Route as ApiWarRoomGoblinAnalyticsRouteImport } from './routes/api/war-room/goblin-analytics'
@@ -166,7 +165,10 @@ import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
 import { Route as ApiWarRoomWorkspaceKernelStateRouteImport } from './routes/api/war-room/workspace-kernel/state'
 import { Route as ApiWarRoomWorkspaceKernelRouteActionRouteImport } from './routes/api/war-room/workspace-kernel/route-action'
+import { Route as ApiWarRoomWorkspaceKernelResolveRunRouteImport } from './routes/api/war-room/workspace-kernel/resolve-run'
 import { Route as ApiWarRoomWorkspaceKernelResetLocalDemoRouteImport } from './routes/api/war-room/workspace-kernel/reset-local-demo'
+import { Route as ApiWarRoomWorkspaceKernelPacketsRouteImport } from './routes/api/war-room/workspace-kernel/packets'
+import { Route as ApiWarRoomWorkspaceKernelPacketHandoffRouteImport } from './routes/api/war-room/workspace-kernel/packet-handoff'
 import { Route as ApiWarRoomWorkspaceKernelEventsRouteImport } from './routes/api/war-room/workspace-kernel/events'
 import { Route as ApiWarRoomObsidianContextPacketRouteImport } from './routes/api/war-room/obsidian-context/packet'
 import { Route as ApiWarRoomEtsyLiveStateRouteImport } from './routes/api/war-room/etsy-live/state'
@@ -174,6 +176,7 @@ import { Route as ApiWarRoomEtsyLiveSharedRoomRouteImport } from './routes/api/w
 import { Route as ApiWarRoomEtsyLiveScoutRouteImport } from './routes/api/war-room/etsy-live/scout'
 import { Route as ApiWarRoomCouncilRunRouteImport } from './routes/api/war-room/council/run'
 import { Route as ApiWarRoomCouncilFollowUpRouteImport } from './routes/api/war-room/council/follow-up'
+import { Route as ApiWarRoomAtlantisVaultStatusRouteImport } from './routes/api/war-room/atlantis-vault/status'
 import { Route as ApiWarRoomAgentControlRunAthenaRouteImport } from './routes/api/war-room/agent-control/run-athena'
 import { Route as ApiWarRoomAgentControlRunAgentRouteImport } from './routes/api/war-room/agent-control/run-agent'
 import { Route as ApiWarRoomAgentControlLocalOnlyRouteImport } from './routes/api/war-room/agent-control/local-only'
@@ -234,11 +237,6 @@ const ProductResearchRoute = ProductResearchRouteImport.update({
 const ProductIntelligenceRoute = ProductIntelligenceRouteImport.update({
   id: '/product-intelligence',
   path: '/product-intelligence',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlaygroundRoute = PlaygroundRouteImport.update({
-  id: '/playground',
-  path: '/playground',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OperationsRoute = OperationsRouteImport.update({
@@ -517,11 +515,6 @@ const ApiPluginsRoute = ApiPluginsRouteImport.update({
   path: '/api/plugins',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPlaygroundNpcRoute = ApiPlaygroundNpcRouteImport.update({
-  id: '/api/playground-npc',
-  path: '/api/playground-npc',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPingRoute = ApiPingRouteImport.update({
   id: '/api/ping',
   path: '/api/ping',
@@ -715,6 +708,11 @@ const ApiWarRoomStationActionRouterRoute =
 const ApiWarRoomStateRoute = ApiWarRoomStateRouteImport.update({
   id: '/api/war-room/state',
   path: '/api/war-room/state',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWarRoomResearchAtlasRoute = ApiWarRoomResearchAtlasRouteImport.update({
+  id: '/api/war-room/research-atlas',
+  path: '/api/war-room/research-atlas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWarRoomOracleAluraSearchRoute =
@@ -982,10 +980,28 @@ const ApiWarRoomWorkspaceKernelRouteActionRoute =
     path: '/api/war-room/workspace-kernel/route-action',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiWarRoomWorkspaceKernelResolveRunRoute =
+  ApiWarRoomWorkspaceKernelResolveRunRouteImport.update({
+    id: '/api/war-room/workspace-kernel/resolve-run',
+    path: '/api/war-room/workspace-kernel/resolve-run',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiWarRoomWorkspaceKernelResetLocalDemoRoute =
   ApiWarRoomWorkspaceKernelResetLocalDemoRouteImport.update({
     id: '/api/war-room/workspace-kernel/reset-local-demo',
     path: '/api/war-room/workspace-kernel/reset-local-demo',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomWorkspaceKernelPacketsRoute =
+  ApiWarRoomWorkspaceKernelPacketsRouteImport.update({
+    id: '/api/war-room/workspace-kernel/packets',
+    path: '/api/war-room/workspace-kernel/packets',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomWorkspaceKernelPacketHandoffRoute =
+  ApiWarRoomWorkspaceKernelPacketHandoffRouteImport.update({
+    id: '/api/war-room/workspace-kernel/packet-handoff',
+    path: '/api/war-room/workspace-kernel/packet-handoff',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiWarRoomWorkspaceKernelEventsRoute =
@@ -1025,6 +1041,12 @@ const ApiWarRoomCouncilFollowUpRoute =
   ApiWarRoomCouncilFollowUpRouteImport.update({
     id: '/api/war-room/council/follow-up',
     path: '/api/war-room/council/follow-up',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWarRoomAtlantisVaultStatusRoute =
+  ApiWarRoomAtlantisVaultStatusRouteImport.update({
+    id: '/api/war-room/atlantis-vault/status',
+    path: '/api/war-room/atlantis-vault/status',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiWarRoomAgentControlRunAthenaRoute =
@@ -1103,7 +1125,6 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
-  '/playground': typeof PlaygroundRoute
   '/product-intelligence': typeof ProductIntelligenceRoute
   '/product-research': typeof ProductResearchRoute
   '/profiles': typeof ProfilesRoute
@@ -1141,7 +1162,6 @@ export interface FileRoutesByFullPath {
   '/api/models': typeof ApiModelsRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
-  '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/product-intelligence': typeof ApiProductIntelligenceRoute
@@ -1237,6 +1257,7 @@ export interface FileRoutesByFullPath {
   '/api/war-room/goblin-analytics': typeof ApiWarRoomGoblinAnalyticsRoute
   '/api/war-room/intents': typeof ApiWarRoomIntentsRoute
   '/api/war-room/oracle-alura-search': typeof ApiWarRoomOracleAluraSearchRoute
+  '/api/war-room/research-atlas': typeof ApiWarRoomResearchAtlasRoute
   '/api/war-room/state': typeof ApiWarRoomStateRoute
   '/api/war-room/station-action-router': typeof ApiWarRoomStationActionRouterRoute
   '/api/war-room/tasks': typeof ApiWarRoomTasksRoute
@@ -1259,6 +1280,7 @@ export interface FileRoutesByFullPath {
   '/api/war-room/agent-control/local-only': typeof ApiWarRoomAgentControlLocalOnlyRoute
   '/api/war-room/agent-control/run-agent': typeof ApiWarRoomAgentControlRunAgentRoute
   '/api/war-room/agent-control/run-athena': typeof ApiWarRoomAgentControlRunAthenaRoute
+  '/api/war-room/atlantis-vault/status': typeof ApiWarRoomAtlantisVaultStatusRoute
   '/api/war-room/council/follow-up': typeof ApiWarRoomCouncilFollowUpRoute
   '/api/war-room/council/run': typeof ApiWarRoomCouncilRunRoute
   '/api/war-room/etsy-live/scout': typeof ApiWarRoomEtsyLiveScoutRoute
@@ -1266,7 +1288,10 @@ export interface FileRoutesByFullPath {
   '/api/war-room/etsy-live/state': typeof ApiWarRoomEtsyLiveStateRoute
   '/api/war-room/obsidian-context/packet': typeof ApiWarRoomObsidianContextPacketRoute
   '/api/war-room/workspace-kernel/events': typeof ApiWarRoomWorkspaceKernelEventsRoute
+  '/api/war-room/workspace-kernel/packet-handoff': typeof ApiWarRoomWorkspaceKernelPacketHandoffRoute
+  '/api/war-room/workspace-kernel/packets': typeof ApiWarRoomWorkspaceKernelPacketsRoute
   '/api/war-room/workspace-kernel/reset-local-demo': typeof ApiWarRoomWorkspaceKernelResetLocalDemoRoute
+  '/api/war-room/workspace-kernel/resolve-run': typeof ApiWarRoomWorkspaceKernelResolveRunRoute
   '/api/war-room/workspace-kernel/route-action': typeof ApiWarRoomWorkspaceKernelRouteActionRoute
   '/api/war-room/workspace-kernel/state': typeof ApiWarRoomWorkspaceKernelStateRoute
 }
@@ -1281,7 +1306,6 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
-  '/playground': typeof PlaygroundRoute
   '/product-intelligence': typeof ProductIntelligenceRoute
   '/product-research': typeof ProductResearchRoute
   '/profiles': typeof ProfilesRoute
@@ -1318,7 +1342,6 @@ export interface FileRoutesByTo {
   '/api/models': typeof ApiModelsRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
-  '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/product-intelligence': typeof ApiProductIntelligenceRoute
@@ -1414,6 +1437,7 @@ export interface FileRoutesByTo {
   '/api/war-room/goblin-analytics': typeof ApiWarRoomGoblinAnalyticsRoute
   '/api/war-room/intents': typeof ApiWarRoomIntentsRoute
   '/api/war-room/oracle-alura-search': typeof ApiWarRoomOracleAluraSearchRoute
+  '/api/war-room/research-atlas': typeof ApiWarRoomResearchAtlasRoute
   '/api/war-room/state': typeof ApiWarRoomStateRoute
   '/api/war-room/station-action-router': typeof ApiWarRoomStationActionRouterRoute
   '/api/war-room/tasks': typeof ApiWarRoomTasksRoute
@@ -1436,6 +1460,7 @@ export interface FileRoutesByTo {
   '/api/war-room/agent-control/local-only': typeof ApiWarRoomAgentControlLocalOnlyRoute
   '/api/war-room/agent-control/run-agent': typeof ApiWarRoomAgentControlRunAgentRoute
   '/api/war-room/agent-control/run-athena': typeof ApiWarRoomAgentControlRunAthenaRoute
+  '/api/war-room/atlantis-vault/status': typeof ApiWarRoomAtlantisVaultStatusRoute
   '/api/war-room/council/follow-up': typeof ApiWarRoomCouncilFollowUpRoute
   '/api/war-room/council/run': typeof ApiWarRoomCouncilRunRoute
   '/api/war-room/etsy-live/scout': typeof ApiWarRoomEtsyLiveScoutRoute
@@ -1443,7 +1468,10 @@ export interface FileRoutesByTo {
   '/api/war-room/etsy-live/state': typeof ApiWarRoomEtsyLiveStateRoute
   '/api/war-room/obsidian-context/packet': typeof ApiWarRoomObsidianContextPacketRoute
   '/api/war-room/workspace-kernel/events': typeof ApiWarRoomWorkspaceKernelEventsRoute
+  '/api/war-room/workspace-kernel/packet-handoff': typeof ApiWarRoomWorkspaceKernelPacketHandoffRoute
+  '/api/war-room/workspace-kernel/packets': typeof ApiWarRoomWorkspaceKernelPacketsRoute
   '/api/war-room/workspace-kernel/reset-local-demo': typeof ApiWarRoomWorkspaceKernelResetLocalDemoRoute
+  '/api/war-room/workspace-kernel/resolve-run': typeof ApiWarRoomWorkspaceKernelResolveRunRoute
   '/api/war-room/workspace-kernel/route-action': typeof ApiWarRoomWorkspaceKernelRouteActionRoute
   '/api/war-room/workspace-kernel/state': typeof ApiWarRoomWorkspaceKernelStateRoute
 }
@@ -1459,7 +1487,6 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
-  '/playground': typeof PlaygroundRoute
   '/product-intelligence': typeof ProductIntelligenceRoute
   '/product-research': typeof ProductResearchRoute
   '/profiles': typeof ProfilesRoute
@@ -1497,7 +1524,6 @@ export interface FileRoutesById {
   '/api/models': typeof ApiModelsRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
-  '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/product-intelligence': typeof ApiProductIntelligenceRoute
@@ -1593,6 +1619,7 @@ export interface FileRoutesById {
   '/api/war-room/goblin-analytics': typeof ApiWarRoomGoblinAnalyticsRoute
   '/api/war-room/intents': typeof ApiWarRoomIntentsRoute
   '/api/war-room/oracle-alura-search': typeof ApiWarRoomOracleAluraSearchRoute
+  '/api/war-room/research-atlas': typeof ApiWarRoomResearchAtlasRoute
   '/api/war-room/state': typeof ApiWarRoomStateRoute
   '/api/war-room/station-action-router': typeof ApiWarRoomStationActionRouterRoute
   '/api/war-room/tasks': typeof ApiWarRoomTasksRoute
@@ -1615,6 +1642,7 @@ export interface FileRoutesById {
   '/api/war-room/agent-control/local-only': typeof ApiWarRoomAgentControlLocalOnlyRoute
   '/api/war-room/agent-control/run-agent': typeof ApiWarRoomAgentControlRunAgentRoute
   '/api/war-room/agent-control/run-athena': typeof ApiWarRoomAgentControlRunAthenaRoute
+  '/api/war-room/atlantis-vault/status': typeof ApiWarRoomAtlantisVaultStatusRoute
   '/api/war-room/council/follow-up': typeof ApiWarRoomCouncilFollowUpRoute
   '/api/war-room/council/run': typeof ApiWarRoomCouncilRunRoute
   '/api/war-room/etsy-live/scout': typeof ApiWarRoomEtsyLiveScoutRoute
@@ -1622,7 +1650,10 @@ export interface FileRoutesById {
   '/api/war-room/etsy-live/state': typeof ApiWarRoomEtsyLiveStateRoute
   '/api/war-room/obsidian-context/packet': typeof ApiWarRoomObsidianContextPacketRoute
   '/api/war-room/workspace-kernel/events': typeof ApiWarRoomWorkspaceKernelEventsRoute
+  '/api/war-room/workspace-kernel/packet-handoff': typeof ApiWarRoomWorkspaceKernelPacketHandoffRoute
+  '/api/war-room/workspace-kernel/packets': typeof ApiWarRoomWorkspaceKernelPacketsRoute
   '/api/war-room/workspace-kernel/reset-local-demo': typeof ApiWarRoomWorkspaceKernelResetLocalDemoRoute
+  '/api/war-room/workspace-kernel/resolve-run': typeof ApiWarRoomWorkspaceKernelResolveRunRoute
   '/api/war-room/workspace-kernel/route-action': typeof ApiWarRoomWorkspaceKernelRouteActionRoute
   '/api/war-room/workspace-kernel/state': typeof ApiWarRoomWorkspaceKernelStateRoute
 }
@@ -1639,7 +1670,6 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/memory'
     | '/operations'
-    | '/playground'
     | '/product-intelligence'
     | '/product-research'
     | '/profiles'
@@ -1677,7 +1707,6 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/paths'
     | '/api/ping'
-    | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/product-intelligence'
@@ -1773,6 +1802,7 @@ export interface FileRouteTypes {
     | '/api/war-room/goblin-analytics'
     | '/api/war-room/intents'
     | '/api/war-room/oracle-alura-search'
+    | '/api/war-room/research-atlas'
     | '/api/war-room/state'
     | '/api/war-room/station-action-router'
     | '/api/war-room/tasks'
@@ -1795,6 +1825,7 @@ export interface FileRouteTypes {
     | '/api/war-room/agent-control/local-only'
     | '/api/war-room/agent-control/run-agent'
     | '/api/war-room/agent-control/run-athena'
+    | '/api/war-room/atlantis-vault/status'
     | '/api/war-room/council/follow-up'
     | '/api/war-room/council/run'
     | '/api/war-room/etsy-live/scout'
@@ -1802,7 +1833,10 @@ export interface FileRouteTypes {
     | '/api/war-room/etsy-live/state'
     | '/api/war-room/obsidian-context/packet'
     | '/api/war-room/workspace-kernel/events'
+    | '/api/war-room/workspace-kernel/packet-handoff'
+    | '/api/war-room/workspace-kernel/packets'
     | '/api/war-room/workspace-kernel/reset-local-demo'
+    | '/api/war-room/workspace-kernel/resolve-run'
     | '/api/war-room/workspace-kernel/route-action'
     | '/api/war-room/workspace-kernel/state'
   fileRoutesByTo: FileRoutesByTo
@@ -1817,7 +1851,6 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/memory'
     | '/operations'
-    | '/playground'
     | '/product-intelligence'
     | '/product-research'
     | '/profiles'
@@ -1854,7 +1887,6 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/paths'
     | '/api/ping'
-    | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/product-intelligence'
@@ -1950,6 +1982,7 @@ export interface FileRouteTypes {
     | '/api/war-room/goblin-analytics'
     | '/api/war-room/intents'
     | '/api/war-room/oracle-alura-search'
+    | '/api/war-room/research-atlas'
     | '/api/war-room/state'
     | '/api/war-room/station-action-router'
     | '/api/war-room/tasks'
@@ -1972,6 +2005,7 @@ export interface FileRouteTypes {
     | '/api/war-room/agent-control/local-only'
     | '/api/war-room/agent-control/run-agent'
     | '/api/war-room/agent-control/run-athena'
+    | '/api/war-room/atlantis-vault/status'
     | '/api/war-room/council/follow-up'
     | '/api/war-room/council/run'
     | '/api/war-room/etsy-live/scout'
@@ -1979,7 +2013,10 @@ export interface FileRouteTypes {
     | '/api/war-room/etsy-live/state'
     | '/api/war-room/obsidian-context/packet'
     | '/api/war-room/workspace-kernel/events'
+    | '/api/war-room/workspace-kernel/packet-handoff'
+    | '/api/war-room/workspace-kernel/packets'
     | '/api/war-room/workspace-kernel/reset-local-demo'
+    | '/api/war-room/workspace-kernel/resolve-run'
     | '/api/war-room/workspace-kernel/route-action'
     | '/api/war-room/workspace-kernel/state'
   id:
@@ -1994,7 +2031,6 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/memory'
     | '/operations'
-    | '/playground'
     | '/product-intelligence'
     | '/product-research'
     | '/profiles'
@@ -2032,7 +2068,6 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/paths'
     | '/api/ping'
-    | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/product-intelligence'
@@ -2128,6 +2163,7 @@ export interface FileRouteTypes {
     | '/api/war-room/goblin-analytics'
     | '/api/war-room/intents'
     | '/api/war-room/oracle-alura-search'
+    | '/api/war-room/research-atlas'
     | '/api/war-room/state'
     | '/api/war-room/station-action-router'
     | '/api/war-room/tasks'
@@ -2150,6 +2186,7 @@ export interface FileRouteTypes {
     | '/api/war-room/agent-control/local-only'
     | '/api/war-room/agent-control/run-agent'
     | '/api/war-room/agent-control/run-athena'
+    | '/api/war-room/atlantis-vault/status'
     | '/api/war-room/council/follow-up'
     | '/api/war-room/council/run'
     | '/api/war-room/etsy-live/scout'
@@ -2157,7 +2194,10 @@ export interface FileRouteTypes {
     | '/api/war-room/etsy-live/state'
     | '/api/war-room/obsidian-context/packet'
     | '/api/war-room/workspace-kernel/events'
+    | '/api/war-room/workspace-kernel/packet-handoff'
+    | '/api/war-room/workspace-kernel/packets'
     | '/api/war-room/workspace-kernel/reset-local-demo'
+    | '/api/war-room/workspace-kernel/resolve-run'
     | '/api/war-room/workspace-kernel/route-action'
     | '/api/war-room/workspace-kernel/state'
   fileRoutesById: FileRoutesById
@@ -2173,7 +2213,6 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   MemoryRoute: typeof MemoryRoute
   OperationsRoute: typeof OperationsRoute
-  PlaygroundRoute: typeof PlaygroundRoute
   ProductIntelligenceRoute: typeof ProductIntelligenceRoute
   ProductResearchRoute: typeof ProductResearchRoute
   ProfilesRoute: typeof ProfilesRoute
@@ -2211,7 +2250,6 @@ export interface RootRouteChildren {
   ApiModelsRoute: typeof ApiModelsRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
-  ApiPlaygroundNpcRoute: typeof ApiPlaygroundNpcRoute
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
   ApiProductIntelligenceRoute: typeof ApiProductIntelligenceRoute
@@ -2285,6 +2323,7 @@ export interface RootRouteChildren {
   ApiWarRoomGoblinAnalyticsRoute: typeof ApiWarRoomGoblinAnalyticsRoute
   ApiWarRoomIntentsRoute: typeof ApiWarRoomIntentsRoute
   ApiWarRoomOracleAluraSearchRoute: typeof ApiWarRoomOracleAluraSearchRoute
+  ApiWarRoomResearchAtlasRoute: typeof ApiWarRoomResearchAtlasRoute
   ApiWarRoomStateRoute: typeof ApiWarRoomStateRoute
   ApiWarRoomStationActionRouterRoute: typeof ApiWarRoomStationActionRouterRoute
   ApiWarRoomTasksRoute: typeof ApiWarRoomTasksRoute
@@ -2296,6 +2335,7 @@ export interface RootRouteChildren {
   ApiWarRoomTerraPrinterFrameRoute: typeof ApiWarRoomTerraPrinterFrameRoute
   ApiWarRoomTerraSlicePlanRoute: typeof ApiWarRoomTerraSlicePlanRoute
   ApiWarRoomToolRouterRoute: typeof ApiWarRoomToolRouterRoute
+  ApiWarRoomAtlantisVaultStatusRoute: typeof ApiWarRoomAtlantisVaultStatusRoute
   ApiWarRoomCouncilFollowUpRoute: typeof ApiWarRoomCouncilFollowUpRoute
   ApiWarRoomCouncilRunRoute: typeof ApiWarRoomCouncilRunRoute
   ApiWarRoomEtsyLiveScoutRoute: typeof ApiWarRoomEtsyLiveScoutRoute
@@ -2303,7 +2343,10 @@ export interface RootRouteChildren {
   ApiWarRoomEtsyLiveStateRoute: typeof ApiWarRoomEtsyLiveStateRoute
   ApiWarRoomObsidianContextPacketRoute: typeof ApiWarRoomObsidianContextPacketRoute
   ApiWarRoomWorkspaceKernelEventsRoute: typeof ApiWarRoomWorkspaceKernelEventsRoute
+  ApiWarRoomWorkspaceKernelPacketHandoffRoute: typeof ApiWarRoomWorkspaceKernelPacketHandoffRoute
+  ApiWarRoomWorkspaceKernelPacketsRoute: typeof ApiWarRoomWorkspaceKernelPacketsRoute
   ApiWarRoomWorkspaceKernelResetLocalDemoRoute: typeof ApiWarRoomWorkspaceKernelResetLocalDemoRoute
+  ApiWarRoomWorkspaceKernelResolveRunRoute: typeof ApiWarRoomWorkspaceKernelResolveRunRoute
   ApiWarRoomWorkspaceKernelRouteActionRoute: typeof ApiWarRoomWorkspaceKernelRouteActionRoute
   ApiWarRoomWorkspaceKernelStateRoute: typeof ApiWarRoomWorkspaceKernelStateRoute
 }
@@ -2378,13 +2421,6 @@ declare module '@tanstack/react-router' {
       path: '/product-intelligence'
       fullPath: '/product-intelligence'
       preLoaderRoute: typeof ProductIntelligenceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/playground': {
-      id: '/playground'
-      path: '/playground'
-      fullPath: '/playground'
-      preLoaderRoute: typeof PlaygroundRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/operations': {
@@ -2772,13 +2808,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPluginsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/playground-npc': {
-      id: '/api/playground-npc'
-      path: '/api/playground-npc'
-      fullPath: '/api/playground-npc'
-      preLoaderRoute: typeof ApiPlaygroundNpcRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/ping': {
       id: '/api/ping'
       path: '/api/ping'
@@ -3043,6 +3072,13 @@ declare module '@tanstack/react-router' {
       path: '/api/war-room/state'
       fullPath: '/api/war-room/state'
       preLoaderRoute: typeof ApiWarRoomStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/research-atlas': {
+      id: '/api/war-room/research-atlas'
+      path: '/api/war-room/research-atlas'
+      fullPath: '/api/war-room/research-atlas'
+      preLoaderRoute: typeof ApiWarRoomResearchAtlasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/war-room/oracle-alura-search': {
@@ -3409,11 +3445,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWarRoomWorkspaceKernelRouteActionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/war-room/workspace-kernel/resolve-run': {
+      id: '/api/war-room/workspace-kernel/resolve-run'
+      path: '/api/war-room/workspace-kernel/resolve-run'
+      fullPath: '/api/war-room/workspace-kernel/resolve-run'
+      preLoaderRoute: typeof ApiWarRoomWorkspaceKernelResolveRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/war-room/workspace-kernel/reset-local-demo': {
       id: '/api/war-room/workspace-kernel/reset-local-demo'
       path: '/api/war-room/workspace-kernel/reset-local-demo'
       fullPath: '/api/war-room/workspace-kernel/reset-local-demo'
       preLoaderRoute: typeof ApiWarRoomWorkspaceKernelResetLocalDemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/workspace-kernel/packets': {
+      id: '/api/war-room/workspace-kernel/packets'
+      path: '/api/war-room/workspace-kernel/packets'
+      fullPath: '/api/war-room/workspace-kernel/packets'
+      preLoaderRoute: typeof ApiWarRoomWorkspaceKernelPacketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/workspace-kernel/packet-handoff': {
+      id: '/api/war-room/workspace-kernel/packet-handoff'
+      path: '/api/war-room/workspace-kernel/packet-handoff'
+      fullPath: '/api/war-room/workspace-kernel/packet-handoff'
+      preLoaderRoute: typeof ApiWarRoomWorkspaceKernelPacketHandoffRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/war-room/workspace-kernel/events': {
@@ -3463,6 +3520,13 @@ declare module '@tanstack/react-router' {
       path: '/api/war-room/council/follow-up'
       fullPath: '/api/war-room/council/follow-up'
       preLoaderRoute: typeof ApiWarRoomCouncilFollowUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/war-room/atlantis-vault/status': {
+      id: '/api/war-room/atlantis-vault/status'
+      path: '/api/war-room/atlantis-vault/status'
+      fullPath: '/api/war-room/atlantis-vault/status'
+      preLoaderRoute: typeof ApiWarRoomAtlantisVaultStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/war-room/agent-control/run-athena': {
@@ -3743,7 +3807,6 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   MemoryRoute: MemoryRoute,
   OperationsRoute: OperationsRoute,
-  PlaygroundRoute: PlaygroundRoute,
   ProductIntelligenceRoute: ProductIntelligenceRoute,
   ProductResearchRoute: ProductResearchRoute,
   ProfilesRoute: ProfilesRoute,
@@ -3781,7 +3844,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelsRoute: ApiModelsRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
-  ApiPlaygroundNpcRoute: ApiPlaygroundNpcRoute,
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
   ApiProductIntelligenceRoute: ApiProductIntelligenceRoute,
@@ -3855,6 +3917,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWarRoomGoblinAnalyticsRoute: ApiWarRoomGoblinAnalyticsRoute,
   ApiWarRoomIntentsRoute: ApiWarRoomIntentsRoute,
   ApiWarRoomOracleAluraSearchRoute: ApiWarRoomOracleAluraSearchRoute,
+  ApiWarRoomResearchAtlasRoute: ApiWarRoomResearchAtlasRoute,
   ApiWarRoomStateRoute: ApiWarRoomStateRoute,
   ApiWarRoomStationActionRouterRoute: ApiWarRoomStationActionRouterRoute,
   ApiWarRoomTasksRoute: ApiWarRoomTasksRoute,
@@ -3866,6 +3929,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWarRoomTerraPrinterFrameRoute: ApiWarRoomTerraPrinterFrameRoute,
   ApiWarRoomTerraSlicePlanRoute: ApiWarRoomTerraSlicePlanRoute,
   ApiWarRoomToolRouterRoute: ApiWarRoomToolRouterRoute,
+  ApiWarRoomAtlantisVaultStatusRoute: ApiWarRoomAtlantisVaultStatusRoute,
   ApiWarRoomCouncilFollowUpRoute: ApiWarRoomCouncilFollowUpRoute,
   ApiWarRoomCouncilRunRoute: ApiWarRoomCouncilRunRoute,
   ApiWarRoomEtsyLiveScoutRoute: ApiWarRoomEtsyLiveScoutRoute,
@@ -3873,8 +3937,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWarRoomEtsyLiveStateRoute: ApiWarRoomEtsyLiveStateRoute,
   ApiWarRoomObsidianContextPacketRoute: ApiWarRoomObsidianContextPacketRoute,
   ApiWarRoomWorkspaceKernelEventsRoute: ApiWarRoomWorkspaceKernelEventsRoute,
+  ApiWarRoomWorkspaceKernelPacketHandoffRoute:
+    ApiWarRoomWorkspaceKernelPacketHandoffRoute,
+  ApiWarRoomWorkspaceKernelPacketsRoute: ApiWarRoomWorkspaceKernelPacketsRoute,
   ApiWarRoomWorkspaceKernelResetLocalDemoRoute:
     ApiWarRoomWorkspaceKernelResetLocalDemoRoute,
+  ApiWarRoomWorkspaceKernelResolveRunRoute:
+    ApiWarRoomWorkspaceKernelResolveRunRoute,
   ApiWarRoomWorkspaceKernelRouteActionRoute:
     ApiWarRoomWorkspaceKernelRouteActionRoute,
   ApiWarRoomWorkspaceKernelStateRoute: ApiWarRoomWorkspaceKernelStateRoute,

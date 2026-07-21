@@ -1,6 +1,9 @@
-import {  useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+
 import { etsyRoomStageLabels } from '../../../lib/war-room/living-v3/etsy-room-contracts'
-import type {CSSProperties} from 'react';
+import { WorkspacePipelineWorkbench } from './WorkspacePipelineWorkbench'
+import { WorkspaceStationCta } from './WorkspaceStationCta'
+import type { CSSProperties } from 'react'
 import type {
   EtsyPipelineState,
   EtsyProductSearchMode,
@@ -12,6 +15,7 @@ import type {
   EtsyProductCandidate as RoomCandidate,
 } from '../../../lib/war-room/living-v3/etsy-room-contracts'
 import type { EtsyLiveResearchRun } from '../../../lib/war-room/living-v3/etsy-live-research'
+import type { LivingV3AgentId, LivingV3StationId } from '../../../lib/war-room/living-v3/living-v3-contract'
 import './etsy-product-prep-workbench.css'
 
 export type EtsyProductPrepLiveScoutState = {
@@ -94,6 +98,12 @@ type StationToolAction = {
     run?: () => void
     disabled?: boolean
   }>
+}
+
+type EtsyToolOwnership = {
+  ownerAgentId: LivingV3AgentId
+  ownerLabel: string
+  targetStationId: LivingV3StationId
 }
 
 export type EtsyPrepChatMemorySnippet = {
@@ -280,6 +290,17 @@ function readinessLabel(missingCount: number, evidenceCount: number) {
   return 'ready for local handoff'
 }
 
+function clampPercent(value: number | null | undefined) {
+  if (!Number.isFinite(value ?? NaN)) return 0
+  return Math.max(0, Math.min(100, Math.round(value as number)))
+}
+
+function metricTone(value: number) {
+  if (value >= 75) return 'good'
+  if (value >= 45) return 'warn'
+  return 'bad'
+}
+
 function isLegacyDemoCandidate(candidate: Pick<CandidateView, 'title' | 'dataOrigin' | 'evidenceQuality' | 'sourceRecordIds' | 'evidenceIds'>) {
   const title = candidate.title.toLowerCase()
   const legacyTitle = title.includes('initial necklace gift necklace') || title.includes('gold initial necklace opportunities')
@@ -334,8 +355,8 @@ function stageWorkbenchCopy(stage: PrepStageStepId) {
       }
     case 'source_truth':
       return {
-        eyebrow: 'Proof',
-        title: 'Product chosen. Prepare visual proof next',
+        eyebrow: 'Evidence',
+        title: 'Product chosen. Prepare visual evidence next',
         detail: 'Only source-backed facts survive. Anything missing stays blocked before copy or media.',
       }
     case 'shotlab':
@@ -482,7 +503,9 @@ function normalizePipelineCandidate(candidate: PipelineCandidate, state: EtsyPip
 function buildCandidateViews(roomState: EtsyRoomState, pipeline: EtsyPipelineState) {
   const views = [
     ...roomState.candidates.map(normalizeRoomCandidate),
-    ...pipeline.candidates.map((candidate) => normalizePipelineCandidate(candidate, pipeline)),
+    ...pipeline.candidates
+      .filter((candidate) => candidate.status !== 'rejected' && !pipeline.rejectedCandidateIds.includes(candidate.candidateId))
+      .map((candidate) => normalizePipelineCandidate(candidate, pipeline)),
   ]
   const seen = new Set<string>()
   return views.filter((candidate) => {
@@ -590,7 +613,33 @@ function buildStationToolStories(roomState: EtsyRoomState, liveScout: EtsyProduc
   ]
 }
 
+function etsyToolOwnership(toolId: string): EtsyToolOwnership {
+  if (toolId === 'product-search') {
+    return { ownerAgentId: 'loki', ownerLabel: 'Loki', targetStationId: 'etsy-loki-product-hunt' }
+  }
+  if (toolId === 'source-truth') {
+    return { ownerAgentId: 'loki', ownerLabel: 'Loki', targetStationId: 'etsy-loki-source-leads' }
+  }
+  if (toolId === 'shotlab-prep') {
+    return { ownerAgentId: 'thor', ownerLabel: 'Thor', targetStationId: 'etsy-thor-shotlab-prep' }
+  }
+  if (toolId === 'seo-workbench') {
+    return { ownerAgentId: 'thor', ownerLabel: 'Thor', targetStationId: 'etsy-thor-seo-metrics' }
+  }
+  return { ownerAgentId: 'odin', ownerLabel: 'Odin', targetStationId: 'etsy-odin-draft-approval' }
+}
+
 function StationToolCard({ tool, action, active }: { tool: StationToolStory; action?: StationToolAction; active?: boolean }) {
+  const ownership = etsyToolOwnership(tool.id)
+  const ctaStatus = !action
+    ? 'locked'
+    : action.primaryDisabled || !action.primaryRun
+      ? action.blockedReason ? 'blocked' : 'locked'
+      : 'ready'
+  const motionSignal = active
+    ? ctaStatus === 'blocked' || ctaStatus === 'locked' ? 'blocked-at-gate' : 'work-at-tool'
+    : 'standby'
+
   return (
     <article
       className={`etsy-prep__tool-card etsy-prep__tool-card--${tool.id} ${active ? 'is-active' : ''}`}
@@ -611,29 +660,29 @@ function StationToolCard({ tool, action, active }: { tool: StationToolStory; act
         <span>{tool.mood}</span>
       </div>
       <footer>
-        <b>{tool.status}</b>
-        {action?.blockedReason && <small>{action.blockedReason}</small>}
-        {action && (
-          <div className="etsy-prep__tool-actions">
-            <button
-              type="button"
-              className="etsy-prep__tool-primary"
-              disabled={action.primaryDisabled || !action.primaryRun}
-              onClick={action.primaryRun}
-            >
-              {action.primaryLabel}
-            </button>
-            {action.secondary?.length ? (
-              <div className="etsy-prep__tool-secondary" aria-label={`${tool.name} secondary actions`}>
-                {action.secondary.map((item) => (
-                  <button key={item.label} type="button" disabled={item.disabled || !item.run} onClick={item.run}>
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        )}
+        <WorkspaceStationCta
+          actionId={`etsy.${tool.id}`}
+          label={action?.primaryLabel ?? 'Locked'}
+          sublabel={action?.blockedReason ?? tool.status}
+          status={ctaStatus}
+          ownerAgentId={ownership.ownerAgentId}
+          ownerLabel={ownership.ownerLabel}
+          targetRoomId="etsy-market-lab"
+          targetStationId={ownership.targetStationId}
+          targetToolLabel={tool.name}
+          motionSignal={motionSignal}
+          position="standard-dock-right"
+          onPrimaryAction={action?.primaryRun}
+          disabled={action?.primaryDisabled || !action?.primaryRun}
+          secondaryActions={(action?.secondary ?? []).slice(0, 2).map((item) => ({
+            id: `${tool.id}-${item.label}`,
+            label: item.label,
+            onClick: item.run,
+            disabled: item.disabled || !item.run,
+          }))}
+          proofSummary="Local Etsy workspace action. Live Etsy writes stay locked until DLV approval."
+          proofItems={[tool.role, tool.hint]}
+        />
       </footer>
     </article>
   )
@@ -887,6 +936,8 @@ export function EtsyProductPrepWorkbench({
   }, [latestChat?.id])
 
   const productCards = candidates.filter((candidate) => !candidate.rejected && !isLegacyDemoCandidate(candidate))
+  const visibleProductCards = productCards.slice(0, 8)
+  const hiddenProductCardCount = Math.max(0, productCards.length - visibleProductCards.length)
   const oracleSignalLabel = roomState.oracleSignalPacket?.selectedKeyword
     ?? pipeline.oracleSignalPacket?.selectedKeyword
     ?? roomState.scoutPacket?.query
@@ -994,6 +1045,73 @@ export function EtsyProductPrepWorkbench({
           : undefined,
     },
   ]
+  const readinessPercent = clampPercent(
+    (roomState.approvalPacket ? 100 : roomState.draftPayload ? 86 : roomState.seoPacket ? 72 : roomState.shotLabHandoffPacket ? 56 : roomState.selectedProductPacket ? 38 : productCards.length ? 22 : 8)
+      - Math.min(28, selectedMissing.length * 4),
+  )
+  const proofPercent = clampPercent(Math.min(100, selectedEvidence.length * 18 + selectedSources.length * 10))
+  const seoPercent = clampPercent(roomState.seoPacket?.metrics.score ?? selectedCandidate?.score ?? 0)
+  const demandPercent = clampPercent(selectedCandidate?.score ?? roomState.seoPacket?.metrics.score ?? 0)
+  const cockpitMetrics = [
+    { id: 'demand', label: 'Demand', value: demandPercent, detail: selectedCandidate ? scoreText(selectedCandidate.score) : 'search first' },
+    { id: 'evidence', label: 'Evidence', value: proofPercent, detail: selectedEvidence.length ? `${selectedEvidence.length} evidence` : 'pending' },
+    { id: 'seo', label: 'SEO', value: seoPercent, detail: roomState.seoPacket ? `${roomState.seoPacket.tagCandidates.length} tags` : 'not written' },
+    { id: 'readiness', label: 'Draft ready', value: readinessPercent, detail: roomState.approvalPacket ? 'approval gate' : roomState.draftPayload ? 'local draft' : 'locked' },
+  ]
+  const comparisonRows = productCards.slice(0, 4)
+  const nextActionState = activeActionDisabled ? 'blocked' : 'ready'
+  const pipelineOsSteps = stageSteps.map((stage, index) => {
+    const copy = stageWorkbenchCopy(stage.id)
+    return {
+      id: stage.id,
+      label: stage.label,
+      status: index < currentStageIndex ? 'done' as const : index === currentStageIndex ? 'active' as const : stage.id === 'approval' ? 'locked' as const : 'waiting' as const,
+      value: surfaceCards.find((card) => card.label.toLowerCase().includes(String(stage.label).toLowerCase()))?.value ?? (index < currentStageIndex ? 'done' : index === currentStageIndex ? 'now' : 'next'),
+      detail: copy.detail,
+      action: stage.id === currentStage ? nextAction.label : undefined,
+    }
+  })
+  const pipelineInputMedia = productCards.slice(0, 6).map((candidate) => ({
+    id: candidate.id,
+    label: candidate.title,
+    meta: `${candidate.dataOrigin} · ${candidate.missingFields.length ? `${candidate.missingFields.length} missing` : 'ready'}`,
+    tone: candidate.selected ? 'active' as const : candidate.board ? 'ready' as const : 'waiting' as const,
+    selected: candidate.id === selectedCandidate?.id,
+    src: undefined,
+  }))
+  const shotLabOutputLabel = roomState.shotLabHandoffPacket
+    ? `${roomState.shotLabHandoffPacket.imageCount} planned ShotLab inputs`
+    : `${roomState.shotLabDraft.imageCount} ShotLab slots`
+  const pipelineOutputMedia = [
+    {
+      id: 'shotlab-brief',
+      label: shotLabOutputLabel,
+      meta: roomState.shotLabHandoffPacket ? `${roomState.shotLabHandoffPacket.preset} · local handoff ready` : 'choose product, filter images, then create local handoff',
+      tone: roomState.shotLabHandoffPacket ? 'ready' as const : canCreateShotLab ? 'waiting' as const : 'locked' as const,
+      src: ETSY_PREP_WINDOW_ASSETS.shotlab.src,
+    },
+    {
+      id: 'shotlab-output-review',
+      label: 'ShotLab output review',
+      meta: 'generated images appear here only after an approved/connected ShotLab run',
+      tone: 'locked' as const,
+      src: undefined,
+    },
+    {
+      id: 'seo-packet',
+      label: 'SEO packet',
+      meta: roomState.seoPacket ? `${roomState.seoPacket.tagCandidates.length} tags · score ${scoreText(roomState.seoPacket.metrics.score)}` : 'not written yet',
+      tone: roomState.seoPacket ? 'ready' as const : canCreateSeo ? 'waiting' as const : 'locked' as const,
+      src: ETSY_PREP_WINDOW_ASSETS.seo.src,
+    },
+    {
+      id: 'draft-approval',
+      label: 'Draft / approval',
+      meta: roomState.approvalPacket ? 'approval packet waiting' : roomState.draftPayload ? 'draft payload ready' : 'locked until SEO exists',
+      tone: roomState.approvalPacket ? 'active' as const : roomState.draftPayload ? 'ready' as const : 'locked' as const,
+      src: ETSY_PREP_WINDOW_ASSETS.approval.src,
+    },
+  ]
 
   return (
     <section
@@ -1029,6 +1147,115 @@ export function EtsyProductPrepWorkbench({
           {actions.resetPipeline && <button type="button" onClick={actions.resetPipeline}>Reset board</button>}
         </div>
       </section>
+
+      {roomState.researchMissionPacket && (
+        <section className="etsy-prep__research-handoff" data-research-mission-handoff="staged" role="status">
+          <div>
+            <p>RESEARCH MISSION STAGED</p>
+            <h3><bdi dir="auto">{roomState.researchMissionPacket.target}</bdi></h3>
+            <span>
+              {roomState.researchMissionPacket.depth} · {roomState.researchMissionPacket.modules.length} modules · External research not started
+            </span>
+          </div>
+          <div>
+            <b><bdi dir="ltr">{roomState.researchMissionPacket.missionId}</bdi></b>
+            <small>Saved locally · review before any external run</small>
+          </div>
+        </section>
+      )}
+
+      <section className="etsy-prep__cockpit" data-etsy-product-prep-cockpit="v1" aria-label="Etsy Product Prep Cockpit">
+        <article className="etsy-prep__cockpit-artifact" data-etsy-active-artifact={selectedCandidate ? 'product' : 'empty'}>
+          <div className="etsy-prep__cockpit-artifact-media">
+            {selectedCandidate ? <LocalProductThumb title={selectedTitle} origin={selectedOrigin} /> : <WindowAssetBadge asset={ETSY_PREP_WINDOW_ASSETS.search} />}
+            <span>{supplierGateLabel}</span>
+          </div>
+          <div>
+            <p>Active product artifact</p>
+            <h2>{selectedCandidate ? selectedTitle : 'No product selected'}</h2>
+            <span>{selectedCandidate ? `${selectedCandidate.niche} · ${selectedOrigin}` : 'Run search, then pick one product before ShotLab/SEO/draft.'}</span>
+          </div>
+          <div className="etsy-prep__cockpit-locks">
+            <span>DB/readback only</span>
+            <span>No Etsy upload</span>
+            <span>No supplier send</span>
+          </div>
+        </article>
+
+        <article className="etsy-prep__next-action" data-etsy-next-action={nextActionState}>
+          <p>Next best action</p>
+          <h3>{nextAction.label}</h3>
+          <span>{activeStatus}</span>
+          <button type="button" disabled={activeActionDisabled || !nextAction.run} onClick={() => nextAction.run?.()}>
+            {nextAction.label}
+          </button>
+          <small>{activeStageCopy.title}</small>
+        </article>
+
+        <div className="etsy-prep__metric-radar" data-etsy-readiness-radar="v1" aria-label="Demand proof SEO readiness radar">
+          {cockpitMetrics.map((metric) => (
+            <article key={metric.id} data-metric-tone={metricTone(metric.value)}>
+              <div className="etsy-prep__metric-dial" style={styleVars({ '--prep-metric': `${metric.value}%` })}>
+                <b>{metric.value}</b>
+              </div>
+              <span>{metric.label}</span>
+              <small>{metric.detail}</small>
+            </article>
+          ))}
+        </div>
+
+        <div className="etsy-prep__comparison-table" data-etsy-candidate-comparison="v1" aria-label="Candidate comparison table">
+          <div className="etsy-prep__comparison-head">
+            <b>Candidate comparison</b>
+            <span>{comparisonRows.length ? `${comparisonRows.length} visible` : 'waiting for search'}</span>
+          </div>
+          {comparisonRows.length ? comparisonRows.map((candidate) => {
+            const rowProof = clampPercent(Math.min(100, candidate.evidenceCount * 22))
+            const rowScore = clampPercent(candidate.score ?? 0)
+            return (
+              <button key={candidate.id} type="button" className={candidate.id === selectedCandidate?.id ? 'is-selected' : ''} onClick={() => setFocusedCandidateId(candidate.id)}>
+                <span>{candidate.title}</span>
+                <b>{scoreText(candidate.score)}</b>
+                <em style={styleVars({ '--prep-row-score': `${rowScore}%`, '--prep-row-proof': `${rowProof}%` })} />
+                <small>{candidate.missingFields.length ? `${candidate.missingFields.length} missing` : 'clean'}</small>
+              </button>
+            )
+          }) : (
+            <p>Search in Oracle first. No mock products are displayed.</p>
+          )}
+        </div>
+      </section>
+
+      <WorkspacePipelineWorkbench
+        id="etsy-product-prep"
+        eyebrow="Pipeline OS · Etsy"
+        title="Research → ShotLab → SEO → Draft"
+        subtitle="A teachable board: choose products, see source media, review ShotLab inputs/outputs, filter packets, then move only approved work forward."
+        activeArtifact={{
+          label: 'Active pipeline item',
+          title: selectedCandidate ? selectedTitle : 'No product selected',
+          meta: selectedCandidate ? `${selectedCandidate.niche} · ${selectedOrigin}` : 'Start in Oracle/search, then choose one product.',
+          emptyLabel: 'ETSY',
+        }}
+        steps={pipelineOsSteps}
+        inputMedia={pipelineInputMedia}
+        outputMedia={pipelineOutputMedia}
+        filters={[
+          { id: 'visible-products', label: 'Products', value: productCards.length, active: Boolean(productCards.length) },
+          { id: 'selected-proof', label: 'Evidence', value: selectedEvidence.length, active: Boolean(selectedEvidence.length) },
+          { id: 'missing-fields', label: 'Missing', value: selectedMissing.length, active: selectedMissing.length === 0 },
+          { id: 'shotlab-state', label: 'ShotLab', value: roomState.shotLabHandoffPacket ? 'ready' : 'not yet', active: Boolean(roomState.shotLabHandoffPacket) },
+        ]}
+        actions={[
+          { id: 'choose-product', label: selectedCandidate ? 'Choose product' : 'Find product', detail: selectedCandidate ? selectedTitle : 'Search first', disabled: !selectedCandidate, onClick: selectedCandidate ? () => runRememberedAction('Choose candidate', selectedCandidate.title, () => actions.selectCandidate(selectedCandidate.id)) : undefined },
+          { id: 'plan-shotlab', label: 'Plan ShotLab', detail: roomState.shotLabHandoffPacket ? 'handoff ready' : 'source images only', disabled: !canCreateShotLab, onClick: canCreateShotLab ? () => runRememberedAction('Create local ShotLab handoff packet', selectedTitle, actions.createShotLabHandoffPacket) : undefined },
+          { id: 'write-seo', label: 'Write SEO', detail: roomState.seoPacket ? `${roomState.seoPacket.tagCandidates.length} tags` : 'after product truth', disabled: !canCreateSeo, onClick: canCreateSeo ? () => runRememberedAction('Create local SEO packet', selectedTitle, actions.createSeoPacket) : undefined },
+          { id: 'request-approval', label: 'Approval gate', detail: roomState.approvalPacket ? 'waiting for DLV' : 'local only', disabled: !canRequestApproval, onClick: canRequestApproval ? () => runRememberedAction('Request local DLV approval packet', draftTitle, actions.createDraftApprovalPacket) : undefined },
+        ]}
+        locks={['No Etsy publish', 'No supplier send', 'No paid ShotLab generation', 'No live sheet write']}
+        readback={<span>Scout: {roomState.scoutPacket?.packetId ?? pipeline.searchPacket?.packetId ?? 'none'} · Selected: {roomState.selectedProductPacket?.packetId ?? 'none'} · ShotLab: {roomState.shotLabHandoffPacket?.packetId ?? 'none'} · SEO: {roomState.seoPacket?.packetId ?? 'none'} · Draft: {roomState.draftPayload?.packetId ?? 'none'}</span>}
+        accent="#8c5bd6"
+      />
 
       <section className="etsy-prep__command-center" data-etsy-product-command-center="v1" aria-label="Product search to draft command center">
         <div className="etsy-prep__command-center-header">
@@ -1071,7 +1298,9 @@ export function EtsyProductPrepWorkbench({
       <section className="etsy-prep__product-heart" data-candidate-board="v1" aria-label="Etsy visual product receiving board">
         <div className="etsy-prep__board-orbit" aria-hidden="true" />
         <div className="etsy-prep__board-center">
-          {productCards.length ? productCards.map((candidate, index) => (
+          {productCards.length ? (
+            <>
+              {visibleProductCards.map((candidate, index) => (
             <article
               key={candidate.id}
               className={`etsy-prep__visual-product-card ${candidate.selected ? 'is-selected' : ''} ${candidate.board ? 'is-boarded' : ''}`}
@@ -1110,7 +1339,16 @@ export function EtsyProductPrepWorkbench({
                 <span>{compactList(candidate.sourceRecordIds, 'source pending', 2).join(' · ')}</span>
               </details>
             </article>
-          )) : (
+              ))}
+              {hiddenProductCardCount > 0 && (
+                <div className="etsy-prep__visual-product-card etsy-prep__visual-product-card--more" data-hidden-product-card-count={hiddenProductCardCount}>
+                  <b>+{hiddenProductCardCount}</b>
+                  <span>more candidates kept off-DOM</span>
+                  <small>Use filters/search to narrow before rendering more cards.</small>
+                </div>
+              )}
+            </>
+          ) : (
             <div className="etsy-prep__empty-gallery" data-empty-product-board="oracle-required">
               <div className="etsy-prep__empty-gallery-art" aria-hidden="true">
                 <span />
@@ -1166,33 +1404,35 @@ export function EtsyProductPrepWorkbench({
         data-debug-proof-collapsed={debugOpen ? 'false' : 'true'}
         onToggle={(event) => setDebugOpen(event.currentTarget.open)}
       >
-        <summary>Proof / packets</summary>
-        <div className="etsy-prep__debug-grid">
-          <div>
-            <b>Selected</b>
-            <span>{selectedTitle}</span>
-            <span>{selectedOrigin}</span>
+        <summary>Readback / packets</summary>
+        {debugOpen ? (
+          <div className="etsy-prep__debug-grid">
+            <div>
+              <b>Selected</b>
+              <span>{selectedTitle}</span>
+              <span>{selectedOrigin}</span>
+            </div>
+            <div>
+              <b>Source proof</b>
+              <span>{selectedSources.length ? selectedSources.slice(0, 4).join(', ') : 'source proof pending'}</span>
+              <span>{selectedEvidence.length ? selectedEvidence.slice(0, 4).join(', ') : 'evidence IDs pending'}</span>
+            </div>
+            <div>
+              <b>Packets</b>
+              <span>Scout: {roomState.scoutPacket?.packetId ?? pipeline.searchPacket?.packetId ?? 'none'}</span>
+              <span>Selected: {roomState.selectedProductPacket?.packetId ?? 'none'}</span>
+              <span>ShotLab: {roomState.shotLabHandoffPacket?.packetId ?? 'none'}</span>
+              <span>SEO: {roomState.seoPacket?.packetId ?? 'none'}</span>
+              <span>Draft: {roomState.draftPayload?.packetId ?? 'none'}</span>
+            </div>
+            <div>
+              <b>Safety</b>
+              <span>liveActionsAllowed:false</span>
+              <span>workerFanoutAllowed:false</span>
+              <span>mockProductsShown:false</span>
+            </div>
           </div>
-          <div>
-            <b>Source proof</b>
-            <span>{selectedSources.length ? selectedSources.slice(0, 4).join(', ') : 'source proof pending'}</span>
-            <span>{selectedEvidence.length ? selectedEvidence.slice(0, 4).join(', ') : 'evidence IDs pending'}</span>
-          </div>
-          <div>
-            <b>Packets</b>
-            <span>Scout: {roomState.scoutPacket?.packetId ?? pipeline.searchPacket?.packetId ?? 'none'}</span>
-            <span>Selected: {roomState.selectedProductPacket?.packetId ?? 'none'}</span>
-            <span>ShotLab: {roomState.shotLabHandoffPacket?.packetId ?? 'none'}</span>
-            <span>SEO: {roomState.seoPacket?.packetId ?? 'none'}</span>
-            <span>Draft: {roomState.draftPayload?.packetId ?? 'none'}</span>
-          </div>
-          <div>
-            <b>Safety</b>
-            <span>liveActionsAllowed:false</span>
-            <span>workerFanoutAllowed:false</span>
-            <span>mockProductsShown:false</span>
-          </div>
-        </div>
+        ) : null}
       </details>
     </section>
   )

@@ -182,11 +182,18 @@ export function fitLivingV3MapCamera(viewport: LivingV3Viewport): LivingV3Camera
 function directionBetween(from: LivingV3Point, to: LivingV3Point): LivingV3Direction {
   const dx = to.x - from.x
   const dy = to.y - from.y
-  if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return 'still'
-  const horizontal = Math.abs(dx) > 0.5 ? (dx > 0 ? 'east' : 'west') : ''
-  const vertical = Math.abs(dy) > 0.5 ? (dy > 0 ? 'south' : 'north') : ''
-  if (horizontal && vertical) return `${vertical}-${horizontal}` as LivingV3Direction
-  return (horizontal || vertical || 'still') as LivingV3Direction
+  const absDx = Math.abs(dx)
+  const absDy = Math.abs(dy)
+  if (absDx < 0.5 && absDy < 0.5) return 'still'
+  const horizontal: Extract<LivingV3Direction, 'east' | 'west'> | '' = absDx > 0.5 ? (dx > 0 ? 'east' : 'west') : ''
+  const vertical: Extract<LivingV3Direction, 'north' | 'south'> | '' = absDy > 0.5 ? (dy > 0 ? 'south' : 'north') : ''
+  if (horizontal && vertical) {
+    const dominantAxisRatio = 1.35
+    if (absDx >= absDy * dominantAxisRatio) return horizontal
+    if (absDy >= absDx * dominantAxisRatio) return vertical
+    return `${vertical}-${horizontal}` as LivingV3Direction
+  }
+  return horizontal || vertical || 'still'
 }
 
 export function livingV3AnimationFor(activity: LivingV3AgentActivity, direction: LivingV3Direction, roomId: LivingV3RoomId): LivingV3AnimationState {

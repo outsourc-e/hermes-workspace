@@ -1,7 +1,8 @@
 import { URL, fileURLToPath } from 'node:url'
-import { execSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import net from 'node:net'
 import { resolve, dirname } from 'node:path'
 import os from 'node:os'
@@ -11,8 +12,9 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 // nitro plugin removed (tanstackStart handles server runtime)
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type Plugin, type ViteDevServer } from 'vite'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
+import { shouldAutoStartWorkspaceCompanions } from './src/lib/workspace-companion-policy'
 
 // ---------------------------------------------------------------------------
 // Hermes Agent auto-start helpers
@@ -83,8 +85,49 @@ async function isClaudeAgentHealthy(port = 8642): Promise<boolean> {
   }
 }
 
+function hashFileContents(path: string): string | null {
+  try {
+    return createHash('sha1').update(readFileSync(path)).digest('hex')
+  } catch {
+    return null
+  }
+}
+
+function suppressUnchangedGeneratedRouteTreeReloads(): Plugin {
+  const generatedRouteTreePath = resolve('src/routeTree.gen.ts')
+  let lastRouteTreeHash = hashFileContents(generatedRouteTreePath)
+
+  return {
+    name: 'workspace-suppress-unchanged-route-tree-reloads',
+    configureServer(server: ViteDevServer) {
+      const watcher = server.watcher
+      const originalEmit = watcher.emit.bind(watcher) as (...args: Array<unknown>) => boolean
+      watcher.emit = ((eventName: string | symbol, ...args: Array<unknown>) => {
+        const filePath = args[0]
+        if (
+          eventName === 'change'
+          && typeof filePath === 'string'
+          && resolve(filePath) === generatedRouteTreePath
+        ) {
+          const nextHash = hashFileContents(generatedRouteTreePath)
+          if (nextHash && nextHash === lastRouteTreeHash) {
+            return false
+          }
+          lastRouteTreeHash = nextHash
+        }
+        return originalEmit(eventName, ...args)
+      }) as typeof watcher.emit
+    },
+  }
+}
+
 const config = defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const autoStartWorkspaceCompanions = shouldAutoStartWorkspaceCompanions({
+    command,
+    mode,
+    env: { ...process.env, ...env },
+  })
   const claudeApiUrl = env.CLAUDE_API_URL?.trim() || 'http://127.0.0.1:8642'
   // /api/connection-status is handled by the real route file at
   // src/routes/api/connection-status.ts; the dev server no longer
@@ -475,7 +518,7 @@ const config = defineConfig(({ mode, command }) => {
       //   2. $PORT env var (for containers, reverse proxies, WhatsApp bridge collisions, etc. — see #96)
       //   3. default 3000 (matches README/docs/docker-compose expectations)
       port: process.env.PORT ? Number(process.env.PORT) : 3000,
-      strictPort: false, // allow fallback if port is taken, but log clearly
+      strictPort: true,
       allowedHosts: true,
       watch: {
         ignored: [
@@ -552,6 +595,7 @@ const config = defineConfig(({ mode, command }) => {
         projects: ['./tsconfig.json'],
       }),
       tailwindcss(),
+      suppressUnchangedGeneratedRouteTreeReloads(),
       tanstackStart(),
       viteReact(),
       {
@@ -582,6 +626,19 @@ const config = defineConfig(({ mode, command }) => {
               requestPath !== '/api/workspace/daemon/restart'
             ) {
               next()
+              return
+            }
+
+            if (!autoStartWorkspaceCompanions) {
+              res.statusCode = 409
+              res.setHeader('content-type', 'application/json')
+              res.end(
+                JSON.stringify({
+                  ok: false,
+                  error:
+                    'Local companion auto-start is disabled. Start services explicitly or run pnpm dev.',
+                }),
+              )
               return
             }
 
@@ -629,8 +686,8 @@ const config = defineConfig(({ mode, command }) => {
             }
           })
 
-          // Auto-start hermes-agent when dev server launches
-          if (command === 'serve') {
+          // Auto-start hermes-agent only for an explicitly opted-in dev serve.
+          if (autoStartWorkspaceCompanions) {
             void startClaudeAgent()
           }
 
@@ -645,7 +702,7 @@ const config = defineConfig(({ mode, command }) => {
           })
 
           if (
-            command !== 'serve' ||
+            !autoStartWorkspaceCompanions ||
             workspaceDaemonStarted ||
             workspaceDaemonStarting
           )
@@ -667,13 +724,11 @@ const config = defineConfig(({ mode, command }) => {
                 return
               }
 
-              try {
-                execSync(
-                  `lsof -ti:${workspaceDaemonPort} | xargs kill -9 2>/dev/null || true`,
-                )
-              } catch {
-                // ignore stale cleanup failures and continue with a fresh spawn
-              }
+              workspaceDaemonStarting = false
+              console.error(
+                `[workspace-daemon] Port ${workspaceDaemonPort} is occupied by an unhealthy or unknown process; refusing to kill it automatically.`,
+              )
+              return
             }
 
             startWorkspaceDaemon()

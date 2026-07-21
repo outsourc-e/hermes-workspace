@@ -1,11 +1,15 @@
-import {  useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { bidiClassNameFor, textDirectionFor } from '../../../lib/war-room/living-v3/bidi-text'
-import type {CSSProperties, ReactNode} from 'react';
+import { CouncilGroupChatWorkbench } from './CouncilGroupChatWorkbench'
+import type { CouncilGroupChatMember, CouncilGroupChatMessage } from './CouncilGroupChatWorkbench'
+import type { CSSProperties, ReactNode } from 'react'
 import './council-chamber-surface.css'
+import './council-group-chat-workbench.css'
 
 type CouncilVote = 'support' | 'neutral' | 'against' | 'abstain'
 type CouncilMotionState = 'roaming' | 'convening' | 'seated'
 type CouncilMinimalView = 'council' | 'advisor'
+type CouncilFlowStage = 'discussion' | 'team-selection' | 'plan-drafting' | 'ready-for-hermes'
 
 const COUNCIL_STEP_PLAN_PROMPT = 'פרק את ההחלטה הזו לתוכנית מפורטת של שלבים: מה עושים ראשון, מי הבעלים, איך בודקים שזה עבד, מה הסיכון, ומה ה־fallback אם זה נכשל.'
 
@@ -47,6 +51,7 @@ type CouncilTurn = {
   generalName: string
   title: string
   accent: string
+  chatSummary?: string
   thought: string
   vote: CouncilVote
   voteReason: string
@@ -56,7 +61,7 @@ type CouncilTurn = {
   replyTo?: string
   replySnippet?: string
   realStatus?: 'completed_local_only' | 'blocked' | 'failed'
-  phase?: 'opinion' | 'peer-vote' | 'single-follow-up'
+  phase?: 'opinion' | 'council-turn' | 'peer-vote' | 'synthesis' | 'single-follow-up'
   contextUsed?: Array<string>
   peerReadback?: Array<string>
   riskFlags?: Array<string>
@@ -104,6 +109,7 @@ type CouncilRecommendation = {
 
 type CouncilSession = {
   packetId: string
+  discussionId?: string
   topic: string
   verdict: string
   summary: string
@@ -127,6 +133,7 @@ type CouncilSession = {
     consensus: string
   }
   recommendation?: CouncilRecommendation
+  sourcesUsed?: Array<string>
   error?: string
 }
 
@@ -140,14 +147,52 @@ type CouncilPersistedState = {
   activeGeneralId: string
   motionState: CouncilMotionState
   handoffState: CouncilHandoffState
+  flowStage?: CouncilFlowStage
+  selectedPlanningGeneralIds?: Array<string>
 }
 
 type CouncilArchivedSession = {
   packetId: string
+  discussionId?: string
   topic: string
   verdict: string
   archivedAtLabel: string
   session: CouncilSession
+}
+
+type CouncilGeneralStats = {
+  generalId: string
+  label: string
+  strengths: Array<string>
+  traits: Array<string>
+  memoryNotes: Array<string>
+  participated: number
+  votes: number
+  wins: number
+  lastSeenAtMs?: number
+}
+
+type CouncilDrawingBoardApiResponse = {
+  ok: boolean
+  activeDiscussionId?: string
+  discussions?: Array<{
+    discussionId: string
+    topic: string
+    status: 'thinking' | 'ready' | 'blocked'
+    updatedAtMs: number
+    result?: RealCouncilApiResponse
+    rounds?: Array<{
+      roundId: string
+      kind: 'opening' | 'reconsideration' | 'follow-up' | 'private-follow-up'
+      question: string
+      targetAgentId?: string
+      status: 'thinking' | 'ready' | 'blocked'
+      startedAtMs: number
+      completedAtMs?: number
+      turns: Array<RealCouncilApiTurn>
+    }>
+  }>
+  generalStats?: Record<string, CouncilGeneralStats>
 }
 
 export type CouncilDecisionHandoff = {
@@ -157,6 +202,8 @@ export type CouncilDecisionHandoff = {
   summary: string
   voteLine: string
   prompt: string
+  planningGeneralIds: Array<string>
+  planningGeneralNames: Array<string>
 }
 
 const COUNCIL_ASSET_VERSION = 'petdex-fixed-20260626-v8-png-council-v1'
@@ -166,10 +213,10 @@ const COUNCIL_WALK_FRAMES = 8
 const COUNCIL_CHAIR_FRAMES = 6
 const COUNCIL_LOCAL_THINKING_MIN_MS = 1_450
 const COUNCIL_LOCAL_THINKING_MAX_MS = 4_600
-const COUNCIL_REAL_AI_TIMEOUT_MS = 60_000
-const COUNCIL_FAST_PASS_AGENT_TIMEOUT_MS = 45_000
+const COUNCIL_REAL_AI_TIMEOUT_MS = 90_000
+const COUNCIL_FULL_COUNCIL_AGENT_TIMEOUT_MS = 45_000
+const COUNCIL_FULL_COUNCIL_HTTP_TIMEOUT_MS = 160_000
 const COUNCIL_FOLLOW_UP_AGENT_TIMEOUT_MS = 45_000
-const COUNCIL_FAST_PASS_AGENT_IDS = ['council-julius', 'council-alexander', 'council-hannibal']
 const COUNCIL_PERSISTENCE_STORAGE_KEY = 'hermes:war-room:council:decision-table:v1'
 const COUNCIL_ARCHIVE_STORAGE_KEY = 'hermes:war-room:council:archive:v1'
 const COUNCIL_ARCHIVE_LIMIT = 18
@@ -279,8 +326,15 @@ const councilGenerals: Array<CouncilGeneral> = [
   },
 ]
 
+const COUNCIL_CHAIR_GENERAL_ID = 'julius'
+
 function isKnownCouncilGeneralId(value: unknown): value is string {
   return typeof value === 'string' && councilGenerals.some((general) => general.id === value)
+}
+
+function orderedCouncilGeneralIds(generalIds: Array<string> = councilGenerals.map((general) => general.id)) {
+  const unique = generalIds.filter((id, index, list) => isKnownCouncilGeneralId(id) && list.indexOf(id) === index)
+  return [...unique.filter((id) => id !== COUNCIL_CHAIR_GENERAL_ID), ...unique.filter((id) => id === COUNCIL_CHAIR_GENERAL_ID)]
 }
 
 function normalizeCouncilMotionState(value: unknown, session: CouncilSession | null): CouncilMotionState {
@@ -291,6 +345,22 @@ function normalizeCouncilMotionState(value: unknown, session: CouncilSession | n
 function normalizeCouncilHandoffState(value: unknown, session: CouncilSession | null): CouncilHandoffState {
   if (!session) return 'idle'
   return value === 'unlocked' || value === 'sent' || value === 'idle' ? value : 'idle'
+}
+
+function normalizeCouncilFlowStage(value: unknown, session: CouncilSession | null, handoffState: CouncilHandoffState): CouncilFlowStage {
+  if (!session) return 'discussion'
+  if (handoffState === 'unlocked' || handoffState === 'sent') return 'ready-for-hermes'
+  return value === 'discussion' || value === 'team-selection' || value === 'plan-drafting' || value === 'ready-for-hermes'
+    ? value
+    : 'discussion'
+}
+
+function normalizeSelectedPlanningGeneralIds(value: unknown): Array<string> {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter(isKnownCouncilGeneralId)
+    .filter((id, index, list) => list.indexOf(id) === index)
+    .slice(0, councilGenerals.length)
 }
 
 function isCouncilSessionLike(value: unknown): value is CouncilSession {
@@ -305,6 +375,90 @@ function isCouncilSessionLike(value: unknown): value is CouncilSession {
   )
 }
 
+const COUNCIL_RAW_RUNNER_LEAK_PATTERN = /(Command failed:|Warning:\s+Unknown toolsets|session_id:|reported\s+usage|reported\s+cost|cost:\s*\$|usage:\s*\d|--profile\s+|--ignore-rules|--max-turns|IMPORTANT IDENTITY RULES|Return JSON only|\/Users\/mac\/\.hermes|\s-q\s+You are\s+|Controlled Hermes runner failed|Technical command\/prompt|No real AI answer returned|no fake response|rawStdout|rawStderr|toolsets=|Hermes CLI|runner failed)/i
+
+function containsCouncilRunnerLeak(value: unknown) {
+  return typeof value === 'string' && COUNCIL_RAW_RUNNER_LEAK_PATTERN.test(value)
+}
+
+function cleanCouncilUiText(value: unknown, fallback: string, max = 900) {
+  if (containsCouncilRunnerLeak(value)) return fallback
+  const text = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
+  if (!text) return fallback
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`
+}
+
+function failedCouncilTurnText(generalName: string) {
+  return `לא התקבלה תשובה נקייה מ-${generalName}. זה לא נספר כדעה; אפשר לנסות שוב עם שאלה קצרה יותר.`
+}
+
+function failedCouncilChatSummary(generalName: string) {
+  return `${generalName} לא החזיר תשובה נקייה כרגע.`
+}
+
+function failedCouncilVoteReason(generalName: string) {
+  return `${generalName} לא נספר כי לא חזרה תשובה אמיתית.`
+}
+
+function sanitizeCouncilTurnForUi(turn: CouncilTurn): CouncilTurn {
+  const general = councilGenerals.find((item) => item.id === turn.generalId)
+  const generalName = general?.shortName ?? turn.generalName
+  const answerLeak = containsCouncilRunnerLeak(turn.thought)
+    || containsCouncilRunnerLeak(turn.chatSummary)
+    || containsCouncilRunnerLeak(turn.voteReason)
+    || containsCouncilRunnerLeak(turn.suggestedFollowUp)
+  const metadataLeak = (turn.riskFlags ?? []).some(containsCouncilRunnerLeak)
+    || (turn.contextUsed ?? []).some(containsCouncilRunnerLeak)
+    || (turn.peerReadback ?? []).some(containsCouncilRunnerLeak)
+    || containsCouncilRunnerLeak(turn.usageReadback)
+  if (answerLeak || (turn.realStatus && turn.realStatus !== 'completed_local_only')) {
+    return {
+      ...turn,
+      thought: failedCouncilTurnText(generalName),
+      chatSummary: failedCouncilChatSummary(generalName),
+      vote: 'abstain',
+      voteReason: failedCouncilVoteReason(generalName),
+      realStatus: turn.realStatus ?? 'failed',
+      contextUsed: [],
+      peerReadback: [],
+      riskFlags: [],
+      usageReadback: undefined,
+      suggestedFollowUp: `נסה שוב את ${generalName} עם שאלה אחת קצרה וברורה.`,
+    }
+  }
+
+  return {
+    ...turn,
+    thought: cleanCouncilUiText(turn.thought, failedCouncilTurnText(generalName), 1_800),
+    chatSummary: cleanCouncilUiText(turn.chatSummary, compactDecisionText(turn.thought, turn.voteReason, 180), 220),
+    voteReason: cleanCouncilUiText(turn.voteReason, 'סיבת הצבעה לא דווחה.', 500),
+    contextUsed: metadataLeak ? (turn.contextUsed ?? []).filter((item) => !containsCouncilRunnerLeak(item)) : turn.contextUsed,
+    peerReadback: metadataLeak ? (turn.peerReadback ?? []).filter((item) => !containsCouncilRunnerLeak(item)) : turn.peerReadback,
+    riskFlags: metadataLeak ? (turn.riskFlags ?? []).filter((item) => !containsCouncilRunnerLeak(item)) : turn.riskFlags,
+    usageReadback: metadataLeak ? undefined : turn.usageReadback,
+    suggestedFollowUp: turn.suggestedFollowUp ? cleanCouncilUiText(turn.suggestedFollowUp, 'שאל שאלה ממוקדת נוספת.', 240) : undefined,
+  }
+}
+
+function sanitizeCouncilSessionForUi(session: CouncilSession): CouncilSession {
+  const turns = session.turns.map(sanitizeCouncilTurnForUi)
+  const discussionRounds = session.discussionRounds.map((round) => ({
+    ...round,
+    operatorOpinion: cleanCouncilUiText(round.operatorOpinion, 'שאלת המשך', 1_200),
+    answers: round.answers.map(sanitizeCouncilTurnForUi),
+  }))
+  return {
+    ...session,
+    topic: cleanCouncilUiText(session.topic, 'דיון מועצה', 1_200),
+    verdict: cleanCouncilUiText(session.verdict, 'מסקנה מוכנה', 280),
+    summary: cleanCouncilUiText(session.summary, 'המועצה סיימה. פתח את הפירוט אם צריך.', 900),
+    voteLine: cleanCouncilUiText(session.voteLine, 'אין הצבעות נקיות עדיין', 180),
+    turns,
+    discussionRounds,
+    error: containsCouncilRunnerLeak(session.error) ? 'לא חזרה תשובה נקייה מהמנוע. הפרטים הטכניים הוסתרו.' : session.error,
+  }
+}
+
 function loadStoredCouncilState(): CouncilPersistedState | null {
   if (typeof window === 'undefined') return null
   try {
@@ -312,13 +466,16 @@ function loadStoredCouncilState(): CouncilPersistedState | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<CouncilPersistedState>
     if (parsed.version !== 1) return null
-    const session = isCouncilSessionLike(parsed.session) && parsed.session.sourceMode !== 'running-real-ai'
-      ? parsed.session
+    const session = isCouncilSessionLike(parsed.session)
+      ? sanitizeCouncilSessionForUi(parsed.session)
       : null
     const topic = typeof parsed.topic === 'string'
       ? parsed.topic
       : session?.topic ?? ''
     const operatorOpinion = typeof parsed.operatorOpinion === 'string' ? parsed.operatorOpinion : ''
+    const selectedPlanningGeneralIds = normalizeSelectedPlanningGeneralIds(parsed.selectedPlanningGeneralIds)
+    const legacyHandoffState = normalizeCouncilHandoffState(parsed.handoffState, session)
+    const handoffState = selectedPlanningGeneralIds.length ? legacyHandoffState : 'idle'
     return {
       version: 1,
       topic,
@@ -328,7 +485,9 @@ function loadStoredCouncilState(): CouncilPersistedState | null {
         ? parsed.activeGeneralId
         : session?.turns[0]?.generalId ?? councilGenerals[0].id,
       motionState: normalizeCouncilMotionState(parsed.motionState, session),
-      handoffState: normalizeCouncilHandoffState(parsed.handoffState, session),
+      handoffState,
+      flowStage: normalizeCouncilFlowStage(parsed.flowStage, session, handoffState),
+      selectedPlanningGeneralIds: normalizeSelectedPlanningGeneralIds(parsed.selectedPlanningGeneralIds),
     }
   } catch {
     return null
@@ -338,15 +497,17 @@ function loadStoredCouncilState(): CouncilPersistedState | null {
 function saveStoredCouncilState(state: Omit<CouncilPersistedState, 'version'>): void {
   if (typeof window === 'undefined') return
   try {
-    const session = state.session?.sourceMode === 'running-real-ai' ? null : state.session
+    const session = state.session ? sanitizeCouncilSessionForUi(state.session) : null
     const payload: CouncilPersistedState = {
       version: 1,
-      topic: state.topic,
-      operatorOpinion: state.operatorOpinion,
+      topic: cleanCouncilUiText(state.topic, '', 1_200),
+      operatorOpinion: cleanCouncilUiText(state.operatorOpinion, '', 1_200),
       session,
       activeGeneralId: state.activeGeneralId,
       motionState: normalizeCouncilMotionState(state.motionState, session),
       handoffState: normalizeCouncilHandoffState(state.handoffState, session),
+      flowStage: normalizeCouncilFlowStage(state.flowStage, session, state.handoffState),
+      selectedPlanningGeneralIds: normalizeSelectedPlanningGeneralIds(state.selectedPlanningGeneralIds),
     }
     if (!payload.topic.trim() && !payload.operatorOpinion.trim() && !payload.session) {
       window.localStorage.removeItem(COUNCIL_PERSISTENCE_STORAGE_KEY)
@@ -375,18 +536,28 @@ function loadCouncilArchive(): Array<CouncilArchivedSession> {
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return []
     return parsed
-      .filter((item): item is CouncilArchivedSession => {
+      .map((item): CouncilArchivedSession | null => {
         const candidate = item as Partial<CouncilArchivedSession> | null
-        return Boolean(
+        if (!(
           candidate
           && typeof candidate.packetId === 'string'
           && typeof candidate.topic === 'string'
           && typeof candidate.verdict === 'string'
           && typeof candidate.archivedAtLabel === 'string'
           && isCouncilSessionLike(candidate.session)
-          && candidate.session.sourceMode !== 'running-real-ai',
-        )
+          && candidate.session.sourceMode !== 'running-real-ai'
+        )) return null
+        const session = sanitizeCouncilSessionForUi(candidate.session)
+        return {
+          packetId: candidate.packetId,
+          discussionId: candidate.discussionId,
+          topic: cleanCouncilUiText(candidate.topic, session.topic, 1_200),
+          verdict: cleanCouncilUiText(candidate.verdict, session.verdict, 280),
+          archivedAtLabel: candidate.archivedAtLabel,
+          session,
+        }
       })
+      .filter((item): item is CouncilArchivedSession => Boolean(item))
       .slice(0, COUNCIL_ARCHIVE_LIMIT)
   } catch {
     return []
@@ -404,14 +575,16 @@ function saveCouncilArchive(entries: Array<CouncilArchivedSession>): void {
 
 function upsertCouncilArchiveSession(session: CouncilSession): Array<CouncilArchivedSession> {
   if (session.sourceMode === 'running-real-ai') return loadCouncilArchive()
+  const cleanSession = sanitizeCouncilSessionForUi(session)
   const entry: CouncilArchivedSession = {
-    packetId: session.packetId,
-    topic: session.topic,
-    verdict: session.verdict,
+    packetId: cleanSession.packetId,
+    discussionId: cleanSession.discussionId,
+    topic: cleanSession.topic,
+    verdict: cleanSession.verdict,
     archivedAtLabel: new Date().toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }),
-    session,
+    session: cleanSession,
   }
-  const archive = loadCouncilArchive().filter((item) => item.packetId !== session.packetId)
+  const archive = loadCouncilArchive().filter((item) => item.packetId !== cleanSession.packetId)
   const next = [entry, ...archive].slice(0, COUNCIL_ARCHIVE_LIMIT)
   saveCouncilArchive(next)
   return next
@@ -453,6 +626,78 @@ function voteCountsFromTurns(turns: Array<CouncilTurn>) {
   )
 }
 
+function allCouncilTurnsForSession(session: CouncilSession) {
+  return [...session.turns, ...session.discussionRounds.flatMap((round) => round.answers)]
+}
+
+function liveStatsFromTurns(turns: Array<CouncilTurn>, total = councilGenerals.length): NonNullable<CouncilSession['stats']> {
+  const cleanTurns = turns.filter((turn) => !isFailedCouncilTurnForUi(turn))
+  const counts = voteCountsFromTurns(cleanTurns)
+  const top = Math.max(counts.support, counts.neutral, counts.against, counts.abstain)
+  const topVotes = [counts.support, counts.neutral, counts.against, counts.abstain].filter((value) => value === top).length
+  const consensus = cleanTurns.length === 0
+    ? 'blocked'
+    : topVotes > 1
+      ? 'split'
+      : top === counts.support
+        ? 'for'
+        : top === counts.neutral
+          ? 'neutral'
+          : top === counts.against
+            ? 'against'
+            : 'split'
+  return {
+    total,
+    completed: cleanTurns.length,
+    blocked: turns.filter((turn) => turn.realStatus === 'blocked').length,
+    failed: turns.filter(isFailedCouncilTurnForUi).length,
+    for: counts.support,
+    neutral: counts.neutral,
+    against: counts.against,
+    abstain: counts.abstain,
+    consensus,
+  }
+}
+
+function sessionWithLiveStats(session: CouncilSession, done: boolean): CouncilSession {
+  const allTurns = allCouncilTurnsForSession(session)
+  const stats = liveStatsFromTurns(allTurns)
+  const base: CouncilSession = {
+    ...session,
+    sourceMode: done ? 'controlled-real-ai-one-shot' : 'running-real-ai',
+    stats,
+    voteLine: voteLineHebrew(stats),
+    sourcesUsed: simpleSourceLabelsFromTurns(allTurns),
+  }
+  return sanitizeCouncilSessionForUi({
+    ...base,
+    verdict: done
+      ? consensusHeadingFor({ ...base, sourceMode: 'controlled-real-ai-one-shot' })
+      : `דיון חי: ${stats.completed}/${councilGenerals.length} גנרלים ענו`,
+    summary: done
+      ? `הדיון הסתיים עם ${voteLineHebrew(stats)}. הסיכום מופיע בסוף השרשור.`
+      : stats.completed > 0
+        ? `${allTurns[allTurns.length - 1]?.generalName ?? 'היועץ האחרון'} ענה. הדובר הבא יקרא אותו ויגיב.`
+        : 'המועצה התחילה לחשוב. כל תשובה תיכנס לצ׳אט כשהיא חוזרת.',
+  })
+}
+
+function appendLiveCouncilTurn(session: CouncilSession, turn: CouncilTurn, done: boolean, roundId?: string): CouncilSession {
+  if (roundId) {
+    const withRoundAnswer: CouncilSession = {
+      ...session,
+      discussionRounds: session.discussionRounds.map((round) => round.id === roundId
+        ? { ...round, answers: [...round.answers.filter((item) => item.generalId !== turn.generalId), turn] }
+        : round),
+    }
+    return sessionWithLiveStats(withRoundAnswer, done)
+  }
+  return sessionWithLiveStats({
+    ...session,
+    turns: [...session.turns.filter((item) => item.generalId !== turn.generalId), turn],
+  }, done)
+}
+
 function neutralCount(stats?: CouncilSession['stats']) {
   return stats?.neutral ?? stats?.guarded ?? 0
 }
@@ -472,6 +717,34 @@ function compactDecisionText(value: string, fallback: string, max = 96) {
   return safe.length <= max ? safe : `${safe.slice(0, max - 1)}…`
 }
 
+function mainChatTextForTurn(turn: CouncilTurn) {
+  return cleanCouncilUiText(turn.chatSummary, compactDecisionText(turn.thought, turn.voteReason, 180), 220)
+}
+
+function shortCouncilOutcome(session: CouncilSession | null) {
+  return compactDecisionText(consensusHeadingFor(session), 'מסקנה מוכנה', 72)
+}
+
+function isFailedCouncilTurnForUi(turn: CouncilTurn) {
+  return turn.realStatus === 'failed'
+    || turn.realStatus === 'blocked'
+    || /לא התקבלה תשובת AI אמיתית|runner נכשל|AI נחסם/i.test(turn.thought)
+}
+
+function mainChatTurnsFor(turns: Array<CouncilTurn>) {
+  return [...turns].sort((left, right) => {
+    const failureOrder = Number(isFailedCouncilTurnForUi(left)) - Number(isFailedCouncilTurnForUi(right))
+    if (failureOrder !== 0) return failureOrder
+    return councilGenerals.findIndex((general) => general.id === left.generalId) - councilGenerals.findIndex((general) => general.id === right.generalId)
+  })
+}
+
+function firstUsableCouncilGeneralId(turns: Array<CouncilTurn>) {
+  const chairTurn = turns.find((turn) => turn.generalId === COUNCIL_CHAIR_GENERAL_ID && !isFailedCouncilTurnForUi(turn))
+  if (chairTurn) return chairTurn.generalId
+  return turns.find((turn) => !isFailedCouncilTurnForUi(turn))?.generalId ?? turns.at(0)?.generalId ?? councilGenerals[0].id
+}
+
 function consensusHeadingFor(session: CouncilSession | null) {
   if (!session) return 'כתוב שאלה ונקבל מסקנה קצרה'
   if (session.sourceMode === 'running-real-ai') return 'מכין מסקנה קצרה…'
@@ -488,8 +761,12 @@ function consensusHeadingFor(session: CouncilSession | null) {
 
 function summaryForSession(session: CouncilSession | null) {
   if (!session) return 'כתוב שאלה אחת. המסקנה תופיע כאן קודם.'
-  if (session.recommendation?.summary) return compactDecisionText(session.recommendation.summary, session.summary, 220)
-  return compactDecisionText(session.summary, 'המועצה סיימה להצביע.', 220)
+  if (session.sourceMode === 'running-real-ai') return 'המועצה קוראת את ההודעה ומחזירה תשובה אמיתית.'
+  if (session.sourceMode === 'blocked-real-ai') return 'ה־runner נכשל; הפרטים הטכניים הוסתרו מהצ׳אט.'
+  if (session.recommendation?.nextStep) return `הצעד הבא: ${compactDecisionText(session.recommendation.nextStep, session.summary, 170)}`
+  if (session.recommendation?.reason) return compactDecisionText(session.recommendation.reason, session.summary, 190)
+  if (session.recommendation?.summary) return compactDecisionText(session.recommendation.summary, session.summary, 190)
+  return compactDecisionText(session.summary, 'המועצה סיימה להצביע.', 190)
 }
 
 function nextStepFor(session: CouncilSession | null) {
@@ -503,7 +780,7 @@ function nextStepFor(session: CouncilSession | null) {
 
 function nextGeneralId(currentId: string) {
   const index = councilGenerals.findIndex((general) => general.id === currentId)
-  const next = councilGenerals[(index + 1 + councilGenerals.length) % councilGenerals.length]
+  const next = councilGenerals.at((index + 1 + councilGenerals.length) % councilGenerals.length)
   return next?.id ?? councilGenerals[0].id
 }
 
@@ -742,7 +1019,7 @@ function buildCouncilSession(rawTopic: string): CouncilSession {
   }
 }
 
-function handoffPromptFor(session: CouncilSession) {
+function handoffPromptFor(session: CouncilSession, planningGeneralNames: Array<string>) {
   const reactionLine = (turn: CouncilTurn) => turn.reactions
     .map((item) => `${item.emoji}${item.by.length} ${item.label}`)
     .join(' · ')
@@ -757,7 +1034,8 @@ function handoffPromptFor(session: CouncilSession) {
       return `Round ${index + 1} · DLV opinion (${round.createdAtLabel}):\n${round.operatorOpinion}\nCouncil replies:\n${answers}`
     }).join('\n\n')
     : 'DLV did not add a separate discussion round before approving this packet.'
-  return `Council decision packet ${session.packetId}\n\nTopic:\n${session.topic}\n\nVerdict:\n${session.verdict}\n\nSummary:\n${session.summary}\n\nVotes:\n${session.voteLine}\n\nOpening general notes:\n${advice}\n\nDLV discussion before handoff:\n${discussion}\n\nHermes: DLV approved this local council packet for discussion. Discuss with me how to execute this best in the Workspace. Keep it scoped, tool-first, local-only by default, and ask before any external/live/money/customer/supplier action.`
+  const planningTeam = planningGeneralNames.length ? planningGeneralNames.join(', ') : 'No planning team selected'
+  return `Council decision packet ${session.packetId}\n\nTopic:\n${session.topic}\n\nVerdict:\n${session.verdict}\n\nSummary:\n${session.summary}\n\nVotes:\n${session.voteLine}\n\nSelected planning team:\n${planningTeam}\n\nOpening general notes:\n${advice}\n\nDLV discussion and planning before handoff:\n${discussion}\n\nHermes: DLV approved this local council packet after discussion and a planning-team breakdown. Use the selected generals' plan as decision context, then discuss execution with DLV in the Workspace. Keep it scoped, tool-first, local-only by default, and ask before any external/live/money/customer/supplier action.`
 }
 
 function generalSpritePath(assetSlug: string) {
@@ -775,8 +1053,9 @@ function generalPortraitPath(assetSlug: string) {
 type RealCouncilApiTurn = {
   generalId: string
   label: string
-  phase: 'opinion' | 'peer-vote' | 'single-follow-up'
+  phase: 'opinion' | 'council-turn' | 'peer-vote' | 'synthesis' | 'single-follow-up'
   status: 'completed_local_only' | 'blocked' | 'failed'
+  chatSummary?: string
   opinion: string
   vote: 'for' | 'neutral' | 'against' | 'guarded' | 'abstain'
   voteReason: string
@@ -788,6 +1067,8 @@ type RealCouncilApiTurn = {
   riskFlags: Array<string>
   suggestedFollowUp: string
   usageReadback: string
+  replyTo?: string
+  replySnippet?: string
   error?: string
 }
 
@@ -810,6 +1091,12 @@ type RealCouncilApiResponse = {
     recommendation?: CouncilRecommendation
     sourceContextPacketId: string
   }
+  drawingBoard?: {
+    discussionId: string
+    database?: string
+    stateVersion?: string
+  }
+  generalStats?: Record<string, CouncilGeneralStats>
   error?: string
 }
 
@@ -829,11 +1116,12 @@ function councilAgentIdForGeneral(generalId: string) {
 
 function peerOpinionsFromSession(session: CouncilSession | null) {
   if (!session) return []
-  return session.turns
+  return allCouncilTurnsForSession(session)
     .filter((turn) => turn.realStatus === 'completed_local_only')
     .map((turn) => ({
       generalId: turn.generalId,
       label: turn.generalName,
+      chatSummary: turn.chatSummary,
       opinion: turn.thought,
       vote: turn.vote === 'support' ? 'for' : turn.vote === 'neutral' ? 'neutral' : turn.vote === 'abstain' ? 'abstain' : 'against',
       voteReason: turn.voteReason,
@@ -857,11 +1145,15 @@ function turnFromRealCouncil(apiTurn: RealCouncilApiTurn): CouncilTurn {
   const thought = apiTurn.status === 'completed_local_only'
     ? apiTurn.opinion
     : `לא התקבלה תשובת AI אמיתית מ-${apiTurn.label}. ${apiTurn.error ?? 'הקריאה נחסמה או נכשלה.'}`
-  return {
+  const chatSummary = apiTurn.status === 'completed_local_only'
+    ? apiTurn.chatSummary ?? apiTurn.opinion
+    : `לא התקבלה תשובה נקייה מ-${apiTurn.label}.`
+  return sanitizeCouncilTurnForUi({
     generalId: apiTurn.generalId,
     generalName: general?.shortName ?? apiTurn.label,
     title: general?.title ?? 'Council AI advisor',
     accent: general?.accent ?? '#f6c56f',
+    chatSummary,
     thought,
     vote,
     voteReason: apiTurn.voteReason,
@@ -875,13 +1167,29 @@ function turnFromRealCouncil(apiTurn: RealCouncilApiTurn): CouncilTurn {
     riskFlags: apiTurn.riskFlags,
     usageReadback: apiTurn.usageReadback,
     suggestedFollowUp: apiTurn.suggestedFollowUp,
-  }
+    replyTo: apiTurn.replyTo,
+    replySnippet: apiTurn.replySnippet,
+  })
 }
 
-function pendingCouncilSession(topic: string): CouncilSession {
+function simpleSourceLabelsFromTurns(turns: Array<CouncilTurn>) {
+  const values = turns.flatMap((turn) => turn.contextUsed ?? [])
+  const labels = ['Obsidian', ...values.map((item) => {
+    const lower = item.toLowerCase()
+    if (lower.includes('obsidian') || lower.endsWith('.md')) return 'Obsidian'
+    if (lower.includes('http') || lower.includes('web')) return 'Web'
+    if (lower.includes('supabase') || lower.includes('database')) return 'Supabase'
+    if (lower.includes('file') || lower.includes('src/')) return 'Project files'
+    return item.length > 24 ? `${item.slice(0, 21)}…` : item
+  })]
+  return labels.filter((item, index, list) => item && list.indexOf(item) === index).slice(0, 5)
+}
+
+function pendingCouncilSession(topic: string, discussionId?: string): CouncilSession {
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   return {
     packetId: `council-running-${Date.now().toString(36)}`,
+    discussionId,
     topic,
     verdict: 'מכין מסקנה קצרה',
     summary: 'אם AI ייכשל — נראה חסימה, לא תשובה מזויפת.',
@@ -894,29 +1202,32 @@ function pendingCouncilSession(topic: string): CouncilSession {
   }
 }
 
-function blockedCouncilSession(topic: string, error: string): CouncilSession {
+function blockedCouncilSession(topic: string, error: string, discussionId?: string): CouncilSession {
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const safeError = cleanCouncilUiText(error, 'המנוע לא החזיר תשובה נקייה. הפרטים הטכניים הוסתרו.', 420)
   return {
     packetId: `council-blocked-${Date.now().toString(36)}`,
-    topic,
+    discussionId,
+    topic: cleanCouncilUiText(topic, 'דיון מועצה', 1_200),
     verdict: 'לא התקבלה מסקנה',
-    summary: error,
+    summary: safeError,
     voteLine: '0 בעד · 0 ניטרלי · 0 נגד · 0 נמנע',
     turns: [],
     discussionRounds: [],
     createdAtLabel: now,
     sourceMode: 'blocked-real-ai',
     noFakeResponses: true,
-    error,
+    error: safeError,
     stats: { total: 6, completed: 0, blocked: 0, failed: 6, for: 0, neutral: 0, against: 0, abstain: 0, consensus: 'blocked' },
   }
 }
 
 function sessionFromRealCouncil(data: RealCouncilApiResponse): CouncilSession {
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  const realTurns = (data.voteTurns?.length ? data.voteTurns : data.openingTurns).map(turnFromRealCouncil)
-  return {
+  const realTurns = [...(data.openingTurns ?? []), ...(data.voteTurns ?? [])].map(turnFromRealCouncil)
+  return sanitizeCouncilSessionForUi({
     packetId: data.decisionPacket?.packetId ?? data.runId,
+    discussionId: data.drawingBoard?.discussionId,
     topic: data.topic,
     verdict: data.decisionPacket?.verdict ?? data.summary,
     summary: data.summary,
@@ -929,15 +1240,93 @@ function sessionFromRealCouncil(data: RealCouncilApiResponse): CouncilSession {
     contextPacketId: data.decisionPacket?.sourceContextPacketId ?? data.contextPacket?.packetId,
     stats: data.stats,
     recommendation: data.decisionPacket?.recommendation ?? data.recommendation,
+    sourcesUsed: simpleSourceLabelsFromTurns(realTurns),
     error: data.error,
+  })
+}
+
+type CouncilDrawingBoardDiscussionPayload = NonNullable<CouncilDrawingBoardApiResponse['discussions']>[number]
+type CouncilDrawingBoardRoundPayload = NonNullable<CouncilDrawingBoardDiscussionPayload['rounds']>[number]
+
+function councilRoundTargetForUi(round: CouncilDrawingBoardRoundPayload): string | undefined {
+  const target = round.targetAgentId
+  if (target === 'council' || target === 'planning-team') return target
+  const generalId = target?.replace(/^council-/, '')
+  if (isKnownCouncilGeneralId(generalId)) return generalId
+  if (round.kind === 'reconsideration' || round.kind === 'follow-up') return 'council'
+  return undefined
+}
+
+function discussionRoundFromDrawingBoard(round: CouncilDrawingBoardRoundPayload): CouncilDiscussionRound | null {
+  if (!round.roundId) return null
+  const answers = Array.isArray(round.turns) ? round.turns.map(turnFromRealCouncil) : []
+  return {
+    id: round.roundId,
+    operatorOpinion: cleanCouncilUiText(round.question, 'שאלת המשך', 1_200),
+    answers,
+    createdAtLabel: new Date(round.completedAtMs ?? round.startedAtMs ?? Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    targetGeneralId: councilRoundTargetForUi(round),
   }
+}
+
+function sessionFromDrawingBoardDiscussion(item: CouncilDrawingBoardDiscussionPayload): CouncilSession | null {
+  const cleanTopic = cleanCouncilUiText(item.topic, 'דיון מועצה', 1_200)
+  const discussionRounds = (item.rounds ?? [])
+    .map(discussionRoundFromDrawingBoard)
+    .filter((round): round is CouncilDiscussionRound => Boolean(round))
+
+  if (!item.result?.runId) {
+    if (item.status === 'thinking') return pendingCouncilSession(cleanTopic, item.discussionId)
+    if (item.status === 'blocked') return blockedCouncilSession(cleanTopic, 'הדיון האחרון נחסם לפני שחזרה תשובת AI נקייה.', item.discussionId)
+    return null
+  }
+
+  const base = sessionFromRealCouncil({
+    ...item.result,
+    drawingBoard: item.result.drawingBoard ?? { discussionId: item.discussionId },
+  })
+  return sanitizeCouncilSessionForUi({
+    ...base,
+    discussionId: item.discussionId,
+    topic: cleanTopic,
+    sourceMode: item.status === 'thinking' ? 'running-real-ai' : base.sourceMode,
+    discussionRounds,
+    sourcesUsed: [...new Set([...(base.sourcesUsed ?? []), ...discussionRounds.flatMap((round) => round.answers.flatMap((turn) => turn.contextUsed ?? []))])].slice(0, 5),
+  })
+}
+
+function archivedSessionFromDrawingBoard(item: NonNullable<CouncilDrawingBoardApiResponse['discussions']>[number]): CouncilArchivedSession | null {
+  const session = sessionFromDrawingBoardDiscussion(item)
+  if (!session || session.sourceMode === 'running-real-ai') return null
+  const cleanTopic = cleanCouncilUiText(item.topic || session.topic, session.topic, 1_200)
+  return {
+    packetId: session.packetId,
+    discussionId: item.discussionId,
+    topic: cleanTopic,
+    verdict: session.verdict,
+    archivedAtLabel: new Date(item.updatedAtMs).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }),
+    session: sanitizeCouncilSessionForUi({
+      ...session,
+      discussionId: item.discussionId,
+      topic: cleanTopic,
+    }),
+  }
+}
+
+async function fetchCouncilDrawingBoardState(): Promise<CouncilDrawingBoardApiResponse> {
+  const response = await fetch('/api/war-room/council/run', {
+    method: 'GET',
+    cache: 'no-store',
+    credentials: 'same-origin',
+  })
+  return await response.json() as CouncilDrawingBoardApiResponse
 }
 
 async function fetchCouncilJsonWithTimeout<T>(url: string, init: RequestInit, timeoutMs = COUNCIL_REAL_AI_TIMEOUT_MS): Promise<{ response: Response; data: T }> {
   const controller = new AbortController()
-  let didTimeout = false
+  const timeoutState = { didTimeout: false }
   const timeout = window.setTimeout(() => {
-    didTimeout = true
+    timeoutState.didTimeout = true
     controller.abort()
   }, timeoutMs)
   try {
@@ -945,26 +1334,46 @@ async function fetchCouncilJsonWithTimeout<T>(url: string, init: RequestInit, ti
     const data = await response.json() as T
     return { response, data }
   } catch (error) {
-    if (didTimeout) throw new Error(`Council API timed out after ${Math.round(timeoutMs / 1000)}s`)
+    if (timeoutState.didTimeout) throw new Error(`Council API timed out after ${Math.round(timeoutMs / 1000)}s`)
     throw error
   } finally {
     window.clearTimeout(timeout)
   }
 }
 
-async function fetchRealCouncilSession(topic: string): Promise<CouncilSession> {
+function activeCouncilRoundIdForTurn(session: CouncilSession) {
+  const latestGroupRound = [...session.discussionRounds].reverse().find((round) => round.targetGeneralId === 'council' || round.targetGeneralId === 'planning-team')
+  return latestGroupRound?.id
+}
+
+function liveCouncilTopicForTurn(baseTopic: string, session: CouncilSession) {
+  const interventions = session.discussionRounds
+    .filter((round) => round.targetGeneralId === 'council' || round.targetGeneralId === 'planning-team')
+    .map((round, index) => `${index + 1}. ${round.operatorOpinion}`)
+  if (!interventions.length) return baseTopic
+  return `${baseTopic}\n\nDLV התערב באמצע הדיון. הדוברים הבאים חייבים להגיב גם להודעות האלה לפי הסדר:\n${interventions.join('\n')}`
+}
+
+async function fetchRealCouncilSession(topic: string, options: { discussionId?: string; roundId?: string; agentIds?: Array<string>; previousOpinions?: ReturnType<typeof peerOpinionsFromSession> } = {}): Promise<CouncilSession> {
   const { response, data } = await fetchCouncilJsonWithTimeout<RealCouncilApiResponse>('/api/war-room/council/run', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       topic,
-      includePeerVote: false,
-      timeoutMs: COUNCIL_FAST_PASS_AGENT_TIMEOUT_MS,
-      agentIds: COUNCIL_FAST_PASS_AGENT_IDS,
+      includePeerVote: true,
+      agentIds: options.agentIds,
+      previousOpinions: options.previousOpinions,
+      timeoutMs: COUNCIL_FULL_COUNCIL_AGENT_TIMEOUT_MS,
+      discussionId: options.discussionId,
+      roundId: options.roundId,
     }),
-  })
-  if (!response.ok) {
-    return blockedCouncilSession(topic, data.error ?? `Council API failed with HTTP ${response.status}`)
+  }, COUNCIL_FULL_COUNCIL_HTTP_TIMEOUT_MS)
+  const hasRoundPayload = typeof data.runId === 'string' && Array.isArray(data.openingTurns) && Boolean(data.stats)
+  if (!response.ok || !data.ok) {
+    const message = data.error ?? data.summary ?? (response.ok ? 'Council API returned ok:false with HTTP 200.' : `Council API failed with HTTP ${response.status}`)
+    return hasRoundPayload
+      ? sessionFromRealCouncil({ ...data, error: message, summary: data.summary ?? message })
+      : blockedCouncilSession(topic, message)
   }
   return sessionFromRealCouncil(data)
 }
@@ -973,6 +1382,7 @@ async function fetchRealCouncilFollowUp(input: {
   session: CouncilSession
   generalId: string
   question: string
+  roundId?: string
 }): Promise<CouncilTurn> {
   const { response, data } = await fetchCouncilJsonWithTimeout<RealCouncilFollowUpResponse>('/api/war-room/council/follow-up', {
     method: 'POST',
@@ -983,6 +1393,8 @@ async function fetchRealCouncilFollowUp(input: {
       agentId: councilAgentIdForGeneral(input.generalId),
       previousOpinions: peerOpinionsFromSession(input.session),
       timeoutMs: COUNCIL_FOLLOW_UP_AGENT_TIMEOUT_MS,
+      discussionId: input.session.discussionId,
+      roundId: input.roundId,
     }),
   })
   if (response.ok && data.turn) {
@@ -1002,14 +1414,14 @@ async function fetchRealCouncilFollowUp(input: {
     status: 'failed',
     opinion: '',
     vote: 'abstain',
-    voteReason: 'No real AI follow-up returned; no fake response was generated.',
+    voteReason: 'לא חזרה תשובת המשך נקייה; לא נוצרה תשובה מזויפת.',
     confidence: 0,
-    personalitySignal: 'Real AI follow-up failed closed.',
+    personalitySignal: 'שיחת ההמשך נכשלה סגור.',
     contextUsed: [],
     peerReadback: [],
-    riskFlags: ['follow-up AI call failed'],
-    suggestedFollowUp: 'Retry after checking the controlled runner.',
-    usageReadback: 'no usage reported',
+    riskFlags: ['שיחת ההמשך לא החזירה תשובה נקייה'],
+    suggestedFollowUp: 'נסה שוב עם שאלה אחת קצרה וברורה.',
+    usageReadback: 'לא דווח שימוש',
     error: returnedError ?? `Council follow-up failed with HTTP ${response.status}`,
   })
 }
@@ -1030,6 +1442,11 @@ function messageBelongsToAdvisor(message: CouncilChatMessage, generalId: string)
     || message.round.answers.some((turn) => turn.generalId === generalId)
 }
 
+function messageBelongsToMainCouncil(message: CouncilChatMessage) {
+  if (message.type === 'operator') return message.round.targetGeneralId === 'council' || message.round.targetGeneralId === 'planning-team'
+  return message.turn.phase !== 'single-follow-up'
+}
+
 function advisorChatMessagesFor(session: CouncilSession, generalId: string): Array<CouncilChatMessage> {
   return chatMessagesFor(session).filter((message) => messageBelongsToAdvisor(message, generalId))
 }
@@ -1038,7 +1455,7 @@ function typingLabelFor(message: CouncilChatMessage | null) {
   if (!message) return ''
   if (message.type === 'operator') return 'השאלה שלך נכנסה לצ׳אט המועצה...'
   const general = councilGenerals.find((item) => item.id === message.turn.generalId)
-  return `${general?.shortName ?? message.turn.generalName} מציג תשובת AI אמיתית...`
+  return `${general?.shortName ?? message.turn.generalName} כותב תשובה נקייה...`
 }
 
 function delayForChatMessage(message: CouncilChatMessage | null, messageIndex: number) {
@@ -1161,11 +1578,9 @@ function TypingBubble({ message }: { message: CouncilChatMessage | null }) {
 }
 
 export function CouncilChamberSurface({
-  onClose,
   onTransferToHermes,
   navigationSlot,
 }: {
-  onClose: () => void
   onTransferToHermes: (handoff: CouncilDecisionHandoff) => void
   navigationSlot?: ReactNode
 }) {
@@ -1176,19 +1591,31 @@ export function CouncilChamberSurface({
   const [activeGeneralId, setActiveGeneralId] = useState(() => initialCouncilState?.activeGeneralId ?? councilGenerals[0].id)
   const [motionState, setMotionState] = useState<CouncilMotionState>(() => initialCouncilState?.motionState ?? 'roaming')
   const [handoffState, setHandoffState] = useState<CouncilHandoffState>(() => initialCouncilState?.handoffState ?? 'idle')
+  const [flowStage, setFlowStage] = useState<CouncilFlowStage>(() => initialCouncilState?.flowStage ?? 'discussion')
+  const [selectedPlanningGeneralIds, setSelectedPlanningGeneralIds] = useState<Array<string>>(() => initialCouncilState?.selectedPlanningGeneralIds ?? [])
   const [visibleMessageCount, setVisibleMessageCount] = useState(() => initialCouncilState?.session ? chatMessagesFor(initialCouncilState.session).length : 0)
-  const [councilRunPending, setCouncilRunPending] = useState(false)
+  const [councilRunPending, setCouncilRunPending] = useState(() => initialCouncilState?.session?.sourceMode === 'running-real-ai')
   const [minimalView, setMinimalView] = useState<CouncilMinimalView>('council')
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiveEntries, setArchiveEntries] = useState<Array<CouncilArchivedSession>>(() => loadCouncilArchive())
+  const [drawingBoardStats, setDrawingBoardStats] = useState<Record<string, CouncilGeneralStats>>({})
+  const [drawingBoardStatus, setDrawingBoardStatus] = useState('Loading saved discussions')
+  const mainChatRef = useRef<HTMLDivElement | null>(null)
   const chatRef = useRef<HTMLDivElement | null>(null)
   const advisorChatRef = useRef<HTMLDivElement | null>(null)
+  const sessionRef = useRef<CouncilSession | null>(initialCouncilState?.session ?? null)
   const handoffUnlocked = Boolean(session && handoffState !== 'idle')
   const activeGeneral = councilGenerals.find((general) => general.id === activeGeneralId) ?? councilGenerals[0]
   const latestRound = session?.discussionRounds[session.discussionRounds.length - 1] ?? null
+  const latestCouncilRound = [...(session?.discussionRounds ?? [])].reverse().find((round) => round.targetGeneralId === 'council') ?? null
   const activeTurn = latestRound?.answers.find((turn) => turn.generalId === activeGeneral.id)
     ?? session?.turns.find((turn) => turn.generalId === activeGeneral.id)
     ?? null
+  const activeGeneralStats = drawingBoardStats[activeGeneral.id]
+  const statLineForGeneral = (general: CouncilGeneral) => {
+    const stats = drawingBoardStats[general.id]
+    return stats ? `${stats.participated} chats · ${stats.wins} wins` : 'new profile'
+  }
   const nextGeneral = councilGenerals.find((general) => general.id === nextGeneralId(activeGeneral.id)) ?? councilGenerals[0]
   const activeAdvisorPrompt = followUpPromptFor(activeGeneral, activeTurn)
   const planningStage = planningStageLabel(session)
@@ -1200,6 +1627,9 @@ export function CouncilChamberSurface({
     { label: 'סיכונים', prompt: 'מה יכול להישבר ומה ה־fallback?' },
     { label: 'להראות לחברים', prompt: 'מה צריך להשתנות כדי שזה יהיה ברור ומרשים למישהו שרואה פעם ראשונה?' },
   ]
+  const selectedPlanningGeneralNames = selectedPlanningGeneralIds
+    .map((id) => councilGenerals.find((general) => general.id === id)?.shortName)
+    .filter((name): name is string => Boolean(name))
   const handoff = useMemo<CouncilDecisionHandoff | null>(() => session
     ? {
       packetId: session.packetId,
@@ -1207,23 +1637,32 @@ export function CouncilChamberSurface({
       verdict: session.verdict,
       summary: session.summary,
       voteLine: session.voteLine,
-      prompt: handoffPromptFor(session),
+      prompt: handoffPromptFor(session, selectedPlanningGeneralNames),
+      planningGeneralIds: selectedPlanningGeneralIds,
+      planningGeneralNames: selectedPlanningGeneralNames,
     }
     : null,
-  [session])
+  [selectedPlanningGeneralIds, selectedPlanningGeneralNames, session])
   const chatMessages = useMemo(() => session ? chatMessagesFor(session) : [], [session])
   const advisorChatMessages = useMemo(() => session ? advisorChatMessagesFor(session, activeGeneral.id) : [], [activeGeneral.id, session])
   const visibleChatMessages = chatMessages.slice(0, visibleMessageCount)
+  const visibleMainChatMessages = visibleChatMessages.filter(messageBelongsToMainCouncil)
   const visibleAdvisorChatMessages = visibleChatMessages.filter((message) => messageBelongsToAdvisor(message, activeGeneral.id))
   const pendingChatMessage = visibleMessageCount < chatMessages.length ? chatMessages[visibleMessageCount] : null
+  const pendingMainChatMessage = pendingChatMessage && messageBelongsToMainCouncil(pendingChatMessage) ? pendingChatMessage : null
   const advisorPendingMessage = pendingChatMessage && messageBelongsToAdvisor(pendingChatMessage, activeGeneral.id) ? pendingChatMessage : null
-  const currentDecisionTurns = latestRound?.answers.length ? latestRound.answers : session?.turns ?? []
+  const currentDecisionTurns = latestCouncilRound ? latestCouncilRound.answers : session?.turns ?? []
   const currentDecisionTurnByGeneral = new Map(currentDecisionTurns.map((turn) => [turn.generalId, turn]))
+  const currentDecisionMessageIds = new Set(latestCouncilRound
+    ? latestCouncilRound.answers.map((turn) => `${latestCouncilRound.id}-${turn.generalId}`)
+    : session?.turns.map((turn) => `opening-${turn.generalId}`) ?? [])
   const visibleVoteGeneralIds = new Set(visibleChatMessages
-    .filter((message): message is Extract<CouncilChatMessage, { type: 'turn' }> => message.type === 'turn')
+    .filter((message): message is Extract<CouncilChatMessage, { type: 'turn' }> => message.type === 'turn' && currentDecisionMessageIds.has(message.id))
     .map((message) => message.turn.generalId))
-  const pendingVoteGeneralId = pendingChatMessage?.type === 'turn' ? pendingChatMessage.turn.generalId : ''
-  const voteCounts = session?.stats
+  const pendingVoteGeneralId = pendingChatMessage?.type === 'turn' && currentDecisionMessageIds.has(pendingChatMessage.id) ? pendingChatMessage.turn.generalId : ''
+  const voteCounts = latestCouncilRound
+    ? voteCountsFromTurns(currentDecisionTurns)
+    : session?.stats
     ? {
       support: session.stats.for,
       neutral: neutralCount(session.stats),
@@ -1282,12 +1721,147 @@ export function CouncilChamberSurface({
   ]
   const councilHasPersistableState = Boolean(session || topic.trim() || operatorOpinion.trim())
   const minimalMode = session ? minimalView : 'start'
-  const primaryCouncilAnswer = session?.recommendation?.supportLine
-    ?? consensusNextStep
-    ?? consensusTitle
+  const primaryCouncilAnswer = shortCouncilOutcome(session)
+  const councilReadbackSources = session?.sourcesUsed?.join(', ') || 'no sources listed'
+  const influentialTurn = currentDecisionTurns.find((turn) => (turn.peerReadback?.length ?? 0) > 0)
+    ?? currentDecisionTurns.find((turn) => Boolean(turn.replyTo))
+    ?? null
+  const rethinkSignal = councilRunPending
+    ? 'המועצה חושבת עכשיו.'
+    : pendingMainChatMessage?.type === 'turn'
+      ? `${pendingMainChatMessage.turn.generalName} כותב עכשיו.`
+      : influentialTurn
+        ? `${influentialTurn.generalName} העלה נקודה שהמועצה בדקה.`
+        : latestCouncilRound
+          ? 'סבב מועצה חדש נוסף לאותו דיון.'
+          : 'אין עדיין סבב נוסף.'
+  const groupChatMembers: Array<CouncilGroupChatMember> = councilGenerals.map((general) => {
+    const turn = currentDecisionTurnByGeneral.get(general.id)
+    const stats = drawingBoardStats[general.id]
+    const isChair = general.id === COUNCIL_CHAIR_GENERAL_ID
+    return {
+      id: general.id,
+      name: general.shortName,
+      personaLabel: isChair ? 'ראש המועצה · מסכם ושומר מחלוקות' : general.personaLabel,
+      memoryLine: stats?.memoryNotes?.[0],
+      statLine: stats ? `${stats.participated} דיונים · ${stats.wins} הובלות` : 'פרופיל חדש',
+      isChair,
+      accent: general.accent,
+      portraitUrl: generalPortraitPath(general.assetSlug),
+      voteLabel: turn ? voteLabel(turn.vote) : 'ממתין',
+      voteTone: turn ? voteTone(turn.vote) : 'pending',
+      selectedForPlanning: selectedPlanningGeneralIds.includes(general.id),
+      answered: Boolean(turn && !isFailedCouncilTurnForUi(turn)),
+    }
+  })
+  const groupChatMessages: Array<CouncilGroupChatMessage> = visibleMainChatMessages.map((message) => {
+    if (message.type === 'operator') {
+      return {
+        id: message.id,
+        senderType: 'operator',
+        senderId: 'dlv',
+        senderName: 'DLV',
+        text: message.round.operatorOpinion,
+        timeLabel: message.round.targetGeneralId === 'planning-team'
+          ? `${message.round.createdAtLabel} · לצוות הפירוק`
+          : `${message.round.createdAtLabel} · למועצה`,
+      }
+    }
+    const general = councilGenerals.find((item) => item.id === message.turn.generalId)
+    return {
+      id: message.id,
+      senderType: 'general',
+      senderId: message.turn.generalId,
+      senderName: message.turn.generalName,
+      portraitUrl: general ? generalPortraitPath(general.assetSlug) : undefined,
+      accent: message.turn.accent,
+      text: mainChatTextForTurn(message.turn),
+      voteLabel: voteLabel(message.turn.vote),
+      voteTone: voteTone(message.turn.vote),
+      replyTo: message.turn.replyTo,
+      replySnippet: message.turn.replySnippet,
+      failed: isFailedCouncilTurnForUi(message.turn),
+      phaseLabel: message.turn.phase === 'single-follow-up'
+        ? 'שיחת יועץ'
+        : message.turn.phase === 'synthesis'
+          ? 'יוליוס · ראש המועצה'
+          : message.turn.phase === 'council-turn'
+            ? 'תגובה לדיון'
+            : 'דעה עצמאית',
+    }
+  })
+  const latestGroupRound = [...(session?.discussionRounds ?? [])].reverse()
+    .find((round) => round.targetGeneralId === 'council' || round.targetGeneralId === 'planning-team')
+  const pendingQueueIds = latestGroupRound?.targetGeneralId === 'planning-team'
+    ? orderedCouncilGeneralIds(selectedPlanningGeneralIds)
+    : orderedCouncilGeneralIds()
+  const answeredQueueIds = new Set((latestGroupRound ? latestGroupRound.answers : session?.turns ?? []).map((turn) => turn.generalId))
+  const pendingGroupMember = councilRunPending
+    ? groupChatMembers.find((member) => pendingQueueIds.includes(member.id) && !answeredQueueIds.has(member.id)) ?? null
+    : null
+
+  function applyRestoredCouncilSession(restoredSession: CouncilSession) {
+    const currentSession = sessionRef.current
+    const sameDiscussion = Boolean(
+      restoredSession.discussionId
+        && currentSession?.discussionId
+        && restoredSession.discussionId === currentSession.discussionId,
+    )
+    if (
+      currentSession
+      && currentSession.sourceMode !== 'running-real-ai'
+      && restoredSession.sourceMode === 'running-real-ai'
+      && sameDiscussion
+    ) return
+
+    sessionRef.current = restoredSession
+    setTopic(restoredSession.topic)
+    setOperatorOpinion('')
+    setSession(restoredSession)
+    setMotionState('seated')
+    setMinimalView('council')
+    setCouncilRunPending(restoredSession.sourceMode === 'running-real-ai')
+    if (restoredSession.sourceMode !== 'running-real-ai') {
+      setActiveGeneralId(firstUsableCouncilGeneralId(allCouncilTurnsForSession(restoredSession)))
+      setVisibleMessageCount(chatMessagesFor(restoredSession).length)
+    } else {
+      setVisibleMessageCount((count) => Math.min(count, chatMessagesFor(restoredSession).length))
+    }
+  }
+
+  function applyDrawingBoardPayload(payload: CouncilDrawingBoardApiResponse) {
+    setDrawingBoardStats(payload.generalStats ?? {})
+    const databaseEntries = (payload.discussions ?? [])
+      .map(archivedSessionFromDrawingBoard)
+      .filter((entry): entry is CouncilArchivedSession => Boolean(entry))
+    if (databaseEntries.length) {
+      const localEntries = loadCouncilArchive()
+      const merged = [...databaseEntries, ...localEntries]
+        .filter((entry, index, list) => list.findIndex((candidate) => candidate.packetId === entry.packetId) === index)
+        .slice(0, COUNCIL_ARCHIVE_LIMIT)
+      setArchiveEntries(merged)
+      saveCouncilArchive(merged)
+    }
+
+    const activeDiscussion = payload.activeDiscussionId
+      ? payload.discussions?.find((item) => item.discussionId === payload.activeDiscussionId)
+      : undefined
+    const restoredSession = activeDiscussion ? sessionFromDrawingBoardDiscussion(activeDiscussion) : null
+    const currentSession = sessionRef.current
+    const shouldRestore = Boolean(
+      restoredSession
+        && (!currentSession
+          || currentSession.sourceMode === 'running-real-ai'
+          || currentSession.discussionId === restoredSession.discussionId),
+    )
+    if (restoredSession && shouldRestore) applyRestoredCouncilSession(restoredSession)
+  }
 
   useEffect(() => {
-    if (councilRunPending) return
+    sessionRef.current = session
+  }, [session])
+
+  useEffect(() => {
     saveStoredCouncilState({
       topic,
       operatorOpinion,
@@ -1295,8 +1869,46 @@ export function CouncilChamberSurface({
       activeGeneralId,
       motionState,
       handoffState,
+      flowStage,
+      selectedPlanningGeneralIds,
     })
-  }, [activeGeneralId, councilRunPending, handoffState, motionState, operatorOpinion, session, topic])
+  }, [activeGeneralId, councilRunPending, flowStage, handoffState, motionState, operatorOpinion, selectedPlanningGeneralIds, session, topic])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const payload = await fetchCouncilDrawingBoardState()
+        if (cancelled) return
+        applyDrawingBoardPayload(payload)
+        setDrawingBoardStatus(payload.ok ? 'נשמר מקומית במחשב' : 'נשמר רק בדפדפן')
+      } catch {
+        if (!cancelled) setDrawingBoardStatus('ארכיון מקומי בלבד')
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (!session?.discussionId || session.sourceMode !== 'running-real-ai') return undefined
+    let cancelled = false
+    const pollActiveDiscussion = async () => {
+      try {
+        const payload = await fetchCouncilDrawingBoardState()
+        if (cancelled) return
+        applyDrawingBoardPayload(payload)
+        setDrawingBoardStatus(payload.ok ? 'ממשיך דיון שמור' : 'ממשיך מהדפדפן')
+      } catch {
+        if (!cancelled) setDrawingBoardStatus('ממשיך מקומית · מחכה לשרת')
+      }
+    }
+    void pollActiveDiscussion()
+    const interval = window.setInterval(() => void pollActiveDiscussion(), 4_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [session?.discussionId, session?.sourceMode])
 
   useEffect(() => {
     if (!session || session.sourceMode === 'running-real-ai') return
@@ -1318,10 +1930,12 @@ export function CouncilChamberSurface({
   }, [session, chatMessages, visibleMessageCount])
 
   useEffect(() => {
+    const mainNode = mainChatRef.current
+    if (mainNode) mainNode.scrollTop = mainNode.scrollHeight
     const node = chatRef.current
     if (!node) return
     node.scrollTop = node.scrollHeight
-  }, [visibleMessageCount, pendingChatMessage?.id, session?.packetId])
+  }, [visibleMessageCount, pendingChatMessage?.id, visibleMainChatMessages.length, session?.packetId])
 
   useEffect(() => {
     const node = advisorChatRef.current
@@ -1338,8 +1952,10 @@ export function CouncilChamberSurface({
           ? 'קורא Obsidian ומריץ גנרלים אמיתיים'
           : session.sourceMode === 'blocked-real-ai'
             ? 'AI נחסם · אין תשובות מזויפות'
-              : latestRound
+              : latestRound?.targetGeneralId && latestRound.targetGeneralId !== 'council'
                 ? `שיחת תכנון 1:1 · ${activeGeneral.shortName}`
+                : latestCouncilRound
+                  ? 'סבב מועצה נוסף'
                 : visibleMessageCount < chatMessages.length
                 ? 'מציג תשובות AI אמיתיות בהדרגה'
                 : 'המועצה פתוחה לתכנון'
@@ -1350,28 +1966,78 @@ export function CouncilChamberSurface({
       ? 'תוכנית מוכנה לשליחה'
       : 'בחר יועץ, דלג, או פרט שלב'
 
+  async function runCouncilAgentQueue(seedSession: CouncilSession, baseTopic: string, requestedGeneralIds: Array<string> = councilGenerals.map((general) => general.id)): Promise<CouncilSession> {
+    const sessionBeforeRequest = sessionRef.current ?? seedSession
+    const queueGeneralIds = orderedCouncilGeneralIds(requestedGeneralIds)
+    const requestAgentIds = queueGeneralIds.map(councilAgentIdForGeneral)
+    const appendRoundId = activeCouncilRoundIdForTurn(sessionBeforeRequest)
+    const requestTopic = liveCouncilTopicForTurn(baseTopic, sessionBeforeRequest)
+    const next = await fetchRealCouncilSession(requestTopic, {
+      discussionId: sessionBeforeRequest.discussionId,
+      roundId: appendRoundId,
+      agentIds: requestAgentIds,
+      previousOpinions: peerOpinionsFromSession(sessionBeforeRequest),
+    })
+
+    const nextSession = appendRoundId
+      ? sanitizeCouncilSessionForUi({
+        ...sessionWithLiveStats({
+          ...sessionBeforeRequest,
+          sourceMode: next.sourceMode,
+          contextPacketId: next.contextPacketId ?? sessionBeforeRequest.contextPacketId,
+          recommendation: next.recommendation ?? sessionBeforeRequest.recommendation,
+          discussionRounds: sessionBeforeRequest.discussionRounds.map((round) => round.id === appendRoundId
+            ? { ...round, answers: next.turns }
+            : round),
+        }, next.sourceMode !== 'running-real-ai'),
+        verdict: next.verdict,
+        summary: next.summary,
+        voteLine: next.voteLine,
+        stats: next.stats,
+        recommendation: next.recommendation,
+        sourcesUsed: [...new Set([...(sessionBeforeRequest.sourcesUsed ?? []), ...(next.sourcesUsed ?? [])])].slice(0, 5),
+      })
+      : sanitizeCouncilSessionForUi({
+        ...next,
+        discussionId: sessionBeforeRequest.discussionId ?? next.discussionId,
+        topic: seedSession.topic,
+      })
+
+    sessionRef.current = nextSession
+    setSession(nextSession)
+    setActiveGeneralId(firstUsableCouncilGeneralId(allCouncilTurnsForSession(nextSession)))
+    setVisibleMessageCount((count) => Math.min(count, chatMessagesFor(nextSession).length))
+    return nextSession
+  }
+
   async function conveneCouncil() {
     if (!canWakeCouncil || councilRunPending) {
       setMotionState('roaming')
       return
     }
     const askedTopic = topic.trim()
+    const discussionId = `discussion-${Date.now().toString(36)}`
     setCouncilRunPending(true)
-    setSession(pendingCouncilSession(askedTopic))
+    const pendingSession = pendingCouncilSession(askedTopic, discussionId)
+    sessionRef.current = pendingSession
+    setSession(pendingSession)
     setActiveGeneralId(councilGenerals[0].id)
     setMotionState('seated')
     setHandoffState('idle')
+    setFlowStage('discussion')
+    setSelectedPlanningGeneralIds([])
     setOperatorOpinion('')
     setVisibleMessageCount(0)
     setMinimalView('council')
     try {
-      const next = await fetchRealCouncilSession(askedTopic)
-      setSession(next)
-      setActiveGeneralId(next.turns[0]?.generalId ?? councilGenerals[0].id)
-      setVisibleMessageCount(0)
+      const finalSession = await runCouncilAgentQueue(pendingSession, askedTopic)
+      setActiveGeneralId(firstUsableCouncilGeneralId(allCouncilTurnsForSession(finalSession)))
+      void fetchCouncilDrawingBoardState().then((payload) => setDrawingBoardStats(payload.generalStats ?? {})).catch(() => undefined)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      setSession(blockedCouncilSession(askedTopic, message))
+      const blocked = blockedCouncilSession(askedTopic, message)
+      sessionRef.current = blocked
+      setSession(blocked)
       setVisibleMessageCount(0)
     } finally {
       setCouncilRunPending(false)
@@ -1382,9 +2048,12 @@ export function CouncilChamberSurface({
     if (session) setArchiveEntries(upsertCouncilArchiveSession(session))
     clearStoredCouncilState()
     setTopic('')
+    sessionRef.current = null
     setSession(null)
     setMotionState('roaming')
     setHandoffState('idle')
+    setFlowStage('discussion')
+    setSelectedPlanningGeneralIds([])
     setOperatorOpinion('')
     setVisibleMessageCount(0)
     setCouncilRunPending(false)
@@ -1395,11 +2064,19 @@ export function CouncilChamberSurface({
   function startNewDiscussion() {
     if (session) setArchiveEntries(upsertCouncilArchiveSession(session))
     clearStoredCouncilState()
+    void fetch('/api/war-room/council/run', {
+      method: 'DELETE',
+      cache: 'no-store',
+      credentials: 'same-origin',
+    }).catch(() => undefined)
     setTopic('')
+    sessionRef.current = null
     setSession(null)
     setActiveGeneralId(councilGenerals[0].id)
     setMotionState('roaming')
     setHandoffState('idle')
+    setFlowStage('discussion')
+    setSelectedPlanningGeneralIds([])
     setOperatorOpinion('')
     setVisibleMessageCount(0)
     setCouncilRunPending(false)
@@ -1413,14 +2090,17 @@ export function CouncilChamberSurface({
   }
 
   function restoreArchivedDiscussion(entry: CouncilArchivedSession) {
-    const restoredSession = entry.session
+    const restoredSession = sanitizeCouncilSessionForUi(entry.session)
     clearStoredCouncilState()
     setTopic(restoredSession.topic)
     setOperatorOpinion('')
+    sessionRef.current = restoredSession
     setSession(restoredSession)
-    setActiveGeneralId(restoredSession.turns[0]?.generalId ?? councilGenerals[0].id)
+    setActiveGeneralId(firstUsableCouncilGeneralId(restoredSession.turns))
     setMotionState('seated')
-    setHandoffState('unlocked')
+    setHandoffState('idle')
+    setFlowStage('discussion')
+    setSelectedPlanningGeneralIds([])
     setVisibleMessageCount(chatMessagesFor(restoredSession).length)
     setCouncilRunPending(false)
     setMinimalView('council')
@@ -1428,12 +2108,11 @@ export function CouncilChamberSurface({
   }
 
   async function askWholeCouncilFollowUp(promptOverride?: string) {
-    const currentSession = session
+    const currentSession = sessionRef.current ?? session
     const question = (promptOverride ?? operatorOpinion).trim()
-    if (!currentSession || !question || councilRunPending) return
+    if (!currentSession || !question) return
     const roundId = `round-${Date.now().toString(36)}`
     const createdAtLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    const requestTopic = `${currentSession.topic}\n\nשאלת המשך למועצה: ${question}`
     const pendingRound: CouncilDiscussionRound = {
       id: roundId,
       operatorOpinion: question,
@@ -1441,44 +2120,42 @@ export function CouncilChamberSurface({
       createdAtLabel,
       targetGeneralId: 'council',
     }
-    setCouncilRunPending(true)
+    const pendingSession = sessionWithLiveStats({
+      ...currentSession,
+      sourceMode: 'running-real-ai',
+      discussionRounds: [...currentSession.discussionRounds, pendingRound],
+    }, false)
+    sessionRef.current = pendingSession
+    setSession(pendingSession)
     setMinimalView('council')
     setMotionState('seated')
     setHandoffState('idle')
+    setFlowStage('discussion')
+    setSelectedPlanningGeneralIds([])
     setOperatorOpinion('')
-    setSession({
-      ...currentSession,
-      sourceMode: 'running-real-ai',
-      summary: 'המועצה קוראת את הודעת ההמשך. אין תשובה מזויפת אם ה־runner נכשל.',
-      voteLine: 'ממתין להצבעות אמיתיות',
-      discussionRounds: [...currentSession.discussionRounds, pendingRound],
-    })
+    setVisibleMessageCount((count) => Math.min(count, Math.max(0, chatMessagesFor(pendingSession).length - 1)))
+
+    if (councilRunPending) {
+      return
+    }
+
+    setCouncilRunPending(true)
     try {
-      const next = await fetchRealCouncilSession(requestTopic)
-      const nextRound: CouncilDiscussionRound = {
-        ...pendingRound,
-        answers: next.turns,
-      }
-      setSession({
-        ...next,
-        topic: currentSession.topic,
-        discussionRounds: [...currentSession.discussionRounds, nextRound],
-      })
-      setActiveGeneralId(next.turns[0]?.generalId ?? activeGeneralId)
-      setVisibleMessageCount(0)
+      const finalSession = await runCouncilAgentQueue(pendingSession, currentSession.topic)
+      setActiveGeneralId(firstUsableCouncilGeneralId(allCouncilTurnsForSession(finalSession)))
+      void fetchCouncilDrawingBoardState().then((payload) => setDrawingBoardStats(payload.generalStats ?? {})).catch(() => undefined)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const blocked = blockedCouncilSession(requestTopic, message)
-      const failedRound: CouncilDiscussionRound = {
-        ...pendingRound,
-        answers: blocked.turns,
-      }
-      setSession({
-        ...blocked,
-        topic: currentSession.topic,
-        discussionRounds: [...currentSession.discussionRounds, failedRound],
-      })
-      setVisibleMessageCount(0)
+      const blocked = blockedCouncilSession(liveCouncilTopicForTurn(currentSession.topic, pendingSession), message)
+      const failedSession = sessionWithLiveStats({
+        ...pendingSession,
+        discussionRounds: pendingSession.discussionRounds.map((round) => round.id === roundId
+          ? { ...round, answers: blocked.turns }
+          : round),
+      }, true)
+      sessionRef.current = failedSession
+      setSession(failedSession)
+      setVisibleMessageCount((count) => Math.min(count, chatMessagesFor(failedSession).length))
     } finally {
       setCouncilRunPending(false)
     }
@@ -1502,15 +2179,17 @@ export function CouncilChamberSurface({
     }
     setCouncilRunPending(true)
     setMinimalView('advisor')
-    setSession({
+    const pendingSession: CouncilSession = {
       ...session,
       discussionRounds: [...session.discussionRounds, pendingRound],
-    })
+    }
+    setSession(pendingSession)
+    setVisibleMessageCount(chatMessagesFor(pendingSession).length)
     setMotionState('seated')
     setHandoffState('idle')
     setOperatorOpinion('')
     try {
-      const answer = await fetchRealCouncilFollowUp({ session, generalId: activeGeneral.id, question: opinion })
+      const answer = await fetchRealCouncilFollowUp({ session, generalId: activeGeneral.id, question: opinion, roundId })
       setSession((current) => {
         if (!current) return current
         return {
@@ -1521,6 +2200,7 @@ export function CouncilChamberSurface({
         }
       })
       setActiveGeneralId(answer.generalId)
+      void fetchCouncilDrawingBoardState().then((payload) => setDrawingBoardStats(payload.generalStats ?? {})).catch(() => undefined)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const failedAnswer = turnFromRealCouncil({
@@ -1530,14 +2210,14 @@ export function CouncilChamberSurface({
         status: 'failed',
         opinion: '',
         vote: 'abstain',
-        voteReason: 'No real AI follow-up returned; no fake response was generated.',
+        voteReason: 'לא חזרה תשובת המשך נקייה; לא נוצרה תשובה מזויפת.',
         confidence: 0,
         personalitySignal: activeGeneral.strength,
         contextUsed: [],
         peerReadback: [],
-        riskFlags: ['follow-up UI call failed'],
-        suggestedFollowUp: 'Retry this one general after checking the controlled runner.',
-        usageReadback: 'no usage reported',
+        riskFlags: ['שליחת ההמשך מהמסך לא החזירה תשובה נקייה'],
+        suggestedFollowUp: 'נסה שוב את היועץ הזה עם שאלה אחת קצרה.',
+        usageReadback: 'לא דווח שימוש',
         error: message,
       })
       setSession((current) => current
@@ -1553,9 +2233,68 @@ export function CouncilChamberSurface({
     }
   }
 
-  function markSatisfiedForHermes() {
-    if (!session) return
-    setHandoffState('unlocked')
+  function beginPlanningTeamSelection() {
+    if (!session || councilRunPending) return
+    setFlowStage('team-selection')
+    setHandoffState('idle')
+    setSelectedPlanningGeneralIds([])
+  }
+
+  function togglePlanningGeneral(generalId: string) {
+    if (!isKnownCouncilGeneralId(generalId) || councilRunPending) return
+    setSelectedPlanningGeneralIds((current) => current.includes(generalId)
+      ? current.filter((id) => id !== generalId)
+      : [...current, generalId])
+  }
+
+  function continueCouncilDiscussion() {
+    if (councilRunPending || handoffState === 'sent') return
+    setFlowStage('discussion')
+    setHandoffState('idle')
+  }
+
+  async function requestPlanningTeamBreakdown() {
+    const currentSession = sessionRef.current ?? session
+    if (!currentSession || !selectedPlanningGeneralIds.length || councilRunPending) return
+    const roundId = `planning-${Date.now().toString(36)}`
+    const selectedNames = selectedPlanningGeneralIds
+      .map((id) => councilGenerals.find((general) => general.id === id)?.shortName)
+      .filter((name): name is string => Boolean(name))
+    const planningQuestion = `${COUNCIL_STEP_PLAN_PROMPT}\n\nDLV בחר בצוות הפירוק: ${selectedNames.join(', ')}. כל אחד חייב לתרום מהעדשה העצמאית שלו, לקרוא את הקודמים, ולהשאיר תוכנית אחת קריאה ומעשית.`
+    const pendingRound: CouncilDiscussionRound = {
+      id: roundId,
+      operatorOpinion: `בחרתי את ${selectedNames.join(', ')} לצוות הפירוק. תפרקו את הכיוון לתוכנית ברורה לפני שנעביר להרמס.`,
+      answers: [],
+      createdAtLabel: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      targetGeneralId: 'planning-team',
+    }
+    const pendingSession = sessionWithLiveStats({
+      ...currentSession,
+      sourceMode: 'running-real-ai',
+      discussionRounds: [...currentSession.discussionRounds, pendingRound],
+    }, false)
+    const planningTopic = `${currentSession.topic}\n\n${planningQuestion}`
+    sessionRef.current = pendingSession
+    setSession(pendingSession)
+    setFlowStage('plan-drafting')
+    setHandoffState('idle')
+    setMinimalView('council')
+    setOperatorOpinion('')
+    setVisibleMessageCount(chatMessagesFor(pendingSession).length)
+    setCouncilRunPending(true)
+    try {
+      const plannedSession = await runCouncilAgentQueue(pendingSession, planningTopic, selectedPlanningGeneralIds)
+      sessionRef.current = plannedSession
+      setSession(plannedSession)
+      setFlowStage('ready-for-hermes')
+      setHandoffState('unlocked')
+      setVisibleMessageCount(chatMessagesFor(plannedSession).length)
+    } catch {
+      setFlowStage('team-selection')
+      setHandoffState('idle')
+    } finally {
+      setCouncilRunPending(false)
+    }
   }
 
   function updateOperatorOpinion(value: string) {
@@ -1578,6 +2317,9 @@ export function CouncilChamberSurface({
     <section
       className="council-chamber"
       data-council-room="strategists-v1"
+      data-professional-workbench="v1"
+      data-room-ownership="council-decision-only"
+      data-scroll-surface="true"
       data-council-generals={councilGenerals.length}
       data-council-decision-packet={session?.packetId ?? ''}
       data-council-handoff-state={handoffState}
@@ -1596,13 +2338,22 @@ export function CouncilChamberSurface({
       data-council-response-mode={councilResponseMode}
       data-council-context-packet={session?.contextPacketId ?? ''}
       data-council-real-ai-pending={councilRunPending ? 'true' : 'false'}
-      data-council-summary-first="true"
+      data-council-summary-first="false"
       data-council-user-prompt-visible="true"
       data-council-static-copy="details-only"
       data-council-vote-labels="for-neutral-against-abstain"
-      data-council-persistence="local-storage-v1"
+      data-council-persistence="local-json-plus-drawing-board-v2"
+      data-council-resume-until-new-discussion="true"
       data-council-persisted-state={councilHasPersistableState ? 'true' : 'false'}
-      data-council-design-pass="command-rail-v2"
+      data-council-design-pass="group-chat-v1"
+      data-council-primary-ui="canonical-group-chat-only-v1"
+      data-council-ux-rescue="group-conversation-v1"
+      data-council-chat-native="live-group-thread-v2"
+      data-council-chat-polish="purpose-built-group-v1"
+      data-council-flow-stage={flowStage}
+      data-council-planning-general-ids={selectedPlanningGeneralIds.join(',')}
+      data-council-pro-layout="generals-room-v1"
+      data-council-independent-opinions="first-pass-no-forced-conflict-v1"
       data-council-planning-workspace="true"
       data-council-command-rail="v2"
       data-council-live-decision-visual="vote-board-v1"
@@ -1616,38 +2367,36 @@ export function CouncilChamberSurface({
       data-council-close-only-header="true"
       data-council-primary-action={minimalMode === 'start' ? 'open-council' : minimalMode === 'council' ? 'continue-council-or-plan' : 'continue-advisor-chat'}
       data-council-active-advisor={activeGeneral.id}
+      data-council-profile-count={councilGenerals.length}
+      data-council-runtime-agent-scope="five-independent-advisors-plus-julius-chair"
       data-council-consultation-count={completedConsultations}
       data-council-min-thinking-ms={COUNCIL_LOCAL_THINKING_MIN_MS}
       data-council-max-thinking-ms={COUNCIL_LOCAL_THINKING_MAX_MS}
+      data-council-rethink-visual={councilRunPending || Boolean(influentialTurn) || Boolean(latestRound) ? 'true' : 'false'}
       aria-label="Council of Strategists planning workspace"
     >
-      <header className="council-chamber__header">
-        <div className="council-chamber__header-copy">
-          <span>{minimalMode === 'start' ? 'פתח נושא' : minimalMode === 'advisor' ? `שיחה עם ${activeGeneral.shortName}` : 'החלטה + המשך'}</span>
-          <h2 dir="rtl">חדר מועצה</h2>
-          <p dir="rtl">דיון חי, ארכיון מקומי, ופקודת המשך אחת ברורה.</p>
+      <header className="council-chamber__header" dir="rtl">
+        <div className="council-chamber__header-copy" dir="rtl">
+          <span>חדר עבודה</span>
+          <h2>חדר מועצת הגנרלים</h2>
+          <p>כתוב נושא, קבל תשובה קצרה ועצמאית מכל גנרל, ואז פתח פרטי אם צריך פירוט.</p>
         </div>
-        <div className="council-chamber__session-actions" dir="rtl">
+        <div className="council-chamber__session-actions" dir="rtl" aria-label="פעולות חדר המועצה">
           {navigationSlot}
-          <button type="button" className="council-chamber__close" onClick={onClose} aria-label="סגור את חדר המועצה">סגור</button>
+          <button type="button" onClick={startNewDiscussion} disabled={councilRunPending} data-council-start-new-discussion="true">דיון חדש</button>
+          <button type="button" onClick={toggleArchive} disabled={councilRunPending} data-council-archive-toggle="true" aria-expanded={archiveOpen}>
+            {archiveOpen ? 'סגור ארכיון' : `ארכיון${archiveEntries.length ? ` (${archiveEntries.length})` : ''}`}
+          </button>
+          <span className="council-chamber__db-status">{drawingBoardStatus}</span>
         </div>
       </header>
-
-      <details className="council-chamber__session-menu" dir="rtl">
-        <summary>ניהול דיון</summary>
-        <div>
-          <button type="button" onClick={startNewDiscussion} disabled={councilRunPending} data-council-start-new-discussion="true">דיון חדש</button>
-          <button type="button" onClick={toggleArchive} disabled={councilRunPending} data-council-archive-toggle="true">
-            {archiveOpen ? 'סגור ארכיון' : `ארכיון דיונים${archiveEntries.length ? ` (${archiveEntries.length})` : ''}`}
-          </button>
-        </div>
-      </details>
 
       {archiveOpen && (
         <section className="council-chamber__archive" data-council-archive-panel="true" dir="rtl" aria-label="ארכיון דיוני מועצה">
           <div className="council-chamber__archive-head">
             <span>ארכיון מקומי</span>
-            <b>שלוף דיון קודם וחזור לעבוד עליו.</b>
+            <b>בחר דיון קודם וחזור לצ׳אט נקי.</b>
+            <button type="button" onClick={() => setArchiveOpen(false)} data-council-archive-close="true">סגור</button>
           </div>
           {archiveEntries.length ? (
             <div className="council-chamber__archive-list">
@@ -1667,280 +2416,33 @@ export function CouncilChamberSurface({
         </section>
       )}
 
-      <div className="council-chamber__grid">
-        <div className="council-chamber__room" aria-label="Council chamber with roaming generals and a clickable strategy table">
-          <div className="council-chamber__floor" />
-          <button
-            type="button"
-            className="council-chamber__table"
-            onClick={canWakeCouncil ? conveneCouncil : releaseCouncilToRoam}
-            aria-label={canWakeCouncil ? 'Wake the Council of Strategists at the decision table' : 'Council is dormant until DLV writes a topic'}
-          >
-            <div className="council-chamber__table-core">
-              <span>{session ? session.sourceMode === 'running-real-ai' ? 'רץ' : 'פעיל' : canWakeCouncil ? 'מוכן' : 'ממתין'}</span>
-              <b>{session ? consensusHeadingFor(session) : canWakeCouncil ? 'שאל עכשיו' : 'כתוב שאלה'}</b>
-              <small>{session ? voteLineHebrew(session.stats) : canWakeCouncil ? 'AI אמיתי' : ''}</small>
-            </div>
-          </button>
-          {councilGenerals.map((general, index) => {
-            const turn = currentDecisionTurnByGeneral.get(general.id)
-            const selected = activeGeneralId === general.id
-            const point = motionState === 'roaming' ? general.roam : general.seat
-            return (
-              <button
-                key={general.id}
-                type="button"
-                className={`council-chamber__general is-${motionState} ${selected ? 'is-selected' : ''}`}
-                style={councilGeneralStyle(general, motionState)}
-                onClick={() => selectAdvisor(general.id)}
-                aria-pressed={selected}
-                aria-label={`Select ${general.name}`}
-                data-council-general-motion={motionState}
-                data-council-general-spot={motionState === 'roaming' ? 'roam' : 'seat'}
-              >
-                <span
-                  className="council-chamber__sprite"
-                  style={{
-                    backgroundImage: `url("${motionState === 'seated' ? generalChairSpritePath(general.assetSlug) : generalSpritePath(general.assetSlug)}")`,
-                    animationDelay: motionState === 'roaming' ? general.roam.delay : `${index * -180}ms`,
-                    transform: `scaleX(${motionState === 'seated' ? 1 : point.flip ?? general.seat.flip ?? 1}) scale(${point.scale ?? general.seat.scale ?? 1})`,
-                  }}
-                  data-sprite-row={motionState === 'seated' ? `chair-${general.chairRow}` : 'walk'}
-                  data-sprite-frames={motionState === 'seated' ? COUNCIL_CHAIR_FRAMES : COUNCIL_WALK_FRAMES}
-                  aria-hidden="true"
-                />
-                <span className="council-chamber__nameplate">
-                  <b>{general.shortName}</b>
-                  <small>{turn ? voteLabel(turn.vote) : motionState === 'roaming' ? 'ממתין' : 'מוכן'}</small>
-                </span>
-                {turn && <span className={`council-chamber__vote-dot is-${voteTone(turn.vote)}`} aria-hidden="true" />}
-              </button>
-            )
-          })}
-        </div>
-
+      <div className="council-chamber__grid" data-council-canonical-surface="desktop-group-chat-v1">
         <div className="council-chamber__tool" aria-label="Council planning tool">
-          <section className="council-chamber__question-card" data-council-question-card="true" data-council-minimal-start="true">
-            <span>מה מתכננים?</span>
-            <p className={displayedQuestion ? bidiClassNameFor(displayedQuestion) : undefined} dir={displayedQuestion ? textDirectionFor(displayedQuestion) : 'rtl'}>
-              {displayedQuestion || 'כתוב מטרה או התלבטות. המועצה תענה קצר, ואז אפשר לדבר עם יועץ אחד.'}
-            </p>
-            <label>
-              <textarea
-                value={topic}
-                onChange={(event) => setTopic(event.target.value)}
-                dir="auto"
-                placeholder="מה אתה רוצה לתכנן?"
-              />
-            </label>
-            <div className="council-chamber__actions">
-              <button type="button" onClick={conveneCouncil} disabled={!canWakeCouncil || councilRunPending}>{councilRunPending ? 'פותח מועצה…' : session ? 'שאל מחדש' : 'פתח מועצה'}</button>
-              {councilHasPersistableState && (
-                <button type="button" onClick={releaseCouncilToRoam} disabled={councilRunPending}>אפס</button>
-              )}
-            </div>
-          </section>
-
-          <section className="council-chamber__planning-guide" data-council-planning-guide="true" dir="rtl">
-            <span>{planningStage}</span>
-            <div>
-              <b>{planningHint}</b>
-              <small>{completedConsultations > 0 ? `${completedConsultations} שיחות יועץ נשמרו בפרוטוקול` : 'אפשר לדלג בין היועצים בלי לסכם עדיין'}</small>
-            </div>
-          </section>
-
-          <section className="council-chamber__consensus" data-council-consensus-card="true" data-council-minimal-council="true" role="status">
-            <span>מסקנת מועצה</span>
-            <h3 dir="rtl">{primaryCouncilAnswer}</h3>
-            <p dir="rtl">{consensusSummary}</p>
-            {session?.recommendation && (
-              <div className="council-chamber__recommendation-proof" data-council-recommendation-card="true" dir="rtl">
-                <b>{session.recommendation.supportLine}</b>
-                <span>{compactDecisionText(session.recommendation.reason, 'זו האפשרות שקיבלה הכי הרבה תמיכה.', 150)}</span>
-                {session.recommendation.options.length > 1 && (
-                  <div className="council-chamber__option-rank" aria-label="דירוג אפשרויות">
-                    {session.recommendation.options.slice(0, 3).map((option) => (
-                      <em key={option.label}>{option.label}: {option.support}</em>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="council-chamber__vote-summary" aria-label="Council vote summary">
-              <b>{voteReadout}</b>
-              <small>{stateLabel} · {needsYouLabel}</small>
-            </div>
-            <div className="council-chamber__next-step" dir="rtl">
-              <span>הצעד הבא</span>
-              <b>{consensusNextStep}</b>
-            </div>
-            <section
-              className="council-chamber__live-vote-board"
-              data-council-live-vote-board="true"
-              data-council-visual-voting="decision-table-live-v1"
-              data-council-live-vote-placement="right-panel"
-              dir="rtl"
-              aria-label="לוח הצבעה חי של המועצה"
-            >
-              <div className="council-chamber__live-vote-head">
-                <span>הצבעת המועצה</span>
-                <b>{session ? voteReadout : 'עוד אין הצבעה'}</b>
-              </div>
-              <div className="council-chamber__vote-meter" style={voteMeterStyle} data-council-decision-ring="support-neutral-against-abstain">
-                <i className="is-support" aria-hidden="true" />
-                <i className="is-neutral" aria-hidden="true" />
-                <i className="is-against" aria-hidden="true" />
-                <i className="is-abstain" aria-hidden="true" />
-              </div>
-              <ol className="council-chamber__decision-timeline" data-council-decision-timeline="live-vote-flow-v1" aria-label="רצף החלטת המועצה">
-                {liveDecisionTimeline.map((step) => (
-                  <li
-                    key={step.key}
-                    className={`is-${step.state}`}
-                    data-council-timeline-step={step.key}
-                    data-council-timeline-state={step.state}
-                  >
-                    <span>{step.label}</span>
-                    <small>{step.detail}</small>
-                  </li>
-                ))}
-              </ol>
-              <div className="council-chamber__vote-lanes" data-council-vote-lanes="true">
-                {councilGenerals.map((general) => {
-                  const turn = currentDecisionTurnByGeneral.get(general.id)
-                  const phase = !session
-                    ? 'idle'
-                    : pendingVoteGeneralId === general.id || (councilRunPending && !turn)
-                      ? 'thinking'
-                      : turn && visibleVoteGeneralIds.has(general.id)
-                        ? 'voted'
-                        : turn
-                          ? 'queued'
-                          : 'idle'
-                  return (
-                    <button
-                      key={`vote-lane-${general.id}`}
-                      type="button"
-                      className={`council-chamber__vote-lane is-${phase} is-${turn ? voteTone(turn.vote) : 'pending'}`}
-                      onClick={() => selectAdvisor(general.id)}
-                      style={{ '--general-accent': general.accent } as CSSProperties}
-                      data-council-vote-lane={general.id}
-                      data-council-vote-phase={phase}
-                      data-council-vote-value={turn ? voteLabel(turn.vote) : 'ממתין'}
-                    >
-                      <span
-                        className="council-chamber__vote-lane-avatar"
-                        style={{ backgroundImage: `url("${generalPortraitPath(general.assetSlug)}")` } as CSSProperties}
-                        aria-hidden="true"
-                      />
-                      <span className="council-chamber__vote-lane-copy">
-                        <b>{general.shortName}</b>
-                        <small>{votePhaseLabel(phase)}</small>
-                      </span>
-                      <em>{voteVisualLabel(turn?.vote)}</em>
-                    </button>
-                  )
-                })}
-              </div>
-            </section>
-            <section className="council-chamber__command-rail" data-council-command-rail-panel="v2" dir="rtl">
-              <div className="council-chamber__command-rail-head">
-                <span>המשך עבודה</span>
-                <b>כתוב למועצה, או בקש פירוק לשלבים.</b>
-              </div>
-              <label className="council-chamber__command-input">
-                <textarea
-                  value={operatorOpinion}
-                  onChange={(event) => updateOperatorOpinion(event.target.value)}
-                  dir="auto"
-                  placeholder="כתוב הודעת המשך למועצה… למשל: תפרקו לי את זה לשלבים, או מה הסיכון פה?"
-                />
-              </label>
-              <div className="council-chamber__command-actions">
-                <button type="button" data-council-ask-whole-council="true" onClick={() => void askWholeCouncilFollowUp()} disabled={!session || !operatorOpinion.trim() || councilRunPending}>
-                  {councilRunPending ? 'המועצה חושבת…' : 'שאל את המועצה'}
-                </button>
-                <button type="button" data-council-step-plan="true" onClick={askCouncilForStepPlan} disabled={!session || councilRunPending}>
-                  פרק לתוכנית שלבים
-                </button>
-                <button type="button" data-council-open-advisor-chat="true" onClick={() => setMinimalView('advisor')} disabled={!session || councilRunPending}>
-                  שאל יועץ אחד
-                </button>
-              </div>
-              <div className="council-chamber__handoff-strip">
-                <button type="button" onClick={markSatisfiedForHermes} disabled={!session || councilRunPending}>סיימתי</button>
-                <button type="button" onClick={transferDecision} disabled={!handoffUnlocked || councilRunPending}>{handoffState === 'sent' ? 'נשלח' : 'שלח להרמס'}</button>
-              </div>
-            </section>
-            <section className="council-chamber__advisor-dock" data-council-right-space-fill="advisor-dock-v1" dir="rtl" aria-label="יועצים זמינים לשיחה אחת על אחת">
-              <div className="council-chamber__advisor-dock-head">
-                <span>שיחה עם גנרל אחד</span>
-                <b>בחר דמות ופתח צ׳אט נקי עם האייקון שלה.</b>
-              </div>
-              <div className="council-chamber__advisor-dock-grid">
-                {councilGenerals.map((general) => {
-                  const turn = currentDecisionTurnByGeneral.get(general.id)
-                  return (
-                    <button
-                      key={`dock-${general.id}`}
-                      type="button"
-                      className={`council-chamber__advisor-dock-card is-${turn ? voteTone(turn.vote) : 'pending'} ${activeGeneralId === general.id ? 'is-active' : ''}`}
-                      onClick={() => selectAdvisor(general.id)}
-                      style={{ '--general-accent': general.accent } as CSSProperties}
-                      data-council-advisor-dock-card={general.id}
-                      data-council-advisor-vote-state={turn ? voteTone(turn.vote) : 'pending'}
-                      data-council-advisor-vote-label={turn ? voteLabel(turn.vote) : 'ממתין'}
-                    >
-                      <span
-                        className="council-chamber__advisor-dock-avatar"
-                        style={{ backgroundImage: `url("${generalPortraitPath(general.assetSlug)}")` } as CSSProperties}
-                        data-council-advisor-avatar="right-space"
-                        aria-hidden="true"
-                      />
-                      <span className="council-chamber__advisor-dock-copy">
-                        <b>{general.shortName}</b>
-                        <small>{turn ? compactDecisionText(turn.thought, turn.voteReason, 72) : general.chatVoice}</small>
-                      </span>
-                      <em className="council-chamber__advisor-dock-vote">{turn ? voteLabel(turn.vote) : 'ממתין'}</em>
-                    </button>
-                  )
-                })}
-              </div>
-            </section>
-          </section>
-
-          <section className="council-chamber__general-summary" data-council-collapsed-generals="true">
-            <span>בחר יועץ לשיחה</span>
-            <div>
-              {councilGenerals.map((general) => {
-                const turn = currentDecisionTurnByGeneral.get(general.id)
-                return (
-                  <button
-                    key={general.id}
-                    type="button"
-                    className={`council-chamber__general-card is-${turn ? voteTone(turn.vote) : 'pending'} ${activeGeneralId === general.id ? 'is-active' : ''}`}
-                    onClick={() => selectAdvisor(general.id)}
-                    data-council-general-card={general.id}
-                    data-council-general-vote={turn ? voteLabel(turn.vote) : 'ממתין'}
-                  >
-                    <span
-                      className="council-chamber__general-card-avatar"
-                      style={{ backgroundImage: `url("${generalPortraitPath(general.assetSlug)}")` } as CSSProperties}
-                      data-council-advisor-avatar="dock"
-                      aria-hidden="true"
-                    />
-                    <span className="council-chamber__general-card-copy">
-                      <b>{general.shortName}</b>
-                      <em>{turn ? voteLabel(turn.vote) : 'ממתין'}</em>
-                      <small>{turn ? compactDecisionText(turn.thought, turn.voteReason, 86) : general.chatVoice}</small>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </section>
-
-          <div
+          {!session || minimalView === 'council' ? (
+            <CouncilGroupChatWorkbench
+              sessionActive={Boolean(session)}
+              topic={session ? displayedQuestion : topic}
+              members={groupChatMembers}
+              messages={groupChatMessages}
+              pendingMember={pendingGroupMember}
+              running={councilRunPending}
+              stage={flowStage}
+              composerValue={session ? operatorOpinion : topic}
+              summaryTitle={primaryCouncilAnswer}
+              summaryBody={consensusSummary}
+              voteLine={voteReadout}
+              handoffSent={handoffState === 'sent'}
+              onComposerChange={session ? updateOperatorOpinion : setTopic}
+              onSendToCouncil={() => { if (session) void askWholeCouncilFollowUp(); else void conveneCouncil() }}
+              onOpenAdvisor={selectAdvisor}
+              onBeginTeamSelection={beginPlanningTeamSelection}
+              onTogglePlanningMember={togglePlanningGeneral}
+              onRequestPlan={() => void requestPlanningTeamBreakdown()}
+              onContinueDiscussion={continueCouncilDiscussion}
+              onSendToHermes={transferDecision}
+            />
+          ) : (
+            <div
             className="council-chamber__operator"
             data-council-advisor-consultation="true"
             data-council-minimal-advisor="true"
@@ -1960,6 +2462,15 @@ export function CouncilChamberSurface({
                 <b>{activeGeneral.shortName}</b>
                 <small>{activeTurn ? compactDecisionText(activeTurn.thought, activeTurn.voteReason, 130) : activeGeneral.chatVoice}</small>
               </div>
+              <button
+                type="button"
+                className="council-chamber__advisor-back"
+                data-council-back-to-decision="true"
+                onClick={() => setMinimalView('council')}
+                disabled={councilRunPending}
+              >
+                חזור להחלטה
+              </button>
             </div>
             <div className="council-chamber__advisor-chat-log" data-council-advisor-chat-log="true" ref={advisorChatRef} aria-label={`צ׳אט עם ${activeGeneral.shortName}`}>
               {visibleAdvisorChatMessages.length ? (
@@ -1986,60 +2497,21 @@ export function CouncilChamberSurface({
               />
             </label>
             <div className="council-chamber__prompt-chips" aria-label="הצעות לשאלת המשך">
-              <button type="button" onClick={() => updateOperatorOpinion(activeAdvisorPrompt)} disabled={!session || councilRunPending}>{activeAdvisorPrompt}</button>
+              <button type="button" onClick={() => updateOperatorOpinion(activeAdvisorPrompt)} disabled={councilRunPending}>{activeAdvisorPrompt}</button>
               {planningPromptChips.slice(0, 3).map((chip) => (
-                <button key={chip.label} type="button" onClick={() => updateOperatorOpinion(chip.prompt)} disabled={!session || councilRunPending}>{chip.label}</button>
+                <button key={chip.label} type="button" onClick={() => updateOperatorOpinion(chip.prompt)} disabled={councilRunPending}>{chip.label}</button>
               ))}
             </div>
             <div className="council-chamber__actions council-chamber__actions--consult">
-              <button type="button" onClick={discussOperatorOpinion} disabled={!session || !operatorOpinion.trim() || councilRunPending}>
+              <button type="button" onClick={discussOperatorOpinion} disabled={!operatorOpinion.trim() || councilRunPending}>
                 {councilRunPending ? 'מחכה…' : 'שלח ליועץ'}
               </button>
               <button type="button" onClick={() => selectAdvisor(nextGeneral.id)} disabled={councilRunPending}>
                 דלג ליועץ הבא
               </button>
-              <button type="button" onClick={() => setMinimalView('council')} disabled={!session || councilRunPending}>
-                חזור למועצה
-              </button>
             </div>
           </div>
-
-          <details className="council-chamber__selected" style={{ '--general-accent': activeGeneral.accent } as CSSProperties} data-council-drilldown="true" open>
-            <summary>
-              <span>היועץ הפעיל</span>
-              <b>{activeGeneral.shortName} · {activeTurn ? voteLabel(activeTurn.vote) : 'בחר לשיחה'}</b>
-            </summary>
-            <h3>{activeGeneral.name}</h3>
-            <p>{activeTurn?.thought ?? activeGeneral.strength}</p>
-            <small>{activeTurn ? `${voteLabel(activeTurn.vote)} · ${activeTurn.voteReason}` : `${activeGeneral.caution} · אפשר לשאול אותו 1:1 למטה.`}</small>
-            {activeTurn && (
-              <div className="council-chamber__selected-meta">
-                <span>Context: {(activeTurn.contextUsed?.length ? activeTurn.contextUsed : ['לא דווח context ספציפי']).slice(0, 3).join(' · ')}</span>
-                <span>Peers: {(activeTurn.peerReadback?.length ? activeTurn.peerReadback : ['אין peer readback נוסף']).slice(0, 2).join(' · ')}</span>
-                <span>Risks: {(activeTurn.riskFlags?.length ? activeTurn.riskFlags : ['לא דווחו סיכונים']).slice(0, 3).join(' · ')}</span>
-                <span>Usage: {activeTurn.usageReadback ?? 'usage לא דווח'}</span>
-              </div>
-            )}
-          </details>
-
-          <details className="council-chamber__transcript" data-council-full-transcript="collapsed">
-            <summary>פרוטוקול מלא</summary>
-            <div className="council-chamber__chat" aria-label="Council debate chat" ref={chatRef}>
-              {session ? (
-                <>
-                  <div className="council-chamber__round-label">AI אמיתי · Obsidian · {session.createdAtLabel}</div>
-                  {visibleChatMessages.map((message) => message.type === 'turn' ? (
-                    <CouncilTurnBubble key={message.id} turn={message.turn} />
-                  ) : (
-                    <OperatorRoundBubble key={message.id} round={message.round} fallbackGeneral={activeGeneral} />
-                  ))}
-                  <TypingBubble message={pendingChatMessage} />
-                </>
-              ) : (
-                <div className="council-chamber__empty"><b>אין פרוטוקול עדיין</b></div>
-              )}
-            </div>
-          </details>
+          )}
         </div>
       </div>
     </section>

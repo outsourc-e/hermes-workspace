@@ -257,6 +257,16 @@ export function createInitialLivingV3HermesState(nowMs = Date.now()): LivingV3He
   }, nowMs + 150)
 
   state = assignLivingV3Task(state, {
+    agentId: 'poseidon',
+    kind: 'work',
+    label: 'Poseidon audits DB and Obsidian catalog health in Atlantis Vault',
+    roomId: 'atlantis-vault',
+    stationId: 'atlantis-index',
+    badge: 'active-task',
+    packetLabel: 'Vault index',
+  }, nowMs + 165)
+
+  state = assignLivingV3Task(state, {
     agentId: 'loki',
     kind: 'work',
     label: 'Loki hunts product angles',

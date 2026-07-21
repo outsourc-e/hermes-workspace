@@ -1,0 +1,734 @@
+.goblin-analytics-shell,
+.goblin-analytics-shell * {
+  box-sizing: border-box;
+}
+
+.goblin-analytics-shell {
+  color: #f4ead0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.goblin-eyebrow,
+.goblin-command span,
+.goblin-shops span,
+.goblin-rail__head span,
+.goblin-product-list button span,
+.goblin-metric span {
+  color: #9e947d;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.goblin-workbench {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  isolation: isolate;
+}
+
+.goblin-workbench__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(0, 0, 0, 0.74);
+  backdrop-filter: blur(10px);
+}
+
+.goblin-workbench--embedded {
+  position: absolute;
+  inset: 58px 16px 14px;
+  z-index: 44;
+  place-items: stretch;
+  padding: 0;
+  pointer-events: auto;
+}
+
+.goblin-analytics-shell--primary {
+  position: absolute;
+  inset: 0;
+  z-index: 43;
+  pointer-events: none;
+}
+
+.goblin-analytics-shell--primary .goblin-workbench,
+.goblin-analytics-shell--primary .goblin-state {
+  pointer-events: auto;
+}
+
+.goblin-workbench__panel {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-columns: 230px minmax(0, 1fr) 330px;
+  grid-template-areas:
+    "top top top"
+    "shops command command"
+    "shops pipeline pipeline"
+    "shops rail dossier"
+    "shops debug debug";
+  gap: 10px;
+  width: min(1580px, 96vw);
+  height: min(940px, 94vh);
+  overflow: hidden;
+  border: 1px solid rgba(214, 183, 118, 0.34);
+  border-radius: 18px;
+  padding: 12px;
+  background: #101311;
+  box-shadow: 0 46px 120px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.goblin-workbench--embedded .goblin-workbench__panel {
+  width: 100%;
+  height: 100%;
+}
+
+.goblin-workbench__topbar {
+  grid-area: top;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid rgba(214, 183, 118, 0.18);
+  padding-bottom: 9px;
+}
+
+.goblin-workbench__topbar h2,
+.goblin-station-card h3 {
+  margin: 0 0 2px;
+  color: #fff1bf;
+  font-size: clamp(1.18rem, 1.7vw, 1.85rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+.goblin-workbench__topbar p,
+.goblin-dossier__hero p,
+.goblin-note,
+.goblin-metric small,
+.goblin-proof-row small,
+.goblin-empty span,
+.goblin-station-card p,
+.goblin-latest,
+.goblin-state span {
+  margin: 0;
+  color: #a9a08b;
+  line-height: 1.38;
+}
+
+.goblin-workbench__top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.goblin-workbench__nav-slot {
+  min-width: min(280px, 32vw);
+}
+
+.goblin-close {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(244, 234, 208, 0.18);
+  border-radius: 10px;
+  color: #fff1bf;
+  background: #171b18;
+  cursor: pointer;
+  font-size: 1.45rem;
+}
+
+.goblin-workbench__view-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(132px, 1fr));
+  gap: 3px;
+  border: 1px solid rgba(214, 183, 118, 0.22);
+  border-radius: 12px;
+  padding: 3px;
+  background: #090b0a;
+}
+
+.goblin-workbench__view-tabs button {
+  display: grid;
+  gap: 1px;
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  padding: 6px 9px;
+  color: #bfb49b;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.goblin-workbench__view-tabs button.is-active,
+.goblin-workbench__view-tabs button[aria-selected='true'] {
+  color: #17130b;
+  background: #d7b96f;
+}
+
+.goblin-workbench__view-tabs span {
+  color: inherit;
+  font-size: 0.66rem;
+}
+
+.goblin-command {
+  grid-area: command;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.goblin-live-pipeline {
+  grid-area: pipeline;
+  display: grid;
+  grid-template-columns: 190px 260px minmax(0, 1fr);
+  gap: 8px;
+  border: 1px solid rgba(159, 232, 220, 0.18);
+  border-radius: 10px;
+  padding: 8px;
+  background: #0d120f;
+}
+
+.goblin-live-pipeline__status,
+.goblin-live-pipeline__agent,
+.goblin-live-pipeline__steps,
+.goblin-live-pipeline__steps article {
+  min-width: 0;
+}
+
+.goblin-live-pipeline__status,
+.goblin-live-pipeline__agent {
+  display: grid;
+  gap: 2px;
+}
+
+.goblin-live-pipeline__status b,
+.goblin-live-pipeline__agent b {
+  overflow: hidden;
+  color: #bfe8d6;
+  font-size: 0.92rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goblin-live-pipeline__agent {
+  border-left: 1px solid rgba(244, 234, 208, 0.1);
+  padding-left: 8px;
+}
+
+.goblin-live-pipeline__agent[data-agent-active='true'] b {
+  color: #f2ca74;
+}
+
+.goblin-live-pipeline__status small,
+.goblin-live-pipeline__agent small {
+  overflow: hidden;
+  color: #9e947d;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goblin-live-pipeline[data-goblin-readback-state='refreshing'] .goblin-live-pipeline__status b,
+.goblin-live-pipeline[data-goblin-readback-state='loading'] .goblin-live-pipeline__status b {
+  animation: goblin-readback-pulse 1.15s ease-in-out infinite;
+}
+
+.goblin-live-pipeline__steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.goblin-live-pipeline__steps article {
+  display: grid;
+  gap: 2px;
+  border: 1px solid rgba(244, 234, 208, 0.1);
+  border-radius: 8px;
+  padding: 6px 7px;
+  background: #151916;
+}
+
+.goblin-live-pipeline__steps article[data-tone='done'] {
+  border-color: rgba(139, 217, 149, 0.38);
+}
+
+.goblin-live-pipeline__steps article[data-tone='active'] {
+  border-color: rgba(215, 185, 111, 0.42);
+}
+
+.goblin-live-pipeline__steps article[data-tone='blocked'] {
+  border-color: rgba(238, 116, 116, 0.44);
+}
+
+.goblin-live-pipeline__steps span {
+  color: #9e947d;
+  font-size: 0.63rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.goblin-live-pipeline__steps b {
+  overflow: hidden;
+  color: #fff1bf;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes goblin-readback-pulse {
+  0%, 100% { opacity: 0.62; }
+  50% { opacity: 1; }
+}
+
+.goblin-command article,
+.goblin-metric,
+.goblin-rail,
+.goblin-dossier,
+.goblin-station-card,
+.goblin-state,
+.goblin-debug {
+  border: 1px solid rgba(244, 234, 208, 0.12);
+  background: #171b18;
+}
+
+.goblin-command article {
+  display: grid;
+  gap: 2px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  border-left: 4px solid #665b43;
+}
+
+.goblin-command article[data-tone='green'] { border-left-color: #8bd995; }
+.goblin-command article[data-tone='amber'] { border-left-color: #d7b96f; }
+.goblin-command article[data-tone='red'] { border-left-color: #ee7474; }
+
+.goblin-command b {
+  color: #fff1bf;
+  font-size: 1.28rem;
+  line-height: 1;
+}
+
+.goblin-command small,
+.goblin-shops small,
+.goblin-shops strong,
+.goblin-product-list small {
+  color: #b7ad97;
+  font-size: 0.77rem;
+}
+
+.goblin-shops {
+  grid-area: shops;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  border-right: 1px solid rgba(214, 183, 118, 0.18);
+  padding-right: 10px;
+}
+
+.goblin-shops button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  border: 1px solid rgba(214, 183, 118, 0.18);
+  border-radius: 10px;
+  padding: 10px;
+  color: inherit;
+  background: #121512;
+  text-align: left;
+  cursor: pointer;
+}
+
+.goblin-shops button[data-tone='green'] { border-color: rgba(139, 217, 149, 0.48); }
+.goblin-shops button[data-tone='amber'] { border-color: rgba(215, 185, 111, 0.4); }
+
+.goblin-shops b {
+  color: #f2ca74;
+  font-size: 1.02rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goblin-shops button[data-tone='green'] b {
+  color: #9be6a5;
+}
+
+.goblin-board {
+  display: contents;
+}
+
+.goblin-rail {
+  grid-area: rail;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.goblin-rail__head {
+  display: grid;
+  gap: 8px;
+}
+
+.goblin-rail__head > div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.goblin-rail__head b {
+  color: #9fe8dc;
+}
+
+.goblin-rail__head label {
+  display: grid;
+  gap: 5px;
+}
+
+.goblin-rail__head input {
+  width: 100%;
+  border: 1px solid rgba(244, 234, 208, 0.13);
+  border-radius: 10px;
+  padding: 10px 11px;
+  color: #fff6d8;
+  background: #0d100e;
+  outline: none;
+}
+
+.goblin-filter-row,
+.goblin-panel-tabs,
+.goblin-link-row,
+.goblin-safety-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.goblin-filter-row button,
+.goblin-panel-tabs button,
+.goblin-link-row a,
+.goblin-safety-row span,
+.goblin-station-card button {
+  border: 1px solid rgba(244, 234, 208, 0.14);
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: #cabf9f;
+  background: #101310;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.goblin-filter-row button[aria-pressed='true'],
+.goblin-panel-tabs button[aria-pressed='true'] {
+  color: #11130f;
+  background: #bfe8d6;
+}
+
+.goblin-product-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-color: rgba(215, 185, 111, 0.34) transparent;
+}
+
+.goblin-product-list button {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "img status demand"
+    "img title title";
+  gap: 4px 8px;
+  width: 100%;
+  border: 1px solid rgba(244, 234, 208, 0.11);
+  border-radius: 8px;
+  padding: 6px;
+  color: inherit;
+  background: #101310;
+  text-align: left;
+  cursor: pointer;
+}
+
+.goblin-product-list button.is-active {
+  border-color: #d7b96f;
+  background: #1d1c15;
+}
+
+.goblin-product-list img,
+.goblin-product-list button > div:first-child {
+  grid-area: img;
+  width: 46px;
+  height: 52px;
+  border-radius: 7px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.goblin-product-list span {
+  grid-area: status;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goblin-product-list b {
+  grid-area: title;
+  overflow: hidden;
+  color: #fff1bf;
+  font-size: 0.82rem;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goblin-product-list small {
+  grid-area: demand;
+  white-space: nowrap;
+}
+
+.goblin-dossier {
+  grid-area: dossier;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.goblin-dossier__hero {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.goblin-dossier__hero img,
+.goblin-dossier__hero > div:first-child {
+  width: 96px;
+  height: 96px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.goblin-pill {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid rgba(215, 185, 111, 0.42);
+  border-radius: 7px;
+  padding: 4px 7px;
+  color: #f6d188;
+  background: #14120d;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.goblin-pill[data-tone='green'] { color: #9be6a5; border-color: rgba(139, 217, 149, 0.48); }
+.goblin-pill[data-tone='red'] { color: #ee7474; border-color: rgba(238, 116, 116, 0.48); }
+
+.goblin-dossier__hero h3 {
+  margin: 6px 0 4px;
+  color: #fff1bf;
+  font-size: 1.05rem;
+  line-height: 1.1;
+}
+
+.goblin-decision-grid,
+.goblin-clean-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.goblin-decision-grid {
+  margin-top: 8px;
+}
+
+.goblin-metric {
+  display: grid;
+  gap: 2px;
+  border-radius: 8px;
+  padding: 7px;
+}
+
+.goblin-metric b {
+  overflow: hidden;
+  color: #fff1bf;
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goblin-note,
+.goblin-link-row,
+.goblin-workbench--embedded .goblin-debug {
+  display: none;
+}
+
+.goblin-panel-tabs {
+  border-top: 1px solid rgba(244, 234, 208, 0.1);
+  padding-top: 8px;
+}
+
+.goblin-panel-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.goblin-proof-list {
+  display: grid;
+  gap: 7px;
+}
+
+.goblin-proof-row,
+.goblin-empty {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(244, 234, 208, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  color: inherit;
+  background: #101310;
+  text-decoration: none;
+}
+
+.goblin-proof-row b,
+.goblin-empty b {
+  color: #fff1bf;
+}
+
+.goblin-proof-row span {
+  color: #c5b99e;
+}
+
+.goblin-proof-row small {
+  overflow-wrap: anywhere;
+}
+
+.goblin-debug {
+  grid-area: debug;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.goblin-debug summary {
+  cursor: pointer;
+  color: #b7ad97;
+  font-weight: 800;
+}
+
+.goblin-debug > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.goblin-station-card,
+.goblin-state {
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.goblin-station-card button {
+  width: fit-content;
+  color: #11130f;
+  background: #d7b96f;
+  font-weight: 900;
+}
+
+.goblin-safety-row {
+  justify-content: flex-start;
+}
+
+.goblin-safety-row span {
+  color: #bdf3c7;
+  background: rgba(72, 130, 79, 0.14);
+}
+
+.goblin-state {
+  position: absolute;
+  inset: 76px 24px auto;
+  z-index: 45;
+  display: grid;
+  gap: 4px;
+}
+
+.goblin-state b {
+  color: #fff1bf;
+}
+
+.goblin-workbench--research .goblin-workbench__panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: 1fr;
+  grid-template-areas: "top" "atlas";
+}
+
+.goblin-workbench--research .research-atlas {
+  grid-area: atlas;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  border-radius: 12px;
+}
+
+@media (max-width: 1180px) {
+  .goblin-workbench__panel {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "top" "command" "pipeline" "shops" "rail" "dossier";
+    height: 94vh;
+    overflow: auto;
+  }
+
+  .goblin-shops,
+  .goblin-command,
+  .goblin-live-pipeline,
+  .goblin-live-pipeline__steps,
+  .goblin-decision-grid,
+  .goblin-clean-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .goblin-workbench {
+    padding: 8px;
+  }
+
+  .goblin-workbench--embedded {
+    inset: 58px 8px 8px;
+  }
+
+  .goblin-workbench__panel {
+    padding: 10px;
+  }
+
+  .goblin-workbench__topbar,
+  .goblin-workbench__top-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .goblin-command,
+  .goblin-shops,
+  .goblin-live-pipeline,
+  .goblin-live-pipeline__steps,
+  .goblin-decision-grid,
+  .goblin-clean-cards,
+  .goblin-workbench__view-tabs {
+    grid-template-columns: 1fr;
+  }
+}

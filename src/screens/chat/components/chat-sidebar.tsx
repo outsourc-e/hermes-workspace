@@ -6,7 +6,6 @@ import {
   BrainIcon,
   Building01Icon,
   Castle02Icon,
-  Chat01Icon,
   CheckListIcon,
   Clock01Icon,
   ComputerTerminal01Icon,
@@ -37,7 +36,11 @@ import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
 import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionMeta } from '../types'
-import { t } from '@/lib/i18n'
+import type { WorkspaceRouteId } from '@/lib/workspace-navigation'
+import {
+  getWorkspaceNavigationSections,
+  matchesWorkspaceRoute,
+} from '@/lib/workspace-navigation'
 import { SettingsDialog } from '@/components/settings-dialog'
 import {
   TooltipContent,
@@ -151,6 +154,27 @@ type NavItemDef = {
   badge?: 'error-dot' | string | number
   dataTour?: string
 }
+
+const DESKTOP_NAV_ICONS: Partial<Record<WorkspaceRouteId, unknown>> = {
+  'war-room': Castle02Icon,
+  tasks: CheckListIcon,
+  chat: MessageMultiple01Icon,
+  swarm: UserGroupIcon,
+  'product-research': Search01Icon,
+  'product-intelligence': Building01Icon,
+  files: File01Icon,
+  memory: BrainIcon,
+  skills: PuzzleIcon,
+  dashboard: DashboardSquare01Icon,
+  operations: UserMultipleIcon,
+  conductor: Rocket01Icon,
+  jobs: Clock01Icon,
+  terminal: ComputerTerminal01Icon,
+  mcp: McpServerIcon,
+  profiles: UserMultipleIcon,
+}
+
+const DESKTOP_NAVIGATION_SECTIONS = getWorkspaceNavigationSections('desktop')
 
 export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
   try {
@@ -569,58 +593,67 @@ function ChatSidebarComponent({
     [],
   )
 
-  // Route active states
-  const isChatActive =
-    pathname === '/' || pathname === '/new' || pathname.startsWith('/chat')
   const isNewSessionActive =
     pathname === '/new' || pathname.startsWith('/chat/new')
-  const _isSettingsActive = pathname === '/settings'
-  const isSkillsActive = pathname === '/skills'
-  const isMcpActive = pathname === '/mcp'
-  const isFilesActive = pathname === '/files'
-  const isPlaygroundActive = pathname === '/playground'
-  const isAgoraActive = pathname === '/agora'
-  const isTerminalActive = pathname === '/terminal'
-  const isJobsActive = pathname === '/jobs'
-  const isMemoryActive = pathname === '/memory'
-  const isTasksActive = pathname === '/tasks'
-  const isProductResearchActive = pathname === '/product-research'
-  const isProductIntelligenceActive = pathname === '/product-intelligence'
-  const isWarRoomActive = pathname === '/war-room'
-  const isConductorActive = pathname === '/conductor'
-  const isOperationsActive = pathname === '/operations'
-  const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
-  const mainRoutes = ['/chat', '/new', '/files', '/terminal']
-  const knowledgeRoutes = ['/memory', '/skills']
-  const systemRoutes = ['/settings', '/logs']
 
   useEffect(() => {
-    if (mainRoutes.includes(pathname)) setLastRoute('main', pathname)
-    if (knowledgeRoutes.includes(pathname)) setLastRoute('knowledge', pathname)
-    if (systemRoutes.includes(pathname)) setLastRoute('system', pathname)
+    const activeSection = DESKTOP_NAVIGATION_SECTIONS.find((section) =>
+      section.items.some((route) =>
+        matchesWorkspaceRoute(route.id as WorkspaceRouteId, pathname),
+      ),
+    )
+    if (activeSection) setLastRoute(activeSection.id, pathname)
   }, [pathname])
-
-  const mainNav = getLastRoute('main') || '/chat'
-  const knowledgeNav = getLastRoute('knowledge') || '/memory'
-  const _systemNav = getLastRoute('system') || '/settings'
 
   const transition = {
     duration: 0.15,
     ease: isCollapsed ? 'easeIn' : 'easeOut',
   } as const
 
-  // Collapsible section states
-  const [mainExpanded, toggleMain] = usePersistedBool(
-    'claude-sidebar-main-expanded',
+  // Product sections are open; technical internals stay collapsed by default.
+  const [primaryExpanded, togglePrimary] = usePersistedBool(
+    'hermes-sidebar-primary-expanded',
+    true,
+  )
+  const [workExpanded, toggleWork] = usePersistedBool(
+    'hermes-sidebar-work-expanded',
     true,
   )
   const [knowledgeExpanded, toggleKnowledge] = usePersistedBool(
     'claude-sidebar-knowledge-expanded',
     true,
   )
-  const [_systemExpanded, _toggleSystem] = usePersistedBool(
-    'claude-sidebar-system-expanded',
+  const [advancedExpanded, toggleAdvanced] = usePersistedBool(
+    'hermes-sidebar-advanced-expanded',
     false,
+  )
+
+  const sectionExpansion = {
+    primary: { expanded: primaryExpanded, toggle: togglePrimary },
+    work: { expanded: workExpanded, toggle: toggleWork },
+    knowledge: { expanded: knowledgeExpanded, toggle: toggleKnowledge },
+    advanced: { expanded: advancedExpanded, toggle: toggleAdvanced },
+  } as const
+
+  const desktopNavigationSections = DESKTOP_NAVIGATION_SECTIONS.map(
+    (section) => ({
+      ...section,
+      items: section.items.map((route): NavItemDef => {
+        const id = route.id as WorkspaceRouteId
+        const icon = DESKTOP_NAV_ICONS[id]
+        if (!icon) throw new Error(`Missing desktop navigation icon for ${route.id}`)
+        return {
+          kind: 'link',
+          to: route.to,
+          search: route.search ? { ...route.search } : undefined,
+          icon,
+          label: route.label,
+          active: matchesWorkspaceRoute(id, pathname),
+          badge: id === 'war-room' ? 'HOME' : undefined,
+          dataTour: id === 'skills' ? 'skills' : undefined,
+        }
+      }),
+    }),
   )
 
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
@@ -781,133 +814,6 @@ function ChatSidebarComponent({
     onClick: openSearchModal,
   }
 
-  const isDashboardActive = pathname === '/dashboard'
-
-  const mainItems: Array<NavItemDef> = [
-    {
-      kind: 'link',
-      to: '/dashboard',
-      icon: DashboardSquare01Icon,
-      label: t('nav.dashboard'),
-      active: isDashboardActive,
-    },
-    {
-      kind: 'link',
-      to: '/chat',
-      icon: MessageMultiple01Icon,
-      label: t('nav.chat'),
-      active: isChatActive,
-    },
-
-    {
-      kind: 'link',
-      to: '/files',
-      icon: File01Icon,
-      label: t('nav.files'),
-      active: isFilesActive,
-    },
-    {
-      kind: 'link',
-      to: '/terminal',
-      icon: ComputerTerminal01Icon,
-      label: t('nav.terminal'),
-      active: isTerminalActive,
-    },
-    {
-      kind: 'link',
-      to: '/jobs',
-      icon: Clock01Icon,
-      label: t('nav.jobs'),
-      active: isJobsActive,
-    },
-    {
-      kind: 'link',
-      to: '/tasks',
-      icon: CheckListIcon,
-      label: t('nav.tasks'),
-      active: isTasksActive,
-    },
-    {
-      kind: 'link',
-      to: '/product-research',
-      icon: Search01Icon,
-      label: 'Product Research',
-      active: isProductResearchActive,
-    },
-    {
-      kind: 'link',
-      to: '/product-intelligence',
-      icon: Building01Icon,
-      label: 'Product Intelligence DB',
-      active: isProductIntelligenceActive,
-    },
-    {
-      kind: 'link',
-      to: '/war-room',
-      search: { etsyOps: 1 },
-      icon: Castle02Icon,
-      label: 'Etsy Ops War Room',
-      active: isWarRoomActive,
-      badge: 'ACTIVE',
-    },
-    {
-      kind: 'link',
-      to: '/conductor',
-      icon: Rocket01Icon,
-      label: 'Conductor',
-      active: isConductorActive,
-    },
-    {
-      kind: 'link',
-      to: '/operations',
-      icon: UserMultipleIcon,
-      label: 'Operations',
-      active: isOperationsActive,
-    },
-    {
-      kind: 'link',
-      to: '/swarm',
-      icon: UserGroupIcon,
-      label: 'Swarm',
-      active: isSwarmActive,
-    },
-
-  ]
-
-  const knowledgeItems: Array<NavItemDef> = [
-    {
-      kind: 'link',
-      to: '/memory',
-      icon: BrainIcon,
-      label: t('nav.memory'),
-      active: isMemoryActive,
-    },
-    {
-      kind: 'link',
-      to: '/skills',
-      icon: PuzzleIcon,
-      label: t('nav.skills'),
-      active: isSkillsActive,
-      dataTour: 'skills',
-    },
-    {
-      kind: 'link',
-      to: '/mcp',
-      icon: McpServerIcon,
-      label: 'MCP',
-      active: isMcpActive,
-    },
-    {
-      kind: 'link',
-      to: '/profiles',
-      icon: UserMultipleIcon,
-      label: t('nav.profiles'),
-      active: pathname === '/profiles',
-    },
-  ]
-
-  const systemItems: Array<NavItemDef> = []
-
   return (
     <motion.aside
       ref={(node) => {
@@ -1058,90 +964,39 @@ function ChatSidebarComponent({
         </div>
       )}
 
-      {/* ── HermesWorld featured link (gold castle, NEW badge) ────── */}
-      {!isVisuallyCollapsed && (
-        <div className="px-2 pb-2">
-          <Link
-            to="/playground"
-            onClick={() => onSelectSession?.()}
-            className={cn(
-              buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'group w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
-              isPlaygroundActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
-            )}
-            data-tour="hermesworld"
-          >
-            <HugeiconsIcon
-              icon={Castle02Icon}
-              size={20}
-              strokeWidth={1.5}
-              className="size-5 shrink-0"
-              style={{ color: '#facc15' }}
-            />
-            <span>HermesWorld</span>
-            <span
-              className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
-              style={{
-                background:
-                  'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
-                color: '#0b1320',
-                boxShadow: '0 0 8px rgba(250,204,21,0.4)',
-                letterSpacing: '0.08em',
-              }}
-            >
-              NEW
-            </span>
-          </Link>
-        </div>
-      )}
-
       {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
-        {/* Navigation sections */}
+        {/* Canonical navigation sections */}
         <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
-          <SectionLabel
-            label="Main"
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            collapsible
-            expanded={mainExpanded}
-            onToggle={toggleMain}
-            navigateTo={mainNav}
-          />
-          <CollapsibleSection
-            expanded={mainExpanded || isCollapsed}
-            items={mainItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
-
-          <SectionLabel
-            label="Knowledge"
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            collapsible
-            expanded={knowledgeExpanded}
-            onToggle={toggleKnowledge}
-            navigateTo={knowledgeNav}
-          />
-          <CollapsibleSection
-            expanded={knowledgeExpanded || isCollapsed}
-            items={knowledgeItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
-
-          {/* System */}
-          <CollapsibleSection
-            expanded={true}
-            items={systemItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
+          {desktopNavigationSections.map((section) => {
+            const expansion = sectionExpansion[section.id]
+            const navigateTo =
+              getLastRoute(section.id) || section.items[0]?.to || '/war-room'
+            return (
+              <div key={section.id}>
+                <SectionLabel
+                  label={section.label}
+                  isCollapsed={isVisuallyCollapsed}
+                  transition={transition}
+                  collapsible
+                  expanded={expansion.expanded}
+                  onToggle={expansion.toggle}
+                  navigateTo={navigateTo}
+                />
+                <CollapsibleSection
+                  expanded={
+                    isVisuallyCollapsed
+                      ? section.id === 'primary'
+                      : expansion.expanded
+                  }
+                  items={section.items}
+                  isCollapsed={isVisuallyCollapsed}
+                  transition={transition}
+                  onSelectSession={onSelectSession}
+                />
+              </div>
+            )
+          })}
         </div>
 
         {/* Sessions list */}

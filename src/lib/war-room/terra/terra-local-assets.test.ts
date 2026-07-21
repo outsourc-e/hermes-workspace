@@ -174,8 +174,38 @@ describe('Terra local assets', () => {
     expect(status.lockedActions).toEqual(expect.arrayContaining(['printer_start', 'printer_heat', 'printer_cancel']))
   })
 
+  it('discovers Elegoo camera access through MQTT without guessing a static port 8080 URL', async () => {
+    const slicerBase = path.join(process.env.HOME as string, 'Library', 'Application Support', 'ElegooSlicer')
+    const userDir = path.join(slicerBase, 'user')
+    fs.mkdirSync(userDir, { recursive: true })
+    fs.writeFileSync(path.join(userDir, 'printer_list.json'), JSON.stringify({
+      'printer-test': {
+        printerName: 'Test Centauri',
+        printerModel: 'Centauri Carbon 2',
+        host: '192.0.2.10',
+        mainboardId: 'TEST-SERIAL',
+        accessCode: 'test-only-code',
+      },
+    }))
+    fs.writeFileSync(path.join(slicerBase, 'ElegooSlicer.conf'), JSON.stringify({
+      print: { printsend_selected_printer_id: 'printer-test' },
+    }))
+
+    const status = await getTerraPrinterReadOnlyStatus(321)
+
+    expect(status.configured).toBe(true)
+    expect(status.state).toBe('configured')
+    expect(status.source).toBe('elegoo-slicer')
+    expect(status.cameraRequestMode).toBe('elegoo-mqtt-on-demand')
+    expect(status.cameraUrl).toBeUndefined()
+    expect(status.metrics.queueState).toBe('camera available on demand')
+    expect(status.discoveryNotes.join(' ')).toContain('no static port or stream URL is assumed')
+  })
+
   it('reports configured live camera URL without enabling side effects', async () => {
+    let cameraRequests = 0
     const server = http.createServer((_request, response) => {
+      cameraRequests += 1
       response.writeHead(200, { 'content-type': 'multipart/x-mixed-replace; boundary=frame' })
       response.write('--frame\r\nContent-Type: image/jpeg\r\n\r\n')
     })
@@ -189,10 +219,12 @@ describe('Terra local assets', () => {
     server.close()
 
     expect(status.configured).toBe(true)
-    expect(status.state).toBe('ready')
+    expect(status.state).toBe('configured')
     expect(status.name).toBe('Test Printer')
     expect(status.cameraUrl).toContain('127.0.0.1')
-    expect(status.metrics.queueState).toBe('camera online')
+    expect(status.metrics.queueState).toBe('camera configured manual frame only')
+    expect(status.message).toContain('will not open the stream')
+    expect(cameraRequests).toBe(0)
     expect(status.lockedActions).toContain('printer_upload')
   })
 })

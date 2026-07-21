@@ -1,4 +1,5 @@
 import { livingV3AgentById } from '../living-v3/living-v3-contract'
+import { WAR_ROOM_RETIRED_AGENT_ALIASES, retiredWarRoomAgentAlias } from './worker-profiles'
 import type { AgentIntent, WarRoomAgentId, WarRoomCapability } from './domain'
 
 export const DEFAULT_WAR_ROOM_CAPABILITIES: Array<WarRoomCapability> = ['say', 'goToStation', 'raiseAlert']
@@ -7,6 +8,7 @@ export const WAR_ROOM_CAPABILITY_REGISTRY: Record<WarRoomAgentId, Array<WarRoomC
   ares: ['say', 'goToStation', 'rest'],
   aphrodite: ['say', 'goToStation', 'rest'],
   hermes: ['say', 'goToStation', 'carryPacket', 'requestApproval', 'raiseAlert', 'startWork'],
+  goblin: ['say', 'goToStation', 'startWork', 'carryPacket', 'raiseAlert'],
   athena: ['say', 'goToStation', 'startWork', 'requestApproval', 'raiseAlert'],
   'loki': ['say', 'goToStation', 'startWork', 'carryPacket', 'raiseAlert'],
   'thor': ['say', 'goToStation', 'startWork', 'carryPacket', 'raiseAlert'],
@@ -19,14 +21,15 @@ export const WAR_ROOM_CAPABILITY_REGISTRY: Record<WarRoomAgentId, Array<WarRoomC
   genghis: ['say', 'goToStation', 'rest'],
   hannibal: ['say', 'goToStation', 'rest'],
   oracle: ['say', 'goToStation', 'startWork', 'raiseAlert'],
-  'merchant-scout': ['say', 'goToStation', 'startWork', 'requestApproval', 'raiseAlert'],
-  'atlantis-archivist': ['say', 'goToStation', 'startWork', 'carryPacket'],
-  'treasury-guardian': ['say', 'goToStation', 'requestApproval', 'raiseAlert'],
+  'merchant-scout': [],
+  'atlantis-archivist': [],
+  poseidon: ['say', 'goToStation', 'startWork', 'carryPacket', 'requestApproval', 'raiseAlert'],
+  'treasury-guardian': [],
   'roster-keeper': ['say', 'goToStation', 'rest'],
   daedalus: ['say', 'goToStation', 'startWork', 'raiseAlert'],
   heimdall: ['say', 'goToStation', 'rest'],
   terra: ['say', 'goToStation', 'startWork', 'requestApproval', 'raiseAlert'],
-  'signal-runner': ['say', 'goToStation', 'carryPacket', 'requestApproval'],
+  'signal-runner': [],
 }
 
 export function capabilityForIntent(intent: AgentIntent): WarRoomCapability {
@@ -44,6 +47,13 @@ export function capabilityForIntentType(intentType: AgentIntent['type']): WarRoo
 }
 
 export function canAgentPerformIntent(intent: AgentIntent) {
+  const retiredAlias = retiredWarRoomAgentAlias(intent.agentId)
+  if (retiredAlias) {
+    return {
+      ok: false as const,
+      reason: `Retired agent alias ${retiredAlias} cannot receive new intents. Use ${WAR_ROOM_RETIRED_AGENT_ALIASES[retiredAlias].canonicalOwner}.`,
+    }
+  }
   const agent = livingV3AgentById(intent.agentId)
   if (!agent) {
     return { ok: false as const, reason: `Unknown agentId: ${intent.agentId}` }

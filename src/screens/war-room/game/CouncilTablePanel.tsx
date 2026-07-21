@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import {  councilMemberById, councilMembers, councilOmens, councilSessions, councilVoteStats } from './council'
+import { councilMemberById, councilMembers, councilSessions, councilVoteStats } from './council'
 import type {CouncilSession} from './council';
 
 type CouncilTablePanelProps = {
@@ -40,19 +40,6 @@ function CouncilSprite({ memberId, state = 'ponder', className = '' }: { memberI
   )
 }
 
-function toneClass(tone: string) {
-  if (tone === 'risk') return 'border-rose-200/36 bg-rose-500/12 text-rose-50'
-  if (tone === 'review') return 'border-amber-200/40 bg-amber-400/12 text-amber-50'
-  if (tone === 'gold') return 'border-yellow-200/38 bg-yellow-300/12 text-yellow-50'
-  return 'border-cyan-200/34 bg-cyan-400/10 text-cyan-50'
-}
-
-const councilLockedBridges = [
-  'No Etsy/shop publish, edit, renew, refund, message, order, or ad-spend action',
-  'No supplier purchase/contact and no AliExpress/Alibaba account action',
-  'Council vote is a theoretical recommendation until DLV approves a local handoff',
-]
-
 function sessionWinner(session: CouncilSession) {
   return session.options.find((option) => option.id === session.winnerOptionId)
 }
@@ -62,32 +49,36 @@ export function CouncilTablePanel({ onClose }: CouncilTablePanelProps) {
   const [sessionId, setSessionId] = useState(councilSessions[0]?.id ?? '')
   const session = councilSessions.find((candidate) => candidate.id === sessionId) ?? councilSessions[0]
   const stats = useMemo(() => councilVoteStats(), [])
-  const topMember = stats[0]
+  const winner = sessionWinner(session)
 
   return (
     <div className="fixed inset-0 isolate z-[180] flex items-center justify-center px-4 py-5" data-war-room-council-panel="open">
       <button type="button" aria-label="Close council backdrop" onClick={onClose} className="absolute inset-0 bg-black/72 backdrop-blur-[6px]" />
-      <section className="relative z-10 grid h-[min(88vh,850px)] w-[min(1180px,94vw)] grid-rows-[auto_1fr] overflow-hidden rounded-[36px] border border-amber-100/24 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,.15),transparent_34%),linear-gradient(135deg,rgba(5,6,14,.98),rgba(28,18,38,.96)_54%,rgba(5,15,20,.98))] shadow-[0_36px_100px_rgba(0,0,0,.82),inset_0_0_70px_rgba(251,191,36,.08)]">
+      <section className="relative z-10 grid h-[min(90vh,880px)] w-[min(1220px,96vw)] grid-rows-[auto_1fr] overflow-hidden rounded-[34px] border border-amber-100/24 bg-[radial-gradient(circle_at_18%_0%,rgba(251,191,36,.18),transparent_28%),radial-gradient(circle_at_86%_18%,rgba(34,211,238,.12),transparent_30%),linear-gradient(135deg,rgba(5,6,14,.98),rgba(24,15,34,.97)_55%,rgba(4,12,18,.98))] shadow-[0_36px_100px_rgba(0,0,0,.82),inset_0_0_70px_rgba(251,191,36,.07)]">
         <style>{`@keyframes councilSpriteFrames { from { background-position: 0 0; } to { background-position: 100% 0; } }`}</style>
-        <header className="flex items-center gap-4 border-b border-amber-100/12 bg-black/34 px-5 py-4">
-          <div className="relative grid h-16 w-20 place-items-center rounded-[24px] border border-amber-100/24 bg-black/58 shadow-[inset_0_0_30px_rgba(251,191,36,.10)]">
-            <span className="absolute inset-x-4 top-1/2 h-6 -translate-y-1/2 rounded-[50%] border border-amber-200/42 bg-amber-300/12 shadow-[0_0_26px_rgba(251,191,36,.24)]" />
-            <span className="relative text-2xl text-amber-100">◈</span>
+        <header className="flex items-center gap-4 border-b border-amber-100/12 bg-black/24 px-5 py-4">
+          <div className="relative grid h-[76px] w-[76px] shrink-0 place-items-center overflow-hidden rounded-[24px] border border-amber-100/28 bg-black/64 shadow-[0_14px_34px_rgba(0,0,0,.46),inset_0_0_34px_rgba(251,191,36,.13)]" data-council-table-header-icon="war-table">
+            <img
+              src={`/war-room/council/council-war-table-seven-chairs-premium-maps-wine-sigils.png?v=${LOCKED_STYLE_ASSET_VERSION}`}
+              alt="Council table icon"
+              className="h-[70px] w-[70px] object-contain drop-shadow-[0_8px_18px_rgba(251,191,36,.24)]"
+            />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[9px] font-black uppercase tracking-[.28em] text-cyan-100/70">Olympus Council OS • read-only</p>
+            <p className="text-[9px] font-black uppercase tracking-[.28em] text-cyan-100/70">Olympus Council</p>
             <h2 className="font-serif text-3xl font-black leading-none text-[#ffeeb0]">Council Table</h2>
-            <p className="mt-1 text-xs font-semibold text-amber-50/70">7 historical military legends • meetings • vote history • suggestion performance • Omens</p>
+            <p className="mt-1 truncate text-xs font-semibold text-amber-50/72">{session.title}</p>
           </div>
-          <div className="hidden max-w-[260px] rounded-2xl border border-yellow-200/24 bg-yellow-300/8 px-3 py-2 text-xs font-bold text-yellow-50/82 md:block">
-            Top performer: <span className="text-yellow-100">{topMember?.member.name}</span> • {topMember?.bestSuggestionScore} score
+          <div className="hidden max-w-[280px] rounded-[22px] border border-yellow-200/22 bg-yellow-300/8 px-4 py-3 text-xs font-bold text-yellow-50/82 md:block">
+            <span className="block text-[9px] uppercase tracking-[.2em] text-yellow-100/52">Leading answer</span>
+            <span className="mt-1 block truncate font-serif text-base font-black text-[#ffeeb0]">{winner?.label}</span>
           </div>
           <button type="button" onClick={onClose} className="rounded-full border border-amber-100/28 bg-amber-200/10 px-4 py-2 text-[10px] font-black uppercase tracking-[.18em] text-amber-50 transition hover:bg-amber-200 hover:text-black focus:outline-none focus:ring-2 focus:ring-amber-100">
             Close ✕
           </button>
         </header>
 
-        <div className="grid min-h-0 grid-cols-[minmax(270px,330px)_1fr] gap-0 overflow-hidden">
+        <div className="grid min-h-0 grid-cols-[minmax(248px,300px)_1fr] gap-0 overflow-hidden">
           <div className="min-h-0 overflow-y-auto border-r border-amber-100/12 bg-black/26 p-4">
             <div className="mb-4 grid grid-cols-2 gap-2">
               {(['meeting', 'history', 'stats', 'models'] as const).map((candidate) => (
@@ -122,38 +113,12 @@ export function CouncilTablePanel({ onClose }: CouncilTablePanelProps) {
           </div>
 
           <main className="min-h-0 overflow-y-auto p-5" data-war-room-scroll-panel="council-main">
-            <div className="mb-4 grid gap-3 md:grid-cols-3">
-              {councilOmens.map((omen) => (
-                <div key={omen.id} className={`rounded-[22px] border p-3 shadow-[0_14px_28px_rgba(0,0,0,.28)] ${toneClass(omen.tone)}`}>
-                  <p className="text-[9px] font-black uppercase tracking-[.18em] opacity-70">Omen • {omen.source}</p>
-                  <h3 className="mt-1 font-serif text-lg font-black leading-tight">{omen.title}</h3>
-                  <p className="mt-1 text-xs font-semibold leading-5 opacity-82">{omen.body}</p>
-                </div>
-              ))}
-            </div>
-
-            <section className="mb-4 rounded-[28px] border border-cyan-100/18 bg-[linear-gradient(135deg,rgba(34,211,238,.13),rgba(251,191,36,.08),rgba(244,63,94,.08))] p-4 shadow-[inset_0_0_50px_rgba(34,211,238,.045)]" data-council-jarvis-readability-panel="true">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[.28em] text-cyan-100/66">JARVIS council verdict layer</p>
-                  <h3 className="mt-1 font-serif text-2xl font-black leading-tight text-cyan-50">Advice only — external bridges sealed</h3>
-                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-cyan-50/68">The council can rank theory, write local recommendations, and prepare a DLV review packet. It cannot connect to Etsy, Alura, suppliers, paid generation, or shop accounts from this cockpit.</p>
-                </div>
-                <span className="rounded-full border border-rose-100/24 bg-rose-500/12 px-4 py-2 text-[10px] font-black uppercase tracking-[.18em] text-rose-50">mock / not connected</span>
-              </div>
-              <div className="mt-3 grid gap-2 lg:grid-cols-3">
-                {councilLockedBridges.map((lock) => (
-                  <div key={lock} className="rounded-[18px] border border-white/10 bg-black/30 p-3 text-[11px] font-black uppercase tracking-[.08em] text-rose-50/82">🔒 {lock}</div>
-                ))}
-              </div>
-            </section>
-
             {tab === 'meeting' ? (
               <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-                <section className="rounded-[30px] border border-amber-100/16 bg-black/30 p-4">
+                <section className="rounded-[30px] border border-amber-100/16 bg-black/24 p-4 shadow-[inset_0_0_45px_rgba(251,191,36,.035)]">
                   <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-[.24em] text-cyan-100/68">Current selected meeting</p>
+                      <p className="text-[9px] font-black uppercase tracking-[.24em] text-cyan-100/68">Current question</p>
                       <h3 className="mt-1 font-serif text-2xl font-black leading-tight text-[#ffeeb0]">{session.title}</h3>
                       <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-amber-50/68">{session.topic}</p>
                     </div>
@@ -170,7 +135,7 @@ export function CouncilTablePanel({ onClose }: CouncilTablePanelProps) {
                         alt="Seven-chair Olympus council war table asset"
                         className="absolute left-1/2 top-1/2 h-[min(90%,500px)] w-[min(90%,500px)] -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-[0_30px_45px_rgba(0,0,0,.72)]"
                       />
-                      <div className="absolute left-1/2 top-5 -translate-x-1/2 rounded-full border border-amber-100/24 bg-black/62 px-3 py-1 text-[9px] font-black uppercase tracking-[.18em] text-amber-50/72">actual table asset • 7 chairs</div>
+                      <div className="absolute left-1/2 top-5 -translate-x-1/2 rounded-full border border-amber-100/24 bg-black/62 px-3 py-1 text-[9px] font-black uppercase tracking-[.18em] text-amber-50/72">live council seating</div>
                       {councilMembers.map((member, index) => {
                         const positions = [
                           'left-1/2 top-[8%] -translate-x-1/2',
@@ -228,12 +193,13 @@ export function CouncilTablePanel({ onClose }: CouncilTablePanelProps) {
                   </div>
                 </section>
 
-                <section className="rounded-[30px] border border-yellow-200/20 bg-yellow-300/8 p-4">
+                <section className="rounded-[30px] border border-yellow-200/20 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,.18),transparent_46%),rgba(251,191,36,.07)] p-4 shadow-[inset_0_0_48px_rgba(251,191,36,.05)]">
                   <p className="text-[9px] font-black uppercase tracking-[.24em] text-yellow-100/68">Council decision</p>
-                  <h3 className="mt-2 font-serif text-2xl font-black text-[#ffeeb0]">{sessionWinner(session)?.label}</h3>
+                  <h3 className="mt-2 font-serif text-2xl font-black text-[#ffeeb0]">{winner?.label}</h3>
                   <p className="mt-3 text-sm font-semibold leading-6 text-yellow-50/75">{session.finalRecommendation}</p>
-                  <div className="mt-4 rounded-2xl border border-emerald-200/24 bg-emerald-400/8 p-3 text-xs font-bold leading-5 text-emerald-50/80">
-                    Safety: {session.safety}. This panel creates no shop, supplier, paid, posting, or account side effect.
+                  <div className="mt-4 rounded-[22px] border border-amber-100/14 bg-black/32 p-3">
+                    <p className="text-[9px] font-black uppercase tracking-[.18em] text-amber-100/52">Next move</p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-amber-50/78">Use the winning direction as the next council brief, then drill into the votes below for why each general agreed or pushed back.</p>
                   </div>
                 </section>
               </div>

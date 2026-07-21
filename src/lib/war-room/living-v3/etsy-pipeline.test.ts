@@ -10,11 +10,13 @@ import {
   createEtsyProductTruthPacket,
   createEtsyVisualQaReport,
   createInitialEtsyPipelineState,
+  rejectEtsyCandidate,
   saveEtsySupplierLead,
   selectEtsyCandidate,
   sendEtsyCandidateToThoth,
   sendEtsySupplierLeadToAnubis,
   stageEtsySheetRowLocally,
+  syncEtsyPipelineToExternalProduct,
   updateEtsyQaItemStatus,
   visibleEtsySupplierLeads,
 } from './etsy-pipeline'
@@ -210,6 +212,73 @@ describe('Etsy Market Lab local product pipeline', () => {
     state = createEtsyDraftApprovalPacket(state, 17_000)
     expect(state.draftApprovalPacket?.status).toBe('waiting_operator')
     expect(state.draftPacket?.status).toBe('waiting_approval')
+  })
+
+  it('deletes a rejected active candidate from the local pipeline staging board', () => {
+    let state = createEtsyProductSearchPacket(createInitialEtsyPipelineState(), {
+      requestText: 'gold initial necklace for gifts',
+      mode: 'niche',
+      nowMs: 10_000,
+      evidence: evidenceFixture,
+    })
+    const candidate = state.candidates[0]
+    state = sendEtsyCandidateToThoth(state, candidate.candidateId, 11_000)
+    expect(state.metricPacket?.candidateId).toBe(candidate.candidateId)
+
+    state = rejectEtsyCandidate(state, candidate.candidateId)
+
+    expect(state.candidates.find((item) => item.candidateId === candidate.candidateId)).toBeUndefined()
+    expect(state.visualBoardCandidateIds).not.toContain(candidate.candidateId)
+    expect(state.rejectedCandidateIds).toContain(candidate.candidateId)
+    expect(state.selectedCandidateId).toBeUndefined()
+    expect(state.metricPacket).toBeUndefined()
+    expect(state.lastReceipt).toContain('deleted from local staging')
+  })
+
+  it('removes every downstream packet that belongs to a different product scope', () => {
+    let state = createEtsyProductSearchPacket(createInitialEtsyPipelineState(), {
+      requestText: 'gold initial necklace for gifts',
+      mode: 'niche',
+      nowMs: 10_000,
+      evidence: evidenceFixture,
+    })
+    const necklaceCandidateId = state.candidates[0].candidateId
+    state = sendEtsyCandidateToThoth(state, necklaceCandidateId, 11_000)
+    state = stageEtsySheetRowLocally(state, 12_000)
+    state = sendEtsySupplierLeadToAnubis(state, visibleEtsySupplierLeads(state)[0], 13_000)
+    state = createEtsyProductTruthPacket(state, 14_000)
+    state = createEtsyVisualQaReport(state, 15_000)
+    state = createEtsyDraftApprovalPacket(state, 16_000)
+    expect(state.supplierLeads.length).toBeGreaterThan(0)
+    expect(state.productTruthPacket?.candidateId).toBe(necklaceCandidateId)
+    expect(state.draftPacket?.candidateId).toBe(necklaceCandidateId)
+
+    state = syncEtsyPipelineToExternalProduct(state, {
+      candidateId: 'stoneware-tumbler',
+      packetId: 'room-packet-stoneware',
+      title: 'Stoneware Ceramic Tumbler',
+      niche: 'ceramic drinkware',
+      signal: '3 evidence refs; 1 missing field',
+      sourceRecordIds: ['source-stoneware'],
+      evidenceIds: ['evidence-1', 'evidence-2', 'evidence-3'],
+      evidenceQuality: 'partial-local',
+      dataOrigin: 'product-intelligence',
+      confidence: 72,
+      sourceLabels: ['Live read-only research'],
+    })
+
+    expect(activeEtsyProductCandidate(state)?.candidateId).toBe('stoneware-tumbler')
+    expect(state.stage).toBe('candidates')
+    expect(state.metricPacket).toBeUndefined()
+    expect(state.supplierLeads).toEqual([])
+    expect(visibleEtsySupplierLeads(state)).toEqual([])
+    expect(state.selectedSupplierLeadId).toBeUndefined()
+    expect(state.productTruthPacket).toBeUndefined()
+    expect(state.qaItems).toEqual([])
+    expect(state.visualQaReport).toBeUndefined()
+    expect(state.draftPacket).toBeUndefined()
+    expect(state.draftApprovalPacket).toBeUndefined()
+    expect(activeEtsyProductCandidate(state)?.estimatedPrice).toBe('not verified')
   })
 
   it('keeps Julius out of Etsy station operators', () => {

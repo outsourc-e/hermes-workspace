@@ -66,6 +66,12 @@ export const EtsyRoomIntentApiPayloadSchema = z.discriminatedUnion('type', [
     correlationId: OptionalTextSchema,
   }).strict(),
   z.object({
+    type: z.literal('reject_etsy_candidate_local'),
+    candidateId: z.string().trim().min(1).max(240),
+    runId: OptionalTextSchema,
+    correlationId: OptionalTextSchema,
+  }).strict(),
+  z.object({
     type: z.literal('create_shotlab_handoff_local'),
     preset: z.enum(['Boutique Premium', 'Minimalist Zen', 'Earthy Organic']).optional(),
     imageCount: z.number().int().min(1).max(12).optional(),

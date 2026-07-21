@@ -1,6 +1,80 @@
 import type { WorkerProfile } from './domain'
 
+export const WAR_ROOM_RETIRED_AGENT_ALIASES = {
+  'signal-runner': {
+    canonicalOwner: 'heimdall',
+    reason: 'Gateway transport and delivery readback belong to Heimdall.',
+    legacyProfileIds: ['gateway-discord-command'],
+  },
+  'merchant-scout': {
+    canonicalOwner: 'loki',
+    reason: 'Supplier intelligence belongs to Loki in Merchant Harbor.',
+    legacyProfileIds: ['harbor-scout-store-evidence'],
+  },
+  'harbor-scout': {
+    canonicalOwner: 'loki',
+    reason: 'Supplier intelligence belongs to Loki in Merchant Harbor.',
+    legacyProfileIds: ['harbor-scout-store-evidence'],
+  },
+  'atlantis-archivist': {
+    canonicalOwner: 'poseidon',
+    reason: 'Atlantis Vault index, archive integrity and retrieval belong to Poseidon.',
+    legacyProfileIds: ['atlantis-archive-memory'],
+  },
+  'treasury-guardian': {
+    canonicalOwner: 'dwarf',
+    reason: 'Treasury cost, margin and live-action locks belong to Dwarf.',
+    legacyProfileIds: ['treasury-cost-approval-locks'],
+  },
+  'athena-agent': {
+    canonicalOwner: 'goblin',
+    reason: 'Opportunity discovery belongs to Goblin; Athena visual assets remain preserved until replacement.',
+    legacyProfileIds: ['athena-strategy-product-review'],
+  },
+} as const
+
+export type RetiredWarRoomAgentAlias = keyof typeof WAR_ROOM_RETIRED_AGENT_ALIASES
+
+export class RetiredWarRoomAgentAliasError extends Error {
+  readonly code = 'RETIRED_WAR_ROOM_AGENT_ALIAS'
+  readonly alias: RetiredWarRoomAgentAlias
+  readonly canonicalOwner: string
+
+  constructor(alias: RetiredWarRoomAgentAlias) {
+    const retirement = WAR_ROOM_RETIRED_AGENT_ALIASES[alias]
+    super(`Retired agent alias ${alias} cannot receive new routing or assignments. Use canonical owner ${retirement.canonicalOwner}.`)
+    this.name = 'RetiredWarRoomAgentAliasError'
+    this.alias = alias
+    this.canonicalOwner = retirement.canonicalOwner
+  }
+}
+
+export function retiredWarRoomAgentAlias(value: string) {
+  return Object.hasOwn(WAR_ROOM_RETIRED_AGENT_ALIASES, value)
+    ? value as RetiredWarRoomAgentAlias
+    : null
+}
+
+export function canonicalWarRoomOwnerFor(value: string) {
+  const alias = retiredWarRoomAgentAlias(value)
+  return alias ? WAR_ROOM_RETIRED_AGENT_ALIASES[alias].canonicalOwner : value
+}
+
+export function assertWarRoomAgentCanReceiveNewAssignment(value: string) {
+  const alias = retiredWarRoomAgentAlias(value)
+  if (alias) throw new RetiredWarRoomAgentAliasError(alias)
+}
+
 export const WAR_ROOM_WORKER_PROFILES: Array<WorkerProfile> = [
+  {
+    agentId: 'goblin',
+    profileId: 'goblin-opportunity-discovery',
+    displayName: 'Goblin',
+    roomId: 'agora-opportunity',
+    role: 'research',
+    description: 'Opportunity discovery, comparative shop/product research, ranking, caveats, and evidence-linked Opportunity Packets for Oracle review.',
+    hermesProfileKey: 'research.opportunity_discovery',
+  },
   {
     agentId: 'athena',
     profileId: 'athena-strategy-product-review',
@@ -118,33 +192,7 @@ export const WAR_ROOM_WORKER_PROFILES: Array<WorkerProfile> = [
     description: 'Research, SEO, trend signals, forecasts, and market evidence.',
     hermesProfileKey: 'research.seo_trends',
   },
-  {
-    agentId: 'merchant-scout',
-    profileId: 'harbor-scout-store-evidence',
-    displayName: 'Harbor Scout',
-    roomId: 'merchant-harbor',
-    role: 'merchant',
-    description: 'Supplier, store, Etsy, listing, and logistics evidence.',
-    hermesProfileKey: 'merchant.store_evidence',
-  },
-  {
-    agentId: 'atlantis-archivist',
-    profileId: 'atlantis-archive-memory',
-    displayName: 'Atlantis Archivist',
-    roomId: 'atlantis-vault',
-    role: 'archivist',
-    description: 'Archive, evidence, memory, files, and long-term source state.',
-    hermesProfileKey: 'archive.memory',
-  },
-  {
-    agentId: 'treasury-guardian',
-    profileId: 'treasury-cost-approval-locks',
-    displayName: 'Treasury Guardian',
-    roomId: 'treasury-commerce',
-    role: 'treasury',
-    description: 'Usage, cost, spend, margin, and approval locks.',
-    hermesProfileKey: 'finance.cost_approval',
-  },
+
   {
     agentId: 'roster-keeper',
     profileId: 'pantheon-roster-rest',
@@ -162,14 +210,5 @@ export const WAR_ROOM_WORKER_PROFILES: Array<WorkerProfile> = [
     role: 'engineering',
     description: 'Development, QA, routing logic, test passes, and automation prototypes.',
     hermesProfileKey: 'engineering.qa_automation',
-  },
-  {
-    agentId: 'signal-runner',
-    profileId: 'gateway-discord-command',
-    displayName: 'Signal Runner',
-    roomId: 'gateway-cockpit',
-    role: 'gateway',
-    description: 'Discord, remote command, operator messages, and gateway handoffs.',
-    hermesProfileKey: 'gateway.discord_command',
   },
 ]

@@ -1,14 +1,11 @@
 import { useRouterState } from '@tanstack/react-router'
 import { isTruthyWarRoomFlag } from '../../lib/war-room/living-v3/route-flags'
-import { EtsyOpsRoom } from './etsy-ops/EtsyOpsRoom'
 import { LivingWarRoomV3 } from './living-v3/LivingWarRoomV3'
 
 export function WarRoomScreen() {
   const routeSearch = useRouterState({
     select: (state) => state.location.search as Record<string, unknown>,
   })
-
-  if (isTruthyWarRoomFlag(routeSearch.legacyEtsyOps)) return <EtsyOpsRoom />
 
   const etsyFocusMode = isTruthyWarRoomFlag(routeSearch.etsyFocus)
   const goblinFocusMode = isTruthyWarRoomFlag(routeSearch.goblinOps) || isTruthyWarRoomFlag(routeSearch.goblinFocus)

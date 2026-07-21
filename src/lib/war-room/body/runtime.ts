@@ -9,6 +9,7 @@ import { appendWarRoomEvent, getWarRoomEventStoreInfo, resetWarRoomEventStoreFor
 import { canAgentPerformIntent, listWarRoomCapabilities } from './capabilities'
 import { resetAgentConnectionControlForDev } from './agent-connection-control'
 import { DEFAULT_SAFETY_LOCKS } from './safety'
+import { assertWarRoomAgentCanReceiveNewAssignment } from './worker-profiles'
 import type {
   AgentBodyState,
   AgentIntent,
@@ -158,6 +159,7 @@ export function resetWarRoomBodyRuntimeForDev(nowMs = Date.now()) {
 }
 
 export function dispatchWarRoomIntent(intent: AgentIntent, nowMs = Date.now()) {
+  assertWarRoomAgentCanReceiveNewAssignment(intent.agentId)
   assertKnownAgent(intent.agentId)
   const capability = canAgentPerformIntent(intent)
   if (!capability.ok) {
@@ -341,7 +343,10 @@ export function createWarRoomTask(input: {
 }, nowMs = Date.now()) {
   assertKnownRoom(input.roomId)
   if (input.stationId) assertKnownStation(input.stationId, input.roomId)
-  if (input.assignedAgentId) assertKnownAgent(input.assignedAgentId)
+  if (input.assignedAgentId) {
+    assertWarRoomAgentCanReceiveNewAssignment(input.assignedAgentId)
+    assertKnownAgent(input.assignedAgentId)
+  }
 
   const task: Task = {
     taskId: input.taskId ?? nextId('task'),
@@ -384,6 +389,7 @@ export function requestWarRoomApproval(input: {
   correlationId?: string
   source?: WarRoomEventMetadata['source']
 }, nowMs = Date.now()) {
+  assertWarRoomAgentCanReceiveNewAssignment(input.agentId)
   assertKnownAgent(input.agentId)
   const task = state.tasks.find((candidate) => candidate.taskId === input.taskId)
   const agent = state.agents.find((candidate) => candidate.agentId === input.agentId)

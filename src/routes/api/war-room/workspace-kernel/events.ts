@@ -7,10 +7,19 @@ import {
 } from '../../../../lib/workspace-kernel'
 import { loadWorkspaceKernelState, saveWorkspaceKernelState } from '../../../../lib/workspace-kernel/store'
 import { isAuthenticated } from '../../../../server/auth-middleware'
+import {
+  type WorkspaceCorePersistenceSnapshot,
+  mergeWorkspaceKernelStateWithSupabase,
+  persistWorkspaceKernelRunsToSupabase,
+} from '../../../../server/workspace-core-db'
 
 const noStoreHeaders = { 'cache-control': 'no-store' }
 
-function responsePayload(result: ReturnType<typeof applyWorkspaceKernelEventIngress>, stateVersion: string) {
+function responsePayload(
+  result: ReturnType<typeof applyWorkspaceKernelEventIngress>,
+  stateVersion: string,
+  persistence?: WorkspaceCorePersistenceSnapshot,
+) {
   return {
     ok: result.ok,
     stateVersion,
@@ -20,13 +29,14 @@ function responsePayload(result: ReturnType<typeof applyWorkspaceKernelEventIngr
     run: result.run,
     telemetry: result.telemetry,
     displayStates: buildKernelAgentDisplayStates(result.state),
-    localOnly: true,
+    localOnly: persistence?.provider !== 'supabase',
     usageAllowed: false,
     workerSpawnAllowed: false,
     externalRequestsAllowed: false,
     liveActionsAllowed: false,
     lockedActions: result.lockedActions,
     safety: WORKSPACE_KERNEL_SAFETY,
+    persistence,
   }
 }
 
@@ -43,10 +53,12 @@ export const Route = createFileRoute('/api/war-room/workspace-kernel/events')({
         } catch {
           return json({ ok: false, error: 'Invalid JSON' }, { status: 400, headers: noStoreHeaders })
         }
-        const state = await loadWorkspaceKernelState()
+        const localState = await loadWorkspaceKernelState()
+        const stateMirror = await mergeWorkspaceKernelStateWithSupabase(localState)
+        const state = stateMirror.state
         const result = applyWorkspaceKernelEventIngress(body, state)
         if (!result.ok) {
-          return json(responsePayload(result, state.stateVersion), { status: 400, headers: noStoreHeaders })
+          return json(responsePayload(result, state.stateVersion, stateMirror.persistence), { status: 400, headers: noStoreHeaders })
         }
         const saved = await saveWorkspaceKernelState({
           ...result.state,
@@ -56,7 +68,8 @@ export const Route = createFileRoute('/api/war-room/workspace-kernel/events')({
           ...result,
           state: saved,
         }
-        return json(responsePayload(savedResult, saved.stateVersion), { headers: noStoreHeaders })
+        const persistence = result.run ? await persistWorkspaceKernelRunsToSupabase([result.run], result.telemetry) : stateMirror.persistence
+        return json(responsePayload(savedResult, saved.stateVersion, persistence), { headers: noStoreHeaders })
       },
     },
   },

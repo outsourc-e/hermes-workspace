@@ -3,11 +3,11 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../../server/auth-middleware'
 import {
   CONTROLLED_COUNCIL_AGENT_IDS,
-
-
-  runControlledCouncilFollowUp
+  runControlledCouncilFollowUp,
+  sanitizeControlledRunnerError,
 } from '../../../../lib/war-room/body'
-import type {ControlledCouncilAgentId, ControlledCouncilPeerOpinion} from '../../../../lib/war-room/body';
+import { recordCouncilFollowUpResult } from '../../../../lib/war-room/body/council-discussion-store'
+import type { ControlledCouncilAgentId, ControlledCouncilPeerOpinion } from '../../../../lib/war-room/body'
 
 const noStoreHeaders = { 'cache-control': 'no-store' }
 
@@ -17,6 +17,8 @@ export type CouncilFollowUpRequestPayload = {
   agentId: ControlledCouncilAgentId
   previousOpinions: Array<ControlledCouncilPeerOpinion>
   timeoutMs?: number
+  discussionId?: string
+  roundId?: string
 }
 
 function safeString(value: unknown, max = 3_000) {
@@ -32,10 +34,11 @@ function parseCouncilAgentId(value: unknown): ControlledCouncilAgentId {
 function parsePreviousOpinions(value: unknown): Array<ControlledCouncilPeerOpinion> {
   if (!Array.isArray(value)) return []
   return value
-    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .filter((item): item is Record<string, unknown> => item !== null && typeof item === 'object')
     .map((item) => ({
       generalId: safeString(item.generalId, 80) as ControlledCouncilPeerOpinion['generalId'],
       label: safeString(item.label, 120) || 'Council general',
+      chatSummary: safeString(item.chatSummary, 400),
       opinion: safeString(item.opinion, 1_200),
       vote: safeString(item.vote, 40) as ControlledCouncilPeerOpinion['vote'],
       voteReason: safeString(item.voteReason, 500),
@@ -50,6 +53,12 @@ function parseCouncilTimeoutMs(value: unknown): number | undefined {
   return Math.max(5_000, Math.min(45_000, Math.round(numeric)))
 }
 
+function parseSafeId(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const clean = value.trim().replace(/[^a-zA-Z0-9:_-]/g, '').slice(0, 96)
+  return clean || undefined
+}
+
 export function readCouncilFollowUpRequestPayload(body: unknown): CouncilFollowUpRequestPayload {
   const input = body && typeof body === 'object' ? body as Record<string, unknown> : {}
   const topic = safeString(input.topic)
@@ -62,6 +71,8 @@ export function readCouncilFollowUpRequestPayload(body: unknown): CouncilFollowU
     agentId: parseCouncilAgentId(input.agentId),
     previousOpinions: parsePreviousOpinions(input.previousOpinions),
     timeoutMs: parseCouncilTimeoutMs(input.timeoutMs),
+    discussionId: parseSafeId(input.discussionId),
+    roundId: parseSafeId(input.roundId),
   }
 }
 
@@ -82,9 +93,25 @@ export const Route = createFileRoute('/api/war-room/council/follow-up')({
             timeoutMs: payload.timeoutMs,
             cwd: process.cwd(),
           })
-          return json(result, { headers: noStoreHeaders })
+          if (payload.discussionId && payload.roundId) {
+            await recordCouncilFollowUpResult({
+              discussionId: payload.discussionId,
+              roundId: payload.roundId,
+              question: payload.question,
+              targetAgentId: payload.agentId,
+              result,
+            })
+          }
+          return json({
+            ...result,
+            drawingBoard: payload.discussionId ? {
+              discussionId: payload.discussionId,
+              roundId: payload.roundId,
+              database: 'Council Drawing Board file database',
+            } : undefined,
+          }, { headers: noStoreHeaders })
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
+          const message = sanitizeControlledRunnerError(error instanceof Error ? error.message : String(error))
           return json({
             ok: false,
             error: message,

@@ -225,7 +225,7 @@ const PROVIDER_CARDS: Array<{
     id: 'kimi-coding',
     name: 'Kimi',
     logo: '/providers/kimi.png',
-    models: ['kimi-latest', 'moonshot-v1-128k'],
+    models: ['kimi-k3', 'kimi-k2.7-code', 'kimi-k2.7-code-highspeed'],
     authType: 'api_key',
     envKey: 'KIMI_API_KEY',
   },

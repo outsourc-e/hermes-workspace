@@ -33,7 +33,7 @@ import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
-import { MobileTabBar } from '@/components/mobile-tab-bar'
+import { MOBILE_NAV_TABS } from '@/components/mobile-tab-bar'
 import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { MobilePageHeader } from '@/components/mobile-page-header'
 
@@ -44,6 +44,7 @@ import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
 import { isTruthyWarRoomFlag } from '@/lib/war-room/living-v3/route-flags'
+import { getWorkspacePageTitle } from '@/lib/workspace-navigation'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 
 const TerminalWorkspace = lazy(() =>
@@ -94,21 +95,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [slideClass, setSlideClass] = useState<string>('')
   const prevTabIndexRef = useRef<number>(-1)
 
-  // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
-  const getTabIndex = useCallback((path: string): number => {
-    if (path === '/dashboard') return 0
-    if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
-    if (path.startsWith('/files')) return 2
-    if (path.startsWith('/terminal')) return 3
-    if (path.startsWith('/jobs')) return 4
-    if (path === '/swarm' || path.startsWith('/swarm2')) return 5
-    if (path.startsWith('/memory')) return 6
-    if (path.startsWith('/skills')) return 7
-    if (path.startsWith('/mcp')) return 8
-    if (path.startsWith('/profiles')) return 9
-    if (path.startsWith('/settings')) return 10
-    return -1
-  }, [])
+  // Keep slide direction aligned with the canonical mobile-tab order.
+  const getTabIndex = useCallback(
+    (path: string): number => MOBILE_NAV_TABS.findIndex((tab) => tab.match(path)),
+    [],
+  )
 
   const isClient = typeof window !== 'undefined'
   // Both SSR and client start with the same value to avoid hydration mismatch.
@@ -169,29 +160,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, [connectionVerified])
 
   // Derive active session from URL
-  const mobilePageTitle = (() => {
-    if (pathname.startsWith('/terminal')) return 'Terminal'
-    if (pathname.startsWith('/files')) return 'Files'
-    if (pathname.startsWith('/jobs')) return 'Jobs'
-    if (pathname.startsWith('/conductor')) return 'Conductor'
-    if (pathname.startsWith('/war-room')) return 'Etsy Ops War Room'
-    if (pathname.startsWith('/operations')) return 'Operations'
-    if (pathname.startsWith('/swarm2') || pathname === '/swarm') return 'Swarm'
-    if (pathname.startsWith('/memory')) return 'Memory'
-    if (pathname.startsWith('/skills')) return 'Skills'
-    if (pathname.startsWith('/mcp')) return 'MCP'
-    if (pathname.startsWith('/profiles')) return 'Profiles'
-    if (pathname.startsWith('/settings')) return 'Settings'
-    if (pathname.startsWith('/debug')) return 'Debug'
-    if (pathname.startsWith('/activity')) return 'Activity'
-    return null
-  })()
+  const mobilePageTitle = getWorkspacePageTitle(pathname)
 
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
-  const isOnPlaygroundRoute = pathname === '/playground' || pathname.startsWith('/playground/')
   const isOnWarRoomRoute = pathname.startsWith('/war-room')
   const isWarRoomFocusMode = isOnWarRoomRoute && (
     isTruthyWarRoomFlag(routeSearch.etsyOps)
@@ -432,18 +406,20 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             </div>
           </main>
 
-          {/* Chat panel — visible on non-chat routes (but not in HermesWorld, which has its own in-game chat) */}
-          {!isOnChatRoute && !isOnPlaygroundRoute && !isOnWarRoomRoute && !isMobile && <ChatPanel />}
+          {/* Chat panel — visible on non-chat, non-War-Room desktop routes. */}
+          {!isOnChatRoute && !isOnWarRoomRoute && !isMobile && <ChatPanel />}
         </div>
 
         {!isMobile && isWarRoomFocusMode && hideChatSidebar ? (
           <button
             type="button"
             aria-label="Open workspace navigation"
+            aria-expanded={false}
             onClick={() => setWarRoomNavigationOpen(true)}
-            className="fixed left-3 top-[calc(var(--titlebar-h,0px)+0.75rem)] z-50 min-h-10 rounded-md border border-primary-300/40 bg-[var(--theme-card)] px-3 text-sm font-semibold text-[var(--theme-text)] shadow-lg"
+            className="workspace-shell__focus-nav-toggle fixed left-3 top-[calc(var(--titlebar-h,0px)+0.75rem)] z-50 inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary-300/40 bg-[var(--theme-card)]/95 px-3.5 text-sm font-semibold text-[var(--theme-text)] shadow-xl backdrop-blur-xl"
           >
-            Menu
+            <span aria-hidden="true">☰</span>
+            <span>Workspace</span>
           </button>
         ) : null}
 
@@ -451,15 +427,16 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           <button
             type="button"
             aria-label="Hide workspace navigation"
+            aria-expanded={true}
             onClick={() => setWarRoomNavigationOpen(false)}
-            className="fixed left-[306px] top-[calc(var(--titlebar-h,0px)+0.75rem)] z-50 h-10 w-10 rounded-md border border-primary-300/40 bg-[var(--theme-card)] text-sm font-semibold text-[var(--theme-text)] shadow-lg"
+            className="workspace-shell__focus-nav-toggle fixed left-[306px] top-[calc(var(--titlebar-h,0px)+0.75rem)] z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-primary-300/40 bg-[var(--theme-card)]/95 text-lg font-semibold text-[var(--theme-text)] shadow-xl backdrop-blur-xl"
           >
-            x
+            <span aria-hidden="true">×</span>
           </button>
         ) : null}
 
-        {/* Floating chat toggle — visible on non-chat routes (but not in HermesWorld) */}
-        {!isOnChatRoute && !isOnPlaygroundRoute && !isOnWarRoomRoute && !isMobile && <ChatPanelToggle />}
+        {/* Floating chat toggle — visible on non-chat, non-War-Room desktop routes. */}
+        {!isOnChatRoute && !isOnWarRoomRoute && !isMobile && <ChatPanelToggle />}
 
         {showDesktopSidebarBackdrop ? (
           <button

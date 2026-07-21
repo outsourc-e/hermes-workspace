@@ -1,0 +1,490 @@
+@media (min-width: 1100px) {
+  .living-v3--etsy-primary-workspace .living-v3__etsy-workspace-mode[data-etsy-desktop-ui="single-frame-v1"] {
+    --etsy-shell-bg: #f3f5f1;
+    --etsy-shell-panel: #fffefa;
+    --etsy-shell-ink: #17211d;
+    --etsy-shell-muted: #66726c;
+    --etsy-shell-line: rgba(38, 62, 51, 0.14);
+    position: fixed !important;
+    inset: 18px 20px 18px 68px !important;
+    z-index: 70;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto minmax(0, 1fr) auto !important;
+    grid-template-areas: none !important;
+    grid-auto-flow: row !important;
+    gap: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(255, 255, 255, 0.86) !important;
+    border-radius: 20px !important;
+    background: var(--etsy-shell-bg) !important;
+    color: var(--etsy-shell-ink) !important;
+    box-shadow: 0 28px 80px rgba(12, 27, 20, 0.28) !important;
+    text-align: left;
+  }
+
+  .living-v3__etsy-workspace-mode[data-etsy-desktop-ui="single-frame-v1"] > .living-v3__etsy-desktop-appbar {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .living-v3__etsy-workspace-mode[data-etsy-desktop-ui="single-frame-v1"] > .living-v3__etsy-desktop-rail {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+  }
+
+  .living-v3__etsy-workspace-mode[data-etsy-desktop-ui="single-frame-v1"] > .living-v3__etsy-desktop-canvas {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+  }
+
+  .living-v3__etsy-workspace-mode[data-etsy-desktop-ui="single-frame-v1"] > .living-v3__etsy-desktop-proof {
+    grid-column: 1 !important;
+    grid-row: 4 !important;
+  }
+
+  .living-v3__etsy-desktop-appbar {
+    display: grid;
+    grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+    gap: 24px;
+    align-items: center;
+    min-height: 90px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--etsy-shell-line);
+    background:
+      linear-gradient(100deg, color-mix(in srgb, var(--etsy-station-accent) 12%, #fffefa), #fffefa 43%),
+      #fffefa;
+  }
+
+  .living-v3__etsy-desktop-title {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .living-v3__etsy-desktop-title > span,
+  .living-v3__etsy-surface-head p {
+    margin: 0;
+    color: color-mix(in srgb, var(--etsy-station-accent) 76%, #27352f);
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .living-v3__etsy-desktop-title h2 {
+    overflow: hidden;
+    margin: 0;
+    color: var(--etsy-shell-ink);
+    font-size: clamp(1.35rem, 2vw, 1.95rem);
+    line-height: 1.04;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .living-v3__etsy-desktop-title small {
+    color: var(--etsy-shell-muted);
+    font-size: 0.72rem;
+  }
+
+  .living-v3__etsy-desktop-context {
+    display: grid;
+    grid-template-columns: minmax(150px, 1fr) minmax(170px, 1fr) auto auto;
+    gap: 8px;
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .living-v3__etsy-desktop-context > span,
+  .living-v3__etsy-desktop-context > button {
+    min-width: 0;
+    min-height: 46px;
+    border: 1px solid var(--etsy-shell-line);
+    border-radius: 11px;
+    background: rgba(246, 248, 244, 0.94);
+    color: var(--etsy-shell-ink);
+    padding: 8px 10px;
+  }
+
+  .living-v3__etsy-desktop-context > span {
+    display: grid;
+    gap: 2px;
+    overflow: hidden;
+    font-size: 0.72rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .living-v3__etsy-desktop-context > span b {
+    color: var(--etsy-shell-muted) !important;
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .living-v3__etsy-desktop-context > span.is-locked {
+    display: grid;
+    place-items: center;
+    border-color: rgba(151, 91, 47, 0.2);
+    background: #fff3e8;
+    color: #7c4928 !important;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .living-v3__etsy-desktop-context > button {
+    cursor: pointer;
+    border-color: color-mix(in srgb, var(--etsy-station-accent) 46%, transparent);
+    background: var(--etsy-shell-ink);
+    color: #fff;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 850;
+  }
+
+  .living-v3__etsy-desktop-rail {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0;
+    min-width: 0;
+    border-bottom: 1px solid var(--etsy-shell-line);
+    background: #e8ece6;
+  }
+
+  .living-v3__etsy-desktop-rail button {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 1px 8px;
+    align-items: center;
+    min-width: 0;
+    min-height: 66px;
+    cursor: pointer;
+    border: 0;
+    border-right: 1px solid rgba(38, 62, 51, 0.1);
+    background: transparent;
+    color: #53605a;
+    padding: 8px 10px;
+    text-align: left;
+  }
+
+  .living-v3__etsy-desktop-rail button::after {
+    position: absolute;
+    right: 10px;
+    bottom: 0;
+    left: 10px;
+    height: 3px;
+    border-radius: 999px 999px 0 0;
+    background: var(--etsy-stage-accent);
+    content: '';
+    opacity: 0.16;
+  }
+
+  .living-v3__etsy-desktop-rail button > b {
+    grid-row: 1 / 3;
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.78);
+    color: var(--etsy-stage-accent);
+    font-size: 0.78rem;
+  }
+
+  .living-v3__etsy-desktop-rail button > span,
+  .living-v3__etsy-desktop-rail button > small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .living-v3__etsy-desktop-rail button > span {
+    color: inherit;
+    font-size: 0.75rem;
+    font-weight: 850;
+  }
+
+  .living-v3__etsy-desktop-rail button > small {
+    color: #7a857f;
+    font-size: 0.62rem;
+  }
+
+  .living-v3__etsy-desktop-rail button.is-active {
+    background: #fffefa;
+    color: var(--etsy-shell-ink);
+  }
+
+  .living-v3__etsy-desktop-rail button.is-active::after {
+    opacity: 1;
+  }
+
+  .living-v3__etsy-desktop-rail button[data-station-ready-state="done"] > b {
+    background: #dff1e8;
+    color: #176248;
+  }
+
+  .living-v3__etsy-desktop-canvas {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    padding: 14px;
+    background:
+      radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--etsy-station-accent) 8%, transparent), transparent 36%),
+      var(--etsy-shell-bg);
+  }
+
+  .living-v3__etsy-desktop-canvas > .living-v3__etsy-app,
+  .living-v3__etsy-desktop-canvas > .living-v3__simple-product-console {
+    width: 100%;
+    min-width: 0;
+    min-height: 100%;
+    margin: 0;
+  }
+
+  .living-v3__etsy-desktop-proof {
+    border: 0;
+    border-top: 1px solid var(--etsy-shell-line);
+    background: #eef1ec;
+  }
+
+  .living-v3__etsy-desktop-proof > summary {
+    display: flex;
+    min-height: 42px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 8px 16px;
+    color: var(--etsy-shell-ink);
+    font-size: 0.74rem;
+    font-weight: 850;
+    list-style: none;
+  }
+
+  .living-v3__etsy-desktop-proof > summary small {
+    overflow: hidden;
+    color: var(--etsy-shell-muted);
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .living-v3__etsy-desktop-proof-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.3fr 1.4fr auto;
+    gap: 8px;
+    padding: 0 14px 12px;
+  }
+
+  .living-v3__etsy-desktop-proof-grid article {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    border: 1px solid var(--etsy-shell-line);
+    border-radius: 10px;
+    background: #fffefa;
+    padding: 9px;
+  }
+
+  .living-v3__etsy-desktop-proof-grid article span {
+    color: var(--etsy-shell-muted);
+    font-size: 0.61rem;
+    font-weight: 850;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .living-v3__etsy-desktop-proof-grid article b {
+    overflow: hidden;
+    font-size: 0.71rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .living-v3__etsy-desktop-proof-grid > button {
+    min-height: 42px;
+    align-self: stretch;
+    cursor: pointer;
+    border: 1px solid rgba(143, 62, 50, 0.22);
+    border-radius: 10px;
+    background: #fff0ed;
+    color: #812f28;
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 850;
+    padding: 8px 12px;
+  }
+
+  .living-v3__etsy-desktop-canvas .living-v3__etsy-surface-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 12px;
+    align-items: center;
+    min-height: 76px;
+    border: 0;
+    border-bottom: 1px solid var(--etsy-shell-line);
+    background: transparent;
+    padding: 4px 2px 12px;
+  }
+
+  .living-v3__etsy-desktop-canvas .living-v3__etsy-surface-head h3 {
+    overflow: hidden;
+    margin: 3px 0 0;
+    color: var(--etsy-shell-ink);
+    font-size: 1.25rem;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .living-v3__etsy-desktop-canvas button,
+  .living-v3__etsy-desktop-canvas select,
+  .living-v3__etsy-desktop-canvas input {
+    min-height: 42px;
+  }
+
+  /* Product Search: visual artifact cockpit, comparison results, decision dossier. */
+  .living-v3__etsy-desktop-canvas .living-v3__simple-product-console {
+    gap: 12px;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .living-v3__etsy-desktop-canvas .living-v3__product-workbench {
+    grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.78fr);
+    align-items: start;
+  }
+
+  /* SEO: ledger-first composition. */
+  .living-v3__etsy-app--ledger .living-v3__etsy-metric-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .living-v3__etsy-app--ledger .living-v3__etsy-metric-cards > div {
+    min-height: 94px;
+    border: 1px solid rgba(50, 93, 116, 0.18);
+    border-radius: 14px;
+    background: linear-gradient(150deg, #f7fbfd, #e8f2f5);
+    padding: 14px;
+  }
+
+  .living-v3__etsy-app--ledger .living-v3__etsy-metric-cards b {
+    display: block;
+    margin-top: 8px;
+    color: #1e536a;
+    font-size: 1.45rem;
+  }
+
+  .living-v3__etsy-app--ledger .living-v3__etsy-work-grid--three {
+    grid-template-columns: 1.15fr 1fr 0.82fr;
+  }
+
+  /* Source Leads: marketplace comparison board. */
+  .living-v3__etsy-app--net .living-v3__etsy-board-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .living-v3__etsy-app--net .living-v3__etsy-lead-card {
+    display: grid;
+    grid-template-rows: 150px minmax(0, 1fr) auto;
+    border-left: 4px solid #6f9f97;
+  }
+
+  /* Source Truth: evidence matrix with distinct claim lanes. */
+  .living-v3__etsy-app--truth .living-v3__etsy-checklist-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .living-v3__etsy-app--truth .living-v3__etsy-truth-check {
+    min-height: 76px;
+    border-left: 4px solid #b87657;
+  }
+
+  .living-v3__etsy-app--truth .living-v3__etsy-truth-check.is-attached {
+    border-left-color: #278263;
+    background: #edf8f2;
+  }
+
+  .living-v3__etsy-app--truth .living-v3__etsy-work-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .living-v3__etsy-app--truth .living-v3__etsy-work-card:nth-child(1) { border-top: 4px solid #278263; }
+  .living-v3__etsy-app--truth .living-v3__etsy-work-card:nth-child(2) { border-top: 4px solid #b34e46; }
+  .living-v3__etsy-app--truth .living-v3__etsy-work-card:nth-child(3) { border-top: 4px solid #9a7d4a; }
+
+  /* ShotLab Prep: media storyboard plus production controls. */
+  .living-v3__etsy-app--shotlab .living-v3__etsy-production-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(270px, 0.5fr);
+    gap: 14px;
+    align-items: start;
+  }
+
+  .living-v3__etsy-app--shotlab .living-v3__etsy-media-slots {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .living-v3__etsy-app--shotlab .living-v3__etsy-media-slot {
+    min-height: 132px;
+    align-content: end;
+    border: 1px dashed rgba(114, 83, 125, 0.36);
+    background: linear-gradient(145deg, #f8f3fa, #eee5f2);
+  }
+
+  /* QA: inspection tiles with decision controls. */
+  .living-v3__etsy-app--inspection .living-v3__etsy-qa-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .living-v3__etsy-app--inspection .living-v3__etsy-qa-card {
+    grid-template-rows: 160px auto auto;
+    border-top: 4px solid #b67838;
+  }
+
+  /* Draft Approval: final read sheet, not another generic board. */
+  .living-v3__etsy-app--draft .living-v3__etsy-review-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.5fr);
+    gap: 12px;
+  }
+
+  .living-v3__etsy-app--draft .living-v3__etsy-review-card--hero {
+    grid-row: span 2;
+    min-height: 230px;
+    border-left: 5px solid #8d6d37;
+    background: linear-gradient(145deg, #fffdf7, #f1eadc);
+  }
+
+  .living-v3__etsy-app--draft .living-v3__etsy-review-card--hero h3 {
+    max-width: 18ch;
+    margin: 10px 0;
+    font-size: clamp(1.8rem, 3vw, 3.35rem) !important;
+    line-height: 1.02 !important;
+    overflow-wrap: anywhere;
+  }
+
+  .living-v3__etsy-app--draft .living-v3__etsy-locked-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}

@@ -945,5 +945,3 @@ export function getConnectionStatus(): ConnectionStatus {
 export function isClaudeConnected(): boolean {
   return capabilities.health || capabilities.dashboard.available
 }
-
-void ensureGatewayProbed()

@@ -4,9 +4,10 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { isAuthenticated } from '../../../../server/auth-middleware'
-import { attachWorkspaceArtifact, createWorkspaceArtifactForRun, createWorkspaceRun, routeWorkspaceActionToBlueprint } from '../../../../lib/workspace-kernel'
+import { attachWorkspaceArtifact, createWorkspaceApprovalForRun, createWorkspaceArtifactForRun, createWorkspaceRun, requestWorkspaceApproval, routeWorkspaceActionToBlueprint } from '../../../../lib/workspace-kernel'
 import { Route as EventsRoute } from './events'
 import { Route as ResetRoute } from './reset-local-demo'
+import { Route as ResolveRunRoute } from './resolve-run'
 import { Route as StateRoute } from './state'
 
 vi.mock('../../../../server/auth-middleware', () => ({
@@ -22,10 +23,14 @@ type EventsHandlers = typeof EventsRoute & {
 type ResetHandlers = typeof ResetRoute & {
   options: { server: { handlers: { POST: (ctx: { request: Request }) => Promise<Response> } } }
 }
+type ResolveRunHandlers = typeof ResolveRunRoute & {
+  options: { server: { handlers: { POST: (ctx: { request: Request }) => Promise<Response> } } }
+}
 
 const stateHandlers = (StateRoute as StateHandlers).options.server.handlers
 const eventsHandlers = (EventsRoute as EventsHandlers).options.server.handlers
 const resetHandlers = (ResetRoute as ResetHandlers).options.server.handlers
+const resolveRunHandlers = (ResolveRunRoute as ResolveRunHandlers).options.server.handlers
 const mockIsAuthenticated = vi.mocked(isAuthenticated)
 let tempDirs: Array<string> = []
 
@@ -48,6 +53,20 @@ function createRun() {
   })
   const run = createWorkspaceRun(route.action, route.blueprint, 100)
   return attachWorkspaceArtifact({ runs: [run] }, run.runId, createWorkspaceArtifactForRun(run, route.blueprint, 101)).runs[0]
+}
+
+function createApprovalRun() {
+  const route = routeWorkspaceActionToBlueprint({
+    actionId: 'api-resolve-run',
+    createdAtMs: 200,
+    source: 'ui',
+    intent: 'publish',
+    summary: 'Publish live Etsy listing',
+    input: { text: 'publish upload live listing' },
+  })
+  const run = createWorkspaceRun(route.action, route.blueprint, 200)
+  const withArtifact = attachWorkspaceArtifact({ runs: [run] }, run.runId, createWorkspaceArtifactForRun(run, route.blueprint, 201)).runs[0]
+  return requestWorkspaceApproval({ runs: [withArtifact] }, withArtifact.runId, createWorkspaceApprovalForRun(withArtifact, route.blueprint, 202)).runs[0]
 }
 
 beforeEach(async () => {
@@ -148,6 +167,63 @@ describe('/api/war-room/workspace-kernel V2 state/events APIs', () => {
       }),
     })
     expect(invalid.status).toBe(400)
+  })
+
+  it('resolve-run records approval without live execution and persists readback', async () => {
+    const run = createApprovalRun()
+    await stateHandlers.POST({
+      request: post('http://localhost/api/war-room/workspace-kernel/state', { runs: [run] }),
+    })
+
+    const response = await resolveRunHandlers.POST({
+      request: post('http://localhost/api/war-room/workspace-kernel/resolve-run', {
+        action: 'approved',
+        approvalId: run.approvals[0].approvalId,
+      }),
+    })
+    const body = await response.json() as {
+      ok: boolean
+      run: { status: string; readback: string; approvals: Array<{ status: string }>; events: Array<{ type: string; payload?: Record<string, unknown> }> }
+      liveActionsAllowed: boolean
+    }
+
+    expect(response.status).toBe(200)
+    expect(body.ok).toBe(true)
+    expect(body.run.status).toBe('blocked')
+    expect(body.run.approvals[0].status).toBe('approved')
+    expect(body.run.readback).toContain('Live executor is still gated')
+    expect(body.run.events.map((event) => event.type)).toContain('approval.approved')
+    expect(body.run.events.at(-1)?.payload).toMatchObject({ liveExecutorConnected: false })
+    expect(body.liveActionsAllowed).toBe(false)
+  })
+
+  it('resolve-run cancels a run and returns 404 for unknown ids', async () => {
+    const run = createApprovalRun()
+    await stateHandlers.POST({
+      request: post('http://localhost/api/war-room/workspace-kernel/state', { runs: [run] }),
+    })
+
+    const cancelled = await resolveRunHandlers.POST({
+      request: post('http://localhost/api/war-room/workspace-kernel/resolve-run', {
+        action: 'cancel',
+        runId: run.runId,
+        reason: 'Operator cancelled from API test.',
+      }),
+    })
+    const cancelBody = await cancelled.json() as { ok: boolean; run: { status: string; approvals: Array<{ status: string }>; events: Array<{ type: string }> } }
+    expect(cancelled.status).toBe(200)
+    expect(cancelBody.ok).toBe(true)
+    expect(cancelBody.run.status).toBe('cancelled')
+    expect(cancelBody.run.approvals[0].status).toBe('rejected')
+    expect(cancelBody.run.events.map((event) => event.type)).toContain('run.cancelled')
+
+    const missing = await resolveRunHandlers.POST({
+      request: post('http://localhost/api/war-room/workspace-kernel/resolve-run', {
+        action: 'approved',
+        approvalId: 'missing-approval',
+      }),
+    })
+    expect(missing.status).toBe(404)
   })
 
   it('reset-local-demo clears only the local durable kernel store', async () => {

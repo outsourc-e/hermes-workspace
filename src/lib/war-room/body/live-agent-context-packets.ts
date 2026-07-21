@@ -47,6 +47,28 @@ const PRODUCT_TRACKER_SOURCE: LiveAgentContextSource = {
   focus: 'Product tracker rule: every product gets its own note, evidence, action log, status, and next action; GREEN requires product + demand + supplier/image + truth-match proof.',
 }
 
+const GOBLIN_SOURCE: LiveAgentContextSource = {
+  title: 'Goblin Analytics - Agora Workspace Room Plan',
+  path: '01 Projects/Etsy Market Lab/Product Tracker/Goblin Analytics - Agora Workspace Room Plan 2026-07-03.md',
+  focus: 'Goblin Analytics is the intelligence room before product prep: read-only competitor/shop/product research, source proof, ranking, caveats, hard blocks, and visual Opportunity Packets.',
+}
+
+const GOBLIN_PACKET: LiveAgentContextPacket = {
+  packetId: 'obsidian-goblin-analytics-v1',
+  label: 'Goblin Analytics opportunity context',
+  scope: 'Goblin Analytics / opportunity discovery / comparative research / candidate ranking',
+  sources: [GOBLIN_SOURCE, ETSY_SOURCE, PRODUCT_TRACKER_SOURCE, UNIVERSAL_WORKSPACE_SOURCE, WAR_ROOM_AUTOMATION_SOURCE],
+  facts: [
+    'Goblin owns discovery, comparison, ranking, and Opportunity Packet preparation for shops, products, and niches.',
+    'An Opportunity Packet contains the candidate, source links, freshness, comparison basis, score, caveats, missing evidence, and a clear recommendation.',
+    'A promising signal is not proof. Oracle owns provenance, confidence, and allowed-claim validation after Goblin handoff.',
+    'Goblin does not write listings, prepare final SEO, contact suppliers, buy, publish, or mutate marketplace/account data.',
+  ],
+  allowedNow: ['shape a discovery query', 'compare and rank candidates', 'prepare an evidence-linked Opportunity Packet', 'name caveats and missing proof', 'route a candidate to Oracle'],
+  blockedWithoutApproval: ['live marketplace/account mutations', 'supplier/customer messages', 'purchases', 'paid generation or paid research', 'claiming a candidate is proven before Oracle validation'],
+  agentInstruction: 'Answer as Goblin. Be sharp and evidence-first. Distinguish discovery score from proof, return an Opportunity Packet when asked, and hand claim validation to Oracle.',
+}
+
 const COUNCIL_SOURCE: LiveAgentContextSource = {
   title: 'Council of Strategists - מקור אמת 2026-06-27',
   path: '01 Projects/War Room/Council of Strategists - מקור אמת 2026-06-27.md',
@@ -158,6 +180,7 @@ function councilPacket(agentId: LivingV3AgentId, lens: string): LiveAgentContext
 
 const LIVE_AGENT_CONTEXT_PACKETS: Partial<Record<LivingV3AgentId, LiveAgentContextPacket>> = {
   hermes: HERMES_PACKET,
+  goblin: GOBLIN_PACKET,
   terra: TERRA_PACKET,
   loki: LOKI_PACKET,
   thor: THOR_PACKET,

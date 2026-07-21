@@ -170,8 +170,10 @@ describe('/api/war-room/terra assets/printer', () => {
     expect(body.assets[0].preview.dataUrl).toMatch(/^data:image\//)
   })
 
-  it('returns read-only live printer status and keeps machine actions locked', async () => {
+  it('returns read-only printer status without opening the camera stream and keeps machine actions locked', async () => {
+    let cameraRequests = 0
     const server = http.createServer((_request, response) => {
+      cameraRequests += 1
       response.writeHead(200, { 'content-type': 'multipart/x-mixed-replace; boundary=frame' })
       response.write('--frame\r\nContent-Type: image/jpeg\r\n\r\n')
     })
@@ -183,13 +185,16 @@ describe('/api/war-room/terra assets/printer', () => {
     process.env.TERRA_PRINTER_NAME = 'Route Test Printer'
 
     const response = await printerHandler({ request: new Request('http://localhost/api/war-room/terra-printer') })
-    const body = await response.json() as { ok: boolean; configured: boolean; state: string; cameraUrl: string; lockedActions: Array<string> }
+    const body = await response.json() as { ok: boolean; configured: boolean; state: string; cameraUrl: string; message: string; discoveryNotes: Array<string>; lockedActions: Array<string> }
 
     expect(response.status).toBe(200)
     expect(body.ok).toBe(true)
     expect(body.configured).toBe(true)
-    expect(body.state).toBe('ready')
+    expect(body.state).toBe('configured')
     expect(body.cameraUrl).toContain('127.0.0.1')
+    expect(body.message).toContain('will not open the stream')
+    expect(body.discoveryNotes).toEqual(expect.arrayContaining(['camera stream probe skipped by default; use manual frame endpoint only']))
+    expect(cameraRequests).toBe(0)
     expect(body.lockedActions).toEqual(expect.arrayContaining(['printer_start', 'printer_heat']))
   })
 

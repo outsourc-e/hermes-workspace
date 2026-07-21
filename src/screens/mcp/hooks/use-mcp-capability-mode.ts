@@ -1,42 +1,28 @@
-import { useQuery } from '@tanstack/react-query'
+import { useFeatureAvailability } from '@/hooks/use-feature-available'
 
 export type McpCapabilityMode = 'native' | 'fallback' | 'off'
 
-interface GatewayStatusResponse {
-  capabilities?: {
-    mcp?: boolean
-    mcpFallback?: boolean
-  }
-}
-
-/**
- * Phase 1.5 — read `/api/gateway-status` and reduce to one of:
- *   - `native`   : `capabilities.mcp` is true (full runtime CRUD).
- *   - `fallback` : `capabilities.mcpFallback` true (config.yaml-only CRUD;
- *                  Test/Discover/Logs disabled).
- *   - `off`      : neither — UI surfaces the upgrade banner instead.
- */
 export function useMcpCapabilityMode(): {
   mode: McpCapabilityMode
   isLoading: boolean
+  isError: boolean
 } {
-  const query = useQuery({
-    queryKey: ['gateway-status', 'mcp-mode'],
-    queryFn: async (): Promise<McpCapabilityMode> => {
-      const res = await fetch('/api/gateway-status')
-      if (!res.ok) return 'off'
-      const body = (await res.json()) as GatewayStatusResponse
-      const caps = body.capabilities ?? {}
-      if (caps.mcp) return 'native'
-      if (caps.mcpFallback) return 'fallback'
-      return 'off'
-    },
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-  })
+  const native = useFeatureAvailability('mcp')
+  const fallback = useFeatureAvailability('mcpFallback')
 
   return {
-    mode: query.data ?? 'off',
-    isLoading: query.isLoading,
+    mode: native.available
+      ? 'native'
+      : fallback.available
+        ? 'fallback'
+        : 'off',
+    isLoading:
+      !native.available &&
+      !fallback.available &&
+      (native.state === 'loading' || fallback.state === 'loading'),
+    isError:
+      !native.available &&
+      !fallback.available &&
+      (native.state === 'error' || fallback.state === 'error'),
   }
 }

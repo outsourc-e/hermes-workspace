@@ -11,14 +11,10 @@ import {
   prepareProductScoutPacketLocal,
   selectEtsyCandidateLocal,
 } from '../../../lib/war-room/living-v3/etsy-room-contracts'
-import {
-  EtsyProductPrepWorkbench
-
-
-} from './EtsyProductPrepWorkbench'
-
-;
-import type {EtsyProductPrepWorkbenchActions, EtsyProductPrepWorkbenchProps} from './EtsyProductPrepWorkbench';import type { OracleSignalPacket } from '../../../lib/war-room/living-v3/oracle-alura'
+import { EtsyProductPrepWorkbench } from './EtsyProductPrepWorkbench'
+import type { OracleSignalPacket } from '../../../lib/war-room/living-v3/oracle-alura'
+import type { ResearchMissionPacket } from '../../../lib/war-room/living-v3/research-atlas-contract'
+import type { EtsyProductPrepWorkbenchActions, EtsyProductPrepWorkbenchProps } from './EtsyProductPrepWorkbench'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -48,6 +44,27 @@ const oracleSignalFixture: OracleSignalPacket = {
   status: 'local_signal_ready',
 }
 
+const researchMissionFixture: ResearchMissionPacket = {
+  schemaVersion: 'war-room-research-mission-v1',
+  missionId: 'research-shop-fixture',
+  createdAtMs: 1_060,
+  status: 'staged',
+  targetType: 'shop',
+  target: 'NewShop',
+  depth: 'deep',
+  modules: ['official-shop', 'supplier-visual', 'risk'],
+  notes: 'Local fixture',
+  owner: { agentId: 'loki', roomId: 'etsy-market-lab', stationId: 'etsy-loki-product-hunt' },
+  outputs: ['workbook'],
+  steps: [{ id: 'research', label: 'Research', state: 'pending' }],
+  safety: {
+    localOnly: true,
+    externalResearchStarted: false,
+    noMarketplaceWrites: true,
+    noSupplierMessages: true,
+    approvalRequiredForSideEffects: true,
+  },
+}
 
 function createReadyRoomState() {
   let state = createInitialEtsyRoomState(1_000)
@@ -134,7 +151,8 @@ async function click(element: HTMLElement) {
 
 describe('EtsyProductPrepWorkbench', () => {
   it('renders practical workbench surfaces with proof collapsed by default', async () => {
-    const { container, unmount } = await renderWorkbench()
+    const roomState = { ...createReadyRoomState(), researchMissionPacket: researchMissionFixture }
+    const { container, unmount } = await renderWorkbench({ roomState })
 
     const root = query(container, '[data-product-prep-workbench="v1"]')
     expect(root.getAttribute('data-workbench-mode')).toBe('visual-receiving-board')
@@ -142,6 +160,11 @@ describe('EtsyProductPrepWorkbench', () => {
     expect(root.getAttribute('data-etsy-product-board-state')).toBe('has-products')
     expect(query(container, '[data-product-search-surface="moved-to-oracle"]').textContent).toContain('ETSY MARKET LAB')
     expect(query(container, '[data-product-search-surface="moved-to-oracle"]').textContent).toContain('Search in Oracle')
+    expect(query(container, '[data-research-mission-handoff="staged"]').textContent).toContain('NewShop')
+    expect(query(container, '[data-research-mission-handoff="staged"]').textContent).toContain('External research not started')
+    expect(query(container, '[data-etsy-product-prep-cockpit="v1"]').textContent).toContain('Active product artifact')
+    expect(query(container, '[data-etsy-readiness-radar="v1"]').textContent).toContain('Draft ready')
+    expect(query(container, '[data-etsy-candidate-comparison="v1"]').textContent).toContain('Candidate comparison')
     expect(query(container, '[data-candidate-board="v1"]').textContent).toContain('Gold Bow Necklace')
     expect(query(container, '[data-product-image-placeholder="bow"]')).toBeTruthy()
     expect(query(container, '[data-etsy-visual-surfaces="v1"]').textContent).toContain('Truth')
@@ -153,7 +176,7 @@ describe('EtsyProductPrepWorkbench', () => {
 
     const proof = query(container, '[data-debug-proof-collapsed="true"]') as HTMLDetailsElement
     expect(proof.open).toBe(false)
-    expect(proof.textContent).toContain('Proof / packets')
+    expect(proof.textContent).toContain('Readback / packets')
     expect(container.textContent).toContain('Live read-only research connector is not enabled.')
 
     const buttonText = Array.from(container.querySelectorAll('button')).map((button) => button.textContent ?? '').join(' ')

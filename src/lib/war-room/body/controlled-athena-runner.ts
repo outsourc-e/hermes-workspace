@@ -34,6 +34,7 @@ export const APPROVED_LIVE_AGENT_PROFILE_IDS: Partial<Record<LivingV3AgentId, st
   // Hermes cannot use a profile literally named "hermes" because the Hermes CLI reserves that name.
   // Until DLV approves a non-generic replacement name, the visible Hermes command agent uses the existing real default profile.
   hermes: 'default',
+  goblin: 'goblin',
   terra: 'terra',
   loki: 'loki',
   thor: 'thor',
@@ -132,8 +133,8 @@ export const CONTROLLED_AGENT_PROFILES: Record<ControlledAgentId, ControlledAgen
     roomId: 'council-strategists',
     stationId: 'council-table',
     source: 'warroom-controlled-council-ui',
-    mission: 'Give one equal council opinion focused on structure, ownership, clear choices, and decision framing — without acting as the boss.',
-    nextSafeStepHint: 'Add Julius as one equal vote in the Council decision summary; DLV decides.',
+    mission: 'Chair the Council: read the independent generals, preserve disagreement, name the owner/order/first step, and make the final decision readable for DLV.',
+    nextSafeStepHint: 'Add Julius as Council chair synthesis: what the generals said, what DLV should do next, and what remains locked.',
   },
   'council-alexander': {
     agentId: 'alexander',
@@ -333,11 +334,12 @@ export type ControlledHermesCommandOutput = {
 }
 
 export type ControlledCouncilVote = 'for' | 'neutral' | 'against' | 'abstain'
-export type ControlledCouncilPhase = 'opinion' | 'peer-vote' | 'single-follow-up'
+export type ControlledCouncilPhase = 'opinion' | 'council-turn' | 'peer-vote' | 'synthesis' | 'single-follow-up'
 
 export type ControlledCouncilPeerOpinion = {
   generalId: ControlledCouncilGeneralId
   label: string
+  chatSummary?: string
   opinion: string
   vote?: ControlledCouncilVote
   voteReason?: string
@@ -360,11 +362,16 @@ export type ControlledCouncilRunContext = {
   safetyRails: Array<string>
   peerOpinions: Array<ControlledCouncilPeerOpinion>
   followUpQuestion?: string
+  liveTranscript?: Array<string>
+  replyToLabel?: string
+  replyToSnippet?: string
+  turnInstruction?: string
 }
 
 export type ControlledCouncilOutput = {
   generalId: ControlledCouncilGeneralId
   phase: ControlledCouncilPhase
+  chatSummary: string
   opinion: string
   vote: ControlledCouncilVote
   voteReason: string
@@ -376,6 +383,8 @@ export type ControlledCouncilOutput = {
   riskFlags: Array<string>
   suggestedDecisionPatch: string
   suggestedFollowUp: string
+  replyTo?: string
+  replySnippet?: string
 }
 
 export type ControlledAgentOutput = {
@@ -437,6 +446,17 @@ function clampConfidence(value: unknown) {
 
 function cleanText(value: unknown, fallback: string) {
   return cleanTextLimit(value, fallback, 500)
+}
+
+const CONTROLLED_RUNNER_RAW_LEAK_PATTERN = /(Command failed:|--profile\s+|--ignore-rules|--max-turns|IMPORTANT IDENTITY RULES|Return JSON only|\/Users\/mac\/\.hermes|\s-q\s+You are\s+)/i
+
+export function sanitizeControlledRunnerError(value: unknown) {
+  const text = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
+  if (!text) return 'Controlled Hermes runner failed before returning clean output.'
+  if (CONTROLLED_RUNNER_RAW_LEAK_PATTERN.test(text)) {
+    return 'Controlled Hermes runner failed before returning a clean AI answer. Technical command/prompt details are hidden from the UI.'
+  }
+  return text.slice(0, 420)
 }
 
 function cleanTextLimit(value: unknown, fallback: string, limit: number) {
@@ -780,9 +800,17 @@ function cleanCouncilVote(value: unknown): ControlledCouncilVote {
 }
 
 function cleanCouncilPhase(value: unknown): ControlledCouncilPhase {
-  return value === 'opinion' || value === 'peer-vote' || value === 'single-follow-up'
+  return value === 'opinion' || value === 'council-turn' || value === 'peer-vote' || value === 'synthesis' || value === 'single-follow-up'
     ? value
     : 'opinion'
+}
+
+function cleanCouncilChatSummary(value: unknown, fallback: string) {
+  const raw = typeof value === 'string' && value.trim() ? value : fallback
+  const text = raw.trim().replace(/\s+/g, ' ')
+  const words = text.split(/\s+/).filter(Boolean)
+  const concise = words.length > 26 ? `${words.slice(0, 26).join(' ')}…` : text
+  return cleanTextLimit(concise, 'תקציר קצר לא סופק; פתח פרטי לפירוט.', 220)
 }
 
 function normalizeControlledCouncilOutput(agentId: ControlledCouncilAgentId, value: unknown, context?: ControlledCouncilRunContext): ControlledCouncilOutput {
@@ -791,9 +819,14 @@ function normalizeControlledCouncilOutput(agentId: ControlledCouncilAgentId, val
   const generalId = controlledCouncilGeneralId(agentId)
   const phase = cleanCouncilPhase(nested.phase ?? context?.phase)
   const opinion = cleanTextLimit(nested.opinion, `${controlledAgentProfile(agentId).label} could not produce a council opinion.`, 1_800)
+  const chatSummary = cleanCouncilChatSummary(
+    nested.chatSummary ?? nested.mainChatSummary ?? nested.shortAnswer ?? council.summary,
+    opinion,
+  )
   return {
     generalId,
     phase,
+    chatSummary,
     opinion,
     vote: cleanCouncilVote(nested.vote),
     voteReason: cleanTextLimit(nested.voteReason, 'Vote reason was not provided.', 700),
@@ -809,6 +842,8 @@ function normalizeControlledCouncilOutput(agentId: ControlledCouncilAgentId, val
     riskFlags: cleanTextArray(nested.riskFlags, [], 8),
     suggestedDecisionPatch: cleanTextLimit(nested.suggestedDecisionPatch, opinion, 900),
     suggestedFollowUp: cleanTextLimit(nested.suggestedFollowUp, 'Ask this general a focused follow-up if this point matters.', 300),
+    replyTo: cleanTextLimit(nested.replyTo ?? context?.replyToLabel, '', 120),
+    replySnippet: cleanTextLimit(nested.replySnippet ?? context?.replyToSnippet, '', 180),
   }
 }
 
@@ -878,18 +913,31 @@ function buildCouncilGeneralPrompt(agentId: ControlledCouncilAgentId, runId: str
     excerpt: source.excerpt.slice(0, 700),
   }))
   const peerOpinions = safeContext.peerOpinions.slice(0, 8)
+  const liveTranscript = (safeContext.liveTranscript ?? []).slice(-12)
+  const isChair = agentId === 'council-julius'
+  const isSequentialCouncilTurn = safeContext.phase === 'council-turn'
   const phaseInstruction = safeContext.phase === 'peer-vote'
-    ? 'Read the other generals\' opinions first, then vote. You may agree, disagree, or choose neutral; do not rubber-stamp the group.'
-    : safeContext.phase === 'single-follow-up'
-      ? 'Answer DLV\'s focused follow-up to you only. Use your personality and the Obsidian context; do not pretend the whole council answered.'
-      : 'Give your first independent opinion before the council vote. Do not claim you saw peer opinions unless provided.'
+    ? 'Read the previous council turns first, then vote honestly. You may agree, amend, challenge, choose neutral, or abstain; do not repeat a generic answer.'
+    : safeContext.phase === 'synthesis'
+      ? 'You are Julius as Council chair. Read every independent answer, preserve the strongest disagreement, and produce the final short synthesis for DLV. Do not pretend the advisors agreed if they did not.'
+      : safeContext.phase === 'single-follow-up'
+        ? 'Answer DLV\'s focused follow-up to you only. Use your personality and the Obsidian context; do not pretend the whole council answered.'
+        : isSequentialCouncilTurn
+          ? 'This is a live council thread. Read the transcript and respond to the last useful speaker: agree with a reason, amend the plan, challenge a risk, or ask for a sharper next step. Do not restart from the original topic and do not mimic the previous wording.'
+          : 'This is an independent blind first pass. Answer from your own lens before seeing other new-round answers; prior context is history only, not a script to copy.'
+  const turnInstruction = cleanTextLimit(safeContext.turnInstruction, phaseInstruction, 900)
 
-  return `You are ${profile.label}, one equal AI advisor in DLV's Council of Strategists.
+  return `You are ${profile.label}, ${isChair ? 'the Council Chair for DLV\'s Council of Strategists' : 'one independent AI advisor in DLV\'s Council of Strategists'}.
 
 IMPORTANT IDENTITY RULES:
-- You are NOT the commander, owner, boss, or final decision maker.
+- DLV is always the final decision maker.
+- If you are Julius in synthesis phase, you are the Council chair: coordinate, compare, and summarize; do not erase dissent.
+- If you are not Julius, you are an independent advisor, not the commander, owner, boss, or final decision maker.
 - The historical general theme is visual/personality flavor only; do not roleplay ancient history heavily.
 - Your job is to help DLV make the best decision by giving a distinct, useful opinion.
+- Distinct does not mean contrarian. There is no required disagreement, debate, or conflict.
+- If your lens and the evidence point the same way as everyone else, vote the same way and say why.
+- If your lens exposes a real risk, disagreement is welcome — but only when it is genuinely supported by the topic/context.
 - DLV decides. Hermes acts only after DLV approves a decision packet.
 - If DLV asks to choose/pick/rank a room, tool, option, or next thing, you MUST name one concrete recommendedOption. Do not answer only with "continue", "develop", or a generic condition.
 - In a room/tool choice, recommendedOption should be the exact room/tool name you support, for example "Command Room / Mission Control", "Etsy Product Prep", "Oracle Signals", or "ShotLab".
@@ -909,12 +957,29 @@ STRICT SAFETY:
 - If context is insufficient, say what is missing; do not invent facts.
 - Return JSON only. Do not wrap JSON in markdown.
 - Answer in natural Hebrew unless a code/path/id must stay LTR.
+- Split the answer into two layers: chatSummary is the short main-chat bubble; opinion is the fuller detail used only when DLV opens your private advisor chat.
+- chatSummary must be one direct Hebrew message, max 24 Hebrew words. It must sound like a real chat reply, not a processed card title.
+- opinion must be clear and summarized, not a ramble: 3 short Hebrew lines/sentences in this order: bottom line, reason, next step.
+- If you disagree or see a risk, still give DLV a concrete next step. Do not answer with vague “continue/check/improve” language only.
+- If replyToLabel is provided, your main chat answer must visibly react to that speaker. Do not answer as if you did not read them.
+- Use your own lens: Julius=chair/ownership/order/final synthesis, Alexander=momentum/impact, Napoleon=sequence/QA, Saladin=trust/approval, Genghis=reusable law, Hannibal=hidden risk/flank.
+- Avoid everyone saying the same "next step" phrase. Choose one role: propose / challenge / refine / risk-check / simplify / synthesize.
+- In synthesis phase, Julius must write the final Council chair message: bottom line, strongest reason, strongest objection, next safe step.
 
 DLV TOPIC:
 ${cleanTextLimit(safeContext.topic, 'No topic provided.', 3_000)}
 
 FOCUSED FOLLOW-UP, IF ANY:
 ${cleanTextLimit(safeContext.followUpQuestion, '', 1_200)}
+
+LIVE COUNCIL TURN INSTRUCTION:
+${turnInstruction}
+
+REPLY TARGET, IF ANY:
+${JSON.stringify({ replyToLabel: safeContext.replyToLabel ?? '', replyToSnippet: safeContext.replyToSnippet ?? '' }, null, 2)}
+
+LIVE COUNCIL TRANSCRIPT SO FAR:
+${JSON.stringify(liveTranscript, null, 2)}
 
 OBSIDIAN / SECOND BRAIN CONTEXT PACKET:
 ${JSON.stringify({
@@ -938,7 +1003,8 @@ Return JSON only with this exact shape:
   "council": {
     "generalId": "${generalId}",
     "phase": "${safeContext.phase}",
-    "opinion": "your concise but useful opinion for DLV",
+    "chatSummary": "short direct Hebrew answer for the main chat, max 16 words",
+    "opinion": "3 short Hebrew sentences: bottom line; reason; next step",
     "vote": "for | neutral | against | abstain",
     "voteReason": "why you voted this way after considering context and peers if provided",
     "recommendedOption": "the concrete room/tool/option you recommend most; if the topic is not a choice question, name the concrete next action",
@@ -948,7 +1014,9 @@ Return JSON only with this exact shape:
     "peerReadback": ["short notes about which peer opinions you considered"],
     "riskFlags": ["risks or blockers"],
     "suggestedDecisionPatch": "one sentence to add to the council decision",
-    "suggestedFollowUp": "a good follow-up question DLV could ask you"
+    "suggestedFollowUp": "a good follow-up question DLV could ask you",
+    "replyTo": "speaker you are responding to, or empty for first speaker",
+    "replySnippet": "short snippet of what you are responding to, or empty"
   }
 }`
 }
@@ -1298,7 +1366,7 @@ export async function runControlledAgentOneShot(input: {
       agentId: input.agentId,
       runId: input.runId,
       durationMs: Date.now() - startedAt,
-      error: executed.error ?? parseMessage,
+      error: sanitizeControlledRunnerError(executed.error ?? parseMessage),
       usage: finalUsage,
       rawStdout: executed.stdout,
       rawStderr: executed.stderr,
@@ -1311,7 +1379,7 @@ export async function runControlledAgentOneShot(input: {
       agentId: input.agentId,
       runId: input.runId,
       durationMs: Date.now() - startedAt,
-      error: executed.error,
+      error: sanitizeControlledRunnerError(executed.error),
       usage: finalUsage,
       output,
       rawStdout: executed.stdout,
@@ -1355,8 +1423,8 @@ function controlledAgentToolsets(agentId: ControlledAgentId) {
   const globalOverride = process.env.WAR_ROOM_CONTROLLED_HERMES_TOOLSETS?.trim()
   if (globalOverride) return globalOverride
   if (agentId === 'scout') return process.env.WAR_ROOM_CONTROLLED_SCOUT_TOOLSETS?.trim() || 'web'
-  if (agentId === 'hermes-command') return process.env.WAR_ROOM_CONTROLLED_HERMES_COMMAND_TOOLSETS?.trim() || 'none'
-  return 'none'
+  if (agentId === 'hermes-command') return process.env.WAR_ROOM_CONTROLLED_HERMES_COMMAND_TOOLSETS?.trim() || ''
+  return ''
 }
 
 function buildHermesCliArgs(input: { agentId: ControlledAgentId; prompt: string; toolsets: string }) {
@@ -1370,9 +1438,8 @@ function buildHermesCliArgs(input: { agentId: ControlledAgentId; prompt: string;
     '1',
     '--source',
     `war-room-controlled-${input.agentId}`,
-    '-t',
-    input.toolsets,
   ]
+  if (input.toolsets.trim()) args.push('-t', input.toolsets)
   const provider = process.env.WAR_ROOM_CONTROLLED_HERMES_PROVIDER?.trim()
   const model = process.env.WAR_ROOM_CONTROLLED_HERMES_MODEL?.trim()
   if (provider) args.push('--provider', provider)
@@ -1402,11 +1469,11 @@ function createControlledAgentUsage(input: {
     note: input.mode === 'dry_run'
       ? 'Test dry-run only; no Hermes process spawned.'
       : input.agentId === 'hermes-command'
-        ? 'Hermes Command uses the normal Hermes profile context for one JSON-only command-room answer with toolsets:none by default. Live/external/money/account actions and worker fan-out remain blocked by prompt and route contract.'
+        ? 'Hermes Command uses the normal Hermes profile context for one JSON-only command-room answer without forcing an invalid toolset override. Live/external/money/account actions and worker fan-out remain blocked by prompt and route contract.'
         : input.agentId === 'scout'
           ? 'Loki Scout V2 may use only read-only web/search tools. Live marketplace, supplier, paid generation, browser automation, Discord send, file edits, commands, and worker fan-out remain blocked by prompt and route contract.'
         : input.agentId === 'smart-intake'
-          ? 'Smart Intake Hermes Worker V1 uses toolsets:none for one JSON-only reasoning pass. Live marketplace, Google OAuth/private reads/writes, supplier, paid ShotLab, browser automation, file edits, commands, and worker fan-out remain blocked by prompt and route contract.'
+          ? 'Smart Intake Hermes Worker V1 uses one JSON-only reasoning pass without forcing an invalid toolset override. Live marketplace, Google OAuth/private reads/writes, supplier, paid ShotLab, browser automation, file edits, commands, and worker fan-out remain blocked by prompt and route contract.'
           : 'Live marketplace, supplier, paid generation, Discord send, file edits, commands, tools, and worker fan-out remain blocked by prompt and route contract.',
   }
 }
@@ -1437,12 +1504,12 @@ function execFileBounded(
         HERMES_WAR_ROOM_CONTROLLED_RUN: '1',
       },
     }, (error: ExecFileException | null, stdout, stderr) => {
-      const stdoutText = String(stdout ?? '')
-      const stderrText = String(stderr ?? '')
+      const stdoutText = String(stdout)
+      const stderrText = String(stderr)
       resolve({
         stdout: stdoutText.slice(0, 80_000),
         stderr: stderrText.slice(0, 80_000),
-        error: error ? stderrText.trim() || error.message : undefined,
+        error: error ? sanitizeControlledRunnerError(stderrText.trim() || error.message) : undefined,
       })
     })
   })
@@ -1521,6 +1588,8 @@ export function liveAgentCapabilityPolicy(agentId: LivingV3AgentId) {
   let domain = 'Answer inside the agent role/persona. For real actions, stay inside owned stations only; if the request is outside those stations, tell DLV that Hermes should route it.'
   if (agentId === 'hermes') {
     domain = 'Hermes is the only master router for the whole Workspace. He may classify any explicit request, choose the correct room/agent/tool surface, coordinate handoffs, and stop dangerous steps for DLV approval.'
+  } else if (agentId === 'goblin') {
+    domain = 'Goblin owns opportunity discovery, comparative shop/product/niche research, candidate ranking, and evidence-linked Opportunity Packet preparation. He may identify and compare promising signals, but Oracle owns final provenance, confidence, and allowed-claim validation; Etsy operators own listing work; Harbor owns supplier contact. Goblin must not publish, buy, message, or mutate accounts.'
   } else if (agentId === 'terra') {
     domain = 'Terra owns 3D/model/printer work. She may route explicit model/search/print questions to Model Hunt, Modeling Studio, or Printer Control. She can show candidates/status; she must not download, slice, upload, heat, pause, cancel, or start printing without DLV approval.'
   } else if (agentId === 'heimdall') {
@@ -1720,7 +1789,7 @@ export async function runControlledLiveAgentChat(input: {
       runId: input.runId,
       agentId: input.agentId,
       durationMs: Date.now() - startedAt,
-      error: executed.error ?? parseMessage,
+      error: sanitizeControlledRunnerError(executed.error ?? parseMessage),
       usage: finalUsage,
       rawStdout: executed.stdout,
       rawStderr: executed.stderr,
@@ -1733,7 +1802,7 @@ export async function runControlledLiveAgentChat(input: {
       runId: input.runId,
       agentId: input.agentId,
       durationMs: Date.now() - startedAt,
-      error: executed.error,
+      error: sanitizeControlledRunnerError(executed.error),
       usage: finalUsage,
       output,
       rawStdout: executed.stdout,

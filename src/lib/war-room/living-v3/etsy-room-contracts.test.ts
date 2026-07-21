@@ -10,6 +10,7 @@ import {
   createSeoPacketLocal,
   createShotLabHandoffLocal,
   prepareProductScoutPacketLocal,
+  rejectEtsyCandidateLocal,
   requestDlvApprovalLocal,
   selectEtsyCandidateLocal,
   validateEtsyRoomPacket,
@@ -96,6 +97,40 @@ describe('Etsy Market Lab Hermes-ready room contracts', () => {
     ]))
   })
 
+  it('clears room downstream packets when the operator switches products', () => {
+    let state = prepareProductScoutPacketLocal(createInitialEtsyRoomState(2_000), {
+      prompt: 'find gold initial necklace opportunities',
+      oracleSignalPacket: oracleSignal,
+      nowMs: 2_010,
+    })
+    const firstCandidate = state.candidates[0]
+    const secondCandidate = {
+      ...firstCandidate,
+      candidateId: `${firstCandidate.candidateId}-alternate`,
+      title: 'Alternate verified jewelry candidate',
+      selected: false,
+    }
+    state = { ...state, candidates: [firstCandidate, secondCandidate] }
+    state = selectEtsyCandidateLocal(state, firstCandidate.candidateId, 2_020)
+    state = createShotLabHandoffLocal(state, { nowMs: 2_030, imageCount: 6, preset: 'Boutique Premium' })
+    state = createSeoPacketLocal(state, 2_040)
+    state = createDraftPayloadLocal(state, 2_050)
+    state = requestDlvApprovalLocal(state, 2_060)
+    expect(state.shotLabHandoffPacket).toBeDefined()
+    expect(state.seoPacket).toBeDefined()
+    expect(state.draftPayload).toBeDefined()
+    expect(state.approvalPacket).toBeDefined()
+
+    state = selectEtsyCandidateLocal(state, secondCandidate.candidateId, 2_070)
+
+    expect(state.selectedCandidateId).toBe(secondCandidate.candidateId)
+    expect(state.selectedProductPacket?.selectedProductTitle).toBe(secondCandidate.title)
+    expect(state.shotLabHandoffPacket).toBeUndefined()
+    expect(state.seoPacket).toBeUndefined()
+    expect(state.draftPayload).toBeUndefined()
+    expect(state.approvalPacket).toBeUndefined()
+  })
+
   it('does not create fallback product cards when no Oracle signal exists', () => {
     const state = prepareProductScoutPacketLocal(createInitialEtsyRoomState(2_000), {
       prompt: 'find celestial charm necklace opportunities',
@@ -164,6 +199,7 @@ describe('Etsy Market Lab Hermes-ready room contracts', () => {
                 marketplace: 'Etsy',
                 url: 'https://www.etsy.com/listing/123/gold-initial-necklace',
                 title: 'Gold Initial Pendant Gift Necklace',
+                imageUrl: 'https://img.example.com/gold-initial.jpg',
                 priceText: '$38.00',
                 salesText: '420 sales',
                 tags: ['gold', 'initial', 'necklace'],
@@ -211,11 +247,14 @@ describe('Etsy Market Lab Hermes-ready room contracts', () => {
       selected: false,
     })
     expect(state.candidates[0].sourceDetails?.[0]).toMatchObject({ priceText: '$38.00', salesText: '420 sales', tags: ['gold', 'initial', 'necklace'] })
+    expect(state.candidates[0].imageRefs).toEqual(['https://img.example.com/gold-initial.jpg'])
+    expect(state.candidates[0].thumbnailRef).toBe('https://img.example.com/gold-initial.jpg')
     expect(state.candidates[0].sourceDetails?.[1]).toMatchObject({ marketplace: 'AliExpress', priceText: '$4.20' })
 
     state = selectEtsyCandidateLocal(state, state.candidates[0].candidateId, 2_320)
     expect(state.stage).toBe('candidate_selected')
     expect(state.selectedProductPacket?.selectedProductTitle).toBe('Gold Initial Pendant Gift Necklace')
+    expect(state.selectedProductPacket?.thumbnailRef).toBe('https://img.example.com/gold-initial.jpg')
     expect(state.selectedProductPacket?.lockedActions).toEqual(expect.arrayContaining([
       'Etsy publish',
       'Etsy upload draft',
@@ -225,8 +264,8 @@ describe('Etsy Market Lab Hermes-ready room contracts', () => {
     expect(state.run.workerSpawnAllowed).toBe(false)
   })
 
-  it('turns a Sheet Intake product into a selected Loki product packet', () => {
-    const state = applySheetIntakeProductToEtsyRoomLocal(createInitialEtsyRoomState(2_500), {
+  it('turns a Sheet Intake product into a selected Loki product packet and preserves its image through every station handoff', () => {
+    let state = applySheetIntakeProductToEtsyRoomLocal(createInitialEtsyRoomState(2_500), {
       sheetRunId: 'sheet-intake-test',
       manifestPath: 'data/etsy-market-lab/sheet-intake/sheet-intake-test/manifest.json',
       nowMs: 2_510,
@@ -274,8 +313,28 @@ describe('Etsy Market Lab Hermes-ready room contracts', () => {
       sourceType: 'Sheet intake local',
     })
     expect(validateEtsyRoomPacket(state.selectedProductPacket!)).toBe(true)
+    expect(state.candidates[0].imageRefs).toEqual(['/images/bow.png'])
+    expect(state.candidates[0].thumbnailRef).toBe('/images/bow.png')
     expect(state.selectedProductPacket?.selectedProductTitle).toBe('Gold Bow Necklace')
+    expect(state.selectedProductPacket?.imageRefs).toEqual(['/images/bow.png'])
+    expect(state.selectedProductPacket?.thumbnailRef).toBe('/images/bow.png')
     expect(state.selectedProductPacket?.nextHandoff).toBe('create_shotlab_handoff_local')
+
+    state = createShotLabHandoffLocal(state, { nowMs: 2_520 })
+    expect(state.shotLabHandoffPacket?.thumbnailRef).toBe('/images/bow.png')
+    expect(state.shotLabHandoffPacket?.imageRefs).toEqual(['/images/bow.png'])
+
+    state = createSeoPacketLocal(state, 2_530)
+    expect(state.seoPacket?.thumbnailRef).toBe('/images/bow.png')
+    expect(state.seoPacket?.imageRefs).toEqual(['/images/bow.png'])
+
+    state = createDraftPayloadLocal(state, 2_540)
+    expect(state.draftPayload?.thumbnailRef).toBe('/images/bow.png')
+    expect(state.draftPayload?.imageRefs).toEqual(['/images/bow.png'])
+
+    state = requestDlvApprovalLocal(state, 2_550)
+    expect(state.approvalPacket?.thumbnailRef).toBe('/images/bow.png')
+    expect(state.approvalPacket?.imageRefs).toEqual(['/images/bow.png'])
     expect(state.run.usageAllowed).toBe(false)
     expect(state.run.workerSpawnAllowed).toBe(false)
   })
@@ -288,6 +347,7 @@ describe('Etsy Market Lab Hermes-ready room contracts', () => {
     ].join('\n'), 2_700)
     const match = selectedSmartIntakeMatch(mission)!
     const imageIds = mission.imageSets[0]?.items.map((item) => item.imageId) ?? []
+    const imageRefs = mission.imageSets[0]?.items.map((item) => item.ref) ?? []
 
     const state = applySmartIntakeMatchToEtsyRoomLocal(createInitialEtsyRoomState(2_700), {
       mission,
@@ -307,9 +367,47 @@ describe('Etsy Market Lab Hermes-ready room contracts', () => {
     })
     expect(validateEtsyRoomPacket(state.selectedProductPacket!)).toBe(true)
     expect(state.selectedProductPacket?.selectedProductTitle).toBe(match.title)
+    expect(state.candidates[0].imageRefs).toEqual(imageRefs)
+    expect(state.selectedProductPacket?.imageRefs).toEqual(imageRefs)
+    expect(state.selectedProductPacket?.thumbnailRef).toBe(imageRefs[0])
     expect(state.selectedProductPacket?.evidenceIds).toEqual(expect.arrayContaining(imageIds))
     expect(state.run.usageAllowed).toBe(false)
     expect(state.run.workerSpawnAllowed).toBe(false)
+  })
+
+  it('deletes a rejected room candidate from local staging and clears dependent packets', () => {
+    let state = applyProductScoutWorkerPacketLocal(createInitialEtsyRoomState(3_000), {
+      prompt: 'gold initial necklace gifts',
+      workerRunId: 'scout-delete-test',
+      workerSummary: 'Scout found read-only public trend evidence.',
+      candidates: [
+        {
+          title: 'Gold Initial Pendant Gift Necklace',
+          niche: 'gift jewelry',
+          score: 84,
+          sourceUrls: ['https://example.com/public-trend'],
+          evidence: ['trend evidence'],
+          missingFields: ['supplier proof'],
+          riskNotes: ['No personalization claim until verified.'],
+        },
+      ],
+      nowMs: 3_010,
+    })
+    const candidateId = state.candidates[0].candidateId
+    state = selectEtsyCandidateLocal(state, candidateId, 3_020)
+    state = createSeoPacketLocal(createShotLabHandoffLocal(state, { nowMs: 3_030 }), 3_040)
+
+    state = rejectEtsyCandidateLocal(state, candidateId, 3_050)
+
+    expect(state.candidates).toHaveLength(0)
+    expect(state.stage).toBe('scout_request')
+    expect(state.allowedNow).toContain('prepare_product_scout_packet_local')
+    expect(state.selectedCandidateId).toBeUndefined()
+    expect(state.selectedProductPacket).toBeUndefined()
+    expect(state.shotLabHandoffPacket).toBeUndefined()
+    expect(state.seoPacket).toBeUndefined()
+    expect(state.events.map((event) => event.type)).toContain('etsy.candidate.rejected')
+    expect(state.lastReceipt).toContain('deleted from local staging')
   })
 
   it('keeps all live and worker actions locked by default', () => {

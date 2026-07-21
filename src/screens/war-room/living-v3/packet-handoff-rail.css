@@ -1,0 +1,201 @@
+.packet-handoff-rail {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgba(114, 224, 212, 0.22);
+  border-radius: 10px;
+  background: rgba(3, 18, 23, 0.72);
+  color: #fff0c7;
+}
+
+.packet-handoff-rail__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.packet-handoff-rail__head div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.packet-handoff-rail__head span,
+.packet-handoff-rail__primary small {
+  color: #72e0d4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.packet-handoff-rail__head b {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.packet-handoff-rail__head > small {
+  max-width: 48%;
+  overflow: hidden;
+  color: rgba(255, 230, 187, 0.62);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.packet-handoff-rail__empty {
+  margin: 0;
+  padding: 9px;
+  border: 1px dashed rgba(255, 230, 187, 0.18);
+  border-radius: 8px;
+  color: rgba(255, 230, 187, 0.68);
+  font-size: 11px;
+}
+
+.packet-handoff-rail__empty.is-error {
+  border-color: rgba(255, 139, 104, 0.38);
+  color: #ffc4a8;
+}
+
+.packet-handoff-rail__items {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.packet-handoff-rail__item {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 230, 187, 0.15);
+  border-left: 3px solid rgba(255, 230, 187, 0.24);
+  border-radius: 8px;
+  background: rgba(4, 25, 30, 0.72);
+}
+
+.packet-handoff-rail__item.is-done {
+  border-left-color: #72e0d4;
+}
+
+.packet-handoff-rail__item.is-active {
+  border-left-color: #ffc75f;
+  background: rgba(56, 42, 12, 0.36);
+}
+
+.packet-handoff-rail__item.is-blocked {
+  border-left-color: #ff8b68;
+  background: rgba(62, 27, 16, 0.4);
+}
+
+.packet-handoff-rail__item.is-waiting {
+  border-left-color: #8ca7ff;
+}
+
+.packet-handoff-rail__summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 8px;
+}
+
+.packet-handoff-rail__route {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.packet-handoff-rail__route b,
+.packet-handoff-rail__route span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.packet-handoff-rail__route b {
+  color: #fff0c7;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.packet-handoff-rail__route span {
+  color: rgba(255, 240, 199, 0.7);
+  font-size: 10px;
+}
+
+.packet-handoff-rail__summary em {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(114, 224, 212, 0.1);
+  color: #b9fff6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.packet-handoff-rail__primary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.packet-handoff-rail__primary > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 230, 187, 0.1);
+}
+
+.packet-handoff-rail__primary b {
+  color: rgba(255, 240, 199, 0.82);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.packet-handoff-rail__technical {
+  padding: 0 8px 8px;
+  color: rgba(255, 230, 187, 0.56);
+  font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.packet-handoff-rail__technical summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.packet-handoff-rail__technical code {
+  display: block;
+  margin-top: 6px;
+  overflow: hidden;
+  color: rgba(255, 230, 187, 0.5);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .packet-handoff-rail__head {
+    display: grid;
+  }
+
+  .packet-handoff-rail__head > small {
+    max-width: 100%;
+    text-align: left;
+  }
+
+  .packet-handoff-rail__primary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

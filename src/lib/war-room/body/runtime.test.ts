@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   AgentIntentSchema,
   DEFAULT_SAFETY_LOCKS,
+  WAR_ROOM_RETIRED_AGENT_ALIASES,
   WAR_ROOM_WORKER_PROFILES,
+  bodyObjectExists,
   createWarRoomTask,
   dispatchWarRoomIntent,
   getWarRoomBodyState,
@@ -88,6 +90,33 @@ describe('War Room body contract/runtime', () => {
     })).toThrow(/does not belong/)
   })
 
+  it('blocks retired aliases from new intents and task assignments while preserving historical body IDs', () => {
+    const retiredRuntimeIds = [
+      'signal-runner',
+      'merchant-scout',
+      'atlantis-archivist',
+      'treasury-guardian',
+    ] as const
+
+    for (const agentId of retiredRuntimeIds) {
+      expect(bodyObjectExists('agent', agentId)).toBe(true)
+      expect(() => dispatchWarRoomIntent({
+        type: 'say',
+        agentId,
+        text: 'New routing must be blocked.',
+      })).toThrow(new RegExp(`${agentId}.*${WAR_ROOM_RETIRED_AGENT_ALIASES[agentId].canonicalOwner}`))
+      expect(() => createWarRoomTask({
+        taskId: `retired-${agentId}`,
+        label: 'Retired alias assignment',
+        roomId: 'olympus-command',
+        assignedAgentId: agentId,
+      })).toThrow(/Retired agent alias/)
+    }
+
+    expect(getWarRoomBodyState().tasks).toHaveLength(0)
+    expect(listWarRoomEvents()).toHaveLength(0)
+  })
+
   it('keeps live external mutation switches locked by default', () => {
     expect(DEFAULT_SAFETY_LOCKS).toEqual({
       liveExternalMutation: false,
@@ -102,14 +131,20 @@ describe('War Room body contract/runtime', () => {
   it('exposes capability and worker profile mappings without live capabilities', () => {
     const capabilities = listWarRoomCapabilities()
     expect(capabilities.hermes).toEqual(['say', 'goToStation', 'carryPacket', 'requestApproval', 'raiseAlert', 'startWork'])
+    expect(capabilities.goblin).toEqual(['say', 'goToStation', 'startWork', 'carryPacket', 'raiseAlert'])
     expect(capabilities.athena).not.toContain('carryPacket')
     expect(capabilities['loki']).toEqual(['say', 'goToStation', 'startWork', 'carryPacket', 'raiseAlert'])
     expect(capabilities['thor']).toEqual(['say', 'goToStation', 'startWork', 'carryPacket', 'raiseAlert'])
     expect(capabilities['odin']).toEqual(['say', 'goToStation', 'startWork', 'carryPacket', 'requestApproval', 'raiseAlert'])
     expect(capabilities['roster-keeper']).toEqual(['say', 'goToStation', 'rest'])
+    expect(capabilities['merchant-scout']).toEqual([])
+    expect(capabilities['atlantis-archivist']).toEqual([])
+    expect(capabilities['treasury-guardian']).toEqual([])
+    expect(capabilities['signal-runner']).toEqual([])
     expect(Object.values(capabilities).flat()).not.toContain('publishEtsy')
     expect(WAR_ROOM_WORKER_PROFILES.map((profile) => profile.agentId)).toEqual(expect.arrayContaining([
       'hermes',
+      'goblin',
       'athena',
       'hephaestus',
       'julius',
@@ -133,6 +168,7 @@ describe('War Room body contract/runtime', () => {
       ]),
     )
     expect(WAR_ROOM_WORKER_PROFILES.find((profile) => profile.agentId === 'loki')?.hermesProfileKey).toBe('research.product_discovery')
+    expect(WAR_ROOM_WORKER_PROFILES.find((profile) => profile.agentId === 'goblin')?.hermesProfileKey).toBe('research.opportunity_discovery')
     expect(WAR_ROOM_WORKER_PROFILES.find((profile) => profile.agentId === 'thor')?.hermesProfileKey).toBe('archive.metrics_ledger')
     expect(WAR_ROOM_WORKER_PROFILES.find((profile) => profile.agentId === 'odin')?.hermesProfileKey).toBe('merchant.draft_handoff')
   })

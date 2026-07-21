@@ -1,18 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-describe('swarm routes stay client-only to avoid hydration/loading loops', () => {
-  it('disables SSR for the canonical /swarm route', () => {
+describe('canonical Agents route', () => {
+  it('keeps /swarm client-only and renders the single Agents surface', () => {
     const source = readFileSync('src/routes/swarm.tsx', 'utf8')
     expect(source).toContain("createFileRoute('/swarm')")
     expect(source).toContain('ssr: false')
-    expect(source).toContain('Loading swarm...')
+    expect(source).toContain('Swarm2Screen')
   })
 
-  it('disables SSR for the /swarm2 route alias', () => {
+  it('redirects the legacy /swarm2 alias to /swarm', () => {
     const source = readFileSync('src/routes/swarm2.tsx', 'utf8')
     expect(source).toContain("createFileRoute('/swarm2')")
-    expect(source).toContain('ssr: false')
-    expect(source).toContain('Loading Swarm...')
+    expect(source).toContain('redirectToCanonicalAgentsRoute')
+    expect(source).toContain("to: '/swarm'")
+    expect(source).toContain('replace: true')
+    expect(source).not.toContain('Swarm2Screen')
   })
 })

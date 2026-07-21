@@ -1,17 +1,12 @@
 import { buildObsidianContextPacket } from '../../workspace-kernel/obsidian-context'
 import {
   CONTROLLED_COUNCIL_AGENT_IDS,
-
-
-
-
-
-
   controlledAgentProfile,
   controlledCouncilGeneralId,
-  runControlledAgentOneShot
+  runControlledAgentOneShot,
+  sanitizeControlledRunnerError,
 } from './controlled-athena-runner'
-import type {ControlledAgentRunResult, ControlledCouncilAgentId, ControlledCouncilGeneralId, ControlledCouncilPeerOpinion, ControlledCouncilRunContext, ControlledCouncilVote} from './controlled-athena-runner';
+import type { ControlledAgentRunResult, ControlledCouncilAgentId, ControlledCouncilGeneralId, ControlledCouncilPeerOpinion, ControlledCouncilRunContext, ControlledCouncilVote } from './controlled-athena-runner'
 import type { WorkspaceContextPacket } from '../../workspace-kernel/context-packet'
 
 export type ControlledCouncilTurnStatus = 'completed_local_only' | 'blocked' | 'failed'
@@ -22,6 +17,7 @@ export type ControlledCouncilTurn = {
   label: string
   phase: ControlledCouncilRunContext['phase']
   status: ControlledCouncilTurnStatus
+  chatSummary: string
   opinion: string
   vote: ControlledCouncilVote
   voteReason: string
@@ -33,8 +29,11 @@ export type ControlledCouncilTurn = {
   riskFlags: Array<string>
   suggestedDecisionPatch: string
   suggestedFollowUp: string
+  replyTo?: string
+  replySnippet?: string
   durationMs: number
   usageReadback: string
+  independentRunId: string
   error?: string
 }
 
@@ -106,6 +105,7 @@ export type RunControlledCouncilRoundInput = {
   timeoutMs?: number
   includePeerVote?: boolean
   agentIds?: Array<ControlledCouncilAgentId>
+  previousOpinions?: Array<ControlledCouncilPeerOpinion>
   nowMs?: number
 }
 
@@ -144,6 +144,10 @@ function councilContextFromPacket(input: {
   phase: ControlledCouncilRunContext['phase']
   packet: WorkspaceContextPacket
   peerOpinions?: Array<ControlledCouncilPeerOpinion>
+  liveTranscript?: Array<string>
+  replyToLabel?: string
+  replyToSnippet?: string
+  turnInstruction?: string
 }): ControlledCouncilRunContext {
   return {
     topic: input.topic,
@@ -159,25 +163,130 @@ function councilContextFromPacket(input: {
     decisions: input.packet.decisions,
     safetyRails: input.packet.safetyRails,
     peerOpinions: input.peerOpinions ?? [],
+    liveTranscript: input.liveTranscript,
+    replyToLabel: input.replyToLabel,
+    replyToSnippet: input.replyToSnippet,
+    turnInstruction: input.turnInstruction,
   }
 }
 
 function usageReadback(result: ControlledAgentRunResult) {
   return result.usage.reportedCost
     ?? result.usage.reportedUsageLine
-    ?? `budget: ${result.usage.budget}; toolsets=${result.usage.toolsets}`
+    ?? 'שיחת מודל אחת הושלמה במסלול מוגבל ונקי.'
 }
 
-function turnFromRunResult(agentId: ControlledCouncilAgentId, phase: ControlledCouncilRunContext['phase'], result: ControlledAgentRunResult): ControlledCouncilTurn {
+function peerOpinionFromTurn(turn: ControlledCouncilTurn): ControlledCouncilPeerOpinion {
+  return {
+    generalId: turn.generalId,
+    label: turn.label,
+    chatSummary: turn.chatSummary,
+    opinion: turn.opinion || turn.chatSummary,
+    vote: turn.vote,
+    voteReason: turn.voteReason,
+  }
+}
+
+function completedPeerOpinions(turns: Array<ControlledCouncilTurn>) {
+  return turns
+    .filter((turn) => turn.status === 'completed_local_only')
+    .map(peerOpinionFromTurn)
+}
+
+function transcriptLineForTurn(turn: ControlledCouncilTurn) {
+  const text = compactText(turn.chatSummary || turn.opinion || turn.voteReason, 'תשובה לא זמינה', 280)
+  const reply = turn.replyTo ? ` ↪ ${turn.replyTo}` : ''
+  return `${turn.label}${reply}: ${text}`
+}
+
+function transcriptFromTurns(turns: Array<ControlledCouncilTurn>) {
+  return turns
+    .filter((turn) => turn.status === 'completed_local_only')
+    .map(transcriptLineForTurn)
+}
+
+function transcriptFromPeerOpinions(peers: Array<ControlledCouncilPeerOpinion>) {
+  return peers.map((peer) => `${peer.label}: ${compactText(peer.chatSummary ?? peer.opinion, peer.voteReason ?? 'דעה קודמת', 280)}`)
+}
+
+function replyTargetFromTurns(turns: Array<ControlledCouncilTurn>) {
+  const completed = turns.filter((turn) => turn.status === 'completed_local_only')
+  const last = completed.at(-1)
+  if (!last) return {}
+  return {
+    replyToLabel: last.label,
+    replyToSnippet: compactText(last.chatSummary || last.opinion, last.voteReason, 150),
+  }
+}
+
+function replyTargetFromPeerOpinions(peers: Array<ControlledCouncilPeerOpinion>) {
+  const last = peers.at(-1)
+  if (!last) return {}
+  return {
+    replyToLabel: last.label,
+    replyToSnippet: compactText(last.chatSummary ?? last.opinion, last.voteReason ?? '', 150),
+  }
+}
+
+const COUNCIL_CHAIR_AGENT_ID: ControlledCouncilAgentId = 'council-julius'
+
+function nonChairCouncilAgentIds(agentIds: Array<ControlledCouncilAgentId>) {
+  return agentIds.filter((agentId) => agentId !== COUNCIL_CHAIR_AGENT_ID)
+}
+
+function hasCouncilChair(agentIds: Array<ControlledCouncilAgentId>) {
+  return agentIds.includes(COUNCIL_CHAIR_AGENT_ID)
+}
+
+function independentBlindCouncilInstruction(agentId: ControlledCouncilAgentId, index: number, total: number) {
+  const profile = controlledAgentProfile(agentId)
+  return `Independent blind first pass ${index + 1}/${total}. Answer from the ${profile.label} lens without seeing the other new answers. Use one natural Hebrew chat bubble, then private detail. Do not summarize the whole council.`
+}
+
+function juliusChairSynthesisInstruction(advisorCount: number) {
+  return `Julius chairs the Council after ${advisorCount} independent blind answers plus the discussion pass. Compare the advisors, preserve the strongest disagreement, then give DLV one final readable Council synthesis: bottom line, reason, risk, next safe step.`
+}
+
+function councilDiscussionPassInstruction(agentId: ControlledCouncilAgentId, index: number, total: number) {
+  const profile = controlledAgentProfile(agentId)
+  return `Discussion pass ${index + 1}/${total}. You are still ${profile.label}. Read the independent blind answers and previous discussion context, then add one useful reaction: support, correction, risk, or sharper next step. Do not repeat your first answer.`
+}
+
+async function runCouncilAgentTurn(input: {
+  agentId: ControlledCouncilAgentId
+  phase: ControlledCouncilRunContext['phase']
+  runId: string
+  cwd?: string
+  timeoutMs?: number
+  councilContext: ControlledCouncilRunContext
+}) {
+  try {
+    const result = await runControlledAgentOneShot({
+      agentId: input.agentId,
+      runId: input.runId,
+      cwd: input.cwd,
+      timeoutMs: input.timeoutMs,
+      councilContext: input.councilContext,
+    })
+    return turnFromRunResult(input.agentId, input.phase, result, input.councilContext)
+  } catch (error) {
+    return blockedTurnFromError(input.agentId, input.phase, error)
+  }
+}
+
+function turnFromRunResult(agentId: ControlledCouncilAgentId, phase: ControlledCouncilRunContext['phase'], result: ControlledAgentRunResult, context?: ControlledCouncilRunContext): ControlledCouncilTurn {
   const profile = controlledAgentProfile(agentId)
   const council = result.output?.council
+  const peerFallback = context?.peerOpinions[context.peerOpinions.length - 1]
+  const replyTo = compactText(council?.replyTo ?? context?.replyToLabel ?? peerFallback?.label ?? '', '', 120)
+  const replySnippet = compactText(council?.replySnippet ?? context?.replyToSnippet ?? peerFallback?.chatSummary ?? peerFallback?.opinion ?? '', '', 180)
   const hasUsableCouncilAnswer = Boolean(
     council
       && result.output?.status === 'completed_local_only'
       && council.opinion.trim(),
   )
   const failedStatus: ControlledCouncilTurnStatus = result.ok ? 'blocked' : result.output?.status === 'failed' ? 'failed' : 'blocked'
-  const resultError = result.ok ? undefined : result.error
+  const resultError = result.ok ? undefined : sanitizeControlledRunnerError(result.error)
   const runnerWarnings = resultError
     ? [`controlled runner warning: ${resultError}`]
     : []
@@ -187,6 +296,7 @@ function turnFromRunResult(agentId: ControlledCouncilAgentId, phase: ControlledC
     label: profile.label,
     phase,
     status: hasUsableCouncilAnswer ? 'completed_local_only' : failedStatus,
+    chatSummary: hasUsableCouncilAnswer ? council!.chatSummary : `לא התקבלה תשובה נקייה מ-${profile.label}.`,
     opinion: hasUsableCouncilAnswer ? council!.opinion : '',
     vote: hasUsableCouncilAnswer ? council!.vote : 'abstain',
     voteReason: hasUsableCouncilAnswer ? council!.voteReason : 'No real AI answer returned; this general is not counted as a real opinion.',
@@ -198,21 +308,25 @@ function turnFromRunResult(agentId: ControlledCouncilAgentId, phase: ControlledC
     riskFlags: hasUsableCouncilAnswer ? Array.from(new Set([...council!.riskFlags, ...runnerWarnings])).slice(0, 8) : ['real AI call did not complete'],
     suggestedDecisionPatch: hasUsableCouncilAnswer ? council!.suggestedDecisionPatch : '',
     suggestedFollowUp: hasUsableCouncilAnswer ? council!.suggestedFollowUp : 'Retry this general only after checking the controlled runner.',
+    replyTo: hasUsableCouncilAnswer && replyTo ? replyTo : undefined,
+    replySnippet: hasUsableCouncilAnswer && replySnippet ? replySnippet : undefined,
     durationMs: result.durationMs,
     usageReadback: usageReadback(result),
+    independentRunId: result.runId,
     error: hasUsableCouncilAnswer ? undefined : resultError,
   }
 }
 
 function blockedTurnFromError(agentId: ControlledCouncilAgentId, phase: ControlledCouncilRunContext['phase'], error: unknown): ControlledCouncilTurn {
   const profile = controlledAgentProfile(agentId)
-  const message = error instanceof Error ? error.message : String(error)
+  const message = sanitizeControlledRunnerError(error instanceof Error ? error.message : String(error))
   return {
     agentId,
     generalId: controlledCouncilGeneralId(agentId),
     label: profile.label,
     phase,
     status: 'failed',
+    chatSummary: `לא התקבלה תשובה נקייה מ-${profile.label}.`,
     opinion: '',
     vote: 'abstain',
     voteReason: 'No real AI answer returned; this general is not counted as a real opinion.',
@@ -226,6 +340,7 @@ function blockedTurnFromError(agentId: ControlledCouncilAgentId, phase: Controll
     suggestedFollowUp: 'Retry this general only after checking the controlled runner.',
     durationMs: 0,
     usageReadback: 'no usage reported; call failed before completion',
+    independentRunId: `failed-before-run-${agentId}`,
     error: message,
   }
 }
@@ -357,7 +472,7 @@ function buildControlledCouncilRecommendation(input: {
     if (b.voteBreakdown.for !== a.voteBreakdown.for) return b.voteBreakdown.for - a.voteBreakdown.for
     return a.label.localeCompare(b.label)
   })
-  const top = options[0]
+  const top = options.at(0)
   if (!top || top.support === 0) {
     const voteLine = `${input.stats.for} בעד · ${input.stats.neutral} ניטרלי · ${input.stats.against} נגד · ${input.stats.abstain} נמנע`
     return {
@@ -413,17 +528,29 @@ export async function runControlledCouncilFollowUp(input: RunControlledCouncilFo
   let turn: ControlledCouncilTurn
   const phase = 'single-follow-up' as const
   try {
+    const previousTurns = (input.previousOpinions ?? []).map((peer) => `${peer.label}: ${compactText(peer.chatSummary ?? peer.opinion, peer.voteReason ?? 'דעה קודמת', 260)}`)
+    const lastPeer = input.previousOpinions?.[input.previousOpinions.length - 1]
+    const councilContext = {
+      ...councilContextFromPacket({
+        topic,
+        phase,
+        packet: contextPacket,
+        peerOpinions: input.previousOpinions ?? [],
+        liveTranscript: previousTurns,
+        replyToLabel: lastPeer?.label,
+        replyToSnippet: lastPeer ? compactText(lastPeer.chatSummary ?? lastPeer.opinion, lastPeer.voteReason ?? '', 150) : undefined,
+        turnInstruction: 'Answer DLV directly, but if previous council context exists, react to the last relevant point instead of restarting the whole discussion.',
+      }),
+      followUpQuestion: question,
+    }
     const result = await runControlledAgentOneShot({
       agentId: input.agentId,
       runId,
       cwd: input.cwd,
       timeoutMs: input.timeoutMs,
-      councilContext: {
-        ...councilContextFromPacket({ topic, phase, packet: contextPacket, peerOpinions: input.previousOpinions ?? [] }),
-        followUpQuestion: question,
-      },
+      councilContext,
     })
-    turn = turnFromRunResult(input.agentId, phase, result)
+    turn = turnFromRunResult(input.agentId, phase, result, councilContext)
   } catch (error) {
     turn = blockedTurnFromError(input.agentId, phase, error)
   }
@@ -461,51 +588,89 @@ export async function runControlledCouncilRound(input: RunControlledCouncilRound
     nowMs,
   })
 
-  const openingTurns = await Promise.all(agentIds.map(async (agentId): Promise<ControlledCouncilTurn> => {
+  const previousOpinions = input.previousOpinions ?? []
+  const chairEnabled = hasCouncilChair(agentIds)
+  const advisorAgentIds = nonChairCouncilAgentIds(agentIds)
+  const independentAgentIds = advisorAgentIds.length ? advisorAgentIds : agentIds
+  const openingTurns = await Promise.all(independentAgentIds.map((agentId, index) => {
     const phase = 'opinion' as const
-    try {
-      const result = await runControlledAgentOneShot({
-        agentId,
-        runId: `${runId}-${agentId}-opinion`,
-        cwd: input.cwd,
-        timeoutMs: input.timeoutMs,
-        councilContext: councilContextFromPacket({ topic, phase, packet: contextPacket }),
-      })
-      return turnFromRunResult(agentId, phase, result)
-    } catch (error) {
-      return blockedTurnFromError(agentId, phase, error)
-    }
+    const councilContext = councilContextFromPacket({
+      topic,
+      phase,
+      packet: contextPacket,
+      peerOpinions: previousOpinions,
+      liveTranscript: transcriptFromPeerOpinions(previousOpinions),
+      turnInstruction: independentBlindCouncilInstruction(agentId, index, independentAgentIds.length),
+    })
+    return runCouncilAgentTurn({
+      agentId,
+      phase,
+      runId: `${runId}-${agentId}-turn-${index + 1}`,
+      cwd: input.cwd,
+      timeoutMs: input.timeoutMs,
+      councilContext,
+    })
   }))
 
-  const peerOpinions: Array<ControlledCouncilPeerOpinion> = openingTurns
-    .filter((turn) => turn.status === 'completed_local_only')
-    .map((turn) => ({
-      generalId: turn.generalId,
-      label: turn.label,
-      opinion: turn.opinion,
-      vote: turn.vote,
-      voteReason: turn.voteReason,
+  const openingPeerOpinions = completedPeerOpinions(openingTurns)
+  const discussionTurns: Array<ControlledCouncilTurn> = input.includePeerVote === false
+    ? []
+    : await Promise.all(independentAgentIds.map((agentId, index) => {
+      const phase = 'council-turn' as const
+      const replyTarget = replyTargetFromTurns(openingTurns)
+      const councilContext = councilContextFromPacket({
+        topic,
+        phase,
+        packet: contextPacket,
+        peerOpinions: [...previousOpinions, ...openingPeerOpinions],
+        liveTranscript: [...transcriptFromPeerOpinions(previousOpinions), ...transcriptFromTurns(openingTurns)],
+        replyToLabel: replyTarget.replyToLabel,
+        replyToSnippet: replyTarget.replyToSnippet,
+        turnInstruction: councilDiscussionPassInstruction(agentId, index, independentAgentIds.length),
+      })
+      return runCouncilAgentTurn({
+        agentId,
+        phase,
+        runId: `${runId}-${agentId}-discussion-${index + 1}`,
+        cwd: input.cwd,
+        timeoutMs: input.timeoutMs,
+        councilContext,
+      })
     }))
-
-  const voteTurns: Array<ControlledCouncilTurn> = input.includePeerVote !== false
-    ? await Promise.all(agentIds.map(async (agentId): Promise<ControlledCouncilTurn> => {
-      const phase = 'peer-vote' as const
-      try {
-        const result = await runControlledAgentOneShot({
-          agentId,
-          runId: `${runId}-${agentId}-vote`,
-          cwd: input.cwd,
-          timeoutMs: input.timeoutMs,
-          councilContext: councilContextFromPacket({ topic, phase, packet: contextPacket, peerOpinions }),
-        })
-        return turnFromRunResult(agentId, phase, result)
-      } catch (error) {
-        return blockedTurnFromError(agentId, phase, error)
-      }
+  const discussionPeerOpinions = completedPeerOpinions(discussionTurns)
+  const chairTurns: Array<ControlledCouncilTurn> = []
+  if (chairEnabled && advisorAgentIds.length) {
+    const phase = 'synthesis' as const
+    const preChairTurns = discussionTurns.length ? discussionTurns : openingTurns
+    const replyTarget = replyTargetFromTurns(preChairTurns)
+    const councilContext = councilContextFromPacket({
+      topic,
+      phase,
+      packet: contextPacket,
+      peerOpinions: [...previousOpinions, ...openingPeerOpinions, ...discussionPeerOpinions],
+      liveTranscript: [
+        ...transcriptFromPeerOpinions(previousOpinions),
+        ...transcriptFromTurns(openingTurns),
+        ...transcriptFromTurns(discussionTurns),
+      ],
+      replyToLabel: replyTarget.replyToLabel,
+      replyToSnippet: replyTarget.replyToSnippet,
+      turnInstruction: juliusChairSynthesisInstruction(openingTurns.length),
+    })
+    chairTurns.push(await runCouncilAgentTurn({
+      agentId: COUNCIL_CHAIR_AGENT_ID,
+      phase,
+      runId: `${runId}-${COUNCIL_CHAIR_AGENT_ID}-chair-synthesis`,
+      cwd: input.cwd,
+      timeoutMs: input.timeoutMs,
+      councilContext,
     }))
-    : []
+  }
 
-  const finalTurns = voteTurns.length ? voteTurns : openingTurns
+  const voteTurns: Array<ControlledCouncilTurn> = [...discussionTurns, ...chairTurns]
+  const allDecisionTurns = [...openingTurns, ...voteTurns]
+
+  const finalTurns = voteTurns.length ? voteTurns : allDecisionTurns
   const stats = buildControlledCouncilStats(finalTurns)
   const recommendation = buildControlledCouncilRecommendation({ topic, turns: finalTurns, stats })
   const summary = recommendation.summary

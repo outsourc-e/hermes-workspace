@@ -3,6 +3,7 @@ import type { LivingV3RoomId, LivingV3StationId } from './living-v3-contract'
 
 export type WorkspaceToolId =
   | 'command-room-manager'
+  | 'etsy-research-lab'
   | 'smart-intake-v2'
   | 'etsy-sheet-intake'
   | 'etsy-product-gallery'
@@ -151,6 +152,27 @@ export const WORKSPACE_TOOL_REGISTRY: Array<WorkspaceToolContract> = [
     needs: noLiveNeeds,
   },
   {
+    id: 'etsy-research-lab',
+    label: 'Etsy Research Lab',
+    description: 'Verified local atlas for product, shop, and comparative market research with selectable investigation depth.',
+    status: 'ready',
+    inputs: [
+      { id: 'research-target', label: 'Product, shop, or market target', kind: 'text', required: true, status: 'ready' },
+      { id: 'research-url', label: 'Optional public source URL', kind: 'public_url', required: false, status: 'ready' },
+      { id: 'research-depth', label: 'Quick, Standard, Deep, or Meta depth', kind: 'text', required: true, status: 'ready' },
+      { id: 'research-modules', label: 'Selected evidence modules', kind: 'packet', required: true, status: 'ready' },
+    ],
+    outputs: [
+      { id: 'verified-research-atlas', label: 'Verified three-shop Research Atlas', kind: 'board', status: 'ready' },
+      { id: 'research-workbooks', label: 'Research workbooks and QA manifest', kind: 'manifest', status: 'ready' },
+      { id: 'research-mission-packet', label: 'Reusable local research mission packet', kind: 'packet', status: 'ready' },
+    ],
+    allowedActions: ['read verified local research', 'open the local interactive atlas', 'download verified workbooks', 'stage a local research mission packet'],
+    lockedActions: [...baseLockedActions, 'live research start without operator confirmation', 'supplier contact'],
+    owningSurface: { roomId: 'etsy-market-lab', stationId: 'etsy-loki-product-hunt', label: 'Etsy Market Lab / Research Lab' },
+    needs: noLiveNeeds,
+  },
+  {
     id: 'smart-intake-v2',
     label: 'Smart Intake V2',
     description: 'Local AI-swarm workbench that detects messy source refs, stages product/image matches, and builds markdown dossiers.',
@@ -168,7 +190,7 @@ export const WORKSPACE_TOOL_REGISTRY: Array<WorkspaceToolContract> = [
       { id: 'smart-dossiers', label: 'Markdown dossiers', kind: 'markdown', status: 'ready' },
       { id: 'smart-odin-packet', label: 'Product Search / ShotLab handoff packet', kind: 'packet', status: 'ready' },
     ],
-    allowedActions: ['detect local source refs', 'mock task progress', 'preview markdown dossiers', 'create local product packet'],
+    allowedActions: ['detect local source refs', 'show staged local progress', 'preview markdown dossiers', 'create local product packet'],
     lockedActions: baseLockedActions,
     owningSurface: { roomId: 'etsy-market-lab', stationId: 'etsy-loki-product-hunt', label: 'Etsy Market Lab / Product Search' },
     needs: { ...noLiveNeeds, approval: true },
@@ -324,7 +346,10 @@ export function recommendWorkspaceTool(taskText: string): WorkspaceToolRecommend
   let tool = toolById('command-room-manager')!
   let reason = 'Use the Command Room Manager to route this local-only request.'
 
-  if (includesAny(text, ['smart intake', 'aliexpress', 'ali express', 'google doc', 'google sheet', 'google drive', 'drive folder', 'mixed input', 'mixed source', 'image match', 'local image', 'free-form prompt', 'freeform prompt'])) {
+  if (includesAny(text, ['research atlas', 'shop research', 'store research', 'market research', 'meta analysis', 'meta-analysis', 'competitor shop', 'מחקר חנות', 'מחקר חנויות', 'מטא אנליזה', 'חנויות'])) {
+    tool = toolById('etsy-research-lab')!
+    reason = 'Use the existing Research Lab for product/shop research, selectable depth, verified source proof, and reusable local mission packets.'
+  } else if (includesAny(text, ['smart intake', 'aliexpress', 'ali express', 'google doc', 'google sheet', 'google drive', 'drive folder', 'mixed input', 'mixed source', 'image match', 'local image', 'free-form prompt', 'freeform prompt'])) {
     tool = toolById('smart-intake-v2')!
     reason = 'This request has mixed source refs, so use Smart Intake V2 instead of the rigid sheet importer.'
   } else if (includesAny(text, ['sheet', 'csv', 'tsv', 'json', 'import', 'product gallery', 'gallery', 'dossier'])) {

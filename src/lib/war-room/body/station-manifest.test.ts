@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { LIVING_V3_WORLD_CONFIG } from '../living-v3/living-v3-contract'
 import {
+  WAR_ROOM_RETIRED_AGENT_ALIASES,
   WAR_ROOM_STATION_MANIFESTS,
   livingV3StationManifestById,
   livingV3StationManifestsByRoom,
@@ -29,5 +30,17 @@ describe('Living V3 station manifest', () => {
       expect(manifest.allowedIntents).not.toContain('publish_etsy')
       expect(livingV3StationManifestById(manifest.stationId)?.stationId).toBe(manifest.stationId)
     }
+  })
+
+  it('never selects a retired alias as a station default', () => {
+    const retiredAliases = new Set(Object.keys(WAR_ROOM_RETIRED_AGENT_ALIASES))
+    for (const manifest of WAR_ROOM_STATION_MANIFESTS) {
+      if (manifest.defaultAgentId) expect(retiredAliases.has(manifest.defaultAgentId)).toBe(false)
+    }
+    expect(livingV3StationManifestById('agora-intake')?.defaultAgentId).toBe('goblin')
+    expect(livingV3StationManifestById('merchant-dock')?.defaultAgentId).toBe('loki')
+    expect(livingV3StationManifestById('atlantis-index')?.defaultAgentId).toBe('poseidon')
+    expect(livingV3StationManifestById('gateway-console')?.defaultAgentId).toBe('heimdall')
+    expect(livingV3StationManifestById('treasury-ledger')?.defaultAgentId).toBeUndefined()
   })
 })
