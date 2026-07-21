@@ -1,0 +1,44 @@
+{
+  "_note": "Example config for scripts/process_chatgpt_roman_dev_room_v3.py. Copy/edit next to generated PNGs or pass with --config. Layout is COLSxROWS; use 6x5 for six-frame row strips across five rows, or 5x6 if ChatGPT returns five columns across six rows.",
+  "source_dir": "/Users/mac/hermes-workspace/generated-candidates/war-room/2026-06-16-chatgpt-roman-dev-room-v3",
+  "canvas": 192,
+  "layout": "auto",
+  "auto_layouts": "6x5,5x6",
+  "sheets": [
+    {
+      "path": "caesar_commander_5x6.png",
+      "slug": "caesar_commander",
+      "layout": "6x5",
+      "kind": "character",
+      "row_names": ["row01", "row02", "row03", "row04", "row05"]
+    },
+    {
+      "path": "roman_legionary_builder_5x6.png",
+      "slug": "roman_legionary_builder",
+      "layout": "6x5",
+      "kind": "character",
+      "row_names": ["row01", "row02", "row03", "row04", "row05"]
+    },
+    {
+      "path": "roman_scribe_engineer_5x6.png",
+      "slug": "roman_scribe_engineer",
+      "layout": "6x5",
+      "kind": "character",
+      "row_names": ["row01", "row02", "row03", "row04", "row05"]
+    },
+    {
+      "path": "roman_courier_qa_runner_5x6.png",
+      "slug": "roman_courier_qa_runner",
+      "layout": "6x5",
+      "kind": "character",
+      "row_names": ["row01", "row02", "row03", "row04", "row05"]
+    },
+    {
+      "path": "roman_tool_station_fx_5x6.png",
+      "slug": "roman_tool_station_fx",
+      "layout": "6x5",
+      "kind": "fx",
+      "row_names": ["row01", "row02", "row03", "row04", "row05"]
+    }
+  ]
+}

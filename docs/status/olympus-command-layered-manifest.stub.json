@@ -1,0 +1,421 @@
+{
+  "schemaVersion": "war-room-layered-room-manifest/v1",
+  "roomId": "olympus-command",
+  "roomName": "Olympus Command",
+  "canvas": {
+    "w": 1600,
+    "h": 900,
+    "coordinateSpace": "percent"
+  },
+  "safety": {
+    "externalMode": "read-only",
+    "allowedActions": [
+      "inspect-local-manifest",
+      "show-mock-command-state",
+      "prepare-draft-handoff",
+      "display-approval-required-state"
+    ],
+    "forbiddenLiveActions": [
+      "etsy-publish",
+      "etsy-edit",
+      "etsy-renew",
+      "etsy-order-action",
+      "shop-account-write",
+      "supplier-message",
+      "supplier-purchase",
+      "shotlab-paid-generation",
+      "external-message-send",
+      "billing-or-payment-action"
+    ],
+    "notes": "Olympus Command layered manifest stub only. Mock/theoretical/read-only UI contract; no real shop, supplier, messaging, purchase, publish, billing, or paid-generation connection."
+  },
+  "layers": [
+    {
+      "id": "floor-base",
+      "kind": "floor-base",
+      "asset": "/war-room/layered/olympus-command/floor_base.png",
+      "bounds": { "x": 0, "y": 0, "w": 100, "h": 100 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 0,
+      "description": "Empty Olympus Command floor and walls only; no props, stations, characters, labels, UI, text, sigils, or baked dashboard elements.",
+      "qaNotes": [
+        "Must be a semantic floor/architecture base, not a complete interactive room image.",
+        "Must preserve walkable negative space for Hermes and stations."
+      ]
+    },
+    {
+      "id": "wall-trim-or-border",
+      "kind": "wall-trim",
+      "asset": "/war-room/layered/olympus-command/wall_trim_or_border.png",
+      "bounds": { "x": 0, "y": 0, "w": 100, "h": 100 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 50,
+      "description": "Optional transparent upper trim, Greek-key rim, depth shadow, or wall vignette. Text-free and non-interactive."
+    }
+  ],
+  "props": [
+    {
+      "id": "prop-packet-routes",
+      "kind": "prop",
+      "asset": "/war-room/layered/olympus-command/props/prop_packet_routes.png",
+      "bounds": { "x": 22, "y": 22, "w": 56, "h": 45 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 180,
+      "occlusion": "none",
+      "description": "Subtle packet route beads/arcs between command table, approval shrine, gateway obelisk, and agent routing dais."
+    },
+    {
+      "id": "prop-worker-tokens",
+      "kind": "prop",
+      "asset": "/war-room/layered/olympus-command/props/prop_worker_tokens.png",
+      "bounds": { "x": 66, "y": 48, "w": 12, "h": 10 },
+      "anchor": "center",
+      "scale": 1,
+      "zIndex": 610,
+      "occlusion": "none",
+      "description": "Small worker/god tokens or empty routing slots. No new character/god generation in this batch."
+    },
+    {
+      "id": "prop-approval-seal-locked",
+      "kind": "prop",
+      "asset": "/war-room/layered/olympus-command/props/prop_approval_seal_locked.png",
+      "bounds": { "x": 75, "y": 30, "w": 8, "h": 8 },
+      "anchor": "center",
+      "scale": 1,
+      "zIndex": 560,
+      "occlusion": "none",
+      "description": "Visible locked seal for risky business operations requiring DLV approval."
+    },
+    {
+      "id": "icon-omen-caduceus",
+      "kind": "prop",
+      "asset": "/war-room/layered/olympus-command/props/icon_omen_eye_or_caduceus.png",
+      "bounds": { "x": 16, "y": 10, "w": 6, "h": 6 },
+      "anchor": "center",
+      "scale": 1,
+      "zIndex": 1020,
+      "occlusion": "none",
+      "description": "Text-free mythic Hermes/JARVIS signal icon paired with the Omen Strip frame."
+    }
+  ],
+  "stations": [
+    {
+      "id": "station-command-table",
+      "kind": "station",
+      "name": "Central Command Table",
+      "stationKind": "mission-routing",
+      "asset": "/war-room/layered/olympus-command/stations/station_command_table.png",
+      "bounds": { "x": 50, "y": 46, "w": 26, "h": 24 },
+      "anchor": "center",
+      "scale": 1,
+      "zIndex": 430,
+      "animation": {
+        "state": "thinking",
+        "playback": "loop",
+        "durationMs": 1800,
+        "notes": "Table pulse overlay may breathe while command loop evaluates mock/draft mission state."
+      },
+      "description": "Main mission/routing artifact; no baked labels or fake dashboards.",
+      "hotspot": { "x": 38, "y": 34, "w": 24, "h": 23 },
+      "operatorSpot": { "x": 50, "y": 63 },
+      "labelSpot": { "x": 50, "y": 30 },
+      "toolSurface": {
+        "surfaceId": "olympus-command-mission-routing",
+        "surfaceKind": "mock-command-loop",
+        "sourceInput": "Local mock mission / Kanban summary / theoretical route state only.",
+        "concreteOutput": "Draft routing recommendation or safe handoff note; no external side effect.",
+        "nextHandoff": "Future Integrator may open a mock command cockpit after in-room Hermes work animation proof.",
+        "lockedRisks": ["external API writes", "shop/listing mutation", "message sending"]
+      },
+      "safety": {
+        "externalMode": "mock-only",
+        "allowedActions": ["display-mock-mission-state", "prepare-draft-route-summary"],
+        "forbiddenLiveActions": ["etsy-edit", "etsy-publish", "shop-write", "supplier-message", "shotlab-paid-generation"],
+        "notes": "Command table is a mock/draft planning station only."
+      }
+    },
+    {
+      "id": "station-approval-shrine",
+      "kind": "station",
+      "name": "Approval / Safety Lock Shrine",
+      "stationKind": "approval-gate",
+      "asset": "/war-room/layered/olympus-command/stations/station_approval_shrine.png",
+      "bounds": { "x": 76, "y": 37, "w": 16, "h": 20 },
+      "anchor": "center",
+      "scale": 1,
+      "zIndex": 440,
+      "animation": {
+        "state": "needs-approval",
+        "playback": "loop",
+        "durationMs": 2200,
+        "notes": "Gold/cyan pulse means awaiting DLV review, not an active live approval action."
+      },
+      "description": "Visible locked gate for risky marketplace/business operations.",
+      "hotspot": { "x": 68, "y": 25, "w": 17, "h": 24 },
+      "operatorSpot": { "x": 66, "y": 52 },
+      "labelSpot": { "x": 76, "y": 21 },
+      "toolSurface": {
+        "surfaceId": "olympus-command-approval-locks",
+        "surfaceKind": "approval-required-review",
+        "sourceInput": "Draft-only risk items, blockers, or theoretical approval requests.",
+        "concreteOutput": "Display required human decision; do not execute approved action directly.",
+        "nextHandoff": "Future UI may create a review-required handoff, not a live shop write.",
+        "lockedRisks": ["publishing", "renewing", "orders/refunds/messages", "supplier purchases", "paid generation"]
+      },
+      "safety": {
+        "externalMode": "disabled",
+        "allowedActions": ["show-locked-risk-state", "prepare-human-review-note"],
+        "forbiddenLiveActions": ["etsy-publish", "etsy-renew", "etsy-order-action", "shop-account-write", "supplier-purchase", "supplier-message", "shotlab-paid-generation"],
+        "notes": "Shrine visually communicates locks; it must not be wired as a direct approve/publish button."
+      }
+    },
+    {
+      "id": "station-gateway-obelisk",
+      "kind": "station",
+      "name": "Gateway / Session Pulse Obelisk",
+      "stationKind": "gateway-status",
+      "asset": "/war-room/layered/olympus-command/stations/station_gateway_obelisk.png",
+      "bounds": { "x": 25, "y": 38, "w": 15, "h": 22 },
+      "anchor": "center",
+      "scale": 1,
+      "zIndex": 435,
+      "animation": {
+        "state": "idle",
+        "playback": "loop",
+        "durationMs": 2400,
+        "notes": "Session pulse is theoretical/read-only unless future integration explicitly provides safe status data."
+      },
+      "description": "Hermes relay obelisk / signal tower for safe gateway/session status.",
+      "hotspot": { "x": 18, "y": 26, "w": 15, "h": 24 },
+      "operatorSpot": { "x": 35, "y": 54 },
+      "labelSpot": { "x": 25, "y": 22 },
+      "toolSurface": {
+        "surfaceId": "olympus-command-gateway-pulse",
+        "surfaceKind": "read-only-session-status",
+        "sourceInput": "Local/mock gateway health and session summary only.",
+        "concreteOutput": "Read-only status surface; no platform sends or API writes.",
+        "nextHandoff": "Future safe status adapter may provide read-only health signals.",
+        "lockedRisks": ["discord send", "telegram send", "account action", "credential display"]
+      },
+      "safety": {
+        "externalMode": "read-only",
+        "allowedActions": ["display-read-only-status", "show-mock-session-pulse"],
+        "forbiddenLiveActions": ["external-message-send", "etsy-message", "shop-write", "supplier-message", "shotlab-paid-generation"],
+        "notes": "No outbound messaging or credential exposure."
+      }
+    },
+    {
+      "id": "station-agent-routing-dais",
+      "kind": "station",
+      "name": "Agent Routing Dais",
+      "stationKind": "assignment-routing",
+      "asset": "/war-room/layered/olympus-command/stations/station_agent_routing_dais.png",
+      "bounds": { "x": 68, "y": 58, "w": 18, "h": 15 },
+      "anchor": "center",
+      "scale": 1,
+      "zIndex": 425,
+      "animation": {
+        "state": "working",
+        "playback": "loop",
+        "durationMs": 2000,
+        "notes": "Assignment path overlay may animate between table and dais; no Kanban write in this stub."
+      },
+      "description": "Multi-seat/token routing table for draft-only worker assignment visualization.",
+      "hotspot": { "x": 58, "y": 50, "w": 20, "h": 16 },
+      "operatorSpot": { "x": 57, "y": 63 },
+      "labelSpot": { "x": 68, "y": 47 },
+      "toolSurface": {
+        "surfaceId": "olympus-command-agent-routing",
+        "surfaceKind": "draft-assignment-display",
+        "sourceInput": "Mock worker/card state or local Kanban summary if future read-only integration is approved.",
+        "concreteOutput": "Draft assignment/handoff preview.",
+        "nextHandoff": "Future Kanban integration must use explicit safe write contract and review gate.",
+        "lockedRisks": ["automatic task creation", "cross-agent write without approval", "external API action"]
+      },
+      "safety": {
+        "externalMode": "draft-only",
+        "allowedActions": ["show-draft-assignment", "prepare-handoff-preview"],
+        "forbiddenLiveActions": ["kanban-write-without-contract", "etsy-edit", "shop-write", "supplier-message", "shotlab-paid-generation"],
+        "notes": "Draft visualization only; no live assignment mutation in this manifest stub."
+      }
+    }
+  ],
+  "characters": [
+    {
+      "id": "character-hermes-operator",
+      "kind": "character",
+      "name": "Hermes Command Operator",
+      "role": "temporary existing Hermes operator; do not regenerate in this first batch",
+      "bounds": { "x": 50, "y": 66, "w": 8, "h": 14 },
+      "anchor": "bottom-center",
+      "scale": 1,
+      "zIndex": 680,
+      "state": "idle",
+      "assets": {
+        "idle": "/war-room/olympus-command/hermes-90frame-v1/processed/hermes-model.png",
+        "walkStrip": {
+          "asset": "/war-room/olympus-command/hermes-90frame-v1/processed/hermes-walk-strip.png",
+          "frameCount": 6,
+          "frameWidth": 99,
+          "frameHeight": 99,
+          "playback": "loop",
+          "framesPerSecond": 8,
+          "directions": ["up", "down", "left", "right"]
+        },
+        "workStrip": {
+          "asset": "/war-room/olympus-command/hermes-90frame-v1/processed/hermes-work-strip.png",
+          "frameCount": 6,
+          "frameWidth": 99,
+          "frameHeight": 99,
+          "playback": "loop",
+          "framesPerSecond": 8,
+          "directions": ["work"]
+        }
+      },
+      "operatorTargets": {
+        "station-command-table": { "x": 50, "y": 63 },
+        "station-approval-shrine": { "x": 66, "y": 52 },
+        "station-gateway-obelisk": { "x": 35, "y": 54 },
+        "station-agent-routing-dais": { "x": 57, "y": 63 }
+      },
+      "patrolPoints": [
+        { "x": 45, "y": 64 },
+        { "x": 55, "y": 64 },
+        { "x": 50, "y": 58 }
+      ],
+      "speech": "Mock command loop only; risky actions stay locked for DLV approval."
+    }
+  ],
+  "overlays": [
+    {
+      "id": "overlay-command-table-pulse",
+      "kind": "overlay",
+      "asset": "/war-room/layered/olympus-command/overlays/overlay_command_table_pulse.png",
+      "bounds": { "x": 36, "y": 32, "w": 28, "h": 28 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 860,
+      "pointerEvents": "none",
+      "animation": {
+        "state": "thinking",
+        "playback": "loop",
+        "durationMs": 1800,
+        "notes": "Subtle cyan/gold signal glow only."
+      }
+    },
+    {
+      "id": "overlay-approval-awaiting-review",
+      "kind": "overlay",
+      "asset": "/war-room/layered/olympus-command/overlays/overlay_approval_gold_cyan_glow.png",
+      "bounds": { "x": 67, "y": 24, "w": 18, "h": 26 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 870,
+      "pointerEvents": "none",
+      "animation": {
+        "state": "needs-approval",
+        "playback": "loop",
+        "durationMs": 2200,
+        "notes": "Indicates waiting for DLV, not a live approval button."
+      }
+    },
+    {
+      "id": "overlay-gateway-pulse",
+      "kind": "overlay",
+      "asset": "/war-room/layered/olympus-command/overlays/overlay_gateway_pulse.png",
+      "bounds": { "x": 17, "y": 25, "w": 17, "h": 25 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 850,
+      "pointerEvents": "none",
+      "animation": {
+        "state": "idle",
+        "playback": "loop",
+        "durationMs": 2400,
+        "notes": "Read-only/mock pulse; no outbound messaging."
+      }
+    },
+    {
+      "id": "overlay-assignment-path",
+      "kind": "overlay",
+      "asset": "/war-room/layered/olympus-command/overlays/overlay_assignment_path.png",
+      "bounds": { "x": 48, "y": 43, "w": 25, "h": 18 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 855,
+      "pointerEvents": "none",
+      "workflowRoute": {
+        "sourceId": "station-command-table",
+        "targetId": "station-agent-routing-dais",
+        "purpose": "Visualize draft-only worker routing from command loop to assignment dais.",
+        "timingMs": 2000
+      },
+      "animation": {
+        "state": "working",
+        "playback": "loop",
+        "durationMs": 2000,
+        "notes": "Decorative route pulse only; does not create tasks."
+      }
+    }
+  ],
+  "uiFrames": [
+    {
+      "id": "frame-omen-strip",
+      "kind": "ui-frame",
+      "asset": "/war-room/layered/olympus-command/frames/frame_omen_strip.png",
+      "bounds": { "x": 10, "y": 4, "w": 80, "h": 12 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 1040,
+      "safeTextBoxes": {
+        "mission": { "x": 20, "y": 6, "w": 34, "h": 4 },
+        "state": { "x": 56, "y": 6, "w": 15, "h": 4 },
+        "nextAction": { "x": 72, "y": 6, "w": 15, "h": 4 }
+      },
+      "description": "Text-free generated JARVIS/Omen Strip frame; all text must be HTML overlay inside safeTextBoxes."
+    },
+    {
+      "id": "plaque-room-title",
+      "kind": "ui-frame",
+      "asset": "/war-room/layered/olympus-command/frames/plaque_room_title.png",
+      "bounds": { "x": 38, "y": 16, "w": 24, "h": 7 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 1030,
+      "safeTextBoxes": {
+        "title": { "x": 41, "y": 18, "w": 18, "h": 3 }
+      },
+      "description": "Text-free room-title plaque for HTML label 'Olympus Command'."
+    },
+    {
+      "id": "frame-mission-brief",
+      "kind": "ui-frame",
+      "asset": "/war-room/layered/olympus-command/frames/frame_mission_brief_panel.png",
+      "bounds": { "x": 8, "y": 72, "w": 38, "h": 18 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 1050,
+      "safeTextBoxes": {
+        "summary": { "x": 11, "y": 75, "w": 32, "h": 7 },
+        "lockedNotice": { "x": 11, "y": 83, "w": 32, "h": 4 }
+      },
+      "description": "Text-free generated mission brief frame. Dynamic copy must state mock/theoretical/locked status when relevant."
+    },
+    {
+      "id": "plaque-station-label-small",
+      "kind": "ui-frame",
+      "asset": "/war-room/layered/olympus-command/frames/plaque_station_label_small.png",
+      "bounds": { "x": 64, "y": 74, "w": 24, "h": 8 },
+      "anchor": "top-left",
+      "scale": 1,
+      "zIndex": 1035,
+      "safeTextBoxes": {
+        "label": { "x": 66, "y": 76, "w": 20, "h": 3 }
+      },
+      "description": "Reusable text-free station label plaque; use only when generated plaque art is needed instead of plain HTML label overlay."
+    }
+  ]
+}

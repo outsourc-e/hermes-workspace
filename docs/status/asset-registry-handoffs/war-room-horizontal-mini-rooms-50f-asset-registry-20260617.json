@@ -1,0 +1,3848 @@
+{
+  "id": "war-room-horizontal-mini-rooms-50f-asset-registry-20260617",
+  "taskId": "t_a03526a1",
+  "created": "2026-06-17",
+  "status": "candidate-registry-and-slicing-plan-only",
+  "workspaceBoundary": "/Users/mac/hermes-workspace",
+  "providerLaw": "ChatGPT/OpenAI-Codex only for this run; no Kimi, Claude, Gemini, or non-ChatGPT AI lane.",
+  "sourceContracts": [
+    "docs/status/automation/2026-06-17-war-room-10h-chatgpt-codex-horizontal-rooms-50f-contract.md",
+    "docs/status/art-direction/war-room-main-screen-asset-list-modular-pixel-olympus-20260617.md",
+    "docs/status/art-direction/war-room-horizontal-mini-rooms-50f-final-asset-contract-20260617.md",
+    "docs/plans/2026-06-17-war-room-horizontal-mini-rooms-50f-implementation-plan.md",
+    "/Users/mac/Documents/Hermes Second Brain/01 Projects/War Room/החלטת עיצוב - מסך ראשי מודולרי חדרים וגשרים 2026-06-17.md"
+  ],
+  "visualLaw": [
+    "horizontal rectangular mini rooms",
+    "physical paved roads/bridges/corridors",
+    "Hermes/Olympus theme",
+    "50+ frame agent contracts; 96-frame target",
+    "no dashboard-card main screen",
+    "no abstract connected-atlas lines",
+    "no fake final sprite-frame claims"
+  ],
+  "safetyPolicy": "No live store/shop/supplier/customer/account/paid actions; future actions must be read-only, dry-run, draft, manual-only, and approval-gated.",
+  "targetRoot": "generated-candidates/war-room/horizontal-mini-rooms-50f/",
+  "runtimePromotionRoot": "public/war-room/v43-horizontal-minirooms/ after explicit approval and QA only",
+  "summaryCounts": {
+    "room": 10,
+    "agent": 10,
+    "station": 30,
+    "road": 17,
+    "effect": 17,
+    "packet": 15,
+    "overlay": 8
+  },
+  "rooms": [
+    {
+      "id": "agora-opportunity",
+      "name": "Agora Opportunity",
+      "bounds": {
+        "x": 1,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "stations": [
+        "market-stall",
+        "product-board",
+        "market-score-scale"
+      ],
+      "agent": "agent-athena-opportunity",
+      "packet": "opportunity-scroll"
+    },
+    {
+      "id": "oracle-signals",
+      "name": "Oracle Signals",
+      "bounds": {
+        "x": 6,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "stations": [
+        "oracle-pool",
+        "signal-screen",
+        "source-scrolls"
+      ],
+      "agent": "agent-oracle-signal-analyst",
+      "packet": "signal-orb"
+    },
+    {
+      "id": "hephaestus-forge",
+      "name": "Forge of Hephaestus",
+      "bounds": {
+        "x": 11,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "stations": [
+        "forge-anvil",
+        "furnace-bellows",
+        "shotlab-rack"
+      ],
+      "agent": "agent-hephaestus-forge-operator",
+      "packet": "draft-artifact-crate"
+    },
+    {
+      "id": "merchant-harbor",
+      "name": "Merchant Harbor",
+      "bounds": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "stations": [
+        "supplier-proof-table",
+        "crate-inspection-bench",
+        "harbor-route-board"
+      ],
+      "agent": "agent-harbor-scout",
+      "packet": "supplier-proof-crate"
+    },
+    {
+      "id": "gateway-discord-cockpit",
+      "name": "Gateway / Discord Cockpit",
+      "bounds": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "stations": [
+        "gateway-console",
+        "discord-draft-scroll",
+        "signal-beacon"
+      ],
+      "agent": "agent-gateway-messenger",
+      "packet": "internal-dispatch-packet"
+    },
+    {
+      "id": "atlantis-vault",
+      "name": "Atlantis Vault / Archive",
+      "bounds": {
+        "x": 1,
+        "y": 5.4,
+        "w": 4,
+        "h": 2
+      },
+      "stations": [
+        "archive-shelves",
+        "evidence-ledger",
+        "vault-door"
+      ],
+      "agent": "agent-atlantis-archivist",
+      "packet": "evidence-folder"
+    },
+    {
+      "id": "olympus-command",
+      "name": "Olympus Command / Hermes Conductor",
+      "bounds": {
+        "x": 9,
+        "y": 5.15,
+        "w": 6,
+        "h": 2.5
+      },
+      "stations": [
+        "command-table",
+        "mission-router-dais",
+        "caduceus-route-map"
+      ],
+      "agent": "agent-hermes-conductor",
+      "packet": "sealed-mission-scroll"
+    },
+    {
+      "id": "treasury-approval",
+      "name": "Treasury / Approval",
+      "bounds": {
+        "x": 19,
+        "y": 5.4,
+        "w": 4,
+        "h": 2
+      },
+      "stations": [
+        "approval-shrine",
+        "treasury-chest",
+        "audit-ledger"
+      ],
+      "agent": "agent-treasury-guard",
+      "packet": "commerce-lock-packet"
+    },
+    {
+      "id": "roman-dev-studio",
+      "name": "Roman Dev Studio",
+      "bounds": {
+        "x": 4.8,
+        "y": 10,
+        "w": 5,
+        "h": 2
+      },
+      "stations": [
+        "roman-build-bench",
+        "qa-shield-rack",
+        "blueprint-table"
+      ],
+      "agent": "agent-roman-producer",
+      "packet": "implementation-packet"
+    },
+    {
+      "id": "rest-room-agent-lounge",
+      "name": "Rest Room / Agent Lounge",
+      "bounds": {
+        "x": 14.2,
+        "y": 10,
+        "w": 5,
+        "h": 2
+      },
+      "stations": [
+        "lounge-couch",
+        "food-water-table",
+        "quiet-plaque"
+      ],
+      "agent": "agent-rest-steward",
+      "packet": "rest-token"
+    }
+  ],
+  "entries": [
+    {
+      "id": "room-shell-agora-opportunity",
+      "family": "room",
+      "roomId": "agora-opportunity",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/agora-opportunity/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 320,
+        "h": 144
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Agora Opportunity",
+      "gridBounds": {
+        "x": 1,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "requiredMiniatureContents": [
+        "market-stall",
+        "product-board",
+        "market-score-scale",
+        "agent-athena-opportunity",
+        "opportunity-scroll"
+      ]
+    },
+    {
+      "id": "agent-athena-opportunity",
+      "family": "agent",
+      "roomId": "agora-opportunity",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-athena-opportunity.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Agora Opportunity",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-market-stall",
+      "family": "station",
+      "roomId": "agora-opportunity",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/agora-opportunity/market-stall.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Agora Opportunity",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-product-board",
+      "family": "station",
+      "roomId": "agora-opportunity",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/agora-opportunity/product-board.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Agora Opportunity",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-market-score-scale",
+      "family": "station",
+      "roomId": "agora-opportunity",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/agora-opportunity/market-score-scale.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Agora Opportunity",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "room-shell-oracle-signals",
+      "family": "room",
+      "roomId": "oracle-signals",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/oracle-signals/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 320,
+        "h": 144
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Oracle Signals",
+      "gridBounds": {
+        "x": 6,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "requiredMiniatureContents": [
+        "oracle-pool",
+        "signal-screen",
+        "source-scrolls",
+        "agent-oracle-signal-analyst",
+        "signal-orb"
+      ]
+    },
+    {
+      "id": "agent-oracle-signal-analyst",
+      "family": "agent",
+      "roomId": "oracle-signals",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-oracle-signal-analyst.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Oracle Signals",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-oracle-pool",
+      "family": "station",
+      "roomId": "oracle-signals",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/oracle-signals/oracle-pool.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Oracle Signals",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-signal-screen",
+      "family": "station",
+      "roomId": "oracle-signals",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/oracle-signals/signal-screen.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Oracle Signals",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-source-scrolls",
+      "family": "station",
+      "roomId": "oracle-signals",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/oracle-signals/source-scrolls.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Oracle Signals",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "room-shell-hephaestus-forge",
+      "family": "room",
+      "roomId": "hephaestus-forge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/hephaestus-forge/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 320,
+        "h": 144
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Forge of Hephaestus",
+      "gridBounds": {
+        "x": 11,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "requiredMiniatureContents": [
+        "forge-anvil",
+        "furnace-bellows",
+        "shotlab-rack",
+        "agent-hephaestus-forge-operator",
+        "draft-artifact-crate"
+      ]
+    },
+    {
+      "id": "agent-hephaestus-forge-operator",
+      "family": "agent",
+      "roomId": "hephaestus-forge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-hephaestus-forge-operator.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Forge of Hephaestus",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-forge-anvil",
+      "family": "station",
+      "roomId": "hephaestus-forge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/hephaestus-forge/forge-anvil.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Forge of Hephaestus",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-furnace-bellows",
+      "family": "station",
+      "roomId": "hephaestus-forge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/hephaestus-forge/furnace-bellows.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Forge of Hephaestus",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-shotlab-rack",
+      "family": "station",
+      "roomId": "hephaestus-forge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/hephaestus-forge/shotlab-rack.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Forge of Hephaestus",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "room-shell-merchant-harbor",
+      "family": "room",
+      "roomId": "merchant-harbor",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/merchant-harbor/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 320,
+        "h": 144
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Merchant Harbor",
+      "gridBounds": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "requiredMiniatureContents": [
+        "supplier-proof-table",
+        "crate-inspection-bench",
+        "harbor-route-board",
+        "agent-harbor-scout",
+        "supplier-proof-crate"
+      ]
+    },
+    {
+      "id": "agent-harbor-scout",
+      "family": "agent",
+      "roomId": "merchant-harbor",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-harbor-scout.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Merchant Harbor",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-supplier-proof-table",
+      "family": "station",
+      "roomId": "merchant-harbor",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/merchant-harbor/supplier-proof-table.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Merchant Harbor",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-crate-inspection-bench",
+      "family": "station",
+      "roomId": "merchant-harbor",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/merchant-harbor/crate-inspection-bench.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Merchant Harbor",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-harbor-route-board",
+      "family": "station",
+      "roomId": "merchant-harbor",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/merchant-harbor/harbor-route-board.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Merchant Harbor",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "room-shell-gateway-discord-cockpit",
+      "family": "room",
+      "roomId": "gateway-discord-cockpit",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/gateway-discord-cockpit/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 320,
+        "h": 144
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Gateway / Discord Cockpit",
+      "gridBounds": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 2
+      },
+      "requiredMiniatureContents": [
+        "gateway-console",
+        "discord-draft-scroll",
+        "signal-beacon",
+        "agent-gateway-messenger",
+        "internal-dispatch-packet"
+      ]
+    },
+    {
+      "id": "agent-gateway-messenger",
+      "family": "agent",
+      "roomId": "gateway-discord-cockpit",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-gateway-messenger.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Gateway / Discord Cockpit",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-gateway-console",
+      "family": "station",
+      "roomId": "gateway-discord-cockpit",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/gateway-discord-cockpit/gateway-console.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Gateway / Discord Cockpit",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-discord-draft-scroll",
+      "family": "station",
+      "roomId": "gateway-discord-cockpit",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/gateway-discord-cockpit/discord-draft-scroll.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Gateway / Discord Cockpit",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-signal-beacon",
+      "family": "station",
+      "roomId": "gateway-discord-cockpit",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/gateway-discord-cockpit/signal-beacon.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Gateway / Discord Cockpit",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "room-shell-atlantis-vault",
+      "family": "room",
+      "roomId": "atlantis-vault",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/atlantis-vault/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 320,
+        "h": 144
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Atlantis Vault / Archive",
+      "gridBounds": {
+        "x": 1,
+        "y": 5.4,
+        "w": 4,
+        "h": 2
+      },
+      "requiredMiniatureContents": [
+        "archive-shelves",
+        "evidence-ledger",
+        "vault-door",
+        "agent-atlantis-archivist",
+        "evidence-folder"
+      ]
+    },
+    {
+      "id": "agent-atlantis-archivist",
+      "family": "agent",
+      "roomId": "atlantis-vault",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-atlantis-archivist.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Atlantis Vault / Archive",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-archive-shelves",
+      "family": "station",
+      "roomId": "atlantis-vault",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/atlantis-vault/archive-shelves.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Atlantis Vault / Archive",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-evidence-ledger",
+      "family": "station",
+      "roomId": "atlantis-vault",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/atlantis-vault/evidence-ledger.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Atlantis Vault / Archive",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-vault-door",
+      "family": "station",
+      "roomId": "atlantis-vault",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/atlantis-vault/vault-door.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Atlantis Vault / Archive",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "room-shell-olympus-command",
+      "family": "room",
+      "roomId": "olympus-command",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/olympus-command/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 480,
+        "h": 180
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Olympus Command / Hermes Conductor",
+      "gridBounds": {
+        "x": 9,
+        "y": 5.15,
+        "w": 6,
+        "h": 2.5
+      },
+      "requiredMiniatureContents": [
+        "command-table",
+        "mission-router-dais",
+        "caduceus-route-map",
+        "agent-hermes-conductor",
+        "sealed-mission-scroll"
+      ]
+    },
+    {
+      "id": "agent-hermes-conductor",
+      "family": "agent",
+      "roomId": "olympus-command",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-hermes-conductor.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Olympus Command / Hermes Conductor",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-command-table",
+      "family": "station",
+      "roomId": "olympus-command",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/olympus-command/command-table.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Olympus Command / Hermes Conductor",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-mission-router-dais",
+      "family": "station",
+      "roomId": "olympus-command",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/olympus-command/mission-router-dais.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Olympus Command / Hermes Conductor",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-caduceus-route-map",
+      "family": "station",
+      "roomId": "olympus-command",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/olympus-command/caduceus-route-map.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Olympus Command / Hermes Conductor",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "room-shell-treasury-approval",
+      "family": "room",
+      "roomId": "treasury-approval",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/treasury-approval/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 320,
+        "h": 144
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Treasury / Approval",
+      "gridBounds": {
+        "x": 19,
+        "y": 5.4,
+        "w": 4,
+        "h": 2
+      },
+      "requiredMiniatureContents": [
+        "approval-shrine",
+        "treasury-chest",
+        "audit-ledger",
+        "agent-treasury-guard",
+        "commerce-lock-packet"
+      ]
+    },
+    {
+      "id": "agent-treasury-guard",
+      "family": "agent",
+      "roomId": "treasury-approval",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-treasury-guard.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Treasury / Approval",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-approval-shrine",
+      "family": "station",
+      "roomId": "treasury-approval",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/treasury-approval/approval-shrine.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Treasury / Approval",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-treasury-chest",
+      "family": "station",
+      "roomId": "treasury-approval",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/treasury-approval/treasury-chest.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Treasury / Approval",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-audit-ledger",
+      "family": "station",
+      "roomId": "treasury-approval",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/treasury-approval/audit-ledger.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Treasury / Approval",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "room-shell-roman-dev-studio",
+      "family": "room",
+      "roomId": "roman-dev-studio",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/roman-dev-studio/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 400,
+        "h": 144
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Roman Dev Studio",
+      "gridBounds": {
+        "x": 4.8,
+        "y": 10,
+        "w": 5,
+        "h": 2
+      },
+      "requiredMiniatureContents": [
+        "roman-build-bench",
+        "qa-shield-rack",
+        "blueprint-table",
+        "agent-roman-producer",
+        "implementation-packet"
+      ]
+    },
+    {
+      "id": "agent-roman-producer",
+      "family": "agent",
+      "roomId": "roman-dev-studio",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-roman-producer.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Roman Dev Studio",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-roman-build-bench",
+      "family": "station",
+      "roomId": "roman-dev-studio",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/roman-dev-studio/roman-build-bench.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Roman Dev Studio",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-qa-shield-rack",
+      "family": "station",
+      "roomId": "roman-dev-studio",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/roman-dev-studio/qa-shield-rack.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Roman Dev Studio",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-blueprint-table",
+      "family": "station",
+      "roomId": "roman-dev-studio",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/roman-dev-studio/blueprint-table.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Roman Dev Studio",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "room-shell-rest-room-agent-lounge",
+      "family": "room",
+      "roomId": "rest-room-agent-lounge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/rooms/rest-room-agent-lounge/room-shell-wide-2x1.png",
+      "frameSizePx": {
+        "w": 400,
+        "h": 144
+      },
+      "sheetGrid": {
+        "columns": 1,
+        "rows": 1
+      },
+      "totalFrames": 1,
+      "states": [
+        "static-candidate"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "horizontal rectangular miniature room; blank plaque only, no baked labels"
+      ],
+      "displayName": "Rest Room / Agent Lounge",
+      "gridBounds": {
+        "x": 14.2,
+        "y": 10,
+        "w": 5,
+        "h": 2
+      },
+      "requiredMiniatureContents": [
+        "lounge-couch",
+        "food-water-table",
+        "quiet-plaque",
+        "agent-rest-steward",
+        "rest-token"
+      ]
+    },
+    {
+      "id": "agent-rest-steward",
+      "family": "agent",
+      "roomId": "rest-room-agent-lounge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/agents/agent-rest-steward.sheet-48x48-8x12.png",
+      "frameSizePx": {
+        "w": 48,
+        "h": 48
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 12
+      },
+      "totalFrames": 96,
+      "states": [
+        "idle",
+        "walk-north",
+        "walk-south",
+        "walk-east",
+        "walk-west",
+        "carry-packet-north",
+        "carry-packet-south",
+        "carry-packet-east",
+        "carry-packet-west",
+        "work-at-station",
+        "talk-status",
+        "rest-or-blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "target agent for Rest Room / Agent Lounge",
+        "96-frame target; do not mark final until actual sheet and frame QA exist"
+      ]
+    },
+    {
+      "id": "station-lounge-couch",
+      "family": "station",
+      "roomId": "rest-room-agent-lounge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/rest-room-agent-lounge/lounge-couch.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Rest Room / Agent Lounge",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-food-water-table",
+      "family": "station",
+      "roomId": "rest-room-agent-lounge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/rest-room-agent-lounge/food-water-table.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Rest Room / Agent Lounge",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "station-quiet-plaque",
+      "family": "station",
+      "roomId": "rest-room-agent-lounge",
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/stations/rest-room-agent-lounge/quiet-plaque.sheet.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 96
+      },
+      "sheetGrid": {
+        "columns": 8,
+        "rows": 5
+      },
+      "totalFrames": 40,
+      "states": [
+        "idle",
+        "active-work",
+        "packet-received",
+        "output-ready",
+        "blocked-manual-approval"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "room-specific station/prop for Rest Room / Agent Lounge",
+        "states must be in-world prop/effect, not dashboard widgets"
+      ]
+    },
+    {
+      "id": "road-horizontal-straight",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-horizontal-straight.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-vertical-straight",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-vertical-straight.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-corner-ne",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-corner-ne.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-corner-nw",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-corner-nw.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-corner-se",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-corner-se.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-corner-sw",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-corner-sw.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-t-junction-up",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-t-junction-up.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-t-junction-down",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-t-junction-down.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-t-junction-left",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-t-junction-left.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-t-junction-right",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-t-junction-right.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "road-cross-junction",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/road-cross-junction.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "short-bridge-room-to-road",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/short-bridge-room-to-road.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "long-bridge-span",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/long-bridge-span.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "door-threshold-gate",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/door-threshold-gate.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "manual-approval-gate-overlay",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/manual-approval-gate-overlay.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "blocked-gate-overlay",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/blocked-gate-overlay.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "route-glow-overlay-cyan-gold",
+      "family": "road",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/roads/route-glow-overlay-cyan-gold.png",
+      "frameSizePx": {
+        "w": 80,
+        "h": 72
+      },
+      "sheetGrid": {
+        "columns": 4,
+        "rows": 1
+      },
+      "totalFrames": 4,
+      "states": [
+        "idle",
+        "packet-traveling",
+        "route-active-glow",
+        "blocked-or-approval-lock"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "seg-agora-drop",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-agora-drop.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-oracle-drop",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-oracle-drop.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-forge-drop",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-forge-drop.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-harbor-drop",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-harbor-drop.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-gateway-drop",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-gateway-drop.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-top-agora-oracle",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-top-agora-oracle.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-top-oracle-forge",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-top-oracle-forge.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-top-forge-harbor",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-top-forge-harbor.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-top-harbor-gateway",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-top-harbor-gateway.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-command-north-link",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-command-north-link.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-atlantis-command",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-atlantis-command.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-command-treasury",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-command-treasury.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-command-lower",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-command-lower.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-lower-roman-command",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-lower-roman-command.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-lower-command-rest",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-lower-command-rest.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-roman-up",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-roman-up.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "seg-rest-up",
+      "family": "effect",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/effects/routes/seg-rest-up.route-manifest.json",
+      "frameSizePx": null,
+      "sheetGrid": null,
+      "totalFrames": null,
+      "states": [
+        "route-idle",
+        "route-active",
+        "packet-progress",
+        "reduced-motion-socket-highlight"
+      ],
+      "alphaRequired": false,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [
+        "physical corridor segment from final topology; renderer must compose from road/bridge pieces, not abstract lines"
+      ]
+    },
+    {
+      "id": "task-packet-cube",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/task-packet-cube.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "generic task packet cube"
+    },
+    {
+      "id": "opportunity-scroll",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/opportunity-scroll.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "product opportunity scroll"
+    },
+    {
+      "id": "supplier-proof-crate",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/supplier-proof-crate.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "supplier proof crate"
+    },
+    {
+      "id": "signal-orb",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/signal-orb.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "SEO/signal orb"
+    },
+    {
+      "id": "draft-listing-artifact",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/draft-listing-artifact.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "draft listing artifact"
+    },
+    {
+      "id": "image-media-bundle",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/image-media-bundle.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "image/media bundle"
+    },
+    {
+      "id": "approval-seal",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/approval-seal.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "approval seal"
+    },
+    {
+      "id": "evidence-folder",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/evidence-folder.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "evidence folder"
+    },
+    {
+      "id": "error-blocker-marker",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/error-blocker-marker.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "error/blocker marker"
+    },
+    {
+      "id": "rest-token",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/rest-token.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "rest/idle status token"
+    },
+    {
+      "id": "commerce-lock-packet",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/commerce-lock-packet.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "manual approval commerce lock packet"
+    },
+    {
+      "id": "implementation-packet",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/implementation-packet.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "Roman build/report packet"
+    },
+    {
+      "id": "internal-dispatch-packet",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/internal-dispatch-packet.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "guarded Gateway draft packet"
+    },
+    {
+      "id": "sealed-mission-scroll",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/sealed-mission-scroll.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "Command mission scroll"
+    },
+    {
+      "id": "draft-artifact-crate",
+      "family": "packet",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/packets/draft-artifact-crate.sheet.png",
+      "frameSizePx": {
+        "w": 32,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 6,
+        "rows": 1
+      },
+      "totalFrames": 6,
+      "states": [
+        "moving-along-road",
+        "waiting-at-entrance",
+        "carried-by-agent",
+        "opened-at-station",
+        "approved-or-sealed",
+        "blocked"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": [],
+      "description": "Forge draft artifact crate"
+    },
+    {
+      "id": "blank-room-name-plaque",
+      "family": "overlay",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/overlays/blank-room-name-plaque.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 2,
+        "rows": 1
+      },
+      "totalFrames": 2,
+      "states": [
+        "idle",
+        "active-or-hover"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "hover-outline-selected-glow",
+      "family": "overlay",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/overlays/hover-outline-selected-glow.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 2,
+        "rows": 1
+      },
+      "totalFrames": 2,
+      "states": [
+        "idle",
+        "active-or-hover"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "speech-bubble-frame",
+      "family": "overlay",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/overlays/speech-bubble-frame.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 2,
+        "rows": 1
+      },
+      "totalFrames": 2,
+      "states": [
+        "idle",
+        "active-or-hover"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "tiny-status-badge-working-idle-resting-approval-blocked",
+      "family": "overlay",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/overlays/tiny-status-badge-working-idle-resting-approval-blocked.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 2,
+        "rows": 1
+      },
+      "totalFrames": 2,
+      "states": [
+        "idle",
+        "active-or-hover"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "manual-only-action-lock-icon",
+      "family": "overlay",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/overlays/manual-only-action-lock-icon.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 2,
+        "rows": 1
+      },
+      "totalFrames": 2,
+      "states": [
+        "idle",
+        "active-or-hover"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "safe-route-highlight",
+      "family": "overlay",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/overlays/safe-route-highlight.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 2,
+        "rows": 1
+      },
+      "totalFrames": 2,
+      "states": [
+        "idle",
+        "active-or-hover"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "active-room-focus-vignette",
+      "family": "overlay",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/overlays/active-room-focus-vignette.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 2,
+        "rows": 1
+      },
+      "totalFrames": 2,
+      "states": [
+        "idle",
+        "active-or-hover"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    },
+    {
+      "id": "mini-tooltip-frame",
+      "family": "overlay",
+      "roomId": null,
+      "status": "candidate-only",
+      "assetPath": "generated-candidates/war-room/horizontal-mini-rooms-50f/overlays/mini-tooltip-frame.png",
+      "frameSizePx": {
+        "w": 96,
+        "h": 32
+      },
+      "sheetGrid": {
+        "columns": 2,
+        "rows": 1
+      },
+      "totalFrames": 2,
+      "states": [
+        "idle",
+        "active-or-hover"
+      ],
+      "alphaRequired": true,
+      "bakedTextAllowed": false,
+      "routeSocketsGrid": [],
+      "safeTextZonePct": null,
+      "hitboxesPct": [],
+      "reducedMotionStill": "first-frame-or-static-still",
+      "externalActionPolicy": "no live external action; read-only/dry-run/draft/manual-only/approval-gated only",
+      "promotionGate": "technical-art QA + visual QA + browser/layout QA + no-overclaim review",
+      "notes": []
+    }
+  ]
+}

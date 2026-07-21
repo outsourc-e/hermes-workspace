@@ -1,0 +1,3159 @@
+{
+  "name": "war-room-v40-local-visual-kit-v2-technical-art-contract",
+  "created_utc": "2026-06-12T23:41:32.243069+00:00",
+  "task": "t_cabfb8e3",
+  "workspace_boundary": "/Users/mac/hermes-workspace",
+  "source_manifest": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/manifests/v40_local_visual_kit_manifest.json",
+  "status": "staged-for-local-app-use; manifest/proof only; no React integration; safe local contract ready for integrator",
+  "public_asset_root": "/war-room/v40/local-visual-kit-v2",
+  "proof_png": "docs/status/technical-art/proofs/war-room-v40-local-visual-kit-v2-safe-zones-proof.png",
+  "assets": [
+    {
+      "id": "olympus_command_cell_bg",
+      "family": "cell-background",
+      "purpose": "council table + dispatch beacon",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/cell-backgrounds/olympus_command_cell_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/olympus_command_cell_bg.png",
+      "dimensions": {
+        "width": 960,
+        "height": 540
+      },
+      "alpha": true,
+      "sha256": "588d182d6c3b5172f5c82c515f9495a0392aa51788c3daf3b8cb5b51dbbff62c",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "16:9 main-board candidate; text-free; intended to sit behind hover plaque/status outside image"
+      ]
+    },
+    {
+      "id": "pantheon_quarters_cell_bg",
+      "family": "cell-background",
+      "purpose": "agent chambers + roster wall",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/cell-backgrounds/pantheon_quarters_cell_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/pantheon_quarters_cell_bg.png",
+      "dimensions": {
+        "width": 960,
+        "height": 540
+      },
+      "alpha": true,
+      "sha256": "6b9d1065701e354572d0077b4afcfdf48818c35b13f0dc9b340a6aa55c803008",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "16:9 main-board candidate; text-free; intended to sit behind hover plaque/status outside image"
+      ]
+    },
+    {
+      "id": "agora_opportunity_cell_bg",
+      "family": "cell-background",
+      "purpose": "idea stalls + read-only counter",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/cell-backgrounds/agora_opportunity_cell_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/agora_opportunity_cell_bg.png",
+      "dimensions": {
+        "width": 960,
+        "height": 540
+      },
+      "alpha": true,
+      "sha256": "84ea2e416daf708508451eb24c50647e6c2ae5f381f92fc3ad17015513867700",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "16:9 main-board candidate; text-free; intended to sit behind hover plaque/status outside image"
+      ]
+    },
+    {
+      "id": "oracle_signals_cell_bg",
+      "family": "cell-background",
+      "purpose": "signal pool + trend stars",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/cell-backgrounds/oracle_signals_cell_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/oracle_signals_cell_bg.png",
+      "dimensions": {
+        "width": 960,
+        "height": 540
+      },
+      "alpha": true,
+      "sha256": "985a797dc29979dcce67f1b42deede4f4c74571382180919181832c71a0819f4",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "16:9 main-board candidate; text-free; intended to sit behind hover plaque/status outside image"
+      ]
+    },
+    {
+      "id": "forge_hephaestus_cell_bg",
+      "family": "cell-background",
+      "purpose": "prompt anvil + sorting rack",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/cell-backgrounds/forge_hephaestus_cell_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/forge_hephaestus_cell_bg.png",
+      "dimensions": {
+        "width": 960,
+        "height": 540
+      },
+      "alpha": true,
+      "sha256": "9726140fffcb6f1a154efe6595c9bd4bb4e6809ee1ebc1689f69363a677bc67b",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "16:9 main-board candidate; text-free; intended to sit behind hover plaque/status outside image"
+      ]
+    },
+    {
+      "id": "merchant_harbor_cell_bg",
+      "family": "cell-background",
+      "purpose": "read-only docks + risk gate",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/cell-backgrounds/merchant_harbor_cell_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/merchant_harbor_cell_bg.png",
+      "dimensions": {
+        "width": 960,
+        "height": 540
+      },
+      "alpha": true,
+      "sha256": "fddf35b8be554354b16183dac7b7d6f36e954c73d374b5afa5dd6d0f83f2ca27",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "16:9 main-board candidate; text-free; intended to sit behind hover plaque/status outside image"
+      ]
+    },
+    {
+      "id": "atlantis_vault_cell_bg",
+      "family": "cell-background",
+      "purpose": "archive shelves + evidence cabinet",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/cell-backgrounds/atlantis_vault_cell_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/atlantis_vault_cell_bg.png",
+      "dimensions": {
+        "width": 960,
+        "height": 540
+      },
+      "alpha": true,
+      "sha256": "1bf588f1408770490906ec3d33a12eb2b2823f49bb41e4a1d94460bdabd3a702",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "16:9 main-board candidate; text-free; intended to sit behind hover plaque/status outside image"
+      ]
+    },
+    {
+      "id": "treasury_commerce_cell_bg",
+      "family": "cell-background",
+      "purpose": "margin chest + locked spend gate",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/cell-backgrounds/treasury_commerce_cell_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/treasury_commerce_cell_bg.png",
+      "dimensions": {
+        "width": 960,
+        "height": 540
+      },
+      "alpha": true,
+      "sha256": "40572bc3502aa7cc0281047360cc1e1a943b9e5c80fbb8bba8cd25359eb6d84b",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "16:9 main-board candidate; text-free; intended to sit behind hover plaque/status outside image"
+      ]
+    },
+    {
+      "id": "dev_studio_cell_bg",
+      "family": "cell-background",
+      "purpose": "planner/code/asset/qa/review benches",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/cell-backgrounds/dev_studio_cell_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/dev_studio_cell_bg.png",
+      "dimensions": {
+        "width": 960,
+        "height": 540
+      },
+      "alpha": true,
+      "sha256": "36fd19aa918c94a59fdd3d101c0c19659c34e139f74c51361980c6a01733e96f",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "16:9 main-board candidate; text-free; intended to sit behind hover plaque/status outside image"
+      ]
+    },
+    {
+      "id": "centered_popup_machine_frame_close_socket",
+      "family": "popup-frame",
+      "purpose": "centered modal ornate machine/window frame with top-right close socket and lower station rail sockets",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/popup-frame/centered_popup_machine_frame_close_socket.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/popup-frame/centered_popup_machine_frame_close_socket.png",
+      "dimensions": {
+        "width": 1600,
+        "height": 1000
+      },
+      "alpha": true,
+      "sha256": "d6b186fd713af1cea7174de73676f52825005a261fd57e1721ae6a7a19839e66",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "safe room viewport approx x=155 y=165 w=1290 h=640",
+        "close socket bbox x=1428 y=82 w=80 h=80"
+      ]
+    },
+    {
+      "id": "council_war_table_prop",
+      "family": "station-prop",
+      "purpose": "Olympus route/action table",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/council_war_table_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/council_war_table_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "684af2056290b7ad803f67146fb37d70fdba75d353f26da4066acfd797ed610d",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "hermes_dispatch_beacon_prop",
+      "family": "station-prop",
+      "purpose": "routing pylon",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/hermes_dispatch_beacon_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/hermes_dispatch_beacon_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "08477aec550b3b7a62becc932e41cbf091e95f1c804f004706ae490a7145cb3c",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "aegis_approval_seal_prop",
+      "family": "station-prop",
+      "purpose": "approval lock shrine",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/aegis_approval_seal_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/aegis_approval_seal_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "654ef733736320b24d8304850be3af8c7b2bf51980a63d932c8354e5698ed00f",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "prompt_anvil_prop",
+      "family": "station-prop",
+      "purpose": "draft artifact forge anvil",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/prompt_anvil_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/prompt_anvil_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "7dcd6b7644769d1015f1a1ce42d55871122916bd55f76bf64c7a9e53d740b3f0",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "sorting_rack_prop",
+      "family": "station-prop",
+      "purpose": "variant compare rack",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/sorting_rack_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/sorting_rack_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "2954f0cf760276f2d8e1329dff79f7563278a189778adde97e83af91a1d0288d",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "signal_pool_prop",
+      "family": "station-prop",
+      "purpose": "ranked signal pool",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/signal_pool_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/signal_pool_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "f80c09ab272d74a12d1e2db259d08230d6e93fcdf1fd58325e39d147de9d42ea",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "keyword_crystal_prop",
+      "family": "station-prop",
+      "purpose": "single query crystal",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/keyword_crystal_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/keyword_crystal_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "59a2d8f63e18df966ff73a79938a3091ee3473e74e773a86ca510937e787b647",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "qa_lens_prop",
+      "family": "station-prop",
+      "purpose": "visual QA lens",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/qa_lens_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/qa_lens_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "ab335ec9633daf68a53cc563596036e0491517ffb574418d8518b80a25a543b2",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "code_bench_prop",
+      "family": "station-prop",
+      "purpose": "local implementation bench",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/code_bench_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/code_bench_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "2fc0b3c32ae10b58ed4db549cb1bca8ff63875e6b881f49590548f7f7818f871",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "asset_table_prop",
+      "family": "station-prop",
+      "purpose": "candidate asset table",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/asset_table_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/asset_table_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "defc9423319c5c3d1aeeb676bce4ad6cb7bbda5c8fb4e3db573b5cd9e31c1b9b",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "review_gate_prop",
+      "family": "station-prop",
+      "purpose": "no-live review gate",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/review_gate_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/review_gate_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "bead65d1aa182e516bbbac3ba676d561a790f8405daa630e03468e7f3af99b1e",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "release_handoff_shrine_prop",
+      "family": "station-prop",
+      "purpose": "handoff/status shrine",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/station-props/release_handoff_shrine_prop.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/station-props/release_handoff_shrine_prop.png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "alpha": true,
+      "sha256": "1f93d6fb38f1aa2a7e0f27bdda7bc814151af57aaf81ee3391d66b7426af206f",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent PNG; no baked label; distinct silhouette for station-specific surface"
+      ]
+    },
+    {
+      "id": "worker_planner_token",
+      "family": "worker-token",
+      "purpose": "worker planner token",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/worker-tokens/worker_planner_token.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_planner_token.png",
+      "dimensions": {
+        "width": 160,
+        "height": 220
+      },
+      "alpha": true,
+      "sha256": "b1f473aab7e3015605de4bdb26b7293d934be1a91fe7753b9c988880ba5ebe3b",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent small operator token; floor-compatible; no CSS circle fallback"
+      ]
+    },
+    {
+      "id": "worker_coder_token",
+      "family": "worker-token",
+      "purpose": "worker coder token",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/worker-tokens/worker_coder_token.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_coder_token.png",
+      "dimensions": {
+        "width": 160,
+        "height": 220
+      },
+      "alpha": true,
+      "sha256": "a96379d3c233759d0fcdf1e067e411ccacb05c514eecab466e07a1ff68219be1",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent small operator token; floor-compatible; no CSS circle fallback"
+      ]
+    },
+    {
+      "id": "worker_asset_token",
+      "family": "worker-token",
+      "purpose": "worker asset token",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/worker-tokens/worker_asset_token.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_asset_token.png",
+      "dimensions": {
+        "width": 160,
+        "height": 220
+      },
+      "alpha": true,
+      "sha256": "58c71bde1beceb708c80f540f3d8feae75e3678b5d060d93e3dbb3b0e22f888a",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent small operator token; floor-compatible; no CSS circle fallback"
+      ]
+    },
+    {
+      "id": "worker_qa_token",
+      "family": "worker-token",
+      "purpose": "worker qa token",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/worker-tokens/worker_qa_token.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_qa_token.png",
+      "dimensions": {
+        "width": 160,
+        "height": 220
+      },
+      "alpha": true,
+      "sha256": "f6067b404fdff017752324f60bdb4e4fa2f23036d3662ce6ff9aedf2e351e3ae",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent small operator token; floor-compatible; no CSS circle fallback"
+      ]
+    },
+    {
+      "id": "worker_reviewer_token",
+      "family": "worker-token",
+      "purpose": "worker reviewer token",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/worker-tokens/worker_reviewer_token.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_reviewer_token.png",
+      "dimensions": {
+        "width": 160,
+        "height": 220
+      },
+      "alpha": true,
+      "sha256": "c1e1074db283c9080de0014b218aa7288fea2f82c019fb8393238c91c38d9e0d",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent small operator token; floor-compatible; no CSS circle fallback"
+      ]
+    },
+    {
+      "id": "worker_release_guard_token",
+      "family": "worker-token",
+      "purpose": "worker release guard token",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/worker-tokens/worker_release_guard_token.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_release_guard_token.png",
+      "dimensions": {
+        "width": 160,
+        "height": 220
+      },
+      "alpha": true,
+      "sha256": "8e28b77af2feca0e5c4d65147d6b5ace6c8b8c580f317e0506a3c0f4a350346d",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent small operator token; floor-compatible; no CSS circle fallback"
+      ]
+    },
+    {
+      "id": "worker_hermes_operator_token",
+      "family": "worker-token",
+      "purpose": "worker hermes operator token",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/worker-tokens/worker_hermes_operator_token.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_hermes_operator_token.png",
+      "dimensions": {
+        "width": 160,
+        "height": 220
+      },
+      "alpha": true,
+      "sha256": "e3de6735bdb0f53108f01d175abc42597270cb0add432d80080902e9d656dcac",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent small operator token; floor-compatible; no CSS circle fallback"
+      ]
+    },
+    {
+      "id": "packet_artifact_diamond",
+      "family": "packet-effect",
+      "purpose": "packet artifact diamond",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_artifact_diamond.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_artifact_diamond.png",
+      "dimensions": {
+        "width": 192,
+        "height": 192
+      },
+      "alpha": true,
+      "sha256": "61c3009f6306f0132530a2c05012c17a6d770fb452a5cdf664a783681c07d37e",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent packet/action marker; label should be added by UI outside asset if needed"
+      ]
+    },
+    {
+      "id": "packet_route_node",
+      "family": "packet-effect",
+      "purpose": "packet route node",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_route_node.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_node.png",
+      "dimensions": {
+        "width": 192,
+        "height": 192
+      },
+      "alpha": true,
+      "sha256": "227d1f50192d6edf4865cb5f14e71a1488914eac1c836eee97a0126a59a86587",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent packet/action marker; label should be added by UI outside asset if needed"
+      ]
+    },
+    {
+      "id": "approval_lock_seal",
+      "family": "packet-effect",
+      "purpose": "approval lock seal",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/approval_lock_seal.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/approval_lock_seal.png",
+      "dimensions": {
+        "width": 192,
+        "height": 192
+      },
+      "alpha": true,
+      "sha256": "61cf7c0067a6e187973a09cbafe002c64dc1e05d89fd41fa57c18772135c56e2",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent packet/action marker; label should be added by UI outside asset if needed"
+      ]
+    },
+    {
+      "id": "draft_only_scroll_glyph",
+      "family": "packet-effect",
+      "purpose": "draft only scroll glyph",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/draft_only_scroll_glyph.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/draft_only_scroll_glyph.png",
+      "dimensions": {
+        "width": 192,
+        "height": 192
+      },
+      "alpha": true,
+      "sha256": "1a593898cb9236962b252ef0fbfa7172895b63e1ed311ee4922c4a095538b974",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent packet/action marker; label should be added by UI outside asset if needed"
+      ]
+    },
+    {
+      "id": "read_only_evidence_crate",
+      "family": "packet-effect",
+      "purpose": "read only evidence crate",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/read_only_evidence_crate.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/read_only_evidence_crate.png",
+      "dimensions": {
+        "width": 192,
+        "height": 192
+      },
+      "alpha": true,
+      "sha256": "da67750f92cc03e1c6145088fb51c5567d5cb63b3d6621a3e97ad7b9e906c8ab",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent packet/action marker; label should be added by UI outside asset if needed"
+      ]
+    },
+    {
+      "id": "not_connected_gate_glyph",
+      "family": "packet-effect",
+      "purpose": "not connected gate glyph",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/not_connected_gate_glyph.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/not_connected_gate_glyph.png",
+      "dimensions": {
+        "width": 192,
+        "height": 192
+      },
+      "alpha": true,
+      "sha256": "54d85c5291483e264de0076397b43b529125e114f17d0a761a2f42ada5b31b22",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "transparent packet/action marker; label should be added by UI outside asset if needed"
+      ]
+    },
+    {
+      "id": "packet_route_animation_frame_00",
+      "family": "packet-route-animation-frame",
+      "purpose": "8-frame source-to-target packet motion tied to station action",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_route_animation_frame_00.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_00.png",
+      "dimensions": {
+        "width": 320,
+        "height": 120
+      },
+      "alpha": true,
+      "sha256": "7743b2dc5cf6cbbdb822437faac58d59a19c5a8934e7479776aa3cc3276e1f55",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "frame index 00 of 07"
+      ]
+    },
+    {
+      "id": "packet_route_animation_frame_01",
+      "family": "packet-route-animation-frame",
+      "purpose": "8-frame source-to-target packet motion tied to station action",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_route_animation_frame_01.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_01.png",
+      "dimensions": {
+        "width": 320,
+        "height": 120
+      },
+      "alpha": true,
+      "sha256": "b0bc52a26e01e50dd0adf1e0f5b23351844f3583a04db9656527bb40ff8eb0bf",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "frame index 01 of 07"
+      ]
+    },
+    {
+      "id": "packet_route_animation_frame_02",
+      "family": "packet-route-animation-frame",
+      "purpose": "8-frame source-to-target packet motion tied to station action",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_route_animation_frame_02.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_02.png",
+      "dimensions": {
+        "width": 320,
+        "height": 120
+      },
+      "alpha": true,
+      "sha256": "e0ad55e05767abfc4aaf50bfe6cb5d2961cc33a87c234c15a1afc9cef380a210",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "frame index 02 of 07"
+      ]
+    },
+    {
+      "id": "packet_route_animation_frame_03",
+      "family": "packet-route-animation-frame",
+      "purpose": "8-frame source-to-target packet motion tied to station action",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_route_animation_frame_03.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_03.png",
+      "dimensions": {
+        "width": 320,
+        "height": 120
+      },
+      "alpha": true,
+      "sha256": "1c55a857ae5181cf32cde7689f5e36a243cda92a4e805d902b6c188e97e2a2fc",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "frame index 03 of 07"
+      ]
+    },
+    {
+      "id": "packet_route_animation_frame_04",
+      "family": "packet-route-animation-frame",
+      "purpose": "8-frame source-to-target packet motion tied to station action",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_route_animation_frame_04.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_04.png",
+      "dimensions": {
+        "width": 320,
+        "height": 120
+      },
+      "alpha": true,
+      "sha256": "398552769b685aac944bd3d37dfa8ace19881ddd2f15a0cd7f78554da49b35d0",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "frame index 04 of 07"
+      ]
+    },
+    {
+      "id": "packet_route_animation_frame_05",
+      "family": "packet-route-animation-frame",
+      "purpose": "8-frame source-to-target packet motion tied to station action",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_route_animation_frame_05.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_05.png",
+      "dimensions": {
+        "width": 320,
+        "height": 120
+      },
+      "alpha": true,
+      "sha256": "45878cc8c5544a65bc26814acd9cce0d3669098386e5060a87e4919b0e40b4a4",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "frame index 05 of 07"
+      ]
+    },
+    {
+      "id": "packet_route_animation_frame_06",
+      "family": "packet-route-animation-frame",
+      "purpose": "8-frame source-to-target packet motion tied to station action",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_route_animation_frame_06.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_06.png",
+      "dimensions": {
+        "width": 320,
+        "height": 120
+      },
+      "alpha": true,
+      "sha256": "a355ceb449f7dde616ef0168b94f2ceae85e0588035e179744ead0e5dbeb731d",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "frame index 06 of 07"
+      ]
+    },
+    {
+      "id": "packet_route_animation_frame_07",
+      "family": "packet-route-animation-frame",
+      "purpose": "8-frame source-to-target packet motion tied to station action",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/packet-effects/packet_route_animation_frame_07.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_07.png",
+      "dimensions": {
+        "width": 320,
+        "height": 120
+      },
+      "alpha": true,
+      "sha256": "3778a7498578641a04b30ff07c4e2d5b921f1ba163ce6814e39bd1a1e9498c16",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "frame index 07 of 07"
+      ]
+    },
+    {
+      "id": "dev_studio_self_working_team_room_bg",
+      "family": "dev-studio-room-bg",
+      "purpose": "optional self-working team popup room crop with planner/coder/asset/QA/review/release stations; text-free",
+      "source_path": "generated-candidates/war-room/v40-6h/20260613-local-visual-kit-v2/dev-studio/dev_studio_self_working_team_room_bg.png",
+      "public_path": "/war-room/v40/local-visual-kit-v2/dev-studio/dev_studio_self_working_team_room_bg.png",
+      "dimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "alpha": true,
+      "sha256": "b5bad093e0bd726ca449b2b19e4e76511c2d69cb094401d826b43e737e4ce716",
+      "status": "staged-for-local-app-use-not-integrated",
+      "provenance": "procedural Pillow drawing generated locally by Hermes assetcreator; no external image/source/API used",
+      "safety": [
+        "local-only",
+        "candidate-only",
+        "not-integrated",
+        "no-live-connectors",
+        "no-publishing",
+        "no-paid-generation"
+      ],
+      "notes": [
+        "safe text zones should be UI overlays, not baked into asset"
+      ]
+    }
+  ],
+  "layout_contracts": {
+    "main_cell": {
+      "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+      "dimensions_px": {
+        "width": 960,
+        "height": 540
+      },
+      "aspect_ratio": "16:9",
+      "whole_cell_click_hitbox": {
+        "unit": "percent",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1,
+        "min_css_size_px": {
+          "w": 220,
+          "h": 124
+        }
+      },
+      "safe_zones": {
+        "room_art_preserve": {
+          "unit": "percent",
+          "x": 0.06,
+          "y": 0.08,
+          "w": 0.88,
+          "h": 0.72
+        },
+        "compact_status_plaque": {
+          "unit": "percent",
+          "x": 0.05,
+          "y": 0.76,
+          "w": 0.9,
+          "h": 0.18
+        },
+        "status_light_or_packet_badge": {
+          "unit": "percent",
+          "x": 0.78,
+          "y": 0.08,
+          "w": 0.16,
+          "h": 0.16
+        },
+        "avoid_text_over_art": {
+          "unit": "percent",
+          "x": 0.12,
+          "y": 0.12,
+          "w": 0.76,
+          "h": 0.5
+        }
+      },
+      "visual_rules": [
+        "image remains dominant",
+        "short room/action text only in plaque",
+        "no long source paths/logs/raw ids on main board",
+        "no detailed decision panel in closed state"
+      ]
+    },
+    "centered_popup": {
+      "asset": "/war-room/v40/local-visual-kit-v2/popup-frame/centered_popup_machine_frame_close_socket.png",
+      "dimensions_px": {
+        "width": 1600,
+        "height": 1000
+      },
+      "css_fit": "contain within centered modal; max-height calc(100vh - workspace footer/status margin)",
+      "safe_zones_px": {
+        "room_viewport": {
+          "unit": "px",
+          "x": 155,
+          "y": 165,
+          "w": 1290,
+          "h": 640
+        },
+        "title_plaque": {
+          "unit": "px",
+          "x": 250,
+          "y": 78,
+          "w": 850,
+          "h": 64
+        },
+        "close_socket_hitbox": {
+          "unit": "px",
+          "x": 1428,
+          "y": 82,
+          "w": 80,
+          "h": 80
+        },
+        "station_rail": {
+          "unit": "px",
+          "x": 175,
+          "y": 815,
+          "w": 1250,
+          "h": 115
+        },
+        "footer_avoid_zone": {
+          "unit": "px",
+          "x": 0,
+          "y": 930,
+          "w": 1600,
+          "h": 70
+        }
+      },
+      "safe_zones_percent": {
+        "room_viewport": {
+          "unit": "percent",
+          "x": 0.0969,
+          "y": 0.165,
+          "w": 0.8063,
+          "h": 0.64
+        },
+        "title_plaque": {
+          "unit": "percent",
+          "x": 0.1562,
+          "y": 0.078,
+          "w": 0.5312,
+          "h": 0.064
+        },
+        "close_socket_hitbox": {
+          "unit": "percent",
+          "x": 0.8925,
+          "y": 0.082,
+          "w": 0.05,
+          "h": 0.08
+        },
+        "station_rail": {
+          "unit": "percent",
+          "x": 0.1094,
+          "y": 0.815,
+          "w": 0.7812,
+          "h": 0.115
+        },
+        "footer_avoid_zone": {
+          "unit": "percent",
+          "x": 0,
+          "y": 0.93,
+          "w": 1,
+          "h": 0.07
+        }
+      },
+      "interaction_hitboxes": {
+        "close_button": {
+          "target": "close_socket_hitbox",
+          "min_css_px": 44,
+          "a11y_label": "Close room and return to cells-only board"
+        },
+        "station_rail_buttons": {
+          "count_suggestion": 3,
+          "min_css_px": 44,
+          "behavior": "local state only inside popup"
+        }
+      },
+      "visual_rules": [
+        "centered popup only after cell click",
+        "background cells remain behind dim/blur",
+        "one obvious close control",
+        "no competing main-board detail panel"
+      ]
+    },
+    "rooms": [
+      {
+        "room_id": "olympus_command",
+        "label": "Olympus Command",
+        "main_cell_asset": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/olympus_command_cell_bg.png",
+        "popup_room_bg": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/olympus_command_cell_bg.png",
+        "default_worker_token": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_hermes_operator_token.png",
+        "primary_station_prop": "/war-room/v40/local-visual-kit-v2/station-props/council_war_table_prop.png",
+        "primary_packet_effect": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_artifact_diamond.png",
+        "default_local_action": "route local mission packet",
+        "required_safety_label": "NOT_CONNECTED / local-only",
+        "main_cell_contract": {
+          "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+          "dimensions_px": {
+            "width": 960,
+            "height": 540
+          },
+          "aspect_ratio": "16:9",
+          "whole_cell_click_hitbox": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "safe_zones": {
+            "room_art_preserve": {
+              "unit": "percent",
+              "x": 0.06,
+              "y": 0.08,
+              "w": 0.88,
+              "h": 0.72
+            },
+            "compact_status_plaque": {
+              "unit": "percent",
+              "x": 0.05,
+              "y": 0.76,
+              "w": 0.9,
+              "h": 0.18
+            },
+            "status_light_or_packet_badge": {
+              "unit": "percent",
+              "x": 0.78,
+              "y": 0.08,
+              "w": 0.16,
+              "h": 0.16
+            },
+            "avoid_text_over_art": {
+              "unit": "percent",
+              "x": 0.12,
+              "y": 0.12,
+              "w": 0.76,
+              "h": 0.5
+            }
+          },
+          "visual_rules": [
+            "image remains dominant",
+            "short room/action text only in plaque",
+            "no long source paths/logs/raw ids on main board",
+            "no detailed decision panel in closed state"
+          ]
+        },
+        "popup_room_slots": {
+          "left_tool": {
+            "unit": "percent",
+            "x": 0.16,
+            "y": 0.56,
+            "w": 0.16,
+            "h": 0.23,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 205,
+              "y": 403,
+              "w": 205,
+              "h": 166
+            }
+          },
+          "center_tool": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 538,
+              "y": 418,
+              "w": 230,
+              "h": 173
+            }
+          },
+          "right_lock": {
+            "unit": "percent",
+            "x": 0.71,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 909,
+              "y": 360,
+              "w": 205,
+              "h": 173
+            }
+          },
+          "output_surface": {
+            "unit": "percent",
+            "x": 0.63,
+            "y": 0.18,
+            "w": 0.26,
+            "h": 0.22,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 806,
+              "y": 130,
+              "w": 333,
+              "h": 158
+            }
+          },
+          "worker_floor": {
+            "unit": "percent",
+            "x": 0.34,
+            "y": 0.54,
+            "w": 0.12,
+            "h": 0.3,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 435,
+              "y": 389,
+              "w": 154,
+              "h": 216
+            }
+          },
+          "packet_route": {
+            "unit": "percent",
+            "x": 0.28,
+            "y": 0.45,
+            "w": 0.46,
+            "h": 0.12,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 358,
+              "y": 324,
+              "w": 589,
+              "h": 86
+            }
+          }
+        },
+        "hitboxes": {
+          "main_cell_click": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "primary_station_click": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24
+          },
+          "local_action_button_area": {
+            "unit": "percent",
+            "x": 0.62,
+            "y": 0.79,
+            "w": 0.24,
+            "h": 0.09
+          },
+          "approval_lock_area": {
+            "unit": "percent",
+            "x": 0.72,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24
+          }
+        },
+        "station_action_surface_contract": [
+          "source/input",
+          "work action",
+          "concrete output",
+          "local variants/options",
+          "risk/lock",
+          "next handoff"
+        ]
+      },
+      {
+        "room_id": "pantheon_quarters",
+        "label": "Pantheon Quarters",
+        "main_cell_asset": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/pantheon_quarters_cell_bg.png",
+        "popup_room_bg": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/pantheon_quarters_cell_bg.png",
+        "default_worker_token": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_reviewer_token.png",
+        "primary_station_prop": "/war-room/v40/local-visual-kit-v2/station-props/review_gate_prop.png",
+        "primary_packet_effect": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_node.png",
+        "default_local_action": "assign/review worker packet",
+        "required_safety_label": "local-only / no provider-key controls",
+        "main_cell_contract": {
+          "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+          "dimensions_px": {
+            "width": 960,
+            "height": 540
+          },
+          "aspect_ratio": "16:9",
+          "whole_cell_click_hitbox": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "safe_zones": {
+            "room_art_preserve": {
+              "unit": "percent",
+              "x": 0.06,
+              "y": 0.08,
+              "w": 0.88,
+              "h": 0.72
+            },
+            "compact_status_plaque": {
+              "unit": "percent",
+              "x": 0.05,
+              "y": 0.76,
+              "w": 0.9,
+              "h": 0.18
+            },
+            "status_light_or_packet_badge": {
+              "unit": "percent",
+              "x": 0.78,
+              "y": 0.08,
+              "w": 0.16,
+              "h": 0.16
+            },
+            "avoid_text_over_art": {
+              "unit": "percent",
+              "x": 0.12,
+              "y": 0.12,
+              "w": 0.76,
+              "h": 0.5
+            }
+          },
+          "visual_rules": [
+            "image remains dominant",
+            "short room/action text only in plaque",
+            "no long source paths/logs/raw ids on main board",
+            "no detailed decision panel in closed state"
+          ]
+        },
+        "popup_room_slots": {
+          "left_tool": {
+            "unit": "percent",
+            "x": 0.16,
+            "y": 0.56,
+            "w": 0.16,
+            "h": 0.23,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 205,
+              "y": 403,
+              "w": 205,
+              "h": 166
+            }
+          },
+          "center_tool": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 538,
+              "y": 418,
+              "w": 230,
+              "h": 173
+            }
+          },
+          "right_lock": {
+            "unit": "percent",
+            "x": 0.71,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 909,
+              "y": 360,
+              "w": 205,
+              "h": 173
+            }
+          },
+          "output_surface": {
+            "unit": "percent",
+            "x": 0.63,
+            "y": 0.18,
+            "w": 0.26,
+            "h": 0.22,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 806,
+              "y": 130,
+              "w": 333,
+              "h": 158
+            }
+          },
+          "worker_floor": {
+            "unit": "percent",
+            "x": 0.34,
+            "y": 0.54,
+            "w": 0.12,
+            "h": 0.3,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 435,
+              "y": 389,
+              "w": 154,
+              "h": 216
+            }
+          },
+          "packet_route": {
+            "unit": "percent",
+            "x": 0.28,
+            "y": 0.45,
+            "w": 0.46,
+            "h": 0.12,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 358,
+              "y": 324,
+              "w": 589,
+              "h": 86
+            }
+          }
+        },
+        "hitboxes": {
+          "main_cell_click": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "primary_station_click": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24
+          },
+          "local_action_button_area": {
+            "unit": "percent",
+            "x": 0.62,
+            "y": 0.79,
+            "w": 0.24,
+            "h": 0.09
+          },
+          "approval_lock_area": {
+            "unit": "percent",
+            "x": 0.72,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24
+          }
+        },
+        "station_action_surface_contract": [
+          "source/input",
+          "work action",
+          "concrete output",
+          "local variants/options",
+          "risk/lock",
+          "next handoff"
+        ]
+      },
+      {
+        "room_id": "agora_opportunity",
+        "label": "Agora of Opportunity",
+        "main_cell_asset": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/agora_opportunity_cell_bg.png",
+        "popup_room_bg": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/agora_opportunity_cell_bg.png",
+        "default_worker_token": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_planner_token.png",
+        "primary_station_prop": "/war-room/v40/local-visual-kit-v2/station-props/keyword_crystal_prop.png",
+        "primary_packet_effect": "/war-room/v40/local-visual-kit-v2/packet-effects/read_only_evidence_crate.png",
+        "default_local_action": "inspect read-only opportunity signal",
+        "required_safety_label": "read-only / no listing editor",
+        "main_cell_contract": {
+          "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+          "dimensions_px": {
+            "width": 960,
+            "height": 540
+          },
+          "aspect_ratio": "16:9",
+          "whole_cell_click_hitbox": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "safe_zones": {
+            "room_art_preserve": {
+              "unit": "percent",
+              "x": 0.06,
+              "y": 0.08,
+              "w": 0.88,
+              "h": 0.72
+            },
+            "compact_status_plaque": {
+              "unit": "percent",
+              "x": 0.05,
+              "y": 0.76,
+              "w": 0.9,
+              "h": 0.18
+            },
+            "status_light_or_packet_badge": {
+              "unit": "percent",
+              "x": 0.78,
+              "y": 0.08,
+              "w": 0.16,
+              "h": 0.16
+            },
+            "avoid_text_over_art": {
+              "unit": "percent",
+              "x": 0.12,
+              "y": 0.12,
+              "w": 0.76,
+              "h": 0.5
+            }
+          },
+          "visual_rules": [
+            "image remains dominant",
+            "short room/action text only in plaque",
+            "no long source paths/logs/raw ids on main board",
+            "no detailed decision panel in closed state"
+          ]
+        },
+        "popup_room_slots": {
+          "left_tool": {
+            "unit": "percent",
+            "x": 0.16,
+            "y": 0.56,
+            "w": 0.16,
+            "h": 0.23,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 205,
+              "y": 403,
+              "w": 205,
+              "h": 166
+            }
+          },
+          "center_tool": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 538,
+              "y": 418,
+              "w": 230,
+              "h": 173
+            }
+          },
+          "right_lock": {
+            "unit": "percent",
+            "x": 0.71,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 909,
+              "y": 360,
+              "w": 205,
+              "h": 173
+            }
+          },
+          "output_surface": {
+            "unit": "percent",
+            "x": 0.63,
+            "y": 0.18,
+            "w": 0.26,
+            "h": 0.22,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 806,
+              "y": 130,
+              "w": 333,
+              "h": 158
+            }
+          },
+          "worker_floor": {
+            "unit": "percent",
+            "x": 0.34,
+            "y": 0.54,
+            "w": 0.12,
+            "h": 0.3,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 435,
+              "y": 389,
+              "w": 154,
+              "h": 216
+            }
+          },
+          "packet_route": {
+            "unit": "percent",
+            "x": 0.28,
+            "y": 0.45,
+            "w": 0.46,
+            "h": 0.12,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 358,
+              "y": 324,
+              "w": 589,
+              "h": 86
+            }
+          }
+        },
+        "hitboxes": {
+          "main_cell_click": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "primary_station_click": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24
+          },
+          "local_action_button_area": {
+            "unit": "percent",
+            "x": 0.62,
+            "y": 0.79,
+            "w": 0.24,
+            "h": 0.09
+          },
+          "approval_lock_area": {
+            "unit": "percent",
+            "x": 0.72,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24
+          }
+        },
+        "station_action_surface_contract": [
+          "source/input",
+          "work action",
+          "concrete output",
+          "local variants/options",
+          "risk/lock",
+          "next handoff"
+        ]
+      },
+      {
+        "room_id": "oracle_signals",
+        "label": "Oracle of Signals",
+        "main_cell_asset": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/oracle_signals_cell_bg.png",
+        "popup_room_bg": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/oracle_signals_cell_bg.png",
+        "default_worker_token": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_planner_token.png",
+        "primary_station_prop": "/war-room/v40/local-visual-kit-v2/station-props/signal_pool_prop.png",
+        "primary_packet_effect": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_node.png",
+        "default_local_action": "rank local signal packet",
+        "required_safety_label": "read-only / no market claims final",
+        "main_cell_contract": {
+          "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+          "dimensions_px": {
+            "width": 960,
+            "height": 540
+          },
+          "aspect_ratio": "16:9",
+          "whole_cell_click_hitbox": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "safe_zones": {
+            "room_art_preserve": {
+              "unit": "percent",
+              "x": 0.06,
+              "y": 0.08,
+              "w": 0.88,
+              "h": 0.72
+            },
+            "compact_status_plaque": {
+              "unit": "percent",
+              "x": 0.05,
+              "y": 0.76,
+              "w": 0.9,
+              "h": 0.18
+            },
+            "status_light_or_packet_badge": {
+              "unit": "percent",
+              "x": 0.78,
+              "y": 0.08,
+              "w": 0.16,
+              "h": 0.16
+            },
+            "avoid_text_over_art": {
+              "unit": "percent",
+              "x": 0.12,
+              "y": 0.12,
+              "w": 0.76,
+              "h": 0.5
+            }
+          },
+          "visual_rules": [
+            "image remains dominant",
+            "short room/action text only in plaque",
+            "no long source paths/logs/raw ids on main board",
+            "no detailed decision panel in closed state"
+          ]
+        },
+        "popup_room_slots": {
+          "left_tool": {
+            "unit": "percent",
+            "x": 0.16,
+            "y": 0.56,
+            "w": 0.16,
+            "h": 0.23,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 205,
+              "y": 403,
+              "w": 205,
+              "h": 166
+            }
+          },
+          "center_tool": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 538,
+              "y": 418,
+              "w": 230,
+              "h": 173
+            }
+          },
+          "right_lock": {
+            "unit": "percent",
+            "x": 0.71,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 909,
+              "y": 360,
+              "w": 205,
+              "h": 173
+            }
+          },
+          "output_surface": {
+            "unit": "percent",
+            "x": 0.63,
+            "y": 0.18,
+            "w": 0.26,
+            "h": 0.22,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 806,
+              "y": 130,
+              "w": 333,
+              "h": 158
+            }
+          },
+          "worker_floor": {
+            "unit": "percent",
+            "x": 0.34,
+            "y": 0.54,
+            "w": 0.12,
+            "h": 0.3,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 435,
+              "y": 389,
+              "w": 154,
+              "h": 216
+            }
+          },
+          "packet_route": {
+            "unit": "percent",
+            "x": 0.28,
+            "y": 0.45,
+            "w": 0.46,
+            "h": 0.12,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 358,
+              "y": 324,
+              "w": 589,
+              "h": 86
+            }
+          }
+        },
+        "hitboxes": {
+          "main_cell_click": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "primary_station_click": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24
+          },
+          "local_action_button_area": {
+            "unit": "percent",
+            "x": 0.62,
+            "y": 0.79,
+            "w": 0.24,
+            "h": 0.09
+          },
+          "approval_lock_area": {
+            "unit": "percent",
+            "x": 0.72,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24
+          }
+        },
+        "station_action_surface_contract": [
+          "source/input",
+          "work action",
+          "concrete output",
+          "local variants/options",
+          "risk/lock",
+          "next handoff"
+        ]
+      },
+      {
+        "room_id": "forge_hephaestus",
+        "label": "Forge of Hephaestus",
+        "main_cell_asset": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/forge_hephaestus_cell_bg.png",
+        "popup_room_bg": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/forge_hephaestus_cell_bg.png",
+        "default_worker_token": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_coder_token.png",
+        "primary_station_prop": "/war-room/v40/local-visual-kit-v2/station-props/prompt_anvil_prop.png",
+        "primary_packet_effect": "/war-room/v40/local-visual-kit-v2/packet-effects/draft_only_scroll_glyph.png",
+        "default_local_action": "stage draft artifact",
+        "required_safety_label": "draft-only / no paid generation",
+        "main_cell_contract": {
+          "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+          "dimensions_px": {
+            "width": 960,
+            "height": 540
+          },
+          "aspect_ratio": "16:9",
+          "whole_cell_click_hitbox": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "safe_zones": {
+            "room_art_preserve": {
+              "unit": "percent",
+              "x": 0.06,
+              "y": 0.08,
+              "w": 0.88,
+              "h": 0.72
+            },
+            "compact_status_plaque": {
+              "unit": "percent",
+              "x": 0.05,
+              "y": 0.76,
+              "w": 0.9,
+              "h": 0.18
+            },
+            "status_light_or_packet_badge": {
+              "unit": "percent",
+              "x": 0.78,
+              "y": 0.08,
+              "w": 0.16,
+              "h": 0.16
+            },
+            "avoid_text_over_art": {
+              "unit": "percent",
+              "x": 0.12,
+              "y": 0.12,
+              "w": 0.76,
+              "h": 0.5
+            }
+          },
+          "visual_rules": [
+            "image remains dominant",
+            "short room/action text only in plaque",
+            "no long source paths/logs/raw ids on main board",
+            "no detailed decision panel in closed state"
+          ]
+        },
+        "popup_room_slots": {
+          "left_tool": {
+            "unit": "percent",
+            "x": 0.16,
+            "y": 0.56,
+            "w": 0.16,
+            "h": 0.23,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 205,
+              "y": 403,
+              "w": 205,
+              "h": 166
+            }
+          },
+          "center_tool": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 538,
+              "y": 418,
+              "w": 230,
+              "h": 173
+            }
+          },
+          "right_lock": {
+            "unit": "percent",
+            "x": 0.71,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 909,
+              "y": 360,
+              "w": 205,
+              "h": 173
+            }
+          },
+          "output_surface": {
+            "unit": "percent",
+            "x": 0.63,
+            "y": 0.18,
+            "w": 0.26,
+            "h": 0.22,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 806,
+              "y": 130,
+              "w": 333,
+              "h": 158
+            }
+          },
+          "worker_floor": {
+            "unit": "percent",
+            "x": 0.34,
+            "y": 0.54,
+            "w": 0.12,
+            "h": 0.3,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 435,
+              "y": 389,
+              "w": 154,
+              "h": 216
+            }
+          },
+          "packet_route": {
+            "unit": "percent",
+            "x": 0.28,
+            "y": 0.45,
+            "w": 0.46,
+            "h": 0.12,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 358,
+              "y": 324,
+              "w": 589,
+              "h": 86
+            }
+          }
+        },
+        "hitboxes": {
+          "main_cell_click": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "primary_station_click": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24
+          },
+          "local_action_button_area": {
+            "unit": "percent",
+            "x": 0.62,
+            "y": 0.79,
+            "w": 0.24,
+            "h": 0.09
+          },
+          "approval_lock_area": {
+            "unit": "percent",
+            "x": 0.72,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24
+          }
+        },
+        "station_action_surface_contract": [
+          "source/input",
+          "work action",
+          "concrete output",
+          "local variants/options",
+          "risk/lock",
+          "next handoff"
+        ]
+      },
+      {
+        "room_id": "merchant_harbor",
+        "label": "Merchant Harbor",
+        "main_cell_asset": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/merchant_harbor_cell_bg.png",
+        "popup_room_bg": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/merchant_harbor_cell_bg.png",
+        "default_worker_token": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_qa_token.png",
+        "primary_station_prop": "/war-room/v40/local-visual-kit-v2/station-props/qa_lens_prop.png",
+        "primary_packet_effect": "/war-room/v40/local-visual-kit-v2/packet-effects/read_only_evidence_crate.png",
+        "default_local_action": "inspect supplier proof packet",
+        "required_safety_label": "read-only / no buy/message",
+        "main_cell_contract": {
+          "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+          "dimensions_px": {
+            "width": 960,
+            "height": 540
+          },
+          "aspect_ratio": "16:9",
+          "whole_cell_click_hitbox": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "safe_zones": {
+            "room_art_preserve": {
+              "unit": "percent",
+              "x": 0.06,
+              "y": 0.08,
+              "w": 0.88,
+              "h": 0.72
+            },
+            "compact_status_plaque": {
+              "unit": "percent",
+              "x": 0.05,
+              "y": 0.76,
+              "w": 0.9,
+              "h": 0.18
+            },
+            "status_light_or_packet_badge": {
+              "unit": "percent",
+              "x": 0.78,
+              "y": 0.08,
+              "w": 0.16,
+              "h": 0.16
+            },
+            "avoid_text_over_art": {
+              "unit": "percent",
+              "x": 0.12,
+              "y": 0.12,
+              "w": 0.76,
+              "h": 0.5
+            }
+          },
+          "visual_rules": [
+            "image remains dominant",
+            "short room/action text only in plaque",
+            "no long source paths/logs/raw ids on main board",
+            "no detailed decision panel in closed state"
+          ]
+        },
+        "popup_room_slots": {
+          "left_tool": {
+            "unit": "percent",
+            "x": 0.16,
+            "y": 0.56,
+            "w": 0.16,
+            "h": 0.23,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 205,
+              "y": 403,
+              "w": 205,
+              "h": 166
+            }
+          },
+          "center_tool": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 538,
+              "y": 418,
+              "w": 230,
+              "h": 173
+            }
+          },
+          "right_lock": {
+            "unit": "percent",
+            "x": 0.71,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 909,
+              "y": 360,
+              "w": 205,
+              "h": 173
+            }
+          },
+          "output_surface": {
+            "unit": "percent",
+            "x": 0.63,
+            "y": 0.18,
+            "w": 0.26,
+            "h": 0.22,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 806,
+              "y": 130,
+              "w": 333,
+              "h": 158
+            }
+          },
+          "worker_floor": {
+            "unit": "percent",
+            "x": 0.34,
+            "y": 0.54,
+            "w": 0.12,
+            "h": 0.3,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 435,
+              "y": 389,
+              "w": 154,
+              "h": 216
+            }
+          },
+          "packet_route": {
+            "unit": "percent",
+            "x": 0.28,
+            "y": 0.45,
+            "w": 0.46,
+            "h": 0.12,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 358,
+              "y": 324,
+              "w": 589,
+              "h": 86
+            }
+          }
+        },
+        "hitboxes": {
+          "main_cell_click": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "primary_station_click": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24
+          },
+          "local_action_button_area": {
+            "unit": "percent",
+            "x": 0.62,
+            "y": 0.79,
+            "w": 0.24,
+            "h": 0.09
+          },
+          "approval_lock_area": {
+            "unit": "percent",
+            "x": 0.72,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24
+          }
+        },
+        "station_action_surface_contract": [
+          "source/input",
+          "work action",
+          "concrete output",
+          "local variants/options",
+          "risk/lock",
+          "next handoff"
+        ]
+      },
+      {
+        "room_id": "atlantis_vault",
+        "label": "Atlantis Vault",
+        "main_cell_asset": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/atlantis_vault_cell_bg.png",
+        "popup_room_bg": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/atlantis_vault_cell_bg.png",
+        "default_worker_token": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_release_guard_token.png",
+        "primary_station_prop": "/war-room/v40/local-visual-kit-v2/station-props/release_handoff_shrine_prop.png",
+        "primary_packet_effect": "/war-room/v40/local-visual-kit-v2/packet-effects/approval_lock_seal.png",
+        "default_local_action": "archive local handoff packet",
+        "required_safety_label": "local archive / no raw DB first-view",
+        "main_cell_contract": {
+          "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+          "dimensions_px": {
+            "width": 960,
+            "height": 540
+          },
+          "aspect_ratio": "16:9",
+          "whole_cell_click_hitbox": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "safe_zones": {
+            "room_art_preserve": {
+              "unit": "percent",
+              "x": 0.06,
+              "y": 0.08,
+              "w": 0.88,
+              "h": 0.72
+            },
+            "compact_status_plaque": {
+              "unit": "percent",
+              "x": 0.05,
+              "y": 0.76,
+              "w": 0.9,
+              "h": 0.18
+            },
+            "status_light_or_packet_badge": {
+              "unit": "percent",
+              "x": 0.78,
+              "y": 0.08,
+              "w": 0.16,
+              "h": 0.16
+            },
+            "avoid_text_over_art": {
+              "unit": "percent",
+              "x": 0.12,
+              "y": 0.12,
+              "w": 0.76,
+              "h": 0.5
+            }
+          },
+          "visual_rules": [
+            "image remains dominant",
+            "short room/action text only in plaque",
+            "no long source paths/logs/raw ids on main board",
+            "no detailed decision panel in closed state"
+          ]
+        },
+        "popup_room_slots": {
+          "left_tool": {
+            "unit": "percent",
+            "x": 0.16,
+            "y": 0.56,
+            "w": 0.16,
+            "h": 0.23,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 205,
+              "y": 403,
+              "w": 205,
+              "h": 166
+            }
+          },
+          "center_tool": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 538,
+              "y": 418,
+              "w": 230,
+              "h": 173
+            }
+          },
+          "right_lock": {
+            "unit": "percent",
+            "x": 0.71,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 909,
+              "y": 360,
+              "w": 205,
+              "h": 173
+            }
+          },
+          "output_surface": {
+            "unit": "percent",
+            "x": 0.63,
+            "y": 0.18,
+            "w": 0.26,
+            "h": 0.22,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 806,
+              "y": 130,
+              "w": 333,
+              "h": 158
+            }
+          },
+          "worker_floor": {
+            "unit": "percent",
+            "x": 0.34,
+            "y": 0.54,
+            "w": 0.12,
+            "h": 0.3,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 435,
+              "y": 389,
+              "w": 154,
+              "h": 216
+            }
+          },
+          "packet_route": {
+            "unit": "percent",
+            "x": 0.28,
+            "y": 0.45,
+            "w": 0.46,
+            "h": 0.12,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 358,
+              "y": 324,
+              "w": 589,
+              "h": 86
+            }
+          }
+        },
+        "hitboxes": {
+          "main_cell_click": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "primary_station_click": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24
+          },
+          "local_action_button_area": {
+            "unit": "percent",
+            "x": 0.62,
+            "y": 0.79,
+            "w": 0.24,
+            "h": 0.09
+          },
+          "approval_lock_area": {
+            "unit": "percent",
+            "x": 0.72,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24
+          }
+        },
+        "station_action_surface_contract": [
+          "source/input",
+          "work action",
+          "concrete output",
+          "local variants/options",
+          "risk/lock",
+          "next handoff"
+        ]
+      },
+      {
+        "room_id": "treasury_commerce",
+        "label": "Treasury of Commerce",
+        "main_cell_asset": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/treasury_commerce_cell_bg.png",
+        "popup_room_bg": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/treasury_commerce_cell_bg.png",
+        "default_worker_token": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_release_guard_token.png",
+        "primary_station_prop": "/war-room/v40/local-visual-kit-v2/station-props/aegis_approval_seal_prop.png",
+        "primary_packet_effect": "/war-room/v40/local-visual-kit-v2/packet-effects/not_connected_gate_glyph.png",
+        "default_local_action": "lock commerce/spend packet",
+        "required_safety_label": "approval-gated / no spend",
+        "main_cell_contract": {
+          "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+          "dimensions_px": {
+            "width": 960,
+            "height": 540
+          },
+          "aspect_ratio": "16:9",
+          "whole_cell_click_hitbox": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "safe_zones": {
+            "room_art_preserve": {
+              "unit": "percent",
+              "x": 0.06,
+              "y": 0.08,
+              "w": 0.88,
+              "h": 0.72
+            },
+            "compact_status_plaque": {
+              "unit": "percent",
+              "x": 0.05,
+              "y": 0.76,
+              "w": 0.9,
+              "h": 0.18
+            },
+            "status_light_or_packet_badge": {
+              "unit": "percent",
+              "x": 0.78,
+              "y": 0.08,
+              "w": 0.16,
+              "h": 0.16
+            },
+            "avoid_text_over_art": {
+              "unit": "percent",
+              "x": 0.12,
+              "y": 0.12,
+              "w": 0.76,
+              "h": 0.5
+            }
+          },
+          "visual_rules": [
+            "image remains dominant",
+            "short room/action text only in plaque",
+            "no long source paths/logs/raw ids on main board",
+            "no detailed decision panel in closed state"
+          ]
+        },
+        "popup_room_slots": {
+          "left_tool": {
+            "unit": "percent",
+            "x": 0.16,
+            "y": 0.56,
+            "w": 0.16,
+            "h": 0.23,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 205,
+              "y": 403,
+              "w": 205,
+              "h": 166
+            }
+          },
+          "center_tool": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 538,
+              "y": 418,
+              "w": 230,
+              "h": 173
+            }
+          },
+          "right_lock": {
+            "unit": "percent",
+            "x": 0.71,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 909,
+              "y": 360,
+              "w": 205,
+              "h": 173
+            }
+          },
+          "output_surface": {
+            "unit": "percent",
+            "x": 0.63,
+            "y": 0.18,
+            "w": 0.26,
+            "h": 0.22,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 806,
+              "y": 130,
+              "w": 333,
+              "h": 158
+            }
+          },
+          "worker_floor": {
+            "unit": "percent",
+            "x": 0.34,
+            "y": 0.54,
+            "w": 0.12,
+            "h": 0.3,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 435,
+              "y": 389,
+              "w": 154,
+              "h": 216
+            }
+          },
+          "packet_route": {
+            "unit": "percent",
+            "x": 0.28,
+            "y": 0.45,
+            "w": 0.46,
+            "h": 0.12,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 358,
+              "y": 324,
+              "w": 589,
+              "h": 86
+            }
+          }
+        },
+        "hitboxes": {
+          "main_cell_click": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "primary_station_click": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24
+          },
+          "local_action_button_area": {
+            "unit": "percent",
+            "x": 0.62,
+            "y": 0.79,
+            "w": 0.24,
+            "h": 0.09
+          },
+          "approval_lock_area": {
+            "unit": "percent",
+            "x": 0.72,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24
+          }
+        },
+        "station_action_surface_contract": [
+          "source/input",
+          "work action",
+          "concrete output",
+          "local variants/options",
+          "risk/lock",
+          "next handoff"
+        ]
+      },
+      {
+        "room_id": "dev_studio",
+        "label": "Dev Studio",
+        "main_cell_asset": "/war-room/v40/local-visual-kit-v2/cell-backgrounds/dev_studio_cell_bg.png",
+        "popup_room_bg": "/war-room/v40/local-visual-kit-v2/dev-studio/dev_studio_self_working_team_room_bg.png",
+        "default_worker_token": "/war-room/v40/local-visual-kit-v2/worker-tokens/worker_coder_token.png",
+        "primary_station_prop": "/war-room/v40/local-visual-kit-v2/station-props/code_bench_prop.png",
+        "primary_packet_effect": "/war-room/v40/local-visual-kit-v2/packet-effects/packet_artifact_diamond.png",
+        "default_local_action": "show self-working team packet",
+        "required_safety_label": "local-only / no git commit/push/reset",
+        "main_cell_contract": {
+          "intended_use": "main cells-only board image surface under compact UI plaque; whole cell is the click target",
+          "dimensions_px": {
+            "width": 960,
+            "height": 540
+          },
+          "aspect_ratio": "16:9",
+          "whole_cell_click_hitbox": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "safe_zones": {
+            "room_art_preserve": {
+              "unit": "percent",
+              "x": 0.06,
+              "y": 0.08,
+              "w": 0.88,
+              "h": 0.72
+            },
+            "compact_status_plaque": {
+              "unit": "percent",
+              "x": 0.05,
+              "y": 0.76,
+              "w": 0.9,
+              "h": 0.18
+            },
+            "status_light_or_packet_badge": {
+              "unit": "percent",
+              "x": 0.78,
+              "y": 0.08,
+              "w": 0.16,
+              "h": 0.16
+            },
+            "avoid_text_over_art": {
+              "unit": "percent",
+              "x": 0.12,
+              "y": 0.12,
+              "w": 0.76,
+              "h": 0.5
+            }
+          },
+          "visual_rules": [
+            "image remains dominant",
+            "short room/action text only in plaque",
+            "no long source paths/logs/raw ids on main board",
+            "no detailed decision panel in closed state"
+          ]
+        },
+        "popup_room_slots": {
+          "left_tool": {
+            "unit": "percent",
+            "x": 0.16,
+            "y": 0.56,
+            "w": 0.16,
+            "h": 0.23,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 205,
+              "y": 403,
+              "w": 205,
+              "h": 166
+            }
+          },
+          "center_tool": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 538,
+              "y": 418,
+              "w": 230,
+              "h": 173
+            }
+          },
+          "right_lock": {
+            "unit": "percent",
+            "x": 0.71,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 909,
+              "y": 360,
+              "w": 205,
+              "h": 173
+            }
+          },
+          "output_surface": {
+            "unit": "percent",
+            "x": 0.63,
+            "y": 0.18,
+            "w": 0.26,
+            "h": 0.22,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 806,
+              "y": 130,
+              "w": 333,
+              "h": 158
+            }
+          },
+          "worker_floor": {
+            "unit": "percent",
+            "x": 0.34,
+            "y": 0.54,
+            "w": 0.12,
+            "h": 0.3,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 435,
+              "y": 389,
+              "w": 154,
+              "h": 216
+            }
+          },
+          "packet_route": {
+            "unit": "percent",
+            "x": 0.28,
+            "y": 0.45,
+            "w": 0.46,
+            "h": 0.12,
+            "px_at_1280x720": {
+              "unit": "px",
+              "x": 358,
+              "y": 324,
+              "w": 589,
+              "h": 86
+            }
+          }
+        },
+        "hitboxes": {
+          "main_cell_click": {
+            "unit": "percent",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "min_css_size_px": {
+              "w": 220,
+              "h": 124
+            }
+          },
+          "primary_station_click": {
+            "unit": "percent",
+            "x": 0.42,
+            "y": 0.58,
+            "w": 0.18,
+            "h": 0.24
+          },
+          "local_action_button_area": {
+            "unit": "percent",
+            "x": 0.62,
+            "y": 0.79,
+            "w": 0.24,
+            "h": 0.09
+          },
+          "approval_lock_area": {
+            "unit": "percent",
+            "x": 0.72,
+            "y": 0.5,
+            "w": 0.16,
+            "h": 0.24
+          }
+        },
+        "station_action_surface_contract": [
+          "source/input",
+          "work action",
+          "concrete output",
+          "local variants/options",
+          "risk/lock",
+          "next handoff"
+        ]
+      }
+    ]
+  },
+  "animation_contract": {
+    "principle": "Motion communicates work state; no random decoration or live-action implication.",
+    "packet_route_frames": [
+      "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_00.png",
+      "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_01.png",
+      "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_02.png",
+      "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_03.png",
+      "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_04.png",
+      "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_05.png",
+      "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_06.png",
+      "/war-room/v40/local-visual-kit-v2/packet-effects/packet_route_animation_frame_07.png"
+    ],
+    "frame_dimensions_px": {
+      "width": 320,
+      "height": 120
+    },
+    "recommended_timing": {
+      "duration_ms": 1100,
+      "easing": "cubic-bezier(0.22, 0.61, 0.36, 1)",
+      "loop": "only while station is working, max 2-3 repeats unless explicitly active"
+    },
+    "allowed_transitions": [
+      {
+        "name": "main-cell-packet-handoff",
+        "from": "source cell badge/edge",
+        "to": "target cell badge/edge",
+        "meaning": "handoff queued locally"
+      },
+      {
+        "name": "popup-worker-to-station",
+        "from": "worker_floor",
+        "to": "center_tool or left_tool",
+        "meaning": "worker starts local station action"
+      },
+      {
+        "name": "station-use-cue",
+        "from": "primary_station_prop",
+        "to": "output_surface",
+        "meaning": "draft/read-only/review artifact updated locally"
+      }
+    ],
+    "forbidden_motion": [
+      "random particle storm",
+      "worker snapping through center after click",
+      "animation tied to publish/buy/message/spend/send-to-Discord",
+      "text/proof-panel motion as substitute for room action"
+    ]
+  },
+  "safety_contract": {
+    "global_status": "LOCAL_ONLY_NOT_CONNECTED_DRAFT_READ_ONLY_APPROVAL_GATED",
+    "forbidden_visible_or_enabled_actions": [
+      "Publish",
+      "Buy",
+      "Order",
+      "Message supplier",
+      "Message customer",
+      "Refund",
+      "Renew",
+      "Edit live listing",
+      "Charge",
+      "Spend",
+      "Send to Discord",
+      "Enable connector"
+    ],
+    "allowed_local_action_verbs": [
+      "Inspect",
+      "Stage draft",
+      "Compare",
+      "Route",
+      "Queue for approval",
+      "Save local note",
+      "Open read-only context",
+      "Ask worker"
+    ],
+    "connector_state_copy": [
+      "NOT_CONNECTED",
+      "local-only",
+      "read-only",
+      "draft-only",
+      "mock",
+      "disabled",
+      "approval-gated"
+    ]
+  },
+  "integration_sequence": [
+    "Preserve /war-room main as cells-only.",
+    "Use public/war-room/v40/local-visual-kit-v2 cell backgrounds as cell image surfaces.",
+    "On cell click, mount one centered popup with the popup-frame overlay and room viewport.",
+    "Place worker token, station prop, packet effect in documented popup_room_slots.",
+    "Use packet_route_animation_frame_00..07 only for a local source-to-target action.",
+    "Keep all external connectors NOT_CONNECTED/read-only/draft-only/approval-gated."
+  ],
+  "verification_expectations": [
+    "pnpm build",
+    "curl -I --max-time 10 http://127.0.0.1:3001/war-room",
+    "browser QA: cells-only -> click cell -> popup -> station/action -> close -> cells-only; console clean; no live actions"
+  ]
+}

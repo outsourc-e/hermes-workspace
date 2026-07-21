@@ -1,0 +1,325 @@
+You are Codex working in the existing repo:
+
+/Users/mac/hermes-workspace
+
+Goal:
+Add the missing safe Agent Connection Control layer for Living V3 War Room, so Hermes can later connect real agents/workers without changing the frontend body, assets, CSS, map, rooms, or route behavior.
+
+IMPORTANT:
+Do NOT connect real Hermes/Kanban workers yet.
+Do NOT start any worker process.
+Do NOT burn usage.
+Do NOT call Etsy, suppliers, Discord sends, paid generation, purchases, publishing, account APIs, or external mutation APIs.
+
+This task is only:
+- freeze/usage guard
+- backend connection-control scaffold
+- frontend control/status button
+- worker connector interface in dry-run/blocked-safe mode
+- tests/docs
+
+Current verified state:
+- Living V3 exists and works.
+- `/war-room?etsyOps=1` remains normal local-adapter mode.
+- `/war-room?etsyOps=1&bodyRuntime=1` enables Body Runtime and shows BODY chip.
+- Body Runtime APIs already exist:
+  - `GET /api/war-room/state`
+  - `GET /api/war-room/events`
+  - `GET /api/war-room/capabilities`
+  - `POST /api/war-room/intents`
+  - `POST /api/war-room/tasks`
+  - `POST /api/war-room/approvals`
+- `43 tests passed` in the focused War Room suite.
+- `pnpm build` passes.
+- `pnpm typecheck` still fails only on the old unrelated `mobile-hamburger-menu.tsx:268` issue. Do not fix that unless absolutely required.
+
+Hard rules:
+1. Preserve the current Living V3 UI/body.
+2. Do not redesign map, rooms, layout, CSS, assets, animations, route flags, or visual direction.
+3. Do not replace the current body runtime.
+4. Do not make `/war-room?etsyOps=1` usage-consuming.
+5. Default state must be `AGENTS FROZEN`.
+6. If any backend/control state is missing, invalid, or fails to load, fail closed to `FROZEN`.
+7. “Approve” must never mean live action. It only means `approved_local_only`.
+8. Any future usage-consuming action must require:
+   - agents not frozen
+   - explicit operator approval
+   - allowed capability
+   - local safety lock pass
+   - correlationId/runId
+9. If uncertain, block and emit a local safety event.
+
+Required implementation:
+
+Phase 1 — Agent Connection Control domain
+Create a safe control model, suggested files:
+
+- `src/lib/war-room/body/agent-connection-control.ts`
+- `src/lib/war-room/body/usage-guard.ts`
+
+Model should include:
+
+```ts
+type AgentConnectionMode =
+  | 'frozen'
+  | 'local_only'
+  | 'armed_manual'
+  | 'connected'
+
+type AgentConnectionState = {
+  mode: AgentConnectionMode
+  frozen: boolean
+  usageAllowed: boolean
+  reason: string
+  updatedAtMs: number
+  updatedBy: 'ui' | 'hermes' | 'test' | 'system'
+  activeRunIds: string[]
+  safetyLocks: {
+    liveExternalMutation: false
+    autonomousLiveActionAllowed: false
+    paidGenerationEnabled: false
+    liveEtsyEnabled: false
+    supplierMessagingEnabled: false
+    purchasesEnabled: false
+  }
+}
+```
+
+Default:
+
+```ts
+mode: 'frozen'
+frozen: true
+usageAllowed: false
+```
+
+Important:
+- `local_only` may allow visual/local body events.
+- `connected` must still NOT allow live Etsy/supplier/paid/Discord actions.
+- Real worker spawning is not implemented in this task.
+
+Phase 2 — Persistent fail-closed state
+Add memory + file-backed option for agent connection state.
+
+Suggested:
+- memory fallback
+- optional local JSON file under project runtime folder, e.g. `.war-room/agent-connection-state.json`
+
+If file read/write fails:
+- return `frozen: true`
+- include warning
+- do not crash the UI
+
+Phase 3 — API routes
+Add routes under:
+
+- `GET /api/war-room/agent-control`
+- `POST /api/war-room/agent-control/freeze`
+- `POST /api/war-room/agent-control/local-only`
+- `POST /api/war-room/agent-control/arm`
+- `POST /api/war-room/agent-control/disconnect`
+
+Do NOT add a route that starts real workers.
+
+If you add a future-looking `connect` route, it must be blocked/dry-run by default unless payload contains an explicit operator confirmation string, and even then it must not spawn workers yet. Prefer naming it `arm`, not `connect`.
+
+All routes must:
+- use existing auth middleware pattern
+- return JSON
+- no-store cache
+- never expose secrets
+- emit local events where appropriate:
+  - `agent.connection.frozen`
+  - `agent.connection.armed`
+  - `agent.connection.blocked`
+  - or reuse `safety.blocked` if adding new event types is risky
+
+Phase 4 — Usage Guard
+Add a function like:
+
+```ts
+assertWarRoomUsageAllowed(input: {
+  agentId: WarRoomAgentId
+  intentType?: AgentIntent['type']
+  runId?: string
+  correlationId?: string
+  requestedAction: string
+  source: 'ui' | 'hermes' | 'dispatcher' | 'test'
+})
+```
+
+It should block if:
+- frozen
+- usageAllowed false
+- missing explicit approval for usage-consuming worker dispatch
+- action attempts live Etsy/supplier/paid/Discord/purchase/publish/account mutation
+- agent lacks capability
+
+It should return a structured result:
+
+```ts
+{ ok: true }
+or
+{ ok: false, reason, blockedAction, safetyLocks }
+```
+
+Phase 5 — Hermes Worker Connector scaffold
+Create a dry-run connector interface, suggested file:
+
+- `src/lib/war-room/body/hermes-worker-connector.ts`
+
+It should define:
+
+```ts
+type HermesWorkerDispatchRequest = {
+  agentId: WarRoomAgentId
+  taskId: string
+  roomId: WarRoomRoomId
+  stationId?: WarRoomStationId
+  prompt: string
+  runId: string
+  correlationId: string
+  source: 'hermes' | 'dispatcher' | 'ui' | 'test'
+}
+```
+
+Functions:
+- `prepareHermesWorkerDispatch`
+- `blockHermesWorkerDispatch`
+- `recordHermesWorkerDryRun`
+
+For this task:
+- never spawn `hermes`
+- never run `hermes kanban`
+- never run shell commands
+- never call external model APIs
+- only create local events/tasks showing what WOULD happen later
+
+Phase 6 — Frontend button/status
+In `LivingWarRoomV3.tsx`, add minimal UI only.
+
+Do not redesign.
+
+Add a visible status/control in the existing HUD/chip area:
+- `FROZEN`
+- `LOCAL`
+- `ARMED`
+- `CONNECTED` only if backend says so
+
+Add one clear button:
+- when not frozen: `Freeze agents / stop usage`
+- when frozen: `Local-only / prepare connection`
+
+Do not make a one-click live connect button.
+
+UI behavior:
+- default should show frozen/no usage.
+- clicking freeze must call backend and show `FROZEN`.
+- local-only can enable local visual body events, but not real workers.
+- if API fails, show locked/error state and keep agents frozen.
+
+Phase 7 — Integrate guard with existing Body Runtime
+Do not block safe local UI intents by default, but make sure any future usage-consuming worker dispatch must pass the usage guard.
+
+Add the guard in:
+- task dispatcher scaffold
+- Hermes worker connector scaffold
+- any future-facing dispatch path
+
+Keep `POST /api/war-room/intents` safe/local. It should not spawn workers.
+
+Phase 8 — Approval safety
+Ensure approvals remain local-only.
+
+Requirements:
+- approving an approval request must not execute any live action
+- `approved` should normalize to `approved_local_only`
+- no approval path should flip:
+  - `liveEtsyEnabled`
+  - `paidGenerationEnabled`
+  - `supplierMessagingEnabled`
+  - `purchasesEnabled`
+  - `autonomousLiveActionAllowed`
+
+Add tests for this.
+
+Phase 9 — Tests
+Add/update tests for:
+
+1. default agent connection state is frozen
+2. missing/broken state file fails closed to frozen
+3. freeze endpoint sets usageAllowed false
+4. local-only mode does not allow worker spawning
+5. armed mode still does not allow live external actions
+6. worker connector is dry-run only
+7. usage guard blocks when frozen
+8. usage guard blocks live Etsy/supplier/paid/Discord/purchase actions
+9. approval resolution remains `approved_local_only`
+10. Body Runtime local intents still work
+11. `/war-room?etsyOps=1` remains local-adapter visually
+12. `/war-room?etsyOps=1&bodyRuntime=1` still shows Body Runtime chip and now agent-control status
+
+Run:
+
+```bash
+pnpm vitest run src/lib/war-room/living-v3/living-v3-contract.test.ts src/lib/war-room/living-v3/living-v3-runtime.test.ts src/lib/war-room/body/*.test.ts --reporter=dot
+pnpm build
+pnpm typecheck
+```
+
+If `pnpm typecheck` still fails only on `mobile-hamburger-menu.tsx:268`, report it as existing unrelated failure. Do not claim typecheck is green.
+
+Phase 10 — Browser/API QA
+Verify:
+
+- `/war-room?etsyOps=1`
+  - loads
+  - 11 rooms
+  - 11 agents
+  - no usage/connected state accidentally enabled
+
+- `/war-room?etsyOps=1&bodyRuntime=1`
+  - loads
+  - BODY chip visible
+  - agent-control status visible
+  - default is FROZEN or LOCAL SAFE, not live connected
+  - freeze button works
+  - no console errors
+
+API smoke:
+
+```bash
+GET /api/war-room/agent-control
+POST /api/war-room/agent-control/freeze
+POST /api/war-room/agent-control/local-only
+POST /api/war-room/intents
+POST /api/war-room/approvals
+```
+
+Final docs:
+Update or create:
+
+- `docs/war-room/living-v3/HERMES-AGENT-CONNECTION.md`
+
+It must explain:
+- how Hermes should check frozen/usage state before dispatching
+- how Hermes should send local intents
+- how Hermes should request approval
+- how future worker dispatch must be gated
+- what remains locked
+- exact next step for Hermes after this task
+
+Final report must answer:
+1. What changed?
+2. What stayed untouched?
+3. Which tests passed?
+4. Did build pass?
+5. Did typecheck fail only on old unrelated issue?
+6. Is anything connected to real workers? Expected answer: no.
+7. Can this burn usage now? Expected answer: no, not until Hermes later connects real workers after explicit operator approval.
+8. What should Hermes do next?
+
+Most important:
+Build the safety switch and usage guard first.
+Do not connect live agents yet.
+Do not replace the body.

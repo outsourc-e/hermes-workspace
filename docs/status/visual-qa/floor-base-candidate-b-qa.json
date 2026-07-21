@@ -1,0 +1,21 @@
+{
+  "assetId": "olympus-command.floor-base.v001",
+  "candidate": "candidate-b",
+  "path": "generated-candidates/war-room/olympus-command/v1/candidate-b/floor_base.png",
+  "sha256": "348c828ed47bb41b32bcfbd875de2e5db7efab97c74e7a2d47da7edb8fca46c9",
+  "size": [
+    1672,
+    941
+  ],
+  "mode": "RGB",
+  "visualQa": "REJECTED_BY_DLV_THEME_MISMATCH",
+  "notes": [
+    "Empty architectural floor/wall shell only.",
+    "No command table, stations, screens, UI panels, readable text, people, gods, statues, or central emblem observed.",
+    "Broad clean walkable center and station zones preserved.",
+    "Candidate remains outside live app integration paths."
+  ],
+  "remainingGate": "Needs optional DLV visual approval before promoted to approvedPath/livePath.",
+  "dlvFeedback": "Liked the vibe but it is not connected enough to the intended mythology/history theme. This must be handled by automation/agents, not manual supervisor work.",
+  "decision": "Do not promote candidate-b to approvedPath/livePath. Generate a new candidate after Art Director theme correction."
+}

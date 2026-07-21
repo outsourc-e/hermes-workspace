@@ -145,3 +145,18 @@ skills-bundle/
 # Local agent artifacts (audit dumps, temporary playwright scripts)
 .hermes/
 .env.bak-*
+
+# Generated reports and asset-production archives
+# Runtime-ready assets belong under public/war-room; raw/proof/zip copies stay in the external asset archive.
+/status/
+/public/reports/
+/docs/status/assets/**/package/
+/docs/status/assets/**/previews/
+/docs/status/assets/**/proofs/
+/docs/status/assets/**/qa/
+/docs/status/assets/**/raw/
+/docs/status/assets/**/refs/
+/docs/status/assets/**/zips/
+/public/war-room/**/_backup*/
+/public/war-room/**/rejected/
+/public/war-room/direct-overhead-v4-4k-empty/contact-sheet.png

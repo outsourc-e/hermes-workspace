@@ -1,0 +1,52 @@
+{
+  "asset": "war-room/olympus-command/v1/candidate-c/floor_base.png",
+  "candidate": "candidate-c",
+  "qaAt": "2026-06-11T20:10:30Z",
+  "status": "pending_qa_approval",
+  "overall": "pass_candidate_pending_human_or_downstream_qa",
+  "localPath": "/Users/mac/hermes-workspace/generated-candidates/war-room/olympus-command/v1/candidate-c/floor_base.png",
+  "metadataPath": "/Users/mac/hermes-workspace/generated-candidates/war-room/olympus-command/v1/candidate-c/floor_base.metadata.json",
+  "technicalMetadata": {
+    "format": "png",
+    "pixelWidth": 1672,
+    "pixelHeight": 941,
+    "mode": "RGB",
+    "bytes": 2803303,
+    "contentId": "file_000000004d14720aa60fc794c8cc764d",
+    "beforeContentIdsFiltered": [
+      "https://cdn.auth0.com/avatars/dl.png",
+      "file_000000002fb8720ab6efa5bd663a1827"
+    ],
+    "candidateAContentId": "file_00000000c408720aa501bb22b3d86162",
+    "candidateBContentId": "file_000000002fb8720ab6efa5bd663a1827",
+    "notReusedCandidateAOrB": true
+  },
+  "visualQa": {
+    "firstFiveSecondRead": {
+      "pass": true,
+      "finding": "Reads as an ancient Greek / Olympus marble-and-bronze strategic chamber rather than a generic SaaS/dashboard room."
+    },
+    "emptyFloorAndShellOnly": {
+      "pass": true,
+      "finding": "Large empty dark marble tile floor with architectural wall/parapet boundary; no station/table/furniture layer baked into the center."
+    },
+    "hermesJarvisSecondary": {
+      "pass": true,
+      "finding": "Cyan signal/glow accents are present on edge columns but remain secondary to marble, stone, bronze, and Greek-key materials."
+    },
+    "forbiddenContent": {
+      "pass": true,
+      "finding": "No visible dashboards, monitors, UI cards, readable text, props, tables, humans, gods, statues, busts, or central blocking emblem. Greek-key border details are ornamental and not readable text."
+    },
+    "placementPerspectiveAndNegativeSpace": {
+      "pass": true,
+      "finding": "Top-down/shallow orthographic 16:9 composition with broad open center and perimeter zones suitable for later modular station and character placement."
+    },
+    "caveats": [
+      "Generated resolution is 1672x941, not true 4K, but aspect ratio is effectively 16:9 and source is a ChatGPT PNG candidate.",
+      "The cyan edge pillars should remain monitored in downstream QA so they do not become the dominant JARVIS/sci-fi read once UI layers are added."
+    ]
+  },
+  "safety": "Local generated candidate only. Not approved. Not integrated into public app assets. No app visuals edited. No Etsy/shop/supplier/ShotLab paid/live connections or writes.",
+  "nextStep": "Leave candidate pending downstream visual QA/approval; do not integrate unless approved by the appropriate QA/review card."
+}
