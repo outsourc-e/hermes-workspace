@@ -1,0 +1,94 @@
+{
+  "source": "/Users/mac/hermes-workspace/generated-candidates/war-room/2026-06-18-etsy-ops-v4-from-scratch",
+  "output": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-v4",
+  "room": "/war-room/etsy-ops-v4/room/room-base.png",
+  "stations": [
+    "/war-room/etsy-ops-v4/stations/product-intake-strip.png",
+    "/war-room/etsy-ops-v4/stations/seo-oracle-strip.png",
+    "/war-room/etsy-ops-v4/stations/supplier-proof-strip.png",
+    "/war-room/etsy-ops-v4/stations/media-sources-strip.png",
+    "/war-room/etsy-ops-v4/stations/shotlab-prep-strip.png",
+    "/war-room/etsy-ops-v4/stations/listing-draft-strip.png",
+    "/war-room/etsy-ops-v4/stations/price-margin-strip.png",
+    "/war-room/etsy-ops-v4/stations/dlv-approval-strip.png",
+    "/war-room/etsy-ops-v4/stations/archive-vault-strip.png"
+  ],
+  "icons": {
+    "packet": "/war-room/etsy-ops-v4/icons/packet-strip.png",
+    "alert": "/war-room/etsy-ops-v4/icons/alert-strip.png",
+    "chat": "/war-room/etsy-ops-v4/icons/chat-strip.png",
+    "lock": "/war-room/etsy-ops-v4/icons/lock-strip.png",
+    "sparkle": "/war-room/etsy-ops-v4/icons/sparkle-strip.png",
+    "approvalSeal": "/war-room/etsy-ops-v4/icons/approval-seal-strip.png",
+    "doorClosed": "/war-room/etsy-ops-v4/icons/door-closed.png",
+    "doorOpen": "/war-room/etsy-ops-v4/icons/door-open.png"
+  },
+  "agents": {
+    "athena-market-strategist": {
+      "frameSizePx": {
+        "w": 192,
+        "h": 192
+      },
+      "states": [
+        "idle",
+        "walk-south",
+        "walk-north",
+        "walk-east",
+        "walk-west",
+        "walk-south-east",
+        "walk-south-west",
+        "walk-north-east",
+        "walk-north-west",
+        "work-at-station",
+        "talk-status",
+        "carry-packet",
+        "wait-approval",
+        "rest-or-blocked"
+      ]
+    },
+    "hephaestus-shotlab-artificer": {
+      "frameSizePx": {
+        "w": 192,
+        "h": 192
+      },
+      "states": [
+        "idle",
+        "walk-south",
+        "walk-north",
+        "walk-east",
+        "walk-west",
+        "walk-south-east",
+        "walk-south-west",
+        "walk-north-east",
+        "walk-north-west",
+        "work-at-station",
+        "talk-status",
+        "carry-packet",
+        "wait-approval",
+        "rest-or-blocked"
+      ]
+    },
+    "caesar-hermes-approval-commander": {
+      "frameSizePx": {
+        "w": 192,
+        "h": 192
+      },
+      "states": [
+        "idle",
+        "walk-south",
+        "walk-north",
+        "walk-east",
+        "walk-west",
+        "walk-south-east",
+        "walk-south-west",
+        "walk-north-east",
+        "walk-north-west",
+        "work-at-station",
+        "talk-status",
+        "carry-packet",
+        "wait-approval",
+        "rest-or-blocked"
+      ]
+    }
+  }
+}

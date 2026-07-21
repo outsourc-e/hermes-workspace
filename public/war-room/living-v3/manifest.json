@@ -1,0 +1,4785 @@
+{
+  "id": "war-room-living-v3-assets",
+  "version": "living-v3-20260626-sprite-stable-1",
+  "assetRoot": "/war-room/living-v3",
+  "rooms": {
+    "etsy-ops": {
+      "path": "/war-room/living-v3/rooms/etsy-ops.png",
+      "size": {
+        "w": 1402,
+        "h": 1122
+      },
+      "nonblank": true
+    },
+    "olympus-command": {
+      "path": "/war-room/living-v3/rooms/olympus-command.png",
+      "size": {
+        "w": 1402,
+        "h": 1122
+      },
+      "nonblank": true
+    },
+    "rest-hall": {
+      "path": "/war-room/living-v3/rooms/rest-hall.png",
+      "size": {
+        "w": 1402,
+        "h": 1122
+      },
+      "nonblank": true
+    }
+  },
+  "stations": {
+    "approval-dais": {
+      "path": "/war-room/living-v3/stations/approval-dais.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "command-table": {
+      "path": "/war-room/living-v3/stations/command-table.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "etsy-approval": {
+      "path": "/war-room/living-v3/stations/etsy-approval.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "etsy-intake": {
+      "path": "/war-room/living-v3/stations/etsy-intake.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "etsy-listing": {
+      "path": "/war-room/living-v3/stations/etsy-listing.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "etsy-media-forge": {
+      "path": "/war-room/living-v3/stations/etsy-media-forge.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "etsy-seo": {
+      "path": "/war-room/living-v3/stations/etsy-seo.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "etsy-shotlab": {
+      "path": "/war-room/living-v3/stations/etsy-shotlab.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "mission-router": {
+      "path": "/war-room/living-v3/stations/mission-router.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "rest-quiet-table": {
+      "path": "/war-room/living-v3/stations/rest-quiet-table.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    },
+    "rest-sleep-pods": {
+      "path": "/war-room/living-v3/stations/rest-sleep-pods.png",
+      "size": {
+        "w": 2048,
+        "h": 192
+      },
+      "nonblank": true
+    }
+  },
+  "bridges": {
+    "command-to-etsy": {
+      "path": "/war-room/living-v3/bridges/command-to-etsy.png",
+      "size": {
+        "w": 1536,
+        "h": 192
+      },
+      "nonblank": true,
+      "frameCount": 8
+    },
+    "command-to-rest": {
+      "path": "/war-room/living-v3/bridges/command-to-rest.png",
+      "size": {
+        "w": 1536,
+        "h": 192
+      },
+      "nonblank": true,
+      "frameCount": 8
+    }
+  },
+  "agents": {
+    "athena": {
+      "totalFrames": 112,
+      "states": {
+        "idle": {
+          "path": "/war-room/living-v3/agents/athena/idle.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  33,
+                  151,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  31,
+                  151,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "walk-south": {
+          "path": "/war-room/living-v3/agents/athena/walk-south.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 6,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  34,
+                  151,
+                  165
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  36,
+                  154,
+                  167
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  37,
+                  155,
+                  168
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  36,
+                  154,
+                  167
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  34,
+                  151,
+                  165
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  147,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  31,
+                  146,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  147,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "walk-north": {
+          "path": "/war-room/living-v3/agents/athena/walk-north.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 3,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  30,
+                  151,
+                  161
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  154,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  33,
+                  155,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  154,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  30,
+                  151,
+                  161
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  28,
+                  147,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  27,
+                  146,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  28,
+                  147,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-east": {
+          "path": "/war-room/living-v3/agents/athena/walk-east.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  32,
+                  155,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  34,
+                  158,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  35,
+                  159,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  34,
+                  158,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  32,
+                  155,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  30,
+                  151,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  29,
+                  150,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  30,
+                  151,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-west": {
+          "path": "/war-room/living-v3/agents/athena/walk-west.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  32,
+                  147,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  34,
+                  150,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  35,
+                  151,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  34,
+                  150,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  32,
+                  147,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  30,
+                  143,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  29,
+                  142,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  30,
+                  143,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-south-east": {
+          "path": "/war-room/living-v3/agents/athena/walk-south-east.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  32,
+                  155,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  34,
+                  158,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  35,
+                  159,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  34,
+                  158,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  32,
+                  155,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  30,
+                  151,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  29,
+                  150,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  30,
+                  151,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-south-west": {
+          "path": "/war-room/living-v3/agents/athena/walk-south-west.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  32,
+                  147,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  34,
+                  150,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  35,
+                  151,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  34,
+                  150,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  32,
+                  147,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  30,
+                  143,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  29,
+                  142,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  30,
+                  143,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-north-east": {
+          "path": "/war-room/living-v3/agents/athena/walk-north-east.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  32,
+                  155,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  34,
+                  158,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  35,
+                  159,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  34,
+                  158,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  32,
+                  155,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  30,
+                  151,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  29,
+                  150,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  30,
+                  151,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-north-west": {
+          "path": "/war-room/living-v3/agents/athena/walk-north-west.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  32,
+                  147,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  34,
+                  150,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  35,
+                  151,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  34,
+                  150,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  32,
+                  147,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  30,
+                  143,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  29,
+                  142,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  30,
+                  143,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "work-standing": {
+          "path": "/war-room/living-v3/agents/athena/work-standing.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  33,
+                  163,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  31,
+                  163,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  163,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "talk-standing": {
+          "path": "/war-room/living-v3/agents/athena/talk-standing.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  33,
+                  175,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  31,
+                  175,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  175,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "carry-packet": {
+          "path": "/war-room/living-v3/agents/athena/carry-packet.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  32,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  32,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  33,
+                  161,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  32,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  32,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  32,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  31,
+                  161,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  32,
+                  161,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "wait-approval": {
+          "path": "/war-room/living-v3/agents/athena/wait-approval.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  171
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  171
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  33,
+                  151,
+                  172
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  171
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  171
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  171
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  31,
+                  151,
+                  170
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  32,
+                  151,
+                  171
+                ]
+              }
+            ]
+          }
+        },
+        "sleep": {
+          "path": "/war-room/living-v3/agents/athena/sleep.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 0,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              }
+            ]
+          }
+        },
+        "portrait": {
+          "path": "/war-room/living-v3/agents/athena/portrait.png",
+          "size": {
+            "w": 192,
+            "h": 192
+          },
+          "nonblank": true
+        }
+      }
+    },
+    "hephaestus": {
+      "totalFrames": 112,
+      "states": {
+        "idle": {
+          "path": "/war-room/living-v3/agents/hephaestus/idle.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  55,
+                  169,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  53,
+                  169,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "walk-south": {
+          "path": "/war-room/living-v3/agents/hephaestus/walk-south.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 6,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  56,
+                  169,
+                  165
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  58,
+                  169,
+                  167
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  59,
+                  169,
+                  168
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  58,
+                  169,
+                  167
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  56,
+                  169,
+                  165
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  53,
+                  169,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "walk-north": {
+          "path": "/war-room/living-v3/agents/hephaestus/walk-north.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 3,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  52,
+                  169,
+                  161
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  55,
+                  169,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  52,
+                  169,
+                  161
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  50,
+                  169,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  49,
+                  169,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  50,
+                  169,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-east": {
+          "path": "/war-room/living-v3/agents/hephaestus/walk-east.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  54,
+                  173,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  56,
+                  173,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  57,
+                  173,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  56,
+                  173,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  54,
+                  173,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  52,
+                  173,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  51,
+                  173,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  52,
+                  173,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-west": {
+          "path": "/war-room/living-v3/agents/hephaestus/walk-west.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  54,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  56,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  57,
+                  165,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  56,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  54,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  52,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  51,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  52,
+                  165,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-south-east": {
+          "path": "/war-room/living-v3/agents/hephaestus/walk-south-east.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  54,
+                  173,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  56,
+                  173,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  57,
+                  173,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  56,
+                  173,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  54,
+                  173,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  52,
+                  173,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  51,
+                  173,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  52,
+                  173,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-south-west": {
+          "path": "/war-room/living-v3/agents/hephaestus/walk-south-west.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  54,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  56,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  57,
+                  165,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  56,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  54,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  52,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  51,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  52,
+                  165,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-north-east": {
+          "path": "/war-room/living-v3/agents/hephaestus/walk-north-east.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  54,
+                  173,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  56,
+                  173,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  57,
+                  173,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  56,
+                  173,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  54,
+                  173,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  52,
+                  173,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  51,
+                  173,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  52,
+                  173,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-north-west": {
+          "path": "/war-room/living-v3/agents/hephaestus/walk-north-west.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  54,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  56,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  57,
+                  165,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  56,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  54,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  52,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  51,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  52,
+                  165,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "work-standing": {
+          "path": "/war-room/living-v3/agents/hephaestus/work-standing.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  55,
+                  169,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  53,
+                  169,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "talk-standing": {
+          "path": "/war-room/living-v3/agents/hephaestus/talk-standing.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  55,
+                  175,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  53,
+                  175,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  175,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "carry-packet": {
+          "path": "/war-room/living-v3/agents/hephaestus/carry-packet.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  55,
+                  169,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  54,
+                  169,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  53,
+                  169,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  54,
+                  169,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "wait-approval": {
+          "path": "/war-room/living-v3/agents/hephaestus/wait-approval.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  171
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  171
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  55,
+                  169,
+                  172
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  171
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  171
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  171
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  53,
+                  169,
+                  170
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  54,
+                  169,
+                  171
+                ]
+              }
+            ]
+          }
+        },
+        "sleep": {
+          "path": "/war-room/living-v3/agents/hephaestus/sleep.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 0,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              }
+            ]
+          }
+        },
+        "portrait": {
+          "path": "/war-room/living-v3/agents/hephaestus/portrait.png",
+          "size": {
+            "w": 192,
+            "h": 192
+          },
+          "nonblank": true
+        }
+      }
+    },
+    "julius": {
+      "totalFrames": 112,
+      "states": {
+        "idle": {
+          "path": "/war-room/living-v3/agents/julius/idle.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  39,
+                  161,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  37,
+                  161,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "walk-south": {
+          "path": "/war-room/living-v3/agents/julius/walk-south.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 6,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  40,
+                  161,
+                  165
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  42,
+                  161,
+                  167
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  43,
+                  161,
+                  168
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  42,
+                  161,
+                  167
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  40,
+                  161,
+                  165
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  37,
+                  161,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "walk-north": {
+          "path": "/war-room/living-v3/agents/julius/walk-north.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 3,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  36,
+                  161,
+                  161
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  39,
+                  161,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  36,
+                  161,
+                  161
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  34,
+                  161,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  33,
+                  161,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  34,
+                  161,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-east": {
+          "path": "/war-room/living-v3/agents/julius/walk-east.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  38,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  40,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  41,
+                  165,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  40,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  38,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  36,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  35,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  36,
+                  165,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-west": {
+          "path": "/war-room/living-v3/agents/julius/walk-west.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  38,
+                  157,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  40,
+                  157,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  41,
+                  157,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  40,
+                  157,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  38,
+                  157,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  36,
+                  157,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  35,
+                  157,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  36,
+                  157,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-south-east": {
+          "path": "/war-room/living-v3/agents/julius/walk-south-east.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  38,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  40,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  41,
+                  165,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  40,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  38,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  36,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  35,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  36,
+                  165,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-south-west": {
+          "path": "/war-room/living-v3/agents/julius/walk-south-west.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  38,
+                  157,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  40,
+                  157,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  41,
+                  157,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  40,
+                  157,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  38,
+                  157,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  36,
+                  157,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  35,
+                  157,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  36,
+                  157,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-north-east": {
+          "path": "/war-room/living-v3/agents/julius/walk-north-east.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  38,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  40,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  41,
+                  165,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  40,
+                  165,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  38,
+                  165,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  36,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  35,
+                  165,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  42,
+                  36,
+                  165,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "walk-north-west": {
+          "path": "/war-room/living-v3/agents/julius/walk-north-west.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 5,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  38,
+                  157,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  40,
+                  157,
+                  165
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  41,
+                  157,
+                  166
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  40,
+                  157,
+                  165
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  38,
+                  157,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  36,
+                  157,
+                  161
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  35,
+                  157,
+                  161
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  34,
+                  36,
+                  157,
+                  161
+                ]
+              }
+            ]
+          }
+        },
+        "work-standing": {
+          "path": "/war-room/living-v3/agents/julius/work-standing.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  39,
+                  163,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  163,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  37,
+                  163,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  163,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "talk-standing": {
+          "path": "/war-room/living-v3/agents/julius/talk-standing.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  39,
+                  175,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  175,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  37,
+                  175,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  175,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "carry-packet": {
+          "path": "/war-room/living-v3/agents/julius/carry-packet.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  39,
+                  161,
+                  164
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  38,
+                  161,
+                  163
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  37,
+                  161,
+                  162
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  37,
+                  38,
+                  161,
+                  163
+                ]
+              }
+            ]
+          }
+        },
+        "wait-approval": {
+          "path": "/war-room/living-v3/agents/julius/wait-approval.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 2,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  171
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  171
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  39,
+                  161,
+                  172
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  171
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  171
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  171
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  37,
+                  161,
+                  170
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  38,
+                  38,
+                  161,
+                  171
+                ]
+              }
+            ]
+          }
+        },
+        "sleep": {
+          "path": "/war-room/living-v3/agents/julius/sleep.png",
+          "size": {
+            "w": 1536,
+            "h": 192
+          },
+          "nonblank": true,
+          "validation": {
+            "frameCount": 8,
+            "frameSize": {
+              "w": 192,
+              "h": 192
+            },
+            "safeMargin": 10,
+            "ok": true,
+            "footAnchorSpanPx": 0,
+            "frames": [
+              {
+                "frame": 0,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 1,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 2,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 3,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 4,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 5,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 6,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              },
+              {
+                "frame": 7,
+                "nonblank": true,
+                "safe": true,
+                "bbox": [
+                  46,
+                  56,
+                  155,
+                  167
+                ]
+              }
+            ]
+          }
+        },
+        "portrait": {
+          "path": "/war-room/living-v3/agents/julius/portrait.png",
+          "size": {
+            "w": 192,
+            "h": 192
+          },
+          "nonblank": true
+        }
+      }
+    }
+  },
+  "icons": {
+    "alert-strip": {
+      "path": "/war-room/living-v3/icons/alert-strip.png",
+      "size": {
+        "w": 768,
+        "h": 96
+      },
+      "nonblank": true
+    },
+    "approval-seal-strip": {
+      "path": "/war-room/living-v3/icons/approval-seal-strip.png",
+      "size": {
+        "w": 768,
+        "h": 96
+      },
+      "nonblank": true
+    },
+    "chat-strip": {
+      "path": "/war-room/living-v3/icons/chat-strip.png",
+      "size": {
+        "w": 768,
+        "h": 96
+      },
+      "nonblank": true
+    },
+    "door-closed": {
+      "path": "/war-room/living-v3/icons/door-closed.png",
+      "size": {
+        "w": 192,
+        "h": 96
+      },
+      "nonblank": true
+    },
+    "door-open": {
+      "path": "/war-room/living-v3/icons/door-open.png",
+      "size": {
+        "w": 192,
+        "h": 96
+      },
+      "nonblank": true
+    },
+    "lock-strip": {
+      "path": "/war-room/living-v3/icons/lock-strip.png",
+      "size": {
+        "w": 768,
+        "h": 96
+      },
+      "nonblank": true
+    },
+    "packet-strip": {
+      "path": "/war-room/living-v3/icons/packet-strip.png",
+      "size": {
+        "w": 768,
+        "h": 96
+      },
+      "nonblank": true
+    },
+    "sparkle-strip": {
+      "path": "/war-room/living-v3/icons/sparkle-strip.png",
+      "size": {
+        "w": 768,
+        "h": 96
+      },
+      "nonblank": true
+    }
+  },
+  "legacyPolicy": "Living V3 runtime must reference only /war-room/living-v3 assets. Older packs remain available for explicit legacy routes only."
+}

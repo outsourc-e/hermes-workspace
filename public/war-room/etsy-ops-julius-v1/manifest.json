@@ -1,0 +1,897 @@
+{
+  "id": "julius-caesar-v1",
+  "version": "julius-v1-20260619",
+  "source": "/Users/mac/hermes-workspace/generated-candidates/war-room/2026-06-18-etsy-ops-v4-from-scratch/05_caesar_hermes_96f_sprite_sheet.png",
+  "output": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar",
+  "frameSizePx": {
+    "w": 192,
+    "h": 192
+  },
+  "framesPerStrip": 8,
+  "states": [
+    "idle",
+    "walk-south",
+    "walk-north",
+    "walk-east",
+    "walk-west",
+    "walk-south-east",
+    "walk-south-west",
+    "walk-north-east",
+    "walk-north-west",
+    "work-at-station",
+    "talk-status",
+    "carry-packet",
+    "wait-approval",
+    "rest-or-blocked"
+  ],
+  "bands": [
+    [
+      18,
+      151
+    ],
+    [
+      171,
+      304
+    ],
+    [
+      324,
+      453
+    ],
+    [
+      471,
+      600
+    ],
+    [
+      621,
+      751
+    ],
+    [
+      772,
+      906
+    ],
+    [
+      933,
+      1111
+    ],
+    [
+      1136,
+      1284
+    ],
+    [
+      1311,
+      1469
+    ]
+  ],
+  "centers": [
+    90.0,
+    208.5,
+    327.0,
+    446.0,
+    566.75,
+    686.5,
+    802.75,
+    924.5
+  ],
+  "qa": {
+    "contactSheet": "/war-room/etsy-ops-julius-v1/qa/julius-caesar-v1-contact-sheet.png",
+    "validation": {
+      "idle": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/idle.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            55,
+            51,
+            139,
+            183
+          ],
+          [
+            55,
+            51,
+            140,
+            183
+          ],
+          [
+            53,
+            51,
+            140,
+            183
+          ],
+          [
+            53,
+            51,
+            140,
+            183
+          ],
+          [
+            54,
+            50,
+            139,
+            183
+          ],
+          [
+            53,
+            50,
+            139,
+            183
+          ],
+          [
+            52,
+            50,
+            137,
+            183
+          ],
+          [
+            50,
+            50,
+            134,
+            183
+          ]
+        ]
+      },
+      "walk-south": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/walk-south.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            61,
+            49,
+            146,
+            183
+          ],
+          [
+            64,
+            50,
+            145,
+            183
+          ],
+          [
+            65,
+            49,
+            147,
+            183
+          ],
+          [
+            64,
+            50,
+            146,
+            183
+          ],
+          [
+            63,
+            50,
+            145,
+            183
+          ],
+          [
+            63,
+            50,
+            143,
+            183
+          ],
+          [
+            62,
+            50,
+            145,
+            183
+          ],
+          [
+            61,
+            50,
+            143,
+            183
+          ]
+        ]
+      },
+      "walk-north": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/walk-north.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            52,
+            56,
+            137,
+            183
+          ],
+          [
+            52,
+            55,
+            135,
+            183
+          ],
+          [
+            52,
+            55,
+            136,
+            183
+          ],
+          [
+            53,
+            55,
+            134,
+            183
+          ],
+          [
+            53,
+            56,
+            133,
+            183
+          ],
+          [
+            55,
+            56,
+            134,
+            183
+          ],
+          [
+            54,
+            56,
+            133,
+            183
+          ],
+          [
+            54,
+            56,
+            134,
+            183
+          ]
+        ]
+      },
+      "walk-east": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/walk-east.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            53,
+            55,
+            138,
+            183
+          ],
+          [
+            48,
+            54,
+            139,
+            183
+          ],
+          [
+            52,
+            54,
+            141,
+            183
+          ],
+          [
+            50,
+            54,
+            140,
+            183
+          ],
+          [
+            50,
+            54,
+            139,
+            183
+          ],
+          [
+            49,
+            54,
+            139,
+            183
+          ],
+          [
+            51,
+            54,
+            143,
+            183
+          ],
+          [
+            50,
+            55,
+            144,
+            183
+          ]
+        ]
+      },
+      "walk-west": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/walk-west.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            54,
+            52,
+            144,
+            183
+          ],
+          [
+            56,
+            53,
+            147,
+            183
+          ],
+          [
+            58,
+            54,
+            148,
+            183
+          ],
+          [
+            58,
+            54,
+            149,
+            183
+          ],
+          [
+            56,
+            54,
+            148,
+            183
+          ],
+          [
+            56,
+            53,
+            148,
+            183
+          ],
+          [
+            58,
+            54,
+            151,
+            183
+          ],
+          [
+            58,
+            54,
+            149,
+            183
+          ]
+        ]
+      },
+      "walk-south-east": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/walk-south-east.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            46,
+            48,
+            136,
+            183
+          ],
+          [
+            48,
+            49,
+            138,
+            183
+          ],
+          [
+            49,
+            49,
+            139,
+            183
+          ],
+          [
+            50,
+            48,
+            140,
+            183
+          ],
+          [
+            49,
+            49,
+            139,
+            183
+          ],
+          [
+            50,
+            49,
+            140,
+            183
+          ],
+          [
+            50,
+            48,
+            141,
+            183
+          ],
+          [
+            48,
+            49,
+            139,
+            183
+          ]
+        ]
+      },
+      "walk-south-west": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/walk-south-west.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            56,
+            48,
+            146,
+            183
+          ],
+          [
+            54,
+            49,
+            144,
+            183
+          ],
+          [
+            53,
+            49,
+            143,
+            183
+          ],
+          [
+            52,
+            48,
+            142,
+            183
+          ],
+          [
+            53,
+            49,
+            143,
+            183
+          ],
+          [
+            52,
+            49,
+            142,
+            183
+          ],
+          [
+            51,
+            48,
+            142,
+            183
+          ],
+          [
+            53,
+            49,
+            144,
+            183
+          ]
+        ]
+      },
+      "walk-north-east": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/walk-north-east.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            46,
+            48,
+            136,
+            183
+          ],
+          [
+            48,
+            49,
+            138,
+            183
+          ],
+          [
+            49,
+            49,
+            139,
+            183
+          ],
+          [
+            50,
+            48,
+            140,
+            183
+          ],
+          [
+            49,
+            49,
+            139,
+            183
+          ],
+          [
+            50,
+            49,
+            140,
+            183
+          ],
+          [
+            50,
+            48,
+            141,
+            183
+          ],
+          [
+            48,
+            49,
+            139,
+            183
+          ]
+        ]
+      },
+      "walk-north-west": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/walk-north-west.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            56,
+            48,
+            146,
+            183
+          ],
+          [
+            54,
+            49,
+            144,
+            183
+          ],
+          [
+            53,
+            49,
+            143,
+            183
+          ],
+          [
+            52,
+            48,
+            142,
+            183
+          ],
+          [
+            53,
+            49,
+            143,
+            183
+          ],
+          [
+            52,
+            49,
+            142,
+            183
+          ],
+          [
+            51,
+            48,
+            142,
+            183
+          ],
+          [
+            53,
+            49,
+            144,
+            183
+          ]
+        ]
+      },
+      "work-at-station": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/work-at-station.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            42,
+            9,
+            147,
+            184
+          ],
+          [
+            41,
+            9,
+            144,
+            184
+          ],
+          [
+            40,
+            9,
+            150,
+            184
+          ],
+          [
+            46,
+            9,
+            154,
+            184
+          ],
+          [
+            48,
+            9,
+            153,
+            184
+          ],
+          [
+            40,
+            7,
+            154,
+            171
+          ],
+          [
+            52,
+            9,
+            159,
+            184
+          ],
+          [
+            54,
+            9,
+            161,
+            184
+          ]
+        ]
+      },
+      "talk-status": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/talk-status.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            41,
+            35,
+            157,
+            183
+          ],
+          [
+            49,
+            36,
+            141,
+            183
+          ],
+          [
+            55,
+            35,
+            157,
+            183
+          ],
+          [
+            54,
+            38,
+            153,
+            183
+          ],
+          [
+            57,
+            37,
+            149,
+            183
+          ],
+          [
+            51,
+            37,
+            149,
+            183
+          ],
+          [
+            61,
+            36,
+            150,
+            183
+          ],
+          [
+            60,
+            36,
+            163,
+            183
+          ]
+        ]
+      },
+      "carry-packet": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/carry-packet.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            40,
+            26,
+            146,
+            183
+          ],
+          [
+            47,
+            26,
+            152,
+            183
+          ],
+          [
+            52,
+            26,
+            155,
+            183
+          ],
+          [
+            54,
+            26,
+            151,
+            183
+          ],
+          [
+            54,
+            25,
+            149,
+            183
+          ],
+          [
+            38,
+            26,
+            164,
+            183
+          ],
+          [
+            61,
+            26,
+            166,
+            183
+          ],
+          [
+            61,
+            26,
+            166,
+            183
+          ]
+        ]
+      },
+      "wait-approval": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/wait-approval.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            40,
+            26,
+            146,
+            183
+          ],
+          [
+            47,
+            26,
+            152,
+            183
+          ],
+          [
+            52,
+            26,
+            155,
+            183
+          ],
+          [
+            54,
+            26,
+            151,
+            183
+          ],
+          [
+            54,
+            25,
+            149,
+            183
+          ],
+          [
+            38,
+            26,
+            164,
+            183
+          ],
+          [
+            61,
+            26,
+            166,
+            183
+          ],
+          [
+            61,
+            26,
+            166,
+            183
+          ]
+        ]
+      },
+      "rest-or-blocked": {
+        "path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-julius-v1/agents/julius-caesar/rest-or-blocked.png",
+        "size": {
+          "w": 1536,
+          "h": 192
+        },
+        "nonblankFrames": 8,
+        "boxes": [
+          [
+            55,
+            51,
+            139,
+            183
+          ],
+          [
+            55,
+            51,
+            140,
+            183
+          ],
+          [
+            53,
+            51,
+            140,
+            183
+          ],
+          [
+            53,
+            51,
+            140,
+            183
+          ],
+          [
+            54,
+            50,
+            139,
+            183
+          ],
+          [
+            53,
+            50,
+            139,
+            183
+          ],
+          [
+            52,
+            50,
+            137,
+            183
+          ],
+          [
+            50,
+            50,
+            134,
+            183
+          ]
+        ]
+      }
+    },
+    "notes": [
+      "Julius is packaged independently from the shared Etsy Ops V4 agent folder.",
+      "Frames preserve source-cell alignment to avoid side-to-side anchor wobble.",
+      "Every runtime strip is 8 alpha frames at 192px, with React text kept outside the art."
+    ]
+  }
+}

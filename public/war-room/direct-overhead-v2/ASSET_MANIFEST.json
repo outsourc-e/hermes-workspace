@@ -1,0 +1,21 @@
+{
+  "pack": "direct-overhead-v2",
+  "status": {
+    "rooms": "pass_with_caveats",
+    "gods": "pass_for_wiring",
+    "tools": "best_available_conditional_fail_strict_overhead_replace_next"
+  },
+  "rooms": [
+    "war-room/direct-overhead-v2/rooms/olympus-command/floor-base.png",
+    "war-room/direct-overhead-v2/rooms/pantheon-quarters/floor-base.png",
+    "war-room/direct-overhead-v2/rooms/agora-opportunity/floor-base.png",
+    "war-room/direct-overhead-v2/rooms/oracle-signals/floor-base.png",
+    "war-room/direct-overhead-v2/rooms/forge-hephaestus/floor-base.png",
+    "war-room/direct-overhead-v2/rooms/merchant-harbor/floor-base.png",
+    "war-room/direct-overhead-v2/rooms/atlantis-vault/floor-base.png",
+    "war-room/direct-overhead-v2/rooms/treasury-commerce/floor-base.png"
+  ],
+  "stationCount": 42,
+  "godCount": 8,
+  "notes": "Generated via ChatGPT browser. Tools retain some perspective/text-like artifacts; integrated only as best available image pack, not final perfect."
+}

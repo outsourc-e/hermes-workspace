@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff7cf"/><stop offset=".45" stop-color="#7fffd4"/><stop offset="1" stop-color="#164f3b"/></linearGradient>
+    <linearGradient id="side" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fffd4" stop-opacity=".9"/><stop offset="1" stop-color="#164f3b"/></linearGradient>
+  </defs>
+  <ellipse cx="48" cy="50" rx="28" ry="24" fill="#7fffd4" opacity=".22" filter="url(#glow)"/>
+  <path d="M48 8 L80 32 L70 66 L48 88 L26 66 L16 32 Z" fill="#164f3b" stroke="#7fffd4" stroke-width="3"/>
+  <path d="M48 8 L80 32 L48 45 L16 32 Z" fill="url(#top)" opacity=".92"/>
+  <path d="M16 32 L48 45 L48 88 L26 66 Z" fill="#164f3b" opacity=".95"/>
+  <path d="M80 32 L48 45 L48 88 L70 66 Z" fill="url(#side)" opacity=".84"/>
+  <path d="M48 9 L48 87 M17 32 L79 32" stroke="#fffbe8" stroke-width="1.6" opacity=".42"/>
+  <circle cx="48" cy="45" r="10" fill="#fff8df" opacity=".72"/>
+  <circle cx="48" cy="45" r="5" fill="#7fffd4"/>
+</svg>

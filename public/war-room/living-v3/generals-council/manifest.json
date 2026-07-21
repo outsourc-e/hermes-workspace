@@ -1,0 +1,158 @@
+{
+  "assetRoot": "/war-room/living-v3/generals-council",
+  "sourceRoot": "/Users/mac/hermes-generated-assets/petdex-fixed-20260626-v8-png/package",
+  "atlas": {
+    "width": 1536,
+    "height": 1872,
+    "cellWidth": 192,
+    "cellHeight": 208,
+    "reviewRow": 8,
+    "reviewFrames": 6
+  },
+  "generals": [
+    {
+      "id": "julius-caesar-general-v1",
+      "displayName": "Julius Caesar General V1",
+      "spritesheet": "/war-room/living-v3/generals-council/julius-caesar-general-v1/spritesheet.png",
+      "chairSheet": "/war-room/living-v3/generals-council/julius-caesar-general-v1/chair-sheet.png",
+      "chairSheetSha256": "e4b7ce498ec9cec96db0922713c2d2d9f3060f45ba9b5a9cb6cadb1247ccd2fc",
+      "chairSource": "/Users/mac/hermes-generated-assets/petdex-fixed-20260626-v8-png/extras/julius-caesar-general-v1/council_chair_angles_6x8.png",
+      "spritesheetSha256": "b8f959932190c8eca78f705d2bbcf90357d5f41834997ec876f1db27e7598f1d",
+      "spriteRepair": [
+        "row 8 review rebuilt from clean chair-sheet row 0, 6 frames"
+      ]
+    },
+    {
+      "id": "alexander-general-v1",
+      "displayName": "Alexander General V1",
+      "spritesheet": "/war-room/living-v3/generals-council/alexander-general-v1/spritesheet.png",
+      "chairSheet": "/war-room/living-v3/generals-council/alexander-general-v1/chair-sheet.png",
+      "chairSheetSha256": "82590d61342770faf87e8cf9ba0dc40668372a13d67c785d660e8bea36ec6993",
+      "chairSource": "/Users/mac/hermes-generated-assets/petdex-fixed-20260626-v8-png/extras/alexander-general-v1/council_chair_angles_6x8.png",
+      "spritesheetSha256": "37f4335076fc8fb667bcc7cc3a02cc5d35c668308f7b9155f7983f22ae530b13",
+      "spriteRepair": [
+        "row 8 review rebuilt from clean chair-sheet row 2, 6 frames"
+      ]
+    },
+    {
+      "id": "hannibal-barca-general-v1",
+      "displayName": "Hannibal Barca General V1",
+      "spritesheet": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/spritesheet.png",
+      "chairSheet": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/chair-sheet.png",
+      "chairSheetSha256": "931d1369948cbb29ff6624e764d14f5c915307dc9492fe6d26e6843de626bd09",
+      "chairSource": "/Users/mac/hermes-generated-assets/petdex-fixed-20260626-v8-png/extras/hannibal-barca-general-v1/council_chair_angles_6x8.png",
+      "spritesheetSha256": "e25585840f2e9fe431505911e5ac2a29942605092494eb20c33160d957dcfeba",
+      "spriteRepair": [
+        "row 8 review rebuilt from clean chair-sheet row 6, 6 frames"
+      ]
+    },
+    {
+      "id": "napoleon-bonaparte-general-v1",
+      "displayName": "Napoleon Bonaparte General V1",
+      "spritesheet": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/spritesheet.png",
+      "chairSheet": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/chair-sheet.png",
+      "chairSheetSha256": "a0ed7b072a5910c9b8a959c4d9cd89315da8a0fa4016ba5660f6bff436e958a0",
+      "chairSource": "/Users/mac/hermes-generated-assets/petdex-fixed-20260626-v8-png/extras/napoleon-bonaparte-general-v1/council_chair_angles_6x8.png",
+      "spritesheetSha256": "9c529fcee59c07aff8c3fd9b2405ffa04cbd22e4bce54d46c8bde95a368515e5",
+      "spriteRepair": [
+        "row 8 review rebuilt from clean chair-sheet row 2, 6 frames"
+      ]
+    },
+    {
+      "id": "saladin-general-v1",
+      "displayName": "Saladin General V1",
+      "spritesheet": "/war-room/living-v3/generals-council/saladin-general-v1/spritesheet.png",
+      "chairSheet": "/war-room/living-v3/generals-council/saladin-general-v1/chair-sheet.png",
+      "chairSheetSha256": "55ee9583c68e027700a764a92adbb1ec27d99ebf73bb335f368efffe3b79988c",
+      "chairSource": "/Users/mac/hermes-generated-assets/petdex-fixed-20260626-v8-png/extras/saladin-general-v1/council_chair_angles_6x8.png",
+      "spritesheetSha256": "1b8b56d0cc8c336d3dcb1faf64d78cdccb7d7a8dafe799065e7ba5d15eaa38a0",
+      "spriteRepair": [
+        "row 8 review rebuilt from clean chair-sheet row 3, 6 frames"
+      ]
+    },
+    {
+      "id": "genghis-khan-general-v1",
+      "displayName": "Genghis Khan General V1",
+      "spritesheet": "/war-room/living-v3/generals-council/genghis-khan-general-v1/spritesheet.png",
+      "chairSheet": "/war-room/living-v3/generals-council/genghis-khan-general-v1/chair-sheet.png",
+      "chairSheetSha256": "2c85c0186480a074b2b6b6f722772fcfedcb85b852e3cbff162a800513cdfaa6",
+      "chairSource": "/Users/mac/hermes-generated-assets/petdex-fixed-20260626-v8-png/extras/genghis-khan-general-v1/council_chair_angles_6x8.png",
+      "spritesheetSha256": "3b84e0641da3c7d58719ac7c9a32a394a1f33c011834e818901d4889ad96b18d",
+      "spriteRepair": [
+        "row 8 review rebuilt from clean chair-sheet row 0, 6 frames",
+        "row 4 jumping rebuilt from /Users/mac/hermes-generated-assets/all-character-expansion-repair-20260626/processed_baseline_repair/genghis-khan-general-v1/genghis-khan-general-v1_jumping_retry_strip.png"
+      ]
+    }
+  ],
+  "chairAtlas": {
+    "width": 1152,
+    "height": 1664,
+    "cols": 6,
+    "rows": 8,
+    "cellWidth": 192,
+    "cellHeight": 208,
+    "framesPerRow": 6,
+    "source": "/Users/mac/hermes-generated-assets/petdex-fixed-20260626-v8-png/extras/*/council_chair_angles_6x8.png"
+  },
+  "liveSpriteRepairs": {
+    "updatedAt": "2026-06-28 10:19:40 IDT",
+    "reason": "Strict visual QA found broken review/seated rows in the live Petdex atlas; Genghis jumping row also contained duplicated bodies. Rebuilt only the faulty rows after local backup.",
+    "repairs": [
+      {
+        "id": "julius-caesar-general-v1",
+        "spritesheet": "/Users/mac/hermes-workspace/public/war-room/living-v3/generals-council/julius-caesar-general-v1/spritesheet.png",
+        "beforeSha256": "b8f959932190c8eca78f705d2bbcf90357d5f41834997ec876f1db27e7598f1d",
+        "afterSha256": "b8f959932190c8eca78f705d2bbcf90357d5f41834997ec876f1db27e7598f1d",
+        "repairs": [
+          "row 8 review rebuilt from clean chair-sheet row 0, 6 frames"
+        ]
+      },
+      {
+        "id": "alexander-general-v1",
+        "spritesheet": "/Users/mac/hermes-workspace/public/war-room/living-v3/generals-council/alexander-general-v1/spritesheet.png",
+        "beforeSha256": "6a8471f7f1d288fe9f67bc3e029d49e75ecb8f69233989d7ccf9cb2072436ae6",
+        "afterSha256": "37f4335076fc8fb667bcc7cc3a02cc5d35c668308f7b9155f7983f22ae530b13",
+        "repairs": [
+          "row 8 review rebuilt from clean chair-sheet row 2, 6 frames"
+        ]
+      },
+      {
+        "id": "hannibal-barca-general-v1",
+        "spritesheet": "/Users/mac/hermes-workspace/public/war-room/living-v3/generals-council/hannibal-barca-general-v1/spritesheet.png",
+        "beforeSha256": "c78bac8d9ef89fb0c0fbeee158db56fdf00e1107c21427dc4c48e86fdb8f3c0e",
+        "afterSha256": "e25585840f2e9fe431505911e5ac2a29942605092494eb20c33160d957dcfeba",
+        "repairs": [
+          "row 8 review rebuilt from clean chair-sheet row 6, 6 frames"
+        ]
+      },
+      {
+        "id": "napoleon-bonaparte-general-v1",
+        "spritesheet": "/Users/mac/hermes-workspace/public/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/spritesheet.png",
+        "beforeSha256": "7837adfac311408ef3bca7a4ca95700bc9b49d49643efdff7e7bbf423da356ec",
+        "afterSha256": "9c529fcee59c07aff8c3fd9b2405ffa04cbd22e4bce54d46c8bde95a368515e5",
+        "repairs": [
+          "row 8 review rebuilt from clean chair-sheet row 2, 6 frames"
+        ]
+      },
+      {
+        "id": "saladin-general-v1",
+        "spritesheet": "/Users/mac/hermes-workspace/public/war-room/living-v3/generals-council/saladin-general-v1/spritesheet.png",
+        "beforeSha256": "1ee05486d47573e117482d319568e0ebb86a008486881fcb9920291baafbc0d7",
+        "afterSha256": "1b8b56d0cc8c336d3dcb1faf64d78cdccb7d7a8dafe799065e7ba5d15eaa38a0",
+        "repairs": [
+          "row 8 review rebuilt from clean chair-sheet row 3, 6 frames"
+        ]
+      },
+      {
+        "id": "genghis-khan-general-v1",
+        "spritesheet": "/Users/mac/hermes-workspace/public/war-room/living-v3/generals-council/genghis-khan-general-v1/spritesheet.png",
+        "beforeSha256": "585f1e398a7dc2c8fc03e3a30deead424efc6c86c2baefc4fba844affd4e22b5",
+        "afterSha256": "3b84e0641da3c7d58719ac7c9a32a394a1f33c011834e818901d4889ad96b18d",
+        "repairs": [
+          "row 8 review rebuilt from clean chair-sheet row 0, 6 frames",
+          "row 4 jumping rebuilt from /Users/mac/hermes-generated-assets/all-character-expansion-repair-20260626/processed_baseline_repair/genghis-khan-general-v1/genghis-khan-general-v1_jumping_retry_strip.png"
+        ]
+      }
+    ]
+  }
+}

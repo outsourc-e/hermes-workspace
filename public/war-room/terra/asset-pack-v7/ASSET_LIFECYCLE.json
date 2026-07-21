@@ -1,0 +1,39 @@
+{
+  "asset_id": "terra-asset-pack-v7",
+  "project": "war-room",
+  "asset_type": "room-ui-asset-pack",
+  "created_at": "2026-07-16 00:00 local",
+  "created_by": "Hermes / local Pillow vector drawing",
+  "root_path": "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7",
+  "live_paths": [
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7"
+  ],
+  "source_paths": [],
+  "proof_paths": [
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/asset-contact-sheet.png"
+  ],
+  "zip_paths": [],
+  "obsidian_note": "",
+  "usage_status": "live",
+  "importance": "critical-live",
+  "cleanup_policy": "keep",
+  "replaced_by": null,
+  "qa_status": "pass",
+  "qa_notes": "Integrated in Terra v7 as layered public PNG assets. Browser DOM confirmed 10 asset layers + 14 asset images, legacy cockpit SVG absent, advanced controls collapsed, and no terra-printer-frame resource auto-loaded. Vision analysis quota failed, screenshot proof saved separately.",
+  "security_status": "sanitized-static",
+  "source_license": "not-applicable",
+  "source_sha256": "not-applicable",
+  "sanitized_paths": [
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/carbon-field.png",
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/blueprint-grid.png",
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/ambient-glow.png",
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/metal-frame.png",
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/build-plate.png",
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/layer-stack.png",
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/gantry-toolhead.png",
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/camera-pod.png",
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/filament-spool.png",
+    "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/hud-glass.png"
+  ],
+  "side_effects": "copied-to-workspace-public-runtime-path"
+}

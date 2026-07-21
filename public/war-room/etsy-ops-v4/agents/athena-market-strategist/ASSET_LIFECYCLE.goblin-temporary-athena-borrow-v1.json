@@ -1,0 +1,35 @@
+{
+  "asset_id": "goblin-temporary-athena-borrow-v1",
+  "project": "war-room",
+  "asset_type": "sprite",
+  "created_at": "2026-07-18 17:04 IDT",
+  "created_by": "Hermes / existing DLV-approved Athena runtime source",
+  "root_path": "/Users/mac/hermes-workspace/public/war-room/etsy-ops-v4/agents/athena-market-strategist",
+  "live_paths": [
+    "/Users/mac/hermes-workspace/src/lib/war-room/living-v3/living-v3-contract.ts",
+    "/war-room/etsy-ops-v4/agents/athena-market-strategist"
+  ],
+  "source_paths": [
+    "/Users/mac/hermes-workspace/public/war-room/etsy-ops-v4/agents/athena-market-strategist"
+  ],
+  "proof_paths": [
+    "/tmp/goblin-war-room.png",
+    "/tmp/goblin-room-focus.png",
+    "/tmp/goblin-room-after-wait.png"
+  ],
+  "zip_paths": [],
+  "obsidian_note": "[[01 Projects/Etsy Market Lab/Product Tracker/Goblin Analytics - Agora Workspace Room Plan 2026-07-03]]",
+  "usage_status": "live",
+  "importance": "critical-live",
+  "cleanup_policy": "keep-until-replaced",
+  "replaced_by": null,
+  "qa_status": "pass",
+  "qa_notes": "Temporary approved Athena visual used only as Goblin's placeholder. Browser map/focus/workbench QA found no broken image or blocking overlap. Must be replaced by a dedicated DLV-approved Goblin portrait and 15-state 8-frame runtime before visual finality.",
+  "security_status": "inspected",
+  "source_license": "internal DLV Workspace asset / not-applicable",
+  "source_sha256": "tree-sha256:cf76ac020a5af2563d9cb3f993d2cfd136a5faa05becce5215ffcd06fb99e6da",
+  "sanitized_paths": [
+    "/Users/mac/hermes-workspace/public/war-room/etsy-ops-v4/agents/athena-market-strategist"
+  ],
+  "side_effects": "No media copied or generated. Existing Athena runtime files are referenced by Goblin with visualStatus=temporary-approved-sprite."
+}

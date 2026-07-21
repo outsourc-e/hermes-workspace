@@ -1,0 +1,59 @@
+{
+  "asset_id": "terra-earth-pet-v1-live-runtime",
+  "project": "workspace",
+  "asset_type": "pet/operator sprite runtime",
+  "created_at": "2026-06-30 22:26 IDT",
+  "created_by": "Hermes integration from approved candidate package",
+  "root_path": "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra",
+  "live_paths": [
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/portrait.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/idle.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/work-standing.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/talk-standing.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/carry-packet.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/wait-approval.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/sleep.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/walk-north.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/walk-north-east.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/walk-east.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/walk-south-east.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/walk-south.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/walk-south-west.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/walk-west.png",
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/terra/walk-north-west.png"
+  ],
+  "source_paths": [
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/portrait.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/idle.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/work-standing.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/talk-standing.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/carry-packet.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/wait-approval.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/sleep.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/walk-north.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/walk-north-east.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/walk-east.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/walk-south-east.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/walk-south.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/walk-south-west.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/walk-west.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/package/terra/runtime/walk-north-west.png"
+  ],
+  "proof_paths": [
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/proofs/terra_all_states_8frame_contact_sheet_runtime_timing.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/qa/terra_crop_margin_zoom_qa.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/previews/terra_LONG_all_15_animations_RUNTIME_TIMING.gif"
+  ],
+  "zip_paths": [
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/zips/terra-earth-pet-v1-runtime-package.zip",
+    "/Users/mac/hermes-workspace/docs/status/assets/terra-earth-pet-v1-20260630/zips/terra-earth-pet-v1-runtime-package-lite-no-raw.zip"
+  ],
+  "obsidian_note": "[[06 Hermes/Terra Forge Workspace Memory]]",
+  "usage_status": "live",
+  "importance": "critical-live",
+  "cleanup_policy": "keep",
+  "replaced_by": null,
+  "qa_status": "partial",
+  "qa_notes": "Copied into public runtime and wired to Terra agent; final app/browser QA pending in this integration pass.",
+  "side_effects": "copied-to-workspace; Terra agent will reference /war-room/living-v3/agents/terra runtime sprites"
+}

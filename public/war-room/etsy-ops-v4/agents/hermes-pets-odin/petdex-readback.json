@@ -1,0 +1,10 @@
+{
+  "agentId": "odin",
+  "petdexSlug": "yinyue-fox",
+  "displayName": "银月狐狸",
+  "kind": "creature",
+  "submittedBy": "dxlian",
+  "source": "Hermes petdex manifest https://petdex.dev/api/manifest",
+  "spritesheet": "spritesheet.webp",
+  "spritesheetUrl": "https://assets.petdex.dev/pets/yinyue-fox-9bcdbb16b1f5/sprite.webp"
+}

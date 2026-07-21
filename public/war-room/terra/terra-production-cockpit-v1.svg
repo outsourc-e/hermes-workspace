@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-label="Terra 3D printer production cockpit artwork">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08130b"/>
+      <stop offset="0.45" stop-color="#142817"/>
+      <stop offset="1" stop-color="#3b2a12"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="48%" cy="44%" r="50%">
+      <stop offset="0" stop-color="#9bf06d" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#65bb55" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#65bb55" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2d58c"/>
+      <stop offset="0.52" stop-color="#a9792e"/>
+      <stop offset="1" stop-color="#53350f"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#baf6c6" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#132918" stop-opacity="0.12"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <pattern id="plateGrid" width="42" height="42" patternUnits="userSpaceOnUse" patternTransform="skewX(-18)">
+      <path d="M 42 0 L 0 0 0 42" fill="none" stroke="#84d46e" stroke-opacity="0.18" stroke-width="2"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="720" rx="44" fill="url(#bg)"/>
+  <ellipse cx="590" cy="384" rx="420" ry="260" fill="url(#glow)" filter="url(#soft)"/>
+  <path d="M132 604 C260 500 894 500 1064 608 L1008 682 L190 682 Z" fill="#07100a" opacity="0.76"/>
+
+  <!-- back printer frame -->
+  <path d="M280 118 L918 118 L1010 486 L196 486 Z" fill="#0a150d" stroke="#caa46a" stroke-opacity="0.58" stroke-width="8"/>
+  <path d="M326 154 L872 154 L938 444 L260 444 Z" fill="url(#glass)" stroke="#9af17d" stroke-opacity="0.22" stroke-width="3"/>
+  <path d="M386 186 L804 186 L836 410 L352 410 Z" fill="#0e1d11" opacity="0.72"/>
+
+  <!-- build plate -->
+  <path d="M264 506 L922 506 L792 638 L140 638 Z" fill="#101d13" stroke="#d4aa66" stroke-width="6" stroke-opacity="0.68"/>
+  <path d="M294 524 L852 524 L760 610 L202 610 Z" fill="url(#plateGrid)" opacity="0.86"/>
+  <path d="M292 524 L852 524 L760 610 L202 610 Z" fill="#7df06a" opacity="0.05"/>
+
+  <!-- model mesh hologram -->
+  <path d="M516 428 L648 378 L748 428 L690 520 L542 520 Z" fill="#8ff077" opacity="0.13" stroke="#adff96" stroke-width="4"/>
+  <path d="M516 428 L542 520 M648 378 L690 520 M748 428 L690 520 M516 428 L690 520 M748 428 L542 520" stroke="#b9ffa9" stroke-opacity="0.35" stroke-width="2"/>
+  <ellipse cx="624" cy="524" rx="138" ry="22" fill="#94ff80" opacity="0.12"/>
+
+  <!-- gantry and nozzle -->
+  <path d="M316 238 L880 238" stroke="url(#brass)" stroke-width="22" stroke-linecap="round"/>
+  <path d="M354 212 L354 426 M842 212 L842 426" stroke="#80551f" stroke-width="12" stroke-linecap="round"/>
+  <path d="M590 222 L638 222 L626 340 L602 376 L578 340 Z" fill="url(#brass)" stroke="#f3d48b" stroke-opacity="0.56" stroke-width="4"/>
+  <path d="M604 376 C594 400 606 414 622 428" stroke="#9eff83" stroke-width="4" stroke-linecap="round" opacity="0.58"/>
+
+  <!-- camera module -->
+  <g transform="translate(914 168)">
+    <circle cx="74" cy="74" r="62" fill="#09110b" stroke="#d2aa68" stroke-width="8"/>
+    <circle cx="74" cy="74" r="36" fill="#13241a" stroke="#85f071" stroke-width="5"/>
+    <circle cx="88" cy="60" r="12" fill="#d7ffd0" opacity="0.8"/>
+    <path d="M8 132 C58 170 116 170 166 132" fill="none" stroke="#7be56c" stroke-opacity="0.34" stroke-width="6"/>
+  </g>
+
+  <!-- filament rack -->
+  <g transform="translate(78 154)">
+    <path d="M0 0 L150 0 L126 304 L20 304 Z" fill="#0b150d" stroke="#c8a066" stroke-opacity="0.5" stroke-width="5"/>
+    <circle cx="75" cy="64" r="46" fill="#f7f1dc" stroke="#caa46a" stroke-width="7"/>
+    <circle cx="75" cy="64" r="17" fill="#162418"/>
+    <circle cx="75" cy="164" r="46" fill="#1a3e27" stroke="#8eed74" stroke-width="7"/>
+    <circle cx="75" cy="164" r="17" fill="#0a150d"/>
+    <circle cx="75" cy="264" r="46" fill="#bd7a34" stroke="#f1c16e" stroke-width="7"/>
+    <circle cx="75" cy="264" r="17" fill="#1c1309"/>
+  </g>
+
+  <!-- approval lock object -->
+  <g transform="translate(962 512)">
+    <rect x="0" y="58" width="126" height="96" rx="22" fill="url(#brass)" stroke="#ffe3a0" stroke-opacity="0.44" stroke-width="4"/>
+    <path d="M32 62 V42 C32 8 94 8 94 42 V62" fill="none" stroke="#d8b06e" stroke-width="16" stroke-linecap="round"/>
+    <circle cx="63" cy="104" r="13" fill="#172414"/>
+    <path d="M63 116 L63 136" stroke="#172414" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <!-- silent status pads -->
+  <g opacity="0.9">
+    <rect x="458" y="612" width="64" height="20" rx="10" fill="#85f071" opacity="0.55"/>
+    <rect x="536" y="612" width="64" height="20" rx="10" fill="#f4bf67" opacity="0.55"/>
+    <rect x="614" y="612" width="64" height="20" rx="10" fill="#85f071" opacity="0.55"/>
+    <rect x="692" y="612" width="64" height="20" rx="10" fill="#f4bf67" opacity="0.55"/>
+  </g>
+
+  <!-- empty overlay-safe zone shimmer -->
+  <path d="M92 56 C236 28 980 28 1112 56" stroke="#e7d49b" stroke-opacity="0.18" stroke-width="5" stroke-linecap="round"/>
+  <path d="M112 674 C318 700 850 700 1086 674" stroke="#8eed74" stroke-opacity="0.14" stroke-width="5" stroke-linecap="round"/>
+</svg>

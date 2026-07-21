@@ -1,0 +1,291 @@
+{
+  "assetRoot": "/war-room/living-v3/generals-council",
+  "cell": {
+    "w": 192,
+    "h": 208
+  },
+  "generals": {
+    "julius-caesar-general-v1": {
+      "idle.png": {
+        "path": "/war-room/living-v3/generals-council/julius-caesar-general-v1/runtime/idle.png",
+        "frames": 6,
+        "row": 0
+      },
+      "walk.png": {
+        "path": "/war-room/living-v3/generals-council/julius-caesar-general-v1/runtime/walk.png",
+        "frames": 8,
+        "row": 1
+      },
+      "talk-standing.png": {
+        "path": "/war-room/living-v3/generals-council/julius-caesar-general-v1/runtime/talk-standing.png",
+        "frames": 4,
+        "row": 3
+      },
+      "work-standing.png": {
+        "path": "/war-room/living-v3/generals-council/julius-caesar-general-v1/runtime/work-standing.png",
+        "frames": 5,
+        "row": 4
+      },
+      "carry-packet.png": {
+        "path": "/war-room/living-v3/generals-council/julius-caesar-general-v1/runtime/carry-packet.png",
+        "frames": 5,
+        "row": 4
+      },
+      "wait-approval.png": {
+        "path": "/war-room/living-v3/generals-council/julius-caesar-general-v1/runtime/wait-approval.png",
+        "frames": 6,
+        "row": 0
+      },
+      "sleep.png": {
+        "path": "/war-room/living-v3/generals-council/julius-caesar-general-v1/runtime/sleep.png",
+        "frames": 8,
+        "row": 5
+      },
+      "sit.png": {
+        "path": "/war-room/living-v3/generals-council/julius-caesar-general-v1/runtime/sit.png",
+        "frames": 6,
+        "row": 0
+      },
+      "portrait.png": {
+        "path": "/war-room/living-v3/generals-council/julius-caesar-general-v1/runtime/portrait.png",
+        "frames": 1,
+        "row": 0
+      }
+    },
+    "alexander-general-v1": {
+      "idle.png": {
+        "path": "/war-room/living-v3/generals-council/alexander-general-v1/runtime/idle.png",
+        "frames": 6,
+        "row": 0
+      },
+      "walk.png": {
+        "path": "/war-room/living-v3/generals-council/alexander-general-v1/runtime/walk.png",
+        "frames": 8,
+        "row": 1
+      },
+      "talk-standing.png": {
+        "path": "/war-room/living-v3/generals-council/alexander-general-v1/runtime/talk-standing.png",
+        "frames": 4,
+        "row": 3
+      },
+      "work-standing.png": {
+        "path": "/war-room/living-v3/generals-council/alexander-general-v1/runtime/work-standing.png",
+        "frames": 5,
+        "row": 4
+      },
+      "carry-packet.png": {
+        "path": "/war-room/living-v3/generals-council/alexander-general-v1/runtime/carry-packet.png",
+        "frames": 5,
+        "row": 4
+      },
+      "wait-approval.png": {
+        "path": "/war-room/living-v3/generals-council/alexander-general-v1/runtime/wait-approval.png",
+        "frames": 6,
+        "row": 0
+      },
+      "sleep.png": {
+        "path": "/war-room/living-v3/generals-council/alexander-general-v1/runtime/sleep.png",
+        "frames": 8,
+        "row": 5
+      },
+      "sit.png": {
+        "path": "/war-room/living-v3/generals-council/alexander-general-v1/runtime/sit.png",
+        "frames": 6,
+        "row": 0
+      },
+      "portrait.png": {
+        "path": "/war-room/living-v3/generals-council/alexander-general-v1/runtime/portrait.png",
+        "frames": 1,
+        "row": 0
+      }
+    },
+    "hannibal-barca-general-v1": {
+      "idle.png": {
+        "path": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/runtime/idle.png",
+        "frames": 6,
+        "row": 0
+      },
+      "walk.png": {
+        "path": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/runtime/walk.png",
+        "frames": 8,
+        "row": 1
+      },
+      "talk-standing.png": {
+        "path": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/runtime/talk-standing.png",
+        "frames": 4,
+        "row": 3
+      },
+      "work-standing.png": {
+        "path": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/runtime/work-standing.png",
+        "frames": 5,
+        "row": 4
+      },
+      "carry-packet.png": {
+        "path": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/runtime/carry-packet.png",
+        "frames": 5,
+        "row": 4
+      },
+      "wait-approval.png": {
+        "path": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/runtime/wait-approval.png",
+        "frames": 6,
+        "row": 0
+      },
+      "sleep.png": {
+        "path": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/runtime/sleep.png",
+        "frames": 8,
+        "row": 5
+      },
+      "sit.png": {
+        "path": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/runtime/sit.png",
+        "frames": 6,
+        "row": 0
+      },
+      "portrait.png": {
+        "path": "/war-room/living-v3/generals-council/hannibal-barca-general-v1/runtime/portrait.png",
+        "frames": 1,
+        "row": 0
+      }
+    },
+    "napoleon-bonaparte-general-v1": {
+      "idle.png": {
+        "path": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/runtime/idle.png",
+        "frames": 6,
+        "row": 0
+      },
+      "walk.png": {
+        "path": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/runtime/walk.png",
+        "frames": 8,
+        "row": 1
+      },
+      "talk-standing.png": {
+        "path": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/runtime/talk-standing.png",
+        "frames": 4,
+        "row": 3
+      },
+      "work-standing.png": {
+        "path": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/runtime/work-standing.png",
+        "frames": 5,
+        "row": 4
+      },
+      "carry-packet.png": {
+        "path": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/runtime/carry-packet.png",
+        "frames": 5,
+        "row": 4
+      },
+      "wait-approval.png": {
+        "path": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/runtime/wait-approval.png",
+        "frames": 6,
+        "row": 0
+      },
+      "sleep.png": {
+        "path": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/runtime/sleep.png",
+        "frames": 8,
+        "row": 5
+      },
+      "sit.png": {
+        "path": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/runtime/sit.png",
+        "frames": 6,
+        "row": 0
+      },
+      "portrait.png": {
+        "path": "/war-room/living-v3/generals-council/napoleon-bonaparte-general-v1/runtime/portrait.png",
+        "frames": 1,
+        "row": 0
+      }
+    },
+    "saladin-general-v1": {
+      "idle.png": {
+        "path": "/war-room/living-v3/generals-council/saladin-general-v1/runtime/idle.png",
+        "frames": 6,
+        "row": 0
+      },
+      "walk.png": {
+        "path": "/war-room/living-v3/generals-council/saladin-general-v1/runtime/walk.png",
+        "frames": 8,
+        "row": 1
+      },
+      "talk-standing.png": {
+        "path": "/war-room/living-v3/generals-council/saladin-general-v1/runtime/talk-standing.png",
+        "frames": 4,
+        "row": 3
+      },
+      "work-standing.png": {
+        "path": "/war-room/living-v3/generals-council/saladin-general-v1/runtime/work-standing.png",
+        "frames": 5,
+        "row": 4
+      },
+      "carry-packet.png": {
+        "path": "/war-room/living-v3/generals-council/saladin-general-v1/runtime/carry-packet.png",
+        "frames": 5,
+        "row": 4
+      },
+      "wait-approval.png": {
+        "path": "/war-room/living-v3/generals-council/saladin-general-v1/runtime/wait-approval.png",
+        "frames": 6,
+        "row": 0
+      },
+      "sleep.png": {
+        "path": "/war-room/living-v3/generals-council/saladin-general-v1/runtime/sleep.png",
+        "frames": 8,
+        "row": 5
+      },
+      "sit.png": {
+        "path": "/war-room/living-v3/generals-council/saladin-general-v1/runtime/sit.png",
+        "frames": 6,
+        "row": 0
+      },
+      "portrait.png": {
+        "path": "/war-room/living-v3/generals-council/saladin-general-v1/runtime/portrait.png",
+        "frames": 1,
+        "row": 0
+      }
+    },
+    "genghis-khan-general-v1": {
+      "idle.png": {
+        "path": "/war-room/living-v3/generals-council/genghis-khan-general-v1/runtime/idle.png",
+        "frames": 6,
+        "row": 0
+      },
+      "walk.png": {
+        "path": "/war-room/living-v3/generals-council/genghis-khan-general-v1/runtime/walk.png",
+        "frames": 8,
+        "row": 1
+      },
+      "talk-standing.png": {
+        "path": "/war-room/living-v3/generals-council/genghis-khan-general-v1/runtime/talk-standing.png",
+        "frames": 4,
+        "row": 3
+      },
+      "work-standing.png": {
+        "path": "/war-room/living-v3/generals-council/genghis-khan-general-v1/runtime/work-standing.png",
+        "frames": 5,
+        "row": 4
+      },
+      "carry-packet.png": {
+        "path": "/war-room/living-v3/generals-council/genghis-khan-general-v1/runtime/carry-packet.png",
+        "frames": 5,
+        "row": 4
+      },
+      "wait-approval.png": {
+        "path": "/war-room/living-v3/generals-council/genghis-khan-general-v1/runtime/wait-approval.png",
+        "frames": 6,
+        "row": 0
+      },
+      "sleep.png": {
+        "path": "/war-room/living-v3/generals-council/genghis-khan-general-v1/runtime/sleep.png",
+        "frames": 8,
+        "row": 5
+      },
+      "sit.png": {
+        "path": "/war-room/living-v3/generals-council/genghis-khan-general-v1/runtime/sit.png",
+        "frames": 6,
+        "row": 0
+      },
+      "portrait.png": {
+        "path": "/war-room/living-v3/generals-council/genghis-khan-general-v1/runtime/portrait.png",
+        "frames": 1,
+        "row": 0
+      }
+    }
+  }
+}

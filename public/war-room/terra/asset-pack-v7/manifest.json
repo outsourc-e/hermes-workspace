@@ -1,0 +1,90 @@
+{
+  "asset_id": "terra-asset-pack-v7",
+  "created_at": "2026-07-16",
+  "project": "war-room",
+  "surface": "Terra Forge / Modeling Studio",
+  "runtime_base": "/war-room/terra/asset-pack-v7",
+  "design_intent": "assembled professional printer/slicer asset layers, no baked text, no single giant hero screenshot",
+  "files": [
+    {
+      "file": "carbon-field.png",
+      "bytes": 650793,
+      "sha256": "f665a6c0ad6bb495497ba4096597f3ac6f1ac8800f04ae71ef77e4c1044f0894",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "blueprint-grid.png",
+      "bytes": 14758,
+      "sha256": "67bd4d11a5831ad68b6c504fd539212420e11e92977645970e853122e66e6c23",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "ambient-glow.png",
+      "bytes": 548634,
+      "sha256": "984f4622b093b24f0f12ef8b902c9313de339c48f37e5b9b831cb5dab18adc18",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "metal-frame.png",
+      "bytes": 22140,
+      "sha256": "13e30fc88d1686db5fb63cbcd799ced52c0b1f4a40c094c47683426cd563911f",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "build-plate.png",
+      "bytes": 23928,
+      "sha256": "60cd29d43257da12dc7cb2ecb3498f15fa2ed5e828fb1ab3e791582ba31c5fc0",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "layer-stack.png",
+      "bytes": 9682,
+      "sha256": "19444d52ec1402a7d9b7473c403d44f7bfba77991a99d0ab38f7f515bd41bbb8",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "gantry-toolhead.png",
+      "bytes": 17328,
+      "sha256": "f9e2a3ba074ab4b0a6411dac1b0043c2b455c4ae9356eb85534212dbffde0c72",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "camera-pod.png",
+      "bytes": 17270,
+      "sha256": "b3f29a8f6e50568f73ea76b6a318c9cc3f38f1bc848937df8b68c3e8817e0c70",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "filament-spool.png",
+      "bytes": 22017,
+      "sha256": "a5e6ff403e219b5d741754d574ff415a4762fbdb5957894174afa3b0da5b746e",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "hud-glass.png",
+      "bytes": 6982,
+      "sha256": "85fd96e187bfee3b635ecaee2785e54223c0f1eeac0b322768b7a97bca9ed4fb",
+      "role": "runtime-layer",
+      "has_baked_text": false
+    },
+    {
+      "file": "asset-contact-sheet.png",
+      "bytes": 166907,
+      "sha256": "bd8f6476d42c743c3ffa23e78278ecd2b3f241598b87fdc6f7fdf47ad59f6858",
+      "role": "qa-proof",
+      "has_baked_text": false
+    }
+  ],
+  "lifecycle_path": "/Users/mac/hermes-workspace/public/war-room/terra/asset-pack-v7/ASSET_LIFECYCLE.json",
+  "usage_status": "live",
+  "qa_status": "pass"
+}

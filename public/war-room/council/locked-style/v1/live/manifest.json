@@ -1,0 +1,196 @@
+{
+  "version": "20260515-distinct-seven-generals-v1",
+  "styleDoc": "/docs/war-room-council-v2-true-identity-animation-contract.md",
+  "figures": {
+    "alexander": {
+      "walk": {
+        "frames": 6,
+        "strip": "/war-room/council/locked-style/v1/live/alexander-walk-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/alexander-walk.png"
+      },
+      "ponder": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/alexander-ponder-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/alexander-ponder.png"
+      },
+      "sit": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/alexander-sit-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/alexander-sit.png"
+      },
+      "speak": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/alexander-speak-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/alexander-speak.png"
+      },
+      "vote": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/alexander-vote-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/alexander-vote.png"
+      }
+    },
+    "caesar": {
+      "walk": {
+        "frames": 6,
+        "strip": "/war-room/council/locked-style/v1/live/caesar-walk-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/caesar-walk.png"
+      },
+      "ponder": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/caesar-ponder-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/caesar-ponder.png"
+      },
+      "sit": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/caesar-sit-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/caesar-sit.png"
+      },
+      "speak": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/caesar-speak-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/caesar-speak.png"
+      },
+      "vote": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/caesar-vote-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/caesar-vote.png"
+      }
+    },
+    "hannibal": {
+      "walk": {
+        "frames": 6,
+        "strip": "/war-room/council/locked-style/v1/live/hannibal-walk-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/hannibal-walk.png"
+      },
+      "ponder": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/hannibal-ponder-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/hannibal-ponder.png"
+      },
+      "sit": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/hannibal-sit-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/hannibal-sit.png"
+      },
+      "speak": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/hannibal-speak-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/hannibal-speak.png"
+      },
+      "vote": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/hannibal-vote-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/hannibal-vote.png"
+      }
+    },
+    "napoleon": {
+      "walk": {
+        "frames": 6,
+        "strip": "/war-room/council/locked-style/v1/live/napoleon-walk-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/napoleon-walk.png"
+      },
+      "ponder": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/napoleon-ponder-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/napoleon-ponder.png"
+      },
+      "sit": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/napoleon-sit-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/napoleon-sit.png"
+      },
+      "speak": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/napoleon-speak-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/napoleon-speak.png"
+      },
+      "vote": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/napoleon-vote-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/napoleon-vote.png"
+      }
+    },
+    "sun-tzu": {
+      "walk": {
+        "frames": 6,
+        "strip": "/war-room/council/locked-style/v1/live/sun-tzu-walk-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/sun-tzu-walk.png"
+      },
+      "ponder": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/sun-tzu-ponder-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/sun-tzu-ponder.png"
+      },
+      "sit": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/sun-tzu-sit-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/sun-tzu-sit.png"
+      },
+      "speak": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/sun-tzu-speak-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/sun-tzu-speak.png"
+      },
+      "vote": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/sun-tzu-vote-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/sun-tzu-vote.png"
+      }
+    },
+    "saladin": {
+      "walk": {
+        "frames": 6,
+        "strip": "/war-room/council/locked-style/v1/live/saladin-walk-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/saladin-walk.png"
+      },
+      "ponder": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/saladin-ponder-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/saladin-ponder.png"
+      },
+      "sit": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/saladin-sit-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/saladin-sit.png"
+      },
+      "speak": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/saladin-speak-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/saladin-speak.png"
+      },
+      "vote": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/saladin-vote-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/saladin-vote.png"
+      }
+    },
+    "genghis": {
+      "walk": {
+        "frames": 6,
+        "strip": "/war-room/council/locked-style/v1/live/genghis-walk-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/genghis-walk.png"
+      },
+      "ponder": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/genghis-ponder-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/genghis-ponder.png"
+      },
+      "sit": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/genghis-sit-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/genghis-sit.png"
+      },
+      "speak": {
+        "frames": 16,
+        "strip": "/war-room/council/locked-style/v1/live/genghis-speak-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/genghis-speak.png"
+      },
+      "vote": {
+        "frames": 18,
+        "strip": "/war-room/council/locked-style/v1/live/genghis-vote-strip.png",
+        "frame": "/war-room/council/locked-style/v1/live/genghis-vote.png"
+      }
+    }
+  },
+  "provenance": "Rebuilt from distinct per-leader sources; Caesar uses v3 individual Roman source, not Hannibal clone. Non-walk long strips repeat clean source poses to satisfy runtime frame counts."
+}

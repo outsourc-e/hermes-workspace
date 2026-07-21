@@ -1,0 +1,42 @@
+{
+  "hermes": {
+    "idle": "/war-room/vNext/agents/fullbody/hermes-fullbody-idle.png",
+    "walkStrip": "/war-room/vNext/agents/fullbody/hermes-fullbody-walk-strip.png",
+    "name": "Hermes"
+  },
+  "hercules": {
+    "idle": "/war-room/vNext/agents/fullbody/hercules-fullbody-idle.png",
+    "walkStrip": "/war-room/vNext/agents/fullbody/hercules-fullbody-walk-strip.png",
+    "name": "Hercules"
+  },
+  "oracle-researcher": {
+    "idle": "/war-room/vNext/agents/fullbody/oracle-researcher-fullbody-idle.png",
+    "walkStrip": "/war-room/vNext/agents/fullbody/oracle-researcher-fullbody-walk-strip.png",
+    "name": "Oracle Researcher"
+  },
+  "oracle": {
+    "idle": "/war-room/vNext/agents/fullbody/oracle-fullbody-idle.png",
+    "walkStrip": "/war-room/vNext/agents/fullbody/oracle-fullbody-walk-strip.png",
+    "name": "Oracle"
+  },
+  "hephaestus": {
+    "idle": "/war-room/vNext/agents/fullbody/hephaestus-fullbody-idle.png",
+    "walkStrip": "/war-room/vNext/agents/fullbody/hephaestus-fullbody-walk-strip.png",
+    "name": "Hephaestus"
+  },
+  "merchant-scout": {
+    "idle": "/war-room/vNext/agents/fullbody/merchant-scout-fullbody-idle.png",
+    "walkStrip": "/war-room/vNext/agents/fullbody/merchant-scout-fullbody-walk-strip.png",
+    "name": "Merchant Scout"
+  },
+  "atlantis-archivist": {
+    "idle": "/war-room/vNext/agents/fullbody/atlantis-archivist-fullbody-idle.png",
+    "walkStrip": "/war-room/vNext/agents/fullbody/atlantis-archivist-fullbody-walk-strip.png",
+    "name": "Atlantis Archivist"
+  },
+  "treasury-watcher": {
+    "idle": "/war-room/vNext/agents/fullbody/treasury-watcher-fullbody-idle.png",
+    "walkStrip": "/war-room/vNext/agents/fullbody/treasury-watcher-fullbody-walk-strip.png",
+    "name": "Treasury Watcher"
+  }
+}

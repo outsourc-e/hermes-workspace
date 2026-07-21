@@ -1,0 +1,80 @@
+{
+  "asset_id": "poseidon-sea-pet-v1-20260704",
+  "character": "poseidon",
+  "runtime_contract": {
+    "portrait": "256x256",
+    "animations": "2048x256, 8 frames x 256px"
+  },
+  "states": [
+    "portrait",
+    "idle",
+    "work-standing",
+    "read-book",
+    "talk-standing",
+    "carry-packet",
+    "wait-approval",
+    "sleep",
+    "walk-north",
+    "walk-north-east",
+    "walk-east",
+    "walk-south-east",
+    "walk-south",
+    "walk-south-west",
+    "walk-west",
+    "walk-north-west"
+  ],
+  "timing_ms": {
+    "portrait": 220,
+    "idle": 170,
+    "work-standing": 140,
+    "read-book": 150,
+    "talk-standing": 140,
+    "carry-packet": 140,
+    "wait-approval": 170,
+    "sleep": 240,
+    "walk-north": 90,
+    "walk-north-east": 90,
+    "walk-east": 90,
+    "walk-south-east": 90,
+    "walk-south": 90,
+    "walk-south-west": 90,
+    "walk-west": 90,
+    "walk-north-west": 90
+  },
+  "movement_speed_sprite_widths_per_sec": 0.7,
+  "source": {
+    "chatgpt_raw_states": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/raw/poseidon_states_8x8_raw.png",
+    "chatgpt_raw_walks": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/raw/poseidon_walk8_8x8_raw_v2_strict.png",
+    "user_reference": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/refs/poseidon_user_reference_sea_king.png",
+    "style_reference": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/refs/accepted_chibi_pet_style_board_clean_no_labels.png"
+  },
+  "runtime_files": {
+    "carry-packet.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/carry-packet.png",
+    "idle.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/idle.png",
+    "portrait.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/portrait.png",
+    "read-book.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/read-book.png",
+    "sleep.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/sleep.png",
+    "talk-standing.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/talk-standing.png",
+    "wait-approval.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/wait-approval.png",
+    "walk-east.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/walk-east.png",
+    "walk-north-east.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/walk-north-east.png",
+    "walk-north-west.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/walk-north-west.png",
+    "walk-north.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/walk-north.png",
+    "walk-south-east.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/walk-south-east.png",
+    "walk-south-west.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/walk-south-west.png",
+    "walk-south.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/walk-south.png",
+    "walk-west.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/walk-west.png",
+    "work-standing.png": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/package/poseidon/runtime/work-standing.png"
+  },
+  "proofs": {
+    "contact_sheet": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/proofs/poseidon_all_states_8frame_contact_sheet_runtime_timing.png",
+    "crop_margin_qa": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/qa/poseidon_crop_margin_zoom_qa.png",
+    "long_gif": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/previews/poseidon_LONG_all_16_animations_RUNTIME_TIMING.gif"
+  },
+  "qa_status": "pass",
+  "qa_issues": [],
+  "integration_status": "integrated into Workspace Living V3 Poseidon agent by DLV request 1522986157598707884",
+  "processing_notes": "Grid extraction from ChatGPT raw sheets with overlap, edge-connected background cleanup, component filtering of cell-edge slivers, row-scale normalization to 256 runtime canvas. Includes requested second action state read-book.",
+  "live_path": "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/poseidon",
+  "side_effects": "asset integration only; no DB writes, no Obsidian writes, no marketplace/account actions"
+}

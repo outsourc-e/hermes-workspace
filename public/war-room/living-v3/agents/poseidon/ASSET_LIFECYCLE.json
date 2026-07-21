@@ -1,0 +1,38 @@
+{
+  "asset_id": "poseidon-sea-pet-v1-20260704",
+  "project": "war-room",
+  "asset_type": "petdex/operator-sprite-package",
+  "created_at": "2026-07-04 17:37 IDT",
+  "created_by": "Hermes / ChatGPT web / local processing",
+  "root_path": "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704",
+  "live_paths": [
+    "/Users/mac/hermes-workspace/public/war-room/living-v3/agents/poseidon"
+  ],
+  "source_paths": [
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/refs/poseidon_user_reference_sea_king.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/refs/accepted_chibi_pet_style_board_clean_no_labels.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/raw/poseidon_states_8x8_raw.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/raw/poseidon_walk8_8x8_raw_v2_strict.png"
+  ],
+  "proof_paths": [
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/proofs/poseidon_all_states_8frame_contact_sheet_runtime_timing.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/qa/poseidon_crop_margin_zoom_qa.png",
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/previews/poseidon_LONG_all_16_animations_RUNTIME_TIMING.gif"
+  ],
+  "zip_paths": [
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/zips/poseidon-sea-pet-v1-runtime-package.zip",
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/zips/poseidon-sea-pet-v1-runtime-package-lite-no-raw.zip"
+  ],
+  "obsidian_note": "not-updated-from-this-tooling",
+  "usage_status": "integrated-live",
+  "importance": "important-source",
+  "cleanup_policy": "keep-until-replaced",
+  "replaced_by": null,
+  "qa_status": "pass",
+  "qa_notes": "Runtime package generated from ChatGPT raw sheets; first walk raw failed as 7x7 and is kept under raw/rejected; strict v2 8x8 walk raw was used. Technical QA pass; DLV approved live Workspace integration on 2026-07-04.",
+  "side_effects": "served from /war-room/living-v3/agents/poseidon; no DB writes, no Obsidian writes",
+  "rejected_paths": [
+    "/Users/mac/hermes-workspace/docs/status/assets/poseidon-sea-pet-v1-20260704/raw/rejected/poseidon_walk8_8x8_raw_v1_failed_7x7.png"
+  ],
+  "integration_status": "live Workspace Living V3 Poseidon agent asset"
+}
