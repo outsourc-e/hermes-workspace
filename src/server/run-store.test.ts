@@ -15,11 +15,71 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   if (tempHome) rmSync(tempHome, { recursive: true, force: true })
   tempHome = null
   if (originalHermesHome === undefined) delete process.env.HERMES_HOME
   else process.env.HERMES_HOME = originalHermesHome
   vi.resetModules()
+})
+
+describe('run text persistence buffer', () => {
+  it('coalesces appended deltas into one bounded-interval write', async () => {
+    vi.useFakeTimers()
+    const { createRunTextPersistenceBuffer } = await import('./run-store')
+    const write = vi.fn(() => Promise.resolve(null))
+    const buffer = createRunTextPersistenceBuffer(write)
+
+    buffer.append('Hello')
+    buffer.append(', ')
+    buffer.append('world')
+
+    expect(write).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(499)
+    expect(write).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(write).toHaveBeenCalledTimes(1)
+    expect(write).toHaveBeenCalledWith('Hello, world', { replace: false })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('lets a full replacement supersede queued appends while preserving later deltas', async () => {
+    const { createRunTextPersistenceBuffer } = await import('./run-store')
+    const writes: Array<{ text: string; replace: boolean }> = []
+    const buffer = createRunTextPersistenceBuffer((text, options) => {
+      writes.push({ text, replace: options.replace })
+      return Promise.resolve(null)
+    })
+
+    buffer.append('discarded delta')
+    buffer.replace('authoritative snapshot')
+    buffer.append(' plus delta')
+    await buffer.flush()
+
+    expect(writes).toEqual([
+      { text: 'authoritative snapshot plus delta', replace: true },
+    ])
+  })
+
+  it('flushes queued text immediately and cancels the scheduled write', async () => {
+    vi.useFakeTimers()
+    const { createRunTextPersistenceBuffer } = await import('./run-store')
+    const write = vi.fn(() => Promise.resolve(null))
+    const buffer = createRunTextPersistenceBuffer(write)
+
+    buffer.append('final text')
+    await buffer.flush()
+
+    expect(write).toHaveBeenCalledTimes(1)
+    expect(write).toHaveBeenCalledWith('final text', { replace: false })
+    expect(vi.getTimerCount()).toBe(0)
+
+    await vi.advanceTimersByTimeAsync(500)
+    expect(write).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('run-store persistence', () => {

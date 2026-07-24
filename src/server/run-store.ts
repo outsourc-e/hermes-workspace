@@ -150,6 +150,68 @@ export async function appendRunText(
   }))
 }
 
+type RunTextWriter = (
+  text: string,
+  options: { replace: boolean },
+) => Promise<unknown>
+
+export type RunTextPersistenceBuffer = {
+  append: (text: string) => void
+  replace: (text: string) => void
+  flush: () => Promise<void>
+}
+
+const RUN_TEXT_PERSIST_INTERVAL_MS = 500
+
+export function createRunTextPersistenceBuffer(
+  write: RunTextWriter,
+  intervalMs = RUN_TEXT_PERSIST_INTERVAL_MS,
+): RunTextPersistenceBuffer {
+  let pending: { text: string; replace: boolean } | null = null
+  let flushTimer: ReturnType<typeof setTimeout> | null = null
+  let writeQueue = Promise.resolve()
+
+  const clearFlushTimer = () => {
+    if (!flushTimer) return
+    clearTimeout(flushTimer)
+    flushTimer = null
+  }
+
+  const flush = async (): Promise<void> => {
+    clearFlushTimer()
+    const batch = pending
+    pending = null
+    if (batch) {
+      writeQueue = writeQueue
+        .catch(() => undefined)
+        .then(() => write(batch.text, { replace: batch.replace }))
+        .then(() => undefined)
+    }
+    await writeQueue
+  }
+
+  const scheduleFlush = () => {
+    if (flushTimer) return
+    flushTimer = setTimeout(() => {
+      flushTimer = null
+      void flush().catch(() => undefined)
+    }, intervalMs)
+  }
+
+  const append = (text: string) => {
+    if (pending) pending.text += text
+    else pending = { text, replace: false }
+    scheduleFlush()
+  }
+
+  const replace = (text: string) => {
+    pending = { text, replace: true }
+    scheduleFlush()
+  }
+
+  return { append, replace, flush }
+}
+
 export async function setRunThinking(
   sessionKey: string,
   runId: string,

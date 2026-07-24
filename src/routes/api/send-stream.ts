@@ -12,6 +12,7 @@ import {
 import {
   appendRunText,
   createPersistedRun,
+  createRunTextPersistenceBuffer,
   markRunStatus,
   setRunThinking,
   upsertRunToolCall,
@@ -44,6 +45,7 @@ import {
   collectSyntheticLiveToolEvents,
   createSyntheticLiveToolTracker,
 } from './-send-stream-live-tools'
+import { createSseHeartbeatLifecycle } from './-send-stream-heartbeat'
 import type {
   OpenAICompatContentPart,
   OpenAICompatMessage,
@@ -395,11 +397,14 @@ export const Route = createFileRoute('/api/send-stream')({
         const encoder = new TextEncoder()
         let streamClosed = false
         let activeRunId: string | null = null
+        let persistedRunId: string | null = null
         let activeRunSessionKey: string | null = null
         let persistedRunReady: Promise<unknown> | null = null
+        let runTextBuffer: ReturnType<
+          typeof createRunTextPersistenceBuffer
+        > | null = null
         let unregisterTimer: ReturnType<typeof setTimeout> | null = null
         let streamTimeoutTimer: ReturnType<typeof setTimeout> | null = null
-        let heartbeatTimer: ReturnType<typeof setInterval> | null = null
         const abortController = new AbortController()
         // Close out the SSE stream — stop enqueueing, clear timers, and
         // abort the upstream Hermes gateway request so the agent stops
@@ -408,10 +413,6 @@ export const Route = createFileRoute('/api/send-stream')({
         let closeStream = () => {
           if (streamClosed) return
           streamClosed = true
-          if (heartbeatTimer) {
-            clearInterval(heartbeatTimer)
-            heartbeatTimer = null
-          }
           if (unregisterTimer) {
             clearTimeout(unregisterTimer)
             unregisterTimer = null
@@ -427,12 +428,12 @@ export const Route = createFileRoute('/api/send-stream')({
         // request.signal fires abort.  Stop the upstream agent (closeStream)
         // and clean up run tracking so we don't burn API credits on an orphan.
         function handleAbort() {
-          if (activeRunId && !streamClosed) {
-            persistActiveRun((runSessionKey, activeId) =>
-              markRunStatus(runSessionKey, activeId, 'handoff'),
-            )
-            unregisterActiveSendRun(activeRunId)
-            activeRunId = null
+          if (!streamClosed) {
+            if (persistedRunId) void persistTerminalRun('handoff')
+            if (activeRunId) {
+              unregisterActiveSendRun(activeRunId)
+              activeRunId = null
+            }
           }
           closeStream()
         }
@@ -446,12 +447,19 @@ export const Route = createFileRoute('/api/send-stream')({
           friendlyId: string,
         ) => {
           if (!runId || persistedRunReady) return
+          persistedRunId = runId
           activeRunSessionKey = runSessionKey
           persistedRunReady = createPersistedRun({
             runId,
             sessionKey: runSessionKey,
             friendlyId,
           }).catch(() => null)
+          runTextBuffer = createRunTextPersistenceBuffer(
+            async (text, options) => {
+              await (persistedRunReady ?? Promise.resolve())
+              return appendRunText(runSessionKey, runId, text, options)
+            },
+          )
         }
 
         const persistActiveRun = (
@@ -465,50 +473,80 @@ export const Route = createFileRoute('/api/send-stream')({
             .catch(() => null)
         }
 
+        const persistRunText = (text: string, replace = false) => {
+          if (replace) runTextBuffer?.replace(text)
+          else runTextBuffer?.append(text)
+        }
+
+        async function persistTerminalRun(
+          status: 'handoff' | 'complete' | 'error',
+          errorMessage?: string,
+        ): Promise<void> {
+          const runId = persistedRunId
+          const runSessionKey = activeRunSessionKey
+          const textBuffer = runTextBuffer
+          if (!runId || !runSessionKey) return
+          try {
+            await textBuffer?.flush()
+          } catch {
+            // Best effort: terminal status must still be persisted.
+          }
+          try {
+            await (persistedRunReady ?? Promise.resolve())
+            await markRunStatus(runSessionKey, runId, status, errorMessage)
+          } catch {
+            // Persistence must not break the response stream.
+          }
+        }
+
         const stream = new ReadableStream({
           async start(controller) {
-            let heartbeatTimer: ReturnType<typeof setInterval> | null = null
-            let lastClientEventAt = Date.now()
             // Track the last human-readable activity so the heartbeat can
             // forward it to the UI. Without this the ThinkingBubble shows a
             // static "Thinking…" for minutes when the agent is reasoning
             // without tool calls, making it look hung.
             let lastActivity: string | null = null
+            let heartbeatLifecycle: ReturnType<
+              typeof createSseHeartbeatLifecycle
+            > | null = null
             const enqueueRaw = (payload: string) => {
               if (streamClosed) return
               controller.enqueue(encoder.encode(payload))
             }
             const sendEvent = (event: string, data: unknown) => {
               if (streamClosed) return
-              lastClientEventAt = Date.now()
+              heartbeatLifecycle?.noteClientEvent()
               const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
               enqueueRaw(payload)
             }
 
+            heartbeatLifecycle = createSseHeartbeatLifecycle({
+              intervalMs: 10_000,
+              getActivity: () => lastActivity,
+              sendActivityHeartbeat: (payload) => {
+                sendEvent('heartbeat', payload)
+              },
+              sendProxyKeepalive: () => {
+                // Use a dedicated hb_signal event (not 'thinking') so it does
+                // not pollute the activity card. The tiny comment is the
+                // actual keepalive byte for Cloudflare Tunnel/Access.
+                sendEvent('hb_signal', { sessionKey })
+                enqueueRaw(': keepalive\n\n')
+              },
+            })
+
             // Cloudflare Tunnel/Access can otherwise leave small SSE streams idle
             // long enough that the browser-side fetch is canceled before visible
-            // assistant chunks arrive. Send an initial padding comment and a
-            // lightweight recognized event periodically so public Workspace chats
-            // do not sit at "Thinking…" until the frontend reports failure.
+            // assistant chunks arrive. Send initial padding immediately, then use
+            // one timer for both proxy keepalive bytes and meaningful UI activity.
             enqueueRaw(`: ${' '.repeat(2048)}\n\n`)
-            heartbeatTimer = setInterval(() => {
-              if (streamClosed) return
-              if (Date.now() - lastClientEventAt < 10_000) return
-              // Heartbeat to keep Cloudflare/Access from culling the SSE stream.
-              // Use a dedicated hb_signal event (not 'thinking') so it does not
-              // pollute the TUI activity card with fake thinking text. Send a
-              // tiny SSE comment as the actual keepalive byte.
-              sendEvent('hb_signal', { sessionKey })
-              enqueueRaw(': keepalive\n\n')
-            }, 10_000)
+            heartbeatLifecycle.start()
 
             closeStream = () => {
               if (streamClosed) return
               streamClosed = true
-              if (heartbeatTimer) {
-                clearInterval(heartbeatTimer)
-                heartbeatTimer = null
-              }
+              heartbeatLifecycle?.stop()
+              heartbeatLifecycle = null
               if (unregisterTimer) {
                 clearTimeout(unregisterTimer)
                 unregisterTimer = null
@@ -528,18 +566,6 @@ export const Route = createFileRoute('/api/send-stream')({
                 // ignore
               }
             }
-
-            // Keep the SSE stream alive during long agent processing (tool calls,
-            // slow LLM responses on large contexts). Without this the client-side
-            // no-activity timer fires after 2-3 min and aborts the stream.
-            // Every 10s we also forward the last known activity so the UI can
-            // show meaningful progress instead of a static "Thinking…".
-            heartbeatTimer = setInterval(() => {
-              sendEvent('heartbeat', {
-                timestamp: Date.now(),
-                activity: lastActivity,
-              })
-            }, 10_000)
 
             try {
               if (chatMode === 'portable') {
@@ -661,14 +687,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       for await (const ev of responsesStream) {
                         if (ev.kind === 'text.delta') {
                           accumulated += ev.delta
-                          persistActiveRun((runSessionKey, activeId) =>
-                            appendRunText(
-                              runSessionKey,
-                              activeId,
-                              accumulated,
-                              { replace: true },
-                            ),
-                          )
+                          persistRunText(accumulated, true)
                           sendEvent('chunk', {
                             text: accumulated,
                             fullReplace: true,
@@ -757,9 +776,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         timestamp: Date.now(),
                       })
                       touchLocalSession(portableSessionKey)
-                      persistActiveRun((runSessionKey, activeId) =>
-                        markRunStatus(runSessionKey, activeId, 'complete'),
-                      )
+                      await persistTerminalRun('complete')
                       sendEvent('done', {
                         state: 'complete',
                         sessionKey: portableSessionKey,
@@ -850,11 +867,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       })
                     } else {
                       accumulated += chunk.text
-                      persistActiveRun((runSessionKey, activeId) =>
-                        appendRunText(runSessionKey, activeId, accumulated, {
-                          replace: true,
-                        }),
-                      )
+                      persistRunText(accumulated, true)
                       sendEvent('chunk', {
                         text: accumulated,
                         fullReplace: true,
@@ -873,9 +886,7 @@ export const Route = createFileRoute('/api/send-stream')({
                   })
                   touchLocalSession(portableSessionKey)
 
-                  persistActiveRun((runSessionKey, activeId) =>
-                    markRunStatus(runSessionKey, activeId, 'complete'),
-                  )
+                  await persistTerminalRun('complete')
                   sendEvent('done', {
                     state: 'complete',
                     sessionKey: portableSessionKey,
@@ -892,14 +903,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 } catch (err) {
                   if (!streamClosed) {
                     const errorMessage = normalizeClaudeErrorMessage(err)
-                    persistActiveRun((runSessionKey, activeId) =>
-                      markRunStatus(
-                        runSessionKey,
-                        activeId,
-                        'error',
-                        errorMessage,
-                      ),
-                    )
+                    await persistTerminalRun('error', errorMessage)
                     sendEvent('error', {
                       message: errorMessage,
                       sessionKey: portableSessionKey,
@@ -1115,11 +1119,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         const content =
                           typeof data.content === 'string' ? data.content : ''
                         if (content) {
-                          persistActiveRun((runSessionKey, activeId) =>
-                            appendRunText(runSessionKey, activeId, content, {
-                              replace: true,
-                            }),
-                          )
+                          persistRunText(content, true)
                           const translated = {
                             text: content,
                             fullReplace: true,
@@ -1135,9 +1135,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         const delta =
                           typeof data.delta === 'string' ? data.delta : ''
                         if (!delta) return
-                        persistActiveRun((runSessionKey, activeId) =>
-                          appendRunText(runSessionKey, activeId, delta),
-                        )
+                        persistRunText(delta)
                         const translated = {
                           text: delta,
                           sessionKey: sessionKeyFromEvent,
@@ -1370,14 +1368,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           ) ||
                           readString(data.message) ||
                           'Hermes stream error'
-                        persistActiveRun((runSessionKey, activeId) =>
-                          markRunStatus(
-                            runSessionKey,
-                            activeId,
-                            'error',
-                            errorMessage,
-                          ),
-                        )
+                        await persistTerminalRun('error', errorMessage)
                         sendEvent('error', {
                           message: errorMessage,
                           sessionKey: sessionKeyFromEvent,
@@ -1480,9 +1471,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           sessionKey: sessionKeyFromEvent,
                           runId,
                         }
-                        persistActiveRun((runSessionKey, activeId) =>
-                          markRunStatus(runSessionKey, activeId, 'complete'),
-                        )
+                        await persistTerminalRun('complete')
                         sendEvent('done', translated)
                         closeStream()
                       }
@@ -1501,15 +1490,18 @@ export const Route = createFileRoute('/api/send-stream')({
 
               // Set a timeout to close the stream if no completion event
               streamTimeoutTimer = setTimeout(() => {
-                if (!streamClosed) {
+                void (async () => {
+                  if (streamClosed) return
+                  await persistTerminalRun('error', 'Stream timeout')
                   sendEvent('error', { message: 'Stream timeout' })
                   closeStream()
-                }
+                })()
               }, SEND_STREAM_RUN_TIMEOUT_MS)
             } catch (err) {
               // Only send error if stream hasn't already completed successfully
               if (!streamClosed) {
                 const errorMsg = normalizeClaudeErrorMessage(err)
+                await persistTerminalRun('error', errorMsg)
                 sendEvent('error', {
                   message: errorMsg,
                   sessionKey,
@@ -1518,18 +1510,17 @@ export const Route = createFileRoute('/api/send-stream')({
               }
             }
           },
-          cancel() {
+          async cancel() {
             // User clicked Stop, navigated away, or browser closed the tab.
-            // Mark the stream complete, persist the run as 'handoff' so
-            // session history reflects the interruption, then delegate to
-            // closeStream() for timer/controller cleanup.  Delegate instead
+            // Persist the interrupted run as 'handoff', then delegate to
+            // closeStream() for timer/controller cleanup. Delegate instead
             // of duplicating cleanup logic to keep the two paths in sync.
-            if (activeRunId && !streamClosed) {
-              persistActiveRun((runSessionKey, activeId) =>
-                markRunStatus(runSessionKey, activeId, 'handoff'),
-              )
-            }
+            const terminalPersistence =
+              persistedRunId && !streamClosed
+                ? persistTerminalRun('handoff')
+                : Promise.resolve()
             closeStream()
+            await terminalPersistence
           },
         })
 
