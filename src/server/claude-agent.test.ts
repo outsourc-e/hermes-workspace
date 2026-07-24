@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { resolveClaudeAgentDir } from './claude-agent'
 
-const tempDirs: string[] = []
+const tempDirs: Array<string> = []
 
 function createAgentDir(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix))

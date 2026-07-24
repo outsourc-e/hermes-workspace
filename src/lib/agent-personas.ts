@@ -8,11 +8,11 @@ export type AgentPersona = {
   role: string
   emoji: string
   color: string // Tailwind color class
-  specialties: string[]
+  specialties: Array<string>
 }
 
 /** Default persona pool — assigned round-robin or by task matching */
-export const AGENT_PERSONAS: AgentPersona[] = [
+export const AGENT_PERSONAS: [AgentPersona, ...Array<AgentPersona>] = [
   {
     name: 'Roger',
     role: 'Frontend Developer',
@@ -221,10 +221,13 @@ export function assignPersona(
     persona = bestMatch
   } else if (available.length > 0) {
     // Deterministic pick from available based on session key hash
-    persona = available[hashCode(sessionKey) % available.length]
+    persona =
+      available[hashCode(sessionKey) % available.length] ?? AGENT_PERSONAS[0]
   } else {
     // All 8 taken — hash into the full pool (allows duplicates beyond 8)
-    persona = AGENT_PERSONAS[hashCode(sessionKey) % AGENT_PERSONAS.length]
+    persona =
+      AGENT_PERSONAS[hashCode(sessionKey) % AGENT_PERSONAS.length] ??
+      AGENT_PERSONAS[0]
   }
 
   assignedPersonas.set(sessionKey, persona)

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
 
 function workerBaseUrl() {
   const explicit = (process.env.PLAYGROUND_ADMIN_BASE_URL || '').trim()
@@ -13,15 +14,16 @@ export const Route = createFileRoute('/api/playground-admin')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const host = (request.headers.get('host') || '').toLowerCase()
-        const localOk = host.startsWith('127.0.0.1:') || host.startsWith('localhost:') || host.endsWith('.local:3002')
-        if (!localOk) {
-          return json({ ok: false, error: 'Admin stats are only available from a local workspace session.' }, { status: 403 })
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
 
         const token = (process.env.PLAYGROUND_ADMIN_TOKEN || '').trim()
         if (!token) {
-          return json({ ok: false, error: 'PLAYGROUND_ADMIN_TOKEN is not configured.' }, { status: 503 })
+          return json(
+            { ok: false, error: 'PLAYGROUND_ADMIN_TOKEN is not configured.' },
+            { status: 503 },
+          )
         }
 
         try {
@@ -34,7 +36,10 @@ export const Route = createFileRoute('/api/playground-admin')({
           const text = await res.text()
           if (!res.ok) {
             return json(
-              { ok: false, error: `Worker admin request failed (${res.status}): ${text.slice(0, 300)}` },
+              {
+                ok: false,
+                error: `Worker admin request failed (${res.status}): ${text.slice(0, 300)}`,
+              },
               { status: res.status },
             )
           }
@@ -46,7 +51,10 @@ export const Route = createFileRoute('/api/playground-admin')({
             },
           })
         } catch (error: any) {
-          return json({ ok: false, error: error?.message || 'Unknown error' }, { status: 500 })
+          return json(
+            { ok: false, error: error?.message || 'Unknown error' },
+            { status: 500 },
+          )
         }
       },
     },

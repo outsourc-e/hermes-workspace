@@ -66,7 +66,7 @@ export function useSwipeNavigation() {
       gestureRef.current = null
       return
     }
-    const touch = event.touches[0]
+    const touch = event.touches[0] as Touch | undefined
     if (!touch || shouldIgnoreTarget(event.target)) {
       gestureRef.current = null
       return
@@ -89,7 +89,7 @@ export function useSwipeNavigation() {
     const gesture = gestureRef.current
     if (!gesture) return
 
-    const touch = event.touches[0]
+    const touch = event.touches[0] as Touch | undefined
     if (!touch) return
 
     if (!gesture.locked) {
@@ -115,7 +115,7 @@ export function useSwipeNavigation() {
       gestureRef.current = null
       if (!gesture) return
 
-      const touch = event.changedTouches[0]
+      const touch = event.changedTouches[0] as Touch | undefined
       if (!touch) return
 
       const dx = touch.clientX - gesture.startX

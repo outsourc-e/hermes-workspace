@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertCircleIcon,
-  CheckmarkCircle02Icon,
   Chat01Icon,
+  CheckmarkCircle02Icon,
   Clock01Icon,
   SentIcon,
 } from '@hugeicons/core-free-icons'
@@ -28,7 +28,7 @@ type SwarmNodeChatProps = {
 
 const STORAGE_PREFIX = 'claude-swarm-chat-v1:'
 
-function loadHistory(workerId: string): Message[] {
+function loadHistory(workerId: string): Array<Message> {
   if (typeof window === 'undefined') return []
   try {
     const raw = window.localStorage.getItem(STORAGE_PREFIX + workerId)
@@ -40,7 +40,7 @@ function loadHistory(workerId: string): Message[] {
   }
 }
 
-function persistHistory(workerId: string, messages: Message[]) {
+function persistHistory(workerId: string, messages: Array<Message>) {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(
@@ -58,7 +58,7 @@ export function SwarmNodeChat({
   collapsed = false,
   onCollapsedChange,
 }: SwarmNodeChatProps) {
-  const [messages, setMessages] = useState<Message[]>(() =>
+  const [messages, setMessages] = useState<Array<Message>>(() =>
     loadHistory(workerId),
   )
   const [draft, setDraft] = useState('')

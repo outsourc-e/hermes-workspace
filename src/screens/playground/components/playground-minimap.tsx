@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { botsFor } from '../lib/playground-bots'
 import type { PlaygroundWorldId } from '../lib/playground-rpg'
 
-const NPC_POSITIONS: Record<PlaygroundWorldId, Array<{ x: number; z: number; color: string }>> = {
+const NPC_POSITIONS: Record<
+  PlaygroundWorldId,
+  Array<{ x: number; z: number; color: string }>
+> = {
   training: [
     { x: -9, z: 7, color: '#a78bfa' },
     { x: -3, z: 0, color: '#22d3ee' },
@@ -61,15 +64,23 @@ export function PlaygroundMinimap({ worldId, worldName, worldAccent }: Props) {
   useEffect(() => {
     let raf = 0
     let last = 0
-    const isMobile = window.matchMedia?.('(pointer: coarse), (max-width: 760px)').matches ?? false
+    const isMobile = window.matchMedia(
+      '(pointer: coarse), (max-width: 760px)',
+    ).matches
     const minFrameMs = isMobile ? 1000 / 30 : 1000 / 60
     const sync = (now: number) => {
       if (now - last >= minFrameMs) {
         last = now
-        const player = (window as any).__hermesPlaygroundPlayerPos as { x?: number; z?: number } | undefined
+        const player = (window as any).__hermesPlaygroundPlayerPos as
+          | { x?: number; z?: number }
+          | undefined
         const x = typeof player?.x === 'number' ? player.x : 0
         const z = typeof player?.z === 'number' ? player.z : 0
-        setPlayerPos((prev) => (Math.abs(prev.x - x) < 0.15 && Math.abs(prev.z - z) < 0.15 ? prev : { x, z }))
+        setPlayerPos((prev) =>
+          Math.abs(prev.x - x) < 0.15 && Math.abs(prev.z - z) < 0.15
+            ? prev
+            : { x, z },
+        )
       }
       raf = window.requestAnimationFrame(sync)
     }
@@ -82,13 +93,27 @@ export function PlaygroundMinimap({ worldId, worldName, worldAccent }: Props) {
       className="pointer-events-auto fixed right-[18px] top-[18px] z-[70] rounded-[22px] border p-2 text-white shadow-2xl backdrop-blur-xl"
       style={{
         borderColor: `${frameAccent}72`,
-        background: 'linear-gradient(180deg, rgba(15,22,34,.9), rgba(10,13,18,.84)), radial-gradient(circle at 50% 0%, rgba(241,197,109,.16), transparent 62%)',
+        background:
+          'linear-gradient(180deg, rgba(15,22,34,.9), rgba(10,13,18,.84)), radial-gradient(circle at 50% 0%, rgba(241,197,109,.16), transparent 62%)',
         boxShadow: `0 18px 42px rgba(0,0,0,.62), 0 0 24px ${frameAccent}2f, inset 0 1px 0 rgba(244,233,211,.12)`,
       }}
     >
       <div className="mb-1 flex items-center justify-between px-1">
-        <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: frameAccent }}>{worldName}</span>
-        <span style={{ borderColor: `${frameAccent}55`, background: "rgba(244,233,211,.06)" }} className="rounded border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#F4E9D3]/70">M</span>
+        <span
+          className="text-[10px] font-bold uppercase tracking-[0.16em]"
+          style={{ color: frameAccent }}
+        >
+          {worldName}
+        </span>
+        <span
+          style={{
+            borderColor: `${frameAccent}55`,
+            background: 'rgba(244,233,211,.06)',
+          }}
+          className="rounded border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#F4E9D3]/70"
+        >
+          M
+        </span>
       </div>
       <div
         className="relative h-[148px] w-[148px] overflow-hidden rounded-[14px] border"
@@ -104,7 +129,17 @@ export function PlaygroundMinimap({ worldId, worldName, worldAccent }: Props) {
           style={{ left: 75, top: 75, borderColor: frameAccent + 'aa' }}
         />
         {/* Player marker — sampled at 5 Hz so the minimap never repaints per frame. */}
-        <div className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: map(playerPos.x), top: map(playerPos.z), width: 8, height: 8, background: '#22d3ee', boxShadow: '0 0 8px #22d3ee' }} />
+        <div
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{
+            left: map(playerPos.x),
+            top: map(playerPos.z),
+            width: 8,
+            height: 8,
+            background: '#22d3ee',
+            boxShadow: '0 0 8px #22d3ee',
+          }}
+        />
         {/* NPCs */}
         {npcs.map((n, i) => (
           <div

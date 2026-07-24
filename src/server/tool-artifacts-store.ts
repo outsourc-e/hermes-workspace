@@ -30,7 +30,7 @@ export type ToolArtifact = {
 }
 
 type ArtifactIndex = {
-  artifacts: Record<string, ToolArtifact>
+  artifacts: Partial<Record<string, ToolArtifact>>
 }
 
 let index: ArtifactIndex = { artifacts: {} }
@@ -42,9 +42,18 @@ function ensureDataDir(): void {
 function loadIndex(): void {
   try {
     if (!existsSync(INDEX_FILE)) return
-    const parsed = JSON.parse(readFileSync(INDEX_FILE, 'utf-8')) as ArtifactIndex
-    if (parsed && typeof parsed === 'object' && parsed.artifacts) {
-      index = parsed
+    const parsed = JSON.parse(readFileSync(INDEX_FILE, 'utf-8')) as unknown
+    if (parsed && typeof parsed === 'object') {
+      const artifacts = (parsed as Record<string, unknown>).artifacts
+      if (
+        artifacts &&
+        typeof artifacts === 'object' &&
+        !Array.isArray(artifacts)
+      ) {
+        index = {
+          artifacts: artifacts as Partial<Record<string, ToolArtifact>>,
+        }
+      }
     }
   } catch {
     index = { artifacts: {} }
@@ -87,7 +96,11 @@ function inferArtifactKind(toolName?: string, text?: string): ToolArtifactKind {
   if (name.includes('read_file') || name === 'read' || name === 'file_read') {
     return 'file_read'
   }
-  if (name.includes('terminal') || name.includes('exec') || name.includes('bash')) {
+  if (
+    name.includes('terminal') ||
+    name.includes('exec') ||
+    name.includes('bash')
+  ) {
     return 'terminal_log'
   }
   if (name.includes('skill')) return 'skill_doc'
@@ -97,11 +110,14 @@ function inferArtifactKind(toolName?: string, text?: string): ToolArtifactKind {
 
 export function listToolArtifacts(sessionId?: string): Array<ToolArtifact> {
   return Object.values(index.artifacts)
+    .filter((artifact): artifact is ToolArtifact => artifact !== undefined)
     .filter((artifact) => !sessionId || artifact.sessionId === sessionId)
     .sort((a, b) => b.createdAt - a.createdAt)
 }
 
-export function getToolArtifact(artifactId: string): (ToolArtifact & { content: string }) | null {
+export function getToolArtifact(
+  artifactId: string,
+): (ToolArtifact & { content: string }) | null {
   const artifact = index.artifacts[artifactId]
   if (!artifact) return null
   try {
@@ -127,7 +143,9 @@ type CreateArtifactInput = {
   kind?: ToolArtifactKind
 }
 
-export function createOrUpdateToolArtifact(input: CreateArtifactInput): ToolArtifact {
+export function createOrUpdateToolArtifact(
+  input: CreateArtifactInput,
+): ToolArtifact {
   const stableKey = [
     input.sessionId,
     input.messageId || '',
@@ -204,7 +222,8 @@ function compactContentForMessage(
     return [{ type: 'text', text: compactText }]
   }
   return originalContent.map((part) => {
-    if (!part || typeof part !== 'object') return part as Record<string, unknown>
+    if (!part || typeof part !== 'object')
+      return part as Record<string, unknown>
     const record = part as Record<string, unknown>
     if (record.type === 'text') return { ...record, text: compactText }
     if (record.type === 'tool_result') return { ...record, text: compactText }

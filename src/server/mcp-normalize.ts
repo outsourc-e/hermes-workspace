@@ -155,7 +155,8 @@ export function normalizeMcpServer(raw: unknown): McpServer | null {
     readNumber(record.discoveredToolsCount, discoveredTools.length) ||
     discoveredTools.length
 
-  const lastTestedAt = readString(record.lastTestedAt) || readString(record.testedAt)
+  const lastTestedAt =
+    readString(record.lastTestedAt) || readString(record.testedAt)
   const lastError = readString(record.lastError) || readString(record.error)
 
   const server: McpServer = {
@@ -235,7 +236,9 @@ export function normalizeMcpServerFromConfig(
   const record = asRecord(raw)
 
   // Transport — accept explicit `transport` field, else infer from url/command.
-  const explicitTransport = readString(record.transport ?? record.transportType).toLowerCase()
+  const explicitTransport = readString(
+    record.transport ?? record.transportType,
+  ).toLowerCase()
   let transportType: McpTransport
   if (explicitTransport === 'stdio' || explicitTransport === 'http') {
     transportType = explicitTransport
@@ -253,7 +256,11 @@ export function normalizeMcpServerFromConfig(
   const authRaw = record.auth
   if (typeof authRaw === 'string') {
     authType = readAuth(authRaw)
-  } else if (authRaw && typeof authRaw === 'object' && !Array.isArray(authRaw)) {
+  } else if (
+    authRaw &&
+    typeof authRaw === 'object' &&
+    !Array.isArray(authRaw)
+  ) {
     const a = authRaw as Record<string, unknown>
     authType = readAuth(a.type ?? a.kind)
     hasBearerToken = Boolean(readString(a.token) || readString(a.bearerToken))
@@ -266,7 +273,9 @@ export function normalizeMcpServerFromConfig(
   // pattern where Authorization is set directly in headers (HTTP servers) or
   // a *_TOKEN/*_KEY/*_SECRET/*_AUTH env var is passed to a stdio server.
   const rawHeaders = asRecord(record.headers)
-  const authHeaderValue = readString(rawHeaders.Authorization ?? rawHeaders.authorization)
+  const authHeaderValue = readString(
+    rawHeaders.Authorization ?? rawHeaders.authorization,
+  )
   if (authHeaderValue) {
     hasBearerToken = true
     if (authType === 'none') authType = 'bearer'
@@ -341,19 +350,21 @@ const ENV_REF_RE = /^\$\{[A-Z][A-Z0-9_]*\}$/
  */
 export function maskSecretsInPlace(server: McpServer): McpServer {
   for (const key of Object.keys(server.env)) {
+    const value = server.env[key] ?? ''
     // Preserve env-ref form — it's a reference, not a literal secret
-    if (ENV_REF_RE.test(server.env[key])) continue
-    server.env[key] = (server.env[key] && server.env[key].length > 0
-      ? MASK_SENTINEL
-      : ('' as McpMaskedValue))
+    if (ENV_REF_RE.test(value)) continue
+    server.env[key] = value.length > 0 ? MASK_SENTINEL : ('' as McpMaskedValue)
   }
   for (const key of Object.keys(server.headers)) {
+    const value = server.headers[key] ?? ''
     // Preserve env-ref form in headers too
-    if (ENV_REF_RE.test(server.headers[key])) continue
+    if (ENV_REF_RE.test(value)) continue
     if (isSecretKey(key)) {
       server.headers[key] = MASK_SENTINEL
-    } else if (server.headers[key].length > 0) {
+    } else if (value.length > 0) {
       server.headers[key] = MASK_SENTINEL
+    } else {
+      server.headers[key] = '' as McpMaskedValue
     }
   }
   return server
@@ -378,7 +389,9 @@ export function detectAuthEnvRef(raw: unknown): string | null {
   }
   // Check Authorization header
   const rawHeaders = asRecord(record.headers)
-  const authHeader = readString(rawHeaders.Authorization ?? rawHeaders.authorization)
+  const authHeader = readString(
+    rawHeaders.Authorization ?? rawHeaders.authorization,
+  )
   if (ENV_REF_RE.test(authHeader)) return authHeader
 
   return null
@@ -405,7 +418,9 @@ export function normalizeTestResult(raw: unknown): {
   } = {
     ok,
     status,
-    discoveredTools: readDiscoveredTools(record.discoveredTools ?? record.tools),
+    discoveredTools: readDiscoveredTools(
+      record.discoveredTools ?? record.tools,
+    ),
   }
   if (Number.isFinite(latency)) result.latencyMs = latency
   if (error) result.error = error
@@ -416,7 +431,10 @@ export function normalizeTestResult(raw: unknown): {
  * Recursively scan an arbitrary payload for any string equal to `sentinel`.
  * Used by tests to prove no submitted secret is ever echoed back.
  */
-export function payloadContainsString(payload: unknown, sentinel: string): boolean {
+export function payloadContainsString(
+  payload: unknown,
+  sentinel: string,
+): boolean {
   if (typeof payload === 'string') return payload.includes(sentinel)
   if (Array.isArray(payload)) {
     return payload.some((entry) => payloadContainsString(entry, sentinel))

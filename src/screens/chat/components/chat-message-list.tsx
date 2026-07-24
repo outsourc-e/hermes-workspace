@@ -203,7 +203,12 @@ function ThinkingBubble({
 
   // Build a meaningful status label from live activity
   const activeToolNames = activeToolCalls
-    .filter((tc) => tc.phase !== 'done' && tc.phase !== 'complete' && tc.phase !== 'completed')
+    .filter(
+      (tc) =>
+        tc.phase !== 'done' &&
+        tc.phase !== 'complete' &&
+        tc.phase !== 'completed',
+    )
     .map((tc) => tc.name.replace(/_/g, ' '))
   const liveToolNames = liveToolActivity.map((a) => a.name.replace(/_/g, ' '))
   const uniqueNames = [...new Set([...activeToolNames, ...liveToolNames])]
@@ -391,10 +396,10 @@ function StatusLine() {
   return (
     <div className="flex items-center gap-2 text-[11px] text-primary-400 dark:text-primary-500 py-0.5">
       <span className="inline-block size-1.5 rounded-full bg-amber-400 animate-pulse" />
-      <span className="opacity-80">
-        {heartbeatActivity || 'Working…'}
+      <span className="opacity-80">{heartbeatActivity || 'Working…'}</span>
+      <span aria-hidden="true" className="opacity-40">
+        ·
       </span>
-      <span aria-hidden="true" className="opacity-40">·</span>
       <span className="tabular-nums opacity-50 font-mono">{elapsedLabel}</span>
     </div>
   )
@@ -427,7 +432,9 @@ function shouldHideSystemInjectedUserMessage(text: string): boolean {
   // Only hide messages that begin with known system-injected prompts. User
   // context summaries may quote these phrases later in the message and must
   // remain visible/persistent in the chat UI.
-  return HIDDEN_SYSTEM_USER_PREFIXES.some((prefix) => trimmed.startsWith(prefix))
+  return HIDDEN_SYSTEM_USER_PREFIXES.some((prefix) =>
+    trimmed.startsWith(prefix),
+  )
 }
 
 function getChronologyRank(message: ChatMessage): number {
@@ -532,7 +539,7 @@ export function buildDisplayEntries(
     }
 
     if (message.role === 'tool' || message.role === 'toolResult') {
-      const previousEntry = entries[entries.length - 1]
+      const previousEntry = entries.at(-1)
       if (previousEntry?.message.role === 'assistant') {
         previousEntry.attachedToolMessages.push(message)
       } else if (pendingAssistantToolMessages.length > 0) {
@@ -547,7 +554,10 @@ export function buildDisplayEntries(
       attachedToolMessages: [],
     }
 
-    if (message.role === 'assistant' && pendingAssistantToolMessages.length > 0) {
+    if (
+      message.role === 'assistant' &&
+      pendingAssistantToolMessages.length > 0
+    ) {
       entry.attachedToolMessages.push(...pendingAssistantToolMessages)
       pendingAssistantToolMessages = []
     }
@@ -558,19 +568,28 @@ export function buildDisplayEntries(
   return entries
 }
 
-export function getTrailingToolOnlyTurnSummary(
-  messages: Array<ChatMessage>,
-): { count: number; toolNames: Array<string>; hasFinalAssistantText: boolean } | null {
+export function getTrailingToolOnlyTurnSummary(messages: Array<ChatMessage>): {
+  count: number
+  toolNames: Array<string>
+  hasFinalAssistantText: boolean
+} | null {
   let lastAssistantTextIndex = -1
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index]
-    if (message.role === 'assistant' && textFromMessage(message).trim().length > 0) {
+    if (!message) continue
+    if (
+      message.role === 'assistant' &&
+      textFromMessage(message).trim().length > 0
+    ) {
       lastAssistantTextIndex = index
       break
     }
   }
 
-  if (lastAssistantTextIndex === -1 || lastAssistantTextIndex === messages.length - 1) {
+  if (
+    lastAssistantTextIndex === -1 ||
+    lastAssistantTextIndex === messages.length - 1
+  ) {
     return null
   }
 
@@ -592,7 +611,8 @@ export function getTrailingToolOnlyTurnSummary(
         ...getToolCallsFromMessage(message)
           .map((toolCall) => toolCall.name)
           .filter((name): name is string => Boolean(name)),
-        ...((message.role === 'tool' || message.role === 'toolResult') && message.toolName
+        ...((message.role === 'tool' || message.role === 'toolResult') &&
+        message.toolName
           ? [message.toolName]
           : []),
       ]),
@@ -936,7 +956,7 @@ function ChatMessageListComponent({
         clearTimeout(thinkingGraceTimerRef.current)
       }
     }
-  }, [displayEntries, waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayEntries, waitingForResponse])
 
   const normalizedMessageSearch = useMemo(
     function getNormalizedMessageSearch() {
@@ -978,7 +998,8 @@ function ChatMessageListComponent({
     [messageSearchMatches],
   )
 
-  const activeSearchMatch = messageSearchMatches[activeSearchMatchIndex] ?? null
+  const activeSearchMatch =
+    messageSearchMatches.at(activeSearchMatchIndex) ?? null
 
   const focusSearchInput = useCallback(function focusSearchInput() {
     window.requestAnimationFrame(function focusSearchInputField() {
@@ -1144,7 +1165,7 @@ function ChatMessageListComponent({
       streamingTargets: new Set<string>(),
       signatureById: nextSignatures,
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
   }, [displayEntries, streamingCleared])
 
   const lastAssistantIndex = visibleEntries
@@ -1186,7 +1207,7 @@ function ChatMessageListComponent({
     if (!effectivelyWaiting) return false
     // If streaming has visible text, hide indicator — response is rendering
     if (isStreaming && streamingText && streamingText.length > 0) return false
-    const lastEntry = visibleEntries[visibleEntries.length - 1]
+    const lastEntry = visibleEntries.at(-1)
     const lastMessage = lastEntry?.message
     if (lastMessage && lastMessage.role === 'assistant') {
       const lastId = getStableMessageId(lastMessage, lastEntry.sourceIndex)
@@ -1286,19 +1307,13 @@ function ChatMessageListComponent({
                 ? 'calling'
                 : toolCall.phase === 'failed' || toolCall.phase === 'error'
                   ? 'error'
-                  : toolCall.phase === 'calling' ||
-                      toolCall.phase === 'running'
+                  : toolCall.phase === 'calling' || toolCall.phase === 'running'
                     ? toolCall.phase
                     : 'calling',
           args: tcAny.args,
           preview:
-            typeof tcAny.preview === 'string'
-              ? (tcAny.preview)
-              : undefined,
-          result:
-            typeof tcAny.result === 'string'
-              ? (tcAny.result)
-              : undefined,
+            typeof tcAny.preview === 'string' ? tcAny.preview : undefined,
+          result: typeof tcAny.result === 'string' ? tcAny.result : undefined,
         }
       })
     }
@@ -1313,39 +1328,11 @@ function ChatMessageListComponent({
   // Pin the last user+assistant group without adding bottom padding.
   const groupStartIndex = typeof lastUserIndex === 'number' ? lastUserIndex : -1
   const hasGroup = pinToTop && groupStartIndex >= 0
-  const shouldVirtualize = false // Disabled — causes scroll glitches
-
-  const virtualRange = useMemo(() => {
-    if (!shouldVirtualize || scrollMetrics.clientHeight <= 0) {
-      return {
-        startIndex: 0,
-        endIndex: visibleEntries.length,
-        topSpacerHeight: 0,
-        bottomSpacerHeight: 0,
-      }
-    }
-
-    const startIndex = Math.max(
-      0,
-      Math.floor(scrollMetrics.scrollTop / VIRTUAL_ROW_HEIGHT) -
-        VIRTUAL_OVERSCAN,
-    )
-    const visibleCount = Math.ceil(
-      scrollMetrics.clientHeight / VIRTUAL_ROW_HEIGHT,
-    )
-    const endIndex = Math.min(
-      visibleEntries.length,
-      startIndex + visibleCount + VIRTUAL_OVERSCAN * 2,
-    )
-
-    return {
-      startIndex,
-      endIndex,
-      topSpacerHeight: startIndex * VIRTUAL_ROW_HEIGHT,
-      bottomSpacerHeight:
-        (visibleEntries.length - endIndex) * VIRTUAL_ROW_HEIGHT,
-    }
-  }, [scrollMetrics, shouldVirtualize, visibleEntries.length])
+  // Virtualization is intentionally disabled because it causes scroll glitches.
+  const virtualRange = {
+    startIndex: 0,
+    endIndex: visibleEntries.length,
+  }
 
   function isMessageStreaming(message: ChatMessage, index: number) {
     if (!isStreaming || !streamingMessageId) return false
@@ -1429,15 +1416,11 @@ function ChatMessageListComponent({
                   ? 'bg-amber-50/30'
                   : undefined
             }
-            toolCalls={
-              messageIsStreaming ? normalizedStreamingToolCalls : undefined
-            }
+            toolCalls={normalizedStreamingToolCalls}
             isStreaming={messageIsStreaming}
             streamingText={streamingText}
-            streamingThinking={
-              messageIsStreaming ? streamingThinking : undefined
-            }
-            lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
+            streamingThinking={streamingThinking}
+            lifecycleEvents={lifecycleEvents}
             simulateStreaming={simulateStreaming}
             streamingKey={signature}
             expandAllToolSections={expandAllToolSections}
@@ -1463,13 +1446,11 @@ function ChatMessageListComponent({
               ? 'bg-amber-50/30'
               : undefined
         }
-        toolCalls={
-          messageIsStreaming ? normalizedStreamingToolCalls : undefined
-        }
+        toolCalls={undefined}
         isStreaming={messageIsStreaming}
-        streamingText={messageIsStreaming ? streamingText : undefined}
-        streamingThinking={messageIsStreaming ? streamingThinking : undefined}
-        lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
+        streamingText={undefined}
+        streamingThinking={undefined}
+        lifecycleEvents={undefined}
         simulateStreaming={simulateStreaming}
         streamingKey={signature}
         expandAllToolSections={expandAllToolSections}
@@ -1508,8 +1489,7 @@ function ChatMessageListComponent({
     if (isNearBottomRef.current) {
       // Use smooth scroll only when user is near bottom (<200px) and new messages arrive;
       // use instant scroll during streaming to avoid choppiness.
-      const behavior: ScrollBehavior =
-        isNearBottomRef.current && !isStreaming ? 'smooth' : 'auto'
+      const behavior: ScrollBehavior = !isStreaming ? 'smooth' : 'auto'
       frameId = window.requestAnimationFrame(() => scrollToBottom(behavior))
     }
 
@@ -1926,23 +1906,11 @@ function ChatMessageListComponent({
               </>
             ) : (
               <>
-                {shouldVirtualize && virtualRange.topSpacerHeight > 0 ? (
-                  <div
-                    aria-hidden="true"
-                    style={{ height: `${virtualRange.topSpacerHeight}px` }}
-                  />
-                ) : null}
                 {visibleEntries
                   .slice(virtualRange.startIndex, virtualRange.endIndex)
                   .map((entry, index) =>
                     renderMessage(entry, virtualRange.startIndex + index),
                   )}
-                {shouldVirtualize && virtualRange.bottomSpacerHeight > 0 ? (
-                  <div
-                    aria-hidden="true"
-                    style={{ height: `${virtualRange.bottomSpacerHeight}px` }}
-                  />
-                ) : null}
               </>
             )}
             {/* Bottom shimmer + branch TUI card. Hide as soon as the
@@ -1988,37 +1956,39 @@ function ChatMessageListComponent({
                     <div className="min-w-0 flex-1 pt-1">
                       {normalizedStreamingToolCalls.length > 0 ? (
                         <TuiActivityCard
-                          toolSections={normalizedStreamingToolCalls.slice(-3).map((tc) => {
-                            const phase = tc.phase
-                            const state =
-                              phase === 'error'
-                                ? ('output-error' as const)
-                                : phase === 'done'
-                                  ? ('output-available' as const)
-                                  : phase === 'running'
-                                    ? ('input-streaming' as const)
-                                    : ('input-available' as const)
-                            return {
-                              key: tc.id,
-                              type: tc.name,
-                              input:
-                                tc.args &&
-                                typeof tc.args === 'object' &&
-                                !Array.isArray(tc.args)
-                                  ? (tc.args as Record<string, unknown>)
-                                  : undefined,
-                              preview: tc.preview,
-                              outputText:
-                                state === 'output-available'
-                                  ? tc.result || ''
-                                  : '',
-                              errorText:
-                                state === 'output-error'
-                                  ? tc.result || 'Tool failed'
-                                  : undefined,
-                              state,
-                            }
-                          })}
+                          toolSections={normalizedStreamingToolCalls
+                            .slice(-3)
+                            .map((tc) => {
+                              const phase = tc.phase
+                              const state =
+                                phase === 'error'
+                                  ? ('output-error' as const)
+                                  : phase === 'done'
+                                    ? ('output-available' as const)
+                                    : phase === 'running'
+                                      ? ('input-streaming' as const)
+                                      : ('input-available' as const)
+                              return {
+                                key: tc.id,
+                                type: tc.name,
+                                input:
+                                  tc.args &&
+                                  typeof tc.args === 'object' &&
+                                  !Array.isArray(tc.args)
+                                    ? (tc.args as Record<string, unknown>)
+                                    : undefined,
+                                preview: tc.preview,
+                                outputText:
+                                  state === 'output-available'
+                                    ? tc.result || ''
+                                    : '',
+                                errorText:
+                                  state === 'output-error'
+                                    ? tc.result || 'Tool failed'
+                                    : undefined,
+                                state,
+                              }
+                            })}
                           thinking={null}
                           isStreaming={true}
                           formatLabel={(name) => name.replace(/_/g, ' ')}
@@ -2069,7 +2039,7 @@ function getToolGroupClass(
   messages: Array<ChatMessage>,
   index: number,
 ): string {
-  const message = messages[index]
+  const message = (messages as Array<ChatMessage | undefined>)[index]
   if (!message || message.role !== 'assistant') return ''
   const hasToolCalls = getToolCallsFromMessage(message).length > 0
   if (!hasToolCalls) return ''

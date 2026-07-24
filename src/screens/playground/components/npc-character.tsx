@@ -1,8 +1,8 @@
-import { GroupProps } from '@react-three/fiber'
-import type { CharacterArchetypeId } from '../lib/character-config'
 import { HERMESWORLD_CHARACTER_ARCHETYPES } from '../lib/character-config'
+import type { ThreeElements } from '@react-three/fiber'
+import type { CharacterArchetypeId } from '../lib/character-config'
 
-type NpcCharacterProps = GroupProps & {
+type NpcCharacterProps = ThreeElements['group'] & {
   archetypeId: CharacterArchetypeId
   accent?: string
 }
@@ -13,10 +13,15 @@ type NpcCharacterProps = GroupProps & {
  * This gives us a clean component boundary so Agora can stop rendering every
  * character ad hoc inside the giant world scene file.
  */
-export function NpcCharacter({ archetypeId, accent, ...props }: NpcCharacterProps) {
+export function NpcCharacter({
+  archetypeId,
+  accent,
+  ...props
+}: NpcCharacterProps) {
   const archetype =
-    HERMESWORLD_CHARACTER_ARCHETYPES.find((entry) => entry.id === archetypeId) ??
-    HERMESWORLD_CHARACTER_ARCHETYPES[0]
+    HERMESWORLD_CHARACTER_ARCHETYPES.find(
+      (entry) => entry.id === archetypeId,
+    ) ?? HERMESWORLD_CHARACTER_ARCHETYPES[0]
 
   const tint = accent ?? inferTint(archetypeId)
 
@@ -28,11 +33,19 @@ export function NpcCharacter({ archetypeId, accent, ...props }: NpcCharacterProp
       </mesh>
       <mesh castShadow position={[0, 1.75, 0]}>
         <sphereGeometry args={[0.22, 20, 20]} />
-        <meshStandardMaterial color="#f1c9a5" roughness={0.72} metalness={0.02} />
+        <meshStandardMaterial
+          color="#f1c9a5"
+          roughness={0.72}
+          metalness={0.02}
+        />
       </mesh>
       <mesh position={[0, 2.2, 0]}>
         <boxGeometry args={[0.84, 0.06, 0.06]} />
-        <meshStandardMaterial color="#d9b35f" emissive="#2c2110" emissiveIntensity={0.14} />
+        <meshStandardMaterial
+          color="#d9b35f"
+          emissive="#2c2110"
+          emissiveIntensity={0.14}
+        />
       </mesh>
     </group>
   )

@@ -36,11 +36,19 @@ export function useVoiceRecorder(
   const callbacksRef = useRef({ onRecorded, onError })
   callbacksRef.current = { onRecorded, onError }
 
+  const runtimeGlobals = globalThis as {
+    navigator?: {
+      mediaDevices?: {
+        getUserMedia?: MediaDevices['getUserMedia']
+      }
+    }
+    MediaRecorder?: typeof MediaRecorder
+  }
+  const mediaDevices = runtimeGlobals.navigator?.mediaDevices
+  const MediaRecorderConstructor = runtimeGlobals.MediaRecorder
   const isSupported =
-    typeof window !== 'undefined' &&
-    typeof navigator !== 'undefined' &&
-    Boolean(navigator.mediaDevices?.getUserMedia) &&
-    typeof MediaRecorder !== 'undefined'
+    typeof mediaDevices?.getUserMedia === 'function' &&
+    typeof MediaRecorderConstructor !== 'undefined'
 
   const cleanup = useCallback(() => {
     if (timerRef.current) {
@@ -66,7 +74,10 @@ export function useVoiceRecorder(
   }, [cleanup])
 
   const start = useCallback(async () => {
-    if (!isSupported) {
+    if (
+      typeof mediaDevices?.getUserMedia !== 'function' ||
+      !MediaRecorderConstructor
+    ) {
       callbacksRef.current.onError?.('Audio recording not supported')
       return
     }
@@ -79,16 +90,18 @@ export function useVoiceRecorder(
     cleanup()
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await mediaDevices.getUserMedia({ audio: true })
 
       // Prefer webm/opus, fall back to whatever is available
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      const mimeType = MediaRecorderConstructor.isTypeSupported(
+        'audio/webm;codecs=opus',
+      )
         ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
+        : MediaRecorderConstructor.isTypeSupported('audio/webm')
           ? 'audio/webm'
           : 'audio/mp4'
 
-      const recorder = new MediaRecorder(stream, { mimeType })
+      const recorder = new MediaRecorderConstructor(stream, { mimeType })
       chunksRef.current = []
       startTimeRef.current = Date.now()
       setDurationMs(0)
@@ -137,7 +150,7 @@ export function useVoiceRecorder(
       callbacksRef.current.onError?.(msg)
       setState('idle')
     }
-  }, [isSupported, cleanup, stop, maxDurationMs])
+  }, [cleanup, stop, maxDurationMs, mediaDevices, MediaRecorderConstructor])
 
   return {
     state,

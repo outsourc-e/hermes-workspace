@@ -13,9 +13,9 @@ import {
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { AgentProgress } from './agent-progress'
-import type { AgentProgressStatus } from './agent-progress'
 import { KillConfirmDialog } from './kill-confirm-dialog'
 import { SteerModal } from './steer-modal'
+import type { AgentProgressStatus } from './agent-progress'
 import { Button } from '@/components/ui/button'
 import { AgentAvatar } from '@/components/agent-avatar'
 import {
@@ -342,7 +342,10 @@ export function AgentCard({
             Back
           </Button>
           <div className="min-w-0 flex-1">
-            <h4 className="truncate text-sm font-medium text-primary-900" title={node.name}>
+            <h4
+              className="truncate text-sm font-medium text-primary-900"
+              title={node.name}
+            >
               {node.name}
             </h4>
             <p className="mt-0.5 text-[11px] font-mono text-primary-700">
@@ -358,14 +361,23 @@ export function AgentCard({
           <span
             className={cn(
               'inline-flex size-2 shrink-0 rounded-full',
-              node.status === 'failed' ? 'bg-red-400' :
-              node.status === 'thinking' ? 'bg-accent-400 animate-pulse' :
-              node.status === 'complete' ? 'bg-emerald-400' :
-              node.status === 'queued' ? 'bg-primary-500' :
-              'bg-emerald-400 animate-pulse',
+              node.status === 'failed'
+                ? 'bg-red-400'
+                : node.status === 'thinking'
+                  ? 'bg-accent-400 animate-pulse'
+                  : node.status === 'complete'
+                    ? 'bg-emerald-400'
+                    : node.status === 'queued'
+                      ? 'bg-primary-500'
+                      : 'bg-emerald-400 animate-pulse',
             )}
           />
-          <span className={cn('text-[11px] font-medium capitalize', getStatusTextClassName(node.status))}>
+          <span
+            className={cn(
+              'text-[11px] font-medium capitalize',
+              getStatusTextClassName(node.status),
+            )}
+          >
             {getStatusLabel(node.status)}
           </span>
           <span className="ml-auto font-mono text-[10px] text-primary-600 truncate max-w-[120px]">
@@ -375,7 +387,9 @@ export function AgentCard({
 
         {/* Last output / task preview */}
         <div className="mb-3 rounded-xl border border-primary-300/30 bg-primary-200/24 p-2.5">
-          <p className="mb-1 text-[10px] font-medium text-primary-600">Last message</p>
+          <p className="mb-1 text-[10px] font-medium text-primary-600">
+            Last message
+          </p>
           <p className="text-[11px] leading-relaxed text-primary-800">
             {node.task.length > 80 ? `${node.task.slice(0, 80)}…` : node.task}
           </p>
@@ -404,14 +418,19 @@ export function AgentCard({
                 View Output
               </Button>
             ) : null}
-            {(node.status === 'running' || node.status === 'thinking') && onKill ? (
+            {(node.status === 'running' || node.status === 'thinking') &&
+            onKill ? (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-8 px-3 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
                 onClick={() => setKillConfirmOpen(true)}
               >
-                <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.5} />
+                <HugeiconsIcon
+                  icon={Delete02Icon}
+                  size={14}
+                  strokeWidth={1.5}
+                />
                 Kill
               </Button>
             ) : null}
@@ -422,7 +441,11 @@ export function AgentCard({
                 className="h-8 flex-1 justify-center"
                 onClick={() => onCancel?.(node.id)}
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />
+                <HugeiconsIcon
+                  icon={Cancel01Icon}
+                  size={16}
+                  strokeWidth={1.5}
+                />
                 Cancel
               </Button>
             ) : null}
@@ -484,7 +507,10 @@ export function AgentCard({
 
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-2">
-                <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-primary-900" title={node.name}>
+                <h4
+                  className="min-w-0 flex-1 truncate text-sm font-semibold text-primary-900"
+                  title={node.name}
+                >
                   {node.name}
                 </h4>
                 {renderWardenMenu('size-6 shrink-0 rounded-md')}
@@ -503,7 +529,12 @@ export function AgentCard({
                           : 'bg-emerald-400',
                   )}
                 />
-                <span className={cn('truncate font-medium', getStatusTextClassName(node.status))}>
+                <span
+                  className={cn(
+                    'truncate font-medium',
+                    getStatusTextClassName(node.status),
+                  )}
+                >
                   {getStatusLabel(node.status)}
                 </span>
               </div>
@@ -515,9 +546,13 @@ export function AgentCard({
                 {compactModelLabel}
               </p>
 
-              <p className="mt-1 truncate text-[11px] text-primary-700">{node.task}</p>
+              <p className="mt-1 truncate text-[11px] text-primary-700">
+                {node.task}
+              </p>
               <p className="mt-0.5 truncate text-[10px] tabular-nums text-primary-600">
-                {formatRuntime(node.runtimeSeconds)} · {node.tokenCount.toLocaleString()} tokens · ${node.cost.toFixed(2)}
+                {formatRuntime(node.runtimeSeconds)} ·{' '}
+                {node.tokenCount.toLocaleString()} tokens · $
+                {node.cost.toFixed(2)}
               </p>
 
               {showActions ? (
@@ -531,7 +566,11 @@ export function AgentCard({
                         onChat(node.id)
                       }}
                     >
-                      <HugeiconsIcon icon={AiChat01Icon} size={13} strokeWidth={1.5} />
+                      <HugeiconsIcon
+                        icon={AiChat01Icon}
+                        size={13}
+                        strokeWidth={1.5}
+                      />
                       Chat
                     </Button>
                   ) : null}
@@ -542,7 +581,11 @@ export function AgentCard({
                       className="h-7 min-w-0 flex-1 justify-center px-2 text-[11px]"
                       onClick={handleViewClick}
                     >
-                      <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={1.5} />
+                      <HugeiconsIcon
+                        icon={EyeIcon}
+                        size={13}
+                        strokeWidth={1.5}
+                      />
                       View
                     </Button>
                   ) : null}
@@ -617,7 +660,10 @@ export function AgentCard({
           {/* Right: Text content */}
           <div className="flex-1 min-w-0 pt-0.5">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h4 className="truncate font-medium text-primary-900 text-xs" title={node.name}>
+              <h4
+                className="truncate font-medium text-primary-900 text-xs"
+                title={node.name}
+              >
                 {node.name}
               </h4>
               <span
@@ -658,9 +704,12 @@ export function AgentCard({
 
       {!isCompact ? (
         <div className="mt-2 max-h-0 overflow-hidden text-primary-700 tabular-nums opacity-0 transition-all duration-200 group-hover:max-h-48 group-hover:opacity-100">
-          <p className="line-clamp-2 text-pretty text-[11px] text-primary-700">{node.task}</p>
+          <p className="line-clamp-2 text-pretty text-[11px] text-primary-700">
+            {node.task}
+          </p>
           <p className="mt-0.5 truncate text-[10px] tabular-nums text-primary-600">
-            {formatRuntime(node.runtimeSeconds)} · {node.tokenCount.toLocaleString()} tokens · {formatCost(node.cost)}
+            {formatRuntime(node.runtimeSeconds)} ·{' '}
+            {node.tokenCount.toLocaleString()} tokens · {formatCost(node.cost)}
           </p>
 
           {showActions ? (
@@ -675,7 +724,11 @@ export function AgentCard({
                       onChat(node.id)
                     }}
                   >
-                    <HugeiconsIcon icon={AiChat01Icon} size={14} strokeWidth={1.5} />
+                    <HugeiconsIcon
+                      icon={AiChat01Icon}
+                      size={14}
+                      strokeWidth={1.5}
+                    />
                     Chat
                   </Button>
                 ) : null}
@@ -700,7 +753,11 @@ export function AgentCard({
                     }}
                     title="Cancel"
                   >
-                    <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.5} />
+                    <HugeiconsIcon
+                      icon={Cancel01Icon}
+                      size={14}
+                      strokeWidth={1.5}
+                    />
                   </Button>
                 ) : null}
               </div>

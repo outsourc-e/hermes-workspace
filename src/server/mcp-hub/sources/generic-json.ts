@@ -20,8 +20,8 @@ import { assertNotPrivate } from '../lib/ssrf-guard'
 import type { HubMcpEntry, HubTrust } from '../types'
 
 export interface GenericJsonResult {
-  entries: HubMcpEntry[]
-  warnings?: string[]
+  entries: Array<HubMcpEntry>
+  warnings?: Array<string>
   /** True when adapter had a soft failure and may be returning stale/empty data. */
   degraded?: boolean
 }
@@ -47,27 +47,38 @@ interface RawItem {
 /** Maximum allowed response body size (5 MB). */
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 
-function extractItems(data: unknown): unknown[] {
+function extractItems(data: unknown): Array<unknown> {
   if (Array.isArray(data)) return data
   if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>
     const candidate =
-      d.servers ?? d.manifests ?? d.packages ?? d.items ?? d.results ?? d.entries
+      d.servers ??
+      d.manifests ??
+      d.packages ??
+      d.items ??
+      d.results ??
+      d.entries
     if (Array.isArray(candidate)) return candidate
   }
   return []
 }
 
-function parseItems(items: unknown[], sourceId: string, defaultTrust: HubTrust): HubMcpEntry[] {
-  const entries: HubMcpEntry[] = []
+function parseItems(
+  items: Array<unknown>,
+  sourceId: string,
+  defaultTrust: HubTrust,
+): Array<HubMcpEntry> {
+  const entries: Array<HubMcpEntry> = []
 
   for (const item of items) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue
     const raw = item as RawItem
 
     // Prefer qualifiedName → name → displayName
-    const qualified = typeof raw.qualifiedName === 'string' ? raw.qualifiedName.trim() : ''
-    const display = typeof raw.displayName === 'string' ? raw.displayName.trim() : ''
+    const qualified =
+      typeof raw.qualifiedName === 'string' ? raw.qualifiedName.trim() : ''
+    const display =
+      typeof raw.displayName === 'string' ? raw.displayName.trim() : ''
     const fallback = typeof raw.name === 'string' ? raw.name.trim() : ''
     const name = qualified || fallback || display
     if (!name) continue
@@ -80,7 +91,7 @@ function parseItems(items: unknown[], sourceId: string, defaultTrust: HubTrust):
         ? raw.homepage
         : null
 
-    const tags: string[] = Array.isArray(raw.tags)
+    const tags: Array<string> = Array.isArray(raw.tags)
       ? raw.tags.filter((t): t is string => typeof t === 'string')
       : []
 
@@ -93,7 +104,9 @@ function parseItems(items: unknown[], sourceId: string, defaultTrust: HubTrust):
       trust = 'official'
     } else if (
       typeof raw.trust === 'string' &&
-      (raw.trust === 'official' || raw.trust === 'community' || raw.trust === 'unverified')
+      (raw.trust === 'official' ||
+        raw.trust === 'community' ||
+        raw.trust === 'unverified')
     ) {
       trust = raw.trust
     }
@@ -144,36 +157,38 @@ function parseItems(items: unknown[], sourceId: string, defaultTrust: HubTrust):
  * Read the response body with a byte limit of MAX_RESPONSE_BYTES (5 MB).
  * Returns { text, truncated } — if truncated is true the body was cut short.
  */
-async function readBodyWithLimit(response: Response): Promise<{ text: string; truncated: boolean }> {
+async function readBodyWithLimit(
+  response: Response,
+): Promise<{ text: string; truncated: boolean }> {
   if (!response.body) {
     const text = await response.text()
     return { text, truncated: false }
   }
 
   const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
+  const chunks: Array<Uint8Array> = []
   let totalBytes = 0
   let truncated = false
 
   try {
-    while (true) {
+    for (;;) {
       const { done, value } = await reader.read()
       if (done) break
-      if (value) {
-        totalBytes += value.byteLength
-        if (totalBytes > MAX_RESPONSE_BYTES) {
-          truncated = true
-          reader.cancel().catch(() => undefined)
-          break
-        }
-        chunks.push(value)
+      totalBytes += value.byteLength
+      if (totalBytes > MAX_RESPONSE_BYTES) {
+        truncated = true
+        reader.cancel().catch(() => undefined)
+        break
       }
+      chunks.push(value)
     }
   } finally {
     reader.releaseLock()
   }
 
-  const combined = new Uint8Array(totalBytes <= MAX_RESPONSE_BYTES ? totalBytes : MAX_RESPONSE_BYTES)
+  const combined = new Uint8Array(
+    totalBytes <= MAX_RESPONSE_BYTES ? totalBytes : MAX_RESPONSE_BYTES,
+  )
   let offset = 0
   for (const chunk of chunks) {
     combined.set(chunk, offset)
@@ -201,7 +216,7 @@ export async function fetchGenericJson(
   // MEDIUM-2: Cache key includes URL so a URL change auto-invalidates.
   const cacheKey = `${sourceId}:${url}`
   const cached = getCache(cacheKey)
-  const warnings: string[] = []
+  const warnings: Array<string> = []
 
   // HIGH-1: SSRF guard — validate hostname resolves to a public address.
   try {
@@ -230,7 +245,11 @@ export async function fetchGenericJson(
     const msg = err instanceof Error ? err.message : String(err)
     warnings.push(`${sourceId}: network error: ${msg}`)
     if (cached) {
-      return { entries: cached.payload as HubMcpEntry[], warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -238,7 +257,7 @@ export async function fetchGenericJson(
   // 304 Not Modified
   if (response.status === 304) {
     touchCache(cacheKey)
-    const payload = cached ? (cached.payload as HubMcpEntry[]) : []
+    const payload = cached ? (cached.payload as Array<HubMcpEntry>) : []
     return { entries: payload, ...(warnings.length > 0 ? { warnings } : {}) }
   }
 
@@ -246,7 +265,8 @@ export async function fetchGenericJson(
   if (response.status === 403) {
     const remaining = response.headers.get('X-RateLimit-Remaining')
     const resetAt = response.headers.get('X-RateLimit-Reset')
-    const remainingNum = remaining !== null ? parseInt(remaining, 10) : undefined
+    const remainingNum =
+      remaining !== null ? parseInt(remaining, 10) : undefined
     const resetAtNum = resetAt !== null ? parseInt(resetAt, 10) : undefined
 
     warnings.push(
@@ -256,10 +276,16 @@ export async function fetchGenericJson(
     if (cached) {
       setCache(cacheKey, {
         ...cached,
-        ...(remainingNum !== undefined ? { rateLimitRemaining: remainingNum } : {}),
+        ...(remainingNum !== undefined
+          ? { rateLimitRemaining: remainingNum }
+          : {}),
         ...(resetAtNum !== undefined ? { rateLimitResetAt: resetAtNum } : {}),
       })
-      return { entries: cached.payload as HubMcpEntry[], warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -267,7 +293,11 @@ export async function fetchGenericJson(
   if (!response.ok) {
     warnings.push(`${sourceId}: unexpected status ${response.status}`)
     if (cached) {
-      return { entries: cached.payload as HubMcpEntry[], warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -277,7 +307,11 @@ export async function fetchGenericJson(
   if (truncated) {
     warnings.push(`${sourceId}: Response too large (>5MB)`)
     if (cached) {
-      return { entries: cached.payload as HubMcpEntry[], warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -290,7 +324,11 @@ export async function fetchGenericJson(
     const msg = err instanceof Error ? err.message : String(err)
     warnings.push(`${sourceId}: failed to parse JSON: ${msg}`)
     if (cached) {
-      return { entries: cached.payload as HubMcpEntry[], warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }

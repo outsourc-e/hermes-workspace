@@ -133,7 +133,9 @@ type ChatState = {
 
   /** Sessions currently waiting for a response — survives component unmount */
   waitingSessionKeys: Set<string>
-  waitingSessionMeta: Record<string, { since: number; runId: string | null }>
+  waitingSessionMeta: Partial<
+    Record<string, { since: number; runId: string | null }>
+  >
   /** Mark a session as waiting for a response */
   setSessionWaiting: (sessionKey: string, runId?: string | null) => void
   /** Clear waiting state for a session */
@@ -267,10 +269,11 @@ function removeWaitingState(sessionKey: string): void {
 
 function restoreWaitingSessions(): {
   keys: Set<string>
-  meta: Record<string, { since: number; runId: string | null }>
+  meta: Partial<Record<string, { since: number; runId: string | null }>>
 } {
   const keys = new Set<string>()
-  const meta: Record<string, { since: number; runId: string | null }> = {}
+  const meta: Partial<Record<string, { since: number; runId: string | null }>> =
+    {}
   if (typeof sessionStorage === 'undefined') return { keys, meta }
 
   const now = Date.now()
@@ -858,6 +861,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (optimisticIndex >= 0) {
           const optimisticMessage = sessionMessages[optimisticIndex]
+          if (!optimisticMessage) break
           const incomingText = extractMessageText(incomingMessage)
           const optimisticText = extractMessageText(optimisticMessage)
           const incomingHasAttachments =
@@ -913,11 +917,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
             newPlainText.length === 0 &&
             sessionMessages.length > 0
           ) {
-            const prevEmptyIdx = sessionMessages.findLastIndex(
-              (m) =>
-                m.role === 'assistant' &&
-                extractMessageText(m).length === 0,
-            )
+            let prevEmptyIdx = -1
+            for (
+              let index = sessionMessages.length - 1;
+              index >= 0;
+              index -= 1
+            ) {
+              const candidate = sessionMessages[index]
+              if (
+                candidate?.role === 'assistant' &&
+                extractMessageText(candidate).length === 0
+              ) {
+                prevEmptyIdx = index
+                break
+              }
+            }
             if (prevEmptyIdx >= 0) {
               sessionMessages[prevEmptyIdx] = incomingMessage
               messages.set(
@@ -1002,17 +1016,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
         )
 
         const nextToolCalls = [...prev.toolCalls]
+        const existingToolCall = nextToolCalls[existingToolIndex]
 
-        if (existingToolIndex >= 0) {
+        if (existingToolCall) {
           nextToolCalls[existingToolIndex] = {
-            ...nextToolCalls[existingToolIndex],
+            ...existingToolCall,
             phase: event.phase,
-            args: event.args ?? nextToolCalls[existingToolIndex].args,
-            preview:
-              (event as any).preview ??
-              nextToolCalls[existingToolIndex].preview,
-            result:
-              (event as any).result ?? nextToolCalls[existingToolIndex].result,
+            args: event.args ?? existingToolCall.args,
+            preview: (event as any).preview ?? existingToolCall.preview,
+            result: (event as any).result ?? existingToolCall.result,
           }
         } else {
           // Create entry for ANY phase (complete, error, skill.loaded, artifact.created, etc.)
@@ -1057,7 +1069,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // ToolCallPill can render them even after streaming state is cleared.
           // Fast tool runs clear streaming state before React renders — embedding
           // __streamToolCalls ensures pills survive in the history message.
-          const streamToolCallsToEmbed = streaming?.toolCalls?.length
+          const streamToolCallsToEmbed = streaming?.toolCalls.length
             ? streaming.toolCalls
             : undefined
           completeMessage = {
@@ -1249,7 +1261,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // returns the complete message after the realtime buffer had a
         // partial version.
         if (rtText.length > 0 && histText.length > 0) {
-          if (histText.startsWith(rtText) || rtText.startsWith(histText)) return true
+          if (histText.startsWith(rtText) || rtText.startsWith(histText))
+            return true
         }
       }
 

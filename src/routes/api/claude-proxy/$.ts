@@ -21,15 +21,27 @@ async function fallbackAvailableModels(
         headers: { 'content-type': 'application/json' },
       })
     }
-    const data = (await res.json()) as { data?: Array<Record<string, unknown>> }
-    const list = Array.isArray(data?.data) ? data.data : []
+    const data: unknown = await res.json()
+    const list =
+      data &&
+      typeof data === 'object' &&
+      'data' in data &&
+      Array.isArray(data.data)
+        ? data.data.filter(
+            (item): item is Record<string, unknown> =>
+              item !== null && typeof item === 'object',
+          )
+        : []
     const wanted = provider.toLowerCase()
     const models = list
       .map((m) => {
         const id = typeof m.id === 'string' ? m.id : ''
         if (!id) return null
-        const owned = typeof m.owned_by === 'string' ? m.owned_by.toLowerCase() : ''
-        const idProvider = id.includes('/') ? id.split('/')[0].toLowerCase() : owned
+        const owned =
+          typeof m.owned_by === 'string' ? m.owned_by.toLowerCase() : ''
+        const idProvider = id.includes('/')
+          ? (id.split('/', 1).at(0)?.toLowerCase() ?? owned)
+          : owned
         if (wanted && idProvider !== wanted) return null
         return { id }
       })

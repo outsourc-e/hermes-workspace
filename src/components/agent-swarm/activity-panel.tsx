@@ -2,12 +2,12 @@
  * ActivityPanel — Right sidebar showing live agent activity feed, roster, and stats.
  */
 import { useMemo } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
-import { assignPersona } from '@/lib/agent-personas'
+import { AnimatePresence, motion } from 'motion/react'
 import { PERSONA_COLORS } from './pixel-avatar'
-import type { SwarmSession } from '@/stores/agent-swarm-store'
-import { cn } from '@/lib/utils'
 import { getSwarmSessionDisplayName } from './session-display-name'
+import type { SwarmSession } from '@/stores/agent-swarm-store'
+import { assignPersona } from '@/lib/agent-personas'
+import { cn } from '@/lib/utils'
 
 type ActivityPanelProps = {
   sessions: Array<SwarmSession>
@@ -65,7 +65,9 @@ function AgentRosterItem({ session }: { session: SwarmSession }) {
     session.task ?? session.initialMessage ?? session.label ?? '',
   )
   const displayName = getSwarmSessionDisplayName(session)
-  const colors = PERSONA_COLORS[persona.name]
+  const colors = PERSONA_COLORS[persona.name] as
+    | { body: string; accent: string }
+    | undefined
   const tokens =
     session.usage?.totalTokens ?? session.totalTokens ?? session.tokenCount ?? 0
   const isActive =

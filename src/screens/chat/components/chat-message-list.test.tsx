@@ -45,7 +45,7 @@ describe('buildDisplayEntries', () => {
 
     expect(entries).toHaveLength(2)
     expect(entries.map((entry) => entry.message.id)).toEqual(['u1', 'a1'])
-    expect(entries[1].attachedToolMessages).toHaveLength(0)
+    expect(entries[1]?.attachedToolMessages).toHaveLength(0)
   })
 })
 

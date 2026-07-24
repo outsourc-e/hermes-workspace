@@ -207,7 +207,7 @@ describe('buildDashboardOverview', () => {
     const overview = await buildDashboardOverview({ fetcher })
     expect(overview.skillsUsage?.distinctSkills).toBe(55)
     expect(overview.skillsUsage?.topSkills).toHaveLength(2)
-    expect(overview.skillsUsage?.topSkills[0].skill).toBe(
+    expect(overview.skillsUsage?.topSkills[0]?.skill).toBe(
       'systematic-debugging',
     )
     const skillInsight = overview.insights.find((i) =>

@@ -1,5 +1,8 @@
 export function hapticTap() {
   try {
-    navigator.vibrate?.(8)
+    const runtimeNavigator = globalThis as {
+      navigator?: { vibrate?: (pattern: number) => boolean }
+    }
+    runtimeNavigator.navigator?.vibrate?.(8)
   } catch {}
 }

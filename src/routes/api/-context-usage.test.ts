@@ -1,5 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  dashboardFetch,
+  ensureGatewayProbed,
+  getCapabilities,
+} from '../../server/gateway-capabilities'
+import { listSessions } from '../../server/claude-api'
+import {
+  getLocalMessages,
+  getLocalSession,
+} from '../../server/local-session-store'
+import {
+  estimateContextTokensFromCacheRead,
+  estimateContextTokensFromMessages,
+  estimateContextTokensFromSessionUsage,
+  readContextUsage,
+} from '../../server/context-usage'
+
 vi.mock('../../server/gateway-capabilities', () => ({
   BEARER_TOKEN: '',
   CLAUDE_API: 'http://127.0.0.1:8642',
@@ -17,20 +34,6 @@ vi.mock('../../server/local-session-store', () => ({
   getLocalSession: vi.fn(() => null),
 }))
 
-import {
-  dashboardFetch,
-  ensureGatewayProbed,
-  getCapabilities,
-} from '../../server/gateway-capabilities'
-import { listSessions } from '../../server/claude-api'
-import { getLocalMessages, getLocalSession } from '../../server/local-session-store'
-import {
-  estimateContextTokensFromCacheRead,
-  estimateContextTokensFromMessages,
-  estimateContextTokensFromSessionUsage,
-  readContextUsage,
-} from '../../server/context-usage'
-
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.clearAllMocks()
@@ -38,19 +41,20 @@ afterEach(() => {
 
 describe('context usage estimation', () => {
   it('prefers live gateway runtime snapshots when the vanilla runtime endpoint is available', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          model: 'anthropic/claude-sonnet-4-20250514',
-          context_tokens: 4321,
-          context_length: 200000,
-          context_percent: 2,
-          prompt_tokens: 111,
-          completion_tokens: 22,
-          total_tokens: 133,
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            model: 'anthropic/claude-sonnet-4-20250514',
+            context_tokens: 4321,
+            context_length: 200000,
+            context_percent: 2,
+            prompt_tokens: 111,
+            completion_tokens: 22,
+            total_tokens: 133,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     )
     vi.stubGlobal('fetch', fetchMock)
 
@@ -113,7 +117,10 @@ describe('context usage estimation', () => {
   })
 
   it('prefers configured dashboard context length for local Workspace-only chats', async () => {
-    vi.mocked(getLocalSession).mockReturnValue({ id: 'local-1', model: null } as any)
+    vi.mocked(getLocalSession).mockReturnValue({
+      id: 'local-1',
+      model: null,
+    } as any)
     vi.mocked(getLocalMessages).mockReturnValue([
       { content: 'x'.repeat(700) },
     ] as any)
@@ -237,7 +244,9 @@ describe('context usage estimation', () => {
       dashboard: { available: true },
     } as any)
 
-    const fetchMock = vi.fn(async () => new Response('not found', { status: 404 }))
+    const fetchMock = vi.fn(
+      async () => new Response('not found', { status: 404 }),
+    )
     vi.stubGlobal('fetch', fetchMock)
     vi.mocked(dashboardFetch).mockResolvedValue(
       new Response(
@@ -280,7 +289,10 @@ describe('context usage estimation', () => {
   })
 
   it('uses structured message estimation for local sessions instead of string-only content lengths', async () => {
-    vi.mocked(getLocalSession).mockReturnValue({ id: 'local-structured', model: null } as any)
+    vi.mocked(getLocalSession).mockReturnValue({
+      id: 'local-structured',
+      model: null,
+    } as any)
     vi.mocked(getLocalMessages).mockReturnValue([
       {
         content: [{ type: 'tool_result', text: 'x'.repeat(400) }],
@@ -293,7 +305,9 @@ describe('context usage estimation', () => {
       dashboard: { available: true },
     } as any)
 
-    const fetchMock = vi.fn(async () => new Response('not found', { status: 404 }))
+    const fetchMock = vi.fn(
+      async () => new Response('not found', { status: 404 }),
+    )
     vi.stubGlobal('fetch', fetchMock)
     vi.mocked(dashboardFetch).mockResolvedValue(
       new Response(
@@ -341,45 +355,25 @@ describe('context usage estimation', () => {
   })
 
   it('estimates context from average input tokens per API call', () => {
-    const estimate = estimateContextTokensFromSessionUsage(
-      21019,
-      31360,
-      0,
-      9,
-    )
+    const estimate = estimateContextTokensFromSessionUsage(21019, 31360, 0, 9)
 
     expect(estimate).toBe(5820)
   })
 
   it('sums input, cache_read, and cache_write before averaging', () => {
-    const estimate = estimateContextTokensFromSessionUsage(
-      5000,
-      3000,
-      2000,
-      5,
-    )
+    const estimate = estimateContextTokensFromSessionUsage(5000, 3000, 2000, 5)
 
     expect(estimate).toBe(2000)
   })
 
   it('handles zero API calls by treating as a single call', () => {
-    const estimate = estimateContextTokensFromSessionUsage(
-      10000,
-      0,
-      0,
-      0,
-    )
+    const estimate = estimateContextTokensFromSessionUsage(10000, 0, 0, 0)
 
     expect(estimate).toBe(10000)
   })
 
   it('handles missing or NaN token fields as zero', () => {
-    const estimate = estimateContextTokensFromSessionUsage(
-      NaN,
-      NaN,
-      NaN,
-      5,
-    )
+    const estimate = estimateContextTokensFromSessionUsage(NaN, NaN, NaN, 5)
 
     expect(estimate).toBe(0)
   })

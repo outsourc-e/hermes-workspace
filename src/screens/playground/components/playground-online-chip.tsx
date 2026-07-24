@@ -29,24 +29,34 @@ type Stats = {
 type Transport = 'offline' | 'broadcast' | 'ws' | 'both'
 
 const STATS_URL =
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_PLAYGROUND_STATS_URL) || ''
+  (typeof import.meta !== 'undefined' &&
+    (import.meta as any).env?.VITE_PLAYGROUND_STATS_URL) ||
+  ''
 
-export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }) {
+function isAborted(signal: AbortSignal): boolean {
+  return signal.aborted
+}
+
+export function PlaygroundOnlineChip({
+  accent = '#34d399',
+}: {
+  accent?: string
+}) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [transport, setTransport] = useState<Transport>('offline')
   const [reachable, setReachable] = useState<boolean | null>(null)
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
 
     const onCount = (ev: Event) => {
-      const detail = (ev as CustomEvent).detail as Stats
+      const detail = (ev as CustomEvent<Stats | undefined>).detail
       if (!detail) return
       setStats(detail)
       setReachable(true)
     }
     const onTransport = (ev: Event) => {
-      const detail = (ev as CustomEvent).detail as Transport
+      const detail = (ev as CustomEvent<Transport | undefined>).detail
       if (detail) setTransport(detail)
     }
     window.addEventListener('hermes-playground-count', onCount)
@@ -55,12 +65,14 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
     // Pre-populate from window globals if hook fired before mount.
     const cur = (window as any).__hermesPlaygroundLiveCount as Stats | undefined
     if (cur) setStats(cur)
-    const curT = (window as any).__hermesPlaygroundLiveTransport as Transport | undefined
+    const curT = (window as any).__hermesPlaygroundLiveTransport as
+      | Transport
+      | undefined
     if (curT) setTransport(curT)
 
     // Fallback: one-shot /stats fetch if no push arrives in 3s.
     const fallbackId = window.setTimeout(async () => {
-      if (cancelled || stats) return
+      if (isAborted(controller.signal) || stats) return
       if (!STATS_URL) {
         setReachable(false)
         return
@@ -69,22 +81,22 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
         const r = await fetch(STATS_URL, { cache: 'no-store' })
         if (!r.ok) throw new Error(String(r.status))
         const data = (await r.json()) as Stats
-        if (cancelled) return
+        if (isAborted(controller.signal)) return
         setStats(data)
         setReachable(true)
       } catch {
-        if (cancelled) return
+        if (isAborted(controller.signal)) return
         setReachable(false)
       }
     }, 3000)
 
     return () => {
-      cancelled = true
+      controller.abort()
       window.clearTimeout(fallbackId)
       window.removeEventListener('hermes-playground-count', onCount)
       window.removeEventListener('hermes-playground-transport', onTransport)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
   }, [])
 
   // Hide entirely when no stats URL configured AND no WS event ever arrived.
@@ -95,7 +107,8 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
   // count from /stats (it does NOT include you yet because you haven't connected).
   const liveConnected = transport === 'ws' || transport === 'both'
   const n = stats?.online ?? 0
-  const displayCount = stats == null ? '—' : liveConnected ? String(n) : n === 0 ? '0' : String(n)
+  const displayCount =
+    stats == null ? '—' : liveConnected ? String(n) : n === 0 ? '0' : String(n)
   const status: { color: string; label: string } = (() => {
     switch (transport) {
       case 'both':
@@ -137,11 +150,16 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
           borderRadius: '50%',
           background: status.color,
           boxShadow: `0 0 8px ${status.color}`,
-          animation: status.color === '#34d399' ? 'pulse-online 2s ease-in-out infinite' : undefined,
+          animation:
+            status.color === '#34d399'
+              ? 'pulse-online 2s ease-in-out infinite'
+              : undefined,
         }}
       />
       <span>Players online</span>
-      <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/80">{displayCount}</span>
+      <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/80">
+        {displayCount}
+      </span>
       {stats?.peakToday && stats.peakToday > 0 && (
         <span className="text-white/45">· peak {stats.peakToday}</span>
       )}

@@ -81,7 +81,7 @@ export function ModelSuggestionToast({
 function getModelDisplayName(modelId: string): string {
   // Extract readable name from model ID
   const parts = modelId.split('/')
-  const name = parts[parts.length - 1]
+  const name = parts[parts.length - 1] ?? modelId
 
   // Capitalize and format
   return name

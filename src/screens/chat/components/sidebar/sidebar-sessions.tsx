@@ -183,6 +183,7 @@ function areSidebarSessionsEqual(
   for (let i = 0; i < prev.sessions.length; i += 1) {
     const prevSession = prev.sessions[i]
     const nextSession = next.sessions[i]
+    if (!prevSession || !nextSession) return false
     if (prevSession.key !== nextSession.key) return false
     if (prevSession.friendlyId !== nextSession.friendlyId) return false
     if (prevSession.label !== nextSession.label) return false

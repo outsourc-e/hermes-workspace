@@ -22,7 +22,7 @@ export function OperationsAgentJobs({
   slugifyJobLabel,
 }: {
   agentId: string
-  jobs: CronJob[]
+  jobs: Array<CronJob>
   slugifyJobLabel: (value: string) => string
 }) {
   const queryClient = useQueryClient()
@@ -144,7 +144,11 @@ export function OperationsAgentJobs({
                 </div>
                 <div className="text-sm text-[var(--theme-muted)] md:text-right">
                   <p className="inline-flex items-center gap-2 md:justify-end">
-                    <HugeiconsIcon icon={Clock01Icon} size={16} strokeWidth={1.8} />
+                    <HugeiconsIcon
+                      icon={Clock01Icon}
+                      size={16}
+                      strokeWidth={1.8}
+                    />
                     {job.schedule}
                   </p>
                   <p className="mt-1">
@@ -169,7 +173,9 @@ export function OperationsAgentJobs({
         <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-2">
-              <span className="text-sm font-medium text-[var(--theme-text)]">Job Name</span>
+              <span className="text-sm font-medium text-[var(--theme-text)]">
+                Job Name
+              </span>
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
@@ -178,7 +184,9 @@ export function OperationsAgentJobs({
               />
             </label>
             <label className="space-y-2">
-              <span className="text-sm font-medium text-[var(--theme-text)]">Schedule</span>
+              <span className="text-sm font-medium text-[var(--theme-text)]">
+                Schedule
+              </span>
               <input
                 value={schedule}
                 onChange={(event) => setSchedule(event.target.value)}
@@ -188,7 +196,9 @@ export function OperationsAgentJobs({
             </label>
           </div>
           <label className="mt-3 block space-y-2">
-            <span className="text-sm font-medium text-[var(--theme-text)]">Description</span>
+            <span className="text-sm font-medium text-[var(--theme-text)]">
+              Description
+            </span>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}

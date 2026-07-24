@@ -179,7 +179,7 @@ export function useAutoSessionTitle({
     onError: (error, payload) => {
       updateSessionTitleState(payload.friendlyId, {
         status: 'error',
-        error: error instanceof Error ? error.message : String(error ?? ''),
+        error: error instanceof Error ? error.message : String(error),
       })
     },
   })

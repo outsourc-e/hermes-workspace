@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
-import { join, extname } from 'node:path'
+import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import server from './dist/server/server.js'
 
@@ -160,7 +160,8 @@ async function tryServeStatic(req, res) {
     } catch {
       res.writeHead(404, {
         'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control':
+          'no-store, no-cache, must-revalidate, proxy-revalidate',
       })
       res.end('Asset not found')
       return true
@@ -231,6 +232,15 @@ async function requestHandler(req, res) {
     body,
     duplex: 'half',
   })
+  // Preserve the trusted Node socket peer for the auth boundary. Fetch Request
+  // intentionally has no remoteAddress, so this adapter is the only place we
+  // can safely attach it before user-controlled headers are considered.
+  if (typeof req.socket.remoteAddress === 'string') {
+    Object.defineProperty(request, 'remoteAddress', {
+      value: req.socket.remoteAddress,
+      enumerable: false,
+    })
+  }
 
   try {
     const response = await server.fetch(request)
@@ -265,7 +275,7 @@ async function requestHandler(req, res) {
     if (response.body) {
       const reader = response.body.getReader()
       const pump = async () => {
-        while (true) {
+        for (;;) {
           const { done, value } = await reader.read()
           if (done) break
           res.write(value)

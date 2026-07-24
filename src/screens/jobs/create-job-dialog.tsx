@@ -54,7 +54,9 @@ export function CreateJobDialog({
   onSubmit,
 }: CreateJobDialogProps) {
   const activeProfile =
-    profiles.find((profile) => profile.active)?.name ?? profiles[0].name
+    profiles.find((profile) => profile.active)?.name ??
+    profiles.at(0)?.name ??
+    ''
   const [form, setForm] = useState(() => getInitialState(activeProfile))
 
   useEffect(() => {

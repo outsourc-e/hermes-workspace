@@ -125,8 +125,9 @@ function parseExecNotification(text: string): ExecNotification | null {
 
   if (!name) {
     const withoutPrefix = trimmed.replace(/^Exec completed[:\s-]*/i, '').trim()
-    const nameMatch = withoutPrefix.match(/^([^\(\{\[]+?)(?:\s*\(|\s*$)/)
-    if (nameMatch) name = nameMatch[1].trim()
+    const nameMatch = withoutPrefix.match(/^([^([{]+?)(?:\s*\(|\s*$)/)
+    const matchedName = nameMatch?.[1]
+    if (matchedName) name = matchedName.trim()
   }
 
   if (exitCode === null) {
@@ -165,13 +166,11 @@ function getAttachmentSignature(message: ChatMessage): string {
 
   return message.attachments
     .map((attachment) => {
-      const name = typeof attachment?.name === 'string' ? attachment.name : ''
+      const name = typeof attachment.name === 'string' ? attachment.name : ''
       const size =
-        typeof attachment?.size === 'number' ? String(attachment.size) : ''
+        typeof attachment.size === 'number' ? String(attachment.size) : ''
       const type =
-        typeof attachment?.contentType === 'string'
-          ? attachment.contentType
-          : ''
+        typeof attachment.contentType === 'string' ? attachment.contentType : ''
       return `${name}:${size}:${type}`
     })
     .sort()
@@ -188,8 +187,7 @@ function isOptimisticUserMessage(message: ChatMessage): boolean {
   // being treated as pending and duplicated in the transcript.
   if (status === 'sent' || status === 'done') return false
   return (
-    status === 'sending' ||
-    normalizeMessageValue(raw.__optimisticId).length > 0
+    status === 'sending' || normalizeMessageValue(raw.__optimisticId).length > 0
   )
 }
 
@@ -339,10 +337,10 @@ export function useChatHistory({
       const cached = queryClient.getQueryData(historyKey)
       const optimisticMessages = Array.isArray((cached as any)?.messages)
         ? (cached as any).messages.filter((message: any) => {
-          if (message.status === 'sending') return true
-          if (message.__optimisticId) return true
-          return Boolean(message.clientId)
-        })
+            if (message.status === 'sending') return true
+            if (message.__optimisticId) return true
+            return Boolean(message.clientId)
+          })
         : []
 
       const serverData = await fetchHistory({
@@ -432,6 +430,7 @@ export function useChatHistory({
 
     const latestOptimisticMessage =
       optimisticMessages[optimisticMessages.length - 1]
+    if (!latestOptimisticMessage) return
 
     persistPendingMessage({
       sessionKey: sessionKeyForHistory,
@@ -462,8 +461,8 @@ export function useChatHistory({
   const historyMessages = useMemo(() => {
     const messages = persistedPending
       ? mergeOptimisticHistoryMessages(rawHistoryMessages, [
-        persistedPending.optimisticMessage,
-      ])
+          persistedPending.optimisticMessage,
+        ])
       : rawHistoryMessages
     const last = messages[messages.length - 1]
     const lastId =
@@ -493,7 +492,7 @@ export function useChatHistory({
         const text = textFromMessage(msg)
         const execNotification = parseExecNotification(text)
         if (execNotification) {
-          ; (msg as any).__execNotification = execNotification
+          ;(msg as any).__execNotification = execNotification
           return true
         }
         if ((msg as any).__execNotification) {
@@ -551,6 +550,7 @@ export function useChatHistory({
     // Messages with real text + tool calls are real responses — always show them
     for (let i = 0; i < filtered.length; i++) {
       const msg = filtered[i]
+      if (!msg) continue
       if (msg.role !== 'assistant') continue
       const content = Array.isArray(msg.content) ? msg.content : []
       const hasToolCall = content.some(
@@ -580,7 +580,7 @@ export function useChatHistory({
           filtered.splice(i, 1)
           i--
         } else {
-          ; (msg as any).__isNarration = true
+          ;(msg as any).__isNarration = true
         }
       }
     }
@@ -685,6 +685,7 @@ function mergeOptimisticHistoryMessages(
 
     if (matchingServerIndex >= 0) {
       const serverMessage = merged[matchingServerIndex]
+      if (!serverMessage) continue
       const serverHasAttachments =
         Array.isArray(serverMessage.attachments) &&
         serverMessage.attachments.length > 0

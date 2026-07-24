@@ -5,7 +5,13 @@ import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { cn } from '@/lib/utils'
 
-type ReportState = 'all' | 'needs_review' | 'ready' | 'blocked' | 'in_progress' | 'artifact'
+type ReportState =
+  | 'all'
+  | 'needs_review'
+  | 'ready'
+  | 'blocked'
+  | 'in_progress'
+  | 'artifact'
 type ReportLayout = 'board' | 'cards' | 'list'
 
 type RuntimeArtifact = {
@@ -120,6 +126,7 @@ type WorkerReportCard = {
   readyCount: number
   blockedCount: number
   artifactCount: number
+  prUrl: string | null
 }
 
 const STATE_FILTERS: Array<{ id: ReportState; label: string }> = [
@@ -142,7 +149,9 @@ function compact(value: string | null | undefined, max = 180): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
-function splitChangedFiles(value: string | null | undefined): Array<RuntimeArtifact> {
+function splitChangedFiles(
+  value: string | null | undefined,
+): Array<RuntimeArtifact> {
   return clean(value, '')
     .split(/\n|,/)
     .map((item) => item.trim())
@@ -157,9 +166,12 @@ function splitChangedFiles(value: string | null | undefined): Array<RuntimeArtif
     }))
 }
 
-function stateForAssignment(assignment: MissionAssignment): Exclude<ReportState, 'all'> {
+function stateForAssignment(
+  assignment: MissionAssignment,
+): Exclude<ReportState, 'all'> {
   const checkpoint = assignment.checkpoint
-  const statusText = `${assignment.state ?? ''} ${checkpoint?.stateLabel ?? ''} ${checkpoint?.checkpointStatus ?? ''}`.toLowerCase()
+  const statusText =
+    `${assignment.state ?? ''} ${checkpoint?.stateLabel ?? ''} ${checkpoint?.checkpointStatus ?? ''}`.toLowerCase()
   if (
     statusText.includes('blocked') ||
     statusText.includes('needs_input') ||
@@ -167,17 +179,42 @@ function stateForAssignment(assignment: MissionAssignment): Exclude<ReportState,
   ) {
     return 'blocked'
   }
-  if (assignment.reviewRequired && ['checkpointed', 'reviewing'].includes(assignment.state ?? '')) return 'needs_review'
-  if (['done', 'complete'].includes(assignment.state ?? '') || statusText.includes('handoff') || statusText.includes('done')) return 'ready'
+  if (
+    assignment.reviewRequired &&
+    ['checkpointed', 'reviewing'].includes(assignment.state ?? '')
+  )
+    return 'needs_review'
+  if (
+    ['done', 'complete'].includes(assignment.state ?? '') ||
+    statusText.includes('handoff') ||
+    statusText.includes('done')
+  )
+    return 'ready'
   return 'in_progress'
 }
 
-function stateForRuntime(entry: RuntimeReportEntry): Exclude<ReportState, 'all'> {
-  const statusText = `${entry.checkpointStatus ?? ''} ${entry.currentTask ?? ''}`.toLowerCase()
-  if (entry.blockedReason || entry.needsHuman || statusText.includes('blocked') || statusText.includes('needs_input')) return 'blocked'
+function stateForRuntime(
+  entry: RuntimeReportEntry,
+): Exclude<ReportState, 'all'> {
+  const statusText =
+    `${entry.checkpointStatus ?? ''} ${entry.currentTask ?? ''}`.toLowerCase()
+  if (
+    entry.blockedReason ||
+    entry.needsHuman ||
+    statusText.includes('blocked') ||
+    statusText.includes('needs_input')
+  )
+    return 'blocked'
   if (statusText.includes('review')) return 'needs_review'
-  if (statusText.includes('done') || statusText.includes('handoff') || entry.lastResult || entry.lastRealResult) return 'ready'
-  if ((entry.artifacts?.length ?? 0) > 0 || (entry.previews?.length ?? 0) > 0) return 'artifact'
+  if (
+    statusText.includes('done') ||
+    statusText.includes('handoff') ||
+    entry.lastResult ||
+    entry.lastRealResult
+  )
+    return 'ready'
+  if ((entry.artifacts?.length ?? 0) > 0 || (entry.previews?.length ?? 0) > 0)
+    return 'artifact'
   return 'in_progress'
 }
 
@@ -203,7 +240,9 @@ export function buildSwarm2ReportRows({
   missions: Array<MissionSummary>
   runtimes: Array<RuntimeReportEntry>
 }): Array<Swarm2ReportRow> {
-  const runtimeByWorker = new Map(runtimes.map((entry) => [entry.workerId, entry]))
+  const runtimeByWorker = new Map(
+    runtimes.map((entry) => [entry.workerId, entry]),
+  )
   const rows: Array<Swarm2ReportRow> = []
 
   for (const mission of missions) {
@@ -225,9 +264,15 @@ export function buildSwarm2ReportRows({
         workerName: runtime?.displayName || workerId,
         state,
         stateLabel: stateLabel(state),
-        updatedAt: assignment.completedAt ?? mission.updatedAt ?? runtime?.lastOutputAt ?? null,
-        summary: compact(checkpoint?.result ?? checkpoint?.blocker ?? checkpoint?.nextAction ?? assignment.task),
-        checkpointStatus: checkpoint?.checkpointStatus ?? checkpoint?.stateLabel ?? null,
+        updatedAt: assignment.completedAt ?? mission.updatedAt,
+        summary: compact(
+          checkpoint?.result ??
+            checkpoint?.blocker ??
+            checkpoint?.nextAction ??
+            assignment.task,
+        ),
+        checkpointStatus:
+          checkpoint?.checkpointStatus ?? checkpoint?.stateLabel ?? null,
         blocker: checkpoint?.blocker ?? null,
         nextAction: checkpoint?.nextAction ?? null,
         reviewRequired: assignment.reviewRequired === true,
@@ -240,10 +285,17 @@ export function buildSwarm2ReportRows({
           { label: 'Commands run', value: clean(checkpoint?.commandsRun) },
           { label: 'Blocker', value: clean(checkpoint?.blocker) },
           { label: 'Next action', value: clean(checkpoint?.nextAction) },
-          { label: 'Checkpoint', value: clean(checkpoint?.checkpointStatus ?? checkpoint?.stateLabel) },
+          {
+            label: 'Checkpoint',
+            value: clean(
+              checkpoint?.checkpointStatus ?? checkpoint?.stateLabel,
+            ),
+          },
           { label: 'Reviewer', value: clean(assignment.reviewedBy) },
         ],
-        artifacts: inferredArtifacts.length ? inferredArtifacts : runtime?.artifacts ?? [],
+        artifacts: inferredArtifacts.length
+          ? inferredArtifacts
+          : (runtime?.artifacts ?? []),
         previews: runtime?.previews ?? [],
       })
     }
@@ -263,8 +315,19 @@ export function buildSwarm2ReportRows({
     const state = stateForRuntime(runtime)
     rows.push({
       id: `runtime:${runtime.workerId}:${runtime.lastOutputAt ?? runtime.lastSessionStartedAt ?? 'latest'}`,
-      kind: (runtime.artifacts?.length ?? 0) > 0 || (runtime.previews?.length ?? 0) > 0 ? 'artifact' : 'runtime',
-      title: clean(runtime.currentTask ?? runtime.lastRealSummary ?? runtime.lastSummary ?? runtime.lastRealResult ?? runtime.lastResult, 'Runtime output'),
+      kind:
+        (runtime.artifacts?.length ?? 0) > 0 ||
+        (runtime.previews?.length ?? 0) > 0
+          ? 'artifact'
+          : 'runtime',
+      title: clean(
+        runtime.currentTask ??
+          runtime.lastRealSummary ??
+          runtime.lastSummary ??
+          runtime.lastRealResult ??
+          runtime.lastResult,
+        'Runtime output',
+      ),
       missionId: null,
       missionTitle: null,
       assignmentId: null,
@@ -273,7 +336,14 @@ export function buildSwarm2ReportRows({
       state,
       stateLabel: stateLabel(state),
       updatedAt: runtime.lastOutputAt ?? runtime.lastSessionStartedAt ?? null,
-      summary: compact(runtime.blockedReason ?? runtime.lastRealResult ?? runtime.lastResult ?? runtime.lastRealSummary ?? runtime.lastSummary ?? runtime.currentTask),
+      summary: compact(
+        runtime.blockedReason ??
+          runtime.lastRealResult ??
+          runtime.lastResult ??
+          runtime.lastRealSummary ??
+          runtime.lastSummary ??
+          runtime.currentTask,
+      ),
       checkpointStatus: runtime.checkpointStatus ?? null,
       blocker: runtime.blockedReason ?? null,
       nextAction: null,
@@ -288,14 +358,21 @@ export function buildSwarm2ReportRows({
         { label: 'Real result', value: clean(runtime.lastRealResult) },
         { label: 'Blocked reason', value: clean(runtime.blockedReason) },
         { label: 'Checkpoint status', value: clean(runtime.checkpointStatus) },
-        { label: 'Recent log tail', value: compact(runtime.recentLogTail, 900) },
+        {
+          label: 'Recent log tail',
+          value: compact(runtime.recentLogTail, 900),
+        },
       ],
       artifacts: runtime.artifacts ?? [],
       previews: runtime.previews ?? [],
     })
   }
 
-  return rows.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || a.workerId.localeCompare(b.workerId))
+  return rows.sort(
+    (a, b) =>
+      (b.updatedAt ?? 0) - (a.updatedAt ?? 0) ||
+      a.workerId.localeCompare(b.workerId),
+  )
 }
 
 export function buildSwarm2InboxLanes({
@@ -306,10 +383,16 @@ export function buildSwarm2InboxLanes({
   runtimes: Array<RuntimeReportEntry>
 }): Swarm2InboxLanes {
   const rows = buildSwarm2ReportRows({ missions, runtimes })
-  const actionable = rows.filter((row): row is Swarm2InboxItem => {
-    if (row.kind !== 'checkpoint' || !row.missionId) return false
-    return row.state === 'needs_review' || row.state === 'blocked' || row.state === 'ready'
-  }).map((row) => ({ ...row, lane: row.state as Swarm2InboxLaneId }))
+  const actionable = rows
+    .filter((row): row is Swarm2InboxItem => {
+      if (row.kind !== 'checkpoint' || !row.missionId) return false
+      return (
+        row.state === 'needs_review' ||
+        row.state === 'blocked' ||
+        row.state === 'ready'
+      )
+    })
+    .map((row) => ({ ...row, lane: row.state as Swarm2InboxLaneId }))
 
   return {
     needs_review: actionable.filter((row) => row.lane === 'needs_review'),
@@ -360,9 +443,20 @@ function statePriority(state: Exclude<ReportState, 'all'>): number {
 }
 
 function colorForWorker(workerId: string): string {
-  const palette = ['#34d399', '#60a5fa', '#a78bfa', '#f59e0b', '#fb7185', '#22d3ee', '#84cc16', '#f472b6']
+  const palette = [
+    '#34d399',
+    '#60a5fa',
+    '#a78bfa',
+    '#f59e0b',
+    '#fb7185',
+    '#22d3ee',
+    '#84cc16',
+    '#f472b6',
+  ]
   const number = Number.parseInt(workerId.replace(/\D/g, ''), 10)
-  return Number.isFinite(number) && number > 0 ? palette[(number - 1) % palette.length] : palette[0]
+  return Number.isFinite(number) && number > 0
+    ? (palette[(number - 1) % palette.length] ?? '#34d399')
+    : (palette[0] ?? '#34d399')
 }
 
 function roleFromWorkerId(workerId: string): string {
@@ -383,7 +477,9 @@ function roleFromWorkerId(workerId: string): string {
   }
 }
 
-function buildWorkerReportCards(rows: Array<Swarm2ReportRow>): Array<WorkerReportCard> {
+export function buildWorkerReportCards(
+  rows: Array<Swarm2ReportRow>,
+): Array<WorkerReportCard> {
   const grouped = new Map<string, Array<Swarm2ReportRow>>()
   for (const row of rows) {
     const existing = grouped.get(row.workerId)
@@ -391,31 +487,42 @@ function buildWorkerReportCards(rows: Array<Swarm2ReportRow>): Array<WorkerRepor
     else grouped.set(row.workerId, [row])
   }
 
-  return [...grouped.entries()].map(([workerId, workerRows]) => {
-    const sorted = [...workerRows].sort((a, b) => {
+  return [...grouped.entries()]
+    .flatMap(([workerId, workerRows]) => {
+      const sorted = [...workerRows].sort((a, b) => {
+        const stateRank = statePriority(a.state) - statePriority(b.state)
+        if (stateRank !== 0) return stateRank
+        return (b.updatedAt ?? 0) - (a.updatedAt ?? 0)
+      })
+      const latest = sorted.at(0)
+      if (!latest) return []
+      return [
+        {
+          workerId,
+          workerName: latest.workerName,
+          role: latest.missionTitle ?? roleFromWorkerId(workerId),
+          state: latest.state,
+          stateLabel: latest.stateLabel,
+          latest,
+          rows: sorted,
+          reviewCount: workerRows.filter((row) => row.state === 'needs_review')
+            .length,
+          readyCount: workerRows.filter((row) => row.state === 'ready').length,
+          blockedCount: workerRows.filter((row) => row.state === 'blocked')
+            .length,
+          artifactCount: workerRows.reduce(
+            (sum, row) => sum + row.artifacts.length + row.previews.length,
+            0,
+          ),
+          prUrl: extractPullRequestUrl(latest),
+        },
+      ]
+    })
+    .sort((a, b) => {
       const stateRank = statePriority(a.state) - statePriority(b.state)
       if (stateRank !== 0) return stateRank
-      return (b.updatedAt ?? 0) - (a.updatedAt ?? 0)
+      return (b.latest.updatedAt ?? 0) - (a.latest.updatedAt ?? 0)
     })
-    const latest = sorted[0]
-    return {
-      workerId,
-      workerName: latest.workerName,
-      role: latest.missionTitle ?? roleFromWorkerId(workerId),
-      state: latest.state,
-      stateLabel: latest.stateLabel,
-      latest,
-      rows: sorted,
-      reviewCount: workerRows.filter((row) => row.state === 'needs_review').length,
-      readyCount: workerRows.filter((row) => row.state === 'ready').length,
-      blockedCount: workerRows.filter((row) => row.state === 'blocked').length,
-      artifactCount: workerRows.reduce((sum, row) => sum + row.artifacts.length + row.previews.length, 0),
-    }
-  }).sort((a, b) => {
-    const stateRank = statePriority(a.state) - statePriority(b.state)
-    if (stateRank !== 0) return stateRank
-    return (b.latest.updatedAt ?? 0) - (a.latest.updatedAt ?? 0)
-  })
 }
 
 function detailValue(row: Swarm2ReportRow, label: string): string | null {
@@ -427,7 +534,10 @@ function cleanDetail(value: string | null | undefined): string | null {
   return text && text !== '—' ? text : null
 }
 
-export function buildBlockedGuidanceTask(row: Swarm2InboxItem, guidance: string): string {
+export function buildBlockedGuidanceTask(
+  row: Swarm2InboxItem,
+  guidance: string,
+): string {
   return [
     guidance.trim(),
     '',
@@ -458,7 +568,10 @@ export function extractPullRequestUrl(row: Swarm2ReportRow): string | null {
   return null
 }
 
-export async function postSwarmDispatch(body: { assignments: Array<{ workerId: string; task: string }> }, fetchImpl: typeof fetch = fetch): Promise<void> {
+export async function postSwarmDispatch(
+  body: { assignments: Array<{ workerId: string; task: string }> },
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
   const res = await fetchImpl('/api/swarm-dispatch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -470,7 +583,10 @@ export async function postSwarmDispatch(body: { assignments: Array<{ workerId: s
   }
 }
 
-export async function markInboxItemReadyForEric(input: { missionId: string; assignmentId: string }, fetchImpl: typeof fetch = fetch): Promise<void> {
+export async function markInboxItemReadyForEric(
+  input: { missionId: string; assignmentId: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
   const res = await fetchImpl('/api/swarm-missions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -512,7 +628,9 @@ export function Swarm2ReportsView({
   const [missionFilter, setMissionFilter] = useState('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({})
-  const [replyErrors, setReplyErrors] = useState<Record<string, string | null>>({})
+  const [replyErrors, setReplyErrors] = useState<Record<string, string | null>>(
+    {},
+  )
   const [busyId, setBusyId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
@@ -522,11 +640,24 @@ export function Swarm2ReportsView({
     return () => window.clearTimeout(timer)
   }, [toastMessage])
 
-  const rows = useMemo(() => buildSwarm2ReportRows({ missions, runtimes }), [missions, runtimes])
-  const inboxLanes = useMemo(() => buildSwarm2InboxLanes({ missions, runtimes }), [missions, runtimes])
-  const workers = useMemo(() => [...new Set(rows.map((row) => row.workerId))].sort(), [rows])
+  const rows = useMemo(
+    () => buildSwarm2ReportRows({ missions, runtimes }),
+    [missions, runtimes],
+  )
+  const inboxLanes = useMemo(
+    () => buildSwarm2InboxLanes({ missions, runtimes }),
+    [missions, runtimes],
+  )
+  const workers = useMemo(
+    () => [...new Set(rows.map((row) => row.workerId))].sort(),
+    [rows],
+  )
   const missionOptions = useMemo(
-    () => missions.map((mission) => ({ id: mission.id, label: mission.title || mission.id })),
+    () =>
+      missions.map((mission) => ({
+        id: mission.id,
+        label: mission.title || mission.id,
+      })),
     [missions],
   )
   const filteredRows = rows.filter((row) => {
@@ -535,7 +666,10 @@ export function Swarm2ReportsView({
     if (missionFilter !== 'all' && row.missionId !== missionFilter) return false
     return true
   })
-  const workerCards = useMemo(() => buildWorkerReportCards(filteredRows), [filteredRows])
+  const workerCards = useMemo(
+    () => buildWorkerReportCards(filteredRows),
+    [filteredRows],
+  )
   const counts = rows.reduce<Record<Exclude<ReportState, 'all'>, number>>(
     (acc, row) => {
       acc[row.state] += 1
@@ -555,23 +689,35 @@ export function Swarm2ReportsView({
   async function sendGuidance(row: Swarm2InboxItem) {
     const guidance = cleanDetail(replyDrafts[row.id])
     if (!guidance) {
-      setReplyErrors((current) => ({ ...current, [row.id]: 'Add guidance before sending.' }))
+      setReplyErrors((current) => ({
+        ...current,
+        [row.id]: 'Add guidance before sending.',
+      }))
       return
     }
     setBusyId(`reply:${row.id}`)
     setReplyErrors((current) => ({ ...current, [row.id]: null }))
     try {
       await postSwarmDispatch({
-        assignments: [{ workerId: row.workerId, task: buildBlockedGuidanceTask(row, guidance) }],
+        assignments: [
+          {
+            workerId: row.workerId,
+            task: buildBlockedGuidanceTask(row, guidance),
+          },
+        ],
       })
       await refreshData()
-      setReplyDrafts((current) => ({ ...current, [row.id]: buildReplyPrefill(row) }))
+      setReplyDrafts((current) => ({
+        ...current,
+        [row.id]: buildReplyPrefill(row),
+      }))
       setExpandedId(null)
       showToast(`Sent to ${row.workerId}`)
     } catch (error) {
       setReplyErrors((current) => ({
         ...current,
-        [row.id]: error instanceof Error ? error.message : 'Failed to send guidance.',
+        [row.id]:
+          error instanceof Error ? error.message : 'Failed to send guidance.',
       }))
     } finally {
       setBusyId(null)
@@ -582,7 +728,9 @@ export function Swarm2ReportsView({
     setBusyId(`review:${row.id}`)
     try {
       await postSwarmDispatch({
-        assignments: [{ workerId: 'swarm6', task: buildReviewerDispatchTask(row) }],
+        assignments: [
+          { workerId: 'swarm6', task: buildReviewerDispatchTask(row) },
+        ],
       })
       await refreshData()
       onRouteToReviewer?.(row)
@@ -590,7 +738,8 @@ export function Swarm2ReportsView({
     } catch (error) {
       setReplyErrors((current) => ({
         ...current,
-        [row.id]: error instanceof Error ? error.message : 'Failed to route reviewer.',
+        [row.id]:
+          error instanceof Error ? error.message : 'Failed to route reviewer.',
       }))
     } finally {
       setBusyId(null)
@@ -601,13 +750,19 @@ export function Swarm2ReportsView({
     if (!row.missionId || !row.assignmentId) return
     setBusyId(`ready:${row.id}`)
     try {
-      await markInboxItemReadyForEric({ missionId: row.missionId, assignmentId: row.assignmentId })
+      await markInboxItemReadyForEric({
+        missionId: row.missionId,
+        assignmentId: row.assignmentId,
+      })
       await refreshData()
       showToast(`Marked ${row.workerId} ready for Eric merge`)
     } catch (error) {
       setReplyErrors((current) => ({
         ...current,
-        [row.id]: error instanceof Error ? error.message : 'Failed to mark ready for Eric.',
+        [row.id]:
+          error instanceof Error
+            ? error.message
+            : 'Failed to mark ready for Eric.',
       }))
     } finally {
       setBusyId(null)
@@ -632,17 +787,27 @@ export function Swarm2ReportsView({
     const disabled = busyId === `reply:${row.id}`
     return (
       <div className="mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
-        <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]" htmlFor={`guidance-${row.id}`}>
+        <label
+          className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]"
+          htmlFor={`guidance-${row.id}`}
+        >
           Guidance for {row.workerId}
         </label>
         <textarea
           id={`guidance-${row.id}`}
           value={replyDrafts[row.id] ?? buildReplyPrefill(row)}
-          onChange={(event) => setReplyDrafts((current) => ({ ...current, [row.id]: event.target.value }))}
+          onChange={(event) =>
+            setReplyDrafts((current) => ({
+              ...current,
+              [row.id]: event.target.value,
+            }))
+          }
           rows={6}
           className="w-full resize-none rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm text-[var(--theme-text)] outline-none"
         />
-        {replyErrors[row.id] ? <div className="mt-2 text-xs text-red-600">{replyErrors[row.id]}</div> : null}
+        {replyErrors[row.id] ? (
+          <div className="mt-2 text-xs text-red-600">{replyErrors[row.id]}</div>
+        ) : null}
         <div className="mt-2 flex justify-end gap-2">
           <button
             type="button"
@@ -671,25 +836,56 @@ export function Swarm2ReportsView({
       : 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
     return (
       <div className="mt-2 flex flex-wrap gap-1.5">
-        <button type="button" aria-label={`Open ${row.workerId} worker`} onClick={() => openWorker(row)} className={buttonClass}>
+        <button
+          type="button"
+          aria-label={`Open ${row.workerId} worker`}
+          onClick={() => openWorker(row)}
+          className={buttonClass}
+        >
           ↗
         </button>
         {row.state === 'blocked' ? (
-          <button type="button" onClick={() => openReply(row)} className={buttonClass}>
+          <button
+            type="button"
+            onClick={() => openReply(row)}
+            className={buttonClass}
+          >
             Guide worker
           </button>
         ) : null}
         {row.state === 'needs_review' ? (
-          <button type="button" onClick={() => void routeToReviewer(row)} className={cn(buttonClass, 'border-amber-400/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15')}>
+          <button
+            type="button"
+            onClick={() => void routeToReviewer(row)}
+            className={cn(
+              buttonClass,
+              'border-amber-400/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15',
+            )}
+          >
             Route to reviewer
           </button>
         ) : null}
         {row.state === 'ready' && prUrl ? (
           <>
-            <a href={prUrl} target="_blank" rel="noreferrer" className={cn(buttonClass, 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15')}>
+            <a
+              href={prUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(
+                buttonClass,
+                'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15',
+              )}
+            >
               Open PR
             </a>
-            <button type="button" onClick={() => void markReady(row)} className={cn(buttonClass, 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15')}>
+            <button
+              type="button"
+              onClick={() => void markReady(row)}
+              className={cn(
+                buttonClass,
+                'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15',
+              )}
+            >
               Mark ready for Eric merge
             </button>
           </>
@@ -698,31 +894,58 @@ export function Swarm2ReportsView({
     )
   }
 
-  function renderInboxLane(lane: Swarm2InboxLaneId, title: string, rowsForLane: Array<Swarm2InboxItem>, emptyText: string) {
+  function renderInboxLane(
+    lane: Swarm2InboxLaneId,
+    title: string,
+    rowsForLane: Array<Swarm2InboxItem>,
+    emptyText: string,
+  ) {
     const laneTone = toneClass(lane)
     return (
       <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-xs font-semibold text-[var(--theme-text)]">{title}</div>
-          <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]', laneTone)}>
+          <div className="text-xs font-semibold text-[var(--theme-text)]">
+            {title}
+          </div>
+          <span
+            className={cn(
+              'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]',
+              laneTone,
+            )}
+          >
             {rowsForLane.length}
           </span>
         </div>
         <div className="mt-3 space-y-2">
-          {rowsForLane.length ? rowsForLane.slice(0, 4).map((row) => (
-            <div key={`lane:${lane}:${row.id}`} className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-semibold text-[var(--theme-text)]">{row.title}</div>
-                  <div className="mt-1 text-[11px] text-[var(--theme-muted)]">{row.workerName} · {row.missionTitle ?? row.missionId}</div>
+          {rowsForLane.length ? (
+            rowsForLane.slice(0, 4).map((row) => (
+              <div
+                key={`lane:${lane}:${row.id}`}
+                className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-semibold text-[var(--theme-text)]">
+                      {row.title}
+                    </div>
+                    <div className="mt-1 text-[11px] text-[var(--theme-muted)]">
+                      {row.workerName} · {row.missionTitle ?? row.missionId}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-[10px] text-[var(--theme-muted)]">
+                    {formatAge(row.updatedAt)}
+                  </div>
                 </div>
-                <div className="shrink-0 text-[10px] text-[var(--theme-muted)]">{formatAge(row.updatedAt)}</div>
+                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--theme-muted-2)]">
+                  {row.summary}
+                </p>
+                {renderRowActions(row, true)}
+                {expandedId === `reply:${row.id}`
+                  ? renderReplyComposer(row)
+                  : null}
               </div>
-              <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--theme-muted-2)]">{row.summary}</p>
-              {renderRowActions(row, true)}
-              {expandedId === `reply:${row.id}` ? renderReplyComposer(row) : null}
-            </div>
-          )) : (
+            ))
+          ) : (
             <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-4 text-xs text-[var(--theme-muted)]">
               {emptyText}
             </div>
@@ -736,16 +959,27 @@ export function Swarm2ReportsView({
     <section className="rounded-[1.5rem] border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-[0_20px_60px_color-mix(in_srgb,var(--theme-shadow)_14%,transparent)]">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Outputs / Reports</div>
-          <h2 className="mt-1 text-lg font-semibold text-[var(--theme-text)]">Worker reports</h2>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+            Outputs / Reports
+          </div>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--theme-text)]">
+            Worker reports
+          </h2>
           <p className="mt-1 max-w-3xl text-xs text-[var(--theme-muted-2)]">
-            Board for queues, Cards for worker-level scanning, List for dense detail.
+            Board for queues, Cards for worker-level scanning, List for dense
+            detail.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
-          <span className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-2 py-1">Review {counts.needs_review}</span>
-          <span className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-2 py-1">Ready {counts.ready}</span>
-          <span className="rounded-xl border border-red-400/40 bg-red-500/10 px-2 py-1">Blocked {counts.blocked}</span>
+          <span className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-2 py-1">
+            Review {counts.needs_review}
+          </span>
+          <span className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-2 py-1">
+            Ready {counts.ready}
+          </span>
+          <span className="rounded-xl border border-red-400/40 bg-red-500/10 px-2 py-1">
+            Blocked {counts.blocked}
+          </span>
         </div>
       </div>
 
@@ -765,20 +999,38 @@ export function Swarm2ReportsView({
             {filter.label}
           </button>
         ))}
-        <select value={workerFilter} onChange={(event) => setWorkerFilter(event.target.value)} className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs text-[var(--theme-muted)] outline-none">
+        <select
+          value={workerFilter}
+          onChange={(event) => setWorkerFilter(event.target.value)}
+          className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs text-[var(--theme-muted)] outline-none"
+        >
           <option value="all">All workers</option>
-          {workers.map((worker) => <option key={worker} value={worker}>{worker}</option>)}
+          {workers.map((worker) => (
+            <option key={worker} value={worker}>
+              {worker}
+            </option>
+          ))}
         </select>
-        <select value={missionFilter} onChange={(event) => setMissionFilter(event.target.value)} className="max-w-xs rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs text-[var(--theme-muted)] outline-none">
+        <select
+          value={missionFilter}
+          onChange={(event) => setMissionFilter(event.target.value)}
+          className="max-w-xs rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs text-[var(--theme-muted)] outline-none"
+        >
           <option value="all">All missions</option>
-          {missionOptions.map((mission) => <option key={mission.id} value={mission.id}>{mission.label}</option>)}
+          {missionOptions.map((mission) => (
+            <option key={mission.id} value={mission.id}>
+              {mission.label}
+            </option>
+          ))}
         </select>
         <div className="ml-auto flex rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] p-1">
-          {([
-            ['board', 'Board'],
-            ['cards', 'Cards'],
-            ['list', 'List'],
-          ] as const).map(([id, label]) => (
+          {(
+            [
+              ['board', 'Board'],
+              ['cards', 'Cards'],
+              ['list', 'List'],
+            ] as const
+          ).map(([id, label]) => (
             <button
               key={id}
               type="button"
@@ -798,114 +1050,227 @@ export function Swarm2ReportsView({
 
       {layout === 'board' ? (
         <div className="grid gap-3 xl:grid-cols-3">
-          {renderInboxLane('needs_review', 'Needs review', inboxLanes.needs_review, 'Reviewer lane is clear. Route the next completed worker output through swarm6.')}
-          {renderInboxLane('blocked', 'Blocked / needs input', inboxLanes.blocked, 'No blockers waiting on human input.')}
-          {renderInboxLane('ready', 'Ready', inboxLanes.ready, 'Nothing is ready yet.')}
+          {renderInboxLane(
+            'needs_review',
+            'Needs review',
+            inboxLanes.needs_review,
+            'Reviewer lane is clear. Route the next completed worker output through swarm6.',
+          )}
+          {renderInboxLane(
+            'blocked',
+            'Blocked / needs input',
+            inboxLanes.blocked,
+            'No blockers waiting on human input.',
+          )}
+          {renderInboxLane(
+            'ready',
+            'Ready',
+            inboxLanes.ready,
+            'Nothing is ready yet.',
+          )}
         </div>
       ) : layout === 'cards' ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {workerCards.length ? workerCards.map((card) => {
-            const expanded = expandedId === `worker:${card.workerId}`
-            const latestInboxItem = {
-              ...card.latest,
-              lane: (card.latest.state === 'blocked' ? 'blocked' : card.latest.state === 'ready' ? 'ready' : 'needs_review') as Swarm2InboxLaneId,
-            }
-            return (
-              <article key={card.workerId} className="rounded-[1.4rem] border border-[var(--theme-border)] border-l-4 border-l-[var(--theme-accent)] bg-[var(--theme-bg)] p-4 shadow-[0_16px_40px_color-mix(in_srgb,var(--theme-shadow)_10%,transparent)]">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <div className="relative flex size-12 shrink-0 items-center justify-center">
-                      <AgentProgress
-                        value={card.state === 'blocked' ? 30 : card.state === 'needs_review' ? 74 : card.state === 'ready' ? 100 : 58}
-                        status={card.state === 'blocked' ? 'failed' : card.state === 'ready' ? 'done' : card.state === 'needs_review' ? 'thinking' : 'running'}
-                        size={48}
-                        strokeWidth={2.5}
-                        className={card.state === 'blocked' ? 'text-red-500' : card.state === 'needs_review' ? 'text-amber-500' : card.state === 'ready' ? 'text-emerald-500' : 'text-sky-500'}
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <PixelAvatar size={34} color={colorForWorker(card.workerId)} accentColor="#fbbf24" status={card.state === 'blocked' ? 'failed' : card.state === 'ready' ? 'running' : 'idle'} />
+          {workerCards.length ? (
+            workerCards.map((card) => {
+              const expanded = expandedId === `worker:${card.workerId}`
+              const latestInboxItem = {
+                ...card.latest,
+                lane: (card.latest.state === 'blocked'
+                  ? 'blocked'
+                  : card.latest.state === 'ready'
+                    ? 'ready'
+                    : 'needs_review') as Swarm2InboxLaneId,
+              }
+              return (
+                <article
+                  key={card.workerId}
+                  className="rounded-[1.4rem] border border-[var(--theme-border)] border-l-4 border-l-[var(--theme-accent)] bg-[var(--theme-bg)] p-4 shadow-[0_16px_40px_color-mix(in_srgb,var(--theme-shadow)_10%,transparent)]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="relative flex size-12 shrink-0 items-center justify-center">
+                        <AgentProgress
+                          value={
+                            card.state === 'blocked'
+                              ? 30
+                              : card.state === 'needs_review'
+                                ? 74
+                                : card.state === 'ready'
+                                  ? 100
+                                  : 58
+                          }
+                          status={
+                            card.state === 'blocked'
+                              ? 'failed'
+                              : card.state === 'ready'
+                                ? 'complete'
+                                : card.state === 'needs_review'
+                                  ? 'thinking'
+                                  : 'running'
+                          }
+                          size={48}
+                          strokeWidth={2.5}
+                          className={
+                            card.state === 'blocked'
+                              ? 'text-red-500'
+                              : card.state === 'needs_review'
+                                ? 'text-amber-500'
+                                : card.state === 'ready'
+                                  ? 'text-emerald-500'
+                                  : 'text-sky-500'
+                          }
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <PixelAvatar
+                            size={34}
+                            color={colorForWorker(card.workerId)}
+                            accentColor="#fbbf24"
+                            status={
+                              card.state === 'blocked'
+                                ? 'failed'
+                                : card.state === 'ready'
+                                  ? 'running'
+                                  : 'idle'
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onSelectWorker?.(card.workerId)}
+                            className="truncate text-left text-sm font-semibold text-[var(--theme-text)] hover:text-[var(--theme-accent-strong)]"
+                          >
+                            {card.workerName}
+                          </button>
+                          <span
+                            className={cn(
+                              'rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]',
+                              toneClass(card.state),
+                            )}
+                          >
+                            {card.stateLabel}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[10px] text-[var(--theme-muted)]">
+                          {card.role} · {formatAge(card.latest.updatedAt)}
+                        </div>
                       </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button type="button" onClick={() => onSelectWorker?.(card.workerId)} className="truncate text-left text-sm font-semibold text-[var(--theme-text)] hover:text-[var(--theme-accent-strong)]">
-                          {card.workerName}
-                        </button>
-                        <span className={cn('rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]', toneClass(card.state))}>{card.stateLabel}</span>
-                      </div>
-                      <div className="mt-1 text-[10px] text-[var(--theme-muted)]">{card.role} · {formatAge(card.latest.updatedAt)}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId(expanded ? null : `worker:${card.workerId}`)}
-                      className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]"
-                    >
-                      {expanded ? 'Hide reports' : `Open reports (${card.rows.length})`}
-                    </button>
-                    {card.prUrl ? (
-                      <a
-                        href={card.prUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
-                      >
-                        ↗
-                      </a>
-                    ) : null}
-                    {(card.state === 'needs_review' || card.state === 'blocked' || card.state === 'ready') ? (
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
-                        onClick={() => onRouteToReviewer?.(card)}
-                        className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
+                        onClick={() =>
+                          setExpandedId(
+                            expanded ? null : `worker:${card.workerId}`,
+                          )
+                        }
+                        className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]"
                       >
-                        Steer
+                        {expanded
+                          ? 'Hide reports'
+                          : `Open reports (${card.rows.length})`}
                       </button>
-                    ) : null}
-                  </div>
-                </div>
-
-                <h3 className="mt-3 text-center line-clamp-2 text-lg font-semibold leading-tight text-[var(--theme-text)]">{card.latest.title}</h3>
-                <p className="mt-1 text-center text-[11px] text-[var(--theme-muted)]">{card.latest.summary}</p>
-
-                <div className="mt-4 flex flex-wrap gap-1.5 text-center text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
-                  <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5">Review {card.reviewCount}</div>
-                  <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-1.5 py-0.5">Ready {card.readyCount}</div>
-                  <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-1.5 py-0.5">Blocked {card.blockedCount}</div>
-                  <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-1.5 py-0.5">Files {card.artifactCount}</div>
-                </div>
-
-                {expandedId === `reply:${latestInboxItem.id}` ? renderReplyComposer(latestInboxItem) : null}
-
-                {expanded ? (
-                  <div className="mt-3 space-y-2 border-t border-[var(--theme-border)] pt-3">
-                    {card.rows.slice(0, 4).map((row) => {
-                      const inboxRow = {
-                        ...row,
-                        lane: (row.state === 'blocked' ? 'blocked' : row.state === 'ready' ? 'ready' : 'needs_review') as Swarm2InboxLaneId,
-                      }
-                      return (
-                        <div
-                          key={row.id}
-                          className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3"
+                      {card.prUrl ? (
+                        <a
+                          href={card.prUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]', toneClass(row.state))}>{row.stateLabel}</span>
-                            <span className="text-[10px] text-[var(--theme-muted)]">{formatAge(row.updatedAt)}</span>
-                          </div>
-                          <div className="mt-2 line-clamp-1 text-xs font-semibold text-[var(--theme-text)]">{row.title}</div>
-                          <div className="mt-1 line-clamp-2 text-[11px] text-[var(--theme-muted-2)]">{row.summary}</div>
-                          {renderRowActions(inboxRow)}
-                          {expandedId === `reply:${row.id}` ? renderReplyComposer(inboxRow) : null}
-                        </div>
-                      )
-                    })}
+                          ↗
+                        </a>
+                      ) : null}
+                      {card.state === 'needs_review' ||
+                      card.state === 'blocked' ||
+                      card.state === 'ready' ? (
+                        <button
+                          type="button"
+                          onClick={() => onRouteToReviewer?.(latestInboxItem)}
+                          className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
+                        >
+                          Steer
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                ) : null}
-              </article>
-            )
-          }) : (
+
+                  <h3 className="mt-3 text-center line-clamp-2 text-lg font-semibold leading-tight text-[var(--theme-text)]">
+                    {card.latest.title}
+                  </h3>
+                  <p className="mt-1 text-center text-[11px] text-[var(--theme-muted)]">
+                    {card.latest.summary}
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap gap-1.5 text-center text-[9px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                    <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5">
+                      Review {card.reviewCount}
+                    </div>
+                    <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-1.5 py-0.5">
+                      Ready {card.readyCount}
+                    </div>
+                    <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-1.5 py-0.5">
+                      Blocked {card.blockedCount}
+                    </div>
+                    <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-1.5 py-0.5">
+                      Files {card.artifactCount}
+                    </div>
+                  </div>
+
+                  {expandedId === `reply:${latestInboxItem.id}`
+                    ? renderReplyComposer(latestInboxItem)
+                    : null}
+
+                  {expanded ? (
+                    <div className="mt-3 space-y-2 border-t border-[var(--theme-border)] pt-3">
+                      {card.rows.slice(0, 4).map((row) => {
+                        const inboxRow = {
+                          ...row,
+                          lane: (row.state === 'blocked'
+                            ? 'blocked'
+                            : row.state === 'ready'
+                              ? 'ready'
+                              : 'needs_review') as Swarm2InboxLaneId,
+                        }
+                        return (
+                          <div
+                            key={row.id}
+                            className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={cn(
+                                  'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]',
+                                  toneClass(row.state),
+                                )}
+                              >
+                                {row.stateLabel}
+                              </span>
+                              <span className="text-[10px] text-[var(--theme-muted)]">
+                                {formatAge(row.updatedAt)}
+                              </span>
+                            </div>
+                            <div className="mt-2 line-clamp-1 text-xs font-semibold text-[var(--theme-text)]">
+                              {row.title}
+                            </div>
+                            <div className="mt-1 line-clamp-2 text-[11px] text-[var(--theme-muted-2)]">
+                              {row.summary}
+                            </div>
+                            {renderRowActions(inboxRow)}
+                            {expandedId === `reply:${row.id}`
+                              ? renderReplyComposer(inboxRow)
+                              : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </article>
+              )
+            })
+          ) : (
             <div className="col-span-full rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] p-8 text-center text-sm text-[var(--theme-muted)]">
               No worker reports match these filters yet.
             </div>
@@ -913,85 +1278,157 @@ export function Swarm2ReportsView({
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredRows.length ? filteredRows.map((row) => {
-            const expanded = expandedId === row.id
-            return (
-              <article key={row.id} className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setExpandedId(expanded ? null : row.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setExpandedId(expanded ? null : row.id)
-                    }
-                  }}
-                  className="block w-full cursor-pointer text-left"
+          {filteredRows.length ? (
+            filteredRows.map((row) => {
+              const expanded = expandedId === row.id
+              return (
+                <article
+                  key={row.id}
+                  className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]', toneClass(row.state))}>{row.stateLabel}</span>
-                        <span className="text-[11px] text-[var(--theme-muted)]">{row.kind}</span>
-                        {row.checkpointStatus ? <span className="text-[11px] text-[var(--theme-muted)]">{row.checkpointStatus}</span> : null}
-                        {row.reviewRequired ? <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700">swarm6 gate</span> : null}
-                        {row.reviewedBy ? <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">reviewed by {row.reviewedBy}</span> : null}
-                        <span className="text-[11px] text-[var(--theme-muted)]">{formatAge(row.updatedAt)}</span>
-                      </div>
-                      <h3 className="mt-2 truncate text-sm font-semibold text-[var(--theme-text)]">{row.title}</h3>
-                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--theme-muted-2)]">{row.summary}</p>
-                    </div>
-                    <div className="shrink-0 text-right text-xs text-[var(--theme-muted)]">
-                      <div className="flex flex-wrap justify-end gap-1.5">
-                        <button type="button" onClick={(event) => { event.stopPropagation(); onSelectWorker?.(row.workerId) }} className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1 font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]">
-                          {row.workerName}
-                        </button>
-                        {row.state === 'needs_review' ? (
-                          <button type="button" onClick={(event) => { event.stopPropagation(); onRouteToReviewer?.({ ...row, lane: 'needs_review' }) }} className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 font-medium text-amber-700 hover:bg-amber-500/15">
-                            Route swarm6
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className="mt-1 max-w-[14rem] truncate">{row.missionTitle ?? 'runtime output'}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {expanded ? (
-                  <div className="mt-3 border-t border-[var(--theme-border)] pt-3">
-                    <dl className="grid gap-2 md:grid-cols-2">
-                      {row.details.map((detail) => (
-                        <div key={detail.label} className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2">
-                          <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">{detail.label}</dt>
-                          <dd className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-[var(--theme-text)]">{detail.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                    {(row.artifacts.length > 0 || row.previews.length > 0) ? (
-                      <div className="mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2">
-                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Artifacts</div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {row.artifacts.map((artifact) => (
-                            <span key={artifact.id} title={artifact.path ?? artifact.label} className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] text-[var(--theme-muted-2)]">
-                              {artifact.kind}: {artifact.label}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setExpandedId(expanded ? null : row.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setExpandedId(expanded ? null : row.id)
+                      }
+                    }}
+                    className="block w-full cursor-pointer text-left"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={cn(
+                              'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]',
+                              toneClass(row.state),
+                            )}
+                          >
+                            {row.stateLabel}
+                          </span>
+                          <span className="text-[11px] text-[var(--theme-muted)]">
+                            {row.kind}
+                          </span>
+                          {row.checkpointStatus ? (
+                            <span className="text-[11px] text-[var(--theme-muted)]">
+                              {row.checkpointStatus}
                             </span>
-                          ))}
-                          {row.previews.map((preview) => (
-                            <a key={preview.id} href={preview.url} target="_blank" rel="noreferrer" className="rounded-full border border-[var(--theme-accent)]/40 bg-[var(--theme-accent-soft)] px-2 py-1 text-[10px] text-[var(--theme-accent-strong)]">
-                              preview: {preview.label}
-                            </a>
-                          ))}
+                          ) : null}
+                          {row.reviewRequired ? (
+                            <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700">
+                              swarm6 gate
+                            </span>
+                          ) : null}
+                          {row.reviewedBy ? (
+                            <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                              reviewed by {row.reviewedBy}
+                            </span>
+                          ) : null}
+                          <span className="text-[11px] text-[var(--theme-muted)]">
+                            {formatAge(row.updatedAt)}
+                          </span>
+                        </div>
+                        <h3 className="mt-2 truncate text-sm font-semibold text-[var(--theme-text)]">
+                          {row.title}
+                        </h3>
+                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--theme-muted-2)]">
+                          {row.summary}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right text-xs text-[var(--theme-muted)]">
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onSelectWorker?.(row.workerId)
+                            }}
+                            className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1 font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]"
+                          >
+                            {row.workerName}
+                          </button>
+                          {row.state === 'needs_review' ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                onRouteToReviewer?.({
+                                  ...row,
+                                  lane: 'needs_review',
+                                })
+                              }}
+                              className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 font-medium text-amber-700 hover:bg-amber-500/15"
+                            >
+                              Route swarm6
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 max-w-[14rem] truncate">
+                          {row.missionTitle ?? 'runtime output'}
                         </div>
                       </div>
-                    ) : null}
+                    </div>
                   </div>
-                ) : null}
-              </article>
-            )
-          }) : (
+
+                  {expanded ? (
+                    <div className="mt-3 border-t border-[var(--theme-border)] pt-3">
+                      <dl className="grid gap-2 md:grid-cols-2">
+                        {row.details.map((detail) => (
+                          <div
+                            key={detail.label}
+                            className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2"
+                          >
+                            <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+                              {detail.label}
+                            </dt>
+                            <dd className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-[var(--theme-text)]">
+                              {detail.value}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                      {row.artifacts.length > 0 || row.previews.length > 0 ? (
+                        <div className="mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2">
+                          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+                            Artifacts
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {row.artifacts.map((artifact) => (
+                              <span
+                                key={artifact.id}
+                                title={artifact.path ?? artifact.label}
+                                className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] text-[var(--theme-muted-2)]"
+                              >
+                                {artifact.kind}: {artifact.label}
+                              </span>
+                            ))}
+                            {row.previews.map((preview) => (
+                              <a
+                                key={preview.id}
+                                href={preview.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-full border border-[var(--theme-accent)]/40 bg-[var(--theme-accent-soft)] px-2 py-1 text-[10px] text-[var(--theme-accent-strong)]"
+                              >
+                                preview: {preview.label}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </article>
+              )
+            })
+          ) : (
             <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] p-8 text-center text-sm text-[var(--theme-muted)]">
-              No reports match these filters yet. Checkpoints appear after workers return the required checkpoint format; runtime artifacts appear when workers publish artifacts/previews.
+              No reports match these filters yet. Checkpoints appear after
+              workers return the required checkpoint format; runtime artifacts
+              appear when workers publish artifacts/previews.
             </div>
           )}
         </div>

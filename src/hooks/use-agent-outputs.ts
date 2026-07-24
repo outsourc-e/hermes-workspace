@@ -44,7 +44,7 @@ export type AgentOutputFilterOption = {
   emoji?: string
 }
 
-const DEFAULT_FILTERS: AgentOutputFilterOption[] = [
+const DEFAULT_FILTERS: Array<AgentOutputFilterOption> = [
   { id: 'all', label: 'All', emoji: '📋' },
   { id: 'ok', label: 'Success', emoji: '✅' },
   { id: 'error', label: 'Errors', emoji: '❌' },
@@ -57,7 +57,7 @@ export function useAgentOutputs(_filter: AgentOutputFilter) {
     // no-op; real implementation will refetch from gateway
   }, [])
   return {
-    outputs: [] as AgentOutput[],
+    outputs: [] as Array<AgentOutput>,
     availableFilters: DEFAULT_FILTERS,
     loading,
     error: null as string | null,

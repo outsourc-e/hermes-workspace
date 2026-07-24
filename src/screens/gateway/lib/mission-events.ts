@@ -70,7 +70,7 @@ export type MissionStartedEvent = MissionEventBase<
   {
     missionId: string
     goal: string
-    team: string[]
+    team: Array<string>
   }
 >
 
@@ -135,14 +135,14 @@ export type MissionEventInput = Omit<MissionEvent, 'id' | 'timestamp'> &
   Partial<Pick<MissionEvent, 'id' | 'timestamp'>>
 
 export type MissionEventFilter = {
-  type?: MissionEventType | MissionEventType[]
+  type?: MissionEventType | Array<MissionEventType>
   agentId?: string
   fromTimestamp?: number
   toTimestamp?: number
 }
 
 function createEventId(): string {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
+  if (typeof globalThis.crypto.randomUUID === 'function') {
     return globalThis.crypto.randomUUID()
   }
 
@@ -157,14 +157,16 @@ function normalizeEvent(event: MissionEventInput): MissionEvent {
   } as MissionEvent
 }
 
-function hasAgentId(event: MissionEvent): event is Extract<
-  MissionEvent,
-  { payload: { agentId: string } }
-> {
+function hasAgentId(
+  event: MissionEvent,
+): event is Extract<MissionEvent, { payload: { agentId: string } }> {
   return 'agentId' in event.payload
 }
 
-function matchesFilter(event: MissionEvent, filter?: MissionEventFilter): boolean {
+function matchesFilter(
+  event: MissionEvent,
+  filter?: MissionEventFilter,
+): boolean {
   if (!filter) return true
 
   if (filter.type) {
@@ -173,14 +175,21 @@ function matchesFilter(event: MissionEvent, filter?: MissionEventFilter): boolea
   }
 
   if (filter.agentId) {
-    if (!hasAgentId(event) || event.payload.agentId !== filter.agentId) return false
+    if (!hasAgentId(event) || event.payload.agentId !== filter.agentId)
+      return false
   }
 
-  if (typeof filter.fromTimestamp === 'number' && event.timestamp < filter.fromTimestamp) {
+  if (
+    typeof filter.fromTimestamp === 'number' &&
+    event.timestamp < filter.fromTimestamp
+  ) {
     return false
   }
 
-  if (typeof filter.toTimestamp === 'number' && event.timestamp > filter.toTimestamp) {
+  if (
+    typeof filter.toTimestamp === 'number' &&
+    event.timestamp > filter.toTimestamp
+  ) {
     return false
   }
 
@@ -188,9 +197,9 @@ function matchesFilter(event: MissionEvent, filter?: MissionEventFilter): boolea
 }
 
 export class MissionEventLog {
-  private events: MissionEvent[]
+  private events: Array<MissionEvent>
 
-  constructor(initialEvents: MissionEventInput[] = []) {
+  constructor(initialEvents: Array<MissionEventInput> = []) {
     this.events = initialEvents.map(normalizeEvent)
   }
 
@@ -200,11 +209,11 @@ export class MissionEventLog {
     return nextEvent
   }
 
-  getEvents(filter?: MissionEventFilter): MissionEvent[] {
+  getEvents(filter?: MissionEventFilter): Array<MissionEvent> {
     return this.events.filter((event) => matchesFilter(event, filter))
   }
 
-  getAgentTimeline(agentId: string): MissionEvent[] {
+  getAgentTimeline(agentId: string): Array<MissionEvent> {
     return this.getEvents({ agentId })
   }
 
@@ -212,10 +221,9 @@ export class MissionEventLog {
     this.events = []
   }
 
-  toJSON(): { events: MissionEvent[] } {
+  toJSON(): { events: Array<MissionEvent> } {
     return {
       events: [...this.events],
     }
   }
 }
-

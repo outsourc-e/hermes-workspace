@@ -72,16 +72,19 @@ function readDisk(): Record<string, CachedProbe> {
   try {
     const text = readFileSync(path, 'utf8')
     const parsed = JSON.parse(text) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {}
+    }
+    const record = parsed as Record<string, unknown>
     if (
-      !parsed ||
-      typeof parsed !== 'object' ||
-      Array.isArray(parsed) ||
-      (parsed as DiskSchema).version !== 1 ||
-      typeof (parsed as DiskSchema).probes !== 'object'
+      record.version !== 1 ||
+      !record.probes ||
+      typeof record.probes !== 'object' ||
+      Array.isArray(record.probes)
     ) {
       return {}
     }
-    return (parsed as DiskSchema).probes as Record<string, CachedProbe>
+    return record.probes as Record<string, CachedProbe>
   } catch {
     // Corrupt or unreadable — start fresh
     return {}
@@ -109,10 +112,18 @@ function writeDisk(probes: Record<string, CachedProbe>): void {
   // but linkSync + unlinkSync mirrors the presets-store pattern used here).
   try {
     // Remove existing file if present so linkSync doesn't fail with EEXIST.
-    try { unlinkSync(path) } catch { /* not present */ }
+    try {
+      unlinkSync(path)
+    } catch {
+      /* not present */
+    }
     linkSync(tmp, path)
   } finally {
-    try { unlinkSync(tmp) } catch { /* ignore */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -126,7 +137,10 @@ const cache = new Map<string, CachedProbe>(Object.entries(readDisk()))
 // Public API
 // ---------------------------------------------------------------------------
 
-export function setProbe(name: string, entry: Omit<CachedProbe, 'testedAt' | 'stale'>): void {
+export function setProbe(
+  name: string,
+  entry: Omit<CachedProbe, 'testedAt' | 'stale'>,
+): void {
   const probe: CachedProbe = { ...entry, testedAt: Date.now() }
   cache.set(name, probe)
 

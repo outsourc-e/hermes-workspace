@@ -1,12 +1,8 @@
+import { MODEL_PRESETS, TEAM_TEMPLATES } from './team-panel'
+import type { ModelPresetId, TeamMember, TeamTemplateId } from './team-panel'
 import type { MissionArtifact } from '@/stores/mission-store'
 import type { HubTask } from './task-board'
-import {
-  MODEL_PRESETS,
-  TEAM_TEMPLATES,
-  type ModelPresetId,
-  type TeamMember,
-  type TeamTemplateId,
-} from './team-panel'
+
 export { ROUGH_COST_PER_1K_TOKENS_USD } from '@/lib/config/costs'
 
 export type AgentHubLayoutProps = {
@@ -37,10 +33,13 @@ export type SavedTeamConfig = {
   description?: string
   createdAt: number
   updatedAt: number
-  team: TeamMember[]
+  team: Array<TeamMember>
 }
 
-export const TEMPLATE_MODEL_SUGGESTIONS: Record<TeamTemplateId, Array<ModelPresetId>> = {
+export const TEMPLATE_MODEL_SUGGESTIONS: Record<
+  TeamTemplateId,
+  Array<ModelPresetId>
+> = {
   research: ['opus', 'sonnet', 'auto'],
   coding: ['opus', 'codex', 'sonnet'],
   content: ['opus', 'sonnet', 'flash'],
@@ -64,7 +63,7 @@ export type GatewayModelEntry = {
 
 export type GatewayModelsResponse = {
   ok?: boolean
-  models?: GatewayModelEntry[]
+  models?: Array<GatewayModelEntry>
 }
 
 export type DetectedGatewayAgent = {
@@ -91,7 +90,7 @@ export type MissionAgentSummary = {
   agentId: string
   agentName: string
   modelId: string
-  lines: string[]
+  lines: Array<string>
   transcript?: Array<{ role: string; text: string }>
   transcriptSummary?: string
 }
@@ -103,11 +102,11 @@ export type MissionReportPayload = {
   teamName: string
   startedAt: number
   completedAt: number
-  team: TeamMember[]
-  tasks: HubTask[]
-  artifacts: MissionArtifact[]
+  team: Array<TeamMember>
+  tasks: Array<HubTask>
+  artifacts: Array<MissionArtifact>
   tokenCount: number
-  agentSummaries: MissionAgentSummary[]
+  agentSummaries: Array<MissionAgentSummary>
   needsEnrichment: boolean
 }
 
@@ -122,7 +121,7 @@ export type StoredMissionReport = {
   duration: number
   tokenCount: number
   costEstimate: number
-  artifacts: MissionArtifact[]
+  artifacts: Array<MissionArtifact>
   report: string
   completedAt: number
 }
@@ -155,7 +154,12 @@ export const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
 
 export type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 export type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
-export type ActiveTab = 'overview' | 'configure' | 'runs' | 'kanban' | 'analytics'
+export type ActiveTab =
+  | 'overview'
+  | 'configure'
+  | 'runs'
+  | 'kanban'
+  | 'analytics'
 export type ConfigSection = 'agents' | 'teams' | 'keys'
 
 export const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
@@ -166,22 +170,39 @@ export const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'configure', icon: '⚙️', label: 'Configure' },
 ]
 
-export const CONFIG_SECTIONS: Array<{ id: ConfigSection; icon: string; label: string }> = [
+export const CONFIG_SECTIONS: Array<{
+  id: ConfigSection
+  icon: string
+  label: string
+}> = [
   { id: 'agents', icon: '🤖', label: 'Agents' },
   { id: 'teams', icon: '👥', label: 'Teams' },
   { id: 'keys', icon: '🔑', label: 'API Keys' },
 ]
 
-export const HUB_PAGE_TITLE_CLASS = 'text-lg font-bold text-neutral-900 dark:text-neutral-100 md:text-xl'
-export const HUB_SUBSECTION_TITLE_CLASS = 'text-base font-bold text-neutral-900 dark:text-white'
-export const HUB_CARD_LABEL_CLASS = 'text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400'
-export const HUB_PRIMARY_BUTTON_CLASS = 'min-h-11 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600 sm:px-4 sm:py-2 sm:text-sm'
-export const HUB_SECONDARY_BUTTON_CLASS = 'min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 sm:px-4 sm:py-2 sm:text-sm'
-export const HUB_PAGE_HEADER_CARD_CLASS = 'flex w-full items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)] sm:px-4 sm:py-3'
-export const HUB_FILTER_PILL_CLASS = 'flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 transition-colors whitespace-nowrap hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700'
-export const HUB_FILTER_PILL_ACTIVE_CLASS = 'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
+export const HUB_PAGE_TITLE_CLASS =
+  'text-lg font-bold text-neutral-900 dark:text-neutral-100 md:text-xl'
+export const HUB_SUBSECTION_TITLE_CLASS =
+  'text-base font-bold text-neutral-900 dark:text-white'
+export const HUB_CARD_LABEL_CLASS =
+  'text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400'
+export const HUB_PRIMARY_BUTTON_CLASS =
+  'min-h-11 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600 sm:px-4 sm:py-2 sm:text-sm'
+export const HUB_SECONDARY_BUTTON_CLASS =
+  'min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 sm:px-4 sm:py-2 sm:text-sm'
+export const HUB_PAGE_HEADER_CARD_CLASS =
+  'flex w-full items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)] sm:px-4 sm:py-3'
+export const HUB_FILTER_PILL_CLASS =
+  'flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 transition-colors whitespace-nowrap hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700'
+export const HUB_FILTER_PILL_ACTIVE_CLASS =
+  'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
 
-export const WIZARD_STEP_ORDER: WizardStep[] = ['gateway', 'team', 'goal', 'launch']
+export const WIZARD_STEP_ORDER: Array<WizardStep> = [
+  'gateway',
+  'team',
+  'goal',
+  'launch',
+]
 
 export const TEAM_QUICK_TEMPLATES: Array<{
   id: string
@@ -190,14 +211,62 @@ export const TEAM_QUICK_TEMPLATES: Array<{
   description: string
   templateId: string
   tier: 'budget' | 'balanced' | 'max'
-  agents: string[]
+  agents: Array<string>
 }> = [
-  { id: 'research-budget', label: 'Research Lite', icon: '🔬', description: 'Fast research with minimal cost', templateId: 'research', tier: 'budget', agents: ['Atlas', 'Lens'] },
-  { id: 'research-max', label: 'Research Pro', icon: '🧪', description: 'Deep analysis with full team', templateId: 'research', tier: 'max', agents: ['Atlas', 'Lens', 'Cipher'] },
-  { id: 'coding-budget', label: 'Dev Lite', icon: '⚡', description: 'Quick coding tasks, single agent', templateId: 'coding', tier: 'budget', agents: ['Forge'] },
-  { id: 'coding-balanced', label: 'Dev Team', icon: '💻', description: 'Balanced dev team with review', templateId: 'coding', tier: 'balanced', agents: ['Forge', 'Sentinel', 'Spark'] },
-  { id: 'content-balanced', label: 'Content Studio', icon: '✍️', description: 'Writing, editing, and polish', templateId: 'content', tier: 'balanced', agents: ['Scout', 'Quill', 'Polish'] },
-  { id: 'full-max', label: 'Full Stack', icon: '🚀', description: 'Maximum output — all roles covered', templateId: 'coding', tier: 'max', agents: ['Forge', 'Sentinel', 'Spark', 'Atlas', 'Lens'] },
+  {
+    id: 'research-budget',
+    label: 'Research Lite',
+    icon: '🔬',
+    description: 'Fast research with minimal cost',
+    templateId: 'research',
+    tier: 'budget',
+    agents: ['Atlas', 'Lens'],
+  },
+  {
+    id: 'research-max',
+    label: 'Research Pro',
+    icon: '🧪',
+    description: 'Deep analysis with full team',
+    templateId: 'research',
+    tier: 'max',
+    agents: ['Atlas', 'Lens', 'Cipher'],
+  },
+  {
+    id: 'coding-budget',
+    label: 'Dev Lite',
+    icon: '⚡',
+    description: 'Quick coding tasks, single agent',
+    templateId: 'coding',
+    tier: 'budget',
+    agents: ['Forge'],
+  },
+  {
+    id: 'coding-balanced',
+    label: 'Dev Team',
+    icon: '💻',
+    description: 'Balanced dev team with review',
+    templateId: 'coding',
+    tier: 'balanced',
+    agents: ['Forge', 'Sentinel', 'Spark'],
+  },
+  {
+    id: 'content-balanced',
+    label: 'Content Studio',
+    icon: '✍️',
+    description: 'Writing, editing, and polish',
+    templateId: 'content',
+    tier: 'balanced',
+    agents: ['Scout', 'Quill', 'Polish'],
+  },
+  {
+    id: 'full-max',
+    label: 'Full Stack',
+    icon: '🚀',
+    description: 'Maximum output — all roles covered',
+    templateId: 'coding',
+    tier: 'max',
+    agents: ['Forge', 'Sentinel', 'Spark', 'Atlas', 'Lens'],
+  },
 ]
 
 export const SYSTEM_PROMPT_TEMPLATES: Array<{

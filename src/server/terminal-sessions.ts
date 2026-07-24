@@ -111,7 +111,7 @@ export function createTerminalSession(params: {
   // Spawn shell directly on Windows, else use Python PTY helper for POSIX
   let proc: ChildProcess
   if (process.platform === 'win32') {
-    proc = spawn(command[0], command.slice(1), {
+    proc = spawn(command[0] ?? defaultShell, command.slice(1), {
       cwd,
       env: {
         ...process.env,

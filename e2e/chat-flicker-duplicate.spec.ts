@@ -1,7 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 test.describe('Chat UI flicker #441', () => {
-  test('chat messages should not contain duplicates after stream completion', async ({ page }) => {
+  test('chat messages should not contain duplicates after stream completion', async ({
+    page,
+  }) => {
     // Navigate to the chat page
     await page.goto('/chat')
     await page.waitForLoadState('load')
@@ -26,7 +28,9 @@ test.describe('Chat UI flicker #441', () => {
 
     // Look for message-like elements. The chat uses data attributes
     // Try a few approaches to find message bubbles
-    const messageElements = page.locator('.message, [role="listitem"], [data-message-id], [class*="message"]')
+    const messageElements = page.locator(
+      '.message, [role="listitem"], [data-message-id], [class*="message"]',
+    )
     const msgCount = await messageElements.count()
 
     if (msgCount > 0) {
@@ -35,11 +39,15 @@ test.describe('Chat UI flicker #441', () => {
 
     // VERIFY: Page rendered without error — no error states visible
     const errorState = page.getByRole('alert')
-    const hasError = await errorState.isVisible({ timeout: 1000 }).catch(() => false)
+    const hasError = await errorState
+      .isVisible({ timeout: 1000 })
+      .catch(() => false)
     expect(hasError).toBe(false)
 
     // VERIFY: No "generating" or "thinking" state showing
-    const producingState = page.locator('text=/generating|waiting for response|Generating/i')
+    const producingState = page.locator(
+      'text=/generating|waiting for response|Generating/i',
+    )
     const producingCount = await producingState.count()
     expect(producingCount).toBe(0)
 

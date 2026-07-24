@@ -30,7 +30,7 @@ function assistantMessageIdentity(message: ChatMessage): string {
 export function createResponseWaitSnapshot(
   messages: Array<ChatMessage>,
 ): ResponseWaitSnapshot {
-  const last = messages[messages.length - 1]
+  const last = messages.at(-1)
   return {
     messageCount: messages.length,
     lastAssistantId:
@@ -42,7 +42,7 @@ export function shouldClearWaitingForAssistantMessage(
   messages: Array<ChatMessage>,
   snapshot: ResponseWaitSnapshot,
 ): boolean {
-  const last = messages[messages.length - 1]
+  const last = messages.at(-1)
   if (!last || last.role !== 'assistant') return false
   if (last.__streamingStatus === 'streaming') return false
 
@@ -72,11 +72,12 @@ export function advanceStickyStreamingText(params: {
   const nextRunId = runId ?? previousState.runId ?? 'streaming'
   const isNewRun = nextRunId !== previousState.runId
   const candidateText = smoothedText || rawText
-  const nextText = candidateText.length > 0
-    ? candidateText
-    : isNewRun
-      ? ''
-      : previousState.text
+  const nextText =
+    candidateText.length > 0
+      ? candidateText
+      : isNewRun
+        ? ''
+        : previousState.text
 
   return {
     runId: nextRunId,

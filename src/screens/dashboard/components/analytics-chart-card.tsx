@@ -11,10 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  ChartLineData01Icon,
-  CancelIcon,
-} from '@hugeicons/core-free-icons'
+import { CancelIcon, ChartLineData01Icon } from '@hugeicons/core-free-icons'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
@@ -142,10 +139,7 @@ export function AnalyticsChartCard({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <PeriodSwitch
-              value={period}
-              onChange={onPeriodChange}
-            />
+            <PeriodSwitch value={period} onChange={onPeriodChange} />
             {hasData ? (
               <button
                 type="button"
@@ -163,7 +157,8 @@ export function AnalyticsChartCard({
         </div>
 
         {insights.length > 0 ? (
-          <ul className="flex flex-col gap-1 rounded-md border p-2 text-[11px]"
+          <ul
+            className="flex flex-col gap-1 rounded-md border p-2 text-[11px]"
             style={{
               borderColor: 'var(--theme-border)',
               background:
@@ -300,10 +295,7 @@ export function AnalyticsChartCard({
         {hasData ? (
           <div className="flex items-center gap-4 text-[10px]">
             <Legend tone="var(--theme-accent)" label="tokens (in+out)" />
-            <Legend
-              tone="var(--theme-accent-secondary)"
-              label="cache reads"
-            />
+            <Legend tone="var(--theme-accent-secondary)" label="cache reads" />
           </div>
         ) : null}
       </div>

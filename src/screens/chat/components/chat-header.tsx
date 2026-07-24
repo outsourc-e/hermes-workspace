@@ -35,10 +35,11 @@ function formatMobileSessionTitle(rawTitle: string): string {
     .filter(Boolean)
   if (
     parts.length >= 2 &&
-    parts[0].toLowerCase() === 'agent' &&
-    parts[1].length > 0
+    parts[0]?.toLowerCase() === 'agent' &&
+    (parts[1]?.length ?? 0) > 0
   ) {
-    const candidate = parts[parts.length - 1]
+    const candidate = parts.at(-1)
+    if (!candidate) return 'New Chat'
     if (candidate.toLowerCase() === 'main') return 'Main Chat'
     return `${toTitleCase(candidate)} Chat`
   }
@@ -299,7 +300,6 @@ function ChatHeaderComponent({
           </button>
 
           <div className="flex-1" />
-
         </div>
       </div>
     )

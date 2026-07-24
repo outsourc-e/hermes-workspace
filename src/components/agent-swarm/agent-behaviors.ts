@@ -121,18 +121,18 @@ export function getExpression(activity: AgentActivity): Expression {
 export function getRandomMessage(pool: keyof typeof CHAT_MESSAGES): string {
   const messages = CHAT_MESSAGES[pool]
   const index = Math.floor(Math.random() * messages.length)
-  return messages[index]
+  return messages[index] ?? messages[0]
 }
 
 export function getBreakType(): AgentActivity {
-  const breakTypes: Array<AgentActivity> = [
+  const breakTypes = [
     'water_break',
     'coffee_break',
     'lunch',
     'meeting',
-  ]
+  ] as const
   const index = Math.floor(Math.random() * breakTypes.length)
-  return breakTypes[index]
+  return breakTypes[index] ?? breakTypes[0]
 }
 
 export function getLocationForActivity(
@@ -142,7 +142,7 @@ export function getLocationForActivity(
   const safeDeskIndex =
     ((deskIndex % DESK_POSITIONS.length) + DESK_POSITIONS.length) %
     DESK_POSITIONS.length
-  const desk = DESK_POSITIONS[safeDeskIndex]
+  const desk = DESK_POSITIONS[safeDeskIndex] ?? DESK_POSITIONS[0]
 
   if (activity === 'water_break') {
     return { ...LOCATIONS.waterCooler }
@@ -194,7 +194,7 @@ export function createBehaviorState(deskIndex: number): AgentBehaviorState {
   const safeDeskIndex =
     ((deskIndex % DESK_POSITIONS.length) + DESK_POSITIONS.length) %
     DESK_POSITIONS.length
-  const desk = DESK_POSITIONS[safeDeskIndex]
+  const desk = DESK_POSITIONS[safeDeskIndex] ?? DESK_POSITIONS[0]
   const deskPosition = { x: desk.x, y: desk.y }
 
   return {

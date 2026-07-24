@@ -76,8 +76,6 @@ export function collectSyntheticLiveToolEvents({
   const runToolCalls: Array<Record<string, unknown>> = []
 
   for (const message of messages) {
-    if (!message) continue
-
     if (message.role === 'tool' || message.role === 'tool_result') {
       const callId =
         readString(message.tool_call_id) || readString(message.toolCallId)
@@ -112,7 +110,9 @@ export function collectSyntheticLiveToolEvents({
       readString(toolCall.name) ||
       readString(toolFunction?.name) ||
       'tool'
-    const args = parseJsonIfPossible(toolFunction?.arguments ?? toolCall.arguments)
+    const args = parseJsonIfPossible(
+      toolFunction?.arguments ?? toolCall.arguments,
+    )
     const resultEntry = resultByCallId.get(toolCallId)
     const nextPhase = resultEntry
       ? resultEntry.isError

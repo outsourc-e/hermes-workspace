@@ -174,7 +174,13 @@ export type DashboardAnalyticsSection = {
   totalSessions: number
   /** API call count over the window. */
   totalApiCalls: number
-  topModels: Array<{ id: string; tokens: number; calls: number; cost: number; sessions: number }>
+  topModels: Array<{
+    id: string
+    tokens: number
+    calls: number
+    cost: number
+    sessions: number
+  }>
   /**
    * Per-day rollup for sparklines. ISO date string + tokens + sessions
    * + cost per day. Always returned, even when empty.
@@ -341,14 +347,13 @@ function normalizePlatforms(raw: unknown): Array<DashboardPlatformEntry> {
 
 function normalizeCron(raw: unknown): DashboardCronSection | null {
   if (!raw) return null
-  let jobs: Array<Record<string, unknown>> = []
+  let jobs: Array<unknown> = []
   if (Array.isArray(raw)) {
-    jobs = raw as Array<Record<string, unknown>>
-  } else if (raw && typeof raw === 'object') {
+    jobs = raw
+  } else if (typeof raw === 'object') {
     const r = raw as Record<string, unknown>
-    if (Array.isArray(r.jobs)) jobs = r.jobs as Array<Record<string, unknown>>
+    if (Array.isArray(r.jobs)) jobs = r.jobs
   }
-  if (!Array.isArray(jobs)) return null
 
   let paused = 0
   let running = 0
@@ -366,7 +371,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       typeof j.last_error === 'string'
         ? j.last_error
         : typeof j.last_delivery_error === 'string'
-          ? (j.last_delivery_error)
+          ? j.last_delivery_error
           : null
     const isFailure =
       lastStatus === 'failed' ||
@@ -376,16 +381,13 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       failed += 1
       const id = readString(j.id) || readString(j.name) || 'unknown'
       const name = readString(j.name) || id
-      const lastRunAt =
-        typeof j.last_run_at === 'string' ? j.last_run_at : null
+      const lastRunAt = typeof j.last_run_at === 'string' ? j.last_run_at : null
       recentFailures.push({ id, name, lastError, lastRunAt })
     }
     const candidates = [
       typeof j.next_run_at === 'string' ? Date.parse(j.next_run_at) : NaN,
       typeof j.next_run === 'string' ? Date.parse(j.next_run) : NaN,
-      typeof j.next_run_at === 'number'
-        ? (j.next_run_at) * 1000
-        : NaN,
+      typeof j.next_run_at === 'number' ? j.next_run_at * 1000 : NaN,
     ].filter((v) => Number.isFinite(v))
     for (const ts of candidates) {
       if (nextRunMs === null || ts < nextRunMs) nextRunMs = ts
@@ -419,7 +421,9 @@ function normalizeKanban(raw: unknown): DashboardKanbanSection | null {
     topBlocked: [],
   }
 
-  const bucketFor = (status: string): keyof Pick<
+  const bucketFor = (
+    status: string,
+  ): keyof Pick<
     DashboardKanbanSection,
     'triage' | 'todo' | 'ready' | 'running' | 'blocked' | 'done' | 'other'
   > => {
@@ -427,7 +431,8 @@ function normalizeKanban(raw: unknown): DashboardKanbanSection | null {
     if (s === 'triage') return 'triage'
     if (s === 'todo' || s === 'queued') return 'todo'
     if (s === 'ready') return 'ready'
-    if (s === 'running' || s === 'claimed' || s === 'in_progress') return 'running'
+    if (s === 'running' || s === 'claimed' || s === 'in_progress')
+      return 'running'
     if (s === 'blocked') return 'blocked'
     if (s === 'done' || s === 'completed' || s === 'complete') return 'done'
     return 'other'
@@ -472,8 +477,7 @@ function normalizeAchievementUnlock(
     category: readString(r.category) || 'General',
     icon: readString(r.icon) || 'Star',
     tier: typeof r.tier === 'string' ? r.tier : null,
-    unlockedAt:
-      typeof r.unlocked_at === 'number' ? (r.unlocked_at) : null,
+    unlockedAt: typeof r.unlocked_at === 'number' ? r.unlocked_at : null,
   }
 }
 
@@ -486,9 +490,7 @@ function normalizeAchievements(
   if (recentArr.length === 0 && (!all || typeof all !== 'object')) return null
   const recentUnlocks = recentArr
     .map(normalizeAchievementUnlock)
-    .filter(
-      (entry): entry is DashboardAchievementUnlock => entry !== null,
-    )
+    .filter((entry): entry is DashboardAchievementUnlock => entry !== null)
     .slice(0, limit)
 
   let totalUnlocked = 0
@@ -546,14 +548,13 @@ function normalizeSkillsUsage(
         skill,
         totalCount: readNumber(e.total_count),
         percentage: readNumber(e.percentage),
-        lastUsedAt:
-          typeof e.last_used_at === 'number'
-            ? (e.last_used_at)
-            : null,
+        lastUsedAt: typeof e.last_used_at === 'number' ? e.last_used_at : null,
       }
     })
     .filter(
-      (e): e is {
+      (
+        e,
+      ): e is {
         skill: string
         totalCount: number
         percentage: number
@@ -562,10 +563,7 @@ function normalizeSkillsUsage(
     )
     .sort((a, b) => b.totalCount - a.totalCount)
     .slice(0, 5)
-  if (
-    !summary &&
-    topSkills.length === 0
-  ) {
+  if (!summary && topSkills.length === 0) {
     return null
   }
   return {
@@ -598,9 +596,7 @@ function normalizeAnalytics(
     totalsRaw?.total_output ?? r.total_output ?? r.output_tokens,
   )
   const cacheReadTokens = readNumber(
-    totalsRaw?.total_cache_read ??
-      r.total_cache_read ??
-      r.cache_read_tokens,
+    totalsRaw?.total_cache_read ?? r.total_cache_read ?? r.cache_read_tokens,
   )
   const reasoningTokens = readNumber(
     totalsRaw?.total_reasoning ?? r.total_reasoning ?? r.reasoning_tokens,
@@ -628,9 +624,7 @@ function normalizeAnalytics(
   // reasoning are exposed separately for the rich UI.
   const fallbackTotal = readNumber(r.total_tokens)
   const totalTokens =
-    inputTokens + outputTokens > 0
-      ? inputTokens + outputTokens
-      : fallbackTotal
+    inputTokens + outputTokens > 0 ? inputTokens + outputTokens : fallbackTotal
 
   const modelsRaw = Array.isArray(r.by_model)
     ? r.by_model
@@ -649,14 +643,19 @@ function normalizeAnalytics(
       const tokensOut = readNumber(e.output_tokens)
       return {
         id,
-        tokens: tokensIn + tokensOut > 0 ? tokensIn + tokensOut : readNumber(e.tokens),
+        tokens:
+          tokensIn + tokensOut > 0
+            ? tokensIn + tokensOut
+            : readNumber(e.tokens),
         calls: readNumber(e.api_calls ?? e.calls ?? e.requests),
         cost: readNumber(e.estimated_cost ?? e.cost),
         sessions: readNumber(e.sessions),
       }
     })
     .filter(
-      (entry): entry is {
+      (
+        entry,
+      ): entry is {
         id: string
         tokens: number
         calls: number
@@ -686,7 +685,9 @@ function normalizeAnalytics(
       }
     })
     .filter(
-      (entry): entry is {
+      (
+        entry,
+      ): entry is {
         day: string
         inputTokens: number
         outputTokens: number
@@ -802,7 +803,7 @@ function shortSkillName(raw: string): string {
  */
 function shortModelName(raw: string): string {
   if (!raw) return raw
-  return raw.split('/').slice(-1)[0]
+  return raw.split('/').at(-1) ?? raw
 }
 
 /**
@@ -824,22 +825,20 @@ function computeInsights(
   // 1. Peak day driver
   let peakIsToday = false
   if (analytics.daily.length >= 3) {
-    let peakIdx = 0
+    let peakDay: string | null = null
     let peakVal = 0
-    for (let i = 0; i < analytics.daily.length; i += 1) {
-      const total =
-        analytics.daily[i].inputTokens + analytics.daily[i].outputTokens
+    for (const day of analytics.daily) {
+      const total = day.inputTokens + day.outputTokens
       if (total > peakVal) {
         peakVal = total
-        peakIdx = i
+        peakDay = day.day
       }
     }
-    if (peakVal > 0) {
-      const driver =
-        analytics.topModels.length > 0
-          ? `, driven by ${shortModelName(analytics.topModels[0].id)}`
-          : ''
-      const peakDay = analytics.daily[peakIdx].day
+    if (peakVal > 0 && peakDay) {
+      const topModel = analytics.topModels[0]
+      const driver = topModel
+        ? `, driven by ${shortModelName(topModel.id)}`
+        : ''
       const todayIso = new Date().toISOString().slice(0, 10)
       peakIsToday = peakDay === todayIso
       out.push({
@@ -854,9 +853,12 @@ function computeInsights(
     const mid = Math.floor(analytics.daily.length / 2)
     let prior = 0
     let recent = 0
-    for (let i = 0; i < mid; i += 1) prior += analytics.daily[i].cacheReadTokens
-    for (let i = mid; i < analytics.daily.length; i += 1)
-      recent += analytics.daily[i].cacheReadTokens
+    for (const day of analytics.daily.slice(0, mid)) {
+      prior += day.cacheReadTokens
+    }
+    for (const day of analytics.daily.slice(mid)) {
+      recent += day.cacheReadTokens
+    }
     if (prior > 0) {
       const delta = ((recent - prior) / prior) * 100
       if (Math.abs(delta) >= 5) {
@@ -873,16 +875,12 @@ function computeInsights(
   // glance.
   const ops: Array<string> = []
   if (cron && cron.failed > 0) {
-    ops.push(
-      `${cron.failed} failed cron job${cron.failed === 1 ? '' : 's'}`,
-    )
+    ops.push(`${cron.failed} failed cron job${cron.failed === 1 ? '' : 's'}`)
   }
   if (cron && cron.nextRunAt) {
     const nextMs = Date.parse(cron.nextRunAt)
     if (Number.isFinite(nextMs) && nextMs - Date.now() < -7 * 86_400_000) {
-      ops.push(
-        `${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`,
-      )
+      ops.push(`${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`)
     }
   }
   if (
@@ -976,7 +974,9 @@ function computeIncidents(
       severity: 'warn',
       source: 'kanban',
       label: `${kanban.blocked} kanban task${kanban.blocked === 1 ? '' : 's'} blocked`,
-      detail: kanban.topBlocked.map((t) => t.title).join(' · ') || 'blocked cards need attention',
+      detail:
+        kanban.topBlocked.map((t) => t.title).join(' · ') ||
+        'blocked cards need attention',
       href: '/swarm2',
     })
   }

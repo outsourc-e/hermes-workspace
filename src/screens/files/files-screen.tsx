@@ -1,4 +1,12 @@
-import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { usePageTitle } from '@/hooks/use-page-title'
 import {
@@ -183,11 +191,14 @@ function computeDiff(original: string, updated: string): Array<DiffLine> {
     new Array(n + 1).fill(0),
   )
   for (let i = 1; i <= m; i++) {
+    const row = dp[i]
+    const previousRow = dp[i - 1]
+    if (!row || !previousRow) continue
     for (let j = 1; j <= n; j++) {
       if (aLines[i - 1] === bLines[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1
+        row[j] = (previousRow[j - 1] ?? 0) + 1
       } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
+        row[j] = Math.max(previousRow[j] ?? 0, row[j - 1] ?? 0)
       }
     }
   }
@@ -197,31 +208,38 @@ function computeDiff(original: string, updated: string): Array<DiffLine> {
   let i = m
   let j = n
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && aLines[i - 1] === bLines[j - 1]) {
+    const aLine = i > 0 ? aLines[i - 1] : undefined
+    const bLine = j > 0 ? bLines[j - 1] : undefined
+    if (aLine !== undefined && bLine !== undefined && aLine === bLine) {
       result.push({
         kind: 'unchanged',
-        text: aLines[i - 1],
+        text: aLine,
         leftNum: i,
         rightNum: j,
       })
       i--
       j--
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+    } else if (
+      bLine !== undefined &&
+      (i === 0 || (dp[i]?.[j - 1] ?? 0) >= (dp[i - 1]?.[j] ?? 0))
+    ) {
       result.push({
         kind: 'added',
-        text: bLines[j - 1],
+        text: bLine,
         leftNum: null,
         rightNum: j,
       })
       j--
-    } else {
+    } else if (aLine !== undefined) {
       result.push({
         kind: 'removed',
-        text: aLines[i - 1],
+        text: aLine,
         leftNum: i,
         rightNum: null,
       })
       i--
+    } else {
+      break
     }
   }
   return result.reverse()
@@ -286,7 +304,10 @@ type HighlightToken = {
   kind: HighlightKind
 }
 
-const HIGHLIGHT_CLASS_BY_KIND: Record<Exclude<HighlightKind, 'plain'>, string> = {
+const HIGHLIGHT_CLASS_BY_KIND: Record<
+  Exclude<HighlightKind, 'plain'>,
+  string
+> = {
   comment: 'hl-comment',
   jsonKey: 'hl-key',
   keyword: 'hl-kw',
@@ -295,18 +316,23 @@ const HIGHLIGHT_CLASS_BY_KIND: Record<Exclude<HighlightKind, 'plain'>, string> =
   type: 'hl-type',
 }
 
-function pushHighlightToken(tokens: Array<HighlightToken>, text: string, kind: HighlightKind = 'plain') {
+function pushHighlightToken(
+  tokens: Array<HighlightToken>,
+  text: string,
+  kind: HighlightKind = 'plain',
+) {
   if (!text) return
   tokens.push({ text, kind })
 }
 
 function tokenizeJson(code: string): Array<HighlightToken> {
   const tokens: Array<HighlightToken> = []
-  const pattern = /("(?:[^"\\]|\\.)*")(\s*:)?|-?\d+\.?\d*|\b(?:true|false|null)\b/g
+  const pattern =
+    /("(?:[^"\\]|\\.)*")(\s*:)?|-?\d+\.?\d*|\b(?:true|false|null)\b/g
   let lastIndex = 0
 
   for (const match of code.matchAll(pattern)) {
-    const index = match.index ?? 0
+    const index = match.index
     pushHighlightToken(tokens, code.slice(lastIndex, index))
 
     const [value, stringValue, colon] = match
@@ -333,13 +359,17 @@ function tokenizeCode(code: string): Array<HighlightToken> {
   let lastIndex = 0
 
   for (const match of code.matchAll(pattern)) {
-    const index = match.index ?? 0
+    const index = match.index
     const value = match[0]
     pushHighlightToken(tokens, code.slice(lastIndex, index))
 
     if (value.startsWith('//') || value.startsWith('/*')) {
       pushHighlightToken(tokens, value, 'comment')
-    } else if (value.startsWith('"') || value.startsWith("'") || value.startsWith('`')) {
+    } else if (
+      value.startsWith('"') ||
+      value.startsWith("'") ||
+      value.startsWith('`')
+    ) {
       pushHighlightToken(tokens, value, 'string')
     } else if (/^-?\d+\.?\d*$/.test(value)) {
       pushHighlightToken(tokens, value, 'number')
@@ -700,7 +730,8 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   const isEditable = isEditableFile(fileName)
 
   const highlighted = useMemo<Array<ReactNode>>(
-    () => (isCode && !isMd && content ? highlightCodeContent(content, ext) : []),
+    () =>
+      isCode && !isMd && content ? highlightCodeContent(content, ext) : [],
     [isCode, isMd, content, ext],
   )
 
@@ -835,7 +866,13 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
             variant="outline"
             onClick={() => setRawMode((v) => !v)}
           >
-            {rawMode ? (isHtml ? 'Preview HTML' : 'Preview') : (isHtml ? 'Raw HTML' : 'Raw')}
+            {rawMode
+              ? isHtml
+                ? 'Preview HTML'
+                : 'Preview'
+              : isHtml
+                ? 'Raw HTML'
+                : 'Raw'}
           </Button>
         )}
         {isEditable && (
@@ -973,7 +1010,9 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   // ── Code viewer (syntax highlighted) — also raw mode for md ───────────────
 
   if (isCode) {
-    const displayContent = isMd ? highlightCodeContent(content, 'md') : highlighted
+    const displayContent = isMd
+      ? highlightCodeContent(content, 'md')
+      : highlighted
     return (
       <>
         {diffModal}
@@ -1249,12 +1288,14 @@ export function FilesScreen() {
               <div className="space-y-1 px-3 py-2 text-xs text-red-500">
                 <div>{treeError}</div>
                 <div className="text-primary-400 dark:text-neutral-500">
-                  Check the server workspace catalog or HERMES_WORKSPACE_DIR; this browser no longer needs local folder access.
+                  Check the server workspace catalog or HERMES_WORKSPACE_DIR;
+                  this browser no longer needs local folder access.
                 </div>
               </div>
             ) : entries.length === 0 ? (
               <div className="px-3 py-2 text-xs text-primary-400 dark:text-neutral-500">
-                Server workspace is empty. Agent-created files will appear here after they are written to the configured workspace path.
+                Server workspace is empty. Agent-created files will appear here
+                after they are written to the configured workspace path.
               </div>
             ) : (
               entries
@@ -1366,7 +1407,8 @@ export function FilesScreen() {
               value={promptValue}
               onChange={(e) => setPromptValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handlePromptSubmit()
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing)
+                  void handlePromptSubmit()
               }}
               className="w-full rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-3 py-2 text-sm text-primary-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-300"
               autoFocus

@@ -32,8 +32,10 @@ async function* streamClaudeChat(
   }
 
   const queue: Array<string> = []
-  let done = false
-  let failure: Error | null = null
+  const state: { done: boolean; failure: Error | null } = {
+    done: false,
+    failure: null,
+  }
   let notify: (() => void) | null = null
 
   void streamChat(
@@ -70,19 +72,19 @@ async function* streamClaudeChat(
     },
   ).then(
     () => {
-      done = true
+      state.done = true
       notify?.()
       notify = null
     },
     (error: unknown) => {
-      failure = error instanceof Error ? error : new Error(String(error))
-      done = true
+      state.failure = error instanceof Error ? error : new Error(String(error))
+      state.done = true
       notify?.()
       notify = null
     },
   )
 
-  while (!done || queue.length > 0) {
+  while (!state.done || queue.length > 0) {
     if (queue.length > 0) {
       yield queue.shift() as string
       continue
@@ -93,7 +95,7 @@ async function* streamClaudeChat(
     })
   }
 
-  if (failure) throw failure
+  if (state.failure) throw state.failure
 }
 
 export async function sendChatUnified(

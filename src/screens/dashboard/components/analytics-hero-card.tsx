@@ -11,12 +11,9 @@ import {
   YAxis,
 } from 'recharts'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  ChartLineData01Icon,
-  CancelIcon,
-} from '@hugeicons/core-free-icons'
-import { formatModelName } from '@/screens/dashboard/lib/formatters'
+import { CancelIcon, ChartLineData01Icon } from '@hugeicons/core-free-icons'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 function formatTokens(n: number): string {
   if (!n || n <= 0) return '0'
@@ -240,10 +237,7 @@ export function AnalyticsHeroCard({
                 </ResponsiveContainer>
               </div>
               <div className="mt-1 flex items-center gap-4 text-[10px]">
-                <LegendDot
-                  tone="var(--theme-accent)"
-                  label="tokens (in+out)"
-                />
+                <LegendDot tone="var(--theme-accent)" label="tokens (in+out)" />
                 <LegendDot
                   tone="var(--theme-accent-secondary)"
                   label="cache reads"

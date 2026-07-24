@@ -2,9 +2,14 @@
 
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Rocket01Icon, CheckmarkCircle02Icon, AlertCircleIcon, Clock01Icon } from '@hugeicons/core-free-icons'
-import { cn } from '@/lib/utils'
+import {
+  AlertCircleIcon,
+  CheckmarkCircle02Icon,
+  Clock01Icon,
+  Rocket01Icon,
+} from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
+import { cn } from '@/lib/utils'
 
 type WorkerResult = {
   workerId: string
@@ -20,20 +25,24 @@ type DispatchResponse = {
   completedAt: number
   prompt: string
   timeoutSeconds: number
-  results: WorkerResult[]
+  results: Array<WorkerResult>
 }
 
 type SwarmComposeProps = {
-  members: CrewMember[]
-  roomIds: string[]
+  members: Array<CrewMember>
+  roomIds: Array<string>
   className?: string
 }
 
-export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps) {
+export function SwarmCompose({
+  members,
+  roomIds,
+  className,
+}: SwarmComposeProps) {
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [history, setHistory] = useState<DispatchResponse[]>([])
+  const [history, setHistory] = useState<Array<DispatchResponse>>([])
   const [timeoutSeconds, setTimeoutSeconds] = useState(240)
 
   const roomMembers = members.filter((member) => roomIds.includes(member.id))
@@ -46,7 +55,11 @@ export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps)
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workerIds: roomIds, prompt: prompt.trim(), timeoutSeconds }),
+        body: JSON.stringify({
+          workerIds: roomIds,
+          prompt: prompt.trim(),
+          timeoutSeconds,
+        }),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -63,23 +76,40 @@ export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps)
   }
 
   return (
-    <div className={cn('rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5', className)}>
+    <div
+      className={cn(
+        'rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5',
+        className,
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-[var(--theme-text)]">Compose orchestration</div>
+          <div className="text-sm font-semibold text-[var(--theme-text)]">
+            Compose orchestration
+          </div>
           <div className="mt-1 text-xs text-[var(--theme-muted)]">
-            Dispatched in parallel against each agent profile with the configured worker runtime.
+            Dispatched in parallel against each agent profile with the
+            configured worker runtime.
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
-          <label htmlFor="swarm-timeout" className="uppercase tracking-[0.18em] text-[10px]">timeout</label>
+          <label
+            htmlFor="swarm-timeout"
+            className="uppercase tracking-[0.18em] text-[10px]"
+          >
+            timeout
+          </label>
           <input
             id="swarm-timeout"
             type="number"
             min={10}
             max={600}
             value={timeoutSeconds}
-            onChange={(event) => setTimeoutSeconds(Math.max(10, Math.min(600, Number(event.target.value) || 240)))}
+            onChange={(event) =>
+              setTimeoutSeconds(
+                Math.max(10, Math.min(600, Number(event.target.value) || 240)),
+              )
+            }
             className="w-16 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-1 text-right text-xs text-[var(--theme-text)]"
           />
           <span className="text-[10px] uppercase tracking-[0.18em]">sec</span>
@@ -89,7 +119,9 @@ export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps)
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--theme-muted)]">
         <span className="text-[10px] uppercase tracking-[0.18em]">Targets</span>
         {roomMembers.length === 0 ? (
-          <span className="italic">No agents selected. Tap "+" on a node to add.</span>
+          <span className="italic">
+            No agents selected. Tap "+" on a node to add.
+          </span>
         ) : (
           roomMembers.map((member) => (
             <span
@@ -113,7 +145,8 @@ export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps)
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs text-[var(--theme-muted)]">
-          {prompt.trim().length} chars · {roomIds.length} target{roomIds.length === 1 ? '' : 's'}
+          {prompt.trim().length} chars · {roomIds.length} target
+          {roomIds.length === 1 ? '' : 's'}
         </div>
         <button
           type="button"
@@ -132,19 +165,27 @@ export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps)
       </div>
 
       {error ? (
-        <div className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>
+        <div className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          {error}
+        </div>
       ) : null}
 
       {history.length > 0 ? (
         <div className="mt-5 space-y-4">
           {history.map((entry) => (
-            <div key={entry.dispatchedAt} className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)]/30 p-4">
+            <div
+              key={entry.dispatchedAt}
+              className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)]/30 p-4"
+            >
               <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--theme-muted)]">
                 <span>
-                  Dispatched {new Date(entry.dispatchedAt).toLocaleTimeString()} · {entry.results.length} workers
+                  Dispatched {new Date(entry.dispatchedAt).toLocaleTimeString()}{' '}
+                  · {entry.results.length} workers
                 </span>
                 <span>
-                  Completed in {((entry.completedAt - entry.dispatchedAt) / 1000).toFixed(1)}s
+                  Completed in{' '}
+                  {((entry.completedAt - entry.dispatchedAt) / 1000).toFixed(1)}
+                  s
                 </span>
               </div>
               <div className="mt-2 rounded-lg bg-[var(--theme-hover)] px-3 py-2 text-xs text-[var(--theme-text)] whitespace-pre-wrap">
@@ -164,16 +205,22 @@ export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps)
                     <div className="flex items-center justify-between text-[var(--theme-text)]">
                       <span className="inline-flex items-center gap-1 font-semibold">
                         <HugeiconsIcon
-                          icon={result.ok ? CheckmarkCircle02Icon : AlertCircleIcon}
+                          icon={
+                            result.ok ? CheckmarkCircle02Icon : AlertCircleIcon
+                          }
                           size={13}
-                          className={result.ok ? 'text-emerald-400' : 'text-red-400'}
+                          className={
+                            result.ok ? 'text-emerald-400' : 'text-red-400'
+                          }
                         />
                         {result.workerId}
                       </span>
                       <span className="inline-flex items-center gap-1 text-[var(--theme-muted)]">
                         <HugeiconsIcon icon={Clock01Icon} size={11} />
                         {(result.durationMs / 1000).toFixed(1)}s
-                        {result.exitCode !== null ? ` · exit ${result.exitCode}` : ''}
+                        {result.exitCode !== null
+                          ? ` · exit ${result.exitCode}`
+                          : ''}
                       </span>
                     </div>
                     {result.error ? (
@@ -183,7 +230,9 @@ export function SwarmCompose({ members, roomIds, className }: SwarmComposeProps)
                     ) : null}
                     {result.output ? (
                       <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap text-[11px] text-[var(--theme-text)]">
-                        {result.output.length > 4000 ? `${result.output.slice(0, 4000)}…\n[truncated]` : result.output}
+                        {result.output.length > 4000
+                          ? `${result.output.slice(0, 4000)}…\n[truncated]`
+                          : result.output}
                       </pre>
                     ) : null}
                   </div>

@@ -84,7 +84,7 @@ export function ProviderModelIcon({
         )}
         style={{ width: size, height: size, fontSize: size * 0.6, ...style }}
       >
-        {provider[0]?.toUpperCase() ?? '?'}
+        {provider.charAt(0).toUpperCase() || '?'}
       </span>
     )
   }

@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-} from '@hugeicons/core-free-icons'
+import { ArrowDown01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -80,24 +77,21 @@ export function BackgroundRunsSection() {
     }
   }, [refresh])
 
-  const handleAbandon = useCallback(
-    async (run: BackgroundRun) => {
-      setBusyRunId(run.runId)
-      try {
-        await fetch(
-          `/api/runs/${encodeURIComponent(run.sessionKey)}/${encodeURIComponent(run.runId)}/abandon`,
-          { method: 'POST' },
-        )
-        // Optimistic removal — server poll will catch up.
-        setRuns((prev) => prev.filter((r) => r.runId !== run.runId))
-      } catch {
-        /* surface via reload */
-      } finally {
-        setBusyRunId(null)
-      }
-    },
-    [],
-  )
+  const handleAbandon = useCallback(async (run: BackgroundRun) => {
+    setBusyRunId(run.runId)
+    try {
+      await fetch(
+        `/api/runs/${encodeURIComponent(run.sessionKey)}/${encodeURIComponent(run.runId)}/abandon`,
+        { method: 'POST' },
+      )
+      // Optimistic removal — server poll will catch up.
+      setRuns((prev) => prev.filter((r) => r.runId !== run.runId))
+    } catch {
+      /* surface via reload */
+    } finally {
+      setBusyRunId(null)
+    }
+  }, [])
 
   const handleOpen = useCallback(
     (run: BackgroundRun) => {
@@ -111,8 +105,9 @@ export function BackgroundRunsSection() {
 
   if (runs.length === 0) return null
 
-  const staleCount = runs.filter((r) => r.stalenessMs >= STALE_THRESHOLD_MS)
-    .length
+  const staleCount = runs.filter(
+    (r) => r.stalenessMs >= STALE_THRESHOLD_MS,
+  ).length
 
   return (
     <section className="rounded-2xl bg-primary-200/15 p-2">
@@ -149,7 +144,7 @@ export function BackgroundRunsSection() {
               const isStale = run.stalenessMs >= STALE_THRESHOLD_MS
               const isBusy = busyRunId === run.runId
               const snippet =
-                run.lastAssistantText?.trim() ||
+                run.lastAssistantText.trim() ||
                 run.lastLifecycleEvent ||
                 (run.lastToolName ? `tool: ${run.lastToolName}` : '') ||
                 'no output yet'

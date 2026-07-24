@@ -80,7 +80,7 @@ function findModelInTier(
   const providerTiers = MODEL_TIERS[provider]
   if (!providerTiers) return null
 
-  const candidates = providerTiers[tier] || []
+  const candidates = providerTiers[tier]
   for (const candidate of candidates) {
     const match = availableModels.find((m) =>
       m.toLowerCase().includes(candidate.toLowerCase()),
@@ -257,7 +257,7 @@ function _useModelSuggestionsDisabled({
     // Check for upgrade opportunity (complex task on weak model)
     // Phase 4.2: Skip if "Only suggest cheaper" is enabled
     if (!settings.onlySuggestCheaper) {
-      const lastMessage = messages[messages.length - 1]
+      const lastMessage = messages.at(-1)
       if (lastMessage && isComplexTask(lastMessage)) {
         let targetTier: ModelTier | null = null
 
@@ -293,7 +293,7 @@ function _useModelSuggestionsDisabled({
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- messages.length as stable proxy
+    // Hook dependencies are intentionally constrained to the explicit array below. -- messages.length as stable proxy
   }, [
     currentModel,
     sessionKey,

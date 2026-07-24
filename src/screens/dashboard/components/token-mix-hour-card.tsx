@@ -86,7 +86,7 @@ export function TokenMixHourCard({
       if (!ts) continue
       const date = new Date(ts)
       const hour = date.getHours()
-      if (hour >= 0 && hour < 24) counts[hour] += 1
+      if (hour >= 0 && hour < 24) counts[hour] = (counts[hour] ?? 0) + 1
     }
     return counts
   }, [sessions])
@@ -207,8 +207,7 @@ export function TokenMixHourCard({
                         : isPeak
                           ? 'var(--theme-accent)'
                           : `color-mix(in srgb, var(--theme-accent) ${Math.max(20, heightPct)}%, transparent)`,
-                    height:
-                      count === 0 ? 4 : `${Math.max(8, heightPct)}%`,
+                    height: count === 0 ? 4 : `${Math.max(8, heightPct)}%`,
                     minHeight: 4,
                   }}
                   title={`${formatHour(hour)} · ${count} session${count === 1 ? '' : 's'}`}

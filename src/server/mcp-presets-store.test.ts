@@ -1,4 +1,3 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   chmodSync,
   existsSync,
@@ -12,6 +11,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   __resetPresetsCacheForTests,
@@ -53,7 +53,10 @@ function writeSeed(payload: unknown): void {
 
 function writeUserFile(payload: unknown): void {
   const path = join(homeDir, 'mcp-presets.json')
-  writeFileSync(path, typeof payload === 'string' ? payload : JSON.stringify(payload))
+  writeFileSync(
+    path,
+    typeof payload === 'string' ? payload : JSON.stringify(payload),
+  )
 }
 
 beforeEach(() => {
@@ -139,14 +142,13 @@ describe('readPresets', () => {
   it('rejects duplicate ids with a path-prefixed error', async () => {
     writeUserFile({
       version: 1,
-      presets: [
-        { ...VALID_SEED.presets[0] },
-        { ...VALID_SEED.presets[0] },
-      ],
+      presets: [{ ...VALID_SEED.presets[0] }, { ...VALID_SEED.presets[0] }],
     })
     const result = await readPresets()
     expect(result.source).toBe('invalid')
-    const dupeErr = result.validationErrors?.find((e) => e.path === 'presets[1].id')
+    const dupeErr = result.validationErrors?.find(
+      (e) => e.path === 'presets[1].id',
+    )
     expect(dupeErr?.message).toMatch(/duplicate/i)
   })
 
@@ -325,12 +327,12 @@ describe('readPresets', () => {
       presets: [{ ...VALID_SEED.presets[0], id: 'altid' }],
     })
     // Pad or trim so lengths match
-    const padded = alt.length < base.length
-      ? alt + ' '.repeat(base.length - alt.length)
-      : alt.slice(0, base.length)
+    const padded =
+      alt.length < base.length
+        ? alt + ' '.repeat(base.length - alt.length)
+        : alt.slice(0, base.length)
     expect(padded.length).toBe(base.length)
 
-    const { mtime } = readFileSync(path) ? { mtime: new Date() } : { mtime: new Date() }
     // Get mtime before write
     const { statSync } = await import('node:fs')
     const beforeMtime = statSync(path).mtime
@@ -347,28 +349,39 @@ describe('readPresets', () => {
 
   // MED-6: category allowlist
   it('rejects preset with unknown category', async () => {
-    writeFileSync(join(homeDir, 'mcp-presets.json'), JSON.stringify({
-      version: 1,
-      presets: [{ ...VALID_SEED.presets[0], category: 'RandomCategory' }],
-    }))
+    writeFileSync(
+      join(homeDir, 'mcp-presets.json'),
+      JSON.stringify({
+        version: 1,
+        presets: [{ ...VALID_SEED.presets[0], category: 'RandomCategory' }],
+      }),
+    )
     __resetPresetsCacheForTests()
     const result = await readPresets()
     expect(result.source).toBe('invalid')
-    const err = result.validationErrors?.find((e) => e.path === 'presets[0].category')
+    const err = result.validationErrors?.find(
+      (e) => e.path === 'presets[0].category',
+    )
     expect(err).toBeDefined()
     expect(err?.message).toMatch(/must be one of/)
   })
 
   it('defaults category to Custom when missing', async () => {
-    const presetWithoutCategory = { ...VALID_SEED.presets[0] } as Record<string, unknown>
+    const presetWithoutCategory = { ...VALID_SEED.presets[0] } as Record<
+      string,
+      unknown
+    >
     delete presetWithoutCategory.category
-    writeFileSync(join(homeDir, 'mcp-presets.json'), JSON.stringify({
-      version: 1,
-      presets: [presetWithoutCategory],
-    }))
+    writeFileSync(
+      join(homeDir, 'mcp-presets.json'),
+      JSON.stringify({
+        version: 1,
+        presets: [presetWithoutCategory],
+      }),
+    )
     __resetPresetsCacheForTests()
     const result = await readPresets()
     expect(result.source).toBe('user-file')
-    expect(result.presets[0].category).toBe('Custom')
+    expect(result.presets[0]?.category).toBe('Custom')
   })
 })

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { buildSwarm2ReportRows } from './swarm2-reports-view'
+import {
+  buildSwarm2ReportRows,
+  buildWorkerReportCards,
+} from './swarm2-reports-view'
 
 describe('Swarm2 reports view model', () => {
   it('turns review-required checkpoints into needs-review report rows', () => {
@@ -31,17 +34,26 @@ describe('Swarm2 reports view model', () => {
           ],
         },
       ],
-      runtimes: [{ workerId: 'swarm5', displayName: 'Swarm5', artifacts: [], previews: [] }],
+      runtimes: [
+        {
+          workerId: 'swarm5',
+          displayName: 'Swarm5',
+          artifacts: [],
+          previews: [],
+        },
+      ],
     })
 
-    expect(rows[0]).toMatchObject({
+    expect(rows.at(0)).toMatchObject({
       kind: 'checkpoint',
       workerId: 'swarm5',
       state: 'needs_review',
       stateLabel: 'Needs review',
       summary: 'Page is implemented.',
     })
-    expect(rows[0].artifacts[0].path).toBe('src/screens/swarm2/swarm2-reports-view.tsx')
+    expect(rows.at(0)?.artifacts.at(0)?.path).toBe(
+      'src/screens/swarm2/swarm2-reports-view.tsx',
+    )
   })
 
   it('surfaces runtime artifacts when no mission checkpoint exists', () => {
@@ -61,7 +73,7 @@ describe('Swarm2 reports view model', () => {
     })
 
     expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({
+    expect(rows.at(0)).toMatchObject({
       kind: 'artifact',
       workerId: 'swarm6',
       state: 'artifact',
@@ -87,13 +99,35 @@ describe('Swarm2 reports view model', () => {
       ],
     })
 
-    expect(rows[0]).toMatchObject({
+    expect(rows.at(0)).toMatchObject({
       workerId: 'swarm4',
       state: 'needs_review',
       stateLabel: 'Needs review',
       summary: 'Reviewer inbox is ready for Eric handoff',
     })
-    expect(rows[0].details.find((detail) => detail.label === 'Result')?.value).toBe('Reviewer inbox is ready for Eric handoff')
+    expect(
+      rows.at(0)?.details.find((detail) => detail.label === 'Result')?.value,
+    ).toBe('Reviewer inbox is ready for Eric handoff')
+  })
+
+  it('surfaces pull request links on worker report cards', () => {
+    const rows = buildSwarm2ReportRows({
+      missions: [],
+      runtimes: [
+        {
+          workerId: 'swarm5',
+          displayName: 'Swarm5',
+          currentTask: 'Open pull request',
+          lastResult: 'Ready at https://github.com/example/repo/pull/42.',
+          artifacts: [],
+          previews: [],
+        },
+      ],
+    })
+
+    expect(buildWorkerReportCards(rows).at(0)?.prUrl).toBe(
+      'https://github.com/example/repo/pull/42',
+    )
   })
 
   it('prioritizes blocked affordances from checkpoints and runtime state', () => {
@@ -119,9 +153,9 @@ describe('Swarm2 reports view model', () => {
       runtimes: [],
     })
 
-    expect(rows[0].state).toBe('blocked')
-    expect(rows[0].stateLabel).toBe('Blocked')
-    expect(rows[0].summary).toBe('Missing token')
+    expect(rows.at(0)?.state).toBe('blocked')
+    expect(rows.at(0)?.stateLabel).toBe('Blocked')
+    expect(rows.at(0)?.summary).toBe('Missing token')
   })
 
   it('does not classify BLOCKER: none checkpoints as blocked', () => {
@@ -152,8 +186,8 @@ describe('Swarm2 reports view model', () => {
       runtimes: [],
     })
 
-    expect(rows[0].state).toBe('ready')
-    expect(rows[0].stateLabel).toBe('Ready')
-    expect(rows[0].summary).toBe('Patch shipped')
+    expect(rows.at(0)?.state).toBe('ready')
+    expect(rows.at(0)?.stateLabel).toBe('Ready')
+    expect(rows.at(0)?.summary).toBe('Patch shipped')
   })
 })

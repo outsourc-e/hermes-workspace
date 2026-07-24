@@ -10,7 +10,7 @@ import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 
 async function sendToActiveTab(data: string) {
   const { tabs, activeTabId } = useTerminalPanelStore.getState()
-  const tab = tabs.find((t) => t.id === activeTabId) ?? tabs[0]
+  const tab = tabs.find((t) => t.id === activeTabId) ?? tabs.at(0)
   if (!tab?.sessionId) return
   await fetch('/api/terminal-input', {
     method: 'POST',

@@ -4,7 +4,7 @@ export const LEGACY_CLAUDE_SESSION_KEY_HEADER = 'x-claude-session-key'
 export const LEGACY_CLAUDE_FRIENDLY_ID_HEADER = 'x-claude-friendly-id'
 
 type HeaderReader = {
-  get(name: string): string | null
+  get: (name: string) => string | null
 }
 
 function normalizeHeaderValue(value: string | null | undefined): string {

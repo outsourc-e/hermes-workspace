@@ -1,3 +1,6 @@
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   buildSwarmDispatchMetadata,
@@ -7,10 +10,9 @@ import {
   getSwarmWrapperPath,
   normalizeSwarmRuntime,
   parseSwarmPluginManifest,
+  patchSwarmRuntimeFile,
+  readSwarmRuntimeFile,
 } from './swarm-foundation'
-import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
 
 describe('normalizeSwarmRuntime', () => {
   it('resolves semantic wrapper aliases from the roster', () => {
@@ -46,21 +48,32 @@ describe('normalizeSwarmRuntime', () => {
 
 describe('classifySwarmPluginBoundary', () => {
   it('treats read-only runtime plugins differently from control plugins', () => {
-    expect(classifySwarmPluginBoundary({ runtimeScopes: ['worker-runtime:read'] })).toBe('runtime-readonly')
-    expect(classifySwarmPluginBoundary({ runtimeScopes: ['worker-dispatch:send'] })).toBe('runtime-control')
+    expect(
+      classifySwarmPluginBoundary({ runtimeScopes: ['worker-runtime:read'] }),
+    ).toBe('runtime-readonly')
+    expect(
+      classifySwarmPluginBoundary({ runtimeScopes: ['worker-dispatch:send'] }),
+    ).toBe('runtime-control')
     expect(
       classifySwarmPluginBoundary({
         runtimeScopes: ['worker-dispatch:send'],
         workspaceScopes: ['workspace-ui:register'],
       }),
     ).toBe('hybrid')
-    expect(classifySwarmPluginBoundary({ workspaceScopes: ['workspace-ui:register'] })).toBe('workspace-only')
+    expect(
+      classifySwarmPluginBoundary({
+        workspaceScopes: ['workspace-ui:register'],
+      }),
+    ).toBe('workspace-only')
   })
 })
 
 describe('deriveSwarmBoundary', () => {
   it('marks external cwd values as outside the workspace boundary', () => {
-    const boundary = deriveSwarmBoundary('/opt/other-project', '/Users/aurora/hermes-workspace')
+    const boundary = deriveSwarmBoundary(
+      '/opt/other-project',
+      '/Users/aurora/hermes-workspace',
+    )
     expect(boundary.insideWorkspace).toBe(false)
     expect(boundary.owner).toBe('external')
     expect(boundary.relativeCwd).toBeNull()
@@ -73,7 +86,11 @@ describe('buildSwarmSessionMetadata', () => {
     fs.writeFileSync(path.join(tempDir, 'state.db'), '', 'utf8')
 
     try {
-      const runtime = normalizeSwarmRuntime('swarm2', {}, { workspaceRoot: '/tmp' })
+      const runtime = normalizeSwarmRuntime(
+        'swarm2',
+        {},
+        { workspaceRoot: '/tmp' },
+      )
       const session = buildSwarmSessionMetadata({
         workerId: 'swarm2',
         profilePath: tempDir,
@@ -149,7 +166,10 @@ describe('parseSwarmPluginManifest', () => {
     )
 
     try {
-      const parsed = parseSwarmPluginManifest({ manifestPath, source: 'project' })
+      const parsed = parseSwarmPluginManifest({
+        manifestPath,
+        source: 'project',
+      })
       expect(parsed.name).toBe('sample-plugin')
       expect(parsed.boundary).toBe('hybrid')
       expect(parsed.runtimeScopes).toContain('worker-dispatch:send')
@@ -162,18 +182,21 @@ describe('parseSwarmPluginManifest', () => {
   })
 })
 
-import { patchSwarmRuntimeFile, readSwarmRuntimeFile } from './swarm-foundation'
-
 describe('patchSwarmRuntimeFile', () => {
   it('returns ok=false when the profile path does not exist', () => {
-    const tempDir = path.join(os.tmpdir(), `patch-runtime-missing-${Date.now()}`)
+    const tempDir = path.join(
+      os.tmpdir(),
+      `patch-runtime-missing-${Date.now()}`,
+    )
     const result = patchSwarmRuntimeFile(tempDir, 'swarm9', { state: 'idle' })
     expect(result.ok).toBe(false)
     expect(result.error).toContain('profile path missing')
   })
 
   it('writes a fresh runtime.json when none exists', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patch-runtime-fresh-'))
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'patch-runtime-fresh-'),
+    )
     try {
       const result = patchSwarmRuntimeFile(tempDir, 'swarm9', {
         state: 'idle',
@@ -194,7 +217,9 @@ describe('patchSwarmRuntimeFile', () => {
   })
 
   it('preserves unrelated fields and only overwrites the patched ones', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patch-runtime-merge-'))
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'patch-runtime-merge-'),
+    )
     try {
       const runtimePath = path.join(tempDir, 'runtime.json')
       fs.writeFileSync(
@@ -235,7 +260,9 @@ describe('patchSwarmRuntimeFile', () => {
   })
 
   it('rewrites cleanly even when existing runtime.json is corrupt', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patch-runtime-corrupt-'))
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'patch-runtime-corrupt-'),
+    )
     try {
       const runtimePath = path.join(tempDir, 'runtime.json')
       fs.writeFileSync(runtimePath, '{ this is not json', 'utf8')

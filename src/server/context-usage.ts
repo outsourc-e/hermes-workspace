@@ -1,3 +1,5 @@
+import { getLocalMessages, getLocalSession } from './local-session-store'
+import { getActiveRunForSession } from './run-store'
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -6,8 +8,6 @@ import {
   getCapabilities,
 } from '@/server/gateway-capabilities'
 import { listSessions } from '@/server/claude-api'
-import { getLocalMessages, getLocalSession } from './local-session-store'
-import { getActiveRunForSession } from './run-store'
 import {
   resolveMainChatSessionId,
   shouldBindMainToPortableSession,
@@ -99,10 +99,12 @@ export function estimateContextTokensFromMessages(
     const topLevelText = typeof msg.text === 'string' ? msg.text : ''
     if (structured) {
       totalChars += structured.length
-      if (topLevelText && topLevelText !== structured) totalChars += topLevelText.length
+      if (topLevelText && topLevelText !== structured)
+        totalChars += topLevelText.length
     } else if (typeof msg.content === 'string') {
       totalChars += msg.content.length
-      if (topLevelText && topLevelText !== msg.content) totalChars += topLevelText.length
+      if (topLevelText && topLevelText !== msg.content)
+        totalChars += topLevelText.length
     } else if (topLevelText) {
       totalChars += topLevelText.length
     }
@@ -123,7 +125,9 @@ export function estimateContextTokensFromCacheRead(
   messageCount: number,
 ): number {
   const assistantTurns = Math.max(1, Math.ceil((Number(messageCount) || 0) / 2))
-  return Math.ceil((Math.max(0, Number(cacheReadTokens) || 0) / assistantTurns) * 1.2)
+  return Math.ceil(
+    (Math.max(0, Number(cacheReadTokens) || 0) / assistantTurns) * 1.2,
+  )
 }
 
 export function estimateContextTokensFromSessionUsage(
@@ -194,7 +198,11 @@ function readConfiguredContextLength(payload: Record<string, unknown>): number {
   if (direct && direct > 0) return direct
 
   const capabilities = payload.capabilities
-  if (capabilities && typeof capabilities === 'object' && !Array.isArray(capabilities)) {
+  if (
+    capabilities &&
+    typeof capabilities === 'object' &&
+    !Array.isArray(capabilities)
+  ) {
     const contextWindow = Number(
       (capabilities as Record<string, unknown>).context_window,
     )
@@ -261,7 +269,8 @@ async function readGatewayRuntimeSnapshot(
       Number(data.total_tokens) ||
       0
     const contextPercent =
-      Number.isFinite(Number(data.context_percent)) && Number(data.context_percent) > 0
+      Number.isFinite(Number(data.context_percent)) &&
+      Number(data.context_percent) > 0
         ? Number(data.context_percent)
         : maxTokens > 0 && usedTokens > 0
           ? Math.round((usedTokens / maxTokens) * 1000) / 10
@@ -341,7 +350,7 @@ async function resolveMirroredRuntimeSessionId(
     const sessions = await listSessions(20, 0)
     const candidate = sessions
       .filter((session) => {
-        if (!session?.id || session.id === sessionId) return false
+        if (!session.id || session.id === sessionId) return false
         if (session.source === 'local') return false
 
         const startedAt = Number(session.started_at) || 0
@@ -365,7 +374,8 @@ async function resolveMirroredRuntimeSessionId(
           return aStartDistance - bStartDistance
         }
         return bUpdated - aUpdated
-      })[0]
+      })
+      .at(0)
 
     return candidate?.id ?? null
   } catch {
@@ -393,9 +403,8 @@ export async function readContextUsage(
       const localMessages = getLocalMessages(explicitSessionId)
       const activeRun = await getActiveRunForSession(explicitSessionId)
       if (localSession) {
-        const mirroredRuntimeSessionId = await resolveMirroredRuntimeSessionId(
-          explicitSessionId,
-        )
+        const mirroredRuntimeSessionId =
+          await resolveMirroredRuntimeSessionId(explicitSessionId)
         if (mirroredRuntimeSessionId) {
           const mirroredRuntime = await readGatewayRuntimeSnapshot(
             mirroredRuntimeSessionId,
@@ -444,7 +453,8 @@ export async function readContextUsage(
           : localMessages
         const usedTokens = estimateContextTokensFromMessages(pendingMessages)
         const model = configuredModelContext?.model || 'gpt-5.4'
-        const maxTokens = configuredModelContext?.maxTokens || getContextWindow(model)
+        const maxTokens =
+          configuredModelContext?.maxTokens || getContextWindow(model)
         const contextPercent =
           maxTokens > 0 ? Math.round((usedTokens / maxTokens) * 1000) / 10 : 0
         return {
@@ -462,9 +472,12 @@ export async function readContextUsage(
     if (explicitSessionId) {
       try {
         const res = capabilities.dashboard.available
-          ? await dashboardFetch(`/api/sessions/${encodeURIComponent(resolvedSessionId)}`, {
-              signal: AbortSignal.timeout(3000),
-            })
+          ? await dashboardFetch(
+              `/api/sessions/${encodeURIComponent(resolvedSessionId)}`,
+              {
+                signal: AbortSignal.timeout(3000),
+              },
+            )
           : await fetch(
               `${CLAUDE_API}/api/sessions/${encodeURIComponent(resolvedSessionId)}`,
               {
@@ -476,7 +489,9 @@ export async function readContextUsage(
           const data = (await res.json()) as {
             session?: Record<string, unknown>
           } & Record<string, unknown>
-          sessionData = capabilities.dashboard.available ? data : (data.session ?? null)
+          sessionData = capabilities.dashboard.available
+            ? data
+            : (data.session ?? null)
         }
       } catch {
         /* ignore */
@@ -490,12 +505,14 @@ export async function readContextUsage(
       return configuredEmptySnapshot(configuredModelContext)
     }
 
-    if (!explicitSessionId) return configuredEmptySnapshot(configuredModelContext)
+    if (!explicitSessionId)
+      return configuredEmptySnapshot(configuredModelContext)
 
     if (!sessionData) return configuredEmptySnapshot(configuredModelContext)
 
     const model = String(sessionData.model || '')
-    const maxTokens = configuredModelContext?.maxTokens || getContextWindow(model)
+    const maxTokens =
+      configuredModelContext?.maxTokens || getContextWindow(model)
     const cacheReadTokens = Number(sessionData.cache_read_tokens) || 0
     const cacheWriteTokens = Number(sessionData.cache_write_tokens) || 0
     const inputTokens = Number(sessionData.input_tokens) || 0
@@ -513,10 +530,14 @@ export async function readContextUsage(
         apiCallCount,
       )
     } else if (cacheReadTokens > 0 && assistantTurns > 0) {
-      usedTokens = estimateContextTokensFromCacheRead(cacheReadTokens, messageCount)
+      usedTokens = estimateContextTokensFromCacheRead(
+        cacheReadTokens,
+        messageCount,
+      )
     } else if (messageCount > 0) {
       try {
-        const targetSessionId = resolvedSessionId || String(sessionData.id || '')
+        const targetSessionId =
+          resolvedSessionId || String(sessionData.id || '')
         if (targetSessionId) {
           const capabilitiesNow = getCapabilities()
           const msgRes = capabilitiesNow.dashboard.available

@@ -366,6 +366,7 @@ function scoreContextTokens(snippet: SessionTitleSnippet): Array<string> {
     const roleWeight = message.role === 'user' ? 3 : 2
     for (let index = 0; index < tokens.length; index += 1) {
       const token = tokens[index]
+      if (!token) continue
       const earlyBonus = index < 5 ? 1 : 0
       const score = (scores.get(token) ?? 0) + roleWeight + earlyBonus
       scores.set(token, score)

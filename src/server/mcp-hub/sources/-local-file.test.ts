@@ -2,15 +2,15 @@
  * Tests for the local-file source adapter.
  * Uses vi.mock to stub mcp-presets-store so no disk I/O occurs.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-
-vi.mock('../../mcp-presets-store', () => ({
-  readPresets: vi.fn(),
-}))
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { readPresets } from '../../mcp-presets-store'
 import { fetchLocalFile } from './local-file'
 import type { ReadPresetsResult } from '../../mcp-presets-store'
+
+vi.mock('../../mcp-presets-store', () => ({
+  readPresets: vi.fn(),
+}))
 
 const mockReadPresets = vi.mocked(readPresets)
 
@@ -46,13 +46,15 @@ describe('fetchLocalFile', () => {
 
     expect(result.entries).toHaveLength(1)
     const entry = result.entries[0]
-    expect(entry.source).toBe('local')
-    expect(entry.trust).toBe('official')
-    expect(entry.name).toBe('github')
-    expect(entry.id).toBe('local:github')
-    expect(entry.homepage).toBe('https://github.com/modelcontextprotocol/servers')
-    expect(entry.tags).toEqual(['dev', 'git'])
-    expect(entry.installed).toBe(false)
+    expect(entry?.source).toBe('local')
+    expect(entry?.trust).toBe('official')
+    expect(entry?.name).toBe('github')
+    expect(entry?.id).toBe('local:github')
+    expect(entry?.homepage).toBe(
+      'https://github.com/modelcontextprotocol/servers',
+    )
+    expect(entry?.tags).toEqual(['dev', 'git'])
+    expect(entry?.installed).toBe(false)
     expect(result.warnings).toBeUndefined()
   })
 
@@ -79,11 +81,18 @@ describe('fetchLocalFile', () => {
           name: 'myserver',
           description: 'test',
           category: 'Custom',
-          template: { name: 'myserver', transportType: 'stdio', command: 'node', args: [] },
+          template: {
+            name: 'myserver',
+            transportType: 'stdio',
+            command: 'node',
+            args: [],
+          },
         },
       ],
       source: 'user-file',
-      warnings: [{ path: 'presets[0].unknown', message: 'unknown field (ignored)' }],
+      warnings: [
+        { path: 'presets[0].unknown', message: 'unknown field (ignored)' },
+      ],
     })
 
     const result = await fetchLocalFile()
@@ -100,7 +109,12 @@ describe('fetchLocalFile', () => {
           name: 'clean',
           description: 'clean server',
           category: 'Custom',
-          template: { name: 'clean', transportType: 'stdio', command: 'node', args: [] },
+          template: {
+            name: 'clean',
+            transportType: 'stdio',
+            command: 'node',
+            args: [],
+          },
         },
       ],
       source: 'seed',
@@ -118,13 +132,18 @@ describe('fetchLocalFile', () => {
           name: 'nohome',
           description: '',
           category: 'Custom',
-          template: { name: 'nohome', transportType: 'stdio', command: 'node', args: [] },
+          template: {
+            name: 'nohome',
+            transportType: 'stdio',
+            command: 'node',
+            args: [],
+          },
         },
       ],
       source: 'seed',
     })
 
     const result = await fetchLocalFile()
-    expect(result.entries[0].homepage).toBeNull()
+    expect(result.entries[0]?.homepage).toBeNull()
   })
 })

@@ -7,30 +7,36 @@ import {
   Activity01Icon,
   ChartLineData02Icon,
   ComputerTerminal01Icon,
+  CpuIcon,
   FlashIcon,
   RefreshIcon,
   ViewIcon,
 } from '@hugeicons/core-free-icons'
+import { useQuery } from '@tanstack/react-query'
+import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
-import {
-  getOnlineStatus,
-  useCrewStatus,
-  type CrewMember,
-} from '@/hooks/use-crew-status'
+import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
 import { TopologyBand } from '@/components/swarm/topology-band'
 import { AgentCard } from '@/components/swarm/agent-card'
 import { WidgetRail } from '@/components/swarm/widget-rail'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
-import { useQuery } from '@tanstack/react-query'
 
 const SWARM_ROOM_STORAGE_KEY = 'claude-swarm-room-v1'
 const WORKER_ID_PATTERN = /^(swarm\d+|[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/i
 const isWorkerId = (id: string) => WORKER_ID_PATTERN.test(id)
 
 type WorkerHealth = { workerId: string; recentAuthErrors: number }
-type HealthData = { workspaceModel: string | null; workers: WorkerHealth[]; summary: { totalWorkers: number; totalAuthErrors24h: number; distinctProviders: string[] } }
+type HealthData = {
+  workspaceModel: string | null
+  workers: Array<WorkerHealth>
+  summary: {
+    totalWorkers: number
+    totalAuthErrors24h: number
+    distinctProviders: Array<string>
+  }
+}
 type RuntimeEntry = {
   workerId: string
   currentTask: string | null
@@ -52,7 +58,7 @@ async function fetchHealth(): Promise<HealthData> {
   return res.json()
 }
 
-async function fetchRuntime(): Promise<{ entries: RuntimeEntry[] }> {
+async function fetchRuntime(): Promise<{ entries: Array<RuntimeEntry> }> {
   const res = await fetch('/api/swarm-runtime')
   if (!res.ok) throw new Error(String(res.status))
   return res.json()
@@ -75,7 +81,9 @@ function useUpdatedAgo(fetchedAt: number | null): string {
   return label
 }
 
-function shellCommandForRuntime(runtime: RuntimeEntry | undefined): string[] {
+function shellCommandForRuntime(
+  runtime: RuntimeEntry | undefined,
+): Array<string> {
   if (runtime?.tmuxAttachable && runtime.tmuxSession) {
     return ['tmux', 'attach', '-t', runtime.tmuxSession]
   }
@@ -97,7 +105,7 @@ export function SwarmScreen() {
   const { crew, lastUpdated, isLoading, isFetching, refetch } = useCrewStatus()
   const updatedAgo = useUpdatedAgo(lastUpdated)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [roomIds, setRoomIds] = useState<string[]>(() => {
+  const [roomIds, setRoomIds] = useState<Array<string>>(() => {
     if (typeof window === 'undefined') return []
     try {
       const raw = window.localStorage.getItem(SWARM_ROOM_STORAGE_KEY)
@@ -118,8 +126,16 @@ export function SwarmScreen() {
     return params.get('view') === 'terminals' ? 'terminals' : 'cards'
   })
 
-  const healthQuery = useQuery({ queryKey: ['swarm', 'health'], queryFn: fetchHealth, refetchInterval: 60_000 })
-  const runtimeQuery = useQuery({ queryKey: ['swarm', 'runtime'], queryFn: fetchRuntime, refetchInterval: 30_000 })
+  const healthQuery = useQuery({
+    queryKey: ['swarm', 'health'],
+    queryFn: fetchHealth,
+    refetchInterval: 60_000,
+  })
+  const runtimeQuery = useQuery({
+    queryKey: ['swarm', 'runtime'],
+    queryFn: fetchRuntime,
+    refetchInterval: 30_000,
+  })
 
   const swarmMembers = useMemo(() => {
     return [...crew]
@@ -146,7 +162,10 @@ export function SwarmScreen() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
-      window.localStorage.setItem(SWARM_ROOM_STORAGE_KEY, JSON.stringify(roomIds))
+      window.localStorage.setItem(
+        SWARM_ROOM_STORAGE_KEY,
+        JSON.stringify(roomIds),
+      )
     } catch {
       /* noop */
     }
@@ -157,32 +176,45 @@ export function SwarmScreen() {
       setSelectedId(null)
       return
     }
-    if (!selectedId || !swarmMembers.some((member) => member.id === selectedId)) {
+    if (
+      !selectedId ||
+      !swarmMembers.some((member) => member.id === selectedId)
+    ) {
       setSelectedId(swarmMembers[0]?.id ?? null)
     }
   }, [swarmMembers, selectedId])
 
-  const onlineCount = swarmMembers.filter((member) => getOnlineStatus(member) === 'online').length
+  const onlineCount = swarmMembers.filter(
+    (member) => getOnlineStatus(member) === 'online',
+  ).length
   const authErrors = healthQuery.data?.summary.totalAuthErrors24h ?? 0
   const workspaceModel = healthQuery.data?.workspaceModel ?? '—'
-  const provider = healthQuery.data?.summary.distinctProviders[0] ?? 'anthropic-routing-layer'
+  const provider =
+    healthQuery.data?.summary.distinctProviders[0] ?? 'anthropic-routing-layer'
 
   const runtimeByWorker = useMemo(() => {
     const map = new Map<string, RuntimeEntry>()
-    for (const entry of runtimeQuery.data?.entries ?? []) map.set(entry.workerId, entry)
+    for (const entry of runtimeQuery.data?.entries ?? [])
+      map.set(entry.workerId, entry)
     return map
   }, [runtimeQuery.data])
 
-  const selectedRuntime = selectedId ? runtimeByWorker.get(selectedId) : undefined
+  const selectedRuntime = selectedId
+    ? runtimeByWorker.get(selectedId)
+    : undefined
   const terminalTargets = useMemo(() => {
     if (roomIds.length > 0) {
       return swarmMembers.filter((member) => roomIds.includes(member.id))
     }
-    return selectedId ? swarmMembers.filter((member) => member.id === selectedId) : []
+    return selectedId
+      ? swarmMembers.filter((member) => member.id === selectedId)
+      : []
   }, [roomIds, selectedId, swarmMembers])
 
   const toggleRoom = useCallback((id: string) => {
-    setRoomIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
+    setRoomIds((cur) =>
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
+    )
   }, [])
 
   async function pingSelected() {
@@ -193,14 +225,29 @@ export function SwarmScreen() {
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workerIds: [selectedId], prompt: `Reply with exactly: ${selectedId.toUpperCase()}_PING_OK`, timeoutSeconds: 60 }),
+        body: JSON.stringify({
+          workerIds: [selectedId],
+          prompt: `Reply with exactly: ${selectedId.toUpperCase()}_PING_OK`,
+          timeoutSeconds: 60,
+        }),
       })
       if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`)
-      const data = (await res.json()) as { results?: Array<{ ok: boolean; output: string; error: string | null; durationMs: number }> }
+      const data = (await res.json()) as {
+        results?: Array<{
+          ok: boolean
+          output: string
+          error: string | null
+          durationMs: number
+        }>
+      }
       const r = data.results && data.results[0]
       if (!r) throw new Error('No reply')
-      if (!r.ok) setPingResult(`✗ ${selectedId} · ${r.error?.slice(0, 80) ?? 'failure'}`)
-      else setPingResult(`✓ ${selectedId} · ${(r.durationMs / 1000).toFixed(1)}s · ${r.output.trim().slice(0, 80)}`)
+      if (!r.ok)
+        setPingResult(`✗ ${selectedId} · ${r.error?.slice(0, 80) ?? 'failure'}`)
+      else
+        setPingResult(
+          `✓ ${selectedId} · ${(r.durationMs / 1000).toFixed(1)}s · ${r.output.trim().slice(0, 80)}`,
+        )
     } catch (err) {
       setPingResult(`✗ ${err instanceof Error ? err.message : 'failed'}`)
     } finally {
@@ -211,21 +258,43 @@ export function SwarmScreen() {
   return (
     <div
       className="relative flex h-full min-h-screen flex-col gap-4 overflow-auto bg-[#0a0d0b] p-4 pb-[420px] text-emerald-50 md:p-6"
-      style={{ background: 'radial-gradient(circle at top, rgba(34,197,94,0.10), transparent 28%), linear-gradient(180deg, #0a0d0b 0%, #0c110d 100%)' }}
+      style={{
+        background:
+          'radial-gradient(circle at top, rgba(34,197,94,0.10), transparent 28%), linear-gradient(180deg, #0a0d0b 0%, #0c110d 100%)',
+      }}
     >
       <header className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-400/20 bg-black/45 px-4 py-2.5 backdrop-blur">
         <div className="inline-flex items-center gap-2">
           <div className="flex size-7 items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/10 text-emerald-300">
             <HugeiconsIcon icon={CpuIcon} size={14} />
           </div>
-          <div className="text-sm font-bold tracking-tight text-white">Swarm OS</div>
+          <div className="text-sm font-bold tracking-tight text-white">
+            Swarm OS
+          </div>
         </div>
         <Chip icon={ChartLineData02Icon} label="Model" value={workspaceModel} />
         <Chip icon={Activity01Icon} label="Provider" value={provider} />
-        <Chip icon={FlashIcon} label="Auth errors 24h" value={String(authErrors)} tone={authErrors === 0 ? 'good' : 'warn'} />
-        <Chip icon={ViewIcon} label="Online" value={`${onlineCount}/${swarmMembers.length} agents`} tone="good" />
+        <Chip
+          icon={FlashIcon}
+          label="Auth errors 24h"
+          value={String(authErrors)}
+          tone={authErrors === 0 ? 'good' : 'warn'}
+        />
+        <Chip
+          icon={ViewIcon}
+          label="Online"
+          value={`${onlineCount}/${swarmMembers.length} agents`}
+          tone="good"
+        />
         {pingResult ? (
-          <div className={cn('truncate rounded-full border px-3 py-1 text-[11px]', pingResult.startsWith('✓') ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-red-500/40 bg-red-500/10 text-red-200')}>
+          <div
+            className={cn(
+              'truncate rounded-full border px-3 py-1 text-[11px]',
+              pingResult.startsWith('✓')
+                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                : 'border-red-500/40 bg-red-500/10 text-red-200',
+            )}
+          >
             {pingResult}
           </div>
         ) : null}
@@ -259,14 +328,22 @@ export function SwarmScreen() {
             ]}
           />
           <ViewModeToggle mode={viewMode} setMode={setViewMode} />
-          {updatedAgo ? <div className="text-[11px] text-emerald-200/55">Updated {updatedAgo}</div> : null}
+          {updatedAgo ? (
+            <div className="text-[11px] text-emerald-200/55">
+              Updated {updatedAgo}
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => void refetch()}
             disabled={isFetching}
             className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white"
           >
-            <HugeiconsIcon icon={RefreshIcon} size={11} className={isFetching ? 'animate-spin' : ''} />
+            <HugeiconsIcon
+              icon={RefreshIcon}
+              size={11}
+              className={isFetching ? 'animate-spin' : ''}
+            />
             Refresh
           </button>
           <button
@@ -302,7 +379,9 @@ export function SwarmScreen() {
         <section>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/65">Agent Workspace</div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/65">
+                Agent Workspace
+              </div>
               <h2 className="text-xl font-semibold text-white">
                 {viewMode === 'cards' ? 'Active Swarm' : 'Live Agent Terminals'}
               </h2>
@@ -322,7 +401,9 @@ export function SwarmScreen() {
           {viewMode === 'cards' ? (
             <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
               {isLoading
-                ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <SkeletonCard key={i} />
+                  ))
                 : swarmMembers.map((member) => {
                     const runtime = runtimeByWorker.get(member.id)
                     const lines = runtime?.recentLogTail
@@ -330,13 +411,17 @@ export function SwarmScreen() {
                           .split('\n')
                           .filter(Boolean)
                           .slice(-2)
-                          .map((line) => line.replace(/^\d{4}-\d{2}-\d{2} [^ ]+\s+/, ''))
+                          .map((line) =>
+                            line.replace(/^\d{4}-\d{2}-\d{2} [^ ]+\s+/, ''),
+                          )
                       : []
                     return (
                       <AgentCard
                         key={member.id}
                         member={member}
-                        currentTask={runtime?.currentTask ?? member.lastSessionTitle}
+                        currentTask={
+                          runtime?.currentTask ?? member.lastSessionTitle
+                        }
                         recentLines={lines}
                         inRoom={roomIds.includes(member.id)}
                         selected={member.id === selectedId}
@@ -346,7 +431,12 @@ export function SwarmScreen() {
                           setSelectedId(member.id)
                           setViewMode('terminals')
                         }}
-                        onOpenTasks={() => void navigate({ to: '/tasks', search: { assignee: member.id } })}
+                        onOpenTasks={() =>
+                          void navigate({
+                            to: '/tasks',
+                            search: { assignee: member.id },
+                          })
+                        }
                       />
                     )
                   })}
@@ -370,13 +460,25 @@ export function SwarmScreen() {
                   {terminalTargets.map((member) => {
                     const runtime = runtimeByWorker.get(member.id)
                     return (
-                      <div key={member.id} className="overflow-hidden rounded-[1.6rem] border border-emerald-400/18 bg-[#0b0f0c]/80 p-3 backdrop-blur-xl">
+                      <div
+                        key={member.id}
+                        className="overflow-hidden rounded-[1.6rem] border border-emerald-400/18 bg-[#0b0f0c]/80 p-3 backdrop-blur-xl"
+                      >
                         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                           <div>
-                            <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/60">{member.id}</div>
-                            <div className="text-base font-semibold text-white">{runtime?.currentTask ?? member.lastSessionTitle ?? 'Idle session'}</div>
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/60">
+                              {member.id}
+                            </div>
+                            <div className="text-base font-semibold text-white">
+                              {runtime?.currentTask ??
+                                member.lastSessionTitle ??
+                                'Idle session'}
+                            </div>
                             <div className="mt-1 text-xs text-emerald-100/50">
-                              {runtime?.tmuxAttachable ? `tmux ${runtime.tmuxSession}` : 'shell fallback'} · last output {relative(runtime?.lastOutputAt)}
+                              {runtime?.tmuxAttachable
+                                ? `tmux ${runtime.tmuxSession}`
+                                : 'shell fallback'}{' '}
+                              · last output {relative(runtime?.lastOutputAt)}
                             </div>
                           </div>
                           <button
@@ -384,7 +486,10 @@ export function SwarmScreen() {
                             onClick={() => setSelectedId(member.id)}
                             className="inline-flex items-center gap-1 rounded-full border border-emerald-400/15 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white"
                           >
-                            <HugeiconsIcon icon={ComputerTerminal01Icon} size={11} />
+                            <HugeiconsIcon
+                              icon={ComputerTerminal01Icon}
+                              size={11}
+                            />
                             Focus
                           </button>
                         </div>
@@ -434,20 +539,34 @@ export function SwarmScreen() {
   )
 }
 
-function ViewModeToggle({ mode, setMode }: { mode: SwarmViewMode; setMode: (mode: SwarmViewMode) => void }) {
+function ViewModeToggle({
+  mode,
+  setMode,
+}: {
+  mode: SwarmViewMode
+  setMode: (mode: SwarmViewMode) => void
+}) {
   return (
     <div className="flex rounded-full border border-emerald-400/20 bg-black/40 p-1 text-[10px] uppercase tracking-[0.18em] text-emerald-200/65">
       <button
         type="button"
         onClick={() => setMode('cards')}
-        className={cn('rounded-full px-3 py-1 transition-colors', mode === 'cards' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
+        className={cn(
+          'rounded-full px-3 py-1 transition-colors',
+          mode === 'cards' ? 'bg-emerald-400 text-black' : 'hover:text-white',
+        )}
       >
         Cards
       </button>
       <button
         type="button"
         onClick={() => setMode('terminals')}
-        className={cn('rounded-full px-3 py-1 transition-colors', mode === 'terminals' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
+        className={cn(
+          'rounded-full px-3 py-1 transition-colors',
+          mode === 'terminals'
+            ? 'bg-emerald-400 text-black'
+            : 'hover:text-white',
+        )}
       >
         Terminals
       </button>
@@ -455,7 +574,17 @@ function ViewModeToggle({ mode, setMode }: { mode: SwarmViewMode; setMode: (mode
   )
 }
 
-function Chip({ icon, label, value, tone = 'neutral' }: { icon: typeof CpuIcon; label: string; value: string; tone?: 'neutral' | 'good' | 'warn' }) {
+function Chip({
+  icon,
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  icon: typeof CpuIcon
+  label: string
+  value: string
+  tone?: 'neutral' | 'good' | 'warn'
+}) {
   return (
     <div
       className={cn(
@@ -468,12 +597,16 @@ function Chip({ icon, label, value, tone = 'neutral' }: { icon: typeof CpuIcon; 
       )}
     >
       <HugeiconsIcon icon={icon} size={11} />
-      <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/55">{label}</span>
+      <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/55">
+        {label}
+      </span>
       <span className="truncate text-emerald-50">{value}</span>
     </div>
   )
 }
 
 function SkeletonCard() {
-  return <div className="h-[420px] animate-pulse rounded-2xl border border-emerald-400/10 bg-emerald-500/5" />
+  return (
+    <div className="h-[420px] animate-pulse rounded-2xl border border-emerald-400/10 bg-emerald-500/5" />
+  )
 }

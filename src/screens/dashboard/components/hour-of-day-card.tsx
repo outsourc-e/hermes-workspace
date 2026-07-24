@@ -25,7 +25,7 @@ export function HourOfDayCard({
       if (!ts) continue
       const date = new Date(ts)
       const hour = date.getHours()
-      if (hour >= 0 && hour < 24) counts[hour] += 1
+      if (hour >= 0 && hour < 24) counts[hour] = (counts[hour] ?? 0) + 1
     }
     return counts
   }, [sessions])

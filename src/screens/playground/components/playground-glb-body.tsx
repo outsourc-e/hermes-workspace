@@ -1,6 +1,6 @@
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Component, Suspense, useEffect, useMemo, useState } from 'react'
 import { useGLTF } from '@react-three/drei'
-import * as THREE from 'three'
+import type { ReactNode } from 'react'
 
 class GlbErrorBoundary extends Component<
   { children: ReactNode; onError?: () => void },
@@ -27,7 +27,10 @@ export function useGlbProbe(url: string): 'unknown' | 'present' | 'missing' {
   )
 
   useEffect(() => {
-    if (probeCache.get(url) === 'present' || probeCache.get(url) === 'missing') {
+    if (
+      probeCache.get(url) === 'present' ||
+      probeCache.get(url) === 'missing'
+    ) {
       setState(probeCache.get(url)!)
       return
     }
@@ -61,11 +64,18 @@ export function useGlbProbe(url: string): 'unknown' | 'present' | 'missing' {
   return state
 }
 
-function GlbInner({ url, scale, yOffset }: { url: string; scale: number; yOffset: number }) {
+function GlbInner({
+  url,
+  scale,
+  yOffset,
+}: {
+  url: string
+  scale: number
+  yOffset: number
+}) {
   const { scene } = useGLTF(url) as any
-  const ref = useRef<THREE.Group>(null)
   const cloned = useMemo(() => {
-    const s = (scene as THREE.Object3D).clone(true)
+    const s = scene.clone(true)
     s.traverse((obj: any) => {
       if (obj.isMesh) {
         obj.frustumCulled = true
@@ -81,7 +91,7 @@ function GlbInner({ url, scale, yOffset }: { url: string; scale: number; yOffset
   }, [scene])
 
   return (
-    <group ref={ref} position={[0, yOffset, 0]} scale={scale}>
+    <group position={[0, yOffset, 0]} scale={scale}>
       <primitive object={cloned} />
     </group>
   )

@@ -21,8 +21,8 @@ const SOURCE_ID = 'mcp-get'
 const REGISTRY_URL = 'https://registry.smithery.ai/servers'
 
 export interface McpGetResult {
-  entries: HubMcpEntry[]
-  warnings?: string[]
+  entries: Array<HubMcpEntry>
+  warnings?: Array<string>
   /**
    * True when the adapter encountered a non-fatal error (network, 403, etc.)
    * and is returning stale/empty data. Callers can use this to decide whether
@@ -46,20 +46,21 @@ interface RawManifestEntry {
   [key: string]: unknown
 }
 
-function parseManifestEntries(data: unknown): HubMcpEntry[] {
+function parseManifestEntries(data: unknown): Array<HubMcpEntry> {
   // The registry may return { manifests: [...] } or a top-level array
-  let items: unknown[]
+  let items: Array<unknown>
   if (Array.isArray(data)) {
     items = data
   } else if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>
-    const candidate = d.manifests ?? d.servers ?? d.packages ?? d.items ?? d.results
+    const candidate =
+      d.manifests ?? d.servers ?? d.packages ?? d.items ?? d.results
     items = Array.isArray(candidate) ? candidate : []
   } else {
     return []
   }
 
-  const entries: HubMcpEntry[] = []
+  const entries: Array<HubMcpEntry> = []
   for (const item of items) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue
     const raw = item as RawManifestEntry
@@ -68,20 +69,23 @@ function parseManifestEntries(data: unknown): HubMcpEntry[] {
     // legacy/manual manifests may use `name`. Prefer qualified, fall back.
     const rawAny = raw as Record<string, unknown>
     const qualified =
-      typeof rawAny.qualifiedName === 'string' ? rawAny.qualifiedName.trim() : ''
+      typeof rawAny.qualifiedName === 'string'
+        ? rawAny.qualifiedName.trim()
+        : ''
     const display =
       typeof rawAny.displayName === 'string' ? rawAny.displayName.trim() : ''
     const fallbackName = typeof raw.name === 'string' ? raw.name.trim() : ''
     const name = qualified || fallbackName || display
     if (!name) continue
 
-    const description = typeof raw.description === 'string' ? raw.description.trim() : ''
+    const description =
+      typeof raw.description === 'string' ? raw.description.trim() : ''
     const homepage =
       typeof raw.homepage === 'string' && raw.homepage.startsWith('http')
         ? raw.homepage
         : null
 
-    const tags: string[] = Array.isArray(raw.tags)
+    const tags: Array<string> = Array.isArray(raw.tags)
       ? raw.tags.filter((t): t is string => typeof t === 'string')
       : []
 
@@ -105,7 +109,10 @@ function parseManifestEntries(data: unknown): HubMcpEntry[] {
       transportType: transport,
       command: typeof raw.command === 'string' ? raw.command : undefined,
       args: Array.isArray(raw.args) ? raw.args : undefined,
-      env: raw.env && typeof raw.env === 'object' && !Array.isArray(raw.env) ? raw.env : undefined,
+      env:
+        raw.env && typeof raw.env === 'object' && !Array.isArray(raw.env)
+          ? raw.env
+          : undefined,
       url: typeof raw.url === 'string' ? raw.url : undefined,
     }
 
@@ -133,7 +140,7 @@ function parseManifestEntries(data: unknown): HubMcpEntry[] {
 
 export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   const cached = getCache(SOURCE_ID)
-  const warnings: string[] = []
+  const warnings: Array<string> = []
 
   // Build request headers with conditional-GET
   const headers: Record<string, string> = {
@@ -153,7 +160,11 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
     const msg = err instanceof Error ? err.message : String(err)
     warnings.push(`mcp-get: network error: ${msg}`)
     if (cached) {
-      return { entries: cached.payload as HubMcpEntry[], warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -161,7 +172,7 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   // 304 Not Modified — return cached payload, bump fetchedAt
   if (response.status === 304) {
     touchCache(SOURCE_ID)
-    const payload = cached ? (cached.payload as HubMcpEntry[]) : []
+    const payload = cached ? (cached.payload as Array<HubMcpEntry>) : []
     return { entries: payload, ...(warnings.length > 0 ? { warnings } : {}) }
   }
 
@@ -169,7 +180,8 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   if (response.status === 403) {
     const remaining = response.headers.get('X-RateLimit-Remaining')
     const resetAt = response.headers.get('X-RateLimit-Reset')
-    const remainingNum = remaining !== null ? parseInt(remaining, 10) : undefined
+    const remainingNum =
+      remaining !== null ? parseInt(remaining, 10) : undefined
     const resetAtNum = resetAt !== null ? parseInt(resetAt, 10) : undefined
 
     warnings.push(
@@ -180,10 +192,16 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
     if (cached) {
       setCache(SOURCE_ID, {
         ...cached,
-        ...(remainingNum !== undefined ? { rateLimitRemaining: remainingNum } : {}),
+        ...(remainingNum !== undefined
+          ? { rateLimitRemaining: remainingNum }
+          : {}),
         ...(resetAtNum !== undefined ? { rateLimitResetAt: resetAtNum } : {}),
       })
-      return { entries: cached.payload as HubMcpEntry[], warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -192,7 +210,11 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   if (!response.ok) {
     warnings.push(`mcp-get: unexpected status ${response.status}`)
     if (cached) {
-      return { entries: cached.payload as HubMcpEntry[], warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -205,7 +227,11 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
     const msg = err instanceof Error ? err.message : String(err)
     warnings.push(`mcp-get: failed to parse JSON: ${msg}`)
     if (cached) {
-      return { entries: cached.payload as HubMcpEntry[], warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }

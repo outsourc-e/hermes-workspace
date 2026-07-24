@@ -23,12 +23,14 @@ export function rewriteLocalMediaSources(content: string): string {
     return `/api/media?path=${encodeURIComponent(path)}`
   }
 
-  const markdownImage = /(!\[[^\]]*\]\()MEDIA:([^\)\s]+)(\))/g
+  const markdownImage = /(!\[[^\]]*\]\()MEDIA:([^\s)]+)(\))/g
   const withMarkdownImages = content.replace(
     markdownImage,
     (_match, prefix: string, mediaPath: string, suffix: string) => {
       const rewritten = rewritePath(mediaPath)
-      return rewritten ? `${prefix}${rewritten}${suffix}` : `${prefix}MEDIA:${mediaPath}${suffix}`
+      return rewritten
+        ? `${prefix}${rewritten}${suffix}`
+        : `${prefix}MEDIA:${mediaPath}${suffix}`
     },
   )
 
@@ -59,7 +61,7 @@ function parseMarkdownIntoBlocks(markdown: string): Array<string> {
 function extractLanguage(className?: string): string {
   if (!className) return 'text'
   const match = className.match(/language-(\w+)/)
-  return match ? match[1] : 'text'
+  return match?.[1] ?? 'text'
 }
 
 type TableRenderContextValue = {

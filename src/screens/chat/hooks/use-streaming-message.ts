@@ -444,21 +444,25 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       // localStorage.removeItem('hermes:debug:sse')
       if (
         typeof window !== 'undefined' &&
-        window.localStorage?.getItem('hermes:debug:sse') === '1'
+        window.localStorage.getItem('hermes:debug:sse') === '1'
       ) {
-         
         console.log(
           '[hermes-sse]',
           event,
-          (payload?.name as string) || '',
-          (payload?.phase as string) || '',
+          (payload.name as string) || '',
+          (payload.phase as string) || '',
           payload,
         )
       }
 
       // hb_signal/keepalive events from server: just mark activity, never let them
       // surface as user-visible thinking or tool rows.
-      if (event === 'hb_signal' || event === 'heartbeat' || event === 'keepalive' || event === 'ping') {
+      if (
+        event === 'hb_signal' ||
+        event === 'heartbeat' ||
+        event === 'keepalive' ||
+        event === 'ping'
+      ) {
         markActivity()
         return
       }
@@ -560,7 +564,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           // model thinking and would otherwise pollute the TUI activity card.
           const isKeepalivePlaceholder =
             typeof thinking === 'string' &&
-            /^still\s+working[\.\u2026]*\s*$/i.test(thinking.trim())
+            /^still\s+working[.\u2026]*\s*$/i.test(thinking.trim())
           if (isKeepalivePlaceholder) break
           if (thinking) {
             markActivity()
@@ -756,7 +760,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
         case 'heartbeat': {
           markActivity()
-          const activity = (payload as { activity?: string | null }).activity ?? null
+          const activity =
+            (payload as { activity?: string | null }).activity ?? null
           useChatStore.getState().setHeartbeatActivity(activity)
           break
         }
@@ -987,7 +992,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
 
         const lifecyclePhase = lifecyclePhaseRef.current as StreamLifecyclePhase
-        if (!finishedRef.current && lifecyclePhase !== 'handoff') {
+        const streamFinished = () => finishedRef.current
+        if (!streamFinished() && lifecyclePhase !== 'handoff') {
           // If the stream ended cleanly (no 'done' event) but we never received
           // any response text, treat it as a failure rather than a successful
           // empty completion. This happens when a proxy (e.g., Tailscale Serve)

@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -17,15 +16,17 @@ import {
   MessageMultiple01Icon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
-import type { CrewMember } from '@/hooks/use-crew-status'
-import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
-import { toast } from '@/components/ui/toast'
 import { OperationalWorkerCard } from './operational-worker-card'
 import { Swarm2OrchestratorCard } from './swarm2-orchestrator-card'
 import { Swarm2Wires } from './swarm2-wires'
 import { Swarm2ActivityFeed } from './swarm2-activity-feed'
 import { Swarm2KanbanBoard } from './swarm2-kanban-board'
-import { Swarm2ReportsView, buildSwarm2InboxLanes, type Swarm2InboxItem } from './swarm2-reports-view'
+import { Swarm2ReportsView, buildSwarm2InboxLanes } from './swarm2-reports-view'
+import type { Swarm2InboxItem } from './swarm2-reports-view'
+import type { CSSProperties } from 'react'
+import type { CrewMember } from '@/hooks/use-crew-status'
+import { toast } from '@/components/ui/toast'
+import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
@@ -44,15 +45,22 @@ const SWARM2_OPERATION_THEME: CSSProperties = {
   ['--theme-muted-2' as string]: 'var(--color-primary-600)',
   ['--theme-accent' as string]: 'var(--color-accent-500)',
   ['--theme-accent-strong' as string]: 'var(--color-accent-600)',
-  ['--theme-accent-soft' as string]: 'color-mix(in srgb, var(--color-accent-500) 12%, transparent)',
-  ['--theme-accent-soft-strong' as string]: 'color-mix(in srgb, var(--color-accent-500) 18%, transparent)',
-  ['--theme-shadow' as string]: 'color-mix(in srgb, var(--color-primary-950) 14%, transparent)',
+  ['--theme-accent-soft' as string]:
+    'color-mix(in srgb, var(--color-accent-500) 12%, transparent)',
+  ['--theme-accent-soft-strong' as string]:
+    'color-mix(in srgb, var(--color-accent-500) 18%, transparent)',
+  ['--theme-shadow' as string]:
+    'color-mix(in srgb, var(--color-primary-950) 14%, transparent)',
   ['--theme-danger' as string]: 'var(--color-red-600, #dc2626)',
-  ['--theme-danger-soft' as string]: 'color-mix(in srgb, var(--theme-danger) 12%, transparent)',
-  ['--theme-danger-border' as string]: 'color-mix(in srgb, var(--theme-danger) 35%, white)',
+  ['--theme-danger-soft' as string]:
+    'color-mix(in srgb, var(--theme-danger) 12%, transparent)',
+  ['--theme-danger-border' as string]:
+    'color-mix(in srgb, var(--theme-danger) 35%, white)',
   ['--theme-warning' as string]: 'var(--color-amber-600, #d97706)',
-  ['--theme-warning-soft' as string]: 'color-mix(in srgb, var(--theme-warning) 12%, transparent)',
-  ['--theme-warning-border' as string]: 'color-mix(in srgb, var(--theme-warning) 35%, white)',
+  ['--theme-warning-soft' as string]:
+    'color-mix(in srgb, var(--theme-warning) 12%, transparent)',
+  ['--theme-warning-border' as string]:
+    'color-mix(in srgb, var(--theme-warning) 35%, white)',
 }
 
 export const SWARM2_INFORMATION_HIERARCHY = [
@@ -76,7 +84,8 @@ export const SWARM2_SURFACE_CONTRACT = {
   routerPlacement: 'bottom-center',
   cardInlineChat: true,
   routerDefaultOpen: false,
-  heartbeatOrchestration: 'main-session loop processes checkpoints and prompts review/continue decisions',
+  heartbeatOrchestration:
+    'main-session loop processes checkpoints and prompts review/continue decisions',
 } as const
 
 export const SWARM2_OPERATIONS_REUSE = [
@@ -150,7 +159,9 @@ type RuntimeEntry = {
   cwd: string | null
   phase?: string | null
   lastSummary?: string | null
+  lastRealSummary?: string | null
   lastResult?: string | null
+  lastRealResult?: string | null
   blockedReason?: string | null
   checkpointStatus?: string | null
   state?: string | null
@@ -175,7 +186,6 @@ type HealthData = {
     distinctProviders: Array<string>
   }
 }
-
 
 type SwarmRosterWorker = {
   id: string
@@ -244,64 +254,97 @@ const ROLE_PRESETS: ReadonlyArray<RolePreset> = [
   {
     role: 'Orchestrator',
     specialty: 'control-plane state, dispatch, drift detection, escalation',
-    mission: 'Run the swarm. Read /swarm-specs/ at start. Dispatch workers per their standing missions. Detect drift, re-prompt, escalate to main agent when stuck.',
-    systemPrompt: 'You are the Hermes Agent orchestrator for the swarm. Read /swarm-specs/SWARM_SPEC.md and /swarm-specs/projects/swarmN.md for every worker before dispatching. Apply the swarm-orchestrator skill: assign work, request proof-bearing checkpoints, detect drift, re-prompt with stronger framing, escalate when blocked. Never make irreversible external actions without main-agent ack.',
-    skills: ['swarm-orchestrator', 'swarm-worker-core', 'swarm-review-learning-loop', 'self-improvement'],
+    mission:
+      'Run the swarm. Read /swarm-specs/ at start. Dispatch workers per their standing missions. Detect drift, re-prompt, escalate to main agent when stuck.',
+    systemPrompt:
+      'You are the Hermes Agent orchestrator for the swarm. Read /swarm-specs/SWARM_SPEC.md and /swarm-specs/projects/swarmN.md for every worker before dispatching. Apply the swarm-orchestrator skill: assign work, request proof-bearing checkpoints, detect drift, re-prompt with stronger framing, escalate when blocked. Never make irreversible external actions without main-agent ack.',
+    skills: [
+      'swarm-orchestrator',
+      'swarm-worker-core',
+      'swarm-review-learning-loop',
+      'self-improvement',
+    ],
     defaultModel: 'GPT-5.4',
   },
   {
     role: 'Builder',
     specialty: 'full-stack implementation, fast ship cycles',
-    mission: 'Implement features per dispatched briefs. Smallest landed artifact first. Tests + build + smoke before checkpoint.',
-    systemPrompt: 'You are a senior builder. Ship working code. Always read the brief, plan smallest landed artifact, implement, run tests + build + smoke, commit (not push), checkpoint with proof.',
+    mission:
+      'Implement features per dispatched briefs. Smallest landed artifact first. Tests + build + smoke before checkpoint.',
+    systemPrompt:
+      'You are a senior builder. Ship working code. Always read the brief, plan smallest landed artifact, implement, run tests + build + smoke, commit (not push), checkpoint with proof.',
     skills: ['swarm-worker-core', 'byte-verified-code-review'],
     defaultModel: 'GPT-5.5',
   },
   {
     role: 'Reviewer',
     specialty: 'byte-verified code review, naming + tests + build gate',
-    mission: 'No PR ships without you. Verify diff, byte-check naming, run tests/build/smoke, verdict APPROVED/CHANGES_REQUESTED/BLOCKED.',
-    systemPrompt: 'You are the merge gate. For every PR: pull branch, read diff, xxd byte-check naming-sensitive areas, run tests, run build, smoke test. Verdict APPROVED routes to main agent for merge ack. Never merge yourself.',
-    skills: ['swarm-worker-core', 'byte-verified-code-review', 'swarm-review-learning-loop'],
+    mission:
+      'No PR ships without you. Verify diff, byte-check naming, run tests/build/smoke, verdict APPROVED/CHANGES_REQUESTED/BLOCKED.',
+    systemPrompt:
+      'You are the merge gate. For every PR: pull branch, read diff, xxd byte-check naming-sensitive areas, run tests, run build, smoke test. Verdict APPROVED routes to main agent for merge ack. Never merge yourself.',
+    skills: [
+      'swarm-worker-core',
+      'byte-verified-code-review',
+      'swarm-review-learning-loop',
+    ],
     defaultModel: 'GPT-5.4',
   },
   {
     role: 'Triage',
     specialty: 'autonomous PR/issues processor',
-    mission: 'Score open issues every 4h, repro top-1, fix branch + tests + PR, request review. Never merge or close.',
-    systemPrompt: 'You are the issues/PRs autopilot. Every 4h: gh issue list per repo, score by Impact x Tractability x (1 + locally-tested), pick top-1 unassigned, repro, fix branch, push, gh pr create, request reviewer. Never merge, never close, always escalate to main agent for greenlight.',
-    skills: ['swarm-worker-core', 'byte-verified-code-review', 'swarm-review-learning-loop'],
+    mission:
+      'Score open issues every 4h, repro top-1, fix branch + tests + PR, request review. Never merge or close.',
+    systemPrompt:
+      'You are the issues/PRs autopilot. Every 4h: gh issue list per repo, score by Impact x Tractability x (1 + locally-tested), pick top-1 unassigned, repro, fix branch, push, gh pr create, request reviewer. Never merge, never close, always escalate to main agent for greenlight.',
+    skills: [
+      'swarm-worker-core',
+      'byte-verified-code-review',
+      'swarm-review-learning-loop',
+    ],
     defaultModel: 'GPT-5.5',
   },
   {
     role: 'Lab',
     specialty: 'local-model R&D, spec-dec, benchmarking',
-    mission: 'Run autonomous lab loop. Test new model pulls. Wire spec-dec/DFlash/TurboQuant. Push tk/s + quality. Document every experiment.',
-    systemPrompt: 'You are the local-model lab. Read /swarm-specs/projects/lane-c-lab.md. Iterate experiments from open hypothesis space. Log to lab-loop-runs.jsonl. Escalate breakthroughs (>=10% tk/s) and install requests to main agent.',
-    skills: ['swarm-worker-core', 'pc1-ollama-gguf-bench', 'swarm-bench-worker'],
+    mission:
+      'Run autonomous lab loop. Test new model pulls. Wire spec-dec/DFlash/TurboQuant. Push tk/s + quality. Document every experiment.',
+    systemPrompt:
+      'You are the local-model lab. Read /swarm-specs/projects/lane-c-lab.md. Iterate experiments from open hypothesis space. Log to lab-loop-runs.jsonl. Escalate breakthroughs (>=10% tk/s) and install requests to main agent.',
+    skills: [
+      'swarm-worker-core',
+      'pc1-ollama-gguf-bench',
+      'swarm-bench-worker',
+    ],
     defaultModel: 'GPT-5.4',
   },
   {
     role: 'Sage',
     specialty: 'research + scripts + X content + creative briefs',
-    mission: 'Research what matters. Draft scripts, X content, briefs. Cite sources. Never post externally without ack.',
-    systemPrompt: 'You are the research/content scout. Find angles, write scripts and drafts, always cite sources. Never post X/Discord/blog without main-agent ack — always draft + escalate.',
+    mission:
+      'Research what matters. Draft scripts, X content, briefs. Cite sources. Never post externally without ack.',
+    systemPrompt:
+      'You are the research/content scout. Find angles, write scripts and drafts, always cite sources. Never post X/Discord/blog without main-agent ack — always draft + escalate.',
     skills: ['swarm-worker-core', 'last30days', 'pdf-and-paper-deep-reading'],
     defaultModel: 'GPT-5.5',
   },
   {
     role: 'Scribe',
     specialty: 'docs, skills hygiene, memory curation',
-    mission: 'Keep docs current. Hygiene the skills folder. Curate memory. Write submission/release copy.',
-    systemPrompt: 'You are the source-of-truth keeper. Audit /skills/ every 12h, flag stale/unused/poorly-documented. Maintain SWARM_SPEC and worker specs as system evolves. Draft READMEs and changelogs.',
+    mission:
+      'Keep docs current. Hygiene the skills folder. Curate memory. Write submission/release copy.',
+    systemPrompt:
+      'You are the source-of-truth keeper. Audit /skills/ every 12h, flag stale/unused/poorly-documented. Maintain SWARM_SPEC and worker specs as system evolves. Draft READMEs and changelogs.',
     skills: ['swarm-worker-core', 'last30days', 'creative-writing'],
     defaultModel: 'GPT-5.5',
   },
   {
     role: 'Foundation',
     specialty: 'infra, repair playbook, autopilot wiring',
-    mission: 'Keep the swarm running. Apply repair playbook. Wire autopilot. Maintain loop infra.',
-    systemPrompt: 'You are infrastructure. Maintain /swarm-specs/playbooks/auto-repair.yaml. Health-check tmux sessions, autopilot tick, dev server. Apply known fixes; escalate novel failures.',
+    mission:
+      'Keep the swarm running. Apply repair playbook. Wire autopilot. Maintain loop infra.',
+    systemPrompt:
+      'You are infrastructure. Maintain /swarm-specs/playbooks/auto-repair.yaml. Health-check tmux sessions, autopilot tick, dev server. Apply known fixes; escalate novel failures.',
     skills: ['swarm-worker-core'],
     defaultModel: 'GPT-5.4',
   },
@@ -309,7 +352,8 @@ const ROLE_PRESETS: ReadonlyArray<RolePreset> = [
     role: 'QA',
     specialty: 'regression QA, render verification',
     mission: 'Run regression suite on every commit + render. Block bad ships.',
-    systemPrompt: 'You are QA. On commit: full test suite. On render: ffprobe + tone consistency + pacing. Verdict PASS/FAIL/FLAKY with evidence.',
+    systemPrompt:
+      'You are QA. On commit: full test suite. On render: ffprobe + tone consistency + pacing. Verdict PASS/FAIL/FLAKY with evidence.',
     skills: ['swarm-worker-core', 'byte-verified-code-review'],
     defaultModel: 'GPT-5.4',
   },
@@ -317,7 +361,8 @@ const ROLE_PRESETS: ReadonlyArray<RolePreset> = [
     role: 'Mirror Integrations',
     specialty: 'asset packs, upstream sync',
     mission: 'Generate assets. Watch upstream. Pack integrations.',
-    systemPrompt: 'You produce assets and watch upstream. Generate art/audio per Lane A. Every 12h diff upstream Hermes Agent main, surface portable items. Never cross-org PR without ack.',
+    systemPrompt:
+      'You produce assets and watch upstream. Generate art/audio per Lane A. Every 12h diff upstream Hermes Agent main, surface portable items. Never cross-org PR without ack.',
     skills: ['swarm-worker-core', 'claude-promo', 'songwriting-and-ai-music'],
     defaultModel: 'GPT-5.4',
   },
@@ -332,7 +377,9 @@ const ROLE_PRESETS: ReadonlyArray<RolePreset> = [
 
 const ROLE_NAMES = ROLE_PRESETS.map((p) => p.role)
 
-async function fetchAvailableModels(): Promise<Array<{ id: string; name: string; provider: string }>> {
+async function fetchAvailableModels(): Promise<
+  Array<{ id: string; name: string; provider: string }>
+> {
   try {
     const res = await fetch('/api/models')
     if (!res.ok) return []
@@ -366,7 +413,7 @@ async function fetchRoster(): Promise<Array<SwarmRosterWorker>> {
   const res = await fetch('/api/swarm-roster')
   if (!res.ok) throw new Error(`Roster request failed: ${res.status}`)
   const data = (await res.json()) as SwarmRosterResponse
-  return Array.isArray(data.roster?.workers) ? data.roster!.workers! : []
+  return Array.isArray(data.roster?.workers) ? data.roster.workers : []
 }
 
 async function fetchMissions(): Promise<Array<SwarmMissionSummary>> {
@@ -508,8 +555,9 @@ function scrollNodeToTop(node: HTMLElement | null) {
 function withInstantScroll<T>(anchor: HTMLElement | null, fn: () => T): T {
   if (typeof window === 'undefined') return fn()
 
-  const targets: HTMLElement[] = []
-  if (document.documentElement instanceof HTMLElement) targets.push(document.documentElement)
+  const targets: Array<HTMLElement> = []
+  if (document.documentElement instanceof HTMLElement)
+    targets.push(document.documentElement)
   if (document.body instanceof HTMLElement) targets.push(document.body)
 
   let current: HTMLElement | null = anchor
@@ -518,13 +566,22 @@ function withInstantScroll<T>(anchor: HTMLElement | null, fn: () => T): T {
     current = current.parentElement
   }
 
-  for (const selector of ['main', '[data-slot="content"]', '[data-slot="main"]', '[data-scroll-container]']) {
+  for (const selector of [
+    'main',
+    '[data-slot="content"]',
+    '[data-slot="main"]',
+    '[data-scroll-container]',
+  ]) {
     const node = document.querySelector(selector)
     if (node instanceof HTMLElement) targets.push(node)
   }
 
-  const deduped = [...new Set(targets)].filter((node) => !node.closest('.xterm'))
-  const previous = deduped.map((node) => [node, node.style.scrollBehavior] as const)
+  const deduped = [...new Set(targets)].filter(
+    (node) => !node.closest('.xterm'),
+  )
+  const previous = deduped.map(
+    (node) => [node, node.style.scrollBehavior] as const,
+  )
   for (const [node] of previous) node.style.scrollBehavior = 'auto'
   try {
     return fn()
@@ -555,7 +612,8 @@ function scrollContextToTop(anchor: HTMLElement | null) {
     ]
 
     for (const node of candidates) {
-      if (node instanceof HTMLElement && !node.closest('.xterm')) scrollNodeToTop(node)
+      if (node instanceof HTMLElement && !node.closest('.xterm'))
+        scrollNodeToTop(node)
     }
 
     if (anchor) {
@@ -568,8 +626,8 @@ function scheduleScrollContextToTop(anchor: HTMLElement | null) {
   if (typeof window === 'undefined') return () => {}
 
   let cancelled = false
-  const timers: number[] = []
-  const frames: number[] = []
+  const timers: Array<number> = []
+  const frames: Array<number> = []
 
   const run = () => {
     if (cancelled) return
@@ -578,7 +636,9 @@ function scheduleScrollContextToTop(anchor: HTMLElement | null) {
 
   run()
   frames.push(window.requestAnimationFrame(run))
-  frames.push(window.requestAnimationFrame(() => window.requestAnimationFrame(run)))
+  frames.push(
+    window.requestAnimationFrame(() => window.requestAnimationFrame(run)),
+  )
   timers.push(window.setTimeout(run, 0))
   timers.push(window.setTimeout(run, 50))
   timers.push(window.setTimeout(run, 150))
@@ -602,25 +662,57 @@ function relativeTime(ts: number | null | undefined): string {
 
 function progressForRuntime(runtime: RuntimeEntry | undefined): number {
   if (!runtime) return 0
-  if (runtime.checkpointStatus === 'done' || runtime.checkpointStatus === 'handoff') return 100
-  if (runtime.checkpointStatus === 'blocked' || runtime.checkpointStatus === 'needs_input') return 100
+  if (
+    runtime.checkpointStatus === 'done' ||
+    runtime.checkpointStatus === 'handoff'
+  )
+    return 100
+  if (
+    runtime.checkpointStatus === 'blocked' ||
+    runtime.checkpointStatus === 'needs_input'
+  )
+    return 100
   if (!runtime.currentTask?.trim()) return 0
-  const text = `${runtime.phase ?? ''} ${runtime.currentTask ?? ''}`.toLowerCase()
+  const text = `${runtime.phase ?? ''} ${runtime.currentTask}`.toLowerCase()
   if (text.includes('review')) return 72
   if (text.includes('test') || text.includes('qa')) return 78
-  if (text.includes('implement') || text.includes('build') || text.includes('patch')) return 64
-  if (text.includes('plan') || text.includes('research') || text.includes('design')) return 48
+  if (
+    text.includes('implement') ||
+    text.includes('build') ||
+    text.includes('patch')
+  )
+    return 64
+  if (
+    text.includes('plan') ||
+    text.includes('research') ||
+    text.includes('design')
+  )
+    return 48
   return 58
 }
 
-function cleanSwarmLabel(rawValue: string, fallback = 'Ready for task', maxLength = 64): string {
+function cleanSwarmLabel(
+  rawValue: string,
+  fallback = 'Ready for task',
+  maxLength = 64,
+): string {
   const raw = rawValue.trim()
   if (!raw) return fallback
-  const lines = raw.split('\n').map((line) => line.trim()).filter(Boolean)
+  const lines = raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
   const goalLine = lines.find((line) => /^goal\s*:/i.test(line))
   const selected = goalLine
     ? goalLine.replace(/^goal\s*:\s*/i, '')
-    : lines.find((line) => !/^you are\b/i.test(line) && !/^context\b/i.test(line) && !/^constraints\b/i.test(line)) || lines[0]
+    : lines.find(
+        (line) =>
+          !/^you are\b/i.test(line) &&
+          !/^context\b/i.test(line) &&
+          !/^constraints\b/i.test(line),
+      ) ||
+      lines[0] ||
+      raw
   const cleaned = selected
     .replace(/^[A-Z][A-Z0-9_ -]{2,}TASK\s*:\s*/i, '')
     .replace(/^DESIGN_ADDENDUM\s*:\s*/i, '')
@@ -634,22 +726,41 @@ function cleanSwarmLabel(rawValue: string, fallback = 'Ready for task', maxLengt
   return compactText(cleaned || raw, maxLength)
 }
 
-function displayTaskTitle(runtime: RuntimeEntry | undefined, fallback: string): string {
+function displayTaskTitle(
+  runtime: RuntimeEntry | undefined,
+  fallback: string,
+): string {
   const realSummary = runtime?.lastRealSummary ?? null
   const realResult = runtime?.lastRealResult ?? null
-  return cleanSwarmLabel(runtime?.blockedReason || runtime?.currentTask || realSummary || runtime?.lastSummary || realResult || runtime?.lastResult || fallback || '', 'Ready for task', 64)
+  return cleanSwarmLabel(
+    runtime?.blockedReason ||
+      runtime?.currentTask ||
+      realSummary ||
+      runtime?.lastSummary ||
+      realResult ||
+      runtime?.lastResult ||
+      fallback ||
+      '',
+    'Ready for task',
+    64,
+  )
 }
 
-
-function formatAssignedModel(model?: string | null, provider?: string | null): string {
+function formatAssignedModel(
+  model?: string | null,
+  provider?: string | null,
+): string {
   const value = `${model || ''} ${provider || ''}`.toLowerCase()
-  if (value.includes('claude-opus-4-7') || value.includes('opus-4-7')) return 'Opus 4.7'
-  if (value.includes('claude-opus-4-6') || value.includes('opus-4-6')) return 'Opus 4.6'
+  if (value.includes('claude-opus-4-7') || value.includes('opus-4-7'))
+    return 'Opus 4.7'
+  if (value.includes('claude-opus-4-6') || value.includes('opus-4-6'))
+    return 'Opus 4.6'
   if (value.includes('gpt-5.5')) return 'GPT-5.5'
   if (value.includes('gpt-5.4')) return 'GPT-5.4'
   if (value.includes('gpt-5.3')) return 'GPT-5.3'
   if (model && model !== 'unknown') return model
-  if (provider && provider !== 'unknown') return provider.replace(/^custom:/, '').replace(/[-_]/g, ' ')
+  if (provider && provider !== 'unknown')
+    return provider.replace(/^custom:/, '').replace(/[-_]/g, ' ')
   return 'Worker'
 }
 
@@ -662,13 +773,37 @@ type ControlPlaneStageProps = {
   selectedLabel: string
   workspaceModel: string | null
   lanes: Array<{ role: string; count: number; active: number }>
-  activeAgents: Array<{ workerId: string; workerName: string; role: string; task: string; progress: number; state: 'working' | 'reviewing' | 'blocked' | 'ready'; age: string }>
-  recentUpdates: Array<{ workerId: string; workerName: string; text: string; age: string; tone: 'idle' | 'active' | 'warning' }>
-  latestMission: { id: string; title: string; state: string; assignmentCount: number; checkpointedCount: number } | null
+  activeAgents: Array<{
+    workerId: string
+    workerName: string
+    role: string
+    task: string
+    progress: number
+    state: 'working' | 'reviewing' | 'blocked' | 'ready'
+    age: string
+  }>
+  recentUpdates: Array<{
+    workerId: string
+    workerName: string
+    text: string
+    age: string
+    tone: 'idle' | 'active' | 'warning'
+  }>
+  latestMission: {
+    id: string
+    title: string
+    state: string
+    assignmentCount: number
+    checkpointedCount: number
+  } | null
   missions: Array<SwarmMissionSummary>
   runtimeEntries: Array<RuntimeEntry>
   inboxCounts: { needsReview: number; blocked: number; ready: number }
-  routerSeed: { key: number; prompt: string; mode: 'auto' | 'manual' | 'broadcast' } | null
+  routerSeed: {
+    key: number
+    prompt: string
+    mode: 'auto' | 'manual' | 'broadcast'
+  } | null
   onOpenInboxItem: (item: Swarm2InboxItem) => void
   onRouteToReviewer: (item: Swarm2InboxItem) => void
   viewMode: ViewMode
@@ -687,7 +822,11 @@ type ControlPlaneStageProps = {
   onToggleFocusedRuntimeWorker: (workerId: string) => void
   onClearFocusedRuntimeWorker: () => void
   onStartAgentSession: (workerId: string) => void
-  onScrollTmuxSession: (workerId: string, direction: 'up' | 'down', session?: string | null) => void
+  onScrollTmuxSession: (
+    workerId: string,
+    direction: 'up' | 'down',
+    session?: string | null,
+  ) => void
 }
 
 function ControlPlaneStage({
@@ -729,19 +868,22 @@ function ControlPlaneStage({
   const stageRef = useRef<HTMLDivElement | null>(null)
   const anchorRef = useRef<HTMLDivElement | null>(null)
   const workerRefsMap = useRef<Map<string, HTMLElement>>(new Map())
-  const cardSetters = useRef<
-    Map<string, (node: HTMLElement | null) => void>
-  >(new Map())
+  const cardSetters = useRef<Map<string, (node: HTMLElement | null) => void>>(
+    new Map(),
+  )
   const [refsVersion, setRefsVersion] = useState(0)
   const bumpRefsVersion = useCallback(() => {
     setRefsVersion((value) => value + 1)
   }, [])
 
-  const setAnchor = useCallback((node: HTMLDivElement | null) => {
-    if (anchorRef.current === node) return
-    anchorRef.current = node
-    bumpRefsVersion()
-  }, [bumpRefsVersion])
+  const setAnchor = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (anchorRef.current === node) return
+      anchorRef.current = node
+      bumpRefsVersion()
+    },
+    [bumpRefsVersion],
+  )
 
   const setWorkerRef = useCallback(
     (workerId: string) => {
@@ -825,7 +967,12 @@ function ControlPlaneStage({
           className="w-full max-w-5xl"
         />
         <div className="relative w-full pt-3">
-          <div className={cn('relative z-10', viewMode === 'cards' ? 'block' : 'hidden')}>
+          <div
+            className={cn(
+              'relative z-10',
+              viewMode === 'cards' ? 'block' : 'hidden',
+            )}
+          >
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 min-[1680px]:grid-cols-3">
               {members.length === 0 ? (
                 <div className="col-span-full rounded-[1.5rem] border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-8 text-sm text-[var(--theme-muted)]">
@@ -843,8 +990,19 @@ function ControlPlaneStage({
                       checkpointStatus={runtime?.checkpointStatus ?? null}
                       runtimeState={runtime?.state ?? null}
                       recentLines={recentLines(runtime)}
-                      recentOutputAt={runtime?.lastOutputAt ?? runtime?.lastSessionStartedAt ?? null}
-                      recentSummary={runtime?.lastRealSummary ?? runtime?.lastRealResult ?? runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? null}
+                      recentOutputAt={
+                        runtime?.lastOutputAt ??
+                        runtime?.lastSessionStartedAt ??
+                        null
+                      }
+                      recentSummary={
+                        runtime?.lastRealSummary ??
+                        runtime?.lastRealResult ??
+                        runtime?.lastSummary ??
+                        runtime?.lastResult ??
+                        runtime?.blockedReason ??
+                        null
+                      }
                       artifacts={runtime?.artifacts ?? []}
                       previews={runtime?.previews ?? []}
                       inRoom={roomIds.includes(member.id)}
@@ -860,14 +1018,30 @@ function ControlPlaneStage({
             </div>
           </div>
 
-          <div className={cn('relative z-10 flex flex-col gap-3', viewMode === 'runtime' ? 'block' : 'hidden')}>
+          <div
+            className={cn(
+              'relative z-10 flex flex-col gap-3',
+              viewMode === 'runtime' ? 'block' : 'hidden',
+            )}
+          >
             {!tmuxAvailable ? (
               <div className="rounded-xl border border-amber-300/40 bg-amber-300/10 px-4 py-2.5 text-xs text-amber-100">
-                <div className="font-semibold text-amber-50">tmux not installed on this host</div>
-                <div className="mt-1 text-amber-100/80">Spawning a Hermes swarm worker requires tmux. Without it, the worker can start but cannot dispatch tasks (you'll see &lsquo;can't find pane: swarm-&lt;id&gt;&rsquo; errors). Install tmux:</div>
-                <code className="mt-1 inline-block rounded bg-black/30 px-2 py-0.5 text-[10px] text-amber-100">brew install tmux</code>{' '}
+                <div className="font-semibold text-amber-50">
+                  tmux not installed on this host
+                </div>
+                <div className="mt-1 text-amber-100/80">
+                  Spawning a Hermes swarm worker requires tmux. Without it, the
+                  worker can start but cannot dispatch tasks (you'll see
+                  &lsquo;can't find pane: swarm-&lt;id&gt;&rsquo; errors).
+                  Install tmux:
+                </div>
+                <code className="mt-1 inline-block rounded bg-black/30 px-2 py-0.5 text-[10px] text-amber-100">
+                  brew install tmux
+                </code>{' '}
                 <span className="text-amber-100/60">(macOS) or</span>{' '}
-                <code className="inline-block rounded bg-black/30 px-2 py-0.5 text-[10px] text-amber-100">apt install tmux</code>{' '}
+                <code className="inline-block rounded bg-black/30 px-2 py-0.5 text-[10px] text-amber-100">
+                  apt install tmux
+                </code>{' '}
                 <span className="text-amber-100/60">(Ubuntu/Debian).</span>
               </div>
             ) : null}
@@ -876,7 +1050,9 @@ function ControlPlaneStage({
                 <span>
                   Focus mode on{' '}
                   <span className="font-semibold text-[var(--theme-text)]">
-                    {members.find((member) => member.id === focusedRuntimeWorkerId)?.displayName || focusedRuntimeWorkerId}
+                    {members.find(
+                      (member) => member.id === focusedRuntimeWorkerId,
+                    )?.displayName || focusedRuntimeWorkerId}
                   </span>
                 </span>
                 <button
@@ -888,10 +1064,16 @@ function ControlPlaneStage({
                 </button>
               </div>
             ) : null}
-            <div className={cn('grid grid-cols-1 gap-3', focusedRuntimeWorkerId ? '' : '2xl:grid-cols-2')}>
+            <div
+              className={cn(
+                'grid grid-cols-1 gap-3',
+                focusedRuntimeWorkerId ? '' : '2xl:grid-cols-2',
+              )}
+            >
               {terminalTargets.length === 0 ? (
                 <div className="rounded-[1.5rem] border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-8 text-sm text-[var(--theme-muted)]">
-                  No active workers detected. Select a worker or wire it into the room to mount its terminal.
+                  No active workers detected. Select a worker or wire it into
+                  the room to mount its terminal.
                 </div>
               ) : (
                 terminalTargets.map((member) => {
@@ -904,35 +1086,118 @@ function ControlPlaneStage({
                         ? 'border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] text-[var(--theme-warning)]'
                         : 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)]'
                   const titleLabel = member.displayName || member.id
-                  const modelLabel = formatAssignedModel(member.model, member.provider)
+                  const modelLabel = formatAssignedModel(
+                    member.model,
+                    member.provider,
+                  )
                   return (
-                    <div key={member.id} className="overflow-hidden rounded-[1.5rem] border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_20px_60px_color-mix(in_srgb,var(--theme-shadow)_14%,transparent)]">
+                    <div
+                      key={member.id}
+                      className="overflow-hidden rounded-[1.5rem] border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_20px_60px_color-mix(in_srgb,var(--theme-shadow)_14%,transparent)]"
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--theme-border)] px-3 py-2 text-[11px] text-[var(--theme-muted)]">
                         <span className="inline-flex items-center gap-2 font-semibold text-[var(--theme-text)]">
                           <HugeiconsIcon icon={CpuIcon} size={13} />
                           <span>{titleLabel}</span>
-                          <span className="text-[10px] font-medium text-[var(--theme-muted)]">· {modelLabel}</span>
+                          <span className="text-[10px] font-medium text-[var(--theme-muted)]">
+                            · {modelLabel}
+                          </span>
                         </span>
                         <div className="ml-auto flex items-center gap-1">
                           {runtime?.tmuxAttachable ? (
                             <>
-                              <button type="button" onClick={() => onScrollTmuxSession(member.id, 'up', runtime.tmuxSession)} className="rounded-full border border-transparent px-1.5 py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]" title={`Scroll up in ${runtime.tmuxSession ?? `swarm-${member.id}`}`}>↑</button>
-                              <button type="button" onClick={() => onScrollTmuxSession(member.id, 'down', runtime.tmuxSession)} className="rounded-full border border-transparent px-1.5 py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]" title={`Scroll down in ${runtime.tmuxSession ?? `swarm-${member.id}`}`}>↓</button>
-                              <button type="button" onClick={() => onToggleFocusedRuntimeWorker(member.id)} className="rounded-full border border-transparent px-1.5 py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]" title={focusedRuntimeWorkerId === member.id ? `Exit focus for swarm-${member.id}` : `Focus swarm-${member.id}`}>
-                                {focusedRuntimeWorkerId === member.id ? '⛶' : '⤢'}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onScrollTmuxSession(
+                                    member.id,
+                                    'up',
+                                    runtime.tmuxSession,
+                                  )
+                                }
+                                className="rounded-full border border-transparent px-1.5 py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                                title={`Scroll up in ${runtime.tmuxSession ?? `swarm-${member.id}`}`}
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onScrollTmuxSession(
+                                    member.id,
+                                    'down',
+                                    runtime.tmuxSession,
+                                  )
+                                }
+                                className="rounded-full border border-transparent px-1.5 py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                                title={`Scroll down in ${runtime.tmuxSession ?? `swarm-${member.id}`}`}
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onToggleFocusedRuntimeWorker(member.id)
+                                }
+                                className="rounded-full border border-transparent px-1.5 py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                                title={
+                                  focusedRuntimeWorkerId === member.id
+                                    ? `Exit focus for swarm-${member.id}`
+                                    : `Focus swarm-${member.id}`
+                                }
+                              >
+                                {focusedRuntimeWorkerId === member.id
+                                  ? '⛶'
+                                  : '⤢'}
                               </button>
                             </>
                           ) : (
-                            <button type="button" disabled={pendingTmux.has(member.id) || !tmuxAvailable} onClick={() => onStartAgentSession(member.id)} className={cn('rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] transition-colors', 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)] hover:opacity-90', (pendingTmux.has(member.id) || !tmuxAvailable) && 'cursor-not-allowed opacity-50')} title={tmuxAvailable ? `Start a live agent session in tmux (swarm-${member.id})` : 'tmux is not installed on this host'}>
-                              {pendingTmux.has(member.id) ? 'Starting…' : 'Start agent'}
+                            <button
+                              type="button"
+                              disabled={
+                                pendingTmux.has(member.id) || !tmuxAvailable
+                              }
+                              onClick={() => onStartAgentSession(member.id)}
+                              className={cn(
+                                'rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] transition-colors',
+                                'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)] hover:opacity-90',
+                                (pendingTmux.has(member.id) ||
+                                  !tmuxAvailable) &&
+                                  'cursor-not-allowed opacity-50',
+                              )}
+                              title={
+                                tmuxAvailable
+                                  ? `Start a live agent session in tmux (swarm-${member.id})`
+                                  : 'tmux is not installed on this host'
+                              }
+                            >
+                              {pendingTmux.has(member.id)
+                                ? 'Starting…'
+                                : 'Start agent'}
                             </button>
                           )}
                         </div>
-                        <span className={cn('inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em]', kindBadgeClass)} title={cmd.command.join(' ')}>
-                          {cmd.kind === 'tmux' ? 'tmux' : cmd.kind === 'log-tail' ? 'logs' : 'shell'}
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em]',
+                            kindBadgeClass,
+                          )}
+                          title={cmd.command.join(' ')}
+                        >
+                          {cmd.kind === 'tmux'
+                            ? 'tmux'
+                            : cmd.kind === 'log-tail'
+                              ? 'logs'
+                              : 'shell'}
                         </span>
                       </div>
-                      <SwarmTerminal workerId={member.id} command={cmd.command} cwd={runtime?.cwd ?? undefined} height={420} active={viewMode === 'runtime'} />
+                      <SwarmTerminal
+                        workerId={member.id}
+                        command={cmd.command}
+                        cwd={runtime?.cwd ?? undefined}
+                        height={420}
+                        active={viewMode === 'runtime'}
+                      />
                     </div>
                   )
                 })
@@ -940,7 +1205,12 @@ function ControlPlaneStage({
             </div>
           </div>
 
-          <div className={cn('relative z-10', viewMode === 'kanban' ? 'block' : 'hidden')}>
+          <div
+            className={cn(
+              'relative z-10',
+              viewMode === 'kanban' ? 'block' : 'hidden',
+            )}
+          >
             <Swarm2KanbanBoard
               workers={members}
               latestMission={latestMission}
@@ -950,7 +1220,12 @@ function ControlPlaneStage({
             />
           </div>
 
-          <div className={cn('relative z-10', viewMode === 'reports' ? 'block' : 'hidden')}>
+          <div
+            className={cn(
+              'relative z-10',
+              viewMode === 'reports' ? 'block' : 'hidden',
+            )}
+          >
             <Swarm2ReportsView
               missions={missions}
               runtimes={runtimeEntries}
@@ -967,8 +1242,6 @@ function ControlPlaneStage({
     </section>
   )
 }
-
-
 
 export const __runtimeTabInternals = {
   commandForRuntime,
@@ -994,7 +1267,11 @@ export function Swarm2Screen() {
   })
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [routerOpen, setRouterOpen] = useState(false)
-  const [routerSeed, setRouterSeed] = useState<{ key: number; prompt: string; mode: 'auto' | 'manual' | 'broadcast' } | null>(null)
+  const [routerSeed, setRouterSeed] = useState<{
+    key: number
+    prompt: string
+    mode: 'auto' | 'manual' | 'broadcast'
+  } | null>(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [addSwarmOpen, setAddSwarmOpen] = useState(false)
   const [addSwarmSaving, setAddSwarmSaving] = useState(false)
@@ -1014,7 +1291,9 @@ export function Swarm2Screen() {
   const [newWorkerMission, setNewWorkerMission] = useState('')
   // Worker IDs whose tmux session is currently being started/stopped via API.
   const [pendingTmux, setPendingTmux] = useState<Set<string>>(new Set())
-  const [focusedRuntimeWorkerId, setFocusedRuntimeWorkerId] = useState<string | null>(null)
+  const [focusedRuntimeWorkerId, setFocusedRuntimeWorkerId] = useState<
+    string | null
+  >(null)
   const topRef = useRef<HTMLDivElement | null>(null)
 
   const runtimeQuery = useQuery({
@@ -1050,31 +1329,26 @@ export function Swarm2Screen() {
         if (!res.ok) {
           const text = await res.text().catch(() => '')
           let parsed: { error?: string } = {}
-          try { parsed = JSON.parse(text) } catch {}
+          try {
+            parsed = JSON.parse(text)
+          } catch {}
           const msg = parsed.error || text || `HTTP ${res.status}`
           if (msg.includes('tmux not installed')) {
-            toast({
-              title: 'tmux not installed',
-              description:
-                `Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (‘brew install tmux’ or ‘apt install tmux’) and try again. See #244.`,
-              variant: 'destructive',
-            })
+            toast(
+              `Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (‘brew install tmux’ or ‘apt install tmux’) and try again. See #244.`,
+              { type: 'error' },
+            )
           } else {
-            toast({
-              title: `Failed to start ${workerId}`,
-              description: msg,
-              variant: 'destructive',
-            })
+            toast(`Failed to start ${workerId}: ${msg}`, { type: 'error' })
           }
-          // eslint-disable-next-line no-console
+
           console.error('[swarm2] start session failed:', res.status, text)
         }
       } catch (err) {
-        toast({
-          title: `Failed to start ${workerId}`,
-          description: err instanceof Error ? err.message : String(err),
-          variant: 'destructive',
-        })
+        toast(
+          `Failed to start ${workerId}: ${err instanceof Error ? err.message : String(err)}`,
+          { type: 'error' },
+        )
       } finally {
         setPendingTmux((prev) => {
           const next = new Set(prev)
@@ -1098,7 +1372,7 @@ export function Swarm2Screen() {
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
-          // eslint-disable-next-line no-console
+
           console.error('[swarm2] stop session failed:', res.status, text)
         }
       } finally {
@@ -1114,7 +1388,11 @@ export function Swarm2Screen() {
   )
 
   const scrollTmuxSession = useCallback(
-    async (workerId: string, direction: 'up' | 'down', session?: string | null) => {
+    async (
+      workerId: string,
+      direction: 'up' | 'down',
+      session?: string | null,
+    ) => {
       try {
         const res = await fetch('/api/swarm-tmux-scroll', {
           method: 'POST',
@@ -1123,11 +1401,10 @@ export function Swarm2Screen() {
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
-          // eslint-disable-next-line no-console
+
           console.error('[swarm2] tmux scroll failed:', res.status, text)
         }
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('[swarm2] tmux scroll exception:', error)
       }
     },
@@ -1135,7 +1412,9 @@ export function Swarm2Screen() {
   )
 
   const toggleFocusedRuntimeWorker = useCallback((workerId: string) => {
-    setFocusedRuntimeWorkerId((current) => (current === workerId ? null : workerId))
+    setFocusedRuntimeWorkerId((current) =>
+      current === workerId ? null : workerId,
+    )
   }, [])
 
   const runtimeByWorker = useMemo(() => {
@@ -1222,7 +1501,6 @@ export function Swarm2Screen() {
     return scheduleScrollContextToTop(topRef.current)
   }, [])
 
-
   const activeRuntimeCount = members.filter((member) =>
     isRuntimeActive(runtimeByWorker.get(member.id)),
   ).length
@@ -1254,7 +1532,10 @@ export function Swarm2Screen() {
     ? autoMountTargets.filter((member) => member.id === focusedRuntimeWorkerId)
     : autoMountTargets
   const rosterLanes = useMemo(() => {
-    const map = new Map<string, { role: string; count: number; active: number }>()
+    const map = new Map<
+      string,
+      { role: string; count: number; active: number }
+    >()
     for (const member of members) {
       const role = member.role || 'Worker'
       const existing = map.get(role) ?? { role, count: 0, active: 0 }
@@ -1262,20 +1543,34 @@ export function Swarm2Screen() {
       if (isRuntimeActive(runtimeByWorker.get(member.id))) existing.active += 1
       map.set(role, existing)
     }
-    return [...map.values()].sort((a, b) => b.active - a.active || b.count - a.count || a.role.localeCompare(b.role))
+    return [...map.values()].sort(
+      (a, b) =>
+        b.active - a.active ||
+        b.count - a.count ||
+        a.role.localeCompare(b.role),
+    )
   }, [members, runtimeByWorker])
   const latestMission = useMemo(() => {
     const mission = missionsQuery.data?.[0]
     if (!mission) return null
     const assignments = mission.assignments ?? []
-    const genericTitle = /^\d+\s+assigned tasks?$/i.test(mission.title.trim()) || /assigned tasks/i.test(mission.title)
-    const firstTask = assignments.find((assignment) => assignment.task?.trim())?.task ?? ''
+    const genericTitle =
+      /^\d+\s+assigned tasks?$/i.test(mission.title.trim()) ||
+      /assigned tasks/i.test(mission.title)
+    const firstTask =
+      assignments.find((assignment) => assignment.task?.trim())?.task ?? ''
     return {
       id: mission.id,
-      title: cleanSwarmLabel(genericTitle ? firstTask : mission.title, 'Swarm mission', 72),
+      title: cleanSwarmLabel(
+        genericTitle ? firstTask : mission.title,
+        'Swarm mission',
+        72,
+      ),
       state: mission.state,
       assignmentCount: assignments.length,
-      checkpointedCount: assignments.filter((assignment) => ['checkpointed', 'done'].includes(assignment.state)).length,
+      checkpointedCount: assignments.filter((assignment) =>
+        ['checkpointed', 'done'].includes(assignment.state),
+      ).length,
     }
   }, [missionsQuery.data])
 
@@ -1284,17 +1579,30 @@ export function Swarm2Screen() {
       .map((member) => {
         const runtime = runtimeByWorker.get(member.id)
         const currentTask = runtime?.currentTask?.trim()
-        const blocked = Boolean(runtime?.blockedReason || runtime?.needsHuman || runtime?.checkpointStatus === 'blocked' || runtime?.checkpointStatus === 'needs_input')
-        const done = runtime?.checkpointStatus === 'done' || runtime?.checkpointStatus === 'handoff'
+        const blocked = Boolean(
+          runtime?.blockedReason ||
+          runtime?.needsHuman ||
+          runtime?.checkpointStatus === 'blocked' ||
+          runtime?.checkpointStatus === 'needs_input',
+        )
+        const done =
+          runtime?.checkpointStatus === 'done' ||
+          runtime?.checkpointStatus === 'handoff'
         if (!currentTask && !blocked) return null
         const state: 'working' | 'reviewing' | 'blocked' | 'ready' = blocked
           ? 'blocked'
           : done
             ? 'ready'
-            : `${runtime?.phase ?? ''} ${currentTask ?? ''}`.toLowerCase().includes('review')
+            : `${runtime?.phase ?? ''} ${currentTask ?? ''}`
+                  .toLowerCase()
+                  .includes('review')
               ? 'reviewing'
               : 'working'
-        const ts = runtime?.lastOutputAt ?? runtime?.lastSessionStartedAt ?? member.lastSessionAt ?? null
+        const ts =
+          runtime?.lastOutputAt ??
+          runtime?.lastSessionStartedAt ??
+          member.lastSessionAt ??
+          null
         return {
           workerId: member.id,
           workerName: member.displayName || member.id,
@@ -1309,7 +1617,11 @@ export function Swarm2Screen() {
       .filter((item): item is NonNullable<typeof item> => Boolean(item))
       .sort((a, b) => {
         const priority = { blocked: 0, reviewing: 1, working: 2, ready: 3 }
-        return priority[a.state] - priority[b.state] || b.ts - a.ts || a.workerId.localeCompare(b.workerId)
+        return (
+          priority[a.state] - priority[b.state] ||
+          b.ts - a.ts ||
+          a.workerId.localeCompare(b.workerId)
+        )
       })
       .map((item) => ({
         workerId: item.workerId,
@@ -1323,7 +1635,11 @@ export function Swarm2Screen() {
   }, [members, runtimeByWorker])
 
   const inboxLanes = useMemo(
-    () => buildSwarm2InboxLanes({ missions: missionsQuery.data ?? [], runtimes: runtimeQuery.data?.entries ?? [] }),
+    () =>
+      buildSwarm2InboxLanes({
+        missions: missionsQuery.data ?? [],
+        runtimes: runtimeQuery.data?.entries ?? [],
+      }),
     [missionsQuery.data, runtimeQuery.data?.entries],
   )
 
@@ -1389,23 +1705,46 @@ export function Swarm2Screen() {
         title: `Mission ${latestMission.state}`,
         body: `${latestMission.checkpointedCount}/${latestMission.assignmentCount} checkpointed · ${latestMission.title}`,
         age: latestMission.id,
-        actionable: latestMission.checkpointedCount < latestMission.assignmentCount,
+        actionable:
+          latestMission.checkpointedCount < latestMission.assignmentCount,
       })
     }
     return laneItems.slice(0, 8)
   }, [inboxLanes, latestMission])
-  const actionableNotificationCount = swarmNotifications.filter((item) => item.actionable).length
+  const actionableNotificationCount = swarmNotifications.filter(
+    (item) => item.actionable,
+  ).length
 
   const recentUpdates = useMemo(() => {
     return members
       .map((member) => {
         const runtime = runtimeByWorker.get(member.id)
-        const ts = runtime?.lastOutputAt ?? runtime?.lastSessionStartedAt ?? member.lastSessionAt ?? null
-        const rawText = runtime?.lastRealSummary ?? runtime?.lastRealResult ?? runtime?.lastSummary ?? runtime?.lastResult ?? runtime?.blockedReason ?? runtime?.currentTask ?? member.lastSessionTitle ?? `Ready in ${member.role || 'worker'} lane`
-        const state = (runtime?.phase || runtime?.currentTask || '').toLowerCase()
+        const ts =
+          runtime?.lastOutputAt ??
+          runtime?.lastSessionStartedAt ??
+          member.lastSessionAt ??
+          null
+        const rawText =
+          runtime?.lastRealSummary ??
+          runtime?.lastRealResult ??
+          runtime?.lastSummary ??
+          runtime?.lastResult ??
+          runtime?.blockedReason ??
+          runtime?.currentTask ??
+          member.lastSessionTitle ??
+          `Ready in ${member.role || 'worker'} lane`
+        const state = (
+          runtime?.phase ||
+          runtime?.currentTask ||
+          ''
+        ).toLowerCase()
         const tone: 'idle' | 'active' | 'warning' = runtime?.blockedReason
           ? 'warning'
-          : (state.includes('review') || state.includes('write') || state.includes('build') || state.includes('implement') || state.includes('active'))
+          : state.includes('review') ||
+              state.includes('write') ||
+              state.includes('build') ||
+              state.includes('implement') ||
+              state.includes('active')
             ? 'active'
             : 'idle'
         return {
@@ -1419,7 +1758,13 @@ export function Swarm2Screen() {
       })
       .sort((a, b) => b.ts - a.ts || a.workerId.localeCompare(b.workerId))
       .slice(0, 3)
-      .map(({ workerId, workerName, text, age, tone }) => ({ workerId, workerName, text, age, tone }))
+      .map(({ workerId, workerName, text, age, tone }) => ({
+        workerId,
+        workerName,
+        text,
+        age,
+        tone,
+      }))
   }, [members, runtimeByWorker])
 
   function toggleRoom(id: string) {
@@ -1431,7 +1776,9 @@ export function Swarm2Screen() {
   }
 
   function openAddSwarm() {
-    const existingIds = new Set((rosterQuery.data ?? []).map((worker) => worker.id))
+    const existingIds = new Set(
+      (rosterQuery.data ?? []).map((worker) => worker.id),
+    )
     let next = 13
     while (existingIds.has(`swarm${next}`)) next += 1
     setNewWorkerId(`swarm${next}`)
@@ -1458,7 +1805,10 @@ export function Swarm2Screen() {
           role: newWorkerRole.trim(),
           specialty: newWorkerSpecialty.trim() || preset?.specialty || '',
           model: newWorkerModel.trim(),
-          mission: newWorkerMission.trim() || preset?.mission || 'Awaiting orchestrator dispatch.',
+          mission:
+            newWorkerMission.trim() ||
+            preset?.mission ||
+            'Awaiting orchestrator dispatch.',
           systemPrompt: preset?.systemPrompt ?? null,
           skills: preset?.skills ?? [],
         }),
@@ -1470,15 +1820,20 @@ export function Swarm2Screen() {
       await rosterQuery.refetch()
       setAddSwarmOpen(false)
     } catch (error) {
-      setAddSwarmError(error instanceof Error ? error.message : 'Failed to save swarm agent')
+      setAddSwarmError(
+        error instanceof Error ? error.message : 'Failed to save swarm agent',
+      )
     } finally {
       setAddSwarmSaving(false)
     }
   }
 
-
   return (
-    <div ref={topRef} className="min-h-full bg-surface text-primary-900" style={SWARM2_OPERATION_THEME}>
+    <div
+      ref={topRef}
+      className="min-h-full bg-surface text-primary-900"
+      style={SWARM2_OPERATION_THEME}
+    >
       <div
         className={cn(
           'mx-auto flex min-h-full max-w-[1680px] flex-col gap-3 px-3 pt-3 sm:px-4 lg:px-5',
@@ -1539,7 +1894,11 @@ export function Swarm2Screen() {
                 aria-label="Swarm notifications"
                 title="Swarm notifications"
               >
-                <HugeiconsIcon icon={AlarmClockIcon} size={17} strokeWidth={1.8} />
+                <HugeiconsIcon
+                  icon={AlarmClockIcon}
+                  size={17}
+                  strokeWidth={1.8}
+                />
                 {actionableNotificationCount > 0 ? (
                   <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                     {actionableNotificationCount}
@@ -1550,34 +1909,55 @@ export function Swarm2Screen() {
                 <div className="absolute right-0 top-12 z-40 w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 text-left shadow-[0_24px_80px_var(--theme-shadow)]">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Swarm updates</div>
-                      <div className="text-xs text-[var(--theme-muted-2)]">Actionable state from canonical mission checkpoints and durable report lanes.</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                        Swarm updates
+                      </div>
+                      <div className="text-xs text-[var(--theme-muted-2)]">
+                        Actionable state from canonical mission checkpoints and
+                        durable report lanes.
+                      </div>
                     </div>
-                    <button type="button" onClick={() => setNotificationsOpen(false)} className="rounded-lg px-2 py-1 text-xs hover:bg-[var(--theme-card2)]">Close</button>
+                    <button
+                      type="button"
+                      onClick={() => setNotificationsOpen(false)}
+                      className="rounded-lg px-2 py-1 text-xs hover:bg-[var(--theme-card2)]"
+                    >
+                      Close
+                    </button>
                   </div>
                   <div className="max-h-80 space-y-2 overflow-y-auto">
-                    {swarmNotifications.length ? swarmNotifications.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          if (item.workerId) {
-                            setViewMode('reports')
-                            setSelectedId(item.workerId)
-                            setFocusedRuntimeWorkerId(item.workerId)
-                          }
-                          setNotificationsOpen(false)
-                        }}
-                        className="block w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-left hover:border-[var(--theme-accent)]"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="truncate text-sm font-medium text-[var(--theme-text)]">{item.title}</span>
-                          <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">{item.age}</span>
-                        </div>
-                        <div className="mt-1 truncate text-xs text-[var(--theme-muted-2)]">{item.body}</div>
-                      </button>
-                    )) : (
-                      <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3 text-xs text-[var(--theme-muted)]">No active swarm updates.</div>
+                    {swarmNotifications.length ? (
+                      swarmNotifications.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            if (item.workerId) {
+                              setViewMode('reports')
+                              setSelectedId(item.workerId)
+                              setFocusedRuntimeWorkerId(item.workerId)
+                            }
+                            setNotificationsOpen(false)
+                          }}
+                          className="block w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-left hover:border-[var(--theme-accent)]"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-medium text-[var(--theme-text)]">
+                              {item.title}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">
+                              {item.age}
+                            </span>
+                          </div>
+                          <div className="mt-1 truncate text-xs text-[var(--theme-muted-2)]">
+                            {item.body}
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3 text-xs text-[var(--theme-muted)]">
+                        No active swarm updates.
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1641,8 +2021,12 @@ export function Swarm2Screen() {
             focusedRuntimeWorkerId={focusedRuntimeWorkerId}
             onToggleFocusedRuntimeWorker={toggleFocusedRuntimeWorker}
             onClearFocusedRuntimeWorker={() => setFocusedRuntimeWorkerId(null)}
-            onStartAgentSession={(workerId) => { void startAgentSession(workerId) }}
-            onScrollTmuxSession={(workerId, direction, session) => { void scrollTmuxSession(workerId, direction, session) }}
+            onStartAgentSession={(workerId) => {
+              void startAgentSession(workerId)
+            }}
+            onScrollTmuxSession={(workerId, direction, session) => {
+              void scrollTmuxSession(workerId, direction, session)
+            }}
           />
         </div>
 
@@ -1656,14 +2040,17 @@ export function Swarm2Screen() {
         ) : null}
       </div>
 
-
       {addSwarmOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] p-6 shadow-[0_30px_100px_var(--theme-shadow)]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold text-[var(--theme-text)]">Add Swarm Agent</h2>
-                <p className="mt-1 text-sm text-[var(--theme-muted-2)]">Create a new swarm roster entry and configure its identity.</p>
+                <h2 className="text-xl font-semibold text-[var(--theme-text)]">
+                  Add Swarm Agent
+                </h2>
+                <p className="mt-1 text-sm text-[var(--theme-muted-2)]">
+                  Create a new swarm roster entry and configure its identity.
+                </p>
               </div>
               <button
                 type="button"
@@ -1675,7 +2062,9 @@ export function Swarm2Screen() {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-[var(--theme-muted)]">Role preset</span>
+                <span className="mb-1 block text-[var(--theme-muted)]">
+                  Role preset
+                </span>
                 <select
                   value={newWorkerRole}
                   onChange={(e) => {
@@ -1683,71 +2072,164 @@ export function Swarm2Screen() {
                     setNewWorkerRole(role)
                     const preset = ROLE_PRESETS.find((p) => p.role === role)
                     if (preset && role !== 'Custom') {
-                      if (!newWorkerSpecialty.trim()) setNewWorkerSpecialty(preset.specialty)
-                      if (!newWorkerMission.trim()) setNewWorkerMission(preset.mission)
-                      if (preset.defaultModel && !newWorkerModel.trim()) setNewWorkerModel(preset.defaultModel)
+                      if (!newWorkerSpecialty.trim())
+                        setNewWorkerSpecialty(preset.specialty)
+                      if (!newWorkerMission.trim())
+                        setNewWorkerMission(preset.mission)
+                      if (preset.defaultModel && !newWorkerModel.trim())
+                        setNewWorkerModel(preset.defaultModel)
                     }
                   }}
                   className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
                 >
                   {ROLE_NAMES.map((r) => (
-                    <option key={r} value={r}>{r}</option>
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                  Presets auto-fill specialty, mission, system prompt, and skill stack. Pick “Custom” for a blank slate.
+                  Presets auto-fill specialty, mission, system prompt, and skill
+                  stack. Pick “Custom” for a blank slate.
                 </p>
               </label>
               <label className="block text-sm">
-                <span className="mb-1 block text-[var(--theme-muted)]">Worker ID</span>
-                <input value={newWorkerId} onChange={(e) => setNewWorkerId(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" placeholder="swarmN" />
+                <span className="mb-1 block text-[var(--theme-muted)]">
+                  Worker ID
+                </span>
+                <input
+                  value={newWorkerId}
+                  onChange={(e) => setNewWorkerId(e.target.value)}
+                  className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
+                  placeholder="swarmN"
+                />
               </label>
               <label className="block text-sm">
-                <span className="mb-1 block text-[var(--theme-muted)]">Display name</span>
-                <input value={newWorkerName} onChange={(e) => setNewWorkerName(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" placeholder="e.g. Mirror, Builder" />
+                <span className="mb-1 block text-[var(--theme-muted)]">
+                  Display name
+                </span>
+                <input
+                  value={newWorkerName}
+                  onChange={(e) => setNewWorkerName(e.target.value)}
+                  className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
+                  placeholder="e.g. Mirror, Builder"
+                />
               </label>
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 flex items-center justify-between text-[var(--theme-muted)]">
                   <span>Model</span>
-                  <span className="text-[10px] text-[var(--theme-muted-2)]">{availableModels.length > 0 ? `${availableModels.length} available` : modelsQuery.isLoading ? 'loading…' : '0 found'}</span>
+                  <span className="text-[10px] text-[var(--theme-muted-2)]">
+                    {availableModels.length > 0
+                      ? `${availableModels.length} available`
+                      : modelsQuery.isLoading
+                        ? 'loading…'
+                        : '0 found'}
+                  </span>
                 </span>
                 <input
                   value={newWorkerModel}
                   onChange={(e) => setNewWorkerModel(e.target.value)}
                   list="swarm-add-models"
-                  placeholder={availableModels.length ? 'Search or pick a detected model…' : modelsQuery.isLoading ? 'Loading detected models…' : 'No models detected'}
+                  placeholder={
+                    availableModels.length
+                      ? 'Search or pick a detected model…'
+                      : modelsQuery.isLoading
+                        ? 'Loading detected models…'
+                        : 'No models detected'
+                  }
                   className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
                 />
                 <datalist id="swarm-add-models">
                   {availableModels.map((m) => (
-                    <option key={m.id} value={m.name}>{m.provider}</option>
+                    <option key={m.id} value={m.name}>
+                      {m.provider}
+                    </option>
                   ))}
                 </datalist>
                 <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                  Searchable picker backed by /api/models, the same source as chat. {modelsQuery.isError ? 'Model discovery errored, so this is empty until refresh.' : 'Start typing to see every detected model from the user’s Hermes config and local providers.'}
+                  Searchable picker backed by /api/models, the same source as
+                  chat.{' '}
+                  {modelsQuery.isError
+                    ? 'Model discovery errored, so this is empty until refresh.'
+                    : 'Start typing to see every detected model from the user’s Hermes config and local providers.'}
                 </p>
               </label>
               <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-[var(--theme-muted)]">Specialty</span>
-                <input value={newWorkerSpecialty} onChange={(e) => setNewWorkerSpecialty(e.target.value)} className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" placeholder={ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.specialty || 'short focus area'} />
+                <span className="mb-1 block text-[var(--theme-muted)]">
+                  Specialty
+                </span>
+                <input
+                  value={newWorkerSpecialty}
+                  onChange={(e) => setNewWorkerSpecialty(e.target.value)}
+                  className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
+                  placeholder={
+                    ROLE_PRESETS.find((p) => p.role === newWorkerRole)
+                      ?.specialty || 'short focus area'
+                  }
+                />
               </label>
               <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-[var(--theme-muted)]">Mission</span>
-                <textarea value={newWorkerMission} onChange={(e) => setNewWorkerMission(e.target.value)} rows={3} className="w-full resize-none rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none" placeholder={ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.mission || 'standing mission for this worker'} />
+                <span className="mb-1 block text-[var(--theme-muted)]">
+                  Mission
+                </span>
+                <textarea
+                  value={newWorkerMission}
+                  onChange={(e) => setNewWorkerMission(e.target.value)}
+                  rows={3}
+                  className="w-full resize-none rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
+                  placeholder={
+                    ROLE_PRESETS.find((p) => p.role === newWorkerRole)
+                      ?.mission || 'standing mission for this worker'
+                  }
+                />
               </label>
-              {ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.systemPrompt ? (
+              {ROLE_PRESETS.find((p) => p.role === newWorkerRole)
+                ?.systemPrompt ? (
                 <div className="md:col-span-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-xs text-[var(--theme-muted-2)]">
-                  <div className="mb-1 font-semibold text-[var(--theme-muted)]">System prompt (embedded with role)</div>
-                  <div className="whitespace-pre-wrap leading-relaxed">{ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.systemPrompt}</div>
-                  <div className="mt-2 font-semibold text-[var(--theme-muted)]">Skills loaded</div>
-                  <div className="font-mono">{(ROLE_PRESETS.find((p) => p.role === newWorkerRole)?.skills ?? []).join(', ') || '—'}</div>
+                  <div className="mb-1 font-semibold text-[var(--theme-muted)]">
+                    System prompt (embedded with role)
+                  </div>
+                  <div className="whitespace-pre-wrap leading-relaxed">
+                    {
+                      ROLE_PRESETS.find((p) => p.role === newWorkerRole)
+                        ?.systemPrompt
+                    }
+                  </div>
+                  <div className="mt-2 font-semibold text-[var(--theme-muted)]">
+                    Skills loaded
+                  </div>
+                  <div className="font-mono">
+                    {(
+                      ROLE_PRESETS.find((p) => p.role === newWorkerRole)
+                        ?.skills ?? []
+                    ).join(', ') || '—'}
+                  </div>
                 </div>
               ) : null}
             </div>
-            {addSwarmError ? <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{addSwarmError}</div> : null}
+            {addSwarmError ? (
+              <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {addSwarmError}
+              </div>
+            ) : null}
             <div className="mt-4 flex items-center justify-end gap-3">
-              <button type="button" onClick={() => setAddSwarmOpen(false)} className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-sm text-[var(--theme-muted)] hover:text-[var(--theme-text)]">Cancel</button>
-              <button type="button" disabled={addSwarmSaving || !newWorkerId.trim() || !newWorkerName.trim()} onClick={() => void saveAddSwarm()} className="rounded-lg bg-[var(--theme-accent)] px-4 py-2 text-sm font-medium text-primary-950 disabled:opacity-50">{addSwarmSaving ? 'Saving…' : 'Save swarm agent'}</button>
+              <button
+                type="button"
+                onClick={() => setAddSwarmOpen(false)}
+                className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-sm text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  addSwarmSaving || !newWorkerId.trim() || !newWorkerName.trim()
+                }
+                onClick={() => void saveAddSwarm()}
+                className="rounded-lg bg-[var(--theme-accent)] px-4 py-2 text-sm font-medium text-primary-950 disabled:opacity-50"
+              >
+                {addSwarmSaving ? 'Saving…' : 'Save swarm agent'}
+              </button>
             </div>
           </div>
         </div>

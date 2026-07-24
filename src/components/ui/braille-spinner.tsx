@@ -27,7 +27,7 @@ const D5 = 0x10,
   D7 = 0x40,
   D8 = 0x80
 
-const PRESETS: Record<string, Array<string>> = {
+const PRESETS: Record<string, Array<string>> & { claude: Array<string> } = {
   // Classic rotating braille spinner
   braille: '⠿⠧⠇⠏⠟⠻⠹⠸⠼⠾'.split(''),
 
@@ -158,7 +158,7 @@ function BrailleSpinnerComponent({
       )}
       style={style}
     >
-      {frames[frame % frames.length]}
+      {frames[frame % frames.length] ?? ''}
     </span>
   )
 }

@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
 import { emitFeedEvent } from './feed-event-bus'
+import { cn } from '@/lib/utils'
+
 export type TaskPriority = 'urgent' | 'high' | 'normal' | 'low'
-export type TaskStatus = 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
+export type TaskStatus =
+  | 'inbox'
+  | 'assigned'
+  | 'in_progress'
+  | 'review'
+  | 'done'
 export type HubTask = {
   id: string
   title: string
@@ -41,10 +47,29 @@ const PRIORITIES: Array<{
   label: string
   badge: string
 }> = [
-  { key: 'urgent', label: 'Urgent', badge: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300' },
-  { key: 'high', label: 'High', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
-  { key: 'normal', label: 'Normal', badge: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-200' },
-  { key: 'low', label: 'Low', badge: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200' },
+  {
+    key: 'urgent',
+    label: 'Urgent',
+    badge: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+  },
+  {
+    key: 'high',
+    label: 'High',
+    badge:
+      'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+  },
+  {
+    key: 'normal',
+    label: 'Normal',
+    badge:
+      'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-200',
+  },
+  {
+    key: 'low',
+    label: 'Low',
+    badge:
+      'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200',
+  },
 ]
 function isTaskStatus(value: unknown): value is TaskStatus {
   return COLUMNS.some((column) => column.key === value)
@@ -63,12 +88,22 @@ function toTask(value: unknown): HubTask | null {
   const row = value as Record<string, unknown>
   const id = typeof row.id === 'string' ? row.id : ''
   const title = typeof row.title === 'string' ? row.title.trim() : ''
-  const description = typeof row.description === 'string' ? row.description.trim() : ''
-  const createdAt = typeof row.createdAt === 'number' ? row.createdAt : Date.now()
-  const updatedAt = typeof row.updatedAt === 'number' ? row.updatedAt : createdAt
+  const description =
+    typeof row.description === 'string' ? row.description.trim() : ''
+  const createdAt =
+    typeof row.createdAt === 'number' ? row.createdAt : Date.now()
+  const updatedAt =
+    typeof row.updatedAt === 'number' ? row.updatedAt : createdAt
   const agentId = typeof row.agentId === 'string' ? row.agentId : undefined
-  const missionId = typeof row.missionId === 'string' ? row.missionId : undefined
-  if (!id || !title || !isTaskPriority(row.priority) || !isTaskStatus(row.status)) return null
+  const missionId =
+    typeof row.missionId === 'string' ? row.missionId : undefined
+  if (
+    !id ||
+    !title ||
+    !isTaskPriority(row.priority) ||
+    !isTaskStatus(row.status)
+  )
+    return null
   return normalizeTask({
     id,
     title,
@@ -97,7 +132,10 @@ function loadTasks(): Array<HubTask> {
   }
 }
 function createTaskId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
     return crypto.randomUUID()
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -113,13 +151,25 @@ type TaskEditDraft = {
   status: TaskStatus
 }
 
-export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTasksChange, activeMissionId }: TaskBoardProps) {
+export function TaskBoard({
+  agents,
+  initialTasks,
+  selectedAgentId,
+  onRef,
+  onTasksChange,
+  activeMissionId,
+}: TaskBoardProps) {
   const [tasks, setTasks] = useState<Array<HubTask>>([])
   const [hydrated, setHydrated] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
-  const [form, setForm] = useState({ title: '', description: '', priority: 'normal' as TaskPriority, agentId: selectedAgentId ?? '' })
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    priority: 'normal' as TaskPriority,
+    agentId: selectedAgentId ?? '',
+  })
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [taskEditDraft, setTaskEditDraft] = useState<TaskEditDraft | null>(null)
   const [showAllTasks, setShowAllTasks] = useState(false)
@@ -145,74 +195,87 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
   useEffect(() => {
     onTasksChangeRef.current?.(tasks)
   }, [tasks])
-  const agentNameById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents])
+  const agentNameById = useMemo(
+    () => new Map(agents.map((agent) => [agent.id, agent.name])),
+    [agents],
+  )
 
   // Filter tasks by activeMissionId (unless showAllTasks is on)
   const visibleTasks = useMemo(() => {
     if (!activeMissionId || showAllTasks) return tasks
     return tasks.filter((t) => t.missionId === activeMissionId)
   }, [tasks, activeMissionId, showAllTasks])
-  const addTasks = useCallback((incomingTasks: Array<HubTask>) => {
-    if (incomingTasks.length === 0) return
-    const normalizedIncomingTasks = incomingTasks.map(normalizeTask)
-    const existingIds = new Set(tasksRef.current.map((task) => task.id))
-    const nextTasks = normalizedIncomingTasks.filter((task) => !existingIds.has(task.id))
-    if (nextTasks.length === 0) return
-    tasksRef.current = [...nextTasks, ...tasksRef.current]
-    setTasks((previous) => [...nextTasks, ...previous])
-    nextTasks.forEach((task) => {
-      emitFeedEvent({
-        type: 'task_created',
-        message: `Task created: ${task.title}`,
-        taskTitle: task.title,
-        agentName: task.agentId ? agentNameById.get(task.agentId) : undefined,
-      })
-      if (task.agentId) {
-        const agentName = agentNameById.get(task.agentId) ?? task.agentId
+  const addTasks = useCallback(
+    (incomingTasks: Array<HubTask>) => {
+      if (incomingTasks.length === 0) return
+      const normalizedIncomingTasks = incomingTasks.map(normalizeTask)
+      const existingIds = new Set(tasksRef.current.map((task) => task.id))
+      const nextTasks = normalizedIncomingTasks.filter(
+        (task) => !existingIds.has(task.id),
+      )
+      if (nextTasks.length === 0) return
+      tasksRef.current = [...nextTasks, ...tasksRef.current]
+      setTasks((previous) => [...nextTasks, ...previous])
+      nextTasks.forEach((task) => {
         emitFeedEvent({
-          type: 'task_assigned',
-          message: `Assigned to ${agentName}`,
+          type: 'task_created',
+          message: `Task created: ${task.title}`,
+          taskTitle: task.title,
+          agentName: task.agentId ? agentNameById.get(task.agentId) : undefined,
+        })
+        if (task.agentId) {
+          const agentName = agentNameById.get(task.agentId) ?? task.agentId
+          emitFeedEvent({
+            type: 'task_assigned',
+            message: `Assigned to ${agentName}`,
+            taskTitle: task.title,
+            agentName,
+          })
+        }
+      })
+    },
+    [agentNameById],
+  )
+  const moveTasks = useCallback(
+    (taskIds: Array<string>, nextStatus: TaskStatus) => {
+      if (taskIds.length === 0) return
+      const ids = new Set(taskIds)
+      const existingTasks = tasksRef.current
+      const now = Date.now()
+      const movedTasks: Array<HubTask> = []
+
+      const nextTasks = existingTasks.map((task) => {
+        if (!ids.has(task.id) || task.status === nextStatus) return task
+        movedTasks.push(task)
+        return { ...task, status: nextStatus, updatedAt: now }
+      })
+
+      if (movedTasks.length === 0) return
+      tasksRef.current = nextTasks
+      setTasks(nextTasks)
+
+      movedTasks.forEach((task) => {
+        const agentName = task.agentId
+          ? agentNameById.get(task.agentId)
+          : undefined
+        emitFeedEvent({
+          type: 'task_moved',
+          message: `${task.title} moved ${statusLabel(task.status)} -> ${statusLabel(nextStatus)}`,
           taskTitle: task.title,
           agentName,
         })
-      }
-    })
-  }, [agentNameById])
-  const moveTasks = useCallback((taskIds: Array<string>, nextStatus: TaskStatus) => {
-    if (taskIds.length === 0) return
-    const ids = new Set(taskIds)
-    const existingTasks = tasksRef.current
-    const now = Date.now()
-    const movedTasks: Array<HubTask> = []
-
-    const nextTasks = existingTasks.map((task) => {
-      if (!ids.has(task.id) || task.status === nextStatus) return task
-      movedTasks.push(task)
-      return { ...task, status: nextStatus, updatedAt: now }
-    })
-
-    if (movedTasks.length === 0) return
-    tasksRef.current = nextTasks
-    setTasks(nextTasks)
-
-    movedTasks.forEach((task) => {
-      const agentName = task.agentId ? agentNameById.get(task.agentId) : undefined
-      emitFeedEvent({
-        type: 'task_moved',
-        message: `${task.title} moved ${statusLabel(task.status)} -> ${statusLabel(nextStatus)}`,
-        taskTitle: task.title,
-        agentName,
+        if (nextStatus === 'done') {
+          emitFeedEvent({
+            type: 'task_completed',
+            message: `Task completed: ${task.title}`,
+            taskTitle: task.title,
+            agentName,
+          })
+        }
       })
-      if (nextStatus === 'done') {
-        emitFeedEvent({
-          type: 'task_completed',
-          message: `Task completed: ${task.title}`,
-          taskTitle: task.title,
-          agentName,
-        })
-      }
-    })
-  }, [agentNameById])
+    },
+    [agentNameById],
+  )
   useEffect(() => {
     if (!initialTasks || initialTasks.length === 0) return
     addTasks(initialTasks)
@@ -249,11 +312,21 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
     closeTaskDetail()
   }
 
-  const selectedAgentName = selectedAgentId ? agentNameById.get(selectedAgentId) ?? selectedAgentId : undefined
+  const selectedAgentName = selectedAgentId
+    ? (agentNameById.get(selectedAgentId) ?? selectedAgentId)
+    : undefined
   const tasksByColumn = useMemo(() => {
-    const grouped: Record<TaskStatus, Array<HubTask>> = { inbox: [], assigned: [], in_progress: [], review: [], done: [] }
+    const grouped: Record<TaskStatus, Array<HubTask>> = {
+      inbox: [],
+      assigned: [],
+      in_progress: [],
+      review: [],
+      done: [],
+    }
     visibleTasks.forEach((task) => grouped[task.status].push(task))
-    ;(Object.keys(grouped) as Array<TaskStatus>).forEach((status) => grouped[status].sort((a, b) => b.updatedAt - a.updatedAt))
+    ;(Object.keys(grouped) as Array<TaskStatus>).forEach((status) =>
+      grouped[status].sort((a, b) => b.updatedAt - a.updatedAt),
+    )
     return grouped
   }, [visibleTasks])
   function closeCreateForm() {
@@ -261,7 +334,12 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
     setForm((previous) => ({ ...previous, title: '', description: '' }))
   }
   function openCreateForm() {
-    setForm({ title: '', description: '', priority: 'normal', agentId: selectedAgentId ?? '' })
+    setForm({
+      title: '',
+      description: '',
+      priority: 'normal',
+      agentId: selectedAgentId ?? '',
+    })
     setIsCreating(true)
   }
   function handleCreateTask() {
@@ -306,7 +384,9 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-neutral-100">Tasks</h2>
             <p className="truncate text-[11px] text-neutral-400">
-              {selectedAgentName ? `Focused agent: ${selectedAgentName}` : 'Showing all agents'}
+              {selectedAgentName
+                ? `Focused agent: ${selectedAgentName}`
+                : 'Showing all agents'}
             </p>
           </div>
           {activeMissionId ? (
@@ -319,7 +399,11 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                   ? 'border-neutral-700 bg-neutral-800 text-neutral-300'
                   : 'border-neutral-800 bg-neutral-900 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300',
               )}
-              title={showAllTasks ? 'Show only current mission tasks' : 'Show tasks from all missions'}
+              title={
+                showAllTasks
+                  ? 'Show only current mission tasks'
+                  : 'Show tasks from all missions'
+              }
             >
               {showAllTasks ? 'Mission only' : 'Show all'}
             </button>
@@ -331,14 +415,21 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
           {COLUMNS.map((column) => {
             const columnTasks = tasksByColumn[column.key]
             return (
-              <div key={column.key} className="min-w-[200px] max-w-[240px] flex-1 rounded-xl border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-800 dark:bg-neutral-900">
+              <div
+                key={column.key}
+                className="min-w-[200px] max-w-[240px] flex-1 rounded-xl border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-800 dark:bg-neutral-900"
+              >
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{column.label}</h3>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                    {column.label}
+                  </h3>
                   <div className="flex items-center gap-1.5">
                     {column.key === 'inbox' ? (
                       <button
                         type="button"
-                        onClick={() => (isCreating ? closeCreateForm() : openCreateForm())}
+                        onClick={() =>
+                          isCreating ? closeCreateForm() : openCreateForm()
+                        }
                         className={cn(
                           'inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors',
                           isCreating
@@ -357,21 +448,24 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                 <div
                   onDragOver={(event) => {
                     event.preventDefault()
-                    if (dragOverStatus !== column.key) setDragOverStatus(column.key)
+                    if (dragOverStatus !== column.key)
+                      setDragOverStatus(column.key)
                   }}
                   onDragLeave={() => {
                     if (dragOverStatus === column.key) setDragOverStatus(null)
                   }}
                   onDrop={(event) => {
                     event.preventDefault()
-                    const taskId = event.dataTransfer.getData('text/plain') || draggedTaskId
+                    const taskId =
+                      event.dataTransfer.getData('text/plain') || draggedTaskId
                     if (taskId) moveTask(taskId, column.key)
                     setDraggedTaskId(null)
                     setDragOverStatus(null)
                   }}
                   className={cn(
                     'min-h-[240px] space-y-2 rounded-xl border border-dashed border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-950 p-2 transition-colors',
-                    dragOverStatus === column.key && 'border-emerald-500 bg-emerald-50 dark:bg-neutral-900',
+                    dragOverStatus === column.key &&
+                      'border-emerald-500 bg-emerald-50 dark:bg-neutral-900',
                   )}
                 >
                   {column.key === 'inbox' && isCreating ? (
@@ -385,14 +479,24 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                       <input
                         type="text"
                         value={form.title}
-                        onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            title: event.target.value,
+                          }))
+                        }
                         placeholder="Task title"
                         className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                         required
                       />
                       <textarea
                         value={form.description}
-                        onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            description: event.target.value,
+                          }))
+                        }
                         placeholder="Description (optional)"
                         rows={3}
                         className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
@@ -402,7 +506,12 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                           <button
                             key={priority.key}
                             type="button"
-                            onClick={() => setForm((prev) => ({ ...prev, priority: priority.key }))}
+                            onClick={() =>
+                              setForm((prev) => ({
+                                ...prev,
+                                priority: priority.key,
+                              }))
+                            }
                             className={cn(
                               'rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors',
                               form.priority === priority.key
@@ -416,12 +525,19 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                       </div>
                       <select
                         value={form.agentId}
-                        onChange={(event) => setForm((prev) => ({ ...prev, agentId: event.target.value }))}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            agentId: event.target.value,
+                          }))
+                        }
                         className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                       >
                         <option value="">Unassigned</option>
                         {agents.map((agent) => (
-                          <option key={agent.id} value={agent.id}>{agent.name}</option>
+                          <option key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </option>
                         ))}
                       </select>
                       <div className="flex items-center justify-end gap-2">
@@ -443,12 +559,20 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                     </form>
                   ) : null}
                   {columnTasks.length === 0 ? (
-                    <p className="py-8 text-center text-[11px] text-neutral-500">Drop tasks here</p>
+                    <p className="py-8 text-center text-[11px] text-neutral-500">
+                      Drop tasks here
+                    </p>
                   ) : null}
                   {columnTasks.map((task) => {
-                    const priority = PRIORITIES.find((item) => item.key === task.priority)
-                    const assignee = task.agentId ? agentNameById.get(task.agentId) ?? task.agentId : 'Unassigned'
-                    const dimmed = Boolean(selectedAgentId && task.agentId !== selectedAgentId)
+                    const priority = PRIORITIES.find(
+                      (item) => item.key === task.priority,
+                    )
+                    const assignee = task.agentId
+                      ? (agentNameById.get(task.agentId) ?? task.agentId)
+                      : 'Unassigned'
+                    const dimmed = Boolean(
+                      selectedAgentId && task.agentId !== selectedAgentId,
+                    )
                     const isExpanded = expandedTaskId === task.id
                     return (
                       <div
@@ -481,15 +605,26 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                           isExpanded && 'border-emerald-700',
                         )}
                       >
-                        <p className="text-xs font-semibold text-neutral-100">{task.title}</p>
+                        <p className="text-xs font-semibold text-neutral-100">
+                          {task.title}
+                        </p>
                         {task.description && !isExpanded ? (
-                          <p className="mt-1 line-clamp-3 text-[11px] text-neutral-400">{task.description}</p>
+                          <p className="mt-1 line-clamp-3 text-[11px] text-neutral-400">
+                            {task.description}
+                          </p>
                         ) : null}
                         <div className="mt-2 flex items-center justify-between gap-2">
-                          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', priority?.badge)}>
+                          <span
+                            className={cn(
+                              'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                              priority?.badge,
+                            )}
+                          >
                             {priority?.label ?? 'Normal'}
                           </span>
-                          <span className="truncate text-[10px] text-neutral-400">{assignee}</span>
+                          <span className="truncate text-[10px] text-neutral-400">
+                            {assignee}
+                          </span>
                         </div>
 
                         {/* Inline slide-down task detail panel */}
@@ -507,7 +642,9 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                                 value={taskEditDraft.title}
                                 onChange={(e) =>
                                   setTaskEditDraft((prev) =>
-                                    prev ? { ...prev, title: e.target.value } : prev,
+                                    prev
+                                      ? { ...prev, title: e.target.value }
+                                      : prev,
                                   )
                                 }
                                 className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
@@ -521,7 +658,9 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                                 value={taskEditDraft.description}
                                 onChange={(e) =>
                                   setTaskEditDraft((prev) =>
-                                    prev ? { ...prev, description: e.target.value } : prev,
+                                    prev
+                                      ? { ...prev, description: e.target.value }
+                                      : prev,
                                   )
                                 }
                                 rows={2}
@@ -530,7 +669,9 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                               />
                             </div>
                             <p className="text-[11px] text-neutral-400">
-                              <span className="font-semibold uppercase tracking-wide">Agent:</span>{' '}
+                              <span className="font-semibold uppercase tracking-wide">
+                                Agent:
+                              </span>{' '}
                               {assignee}
                             </p>
                             <div>
@@ -542,7 +683,11 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                                 onChange={(e) =>
                                   setTaskEditDraft((prev) =>
                                     prev
-                                      ? { ...prev, priority: e.target.value as TaskPriority }
+                                      ? {
+                                          ...prev,
+                                          priority: e.target
+                                            .value as TaskPriority,
+                                        }
                                       : prev,
                                   )
                                 }
@@ -564,7 +709,10 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                                 onChange={(e) =>
                                   setTaskEditDraft((prev) =>
                                     prev
-                                      ? { ...prev, status: e.target.value as TaskStatus }
+                                      ? {
+                                          ...prev,
+                                          status: e.target.value as TaskStatus,
+                                        }
                                       : prev,
                                   )
                                 }

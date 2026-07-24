@@ -25,7 +25,7 @@ export type CharacterArchetype = {
   notes: string
 }
 
-export const CHARACTER_ANIMATION_PRIORITY: CharacterAnimationClip[] = [
+export const CHARACTER_ANIMATION_PRIORITY: Array<CharacterAnimationClip> = [
   'idle',
   'walk',
   'run',
@@ -34,7 +34,7 @@ export const CHARACTER_ANIMATION_PRIORITY: CharacterAnimationClip[] = [
   'use',
 ]
 
-export const HERMESWORLD_CHARACTER_ARCHETYPES: CharacterArchetype[] = [
+export const HERMESWORLD_CHARACTER_ARCHETYPES: Array<CharacterArchetype> = [
   {
     id: 'player-adventurer',
     label: 'Player Adventurer',
@@ -42,8 +42,10 @@ export const HERMESWORLD_CHARACTER_ARCHETYPES: CharacterArchetype[] = [
     role: 'player',
     modelPath: '/assets/hermesworld/characters/player-adventurer.glb',
     defaultScale: 1,
-    paletteHint: 'Blue-gold hero silhouette with cleaner semi-real proportions.',
-    notes: 'First believable player base. Use as camera / control reference for the Agora pass.',
+    paletteHint:
+      'Blue-gold hero silhouette with cleaner semi-real proportions.',
+    notes:
+      'First believable player base. Use as camera / control reference for the Agora pass.',
   },
   {
     id: 'oracle-scholar',
@@ -53,7 +55,8 @@ export const HERMESWORLD_CHARACTER_ARCHETYPES: CharacterArchetype[] = [
     modelPath: '/assets/hermesworld/characters/oracle-scholar.glb',
     defaultScale: 1,
     paletteHint: 'Violet-blue robes, mystic trim, readable scholar silhouette.',
-    notes: 'High-value NPC for questing, prophecy, and talk/gesture animation validation.',
+    notes:
+      'High-value NPC for questing, prophecy, and talk/gesture animation validation.',
   },
   {
     id: 'forge-blacksmith',
@@ -63,7 +66,8 @@ export const HERMESWORLD_CHARACTER_ARCHETYPES: CharacterArchetype[] = [
     modelPath: '/assets/hermesworld/characters/forge-blacksmith.glb',
     defaultScale: 1,
     paletteHint: 'Warm leather, metal, ember-orange accents.',
-    notes: 'Use for prop interaction, forge-zone silhouette, and stronger grounded body type.',
+    notes:
+      'Use for prop interaction, forge-zone silhouette, and stronger grounded body type.',
   },
   {
     id: 'guard-knight',
@@ -73,7 +77,8 @@ export const HERMESWORLD_CHARACTER_ARCHETYPES: CharacterArchetype[] = [
     modelPath: '/assets/hermesworld/characters/guard-knight.glb',
     defaultScale: 1,
     paletteHint: 'Structured armor silhouette with readable guard posture.',
-    notes: 'Important for believable town square presence and stronger social framing.',
+    notes:
+      'Important for believable town square presence and stronger social framing.',
   },
   {
     id: 'merchant-villager',
@@ -83,7 +88,8 @@ export const HERMESWORLD_CHARACTER_ARCHETYPES: CharacterArchetype[] = [
     modelPath: '/assets/hermesworld/characters/merchant-villager.glb',
     defaultScale: 1,
     paletteHint: 'Civilian clothing, softer colors, market readability.',
-    notes: 'Supports prop clusters and makes Agora feel inhabited rather than staged.',
+    notes:
+      'Supports prop clusters and makes Agora feel inhabited rather than staged.',
   },
   {
     id: 'villager-common',
@@ -93,14 +99,16 @@ export const HERMESWORLD_CHARACTER_ARCHETYPES: CharacterArchetype[] = [
     modelPath: '/assets/hermesworld/characters/villager-common.glb',
     defaultScale: 1,
     paletteHint: 'Simple but believable peasant/traveler look.',
-    notes: 'Cheap repeatable baseline for believable crowd fill before deeper variety.',
+    notes:
+      'Cheap repeatable baseline for believable crowd fill before deeper variety.',
   },
 ]
 
 export const HERMESWORLD_CHARACTER_PIPELINE_NOTES = {
   sourcePriority: ['Ready Player Me', 'Mixamo', 'custom GLB cleanup'],
   immediateSprint: 'Agora believable',
-  firstZoneGoal: 'Replace placeholder/toy-like figures with semi-real fantasy humans in Agora first.',
+  firstZoneGoal:
+    'Replace placeholder/toy-like figures with semi-real fantasy humans in Agora first.',
   performanceRules: [
     'Prefer GLB with compressed textures.',
     'Cap material count aggressively.',

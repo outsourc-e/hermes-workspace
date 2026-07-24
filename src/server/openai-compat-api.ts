@@ -64,8 +64,15 @@ async function getDefaultModel(): Promise<string> {
         const preferred = data.data.find((m) =>
           /qwen|llama|mistral|gemma/i.test(m.id),
         )
-        _cachedDefaultModel = preferred?.id ?? data.data[0].id
-        return _cachedDefaultModel
+        const first = data.data[0]
+        if (preferred) {
+          _cachedDefaultModel = preferred.id
+          return _cachedDefaultModel
+        }
+        if (first) {
+          _cachedDefaultModel = first.id
+          return _cachedDefaultModel
+        }
       }
     }
   } catch {
@@ -158,8 +165,7 @@ function parseClaudeToolProgressChunk(payload: string): StreamChunkType | null {
     const parsed = JSON.parse(payload) as unknown
     const record = readRecord(parsed)
     if (!record) return null
-    const name =
-      readString(record.tool) || readString(record.name) || 'tool'
+    const name = readString(record.tool) || readString(record.name) || 'tool'
     const emoji = readString(record.emoji)
     const labelText = readString(record.label)
     const label = [emoji, labelText].filter(Boolean).join(' ').trim()
@@ -202,7 +208,7 @@ export async function* parseOpenAIStream(
   const decoder = new TextDecoder()
   let buffer = ''
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read()
     if (done) break
 
@@ -214,7 +220,7 @@ export async function* parseOpenAIStream(
       buffer = buffer.slice(boundary + 2)
 
       let eventName = ''
-      const dataLines: string[] = []
+      const dataLines: Array<string> = []
 
       for (const line of rawEvent.split('\n')) {
         const trimmed = line.trim()

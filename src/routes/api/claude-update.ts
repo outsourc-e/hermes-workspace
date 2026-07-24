@@ -1,8 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 
 type RemoteName = 'origin' | 'upstream'
@@ -32,7 +32,11 @@ export const UPDATE_REMOTE_DEFINITIONS: Array<RemoteDefinition> = [
     name: 'origin',
     label: 'Hermes Workspace',
     expectedRepo: 'hermes-workspace',
-    aliases: ['claude-workspace', 'hermes-workspace', 'outsourc-e/hermes-workspace'],
+    aliases: [
+      'claude-workspace',
+      'hermes-workspace',
+      'outsourc-e/hermes-workspace',
+    ],
   },
   {
     name: 'upstream',
@@ -42,9 +46,15 @@ export const UPDATE_REMOTE_DEFINITIONS: Array<RemoteDefinition> = [
   },
 ]
 
-function git(args: string[], timeout = 5000): string | null {
+function git(args: Array<string>, timeout = 5000): string | null {
   try {
-    return execFileSync('git', args, { cwd: process.cwd(), encoding: 'utf8', timeout }).trim() || null
+    return (
+      execFileSync('git', args, {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        timeout,
+      }).trim() || null
+    )
   } catch {
     return null
   }
@@ -52,21 +62,28 @@ function git(args: string[], timeout = 5000): string | null {
 
 function pkgVersion(): string {
   try {
-    const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { version?: string }
+    const pkg = JSON.parse(
+      readFileSync(join(process.cwd(), 'package.json'), 'utf8'),
+    ) as { version?: string }
     return pkg.version ?? 'unknown'
   } catch {
     return 'unknown'
   }
 }
 
-export function remoteUrlMatchesExpectedRepo(url: string | null, aliases: Array<string>): boolean {
+export function remoteUrlMatchesExpectedRepo(
+  url: string | null,
+  aliases: Array<string>,
+): boolean {
   if (!url) return false
   const normalizedUrl = url
     .toLowerCase()
     .replace(/^git@github\.com:/, 'github.com/')
     .replace(/^https?:\/\//, '')
     .replace(/\.git$/, '')
-  return aliases.some((alias) => normalizedUrl.includes(alias.toLowerCase().replace(/\.git$/, '')))
+  return aliases.some((alias) =>
+    normalizedUrl.includes(alias.toLowerCase().replace(/\.git$/, '')),
+  )
 }
 
 export function createRemoteStatus(input: {
@@ -98,12 +115,20 @@ export function createRemoteStatus(input: {
     repoMatches,
     remoteHead: repoMatches ? input.remoteHead : null,
     currentHead: input.currentHead,
-    updateAvailable: Boolean(repoMatches && input.currentHead && input.remoteHead && input.currentHead !== input.remoteHead),
+    updateAvailable: Boolean(
+      repoMatches &&
+      input.currentHead &&
+      input.remoteHead &&
+      input.currentHead !== input.remoteHead,
+    ),
     error,
   }
 }
 
-function remoteStatus(definition: RemoteDefinition, currentHead: string | null): RemoteStatus {
+function remoteStatus(
+  definition: RemoteDefinition,
+  currentHead: string | null,
+): RemoteStatus {
   const url = git(['remote', 'get-url', definition.name])
   const repoMatches = remoteUrlMatchesExpectedRepo(url, definition.aliases)
   let remoteHead: string | null = null
@@ -138,7 +163,9 @@ export const Route = createFileRoute('/api/claude-update')({
         const currentHead = git(['rev-parse', 'HEAD'])
         const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'])
         const dirty = Boolean(git(['status', '--porcelain']))
-        const remotes = UPDATE_REMOTE_DEFINITIONS.map((definition) => remoteStatus(definition, currentHead))
+        const remotes = UPDATE_REMOTE_DEFINITIONS.map((definition) =>
+          remoteStatus(definition, currentHead),
+        )
 
         return json({
           ok: true,

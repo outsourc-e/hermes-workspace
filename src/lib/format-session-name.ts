@@ -38,6 +38,7 @@ export function formatSessionKey(key: string): string {
   // agent:main:direct:PLATFORM:ID → Platform name
   if (parts.length >= 4 && parts[2] === 'direct') {
     const platform = parts[3]
+    if (!platform) return 'Direct'
     return PLATFORM_NAMES[platform] || titleCase(platform)
   }
 
@@ -51,9 +52,9 @@ export function formatSessionKey(key: string): string {
   if (parts[0] === 'agent' && parts.length >= 2) {
     const name = parts[1]
     if (name === 'main' && parts.length > 2) {
-      return titleCase(parts[2])
+      return titleCase(parts[2] ?? 'main')
     }
-    return titleCase(name)
+    return titleCase(name ?? 'agent')
   }
 
   // Fallback: last meaningful segment

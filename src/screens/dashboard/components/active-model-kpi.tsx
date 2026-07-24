@@ -1,5 +1,5 @@
-import { formatModelName } from '@/screens/dashboard/lib/formatters'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 function formatCount(n: number): string {
   if (!n || n <= 0) return '0'
@@ -86,7 +86,10 @@ export function ActiveModelKpi({
             color: tone,
           }}
         >
-          <span className="size-1.5 rounded-full" style={{ background: tone }} />
+          <span
+            className="size-1.5 rounded-full"
+            style={{ background: tone }}
+          />
           {connected ? 'Online' : 'Offline'}
         </span>
       </div>
@@ -103,7 +106,8 @@ export function ActiveModelKpi({
           <span
             className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em]"
             style={{
-              background: 'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
+              background:
+                'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
               color: 'var(--theme-accent)',
             }}
             title="Share of API calls in the analytics window."

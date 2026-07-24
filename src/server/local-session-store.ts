@@ -25,7 +25,7 @@ export type LocalMessage = {
 }
 
 type StoreData = {
-  sessions: Record<string, LocalSession>
+  sessions: Partial<Record<string, LocalSession>>
   messages: Record<string, Array<LocalMessage>>
 }
 
@@ -35,9 +35,17 @@ function loadFromDisk(): void {
   try {
     if (existsSync(SESSIONS_FILE)) {
       const raw = readFileSync(SESSIONS_FILE, 'utf-8')
-      const parsed = JSON.parse(raw) as StoreData
-      if (parsed.sessions && parsed.messages) {
-        store = parsed
+      const parsed = JSON.parse(raw) as unknown
+      if (parsed && typeof parsed === 'object') {
+        const candidate = parsed as Partial<StoreData>
+        if (
+          candidate.sessions &&
+          typeof candidate.sessions === 'object' &&
+          candidate.messages &&
+          typeof candidate.messages === 'object'
+        ) {
+          store = candidate as StoreData
+        }
       }
     }
   } catch {
@@ -57,7 +65,9 @@ function saveToDisk(): void {
 loadFromDisk()
 
 export function listLocalSessions(): Array<LocalSession> {
-  return Object.values(store.sessions).sort((a, b) => b.updatedAt - a.updatedAt)
+  return Object.values(store.sessions)
+    .filter((session): session is LocalSession => session !== undefined)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
 export function getLocalSession(sessionId: string): LocalSession | null {
@@ -68,8 +78,9 @@ export function ensureLocalSession(
   sessionId: string,
   model?: string,
 ): LocalSession {
-  if (!store.sessions[sessionId]) {
-    store.sessions[sessionId] = {
+  let session = store.sessions[sessionId]
+  if (!session) {
+    session = {
       id: sessionId,
       title: null,
       model: model ?? null,
@@ -77,10 +88,11 @@ export function ensureLocalSession(
       updatedAt: Date.now(),
       messageCount: 0,
     }
+    store.sessions[sessionId] = session
     store.messages[sessionId] = []
     saveToDisk()
   }
-  return store.sessions[sessionId]
+  return session
 }
 
 export function updateLocalSessionTitle(

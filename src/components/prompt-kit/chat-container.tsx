@@ -97,7 +97,7 @@ function ChatContainerRoot({
       let previousHeight = content.getBoundingClientRect().height
 
       resizeObserver = new ResizeObserver((entries) => {
-        const entry = entries[0]
+        const entry = entries.at(0)
         if (!entry) return
         const nextHeight = entry.contentRect.height
         const heightDelta = nextHeight - previousHeight

@@ -6,7 +6,11 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import { updateHubSource, deleteHubSource, readHubSources } from '../../../server/mcp-hub-sources-store'
+import {
+  deleteHubSource,
+  readHubSources,
+  updateHubSource,
+} from '../../../server/mcp-hub-sources-store'
 import { invalidateUserSourceCache } from '../../../server/mcp-hub/sources/generic-json'
 
 export const Route = createFileRoute('/api/mcp/hub-sources/$id')({
@@ -14,13 +18,19 @@ export const Route = createFileRoute('/api/mcp/hub-sources/$id')({
     handlers: {
       PUT: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          return Response.json(
+            { ok: false, error: 'Unauthorized' },
+            { status: 401 },
+          )
         }
         let body: unknown
         try {
           body = await request.json()
         } catch {
-          return Response.json({ ok: false, errors: [{ path: '', message: 'invalid JSON body' }] })
+          return Response.json({
+            ok: false,
+            errors: [{ path: '', message: 'invalid JSON body' }],
+          })
         }
 
         // MEDIUM-2: Capture old URL before update so we can invalidate the
@@ -50,7 +60,10 @@ export const Route = createFileRoute('/api/mcp/hub-sources/$id')({
 
       DELETE: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
-          return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          return Response.json(
+            { ok: false, error: 'Unauthorized' },
+            { status: 401 },
+          )
         }
         const result = await deleteHubSource(params.id)
         if (!result.ok) {
