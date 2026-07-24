@@ -26,6 +26,7 @@ let seedFile: string
 const originalHermesHome = process.env.HERMES_HOME
 const originalSeedPath = process.env.MCP_PRESETS_SEED_PATH
 const originalPassword = process.env.CLAUDE_PASSWORD
+const originalHermesPassword = process.env.HERMES_PASSWORD
 
 interface PresetsRouteModule {
   Route: {
@@ -50,6 +51,7 @@ beforeEach(() => {
   writeFileSync(seedFile, JSON.stringify(VALID_SEED))
   process.env.HERMES_HOME = homeDir
   process.env.MCP_PRESETS_SEED_PATH = seedFile
+  delete process.env.HERMES_PASSWORD
 })
 
 afterEach(() => {
@@ -60,6 +62,8 @@ afterEach(() => {
   else process.env.MCP_PRESETS_SEED_PATH = originalSeedPath
   if (originalPassword === undefined) delete process.env.CLAUDE_PASSWORD
   else process.env.CLAUDE_PASSWORD = originalPassword
+  if (originalHermesPassword === undefined) delete process.env.HERMES_PASSWORD
+  else process.env.HERMES_PASSWORD = originalHermesPassword
   rmSync(homeDir, { recursive: true, force: true })
 })
 

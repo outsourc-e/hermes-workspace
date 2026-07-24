@@ -82,4 +82,14 @@ describe('getTrailingToolOnlyTurnSummary', () => {
 
     expect(summary).toBeNull()
   })
+
+  it('returns null when a subsequent user message follows the final assistant response', () => {
+    const summary = getTrailingToolOnlyTurnSummary([
+      textMessage('u1', 'user', 'show issues'),
+      textMessage('a1', 'assistant', 'Open issues: 2'),
+      textMessage('u2', 'user', 'thanks'),
+    ])
+
+    expect(summary).toBeNull()
+  })
 })

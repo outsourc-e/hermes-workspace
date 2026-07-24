@@ -24,7 +24,7 @@ import {
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { getStateDir } from './workspace-state-dir'
+import { getHermesHome } from './workspace-state-dir'
 
 export interface CachedProbe {
   status: 'connected' | 'failed' | 'unknown'
@@ -59,7 +59,7 @@ function getTtlMs(): number {
 }
 
 export function cacheFilePath(): string {
-  return join(getStateDir(), 'cache', 'mcp-tools.json')
+  return join(getHermesHome(), 'cache', 'mcp-tools.json')
 }
 
 // ---------------------------------------------------------------------------

@@ -313,7 +313,7 @@ export const LOCALE_LABELS: Record<LocaleId, string> = {
   es: 'Español',
   fr: 'Français',
   de: 'Deutsch',
-  zh: '中文（简体）',
+  zh: '中文',
   'zh-TW': '繁體中文',
   ja: '日本語',
   ko: '한국어',

@@ -555,14 +555,55 @@ export function buildDisplayEntries(
     entries.push(entry)
   })
 
-  if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
-    if (previousEntry?.message.role === 'assistant') {
-      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
+  return entries
+}
+
+export function getTrailingToolOnlyTurnSummary(
+  messages: Array<ChatMessage>,
+): { count: number; toolNames: Array<string>; hasFinalAssistantText: boolean } | null {
+  let lastAssistantTextIndex = -1
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (message.role === 'assistant' && textFromMessage(message).trim().length > 0) {
+      lastAssistantTextIndex = index
+      break
     }
   }
 
-  return entries
+  if (lastAssistantTextIndex === -1 || lastAssistantTextIndex === messages.length - 1) {
+    return null
+  }
+
+  const trailingMessages = messages.slice(lastAssistantTextIndex + 1)
+  if (
+    !trailingMessages.every(
+      (message) =>
+        isAssistantToolCallOnlyMessage(message) ||
+        message.role === 'tool' ||
+        message.role === 'toolResult',
+    )
+  ) {
+    return null
+  }
+
+  const toolNames = [
+    ...new Set(
+      trailingMessages.flatMap((message) => [
+        ...getToolCallsFromMessage(message)
+          .map((toolCall) => toolCall.name)
+          .filter((name): name is string => Boolean(name)),
+        ...((message.role === 'tool' || message.role === 'toolResult') && message.toolName
+          ? [message.toolName]
+          : []),
+      ]),
+    ),
+  ]
+
+  return {
+    count: trailingMessages.length,
+    toolNames,
+    hasFinalAssistantText: true,
+  }
 }
 
 function escapeAttributeSelector(value: string): string {

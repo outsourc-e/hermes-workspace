@@ -23,7 +23,7 @@ import {
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { getStateDir } from './workspace-state-dir'
+import { getHermesHome } from './workspace-state-dir'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -100,7 +100,7 @@ const KNOWN_TOP_FIELDS = new Set(['version', 'sources'])
 // ---------------------------------------------------------------------------
 
 export function hubSourcesFilePath(): string {
-  return join(getStateDir(), 'mcp-hub-sources.json')
+  return join(getHermesHome(), 'mcp-hub-sources.json')
 }
 
 // ---------------------------------------------------------------------------

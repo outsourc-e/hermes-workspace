@@ -41,6 +41,13 @@ describe('getStateDir', () => {
     expect(result).toBe('/hermes/home/workspace')
   })
 
+  it('ignores blank HERMES_HOME in favor of CLAUDE_HOME', () => {
+    process.env.HERMES_HOME = '   '
+    process.env.CLAUDE_HOME = '/claude/home'
+    const result = getStateDir()
+    expect(result).toBe('/claude/home/workspace')
+  })
+
   it('prefers HERMES_WORKSPACE_STATE_DIR over everything', () => {
     process.env.HERMES_WORKSPACE_STATE_DIR = '/explicit/workspace'
     process.env.HERMES_HOME = '/hermes/home'

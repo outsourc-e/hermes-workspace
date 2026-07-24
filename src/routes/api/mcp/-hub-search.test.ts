@@ -83,6 +83,12 @@ describe('GET /api/mcp/hub-search — query parsing', () => {
     expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 100)
   })
 
+  it('passes an explicit offset through for paginated search', async () => {
+    mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
+    await callGet('http://localhost/api/mcp/hub-search?limit=5&offset=10')
+    expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 5, 10)
+  })
+
   it('defaults invalid source to all', async () => {
     mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
     await callGet('http://localhost/api/mcp/hub-search?source=invalid')

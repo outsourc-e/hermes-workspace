@@ -436,6 +436,7 @@ const config = defineConfig(({ mode, command }) => {
       exclude: [
         '**/node_modules/**',
         '**/dist/**',
+        '**/e2e/**',
         '**/skills-bundle/**',
         '**/.{idea,git,cache,output,temp}/**',
       ],
