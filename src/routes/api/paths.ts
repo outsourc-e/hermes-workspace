@@ -10,7 +10,7 @@ const CLAUDE_HOME =
 export const Route = createFileRoute('/api/paths')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -20,7 +20,7 @@ export const Route = createFileRoute('/api/paths')({
           memoriesDir: path.join(CLAUDE_HOME, 'memories'),
           skillsDir: path.join(CLAUDE_HOME, 'skills'),
         })
-      },
+      })()),
     },
   },
 })

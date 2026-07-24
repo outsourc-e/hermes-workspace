@@ -129,7 +129,7 @@ export function AgentChatPanel({
       streamingText = fullReplace ? text : streamingText + text
 
       setMessages((prev) => {
-        const last = prev[prev.length - 1]
+        const last = prev.at(-1)
         if (last?.id === 'streaming-assistant') {
           return [...prev.slice(0, -1), { ...last, content: streamingText }]
         }

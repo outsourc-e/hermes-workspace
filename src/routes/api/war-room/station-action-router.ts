@@ -41,7 +41,7 @@ export function stationActionPayloadFromBody(body: unknown): WorkspaceStationAct
 export const Route = createFileRoute('/api/war-room/station-action-router')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

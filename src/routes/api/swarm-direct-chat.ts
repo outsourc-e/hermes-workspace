@@ -112,7 +112,7 @@ function execFileAsync(
   return new Promise((resolve) => {
     const child = execFile(cmd, args, { timeout, maxBuffer: MAX_OUTPUT_CHARS }, (error, stdout, stderr) => {
       if (error) {
-        resolve({ ok: false, error: stderr?.toString().trim() || error.message })
+        resolve({ ok: false, error: stderr.toString().trim() || error.message })
         return
       }
       resolve({

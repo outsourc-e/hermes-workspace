@@ -450,7 +450,7 @@ export const Route = createFileRoute('/api/send-stream')({
 
         const stream = new ReadableStream({
           async start(controller) {
-            let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+            let controllerHeartbeatTimer: ReturnType<typeof setInterval> | null = null
             let lastClientEventAt = Date.now()
             // Track the last human-readable activity so the heartbeat can
             // forward it to the UI. Without this the ThinkingBubble shows a
@@ -474,7 +474,7 @@ export const Route = createFileRoute('/api/send-stream')({
             // lightweight recognized event periodically so public Workspace chats
             // do not sit at "Thinking…" until the frontend reports failure.
             enqueueRaw(`: ${' '.repeat(2048)}\n\n`)
-            heartbeatTimer = setInterval(() => {
+            controllerHeartbeatTimer = setInterval(() => {
               if (streamClosed) return
               if (Date.now() - lastClientEventAt < 10_000) return
               // Heartbeat to keep Cloudflare/Access from culling the SSE stream.
@@ -488,9 +488,9 @@ export const Route = createFileRoute('/api/send-stream')({
             closeStream = () => {
               if (streamClosed) return
               streamClosed = true
-              if (heartbeatTimer) {
-                clearInterval(heartbeatTimer)
-                heartbeatTimer = null
+              if (controllerHeartbeatTimer) {
+                clearInterval(controllerHeartbeatTimer)
+                controllerHeartbeatTimer = null
               }
               if (unregisterTimer) {
                 clearTimeout(unregisterTimer)
@@ -517,7 +517,7 @@ export const Route = createFileRoute('/api/send-stream')({
             // no-activity timer fires after 2-3 min and aborts the stream.
             // Every 10s we also forward the last known activity so the UI can
             // show meaningful progress instead of a static "Thinking…".
-            heartbeatTimer = setInterval(() => {
+            controllerHeartbeatTimer = setInterval(() => {
               sendEvent('heartbeat', { timestamp: Date.now(), activity: lastActivity })
             }, 10_000)
 
@@ -606,7 +606,6 @@ export const Route = createFileRoute('/api/send-stream')({
                   const useResponsesApi =
                     process.env.HERMES_USE_RESPONSES === '1' && !localBaseUrl
                   if (useResponsesApi) {
-                    const thinking = ''
                     // Track tool calls by callId so a `tool.completed`
                     // followed by `tool.output` can carry the full
                     // arguments forward without losing them.
@@ -716,9 +715,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           // shared 'done' emit below.
                           break
                         }
-                        if (ev.kind === 'failed') {
-                          throw new Error(ev.error)
-                        }
+                        throw new Error(ev.error)
                       }
                       appendLocalMessage(portableSessionKey, {
                         id: crypto.randomUUID(),
@@ -736,10 +733,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                         message: {
                           role: 'assistant',
-                          content: [
-                            ...(thinking ? [{ type: 'thinking', thinking }] : []),
-                            { type: 'text', text: accumulated },
-                          ],
+                          content: [{ type: 'text', text: accumulated }],
                         },
                       })
                       closeStream()
@@ -757,7 +751,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   }
 
-                  const stream = await openaiChat(portableMessages, {
+                  const portableStream = await openaiChat(portableMessages, {
                     model: localBaseUrl ? bareModel : (typeof body.model === 'string' ? body.model : undefined),
                     temperature:
                       typeof body.temperature === 'number'
@@ -769,16 +763,16 @@ export const Route = createFileRoute('/api/send-stream')({
                     baseUrl: localBaseUrl,
                   })
 
-                  let thinking = ''
+                  let portableThinking = ''
                   let toolEventCount = 0
-                  for await (const chunk of stream) {
+                  for await (const chunk of portableStream) {
                     if (chunk.type === 'reasoning') {
-                      thinking += chunk.text
+                      portableThinking += chunk.text
                       persistActiveRun((runSessionKey, activeId) =>
-                        setRunThinking(runSessionKey, activeId, thinking),
+                        setRunThinking(runSessionKey, activeId, portableThinking),
                       )
                       sendEvent('thinking', {
-                        text: thinking,
+                        text: portableThinking,
                         sessionKey: portableSessionKey,
                         runId,
                       })
@@ -852,7 +846,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     message: {
                       role: 'assistant',
                       content: [
-                        ...(thinking ? [{ type: 'thinking', thinking }] : []),
+                        ...(portableThinking ? [{ type: 'thinking', thinking: portableThinking }] : []),
                         { type: 'text', text: accumulated },
                       ],
                     },
@@ -930,8 +924,6 @@ export const Route = createFileRoute('/api/send-stream')({
               // In enhanced mode, the HTTP stream response delivers all events
               // directly to useStreamingMessage. Skip publishChatEvent to prevent
               // useRealtimeChatHistory from creating duplicate message bubbles.
-              const skipPublish = true
-
               // Mid-run tool polling: vanilla Hermes Agent currently does not
               // emit tool.* SSE events live (callback signature drift). Until
               // upstream fixes that, we synthesize live tool events by polling
@@ -942,6 +934,7 @@ export const Route = createFileRoute('/api/send-stream')({
               // any real live events that might arrive.
               const syntheticLiveToolTracker = createSyntheticLiveToolTracker()
               let liveRunActive = true
+              const isLiveRunActive = () => liveRunActive
               const livePollIntervalMs = 800
               // Snapshot the session message count at run-start so the poller
               // and the post-run backfill only consider messages persisted by
@@ -961,8 +954,8 @@ export const Route = createFileRoute('/api/send-stream')({
                 // Initial small delay so the agent has time to ingest the
                 // user message before we start asking for session state.
                 await new Promise((r) => setTimeout(r, 600))
-                while (liveRunActive) {
-                  if (!liveRunActive || streamClosed) break
+                while (isLiveRunActive()) {
+                  if (streamClosed) break
                   try {
                     const allMsgs = (await getSessionMessagesFromAgent(
                       sessionKey,
@@ -1055,43 +1048,17 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
 
                     if (event === 'run.started') {
-                      const userMessage =
-                        data.user_message &&
-                        typeof data.user_message === 'object'
-                          ? (data.user_message as Record<string, unknown>)
-                          : null
-                      if (userMessage) {
-                        skipPublish ||
-                          publishChatEvent('user_message', {
-                            message: {
-                              id: userMessage.id,
-                              role: userMessage.role ?? 'user',
-                              content: [
-                                {
-                                  type: 'text',
-                                  text:
-                                    typeof userMessage.content === 'string'
-                                      ? userMessage.content
-                                      : '',
-                                },
-                              ],
-                            },
-                            sessionKey: sessionKeyFromEvent,
-                            source: 'claude',
-                            runId,
-                          })
-                      }
                       return
                     }
 
                     if (event === 'message.started') {
-                      const message =
+                      const startedMessage =
                         data.message && typeof data.message === 'object'
                           ? (data.message as Record<string, unknown>)
                           : {}
                       const translated = {
                         message: {
-                          id: message.id,
+                          id: startedMessage.id,
                           role: 'assistant',
                           content: [],
                         },
@@ -1099,7 +1066,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('message', translated)
-                      skipPublish || publishChatEvent('message', translated)
                       return
                     }
 
@@ -1121,7 +1087,6 @@ export const Route = createFileRoute('/api/send-stream')({
                           runId,
                         }
                         sendEvent('chunk', translated)
-                        skipPublish || publishChatEvent('chunk', translated)
                       }
                       return
                     }
@@ -1139,7 +1104,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('chunk', translated)
-                      skipPublish || publishChatEvent('chunk', translated)
                       return
                     }
 
@@ -1176,7 +1140,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         }),
                       )
                       sendEvent('tool', translated)
-                      skipPublish || publishChatEvent('tool', translated)
                       lastActivity = `Running: ${toolName.replace(/_/g, ' ')}`
                       return
                     }
@@ -1195,7 +1158,6 @@ export const Route = createFileRoute('/api/send-stream')({
                           runId,
                         }
                         sendEvent('thinking', translated)
-                        skipPublish || publishChatEvent('thinking', translated)
                         lastActivity = delta.length > 60 ? delta.slice(0, 60) + '...' : delta
                         return
                       }
@@ -1218,7 +1180,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         }),
                       )
                       sendEvent('tool', translated)
-                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -1244,7 +1205,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         }),
                       )
                       sendEvent('tool', translated)
-                      skipPublish || publishChatEvent('tool', translated)
                       lastActivity = `Completed: ${toolName.replace(/_/g, ' ')}`
                       return
                     }
@@ -1270,7 +1230,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         runId,
                       }
                       sendEvent('artifact', translated)
-                      skipPublish || publishChatEvent('artifact', translated)
                       return
                     }
 
@@ -1294,7 +1253,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         }),
                       )
                       sendEvent('tool', translated)
-                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -1323,7 +1281,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         }),
                       )
                       sendEvent('tool', translated)
-                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -1351,7 +1308,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         }),
                       )
                       sendEvent('tool', translated)
-                      skipPublish || publishChatEvent('tool', translated)
                       return
                     }
 
@@ -1423,7 +1379,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           let lastAssistantIndex = -1
                           for (let i = recent.length - 1; i >= 0; i--) {
                             const m = recent[i]
-                            if (m && m.role === 'assistant') {
+                            if (m.role === 'assistant') {
                               lastAssistantIndex = i
                               break
                             }
@@ -1463,8 +1419,6 @@ export const Route = createFileRoute('/api/send-stream')({
                                   ),
                               )
                               sendEvent('tool', synthetic)
-                              skipPublish ||
-                                publishChatEvent('tool', synthetic)
                             }
                           }
                         }
@@ -1485,7 +1439,6 @@ export const Route = createFileRoute('/api/send-stream')({
                         markRunStatus(runSessionKey, activeId, 'complete'),
                       )
                       sendEvent('done', translated)
-                      skipPublish || publishChatEvent('done', translated)
                       closeStream()
                     }
                   },

@@ -29,12 +29,12 @@ function isValidHttpUrl(u: string): boolean {
 export const Route = createFileRoute('/api/connection-settings')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
         return json(getResolvedUrls())
-      },
+      })()),
       PUT: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })

@@ -105,7 +105,7 @@ async function renderWorkbench(overrides: Partial<EtsyProductPrepWorkbenchProps>
   const roomState = overrides.roomState ?? createReadyRoomState()
   const pipeline = overrides.pipeline ?? { ...createInitialEtsyPipelineState(), searchInput: 'gold bow necklace' }
   const actions = overrides.actions ?? createActions()
-  await React.act(async () => {
+  await React.act(() => {
     root.render(
       <EtsyProductPrepWorkbench
         pipeline={pipeline}
@@ -125,7 +125,7 @@ async function renderWorkbench(overrides: Partial<EtsyProductPrepWorkbenchProps>
     roomState,
     actions,
     unmount: async () => {
-      await React.act(async () => root.unmount())
+      await React.act(() => root.unmount())
       document.body.removeChild(container)
     },
   }
@@ -144,7 +144,7 @@ function buttonNamed(container: HTMLElement, label: string) {
 }
 
 async function click(element: HTMLElement) {
-  await React.act(async () => {
+  await React.act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
 }

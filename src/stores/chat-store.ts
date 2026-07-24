@@ -133,7 +133,7 @@ type ChatState = {
 
   /** Sessions currently waiting for a response — survives component unmount */
   waitingSessionKeys: Set<string>
-  waitingSessionMeta: Record<string, { since: number; runId: string | null }>
+  waitingSessionMeta: Partial<Record<string, { since: number; runId: string | null }>>
   /** Mark a session as waiting for a response */
   setSessionWaiting: (sessionKey: string, runId?: string | null) => void
   /** Clear waiting state for a session */
@@ -917,7 +917,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             for (let index = sessionMessages.length - 1; index >= 0; index -= 1) {
               const candidate = sessionMessages[index]
               if (
-                candidate?.role === 'assistant' &&
+                candidate.role === 'assistant' &&
                 extractMessageText(candidate).length === 0
               ) {
                 prevEmptyIdx = index
@@ -1063,7 +1063,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // ToolCallPill can render them even after streaming state is cleared.
           // Fast tool runs clear streaming state before React renders — embedding
           // __streamToolCalls ensures pills survive in the history message.
-          const streamToolCallsToEmbed = streaming?.toolCalls?.length
+          const streamToolCallsToEmbed = streaming?.toolCalls.length
             ? streaming.toolCalls
             : undefined
           completeMessage = {

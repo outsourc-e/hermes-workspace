@@ -23,7 +23,7 @@ function splitCodeFences(input: string): Array<TextSegment> {
     const full = match[0]
     const lang = (match[1] || '').trim()
     const code = match[2] || ''
-    const idx = match.index ?? 0
+    const idx = match.index
 
     if (idx > lastIndex) {
       segments.push({ type: 'text', value: input.slice(lastIndex, idx) })

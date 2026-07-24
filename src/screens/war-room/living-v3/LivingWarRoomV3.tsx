@@ -169,8 +169,8 @@ import {
 
 
 
-  freezeWarRoomAgents,
   applySharedEtsyProductWorkspaceCommandClient,
+  freezeWarRoomAgents,
   readSharedEtsyRoomState,
   requestWarRoomApproval,
 
@@ -331,10 +331,18 @@ function loadStoredLivingV3Messages() {
   try {
     const raw = window.localStorage.getItem(LIVING_V3_MESSAGES_STORAGE_KEY)
     if (!raw) return defaultLivingV3Messages()
-    const parsed = JSON.parse(raw) as Array<AgentMessage>
+    const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed) || !parsed.length) return defaultLivingV3Messages()
     return parsed
-      .filter((message) => message && typeof message.id === 'string' && typeof message.text === 'string')
+      .filter((message): message is AgentMessage => {
+        if (!message || typeof message !== 'object') return false
+        const candidate = message as Record<string, unknown>
+        return typeof candidate.id === 'string'
+          && typeof candidate.agentId === 'string'
+          && LIVING_V3_WORLD_CONFIG.agents.some((agent) => agent.id === candidate.agentId)
+          && (candidate.from === 'operator' || candidate.from === 'agent' || candidate.from === 'receipt')
+          && typeof candidate.text === 'string'
+      })
       .slice(-LIVING_V3_MESSAGES_LIMIT)
   } catch {
     return defaultLivingV3Messages()
@@ -470,15 +478,17 @@ function loadStoredEtsyPipeline() {
   try {
     const raw = window.localStorage.getItem(ETSY_PIPELINE_STORAGE_KEY)
     if (!raw) return createInitialEtsyPipelineState()
-    const parsed = JSON.parse(raw) as EtsyPipelineState
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.candidates) || !Array.isArray(parsed.supplierLeads)) {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return createInitialEtsyPipelineState()
+    const candidate = parsed as Partial<EtsyPipelineState>
+    if (!Array.isArray(candidate.candidates) || !Array.isArray(candidate.supplierLeads)) {
       return createInitialEtsyPipelineState()
     }
-    if (isLegacyEtsyDemoState(parsed)) {
+    if (isLegacyEtsyDemoState(candidate)) {
       window.localStorage.removeItem(ETSY_PIPELINE_STORAGE_KEY)
       return createInitialEtsyPipelineState()
     }
-    return { ...createInitialEtsyPipelineState(), ...parsed }
+    return { ...createInitialEtsyPipelineState(), ...candidate }
   } catch {
     return createInitialEtsyPipelineState()
   }
@@ -489,15 +499,17 @@ function loadStoredEtsyRoomState() {
   try {
     const raw = window.localStorage.getItem(ETSY_ROOM_STORAGE_KEY)
     if (!raw) return createInitialEtsyRoomState()
-    const parsed = JSON.parse(raw) as Partial<EtsyRoomState>
-    if (!parsed || typeof parsed !== 'object' || !parsed.run) {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return createInitialEtsyRoomState()
+    const candidate = parsed as Partial<EtsyRoomState>
+    if (!candidate.run) {
       return createInitialEtsyRoomState()
     }
-    if (isLegacyEtsyDemoState(parsed)) {
+    if (isLegacyEtsyDemoState(candidate)) {
       window.localStorage.removeItem(ETSY_ROOM_STORAGE_KEY)
       return createInitialEtsyRoomState()
     }
-    return { ...createInitialEtsyRoomState(), ...parsed }
+    return { ...createInitialEtsyRoomState(), ...candidate }
   } catch {
     return createInitialEtsyRoomState()
   }
@@ -1609,7 +1621,9 @@ function terraHealthSummary(
   return {
     state: 'yellow',
     label: 'Partial',
-    detail: status?.message ?? 'Some printer workspace sources are missing or not readable.',
+    detail: typeof status.message === 'string' && status.message.trim()
+      ? status.message
+      : 'Some printer workspace sources are missing or not readable.',
     checks,
   }
 }
@@ -2159,7 +2173,7 @@ function TerraForgeStationSurface({
   onRefreshPrinter: () => void
   onRequestPrinterFrame?: () => void
 }) {
-  const config = TERRA_FORGE_TOOL_CONFIG[station.id as TerraForgeStationId]
+  const config = isTerraForgeStationId(station.id) ? TERRA_FORGE_TOOL_CONFIG[station.id] : undefined
   if (!config) return null
   const isPrinter = station.id === 'terra-printer-control'
 
@@ -2237,7 +2251,7 @@ function TerraForgeStationSurface({
 }
 
 function terraDefaultProfile(profiles: Array<TerraSlicerProfileClient>, selectedId?: string) {
-  return profiles.find((profile) => profile.id === selectedId) ?? profiles.find((profile) => profile.default) ?? profiles[0]
+  return profiles.find((profile) => profile.id === selectedId) ?? profiles.find((profile) => profile.default) ?? profiles.at(0)
 }
 
 function TerraStatePill({ state }: { state: TerraWorkflowStepClient['state'] }) {
@@ -2385,7 +2399,7 @@ function TerraForgePrimaryWorkspace({
   onStageReceipt: (receipt: string) => void
 }) {
   const assets = modelAssets?.assets ?? []
-  const selectedAsset = assets.find((asset) => asset.id === state.selectedAssetId) ?? assets[0]
+  const selectedAsset = assets.find((asset) => asset.id === state.selectedAssetId) ?? assets.at(0)
   const stagedInternetCandidate = state.internetSearch?.candidates.find((candidate) => candidate.id === state.internetCandidateId)
   const machines = capabilities?.slicer.profiles.machines ?? []
   const processes = capabilities?.slicer.profiles.processes ?? []
@@ -2971,12 +2985,12 @@ function EtsyPipelineStrip({
       </div>
       <div className="living-v3__etsy-pipeline-facts">
         <span><b>Request</b>{roomState.scoutPacket?.query ?? requestText}</span>
-        <span><b>Product</b>{roomState.selectedProductPacket?.selectedProductTitle ?? roomCandidate?.title ?? candidate?.title ?? 'not selected'}</span>
-        <span><b>Stage</b>{etsyRoomStageLabels[roomState.stage] ?? etsyPipelineStageLabel(pipeline.stage)}</span>
+        <span><b>Product</b>{roomState.selectedProductPacket?.selectedProductTitle ?? roomCandidate?.title ?? 'Choose a product'}</span>
+        <span><b>Stage</b>{etsyRoomStageLabels[roomState.stage]}</span>
         <span><b>Next</b>{roomState.allowedNow[0] ?? nextEtsyPipelineStationLabel(pipeline.stage)}</span>
         <span><b>Status</b>{roomState.approvalPacket?.approvalStatus ?? roomState.lastReceipt ?? packetStatus}</span>
         <span><b>Operator</b>{operatorLabel}</span>
-        <span><b>Origin</b>{roomCandidate?.dataOrigin ?? candidate?.dataOrigin ?? pipeline.searchPacket?.dataOrigin ?? 'none'}</span>
+        <span><b>Origin</b>{roomCandidate?.dataOrigin ?? 'local-user-input'}</span>
         <span><b>Signal</b>{pipeline.oracleSignalPacket?.selectedKeyword ?? 'none'}</span>
       </div>
     </div>
@@ -3133,7 +3147,7 @@ function etsyWorkspaceProductTitle(pipeline: EtsyPipelineState, roomState: EtsyR
   return roomState.selectedProductPacket?.selectedProductTitle
     ?? activeEtsyRoomCandidate(roomState)?.title
     ?? activeEtsyProductCandidate(pipeline)?.title
-    ?? 'No product selected'
+    ?? 'Choose a product'
 }
 
 function etsyWorkspaceNextAction(pipeline: EtsyPipelineState, roomState: EtsyRoomState) {
@@ -3750,7 +3764,7 @@ function CommandRoomManagerSurface({
   useEffect(() => {
     if (activeAgentId) setLocalActiveAgentId(activeAgentId)
   }, [activeAgentId])
-  const activeRosterRow = agentRoster.find((agent) => agent.agentId === (localActiveAgentId ?? activeAgentId)) ?? agentRoster.find((agent) => agent.statusTone === 'active' || agent.statusTone === 'approval') ?? agentRoster[0]
+  const activeRosterRow = agentRoster.find((agent) => agent.agentId === (localActiveAgentId ?? activeAgentId)) ?? agentRoster.find((agent) => agent.statusTone === 'active' || agent.statusTone === 'approval') ?? agentRoster.at(0)
   const commandActionAgentLabel = agentRoster.find((agent) => agent.agentId === actionRun.assignedAgentId)?.label ?? actionRun.assignedAgentId
   function selectAgentInCommandRoster(agentId: LivingV3AgentId) {
     setLocalActiveAgentId(agentId)
@@ -3776,9 +3790,6 @@ function CommandRoomManagerSurface({
     ?? (commandHasPrompt ? 'אני אראה כאן ניתוב, תוצאה או חסימה לפי הטקסט שכתבת — בלי קיר סטטי.' : 'המרכז הוא אזור העבודה: כתוב מה אתה רוצה, ואז המידע הרלוונטי יופיע כאן.')
   const commandFocusNext = hermesCommand?.recommendedRoute?.actionLabel
     ?? actionRun.visualNextStep
-    ?? stationActionResult?.route.stationHandoff.nextUiStep
-    ?? activeRoute?.stationHandoff.nextUiStep
-    ?? 'הרץ בקשה או בחר Agent בצד.'
   const commandFocusMeta = [
     actionStatusLabel[actionRun.status],
     actionRoomLabel,
@@ -3905,40 +3916,46 @@ function CommandRoomManagerSurface({
                   </div>
                   <small>{onlineAgentCount}/{agentRoster.length} active · {controlledProfileCount} backend profile{controlledProfileCount === 1 ? '' : 's'}</small>
                 </div>
-                <div className="living-v3__agent-control-active">
-                  <span>Now selected</span>
-                  <b>{activeRosterRow ? `${activeRosterRow.label} · ${activeRosterRow.activityLabel}` : 'No agent selected'}</b>
-                  <small>{activeRosterRow ? `${activeRosterRow.roomLabel}${activeRosterRow.primaryStationLabel ? ` / ${activeRosterRow.primaryStationLabel}` : ''}` : 'Pick an agent below'}</small>
-                  {activeRosterRow && (
+                {activeRosterRow ? (
+                  <div className="living-v3__agent-control-active">
+                    <span>Now selected</span>
+                    <b>{`${activeRosterRow.label} · ${activeRosterRow.activityLabel}`}</b>
+                    <small>{`${activeRosterRow.roomLabel}${activeRosterRow.primaryStationLabel ? ` / ${activeRosterRow.primaryStationLabel}` : ''}`}</small>
                     <div className="living-v3__agent-control-active-actions">
-                      <button type="button" data-agent-control-talk={activeRosterRow.agentId} onClick={() => onTalkAgent(activeRosterRow.agentId)}>Talk</button>
-                      <button type="button" data-agent-control-focus={activeRosterRow.agentId} onClick={() => onFocusAgent(activeRosterRow.agentId)}>Focus</button>
-                      <button
-                        type="button"
-                        data-agent-control-work={activeRosterRow.agentId}
-                        onClick={() => onAssignAgentPrimaryStation(activeRosterRow.agentId)}
-                        disabled={!activeRosterRow.primaryStationId}
-                        title={activeRosterRow.primaryStationLabel ? `Send to ${activeRosterRow.primaryStationLabel}` : 'This agent has no assigned station yet'}
-                      >
-                        Work
-                      </button>
-                      <button type="button" data-agent-control-rest={activeRosterRow.agentId} onClick={() => onRestAgent(activeRosterRow.agentId)}>Rest</button>
-                      {activeRosterRow.controlledProfiles.map((profile) => (
+                        <button type="button" data-agent-control-talk={activeRosterRow.agentId} onClick={() => onTalkAgent(activeRosterRow.agentId)}>Talk</button>
+                        <button type="button" data-agent-control-focus={activeRosterRow.agentId} onClick={() => onFocusAgent(activeRosterRow.agentId)}>Focus</button>
                         <button
-                          key={profile.agentId}
                           type="button"
-                          data-agent-control-run={profile.agentId}
-                          className={`is-${profile.runState.status}`}
-                          onClick={() => onRunControlledAgent(profile.agentId, `Operator launched ${profile.label} from Hermes Agent Control.`)}
-                          disabled={!canAskHermes || profile.runState.status === 'running'}
-                          title={canAskHermes ? profile.runState.label : 'Open with bodyRuntime=1 to run this backend profile'}
+                          data-agent-control-work={activeRosterRow.agentId}
+                          onClick={() => onAssignAgentPrimaryStation(activeRosterRow.agentId)}
+                          disabled={!activeRosterRow.primaryStationId}
+                          title={activeRosterRow.primaryStationLabel ? `Send to ${activeRosterRow.primaryStationLabel}` : 'This agent has no assigned station yet'}
                         >
-                          Run
+                          Work
                         </button>
-                      ))}
+                        <button type="button" data-agent-control-rest={activeRosterRow.agentId} onClick={() => onRestAgent(activeRosterRow.agentId)}>Rest</button>
+                        {activeRosterRow.controlledProfiles.map((profile) => (
+                          <button
+                            key={profile.agentId}
+                            type="button"
+                            data-agent-control-run={profile.agentId}
+                            className={`is-${profile.runState.status}`}
+                            onClick={() => onRunControlledAgent(profile.agentId, `Operator launched ${profile.label} from Hermes Agent Control.`)}
+                            disabled={!canAskHermes || profile.runState.status === 'running'}
+                            title={canAskHermes ? profile.runState.label : 'Open with bodyRuntime=1 to run this backend profile'}
+                          >
+                            Run
+                          </button>
+                        ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="living-v3__agent-control-active">
+                    <span>Now selected</span>
+                    <b>No agents available</b>
+                    <small>Waiting for the local roster readback.</small>
+                  </div>
+                )}
                 <div className="living-v3__agent-control-list" aria-label="All War Room agents">
                   {agentRoster.map((agent) => (
                     <article
@@ -4168,7 +4185,7 @@ function CommandRoomManagerSurface({
               <div className="living-v3__kernel-run-list">
                 {runs.map((run) => {
                   const blueprint = getWorkspaceBlueprintById(run.blueprintId)
-                  const artifact = run.artifacts[0]
+                  const artifact = run.artifacts.at(0)
                   const approvalStatus = workspaceKernelApprovalStatus(run)
                   return (
                     <button
@@ -4501,7 +4518,7 @@ function SmartIntakeWorkbench({ state, handlers }: { state: SmartIntakeUiState; 
 function EtsySheetIntakeTool({ state, handlers }: { state: EtsySheetIntakeUiState; handlers: EtsyPipelineHandlers }) {
   const products = state.run?.products ?? []
   const visibleProducts = filterSheetIntakeProducts(products, state.filter)
-  const selectedProduct = products.find((product) => product.productId === state.selectedProductId) ?? visibleProducts[0] ?? products[0]
+  const selectedProduct = products.find((product) => product.productId === state.selectedProductId) ?? visibleProducts.at(0)
   return (
     <div className="living-v3__sheet-intake" data-sheet-intake-run={state.run?.runId ?? ''}>
       <div className="living-v3__sheet-source-tabs" aria-label="Sheet Intake source mode">
@@ -4660,7 +4677,7 @@ type SimpleProductSourceDetail = {
 function simpleProductSourceDetails(candidate?: EtsyRoomState['candidates'][number]): Array<SimpleProductSourceDetail> {
   if (!candidate) return []
   if (candidate.sourceDetails?.length) return candidate.sourceDetails
-  return (candidate.sourceRecordIds ?? [])
+  return (candidate.sourceRecordIds)
     .filter((source) => /^https?:\/\//i.test(source))
     .map((url): SimpleProductSourceDetail => {
       const kind = simpleProductSourceKindFromUrl(url)
@@ -4947,11 +4964,11 @@ function SimpleProductConsole({
       <section className="living-v3__product-cockpit" data-etsy-product-prep-cockpit="v1" data-etsy-primary-cockpit="v1" aria-label="Etsy product prep cockpit">
         <article className="living-v3__product-cockpit-artifact" data-product-artifact-state={hasSelectedProduct ? 'selected' : liveResults.length ? 'candidate' : 'empty'}>
           <div className="living-v3__product-cockpit-media">
-            <SimpleProductImage imageUrl={selectedImageUrl ?? simpleProductPrimaryImage(liveResults[0])} label={`${selectedTitle ?? liveResults[0]?.title ?? 'Product'} cockpit image`} />
+            <SimpleProductImage imageUrl={selectedImageUrl ?? simpleProductPrimaryImage(liveResults[0])} label={`${selectedTitle ?? liveResults[0]?.title} cockpit image`} />
           </div>
           <div>
             <p>מוצר</p>
-            <h3>{selectedTitle ?? liveResults[0]?.title ?? 'אין מוצר נבחר'}</h3>
+            <h3>{selectedTitle ?? liveResults[0]?.title}</h3>
             <span>{hasSelectedProduct ? selectedDecision : liveResults.length ? 'בחר מוצר אחד.' : 'התוצאות יופיעו כאן.'}</span>
           </div>
           <div className="living-v3__product-cockpit-locks">
@@ -5177,8 +5194,8 @@ function SimpleProductConsole({
 }
 
 function renderEtsyStationApp(stationId: LivingV3StationDefinition['id'], pipeline: EtsyPipelineState, handlers: EtsyPipelineHandlers) {
+  if (!isEtsyMarketLabStationId(stationId)) return null
   const appId = etsyMarketLabStationAppId(stationId)
-  if (!appId) return null
   const roomState = handlers.roomState
   const roomCandidate = activeEtsyRoomCandidate(roomState)
   const activeCandidate = activeEtsyProductCandidate(pipeline)
@@ -5745,7 +5762,7 @@ export function LivingWarRoomV3({
         ? { kind: 'station', id: 'agora-intake' }
         : null,
   )
-  const [drafts, setDrafts] = useState<Record<LivingV3AgentId, string>>(
+  const [drafts, setDrafts] = useState<Partial<Record<LivingV3AgentId, string>>>(
     () => Object.fromEntries(LIVING_V3_WORLD_CONFIG.agents.map((agent) => [agent.id, ''])) as Record<LivingV3AgentId, string>,
   )
   const [messages, setMessages] = useState<Array<AgentMessage>>(loadStoredLivingV3Messages)
@@ -5819,7 +5836,7 @@ export function LivingWarRoomV3({
       const sentMutation = etsyWorkspaceLocalMutationRef.current
       if (etsyWorkspaceSyncedMutationRef.current >= sentMutation) return
       const desired = etsyWorkspaceStateRef.current
-      const commandId = typeof globalThis.crypto?.randomUUID === 'function'
+      const commandId = typeof globalThis.crypto.randomUUID === 'function'
         ? globalThis.crypto.randomUUID()
         : `etsy-workspace-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const result = await applySharedEtsyProductWorkspaceCommandClient({
@@ -6208,7 +6225,7 @@ export function LivingWarRoomV3({
 
   async function runTerraPrintQa(options: { auto?: boolean; runKey?: string } = {}) {
     const assets = terraModelAssets?.assets ?? []
-    const selectedAsset = assets.find((asset) => asset.id === terraWorkbench.selectedAssetId) ?? assets[0]
+    const selectedAsset = assets.find((asset) => asset.id === terraWorkbench.selectedAssetId) ?? assets.at(0)
     const runKey = options.runKey ?? `${selectedAsset?.id ?? 'no-model'}:${Date.now()}`
     const startedAtMs = Date.now()
     setTerraPrinterFrameNonce(startedAtMs)
@@ -6637,7 +6654,7 @@ export function LivingWarRoomV3({
       const snapshot = getAgentSnapshot(snapshots, agent.id)
       const roomId = snapshot?.roomId ?? agent.home.roomId
       const room = livingV3RoomById(roomId)
-      const primaryStationId = agent.primaryStationIds[0]
+      const primaryStationId = agent.primaryStationIds.at(0)
       const primaryStation = primaryStationId ? livingV3StationById(primaryStationId) : null
       const controlledProfiles = controlledAgentButtons
         .filter((profile) => profile.visualAgentId === agent.id)
@@ -6719,7 +6736,7 @@ export function LivingWarRoomV3({
     }
     const displayStates = payload.displayStates ?? buildKernelAgentDisplayStates(state)
     setWorkspaceKernelRuns(state.runs)
-    setWorkspaceKernelEvents(state.events ?? state.runs.flatMap((run) => run.events))
+    setWorkspaceKernelEvents(state.events)
     setWorkspaceKernelDisplayStates(displayStates)
     setWorkspaceKernelTelemetry(payload.telemetry ?? state.telemetry ?? null)
     setWorkspaceKernelStateVersion(payload.stateVersion ?? state.stateVersion)
@@ -7102,12 +7119,12 @@ export function LivingWarRoomV3({
           focusRoom('terra-forge', { kind: 'station', id: 'terra-model-hunt' })
         }
         if (result.actionSystemRun) {
-          const actionRun = result.actionSystemRun
+          const completedActionRun = result.actionSystemRun
           setStationActionReceipts((current) => ({
             ...current,
-            ...(agent?.primaryStationIds[0] ? { [agent.primaryStationIds[0]]: actionRun.readback } : {}),
-            ...(actionRun.targetStationId ? { [actionRun.targetStationId]: `${actionRun.readback} ${actionRun.visualNextStep}` } : {}),
-            'mission-router': `${actionRun.status}: ${actionRun.readback}`,
+            ...(agent?.primaryStationIds[0] ? { [agent.primaryStationIds[0]]: completedActionRun.readback } : {}),
+            ...(completedActionRun.targetStationId ? { [completedActionRun.targetStationId]: `${completedActionRun.readback} ${completedActionRun.visualNextStep}` } : {}),
+            'mission-router': `${completedActionRun.status}: ${completedActionRun.readback}`,
           }))
         }
         if (result.result?.usage && !result.actionSystemRun) {
@@ -7191,8 +7208,8 @@ export function LivingWarRoomV3({
 
   function activateEtsyStationOperator(stationId: LivingV3StationDefinition['id'], actionLabel?: string) {
     const station = livingV3StationById(stationId)
+    if (!station || !isEtsyMarketLabStationId(stationId)) return
     const operatorId = etsyMarketLabStationOperatorId(stationId)
-    if (!station || !operatorId) return
     const snapshot = getAgentSnapshot(snapshots, operatorId)
     const createdAt = Date.now()
     const status = etsyOperatorStatusForStation(stationId, actionLabel)
@@ -7694,7 +7711,7 @@ export function LivingWarRoomV3({
     runLiveScout: runEtsyLiveScout,
     resetPipeline: () => {
       const current = etsyWorkspaceStateRef.current
-      const commandId = typeof globalThis.crypto?.randomUUID === 'function'
+      const commandId = typeof globalThis.crypto.randomUUID === 'function'
         ? globalThis.crypto.randomUUID()
         : `etsy-workspace-reset-${Date.now()}-${Math.random().toString(36).slice(2)}`
       setStationActionReceipts((receipts) => ({ ...receipts, 'etsy-loki-product-hunt': 'Resetting the shared Etsy V2 workspace…' }))
@@ -8160,7 +8177,7 @@ export function LivingWarRoomV3({
           error: result.ok || actionRun ? undefined : answer,
         })
         setHermesCommandActionRun({
-          runId: actionRun?.actionRunId ?? result.runId ?? `command-${Date.now()}`,
+          runId: actionRun?.actionRunId ?? result.runId,
           status: actionRun?.status === 'waiting_operator'
             ? 'waiting_operator'
             : actionRun?.status === 'blocked_missing_capability' || actionRun?.status === 'blocked_tool_error'
@@ -8510,7 +8527,7 @@ export function LivingWarRoomV3({
           ...current,
           [action.stationId ?? 'mission-router']: action.receipt,
         }))
-      } else if (action.type === 'queue_basic_agent_motion') {
+      } else {
         queueStationActionMotion(action, result, createdAt)
       }
     }
@@ -9442,7 +9459,7 @@ export function LivingWarRoomV3({
         />
       )}
 
-      {selectedStationUsesTerraWorkspace && selectedStation && (
+      {selectedStationUsesTerraWorkspace && (
         <TerraForgePrimaryWorkspace
           selectedStation={selectedStation}
           modelAssets={terraModelAssets}
@@ -9475,7 +9492,7 @@ export function LivingWarRoomV3({
         />
       )}
 
-      {selectedStationUsesOracleWorkspace && selectedStation && (
+      {selectedStationUsesOracleWorkspace && (
         <OracleWorkbench
           resultCount={oracleSearch.result?.keywordResults.length ?? 0}
           selectedKeyword={oracleSearch.result?.keywordResults.find((result) => result.id === oracleSearch.selectedKeywordId)?.keyword
@@ -9487,7 +9504,7 @@ export function LivingWarRoomV3({
         </OracleWorkbench>
       )}
 
-      {selectedStationUsesGoblinWorkspace && selectedStation && (
+      {selectedStationUsesGoblinWorkspace && (
         <GoblinAnalyticsShell
           variant="primary"
           onClose={() => focusRoom(selectedStation.roomId)}
@@ -9505,7 +9522,7 @@ export function LivingWarRoomV3({
         />
       )}
 
-      {selectedStationUsesAtlantisWorkspace && selectedStation && (
+      {selectedStationUsesAtlantisWorkspace && (
         <AtlantisVaultSurface
           variant="primary"
           navigationSlot={(

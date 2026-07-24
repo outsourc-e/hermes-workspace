@@ -40,7 +40,7 @@ export function useMcpPresets() {
       return {
         ok: body.ok ?? false,
         presets: body.presets ?? [],
-        source: (body.source as McpPresetSource) ?? 'invalid',
+        source: body.source === 'user-file' || body.source === 'seed' || body.source === 'invalid' ? body.source : 'invalid',
         error: body.error,
         errorPath: body.errorPath,
         validationErrors: body.validationErrors,

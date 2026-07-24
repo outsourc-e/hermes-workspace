@@ -6,7 +6,7 @@ import { getProductIntelligence } from '../../server/product-intelligence-data'
 export const Route = createFileRoute('/api/product-intelligence')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -22,7 +22,7 @@ export const Route = createFileRoute('/api/product-intelligence')({
         return json(getProductIntelligence({ q, limit, room, status, minScore }), {
           headers: { 'cache-control': 'no-store' },
         })
-      },
+      })()),
     },
   },
 })

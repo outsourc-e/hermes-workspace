@@ -130,7 +130,7 @@ function remoteStatus(definition: RemoteDefinition, currentHead: string | null):
 export const Route = createFileRoute('/api/claude-update')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -154,7 +154,7 @@ export const Route = createFileRoute('/api/claude-update')({
           updateAvailable: remotes.some((remote) => remote.updateAvailable),
           manualConfirmRequired: true,
         })
-      },
+      })()),
     },
   },
 })

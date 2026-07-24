@@ -557,7 +557,7 @@ export async function runEtsyOpsAction(input: EtsyOpsActionInput, workspaceRoot 
   }
 
   const state = buildEtsyOpsRoomState(workspaceRoot)
-  const product = state.products.find((item) => item.id === input.productId) ?? state.products[0] ?? null
+  const product = state.products.find((item) => item.id === input.productId) ?? state.products.at(0)
 
   if (!policy.createsKanbanCard) {
     return {
@@ -577,7 +577,7 @@ export async function runEtsyOpsAction(input: EtsyOpsActionInput, workspaceRoot 
   const status = policy.mode === 'manual-approval-packet' ? 'review' : input.actionId === 'hold-for-review' ? 'blocked' : 'ready'
   const card = await createKanbanCard({
     title: `[Etsy Ops] ${policy.label}${product ? ` · ${product.title}` : ''}`,
-    spec: specForAction(input, product),
+    spec: specForAction(input, product ?? null),
     acceptanceCriteria: [
       'Workspace/local packet only; no external marketplace or paid action performed.',
       'Product, media, supplier, keyword, and pricing evidence attached or explicitly marked missing.',

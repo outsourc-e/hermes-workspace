@@ -156,18 +156,16 @@ async function readBodyWithLimit(response: Response): Promise<{ text: string; tr
   let truncated = false
 
   try {
-    while (true) {
+    for (;;) {
       const { done, value } = await reader.read()
       if (done) break
-      if (value) {
-        totalBytes += value.byteLength
-        if (totalBytes > MAX_RESPONSE_BYTES) {
-          truncated = true
-          reader.cancel().catch(() => undefined)
-          break
-        }
-        chunks.push(value)
+      totalBytes += value.byteLength
+      if (totalBytes > MAX_RESPONSE_BYTES) {
+        truncated = true
+        reader.cancel().catch(() => undefined)
+        break
       }
+      chunks.push(value)
     }
   } finally {
     reader.releaseLock()

@@ -305,7 +305,7 @@ function RootLayout() {
             modelConfigured?: boolean
           } | null,
         ) => {
-          if (status?.ok || (status?.chatReady && status?.modelConfigured)) {
+          if (status?.ok || (status?.chatReady && status.modelConfigured)) {
             localStorage.setItem(ONBOARDING_KEY, 'true')
             syncOnboardingCompletion()
           }

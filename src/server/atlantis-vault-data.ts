@@ -157,6 +157,8 @@ export async function getAtlantisVaultSnapshot(options: AtlantisVaultSnapshotOpt
   ])
   const kernelMirror = await mergeWorkspaceKernelStateWithSupabase(localKernel)
   const kernel = kernelMirror.state
+  const kernelRuns = Array.isArray(kernel.runs) ? kernel.runs : []
+  const kernelEvents = Array.isArray(kernel.events) ? kernel.events : []
   const workspaceCorePersistence = kernelMirror.persistence
   const workspaceCoreConnected = workspaceCorePersistence.provider === 'supabase' && workspaceCorePersistence.status === 'connected'
 
@@ -167,8 +169,8 @@ export async function getAtlantisVaultSnapshot(options: AtlantisVaultSnapshotOpt
   const poseidonLiveDir = path.join(projectRoot, 'public', 'war-room', 'living-v3', 'agents', 'poseidon')
   const supabaseDir = path.join(projectRoot, 'supabase')
 
-  const artifacts = kernel.runs.flatMap((run) => run.artifacts ?? [])
-  const approvalsWaiting = kernel.runs.flatMap((run) => run.approvals ?? []).filter((approval) => approval.status === 'waiting_operator' || approval.status === 'needs_edit').length
+  const artifacts = kernelRuns.flatMap((run) => Array.isArray(run.artifacts) ? run.artifacts : [])
+  const approvalsWaiting = kernelRuns.flatMap((run) => Array.isArray(run.approvals) ? run.approvals : []).filter((approval) => approval.status === 'waiting_operator' || approval.status === 'needs_edit').length
   const etsyCandidates = etsy.roomState.candidates.length
   const rejectedCandidates = etsy.roomState.events.filter((event) => event.type === 'etsy.candidate.rejected').length
   const selectedCandidate = etsy.roomState.selectedCandidateId ? 1 : 0
@@ -184,10 +186,10 @@ export async function getAtlantisVaultSnapshot(options: AtlantisVaultSnapshotOpt
       id: 'workspace-kernel',
       kind: 'workspace-kernel',
       label: 'Workspace Kernel',
-      state: storeState(kernel.runs.length + (kernel.events?.length ?? 0), existsSync(kernelStatePath)),
-      recordCount: kernel.runs.length + (kernel.events?.length ?? 0),
-      updatedAtMs: fileUpdatedAtMs(kernelStatePath) ?? kernel.updatedAtMs ?? null,
-      detail: `${kernel.runs.length} runs · ${kernel.events?.length ?? 0} events · ${artifacts.length} packets`,
+      state: storeState(kernelRuns.length + kernelEvents.length, existsSync(kernelStatePath)),
+      recordCount: kernelRuns.length + kernelEvents.length,
+      updatedAtMs: fileUpdatedAtMs(kernelStatePath) ?? kernel.updatedAtMs,
+      detail: `${kernelRuns.length} runs · ${kernelEvents.length} events · ${artifacts.length} packets`,
       path: kernelStatePath,
       proof: [kernelStatePath, kernelEventsPath].filter((filePath) => existsSync(filePath)),
     },
@@ -197,7 +199,7 @@ export async function getAtlantisVaultSnapshot(options: AtlantisVaultSnapshotOpt
       label: 'Etsy Room Store',
       state: storeState(etsyCandidates + selectedCandidate + etsy.roomState.events.length, existsSync(etsyStatePath)),
       recordCount: etsyCandidates + selectedCandidate + etsy.roomState.events.length,
-      updatedAtMs: fileUpdatedAtMs(etsyStatePath) ?? etsy.updatedAtMs ?? null,
+      updatedAtMs: fileUpdatedAtMs(etsyStatePath) ?? etsy.updatedAtMs,
       detail: `${etsyCandidates} candidates · ${selectedCandidate ? '1 selected' : '0 selected'} · ${rejectedCandidates} rejected events`,
       path: etsyStatePath,
       proof: existsSync(etsyStatePath) ? [etsyStatePath] : [],
@@ -208,7 +210,7 @@ export async function getAtlantisVaultSnapshot(options: AtlantisVaultSnapshotOpt
       label: 'Council Drawing Board',
       state: storeState(council.discussions.length, existsSync(councilStatePath)),
       recordCount: council.discussions.length,
-      updatedAtMs: fileUpdatedAtMs(councilStatePath) ?? council.updatedAtMs ?? null,
+      updatedAtMs: fileUpdatedAtMs(councilStatePath) ?? council.updatedAtMs,
       detail: `${council.discussions.length} discussions · ${council.activeDiscussionId ? 'active thread present' : 'no active thread'}`,
       path: councilStatePath,
       proof: existsSync(councilStatePath) ? [councilStatePath] : [],
@@ -256,7 +258,7 @@ export async function getAtlantisVaultSnapshot(options: AtlantisVaultSnapshotOpt
   const warnings = stores.filter((store) => store.state === 'warn').length
   const blocked = stores.filter((store) => store.state === 'blocked' || store.state === 'fail').length
   const flow = [
-    flowEdge({ id: 'kernel-to-poseidon', from: 'Workspace Kernel', to: 'Poseidon', label: 'runs / packets', value: kernel.runs.length + artifacts.length, state: stores[0].state }),
+    flowEdge({ id: 'kernel-to-poseidon', from: 'Workspace Kernel', to: 'Poseidon', label: 'runs / packets', value: kernelRuns.length + artifacts.length, state: stores[0].state }),
     flowEdge({ id: 'workspace-core-to-approval-spine', from: workspaceCoreConnected ? 'Supabase Core' : 'Local Kernel', to: 'Approval spine', label: workspaceCoreConnected ? 'DB runs / approvals' : 'fallback store', value: workspaceCorePersistence.runCount + workspaceCorePersistence.approvalCount, state: stores[5].state }),
     flowEdge({ id: 'etsy-to-vault', from: 'Etsy Room Store', to: 'Atlantis index', label: 'candidates / rejections', value: etsyCandidates + rejectedCandidates, state: stores[1].state }),
     flowEdge({ id: 'obsidian-to-vault', from: 'Obsidian Shelf', to: 'Context packet', label: 'loaded notes', value: loadedNotes, state: stores[3].state }),
@@ -297,8 +299,8 @@ export async function getAtlantisVaultSnapshot(options: AtlantisVaultSnapshotOpt
       storesEmpty: stores.filter((store) => store.state === 'empty').length,
       warnings,
       blocked,
-      runs: kernel.runs.length,
-      events: kernel.events?.length ?? 0,
+      runs: kernelRuns.length,
+      events: kernelEvents.length,
       artifacts: artifacts.length,
       approvalsWaiting,
       etsyCandidates,
@@ -316,7 +318,7 @@ export async function getAtlantisVaultSnapshot(options: AtlantisVaultSnapshotOpt
       allowlistedNotes: OBSIDIAN_CONTEXT_NOTE_ALLOWLIST.length,
       notes,
     },
-    recentRuns: [...kernel.runs].sort((left, right) => right.updatedAtMs - left.updatedAtMs).slice(0, 8).map(safeRecentRun),
+    recentRuns: [...kernelRuns].sort((left, right) => right.updatedAtMs - left.updatedAtMs).slice(0, 8).map(safeRecentRun),
     recentArtifacts: [...artifacts].sort((left, right) => right.createdAtMs - left.createdAtMs).slice(0, 8).map(safeRecentArtifact),
     safety: {
       ...SAFETY,

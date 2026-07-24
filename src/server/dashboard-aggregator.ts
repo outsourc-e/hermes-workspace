@@ -341,12 +341,12 @@ function normalizePlatforms(raw: unknown): Array<DashboardPlatformEntry> {
 
 function normalizeCron(raw: unknown): DashboardCronSection | null {
   if (!raw) return null
-  let jobs: Array<Record<string, unknown>> = []
+  let jobs: Array<unknown> = []
   if (Array.isArray(raw)) {
-    jobs = raw as Array<Record<string, unknown>>
-  } else if (raw && typeof raw === 'object') {
+    jobs = raw
+  } else if (typeof raw === 'object') {
     const r = raw as Record<string, unknown>
-    if (Array.isArray(r.jobs)) jobs = r.jobs as Array<Record<string, unknown>>
+    if (Array.isArray(r.jobs)) jobs = r.jobs
   }
   if (!Array.isArray(jobs)) return null
 
@@ -357,7 +357,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
   const recentFailures: DashboardCronSection['recentFailures'] = []
   for (const job of jobs) {
     if (!job || typeof job !== 'object') continue
-    const j = job
+    const j = job as Record<string, unknown>
     const state = readString(j.state || j.status).toLowerCase()
     if (state === 'paused') paused += 1
     else if (state === 'running') running += 1

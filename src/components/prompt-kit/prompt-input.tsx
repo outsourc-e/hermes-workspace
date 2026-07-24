@@ -274,8 +274,8 @@ function PromptInputTextarea({
       if (pastedText.length > 0) {
         e.preventDefault()
         const el = e.currentTarget
-        const selectionStart = el.selectionStart ?? value.length
-        const selectionEnd = el.selectionEnd ?? selectionStart
+        const selectionStart = el.selectionStart
+        const selectionEnd = el.selectionEnd
         const nextValue =
           value.slice(0, selectionStart) +
           pastedText +

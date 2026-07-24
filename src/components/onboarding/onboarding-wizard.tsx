@@ -86,8 +86,7 @@ export function OnboardingWizard() {
 
   return (
     <AnimatePresence>
-      {isOpen && (
-        <motion.div
+      <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -235,7 +234,6 @@ export function OnboardingWizard() {
             </div>
           </motion.div>
         </motion.div>
-      )}
     </AnimatePresence>
   )
 }

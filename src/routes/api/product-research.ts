@@ -35,7 +35,7 @@ function fallbackState() {
 export const Route = createFileRoute('/api/product-research')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -57,7 +57,7 @@ export const Route = createFileRoute('/api/product-research')({
             { status: 500 },
           )
         }
-      },
+      })()),
     },
   },
 })

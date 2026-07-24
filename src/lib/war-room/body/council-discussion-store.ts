@@ -156,7 +156,7 @@ function turnsForDiscussion(discussion: CouncilDrawingBoardDiscussion) {
 }
 
 function winnerLabelsForDiscussion(discussion: CouncilDrawingBoardDiscussion) {
-  const supportedBy = discussion.result?.recommendation?.supportedBy ?? []
+  const supportedBy = discussion.result?.recommendation.supportedBy ?? []
   return new Set(supportedBy.map((label) => label.toLowerCase()))
 }
 
@@ -179,7 +179,8 @@ function memoryNoteForTurn(turn: ControlledCouncilTurn) {
 
 function addMemoryNote(item: CouncilGeneralDrawingBoardStats, note?: string) {
   if (!note) return
-  item.memoryNotes = [note, ...(item.memoryNotes ?? []).filter((existing) => existing !== note)].slice(0, 5)
+  const existingNotes = Array.isArray(item.memoryNotes) ? item.memoryNotes : []
+  item.memoryNotes = [note, ...existingNotes.filter((existing) => existing !== note)].slice(0, 5)
 }
 
 function rebuildGeneralStats(discussions: Array<CouncilDrawingBoardDiscussion>): Record<string, CouncilGeneralDrawingBoardStats> {
@@ -435,7 +436,7 @@ export async function recordCouncilFollowUpResult(input: {
     sourcesUsed: [
       ...existing.sourcesUsed,
       'Obsidian',
-      ...(input.result.turn.contextUsed ?? []),
+      ...(Array.isArray(input.result.turn.contextUsed) ? input.result.turn.contextUsed : []),
     ].filter((item, index, list) => item && list.indexOf(item) === index).slice(0, 12),
   }
   return saveCouncilDrawingBoardStore(upsertDiscussion(store, discussion), { ...options, nowMs })

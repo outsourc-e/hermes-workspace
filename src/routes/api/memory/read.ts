@@ -6,7 +6,7 @@ import { readMemoryFile } from '../../../server/memory-browser'
 export const Route = createFileRoute('/api/memory/read')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/api/memory/read')({
               : 500
           return json({ error: message }, { status })
         }
-      },
+      })()),
     },
   },
 })

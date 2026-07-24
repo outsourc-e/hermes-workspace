@@ -188,11 +188,11 @@ function ocParseContextPct(payload: unknown): number {
     (root.totals as Record<string, unknown> | undefined) ??
     root
   return ocReadPercent(
-    (usage)?.contextPercent ??
-      (usage)?.context_percent ??
-      (usage)?.context ??
-      root?.contextPercent ??
-      root?.context_percent,
+    (usage).contextPercent ??
+      (usage).context_percent ??
+      (usage).context ??
+      root.contextPercent ??
+      root.context_percent,
   )
 }
 
@@ -256,7 +256,6 @@ function OrchestratorCard({
     if (okProviders.length < 2) return
     const currentIdx = okProviders.findIndex((p) => p.provider === preferredProvider)
     const next = okProviders[(currentIdx + 1) % okProviders.length]
-    if (!next) return
     setPreferredProvider(next.provider)
     try { localStorage.setItem(PREFERRED_PROVIDER_KEY_OC, next.provider) } catch { /* noop */ }
     updateUsageRowsFromProviders(allOcProviders, next.provider)
@@ -266,43 +265,47 @@ function OrchestratorCard({
   }
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
+    const requestWasCancelled = () => controller.signal.aborted
     async function fetchAll() {
       try {
         // session-status: model + context pct
-        const res = await fetch('/api/session-status')
+        const res = await fetch('/api/session-status', {
+          signal: controller.signal,
+        })
         if (!res.ok) return
         const data = await res.json()
         const payload = data.payload ?? data
         const m = payload.model ?? payload.currentModel ?? ''
-        if (!cancelled && m) setModel(String(m))
+        if (!requestWasCancelled() && m) setModel(String(m))
         const sn = String(payload.sessionLabel ?? payload.sessionName ?? payload.name ?? payload.label ?? '')
-        if (!cancelled && sn) setSessionName(sn)
+        if (!requestWasCancelled() && sn) setSessionName(sn)
         const pct = ocParseContextPct(payload)
-        if (!cancelled) setContextPct(Math.min(100, Math.round(pct)))
+        if (!requestWasCancelled()) {
+          setContextPct(Math.min(100, Math.round(pct)))
+        }
       } catch { /* noop */ }
 
       try {
         // provider-usage: all bars
-        const res2 = await fetch('/api/provider-usage')
-        if (!res2.ok || cancelled) return
+        const res2 = await fetch('/api/provider-usage', {
+          signal: controller.signal,
+        })
+        if (!res2.ok || requestWasCancelled()) return
         const data2 = await res2.json().catch(() => null) as {
           ok?: boolean
           providers?: Array<OcProviderEntry>
         } | null
-        if (!data2?.providers || cancelled) return
-
-        if (!cancelled) {
-          setAllOcProviders(data2.providers)
-          updateUsageRowsFromProviders(data2.providers, preferredProvider)
-        }
+        if (!data2?.providers || requestWasCancelled()) return
+        setAllOcProviders(data2.providers)
+        updateUsageRowsFromProviders(data2.providers, preferredProvider)
       } catch { /* noop */ }
     }
 
     void fetchAll()
     const timer = setInterval(fetchAll, USAGE_POLL_MS)
     return () => {
-      cancelled = true
+      controller.abort()
       clearInterval(timer)
       if (flashTimerRefOc.current) clearTimeout(flashTimerRefOc.current)
     }
@@ -344,9 +347,9 @@ function OrchestratorCard({
     'meta':      'https://cdn.simpleicons.org/meta',
     'nvidia':    'https://cdn.simpleicons.org/nvidia',
   }
-  function getProviderLogoUrl(label: string | null): string | null {
-    if (!label) return null
-    const key = label.toLowerCase()
+  function getProviderLogoUrl(providerName: string | null): string | null {
+    if (!providerName) return null
+    const key = providerName.toLowerCase()
     for (const [k, v] of Object.entries(PROVIDER_LOGO_URLS)) {
       if (key.includes(k)) return v
     }
@@ -754,7 +757,7 @@ export function AgentViewPanel() {
     [activeNodes, agentSpawn],
   )
 
-  const updateSourceBubbleRect = useCallback(function updateSourceBubbleRect() {
+  const updateSourceBubbleRect = useCallback(function syncSourceBubbleRect() {
     if (typeof document === 'undefined') return
     const element = getLastUserMessageBubbleElement()
     if (!element) {
@@ -1384,7 +1387,7 @@ export function AgentViewPanel() {
                             <MiniAgentCard
                               key={agent.id}
                               sessionLabel={agent.name}
-                              model={agent.status || 'unknown'}
+                              model={agent.status}
                               status={getMiniAgentCardStatus(agent.status)}
                               footer={
                                 <div className="flex justify-end">

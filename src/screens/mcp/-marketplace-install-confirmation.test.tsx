@@ -55,13 +55,17 @@ async function renderInto(element: React.ReactElement) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  await React.act(async () => {
+  await React.act(() => {
     root.render(element)
+    return Promise.resolve()
   })
   return {
     container,
     unmount: async () => {
-      await React.act(async () => { root.unmount() })
+      await React.act(() => {
+        root.unmount()
+        return Promise.resolve()
+      })
       document.body.removeChild(container)
     },
   }
@@ -226,7 +230,10 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
     )
 
     const btn = container.querySelector('[data-testid="install-confirm-btn"]') as HTMLButtonElement
-    await React.act(async () => { btn.click() })
+    await React.act(() => {
+      btn.click()
+      return Promise.resolve()
+    })
     // Let the async fetch resolve
     await React.act(async () => { await Promise.resolve() })
 
@@ -249,7 +256,10 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
     )
 
     const btn = container.querySelector('[data-testid="install-confirm-btn"]') as HTMLButtonElement
-    await React.act(async () => { btn.click() })
+    await React.act(() => {
+      btn.click()
+      return Promise.resolve()
+    })
     await React.act(async () => { await Promise.resolve() })
 
     expect(capturedBody).toMatchObject({
@@ -275,7 +285,10 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
     )
 
     const btn = container.querySelector('[data-testid="install-confirm-btn"]') as HTMLButtonElement
-    await React.act(async () => { btn.click() })
+    await React.act(() => {
+      btn.click()
+      return Promise.resolve()
+    })
     await React.act(async () => { await Promise.resolve() })
 
     expect(onInstalled).toHaveBeenCalledOnce()
@@ -297,7 +310,10 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
     )
 
     const btn = container.querySelector('[data-testid="install-confirm-btn"]') as HTMLButtonElement
-    await React.act(async () => { btn.click() })
+    await React.act(() => {
+      btn.click()
+      return Promise.resolve()
+    })
     await React.act(async () => { await Promise.resolve() })
 
     expect(container.textContent).toContain('Server unavailable')
@@ -317,7 +333,10 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
     const cancelBtn = Array.from(container.querySelectorAll('button')).find(
       (b) => b.textContent === 'Cancel',
     ) as HTMLButtonElement
-    await React.act(async () => { cancelBtn.click() })
+    await React.act(() => {
+      cancelBtn.click()
+      return Promise.resolve()
+    })
 
     expect(onClose).toHaveBeenCalledOnce()
     expect(fetchSpy).not.toHaveBeenCalled()
@@ -340,7 +359,10 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
 
     // Click Install — starts the in-flight fetch
     const btn = container.querySelector('[data-testid="install-confirm-btn"]') as HTMLButtonElement
-    await React.act(async () => { btn.click() })
+    await React.act(() => {
+      btn.click()
+      return Promise.resolve()
+    })
 
     // Signal should exist and not yet aborted
     expect(capturedSignal).not.toBeNull()

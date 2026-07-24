@@ -15,7 +15,7 @@ import {
 export const Route = createFileRoute('/api/chat-events')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'Unauthorized' }),
@@ -108,7 +108,7 @@ export const Route = createFileRoute('/api/chat-events')({
             'X-Accel-Buffering': 'no',
           },
         })
-      },
+      })()),
     },
   },
 })

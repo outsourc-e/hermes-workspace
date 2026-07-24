@@ -118,6 +118,7 @@ const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
 
 const DEFAULT_MODEL_BADGE_COLOR =
   'bg-neutral-100 text-neutral-700'
+const MODEL_BADGE_COLOR_BY_ID = new Map<string, string>(Object.entries(MODEL_BADGE_COLOR))
 
 type SessionDotState = 'active' | 'idle' | 'stale' | 'dead' | 'spawning' | 'none'
 
@@ -196,7 +197,7 @@ export function TeamPanel({
   }
 
   function getModelBadgeColor(modelId: string): string {
-    return MODEL_BADGE_COLOR[modelId as ModelPresetId] ?? DEFAULT_MODEL_BADGE_COLOR
+    return MODEL_BADGE_COLOR_BY_ID.get(modelId) ?? DEFAULT_MODEL_BADGE_COLOR
   }
 
   function handleToggleAgent(agentId: string) {

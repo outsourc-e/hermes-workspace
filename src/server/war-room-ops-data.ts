@@ -184,7 +184,7 @@ function asText(value: unknown): string {
 function readProductIntelligence(): ProductIntelligencePayload | null {
   try {
     const payload = getProductIntelligence({ limit: 24, minScore: 0 }) as ProductIntelligencePayload
-    return payload?.ok ? payload : null
+    return payload.ok ? payload : null
   } catch {
     return null
   }
@@ -448,7 +448,7 @@ function statusForWorkerAssignments(assignments: Array<SwarmMissionAssignment>):
 }
 
 function workerRoomFor(workerId: string, assignments: Array<SwarmMissionAssignment>): string {
-  const bookRoom = WORKER_ROOM_BOOK[workerId]?.roomId
+  const bookRoom = WORKER_ROOM_BOOK[workerId].roomId
   if (bookRoom) return bookRoom
   const assignmentBlob = assignments.map((assignment) => assignmentText(assignment)).join(' ')
   return assignmentBlob ? bestApiRoom(assignmentBlob) : 'pantheon'
@@ -492,7 +492,7 @@ function buildAgentOps(missions: Array<SwarmMission>): Record<string, WarRoomAge
   const ops: Record<string, WarRoomAgentRoomOps> = {}
   for (const entry of WAR_ROOM_ROOM_MAP) {
     const roomWorkers = workers.filter((worker) => worker.roomId === entry.apiRoomId)
-    const leadWorkerId = ROOM_LEAD_WORKER[entry.apiRoomId] ?? entry.primaryAgentId ?? roomWorkers[0]?.id ?? 'default'
+    const leadWorkerId = ROOM_LEAD_WORKER[entry.apiRoomId] ?? entry.primaryAgentId
     const leadWorker = workers.find((worker) => worker.id === leadWorkerId)
     const includedWorkers = roomWorkers.some((worker) => worker.id === leadWorkerId) || !leadWorker ? roomWorkers : [leadWorker, ...roomWorkers]
     const assignmentCount = includedWorkers.reduce((sum, worker) => sum + worker.assignmentCount, 0)
@@ -653,7 +653,7 @@ function buildFeed(missions: Array<SwarmMission>, sessions: Array<SessionSummary
   return sortFeed(feed)
 }
 
-function roomSummaryFor(apiRoomId: string, feed: Array<WarRoomFeedItem>, approvalCount: number, productIntelligence: ProductIntelligencePayload | null, agentOpsByRoom: Record<string, WarRoomAgentRoomOps>, workflowPackets: Array<WarRoomWorkflowPacket>): WarRoomRoomSummary {
+function roomSummaryFor(apiRoomId: string, feed: Array<WarRoomFeedItem>, approvalCount: number, productIntelligence: ProductIntelligencePayload | null, agentOpsByRoom: Partial<Record<string, WarRoomAgentRoomOps>>, workflowPackets: Array<WarRoomWorkflowPacket>): WarRoomRoomSummary {
   const entry = roomMapForApiRoom(apiRoomId)
   const roomFeed = feed.filter((item) => item.roomId === apiRoomId)
   const roomPackets = workflowPackets.filter((packet) => packet.sourceRoomId === apiRoomId || packet.targetRoomId === apiRoomId)
@@ -1046,6 +1046,6 @@ export async function buildWarRoomRoomDetail(uiRoomId: string, limit = 8): Promi
     approvalGates: approvalGatesForUiRoom(uiRoomId),
     designNorthStar: WAR_ROOM_DESIGN_NORTH_STAR,
     productIntelligence: productIntelligenceDetailFor(apiRoomId, productIntelligence),
-    sourceLine: `${base.sources.sessions} synced • ${base.sources.productIntelligence ?? 'product-intel unavailable'} • ${detailRoom?.agentOps?.leadWorkerId ?? 'manager'} lead • ${detailRoom?.agentOps?.assignmentCount ?? 0} swarm tasks • ${base.pulse.missions} missions • ${base.pulse.approvals} approvals`,
+    sourceLine: `${base.sources.sessions} synced • ${base.sources.productIntelligence} • ${detailRoom?.agentOps?.leadWorkerId ?? 'manager'} lead • ${detailRoom?.agentOps?.assignmentCount ?? 0} swarm tasks • ${base.pulse.missions} missions • ${base.pulse.approvals} approvals`,
   }
 }

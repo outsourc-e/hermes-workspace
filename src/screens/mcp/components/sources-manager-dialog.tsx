@@ -89,14 +89,14 @@ function SourceForm({ initial, isEdit, onSave, onCancel, saving, serverErrors }:
     onSave(form)
   }
 
-  function set<K extends keyof AddSourceInput>(key: K, value: AddSourceInput[K]) {
+  function set<TKey extends keyof AddSourceInput>(key: TKey, value: AddSourceInput[TKey]) {
     setForm((prev) => ({ ...prev, [key]: value }))
     setLocalErrors((prev) => { const next = { ...prev }; delete next[key]; return next })
   }
 
-  const idErr = localErrors.id ?? fieldError(serverErrors, 'id')
-  const nameErr = localErrors.name ?? fieldError(serverErrors, 'name')
-  const urlErr = localErrors.url ?? fieldError(serverErrors, 'url')
+  const idErr = localErrors.id
+  const nameErr = localErrors.name
+  const urlErr = localErrors.url
   const trustErr = fieldError(serverErrors, 'trust')
   const formatErr = fieldError(serverErrors, 'format')
 

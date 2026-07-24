@@ -17,7 +17,7 @@ type Suggestion = {
 }
 
 // Provider-specific model tiers (fallback when cost metadata unavailable)
-const MODEL_TIERS: Record<string, Record<ModelTier, Array<string>>> = {
+const MODEL_TIERS: Partial<Record<string, Record<ModelTier, Array<string>>>> = {
   anthropic: {
     budget: ['claude-3-5-haiku', 'claude-haiku'],
     balanced: ['claude-3-5-sonnet', 'claude-sonnet-4-5'],
@@ -53,6 +53,7 @@ function getModelTier(modelId: string): ModelTier {
   const normalized = modelId.toLowerCase()
 
   for (const tiers of Object.values(MODEL_TIERS)) {
+    if (!tiers) continue
     if (tiers.budget.some((m) => normalized.includes(m.toLowerCase())))
       return 'budget'
     if (tiers.balanced.some((m) => normalized.includes(m.toLowerCase())))
@@ -80,7 +81,7 @@ function findModelInTier(
   const providerTiers = MODEL_TIERS[provider]
   if (!providerTiers) return null
 
-  const candidates = providerTiers[tier] || []
+  const candidates = providerTiers[tier]
   for (const candidate of candidates) {
     const match = availableModels.find((m) =>
       m.toLowerCase().includes(candidate.toLowerCase()),
@@ -257,7 +258,7 @@ function _useModelSuggestionsDisabled({
     // Check for upgrade opportunity (complex task on weak model)
     // Phase 4.2: Skip if "Only suggest cheaper" is enabled
     if (!settings.onlySuggestCheaper) {
-      const lastMessage = messages[messages.length - 1]
+      const lastMessage = messages.at(-1)
       if (lastMessage && isComplexTask(lastMessage)) {
         let targetTier: ModelTier | null = null
 

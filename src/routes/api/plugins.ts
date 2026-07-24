@@ -6,12 +6,12 @@ import { listWorkspacePlugins } from '../../server/plugins-browser'
 export const Route = createFileRoute('/api/plugins')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         return json({ ok: true, plugins: listWorkspacePlugins() })
-      },
+      })()),
     },
   },
 })

@@ -6,7 +6,7 @@ import { readKnowledgePage } from '../../../server/knowledge-browser'
 export const Route = createFileRoute('/api/knowledge/read')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -32,7 +32,7 @@ export const Route = createFileRoute('/api/knowledge/read')({
                 : 500
           return json({ error: message }, { status })
         }
-      },
+      })()),
     },
   },
 })

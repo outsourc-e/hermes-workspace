@@ -3,6 +3,7 @@ import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
+import type { Dirent } from 'node:fs'
 
 export type TerraModelAssetPreview = {
   kind: 'embedded' | 'generated' | 'none'
@@ -568,7 +569,7 @@ async function walk3mfFiles(root: string, maxDepth: number, errors: Array<string
   const files: Array<string> = []
   async function walk(dir: string, depth: number) {
     if (depth > maxDepth) return
-    let entries: Array<import('node:fs').Dirent>
+    let entries: Array<Dirent>
     try {
       entries = await fs.readdir(dir, { withFileTypes: true })
     } catch (error) {
@@ -682,7 +683,7 @@ function generatedGeometryPreview(xml: string, name: string): TerraModelAssetPre
   const vertexRegex = /<[^>]*vertex\b([^>]*)>/gi
   let vertexMatch: RegExpExecArray | null
   while ((vertexMatch = vertexRegex.exec(xml)) && vertices.length < 25_000) {
-    const attrs = vertexMatch[1] ?? ''
+    const attrs = vertexMatch[1]
     const x = attrNumber(attrs, 'x')
     const y = attrNumber(attrs, 'y')
     const z = attrNumber(attrs, 'z')
@@ -704,7 +705,7 @@ function generatedGeometryPreview(xml: string, name: string): TerraModelAssetPre
   const height = Math.max(1, maxY - minY)
   const scale = Math.min(220 / width, 128 / height)
   const mapPoint = (index: number) => {
-    const vertex = vertices[index]
+    const vertex = vertices.at(index)
     if (!vertex) return '0,0'
     const x = 140 + (vertex.px - (minX + width / 2)) * scale
     const y = 92 + (vertex.py - (minY + height / 2)) * scale
@@ -718,7 +719,7 @@ function generatedGeometryPreview(xml: string, name: string): TerraModelAssetPre
   while ((triangleMatch = triangleRegex.exec(xml)) && seen < 20_000) {
     seen += 1
     if (seen % Math.max(1, Math.floor(20_000 / 900)) !== 0 && triangles.length > 900) continue
-    const attrs = triangleMatch[1] ?? ''
+    const attrs = triangleMatch[1]
     const v1 = Math.floor(attrNumber(attrs, 'v1'))
     const v2 = Math.floor(attrNumber(attrs, 'v2'))
     const v3 = Math.floor(attrNumber(attrs, 'v3'))
@@ -753,7 +754,8 @@ async function create3mfPreview(filePath: string, name: string): Promise<TerraMo
     const entries = parseZipEntries(buffer)
     const previewEntry = entries
       .filter((entry) => previewEntryScore(entry) < 10_000 && entry.uncompressedSize <= MAX_EMBEDDED_PREVIEW_BYTES)
-      .sort((a, b) => previewEntryScore(a) - previewEntryScore(b) || a.uncompressedSize - b.uncompressedSize)[0]
+      .sort((a, b) => previewEntryScore(a) - previewEntryScore(b) || a.uncompressedSize - b.uncompressedSize)
+      .at(0)
     if (previewEntry) {
       const image = extractZipEntry(buffer, previewEntry)
       if (image?.length) {
@@ -767,7 +769,8 @@ async function create3mfPreview(filePath: string, name: string): Promise<TerraMo
 
     const modelEntry = entries
       .filter((entry) => entry.name.toLowerCase().endsWith('.model') && entry.uncompressedSize <= MAX_MODEL_XML_BYTES)
-      .sort((a, b) => (a.name === '3D/3dmodel.model' ? -1 : 0) - (b.name === '3D/3dmodel.model' ? -1 : 0) || a.uncompressedSize - b.uncompressedSize)[0]
+      .sort((a, b) => (a.name === '3D/3dmodel.model' ? -1 : 0) - (b.name === '3D/3dmodel.model' ? -1 : 0) || a.uncompressedSize - b.uncompressedSize)
+      .at(0)
     if (modelEntry) {
       const model = extractZipEntry(buffer, modelEntry)
       if (model?.length) return generatedGeometryPreview(model.toString('utf8'), name)
@@ -924,7 +927,7 @@ async function readElegooSlicerPrinterConfig(): Promise<PrinterConfig> {
         source: 'elegoo-slicer' as const,
       }
     })
-  const selected = discoveredPrinters.find((printer) => printer.printerId === selectedId) ?? discoveredPrinters.find((printer) => printer.host) ?? discoveredPrinters[0]
+  const selected = discoveredPrinters.find((printer) => printer.printerId === selectedId) ?? discoveredPrinters.find((printer) => printer.host) ?? discoveredPrinters.at(0)
   if (!selected) return { discoveryNotes: ['ElegooSlicer printer list is empty.'] }
   if (selected.host) notes.push(`ElegooSlicer discovered ${selected.name} at ${selected.host}.`)
   if (selected.cameraRequestMode === 'elegoo-mqtt-on-demand') notes.push('Camera URL must be requested from the printer via Elegoo MQTT; no static port or stream URL is assumed.')
@@ -1108,7 +1111,10 @@ async function probeCamera(cameraUrl: string) {
 function mergePrinterConfig(...configs: Array<PrinterConfig>): PrinterConfig {
   return configs.reduce<PrinterConfig>((merged, config) => ({
     ...merged,
-    ...Object.fromEntries(Object.entries(config).filter(([, value]) => value !== undefined && value !== null && value !== '')),
+    ...Object.fromEntries(
+      Object.entries(config as Record<string, unknown>)
+        .filter(([, value]) => value !== undefined && value !== null && value !== ''),
+    ) as PrinterConfig,
     discoveryNotes: [...(merged.discoveryNotes ?? []), ...(config.discoveryNotes ?? [])],
     discoveredPrinters: config.discoveredPrinters ?? merged.discoveredPrinters,
   }), {})
@@ -1292,7 +1298,7 @@ async function readJsonProfiles(kind: TerraSlicerProfileKind, dir: string, selec
   const profiles: Array<TerraSlicerProfile> = []
   async function walk(current: string, depth: number) {
     if (depth > 3) return
-    let entries: Array<import('node:fs').Dirent>
+    let entries: Array<Dirent>
     try {
       entries = await fs.readdir(current, { withFileTypes: true })
     } catch {
@@ -1522,12 +1528,12 @@ function shellQuote(value: string) {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
-async function pathIsAllowed(filePath: string, roots: Array<string>) {
+function pathIsAllowed(filePath: string, roots: Array<string>): Promise<string | undefined> {
   const resolved = path.resolve(expandHome(filePath))
   for (const root of roots.map((item) => path.resolve(expandHome(item)))) {
-    if (resolved === root || resolved.startsWith(`${root}${path.sep}`)) return resolved
+    if (resolved === root || resolved.startsWith(`${root}${path.sep}`)) return Promise.resolve(resolved)
   }
-  return undefined
+  return Promise.resolve(undefined)
 }
 
 export async function createTerraSlicePlan(request: TerraSlicePlanRequest, nowMs = Date.now()): Promise<TerraSlicePlanResult> {
@@ -1735,7 +1741,7 @@ async function requestElegooMqttLivingVideoUrl() {
   function emit(event: MqttEvent) {
     for (let index = 0; index < waiters.length; index += 1) {
       const waiter = waiters[index]
-      if (waiter?.predicate(event)) {
+      if (waiter.predicate(event)) {
         cleanupWaiter(index)
         waiter.resolve(event)
         return

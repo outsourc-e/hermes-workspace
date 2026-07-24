@@ -12,7 +12,12 @@ import type { HubTrust } from './types'
 const SHELL_METACHAR_RE = /[;|&$`<>]/
 
 // Control characters (including NUL) that must not appear in command or args
-const CONTROL_CHAR_RE = /[\x00-\x1F\x7F]/
+function hasControlCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0)
+    return code <= 31 || code === 127
+  })
+}
 
 // Env key must be SCREAMING_SNAKE_CASE (same rule as mcp-input-validate.ts)
 const ENV_KEY_RE = /^[A-Z][A-Z0-9_]*$/
@@ -110,7 +115,7 @@ export function normalizeTemplate(
     }
 
     // Control-char check on command
-    if (CONTROL_CHAR_RE.test(command)) {
+    if (hasControlCharacter(command)) {
       return { ok: false, reason: `command contains disallowed control characters: "${command}"` }
     }
 
@@ -143,7 +148,7 @@ export function normalizeTemplate(
     const rawArgs = Array.isArray(t.args) ? t.args : []
     for (const arg of rawArgs) {
       const s = String(arg)
-      if (CONTROL_CHAR_RE.test(s)) {
+      if (hasControlCharacter(s)) {
         return { ok: false, reason: `args contains disallowed control characters: "${s}"` }
       }
       if (s === '-c' || s.startsWith('-c=') || s.startsWith('-c ')) {

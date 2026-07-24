@@ -55,15 +55,24 @@ async function renderInto(element: React.ReactElement) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  await React.act(async () => { root.render(element) })
+  await React.act(() => {
+    root.render(element)
+    return Promise.resolve()
+  })
   return {
     container,
     unmount: async () => {
-      await React.act(async () => { root.unmount() })
+      await React.act(() => {
+        root.unmount()
+        return Promise.resolve()
+      })
       document.body.removeChild(container)
     },
     rerender: async (el: React.ReactElement) => {
-      await React.act(async () => { root.render(el) })
+      await React.act(() => {
+        root.render(el)
+        return Promise.resolve()
+      })
     },
   }
 }
@@ -219,7 +228,10 @@ describe('(a) clean template — commits on first click', () => {
     const btn = getInstallBtn(container)
     expect(btn.disabled).toBe(false)
 
-    await React.act(async () => { btn.click() })
+    await React.act(() => {
+      btn.click()
+      return Promise.resolve()
+    })
     await React.act(async () => { await Promise.resolve() })
 
     expect(global.fetch).toHaveBeenCalledOnce()
@@ -245,7 +257,10 @@ describe('(b) placeholder template — shows fill form on first click', () => {
     )
 
     const btn = getInstallBtn(container)
-    await React.act(async () => { btn.click() })
+    await React.act(() => {
+      btn.click()
+      return Promise.resolve()
+    })
 
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(container.querySelector('[data-testid="placeholder-fill-form"]')).not.toBeNull()
@@ -260,7 +275,10 @@ describe('(b) placeholder template — shows fill form on first click', () => {
     )
 
     const btn = getInstallBtn(container)
-    await React.act(async () => { btn.click() })
+    await React.act(() => {
+      btn.click()
+      return Promise.resolve()
+    })
 
     // After showing placeholder form with empty overrides, button must be disabled
     const btnAfter = getInstallBtn(container)
@@ -282,7 +300,10 @@ describe('(c) partial fill keeps Install disabled', () => {
     )
 
     // First click — show fill form
-    await React.act(async () => { getInstallBtn(container).click() })
+    await React.act(() => {
+      getInstallBtn(container).click()
+      return Promise.resolve()
+    })
 
     // Fill only the arg, leave env empty
     const argInput = container.querySelector<HTMLInputElement>(
@@ -290,13 +311,14 @@ describe('(c) partial fill keeps Install disabled', () => {
     )
     expect(argInput).not.toBeNull()
 
-    await React.act(async () => {
+    await React.act(() => {
       if (argInput) {
         argInput.value = '/real/path/to/server'
         argInput.dispatchEvent(new Event('input', { bubbles: true }))
         // React listens to 'change' for inputs
         argInput.dispatchEvent(new Event('change', { bubbles: true }))
       }
+      return Promise.resolve()
     })
 
     // Install button should still be disabled (env still empty)
@@ -328,19 +350,23 @@ describe('(d) full fill — commits with merged overrides', () => {
     )
 
     // First click — show fill form
-    await React.act(async () => { getInstallBtn(container).click() })
+    await React.act(() => {
+      getInstallBtn(container).click()
+      return Promise.resolve()
+    })
 
     // Fill arg placeholder
     const argInput = container.querySelector(
       '[data-testid="placeholder-input-args[1]"]',
     ) as HTMLInputElement
-    await React.act(async () => {
+    await React.act(() => {
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
         'value',
       )?.set
       nativeInputValueSetter?.call(argInput, '/real/path/mcp')
       argInput.dispatchEvent(new Event('input', { bubbles: true }))
+      return Promise.resolve()
       argInput.dispatchEvent(new Event('change', { bubbles: true }))
     })
 
@@ -348,18 +374,22 @@ describe('(d) full fill — commits with merged overrides', () => {
     const envInput = container.querySelector(
       '[data-testid="placeholder-input-env.MY_API_KEY"]',
     ) as HTMLInputElement
-    await React.act(async () => {
+    await React.act(() => {
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
         'value',
       )?.set
       nativeInputValueSetter?.call(envInput, 'my-real-api-key')
       envInput.dispatchEvent(new Event('input', { bubbles: true }))
+      return Promise.resolve()
       envInput.dispatchEvent(new Event('change', { bubbles: true }))
     })
 
     // Now click Install again
-    await React.act(async () => { getInstallBtn(container).click() })
+    await React.act(() => {
+      getInstallBtn(container).click()
+      return Promise.resolve()
+    })
     await React.act(async () => { await Promise.resolve() })
 
     expect(global.fetch).toHaveBeenCalledOnce()

@@ -51,7 +51,7 @@ function execFileAsync(
   return new Promise((resolve) => {
     execFile(cmd, args, { timeout: 5_000 }, (error, _stdout, stderr) => {
       if (error) {
-        resolve({ ok: false, error: stderr?.toString().trim() || error.message })
+        resolve({ ok: false, error: stderr.toString().trim() || error.message })
         return
       }
       resolve({ ok: true })

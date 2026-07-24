@@ -109,7 +109,7 @@ export function AttentionMarquee({
                 style={{ color: SEVERITY_COLOR[item.severity] }}
               >
                 <span aria-hidden className="text-[12px]">
-                  {SOURCE_GLYPH[item.source] ?? '•'}
+                  {SOURCE_GLYPH[item.source]}
                 </span>
                 <span style={{ color: 'var(--theme-text)' }}>
                   {item.label}

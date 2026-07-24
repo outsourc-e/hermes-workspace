@@ -79,7 +79,7 @@ export function Swarm2MemoryPanel({ workerId, className }: Swarm2MemoryPanelProp
       <header className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]/85">
         <span>Memory</span>
         <span className="text-[9px] normal-case tracking-normal text-[var(--theme-muted)]/70">
-          {profileQuery.data?.root?.replace('/Users/aurora', '~') ?? '—'}
+          {profileQuery.data?.root.replace('/Users/aurora', '~') ?? '—'}
         </span>
       </header>
 

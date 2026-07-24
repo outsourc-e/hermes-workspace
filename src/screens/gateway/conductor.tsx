@@ -105,7 +105,7 @@ const CONDUCTOR_GOAL_DRAFT_STORAGE_KEY = 'conductor:goal-draft'
 
 function loadConductorGoalDraft(): string {
   try {
-    return globalThis.localStorage?.getItem(CONDUCTOR_GOAL_DRAFT_STORAGE_KEY) ?? ''
+    return globalThis.localStorage.getItem(CONDUCTOR_GOAL_DRAFT_STORAGE_KEY) ?? ''
   } catch {
     return ''
   }
@@ -114,9 +114,9 @@ function loadConductorGoalDraft(): string {
 function persistConductorGoalDraft(value: string): void {
   try {
     if (value.trim()) {
-      globalThis.localStorage?.setItem(CONDUCTOR_GOAL_DRAFT_STORAGE_KEY, value)
+      globalThis.localStorage.setItem(CONDUCTOR_GOAL_DRAFT_STORAGE_KEY, value)
     } else {
-      globalThis.localStorage?.removeItem(CONDUCTOR_GOAL_DRAFT_STORAGE_KEY)
+      globalThis.localStorage.removeItem(CONDUCTOR_GOAL_DRAFT_STORAGE_KEY)
     }
   } catch {
     // Ignore storage failures; the in-memory state still works.
@@ -256,7 +256,7 @@ function buildProjectPathCandidates(workers: Array<{ label: string }>, missionSt
   const candidates = new Set<string>()
 
   for (const worker of workers) {
-    const label = worker.label ?? ''
+    const label = worker.label
     const slug = label.replace(/^worker-/, '').trim()
     if (!slug) continue
 
@@ -648,7 +648,7 @@ function extractMessageText(message: HistoryMessage | undefined): string {
   if (typeof message.content === 'string') return message.content
   if (Array.isArray(message.content)) {
     return message.content
-      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+      .map((part) => (typeof part.text === 'string' ? part.text : ''))
       .filter(Boolean)
       .join('\n')
   }
@@ -659,7 +659,7 @@ function getLastAssistantMessage(messages: Array<HistoryMessage> | undefined): s
   if (!Array.isArray(messages)) return ''
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
-    if (message?.role !== 'assistant') continue
+    if (message.role !== 'assistant') continue
     const text = extractMessageText(message)
     if (text.trim()) return text.trim()
   }
@@ -769,7 +769,7 @@ export function Conductor() {
 
         if (cancelled) return
         setDirectoryBrowserPath(typeof data.root === 'string' && data.root.trim() ? data.root : directoryBrowserPath)
-        setDirectoryBrowserEntries(Array.isArray(data.entries) ? data.entries.filter((entry) => entry?.type === 'folder') : [])
+        setDirectoryBrowserEntries(Array.isArray(data.entries) ? data.entries.filter((entry) => entry.type === 'folder') : [])
       } catch (error) {
         if (cancelled) return
         setDirectoryBrowserEntries([])
@@ -862,7 +862,7 @@ export function Conductor() {
     const combinedPrompt = [
       'CONTINUATION OF PREVIOUS MISSION',
       `Original goal: ${conductor.goal}`,
-      `Previous output summary: ${truncateContinuationText(continuationSummarySource ?? '')}`,
+      `Previous output summary: ${truncateContinuationText(continuationSummarySource)}`,
       `New instructions: ${trimmedInstructions}`,
       '',
       'Please continue building on the previous work.',
@@ -1085,7 +1085,7 @@ export function Conductor() {
       Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
       conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)).find((output) => output.trim()) ??
       conductor.streamText
-    return truncateContinuationText(summarySource ?? '')
+    return truncateContinuationText(summarySource)
   }, [completeSummary, conductor.streamText, conductor.workerOutputs, conductor.workers])
   const continuationModalPreview = useMemo(() => truncateContinuationText(continuationPreview, 200), [continuationPreview])
   const hasMissionHistory = conductor.missionHistory.length > 0
@@ -1098,7 +1098,7 @@ export function Conductor() {
   const filteredSessions = (() => {
     const sessions = conductor.recentSessions
     if (activityFilter === 'all') return sessions
-    return sessions.filter((session) => ((session.label as string) ?? '').startsWith('worker-')).filter((session) => deriveSessionStatus(session) === activityFilter)
+    return sessions.filter((session) => typeof session.label === 'string' && session.label.startsWith('worker-')).filter((session) => deriveSessionStatus(session) === activityFilter)
   })()
   const activityItems: Array<MissionHistoryEntry | GatewaySession> = hasMissionHistory ? filteredHistory : filteredSessions
   const ACTIVITY_PAGE_SIZE = 3

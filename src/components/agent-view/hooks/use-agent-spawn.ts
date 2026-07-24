@@ -33,21 +33,13 @@ function removeSetItems(base: Set<string>, items: Array<string>): Set<string> {
 }
 
 function intersectSet(base: Set<string>, activeIds: Set<string>): Set<string> {
-  // Check if intersection would be identical to base — if so, return same reference
-  // to avoid triggering unnecessary re-renders
-  let allPresent = true
-  base.forEach(function checkPresent(id) {
-    if (!activeIds.has(id)) allPresent = false
-  })
-  if (allPresent) return base
-
   const next = new Set<string>()
   base.forEach(function keepOnlyActive(id) {
     if (activeIds.has(id)) {
       next.add(id)
     }
   })
-  return next
+  return next.size === base.size ? base : next
 }
 
 export type AgentSpawnState = {

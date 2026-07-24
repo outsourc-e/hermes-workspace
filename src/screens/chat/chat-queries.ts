@@ -404,14 +404,15 @@ export function updateHistoryMessageByClientIdEverywhere(
   for (const [queryKey, data] of historyQueries) {
     const current = data
     const messages = Array.isArray(current?.messages) ? current.messages : []
-    let changed = false
     const nextMessages = messages.map((message) => {
       if (!isMatchingClientMessage(message, normalizedClientId, optimisticId)) {
         return message
       }
-      changed = true
       return updater(message)
     })
+    const changed = nextMessages.some(
+      (message, index) => message !== messages[index],
+    )
     if (!changed) continue
     queryClient.setQueryData(queryKey, {
       sessionKey: current?.sessionKey ?? '',

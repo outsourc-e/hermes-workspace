@@ -64,7 +64,7 @@ const FIELD =
 function applyOverrides(
   template: McpClientInput,
   placeholders: Array<PlaceholderField>,
-  overrides: Record<string, string>,
+  overrides: Partial<Record<string, string>>,
 ): McpClientInput {
   const out: McpClientInput = {
     ...template,
@@ -83,7 +83,7 @@ function applyOverrides(
         const idx = parseInt(m[1], 10)
         if (out.args) out.args[idx] = val
       }
-    } else if (ph.kind === 'env') {
+    } else {
       // Path is "env.KEY"
       const key = ph.path.slice(4) // strip "env."
       if (out.env) out.env[key] = val

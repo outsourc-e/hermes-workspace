@@ -30,9 +30,9 @@ function printablesResponse(name = 'Spin Fidget Toy') {
 describe('Terra internet model search query normalization', () => {
   it('normalizes Hebrew fidget print requests before calling Printables', async () => {
     let variables: Record<string, unknown> | undefined
-    const fetcher = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+    const fetcher = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
       variables = JSON.parse(String(init?.body)).variables
-      return printablesResponse()
+      return Promise.resolve(printablesResponse())
     })
 
     const result = await searchTerraInternetModels({ query: 'פידגטים להדפסה', limit: 20 }, 1_700_000_000_000, fetcher as typeof fetch)
@@ -48,9 +48,9 @@ describe('Terra internet model search query normalization', () => {
 
   it('normalizes common Hebrew utility model requests', async () => {
     let variables: Record<string, unknown> | undefined
-    const fetcher = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+    const fetcher = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
       variables = JSON.parse(String(init?.body)).variables
-      return printablesResponse('Cable Clip')
+      return Promise.resolve(printablesResponse('Cable Clip'))
     })
 
     await searchTerraInternetModels({ query: 'מחזיק כבל להדפסה', limit: 5 }, 1_700_000_000_000, fetcher as typeof fetch)

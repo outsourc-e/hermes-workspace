@@ -6,7 +6,7 @@ import { getSwarmEnvironment } from '../../server/swarm-environment'
 export const Route = createFileRoute('/api/swarm-environment')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -15,7 +15,7 @@ export const Route = createFileRoute('/api/swarm-environment')({
           generatedAt: Date.now(),
           ...getSwarmEnvironment(),
         })
-      },
+      })()),
     },
   },
 })

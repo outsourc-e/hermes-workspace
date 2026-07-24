@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
+import type { Dirent } from 'node:fs'
 
 export type WorkspaceSkillSummary = {
   id: string
@@ -80,7 +81,7 @@ function firstParagraph(content: string) {
 
 async function walkSkillFiles(dir: string, root = dir, depth = 0): Promise<Array<string>> {
   if (depth > 5) return []
-  let entries: Array<import('node:fs').Dirent>
+  let entries: Array<Dirent>
   try {
     entries = await fs.readdir(dir, { withFileTypes: true })
   } catch {

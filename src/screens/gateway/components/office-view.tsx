@@ -95,17 +95,19 @@ export const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
 }
 
 const DEFAULT_OFFICE_MODEL_BADGE = 'border border-neutral-200 bg-neutral-50 text-neutral-700'
+const OFFICE_MODEL_BADGE_BY_ID = new Map<string, string>(Object.entries(OFFICE_MODEL_BADGE))
+const OFFICE_MODEL_LABEL_BY_ID = new Map<string, string>(Object.entries(OFFICE_MODEL_LABEL))
 type OfficeLayoutTemplate = 'grid' | 'roundtable' | 'warroom'
 type SocialSpotType = 'coffee' | 'water' | 'plant' | 'snack'
 type SocialSpot = { x: number; y: number; type: SocialSpotType }
 
 export function getOfficeModelBadge(modelId: string): string {
-  return OFFICE_MODEL_BADGE[modelId as ModelPresetId] ?? DEFAULT_OFFICE_MODEL_BADGE
+  return OFFICE_MODEL_BADGE_BY_ID.get(modelId) ?? DEFAULT_OFFICE_MODEL_BADGE
 }
 
 export function getOfficeModelLabel(modelId: string): string {
   if (!modelId) return 'Unknown'
-  return OFFICE_MODEL_LABEL[modelId as ModelPresetId] ?? modelId.split('/')[1] ?? modelId
+  return OFFICE_MODEL_LABEL_BY_ID.get(modelId) ?? modelId.split('/').at(1) ?? modelId
 }
 
 export function getAgentStatusMeta(status: AgentWorkingStatus): {

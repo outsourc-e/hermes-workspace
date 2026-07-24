@@ -19,6 +19,12 @@ import {
   lerpPosition
 } from '@/components/agent-swarm/agent-behaviors'
 
+const BREAK_ACTIVITIES = new Set<AgentActivity>(['water_break', 'coffee_break', 'lunch', 'meeting'])
+
+function breakActivity(value: string | null): AgentActivity {
+  return value && BREAK_ACTIVITIES.has(value as AgentActivity) ? value as AgentActivity : 'water_break'
+}
+
 const TICK_MS = 1000
 const CODING_MIN_MS = 15_000
 const CODING_MAX_MS = 30_000
@@ -240,7 +246,7 @@ export function useAgentBehaviors(
             } else {
               // At break location
               const breakType =
-                (state.chatTarget as AgentActivity) ?? 'water_break'
+                breakActivity(state.chatTarget)
               state.activity = breakType
               state.expression = getExpression(breakType)
               state.activityStartTime = now
@@ -280,18 +286,17 @@ export function useAgentBehaviors(
 
           const session1 = runningSessions[idx1]
           const session2 = runningSessions[idx2]
-          if (session1 && session2) {
-            const key1 = session1.key ?? session1.friendlyId ?? ''
-            const key2 = session2.key ?? session2.friendlyId ?? ''
-            const state1 = statesRef.current.get(key1)
-            const state2 = statesRef.current.get(key2)
+          const key1 = session1.key ?? session1.friendlyId ?? ''
+          const key2 = session2.key ?? session2.friendlyId ?? ''
+          const state1 = statesRef.current.get(key1)
+          const state2 = statesRef.current.get(key2)
 
-            if (
-              state1 &&
-              state2 &&
-              state1.activity === 'coding' &&
-              state2.activity === 'coding'
-            ) {
+          if (
+            state1 &&
+            state2 &&
+            state1.activity === 'coding' &&
+            state2.activity === 'coding'
+          ) {
               const persona2 = assignPersona(
                 key2,
                 session2.task ?? session2.label ?? '',
@@ -331,7 +336,6 @@ export function useAgentBehaviors(
                 }
                 if (s2) s2.chatMessage = null
               }, CHAT_BUBBLE_MS + 2000)
-            }
           }
         }
         lastChatVisit.current = now

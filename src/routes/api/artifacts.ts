@@ -6,7 +6,7 @@ import { listToolArtifacts } from '../../server/tool-artifacts-store'
 export const Route = createFileRoute('/api/artifacts')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -19,7 +19,7 @@ export const Route = createFileRoute('/api/artifacts')({
           Number.isFinite(limit) && limit > 0 ? limit : 100,
         )
         return json({ ok: true, artifacts })
-      },
+      })()),
     },
   },
 })

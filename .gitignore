@@ -167,3 +167,10 @@ pr-triage-20260505-*/
 /public/war-room/**/_backup*/
 /public/war-room/**/rejected/
 /public/war-room/direct-overhead-v4-4k-empty/contact-sheet.png
+
+# Third-party marketplace research images are local evidence, not repository-owned media.
+# Keep provenance manifests in Git; clean clones fall back to their documented source URLs.
+/public/war-room/etsy-product-media/**/*.jpg
+/public/war-room/etsy-product-media/**/*.jpeg
+/public/war-room/etsy-product-media/**/*.png
+/public/war-room/etsy-product-media/**/*.webp

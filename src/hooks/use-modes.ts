@@ -34,6 +34,10 @@ export function useModes() {
   const [modes, setModes] = useState<Array<Mode>>(loadModes)
   const [appliedModeId, setAppliedModeId] = useState<string | null>(null)
   const { settings, updateSettings } = useSettings()
+  const smartSuggestionsEnabled = typeof settings.smartSuggestionsEnabled === 'boolean' ? settings.smartSuggestionsEnabled : false
+  const onlySuggestCheaper = typeof settings.onlySuggestCheaper === 'boolean' ? settings.onlySuggestCheaper : false
+  const preferredBudgetModel = typeof settings.preferredBudgetModel === 'string' ? settings.preferredBudgetModel : ''
+  const preferredPremiumModel = typeof settings.preferredPremiumModel === 'string' ? settings.preferredPremiumModel : ''
 
   // Sync modes to localStorage whenever they change
   useEffect(() => {
@@ -44,17 +48,15 @@ export function useModes() {
   const checkDrift = useCallback(
     (mode: Mode): boolean => {
       return (
-        mode.smartSuggestionsEnabled !==
-          (settings.smartSuggestionsEnabled ?? false) ||
-        mode.onlySuggestCheaper !== (settings.onlySuggestCheaper ?? false) ||
+        mode.smartSuggestionsEnabled !== smartSuggestionsEnabled ||
+        mode.onlySuggestCheaper !== onlySuggestCheaper ||
         (mode.preferredBudgetModel !== undefined &&
-          mode.preferredBudgetModel !==
-            (settings.preferredBudgetModel ?? '')) ||
+          mode.preferredBudgetModel !== preferredBudgetModel) ||
         (mode.preferredPremiumModel !== undefined &&
-          mode.preferredPremiumModel !== (settings.preferredPremiumModel ?? ''))
+          mode.preferredPremiumModel !== preferredPremiumModel)
       )
     },
-    [settings],
+    [onlySuggestCheaper, preferredBudgetModel, preferredPremiumModel, smartSuggestionsEnabled],
   )
 
   // Clear applied mode if settings drift
@@ -82,17 +84,17 @@ export function useModes() {
         id: crypto.randomUUID(),
         name,
         preferredModel: includeCurrentModel ? currentModel : undefined,
-        smartSuggestionsEnabled: settings.smartSuggestionsEnabled ?? false,
-        onlySuggestCheaper: settings.onlySuggestCheaper ?? false,
-        preferredBudgetModel: settings.preferredBudgetModel ?? '',
-        preferredPremiumModel: settings.preferredPremiumModel ?? '',
+        smartSuggestionsEnabled,
+        onlySuggestCheaper,
+        preferredBudgetModel,
+        preferredPremiumModel,
       }
 
       setModes((prev) => [...prev, newMode])
       setAppliedModeId(newMode.id)
       return newMode
     },
-    [modes, settings],
+    [modes, onlySuggestCheaper, preferredBudgetModel, preferredPremiumModel, smartSuggestionsEnabled],
   )
 
   const renameMode = useCallback(

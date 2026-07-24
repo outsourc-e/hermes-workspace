@@ -121,7 +121,7 @@ function artifactKindForEvent(run: WorkspaceRun, event: WorkspaceEvent): Workspa
 function displayFrom(run: WorkspaceRun, event: WorkspaceEvent): KernelAgentDisplayState {
   return {
     agentId: agentFor(run, event),
-    roomId: event.roomId ?? run.ownerRoomId,
+    roomId: event.roomId,
     stationId: event.stationId ?? run.ownerStationId,
     mode: modeFor(event),
     currentRunId: run.runId,
@@ -134,7 +134,7 @@ function displayFrom(run: WorkspaceRun, event: WorkspaceEvent): KernelAgentDispl
 export function buildKernelAgentDisplayStates(state: Pick<WorkspaceKernelPersistedState, 'runs' | 'events'>) {
   const runsById = new Map(state.runs.map((run) => [run.runId, run]))
   const displayByAgent = new Map<LivingV3AgentId, KernelAgentDisplayState>()
-  const events = [...(state.events ?? state.runs.flatMap((run) => run.events))]
+  const events = [...(state.events)]
     .sort((left, right) => left.createdAtMs - right.createdAtMs)
   for (const event of events) {
     const run = runsById.get(event.runId)
@@ -148,7 +148,7 @@ export function buildKernelAgentDisplayStates(state: Pick<WorkspaceKernelPersist
 }
 
 export function latestKernelAgentDisplayState(state: Pick<WorkspaceKernelPersistedState, 'runs' | 'events'>) {
-  const events = [...(state.events ?? state.runs.flatMap((run) => run.events))]
+  const events = [...(state.events)]
     .sort((left, right) => right.createdAtMs - left.createdAtMs)
   const runsById = new Map(state.runs.map((run) => [run.runId, run]))
   for (const event of events) {

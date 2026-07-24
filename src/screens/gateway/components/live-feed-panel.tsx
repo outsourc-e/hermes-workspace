@@ -49,7 +49,9 @@ const ACTIVITY_TYPES = new Set<FeedEventType>([
 type EventBadge = { label: string; className: string }
 type EventSeverity = 'error' | 'spawn' | 'system' | 'default'
 
-const EVENT_BADGE: Record<FeedEventType, EventBadge> = {
+const SYSTEM_EVENT_BADGE: EventBadge = { label: 'SYS', className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' }
+
+const EVENT_BADGE: Partial<Record<FeedEventType, EventBadge>> = {
   mission_started: { label: 'MISSION', className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50' },
   task_created:    { label: 'TASK',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
   task_moved:      { label: 'MOVE',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
@@ -61,7 +63,7 @@ const EVENT_BADGE: Record<FeedEventType, EventBadge> = {
   agent_spawned:   { label: 'SPAWN',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
   agent_killed:    { label: 'KILL',    className: 'bg-red-950/70 text-red-400 border border-red-800/50' },
   gateway_health:  { label: 'SYS',     className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' },
-  system:          { label: 'SYS',     className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' },
+  system:          SYSTEM_EVENT_BADGE,
 }
 
 function readString(value: unknown): string {
@@ -131,7 +133,7 @@ function severityBadge(event: FeedRow, severity: EventSeverity): EventBadge {
   if (severity === 'error') {
     return { label: 'ERROR', className: 'bg-red-950/70 text-red-300 border border-red-800/60' }
   }
-  return EVENT_BADGE[event.type] ?? EVENT_BADGE.system
+  return EVENT_BADGE[event.type] ?? SYSTEM_EVENT_BADGE
 }
 
 function severityTextClass(severity: EventSeverity): string {
@@ -163,7 +165,7 @@ export function LiveFeedPanel() {
     () =>
       onFeedEvent((event) =>
         setEvents((previous) => {
-          const latest = previous[0]
+          const latest = previous.at(0)
           if (
             latest &&
             latest.type === event.type &&

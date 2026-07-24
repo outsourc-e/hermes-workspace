@@ -55,7 +55,7 @@ export function buildInsights(
       }
     }
     if (peakVal > 0) {
-      const top = analytics.topModels[0]
+      const top = analytics.topModels.at(0)
       const driver = top ? `, driven by ${formatModelName(top.id)}` : ''
       out.push({
         tone: 'info',

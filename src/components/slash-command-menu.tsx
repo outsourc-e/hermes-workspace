@@ -97,7 +97,7 @@ export function mergeSlashCommands(
   return merged
 }
 
-const SlashCommandMenu = forwardRef(function SlashCommandMenu(
+const SlashCommandMenu = forwardRef(function SlashCommandMenuView(
   { open, query, onSelect, commands = DEFAULT_SLASH_COMMANDS }: SlashCommandMenuProps,
   ref: Ref<SlashCommandMenuHandle>,
 ) {
@@ -147,7 +147,6 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
       selectActive() {
         if (!open || filteredCommands.length === 0) return false
         const selected = filteredCommands[activeIndex]
-        if (!selected) return false
         onSelect(selected)
         return true
       },

@@ -156,7 +156,7 @@ const TIPS: ReadonlyArray<Tip> = [
       if (!a || a.source !== 'analytics') return 0
       const total = a.topModels.reduce((x, m) => x + m.calls, 0)
       if (total === 0) return 0
-      const top = a.topModels[0]
+      const top = a.topModels.at(0)
       if (!top) return 0
       return top.calls / total > 0.7 ? 45 : 0
     },

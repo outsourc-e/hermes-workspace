@@ -69,7 +69,7 @@ type LegacyWarRoomRoom = {
   feed?: Array<LiveWarRoomFeedItem>
 }
 
-type LiveWarRoomStatus = Partial<WarRoomSummaryResponse> & {
+type LiveWarRoomStatus = Omit<Partial<WarRoomSummaryResponse>, 'rooms'> & {
   readOnly?: boolean
   rooms?: Array<WarRoomRoomSummary> | Record<string, LegacyWarRoomRoom>
 }
@@ -149,8 +149,8 @@ function liveSourceLine(status: LiveWarRoomStatus | null) {
 }
 
 function livePulseDetail(status: LiveWarRoomStatus | null) {
-  const running = status?.pulse?.agents?.running ?? 0
-  const failed = status?.pulse?.agents?.failed ?? 0
+  const running = status?.pulse?.agents.running ?? 0
+  const failed = status?.pulse?.agents.failed ?? 0
   const approvals = status?.pulse?.approvals ?? 0
   const review = approvals ? `${approvals} waiting review` : 'approval gate clear'
   const agentLine = running ? `${running} agents active` : failed ? `${failed} agents need attention` : 'agents standing by'
@@ -180,8 +180,8 @@ function roomIntelLine(room: LegacyWarRoomRoom | WarRoomRoomSummary | null) {
 
 function RoomBrotherPanel({ room, liveRoom, activeStation, agent, walking }: { room: OlympusRoom; liveRoom: LegacyWarRoomRoom | WarRoomRoomSummary | null; activeStation: OlympusStation | null; agent: OlympusAgentInstance; walking: boolean }) {
   const ops = liveRoom && 'agentOps' in liveRoom ? liveRoom.agentOps : null
-  const primaryWorker = ops?.workers?.[0]
-  const visibleWorkers = ops?.workers?.slice(0, 3) ?? (primaryWorker ? [primaryWorker] : [])
+  const primaryWorker = ops?.workers[0]
+  const visibleWorkers = ops?.workers.slice(0, 3) ?? (primaryWorker ? [primaryWorker] : [])
   const stationName = activeStation?.name ?? 'room floor'
   const workMode = activeStation ? (walking ? `walking to ${stationName}` : `working at ${stationName}`) : 'standing by for a tool click'
   const output = activeStation
@@ -229,7 +229,7 @@ function RoomBrotherPanel({ room, liveRoom, activeStation, agent, walking }: { r
 }
 
 function latestLiveLine(status: LiveWarRoomStatus | null, room: OlympusRoom, liveRoom: LegacyWarRoomRoom | WarRoomRoomSummary | null) {
-  const feedLine = liveRoomFeed(status, room.id)[0]
+  const feedLine = liveRoomFeed(status, room.id).at(0)
   if (feedLine?.title) return feedLine.title
   if (feedLine?.summary) return feedLine.summary
   const intel = roomIntelLine(liveRoom)
@@ -239,7 +239,7 @@ function latestLiveLine(status: LiveWarRoomStatus | null, room: OlympusRoom, liv
 }
 
 function roomPacketCount(liveRoom: LegacyWarRoomRoom | WarRoomRoomSummary | null) {
-  if (liveRoom && 'workflowPacketCount' in liveRoom) return liveRoom.workflowPacketCount ?? 0
+  if (liveRoom && 'workflowPacketCount' in liveRoom) return liveRoom.workflowPacketCount
   return 0
 }
 
@@ -409,8 +409,8 @@ function packetAsset(artifactType?: string) {
 
 function useLiveAtlasMotion(roomRows: Array<{ room: OlympusRoom; liveRoom: LegacyWarRoomRoom | WarRoomRoomSummary | null; latestLine: string }>, liveStatus: LiveWarRoomStatus | null) {
   return useMemo(() => {
-    const actors: Record<string, LiveAtlasActor> = {}
-    const roomPackets: Record<string, Array<LiveAtlasRoomPacket>> = {}
+    const actors: Partial<Record<string, LiveAtlasActor>> = {}
+    const roomPackets: Partial<Record<string, Array<LiveAtlasRoomPacket>>> = {}
     const workflowPackets = (liveStatus?.workflowPackets ?? [])
     const packetsByRoom = new Map<string, Array<WarRoomWorkflowPacket>>()
 
@@ -424,11 +424,11 @@ function useLiveAtlasMotion(roomRows: Array<{ room: OlympusRoom; liveRoom: Legac
     })
 
     roomRows.forEach(({ room, liveRoom }) => {
-      const agent = room.agents[0]
+      const agent = room.agents.at(0)
       const visiblePackets = packetsByRoom.get(room.id) ?? []
       const priorityStation = room.stations.find((station) => station.kind === 'approval' && liveRoom?.health === 'review')
         ?? room.stations.find((station) => station.kind === 'archive' && room.id === 'atlantis-vault')
-        ?? room.stations[0]
+        ?? room.stations.at(0)
       const point = priorityStation?.operatorSpot ?? priorityStation?.position ?? agent?.position ?? { x: 50, y: 50 }
       const agentName = agent?.name ?? room.name
       const packetCount = roomPacketCount(liveRoom)
@@ -448,7 +448,7 @@ function useLiveAtlasMotion(roomRows: Array<{ room: OlympusRoom; liveRoom: Legac
         phase: 0,
       }
 
-      const packet = visiblePackets[0]
+      const packet = visiblePackets.at(0)
       roomPackets[room.id] = packet ? [{
         id: packet.id,
         roomId: room.id,
@@ -464,7 +464,7 @@ function useLiveAtlasMotion(roomRows: Array<{ room: OlympusRoom; liveRoom: Legac
   }, [liveStatus, roomRows])
 }
 function MiniRoomCell({ room, liveRoom, latestLine, actor, packets, onOpen }: { room: OlympusRoom; liveRoom: LegacyWarRoomRoom | WarRoomRoomSummary | null; latestLine: string; actor?: LiveAtlasActor; packets?: Array<LiveAtlasRoomPacket>; onOpen: (roomId: string) => void }) {
-  const agent = room.agents[0]
+  const agent = room.agents.at(0)
   const packetCount = roomPacketCount(liveRoom)
   const health = liveRoom?.health ?? 'idle'
   const featuredStations = room.stations.slice(0, 6)
@@ -521,7 +521,7 @@ function MiniRoomCell({ room, liveRoom, latestLine, actor, packets, onOpen }: { 
             </span>
           )
         })}
-        {actor ? (
+        {actor && agent ? (
           <span
             className="absolute z-20 h-[42px] w-[42px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-100/16 bg-cyan-200/[.035] shadow-[0_0_16px_rgba(45,212,191,.22)] brightness-100"
             style={{ left: `${agentX}%`, top: `${agentY}%` }}
@@ -529,14 +529,12 @@ function MiniRoomCell({ room, liveRoom, latestLine, actor, packets, onOpen }: { 
             data-live-atlas-moving={actor.moving ? 'true' : 'false'}
             data-live-atlas-action={actor.action}
           >
-            {agent ? (
-              <img
-                src={`${agent.idleFrame ?? agent.spriteSheet}?v=live-atlas-r4-motion`}
-                alt=""
-                className="h-full w-full object-contain [image-rendering:pixelated] drop-shadow-[0_10px_12px_rgba(0,0,0,.82)]"
-                draggable={false}
-              />
-            ) : <span className="block h-full w-full rounded-full bg-cyan-200" />}
+            <img
+              src={`${agent.idleFrame ?? agent.spriteSheet}?v=live-atlas-r4-motion`}
+              alt=""
+              className="h-full w-full object-contain [image-rendering:pixelated] drop-shadow-[0_10px_12px_rgba(0,0,0,.82)]"
+              draggable={false}
+            />
 
           </span>
         ) : null}
@@ -560,7 +558,7 @@ function MiniRoomCell({ room, liveRoom, latestLine, actor, packets, onOpen }: { 
 }
 
 function CampaignMapNode({ room, liveRoom, latestLine, actor, packets, onOpen }: { room: OlympusRoom; liveRoom: LegacyWarRoomRoom | WarRoomRoomSummary | null; latestLine: string; actor?: LiveAtlasActor; packets?: Array<LiveAtlasRoomPacket>; onOpen: (roomId: string) => void }) {
-  const point = LIVE_ATLAS_CAMPAIGN_POINTS[room.id] ?? LIVE_ATLAS_CELL_CENTERS[room.id] ?? { x: 50, y: 50 }
+  const point = LIVE_ATLAS_CAMPAIGN_POINTS[room.id] ?? LIVE_ATLAS_CELL_CENTERS[room.id]
   const packetCount = roomPacketCount(liveRoom)
   const health = liveRoom?.health ?? 'idle'
   const status = health === 'blocked' || health === 'review' ? 'needs review' : actor?.moving ? 'routing' : packetCount ? 'working' : 'ready'
@@ -592,15 +590,21 @@ function LiveMoneyOsRun({ packets, rooms, onOpenPacket }: { packets: Array<WarRo
   const activePacket = packets.find((packet) => packet.state === 'approval-waiting')
     ?? packets.find((packet) => packet.state === 'draft-ready')
     ?? packets.find((packet) => packet.state === 'needs-proof')
-    ?? packets[0]
-  const destination = activePacket ? packetDestination(activePacket) : null
-  const destinationRoom = destination ? rooms.find((room) => room.id === destination.roomId) : null
-  const destinationStation = destinationRoom && destination?.stationId ? destinationRoom.stations.find((station) => station.id === destination.stationId) : null
+    ?? packets.at(0)
+  if (!activePacket) return null
+  const destination = packetDestination(activePacket)
+  const destinationRoom =
+    rooms.find((room) => room.id === destination.roomId) ?? null
+  const destinationStation = destinationRoom && destination.stationId
+    ? destinationRoom.stations.find(
+        (station) => station.id === destination.stationId,
+      )
+    : null
   const steps = [
-    { id: 'signal', label: 'Signal', detail: activePacket?.input ?? 'waiting for source record', done: Boolean(activePacket) },
-    { id: 'route', label: 'Hermes route', detail: activePacket ? `${livingRoomLabel(activePacket.sourceRoomId)} → ${livingRoomLabel(activePacket.targetRoomId)}` : 'no packet selected', done: Boolean(activePacket) },
-    { id: 'work', label: destinationStation?.name ?? 'Station work', detail: activePacket?.output ?? 'station output not ready', done: Boolean(activePacket && activePacket.state !== 'source-ready') },
-    { id: 'gate', label: 'DLV gate', detail: activePacket?.risk ?? 'external actions locked', done: activePacket?.state === 'approval-waiting' || activePacket?.state === 'archived' },
+    { id: 'signal', label: 'Signal', detail: activePacket.input, done: true },
+    { id: 'route', label: 'Hermes route', detail: `${livingRoomLabel(activePacket.sourceRoomId)} → ${livingRoomLabel(activePacket.targetRoomId)}`, done: true },
+    { id: 'work', label: destinationStation?.name ?? 'Station work', detail: activePacket.output, done: activePacket.state !== 'source-ready' },
+    { id: 'gate', label: 'DLV gate', detail: activePacket.risk, done: activePacket.state === 'approval-waiting' || activePacket.state === 'archived' },
   ]
   return (
     <section className="relative max-h-[38px] shrink-0 overflow-hidden rounded-[14px] border border-amber-100/10 bg-black/24 px-3 py-1.5 shadow-[0_8px_18px_rgba(0,0,0,.26)]" data-war-room-live-money-os-run="true">
@@ -609,10 +613,10 @@ function LiveMoneyOsRun({ packets, rooms, onOpenPacket }: { packets: Array<WarRo
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <span className="shrink-0 text-[8px] font-black uppercase tracking-[.22em] text-amber-100/60">Live run</span>
-            <h2 className="truncate text-[12px] font-black leading-none text-amber-50">{activePacket?.title ?? 'No active packet yet'}</h2>
+            <h2 className="truncate text-[12px] font-black leading-none text-amber-50">{activePacket.title}</h2>
           </div>
           <div className="mt-1 flex flex-wrap gap-1.5 text-[7px] font-black uppercase tracking-[.10em]">
-            <span className={`rounded-full border px-2.5 py-1 ${packetStateTone(activePacket?.state)}`}>{activePacket?.state?.replace(/-/g, ' ') ?? 'idle'}</span>
+            <span className={`rounded-full border px-2.5 py-1 ${packetStateTone(activePacket.state)}`}>{activePacket.state.replace(/-/g, ' ')}</span>
             <span className="rounded-full border border-cyan-100/20 bg-cyan-300/[.08] px-2.5 py-1 text-cyan-50">{destinationRoom?.name ?? 'waiting room'}</span>
           </div>
         </div>
@@ -630,7 +634,7 @@ function LiveMoneyOsRun({ packets, rooms, onOpenPacket }: { packets: Array<WarRo
           ))}
         </div>
 
-        <button type="button" disabled={!activePacket} onClick={() => { if (activePacket) onOpenPacket(activePacket) }} className="shrink-0 rounded-full border border-emerald-100/24 bg-emerald-300/90 px-3 py-1.5 text-[8px] font-black uppercase tracking-[.14em] text-black shadow-[0_8px_18px_rgba(16,185,129,.14)] transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-100 disabled:cursor-default disabled:border-white/10 disabled:bg-white/10 disabled:text-white/42" data-war-room-jump-live-handoff="true">
+        <button type="button" onClick={() => onOpenPacket(activePacket)} className="shrink-0 rounded-full border border-emerald-100/24 bg-emerald-300/90 px-3 py-1.5 text-[8px] font-black uppercase tracking-[.14em] text-black shadow-[0_8px_18px_rgba(16,185,129,.14)] transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-100 disabled:cursor-default disabled:border-white/10 disabled:bg-white/10 disabled:text-white/42" data-war-room-jump-live-handoff="true">
           Handoff
         </button>
       </div>
@@ -653,7 +657,7 @@ const LIVE_ATLAS_CORRIDORS: Array<[string, string]> = [
 ]
 
 function corridorPoint(roomId: string) {
-  return LIVE_ATLAS_CAMPAIGN_POINTS[roomId] ?? LIVE_ATLAS_CELL_CENTERS[roomId] ?? { x: 50, y: 50 }
+  return LIVE_ATLAS_CAMPAIGN_POINTS[roomId] ?? LIVE_ATLAS_CELL_CENTERS[roomId]
 }
 
 function corridorPath(from: OlympusPoint, to: OlympusPoint) {
@@ -662,7 +666,7 @@ function corridorPath(from: OlympusPoint, to: OlympusPoint) {
   return `M ${from.x} ${from.y} C ${midX} ${from.y - lift}, ${midX} ${to.y + lift}, ${to.x} ${to.y}`
 }
 
-function ConnectedCellsMap({ roomRows, actors, roomPackets, workflowPackets, onOpenRoom, onOpenPacket }: { roomRows: Array<{ room: OlympusRoom; liveRoom: LegacyWarRoomRoom | WarRoomRoomSummary | null; latestLine: string }>; actors: Record<string, LiveAtlasActor>; roomPackets: Record<string, Array<LiveAtlasRoomPacket>>; workflowPackets: Array<WarRoomWorkflowPacket>; onOpenRoom: (roomId: string) => void; onOpenPacket: (packet: WarRoomWorkflowPacket) => void }) {
+function ConnectedCellsMap({ roomRows, actors, roomPackets, workflowPackets, onOpenRoom, onOpenPacket }: { roomRows: Array<{ room: OlympusRoom; liveRoom: LegacyWarRoomRoom | WarRoomRoomSummary | null; latestLine: string }>; actors: Partial<Record<string, LiveAtlasActor>>; roomPackets: Partial<Record<string, Array<LiveAtlasRoomPacket>>>; workflowPackets: Array<WarRoomWorkflowPacket>; onOpenRoom: (roomId: string) => void; onOpenPacket: (packet: WarRoomWorkflowPacket) => void }) {
   const transferPackets = workflowPackets.slice(0, 7).map((packet, index) => {
     const sourceRoomId = packetUiRoom(packet.sourceRoomId)
     const targetRoomId = packetUiRoom(packet.targetRoomId)
@@ -727,7 +731,9 @@ function ConnectedCellsMap({ roomRows, actors, roomPackets, workflowPackets, onO
         const point = corridorPoint(room.id)
         const packetCount = roomPacketCount(liveRoom)
         const health = liveRoom?.health ?? 'idle'
-        const agent = room.agents[0]
+        const agent = room.agents.at(0)
+        const roomActor = actors[room.id]
+        const firstRoomPacket = roomPackets[room.id]?.at(0)
         const isForgeFocus = room.id === 'forge'
         return (
           <button key={room.id} type="button" onClick={() => onOpenRoom(room.id)} className={`group absolute overflow-hidden border bg-[#070507]/88 text-left shadow-[0_18px_34px_rgba(0,0,0,.64),inset_0_0_24px_rgba(255,187,91,.08)] backdrop-blur-[2px] transition hover:z-40 hover:border-amber-100/70 focus:z-40 focus:outline-none focus:ring-2 focus:ring-amber-100 ${isForgeFocus ? 'z-30 h-[184px] w-[min(500px,34vw)] min-w-[340px] rounded-[26px] border-amber-100/42 p-3 shadow-[0_30px_80px_rgba(0,0,0,.78),0_0_44px_rgba(249,115,22,.20),inset_0_0_42px_rgba(255,187,91,.10)]' : 'z-20 h-[56px] w-[min(126px,11vw)] min-w-[92px] rounded-[14px] border-amber-100/14 p-1 opacity-68 hover:opacity-100'}`} style={{ left: `${point.x}%`, top: `${point.y}%`, animation: isForgeFocus ? undefined : `warRoomCellBreathe ${5.8 + (room.name.length % 4)}s ease-in-out infinite`, transform: 'translate(-50%, -50%)' }} aria-label={`Enter connected cell ${room.name}`} data-war-room-connected-cell={room.id} data-workflow-packets={packetCount} data-war-room-focus-cell={isForgeFocus ? 'true' : undefined}>
@@ -743,11 +749,11 @@ function ConnectedCellsMap({ roomRows, actors, roomPackets, workflowPackets, onO
                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full border ${healthTone(health)}`} />
               </div>
               <div className="flex items-end justify-between gap-2">
-                {agent ? <span className={`relative block ${isForgeFocus ? 'h-16 w-16' : 'h-7 w-7'}`} style={{ animation: `warRoomAgentPatrol ${4.4 + (room.id.length % 3)}s ease-in-out infinite` }}><img src={agent.idleFrame ?? agent.spriteSheet} alt="" className="h-full w-full object-contain [image-rendering:pixelated] drop-shadow-[0_8px_10px_rgba(0,0,0,.76)]" draggable={false} /></span> : <span />}
+                {agent ? <span className={`relative block ${isForgeFocus ? 'h-16 w-16' : 'h-7 w-7'}`} style={{ animation: `warRoomAgentPatrol ${4.4 + (room.id.length % 3)}s ease-in-out infinite` }}><img src={agent.idleFrame ?? agent.spriteSheet} alt="" className="h-full w-full object-contain [image-rendering:pixelated] drop-shadow-[0_8px_10px_rgba(0,0,0,.76)]" draggable={false} /></span> : null}
                 {isForgeFocus ? <span className="rounded-full border border-orange-100/24 bg-black/56 px-3 py-1 text-[9px] font-black uppercase tracking-[.14em] text-orange-50 shadow-[0_0_20px_rgba(249,115,22,.22)]">open cell</span> : null}
-                {!isForgeFocus && roomPackets[room.id]?.[0] ? <img src={packetAsset(roomPackets[room.id][0].artifactType)} alt="" className="h-5 w-5 rounded-full border border-amber-100/20 bg-black/56 p-0.5 shadow-[0_0_14px_rgba(251,191,36,.18)]" draggable={false} /> : null}
+                {!isForgeFocus && firstRoomPacket ? <img src={packetAsset(firstRoomPacket.artifactType)} alt="" className="h-5 w-5 rounded-full border border-amber-100/20 bg-black/56 p-0.5 shadow-[0_0_14px_rgba(251,191,36,.18)]" draggable={false} /> : null}
               </div>
-              <div className={`absolute truncate font-semibold text-stone-200/82 ${isForgeFocus ? 'bottom-3 left-20 right-24 text-[10px]' : 'bottom-1 left-8 right-1 text-[6px]'}`}>{actors[room.id]?.action ?? latestLine}</div>
+              <div className={`absolute truncate font-semibold text-stone-200/82 ${isForgeFocus ? 'bottom-3 left-20 right-24 text-[10px]' : 'bottom-1 left-8 right-1 text-[6px]'}`}>{roomActor?.action ?? `${room.name} ready`}</div>
             </div>
           </button>
         )
@@ -868,7 +874,7 @@ const JARVIS_OMEN_TONE_CLASS: Record<JarvisOmenTone, string> = {
 
 function jarvisOmens(liveStatus: LiveWarRoomStatus | null, liveStatusError: string | null, workflowPackets: Array<WarRoomWorkflowPacket>): Array<JarvisOmen> {
   const approvals = liveStatus?.pulse?.approvals ?? workflowPackets.filter((packet) => packet.state === 'approval-waiting').length
-  const runningAgents = liveStatus?.pulse?.agents?.running ?? 0
+  const runningAgents = liveStatus?.pulse?.agents.running ?? 0
   const missions = liveStatus?.pulse?.missions ?? 0
   const pulseLine = liveStatus?.ok
     ? `${livePulseDetail(liveStatus)} • ${missions} missions in local pulse.`
@@ -915,7 +921,7 @@ function jarvisOmens(liveStatus: LiveWarRoomStatus | null, liveStatusError: stri
 
 function JarvisOmenStrip({ liveStatus, liveStatusError, workflowPackets, onOpenCommand }: { liveStatus: LiveWarRoomStatus | null; liveStatusError: string | null; workflowPackets: Array<WarRoomWorkflowPacket>; onOpenCommand: () => void }) {
   const approvals = liveStatus?.pulse?.approvals ?? workflowPackets.filter((packet) => packet.state === 'approval-waiting').length
-  const runningAgents = liveStatus?.pulse?.agents?.running ?? 0
+  const runningAgents = liveStatus?.pulse?.agents.running ?? 0
   const readyPackets = workflowPackets.filter((packet) => packet.state !== 'archived').length
   const omens = jarvisOmens(liveStatus, liveStatusError, workflowPackets)
 
@@ -1475,7 +1481,7 @@ function liveStationForRoom(roomId: string) {
 
 function liveRoomLine(room: OlympusRoom) {
   const summary = roomOpsSummary(room.id)
-  return summary.activeAgent?.line ?? summary.mission?.summary ?? room.agents[0]?.speech ?? 'Realm is idle.'
+  return summary.activeAgent?.line ?? `${room.name} ready for live data`
 }
 
 function OlympusEnvironmentField() {
@@ -1500,7 +1506,7 @@ function OlympusEnvironmentField() {
       {realmMapHotspots.map((spot) => {
         const summary = roomOpsSummary(spot.roomId)
         const room = olympusGameManifest.rooms.find((candidate) => candidate.id === spot.roomId)
-        const agentName = summary.activeAgent?.name ?? room?.agents[0]?.name ?? spot.label
+        const agentName = summary.activeAgent?.name ?? room?.agents.at(0)?.name ?? spot.label
         const state = summary.activeAgent?.state
         const color = agentStateColor(state)
         return (
@@ -1508,7 +1514,7 @@ function OlympusEnvironmentField() {
             key={`live-god-${spot.roomId}`}
             className="absolute z-[19] h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border bg-black/52 shadow-[0_0_18px_rgba(0,0,0,.75)]"
             style={{ left: `${Math.min(94, spot.x + 5)}%`, top: `${Math.max(6, spot.y - 7)}%`, borderColor: color, boxShadow: `0 0 18px ${color}66` }}
-            title={`${agentName} • ${state ?? 'idle'}`}
+            title={`${agentName} • ${state}`}
           >
             <span className="absolute inset-[-8px] rounded-full border opacity-55 animate-ping" style={{ borderColor: color }} />
             <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ background: color, boxShadow: `0 0 14px ${color}` }} />
@@ -1767,8 +1773,8 @@ function PacketActionLayer({ packet, station, agent, walking, phase }: { packet:
         : phase === 'handoff-ready'
           ? `Handoff ready — opening ${station.name}`
           : `${agent.name} forging output at ${station.name}`
-  const from = agent.position ?? { x: 50, y: 78 }
-  const to = station.operatorSpot ?? station.position
+  const from = agent.position
+  const to = station.operatorSpot
   const tool = station.position
   const pathToOperator = `M ${from.x} ${from.y} C ${(from.x + to.x) / 2} ${Math.min(from.y, to.y) - 12}, ${(from.x + to.x) / 2} ${Math.max(from.y, to.y) + 8}, ${to.x} ${to.y}`
   const pathToTool = `M ${to.x} ${to.y} C ${(to.x + tool.x) / 2} ${Math.min(to.y, tool.y) - 8}, ${(to.x + tool.x) / 2} ${Math.max(to.y, tool.y) + 7}, ${tool.x} ${tool.y}`
@@ -1921,7 +1927,7 @@ function mapMarkerState(roomId: string) {
 
 function dedupePath(points: Array<OlympusPoint>): Array<OlympusPoint> {
   return points.filter((point, index) => {
-    const previous = points[index - 1]
+    const previous = points.at(index - 1)
     return !previous || Math.abs(previous.x - point.x) > 0.4 || Math.abs(previous.y - point.y) > 0.4
   })
 }
@@ -2155,7 +2161,7 @@ export function WarRoomGame() {
         const payload = await response.json() as WarRoomSummaryResponse
         if (cancelled) return
         setLiveStatus(payload)
-        setLiveStatusError(payload.sources?.sessionError ?? null)
+        setLiveStatusError(payload.sources.sessionError ?? null)
         setLiveSyncPulse((value) => value + 1)
       } catch (error) {
         if (cancelled) return
@@ -2215,7 +2221,7 @@ export function WarRoomGame() {
         const payload = await response.json() as WarRoomRoomDetailResponse
         if (cancelled) return
         setRoomDetail(payload)
-        setLiveStatusError(payload.sources?.sessionError ?? null)
+        setLiveStatusError(payload.sources.sessionError ?? null)
       } catch (error) {
         if (cancelled) return
         setRoomDetail(null)
@@ -2245,7 +2251,7 @@ export function WarRoomGame() {
     setAmbientToolId(null)
     if (room?.id !== 'olympus-command' || dialogOpen) return
 
-    let cancelled = false
+    const cancellationState = new Set<'cancelled'>()
     let pulseTimer: number | null = null
     let clearTimer: number | null = null
     const commandToolIds = room.stations
@@ -2254,21 +2260,21 @@ export function WarRoomGame() {
 
     const schedulePulse = (delay = 58_000 + Math.round(Math.random() * 8_000)) => {
       pulseTimer = window.setTimeout(() => {
-        if (cancelled || dialogOpen || commandToolIds.length === 0) return
+        if (cancellationState.has('cancelled') || commandToolIds.length === 0) return
         const available = commandToolIds.filter((id) => id !== activeStationId)
         const pool = available.length ? available : commandToolIds
         const next = pool[Math.floor(Math.random() * pool.length)]
         setAmbientToolId(next)
         clearTimer = window.setTimeout(() => {
           setAmbientToolId(null)
-          if (!cancelled) schedulePulse()
+          if (!cancellationState.has('cancelled')) schedulePulse()
         }, 4_200)
       }, delay)
     }
 
     schedulePulse(24_000)
     return () => {
-      cancelled = true
+      cancellationState.add('cancelled')
       if (pulseTimer) window.clearTimeout(pulseTimer)
       if (clearTimer) window.clearTimeout(clearTimer)
       setAmbientToolId(null)

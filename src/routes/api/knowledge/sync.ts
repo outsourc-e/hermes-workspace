@@ -49,13 +49,13 @@ export const Route = createFileRoute('/api/knowledge/sync')({
           )
         }
       },
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
         const config = readKnowledgeBaseConfig()
         return json({ source: config.source })
-      },
+      })()),
     },
   },
 })

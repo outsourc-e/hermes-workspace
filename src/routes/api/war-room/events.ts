@@ -13,7 +13,7 @@ import type {WarRoomAgentId, WarRoomTaskId} from '../../../lib/war-room/body';
 export const Route = createFileRoute('/api/war-room/events')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

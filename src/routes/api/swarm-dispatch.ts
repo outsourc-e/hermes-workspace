@@ -873,7 +873,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
           }
           appendSwarmMemoryEvent({
             workerId,
-            missionId: options?.missionId ?? null,
+            missionId: options.missionId ?? null,
             assignmentId: assignment.assignmentId ?? null,
             type: 'checkpoint',
             summary: checkpoint.result ?? `Checkpoint ${checkpoint.stateLabel}`,
@@ -888,7 +888,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
           })
           publishSwarmCheckpointNotification({
             workerId,
-            missionId: options?.missionId ?? null,
+            missionId: options.missionId ?? null,
             assignmentId: assignment.assignmentId ?? null,
             checkpoint,
             notifySessionKey: options.notifySessionKey ?? 'main',
@@ -993,7 +993,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
             })
             appendSwarmMemoryEvent({
               workerId,
-              missionId: options?.missionId ?? null,
+              missionId: options.missionId ?? null,
               assignmentId: assignment.assignmentId ?? null,
               type: 'checkpoint',
               summary: checkpoint.result ?? `Checkpoint ${checkpoint.stateLabel}`,
@@ -1008,7 +1008,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
             })
             publishSwarmCheckpointNotification({
               workerId,
-              missionId: options?.missionId ?? null,
+              missionId: options.missionId ?? null,
               assignmentId: assignment.assignmentId ?? null,
               checkpoint,
               notifySessionKey: options.notifySessionKey ?? 'main',

@@ -302,7 +302,7 @@ function mergeWithBuiltins(userSources: Array<HubSourceEntry>): Array<HubSourceE
 // ---------------------------------------------------------------------------
 
 /** Read hub sources, bootstrapping the file if missing. */
-export async function readHubSources(): Promise<ReadHubSourcesResult> {
+function readHubSourcesSync(): ReadHubSourcesResult {
   const path = hubSourcesFilePath()
 
   const stat = statKey(path)
@@ -391,11 +391,15 @@ export async function readHubSources(): Promise<ReadHubSourcesResult> {
   return result
 }
 
+export function readHubSources(): Promise<ReadHubSourcesResult> {
+  return Promise.resolve(readHubSourcesSync())
+}
+
 // ---------------------------------------------------------------------------
 // Internal: read only user-defined sources from the file
 // ---------------------------------------------------------------------------
 
-async function readUserSources(): Promise<{ sources: Array<HubSourceEntry>; error?: string; validationErrors?: Array<ValidationIssue> }> {
+function readUserSourcesSync(): { sources: Array<HubSourceEntry>; error?: string; validationErrors?: Array<ValidationIssue> } {
   const path = hubSourcesFilePath()
   const stat = statKey(path)
   if (!stat.ok) {
@@ -420,6 +424,10 @@ async function readUserSources(): Promise<{ sources: Array<HubSourceEntry>; erro
     return { sources: validation.sources, error: 'validation errors', validationErrors: hardErrors }
   }
   return { sources: validation.sources }
+}
+
+function readUserSources(): Promise<{ sources: Array<HubSourceEntry>; error?: string; validationErrors?: Array<ValidationIssue> }> {
+  return Promise.resolve(readUserSourcesSync())
 }
 
 // ---------------------------------------------------------------------------

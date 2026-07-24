@@ -265,7 +265,7 @@ export function normalizeSessions(
       preview:
         typeof session.preview === 'string'
           ? cleanUserText(session.preview) || session.preview.trim() || null
-          : session.preview ?? null,
+          : null,
     }
   })
 }

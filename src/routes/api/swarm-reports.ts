@@ -6,7 +6,7 @@ import { listSwarmReports } from '../../server/swarm-missions'
 export const Route = createFileRoute('/api/swarm-reports')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -22,7 +22,7 @@ export const Route = createFileRoute('/api/swarm-reports')({
           workerId,
           reports: listSwarmReports({ missionId, workerId, limit }),
         })
-      },
+      })()),
     },
   },
 })

@@ -287,7 +287,7 @@ function sessionMatchesMissionContext(
 
 function loadPersistedMission(): PersistedMission | null {
   try {
-    const raw = globalThis.localStorage?.getItem(ACTIVE_MISSION_STORAGE_KEY)
+    const raw = globalThis.localStorage.getItem(ACTIVE_MISSION_STORAGE_KEY)
     if (!raw) return null
 
     const parsed = JSON.parse(raw) as Record<string, unknown>
@@ -370,7 +370,7 @@ function loadPersistedMission(): PersistedMission | null {
 
 function loadConductorSettings(): ConductorSettings {
   try {
-    const raw = globalThis.localStorage?.getItem(CONDUCTOR_SETTINGS_STORAGE_KEY)
+    const raw = globalThis.localStorage.getItem(CONDUCTOR_SETTINGS_STORAGE_KEY)
     if (!raw) return DEFAULT_CONDUCTOR_SETTINGS
     const parsed = JSON.parse(raw) as Record<string, unknown>
     return {
@@ -387,7 +387,7 @@ function loadConductorSettings(): ConductorSettings {
 
 function persistConductorSettings(settings: ConductorSettings): void {
   try {
-    globalThis.localStorage?.setItem(CONDUCTOR_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+    globalThis.localStorage.setItem(CONDUCTOR_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
   } catch {
     // Ignore persistence failures.
   }
@@ -395,7 +395,7 @@ function persistConductorSettings(settings: ConductorSettings): void {
 
 function loadMissionHistory(): Array<MissionHistoryEntry> {
   try {
-    const raw = globalThis.localStorage?.getItem(HISTORY_STORAGE_KEY)
+    const raw = globalThis.localStorage.getItem(HISTORY_STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -440,7 +440,7 @@ function appendMissionHistory(entry: MissionHistoryEntry): void {
     // Deduplicate by id before appending
     const filtered = current.filter((e) => e.id !== entry.id)
     const updated = [entry, ...filtered].slice(0, MAX_HISTORY_ENTRIES)
-    globalThis.localStorage?.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated))
+    globalThis.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated))
   } catch {
     // Ignore persistence failures.
   }
@@ -448,7 +448,7 @@ function appendMissionHistory(entry: MissionHistoryEntry): void {
 
 function persistMission(state: PersistedMission): void {
   try {
-    globalThis.localStorage?.setItem(ACTIVE_MISSION_STORAGE_KEY, JSON.stringify(state))
+    globalThis.localStorage.setItem(ACTIVE_MISSION_STORAGE_KEY, JSON.stringify(state))
   } catch {
     // Ignore persistence failures.
   }
@@ -456,7 +456,7 @@ function persistMission(state: PersistedMission): void {
 
 function clearPersistedMission(): void {
   try {
-    globalThis.localStorage?.removeItem(ACTIVE_MISSION_STORAGE_KEY)
+    globalThis.localStorage.removeItem(ACTIVE_MISSION_STORAGE_KEY)
   } catch {
     // Ignore persistence failures.
   }
@@ -464,7 +464,7 @@ function clearPersistedMission(): void {
 
 function clearMissionHistoryStorage(): void {
   try {
-    globalThis.localStorage?.removeItem(HISTORY_STORAGE_KEY)
+    globalThis.localStorage.removeItem(HISTORY_STORAGE_KEY)
   } catch {
     // Ignore persistence failures.
   }
@@ -570,7 +570,7 @@ function extractHistoryMessageText(message: HistoryMessage | undefined): string 
   if (typeof message.content === 'string') return message.content
   if (Array.isArray(message.content)) {
     return message.content
-      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+      .map((part) => (typeof part.text === 'string' ? part.text : ''))
       .filter(Boolean)
       .join('\n')
   }
@@ -583,7 +583,7 @@ function getLastAssistantMessage(messages: Array<HistoryMessage> | undefined): s
   let best = ''
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
-    if (message?.role !== 'assistant') continue
+    if (message.role !== 'assistant') continue
     const text = extractHistoryMessageText(message).trim()
     if (text.length > best.length) best = text
   }
@@ -1171,9 +1171,7 @@ export function useConductorGateway() {
     }
 
     const timer = setTimeout(() => {
-      if (phase === 'decomposing') {
-        setPhase('running')
-      }
+      setPhase('running')
     }, 15_000)
 
     return () => clearTimeout(timer)
@@ -1302,7 +1300,7 @@ export function useConductorGateway() {
     if (tasks.length === 0 || workers.length === 0) return
     setTasks((current) => {
       const updated = current.map((task, index) => {
-        const worker = workers[index]
+        const worker = workers.at(index)
         if (!worker) return task
         const workerOutput = workerOutputs[worker.key] ?? null
         const newStatus: ConductorTask['status'] = worker.status === 'complete' ? 'complete' : worker.status === 'stale' ? 'failed' : worker.status === 'running' ? 'running' : task.status

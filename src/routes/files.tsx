@@ -367,7 +367,7 @@ function FilesRoute() {
                   className="max-h-full max-w-full rounded-lg border border-primary-200 shadow-sm object-contain"
                 />
               </div>
-            ) : isMarkdown && renderMarkdown && loaded ? (
+            ) : isMarkdown && renderMarkdown ? (
               <ScrollAreaRoot className="h-full">
                 <ScrollAreaViewport>
                   <div className="markdown-preview mx-auto max-w-4xl px-6 py-5 text-sm text-primary-900">

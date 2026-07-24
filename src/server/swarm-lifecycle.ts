@@ -219,12 +219,12 @@ function sendTmux(workerId: string, prompt: string): Promise<{ ok: boolean; erro
     const tmux = tmuxBin()
     if (!tmux) return resolve({ ok: false, error: 'tmux not available on this platform' })
     const child = execFile(tmux, ['load-buffer', '-b', `swarm-lifecycle-${workerId}`, '-'], (loadErr, _stdout, stderr) => {
-      if (loadErr) return resolve({ ok: false, error: stderr?.toString() || loadErr.message })
+      if (loadErr) return resolve({ ok: false, error: stderr.toString() || loadErr.message })
       execFile(tmux, ['send-keys', '-t', session, 'C-u'], () => {
         execFile(tmux, ['paste-buffer', '-d', '-b', `swarm-lifecycle-${workerId}`, '-t', session], (pasteErr, _out2, err2) => {
-          if (pasteErr) return resolve({ ok: false, error: err2?.toString() || pasteErr.message })
+          if (pasteErr) return resolve({ ok: false, error: err2.toString() || pasteErr.message })
           setTimeout(() => execFile(tmux, ['send-keys', '-t', session, 'Enter'], (enterErr, _out3, err3) => {
-            if (enterErr) return resolve({ ok: false, error: err3?.toString() || enterErr.message })
+            if (enterErr) return resolve({ ok: false, error: err3.toString() || enterErr.message })
             resolve({ ok: true })
           }), 150)
         })
@@ -303,10 +303,10 @@ function startWorkerProcessNative(workerId: string): { ok: boolean; error?: stri
   workerProcesses.set(workerId, proc)
 
   // Log stdout/stderr
-  proc.stdout?.on('data', (data: Buffer) => {
+  proc.stdout.on('data', (data: Buffer) => {
     appendWorkerLog(workerId, `[stdout] ${data.toString().trimEnd()}`)
   })
-  proc.stderr?.on('data', (data: Buffer) => {
+  proc.stderr.on('data', (data: Buffer) => {
     appendWorkerLog(workerId, `[stderr] ${data.toString().trimEnd()}`)
   })
 
@@ -381,7 +381,7 @@ function tmuxKill(workerId: string): Promise<{ ok: boolean; error?: string }> {
   if (!binary) return Promise.resolve({ ok: false, error: 'tmux not found' })
   return new Promise((resolve) => {
     execFile(binary, ['kill-session', '-t', session], (err, _out, stderr) => {
-      if (err) return resolve({ ok: false, error: stderr?.toString() || err.message })
+      if (err) return resolve({ ok: false, error: stderr.toString() || err.message })
       resolve({ ok: true })
     })
   })
@@ -395,7 +395,7 @@ function tmuxStart(workerId: string): Promise<{ ok: boolean; error?: string }> {
   if (!binary) return Promise.resolve({ ok: false, error: 'tmux not found' })
   return new Promise((resolve) => {
     execFile(binary, ['new-session', '-d', '-s', session, wrapper], (err, _out, stderr) => {
-      if (err) return resolve({ ok: false, error: stderr?.toString() || err.message })
+      if (err) return resolve({ ok: false, error: stderr.toString() || err.message })
       resolve({ ok: true })
     })
   })
@@ -428,7 +428,7 @@ export async function renewWorker(workerId: string): Promise<{ ok: boolean; rest
       event: { handoffPath: hp, started: started.ok, resumeSent: sent.ok },
     })
   } catch { /* best-effort */ }
-  return { ok: started.ok && sent.ok, restarted: started.ok, resumeSent: sent.ok, error: sent.error, handoffPath: hp }
+  return { ok: sent.ok, restarted: started.ok, resumeSent: sent.ok, error: sent.error, handoffPath: hp }
 }
 
 export async function autoSweepLifecycle(workerIds: Array<string>): Promise<Array<{ workerId: string; action: 'none' | 'request-handoff' | 'renew'; status: SwarmLifecycleStatus; result?: { ok: boolean; error?: string } }>> {

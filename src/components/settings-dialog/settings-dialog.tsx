@@ -383,7 +383,8 @@ function HermesContent() {
         setDefaultProvider(d.activeProvider || '')
         setDefaultModelId(d.activeModel || '')
         if (d.activeProvider) fetchModelsForProvider(d.activeProvider)
-        const mem = (d.config?.memory as Record<string, unknown>) || {}
+        const mem =
+          (d.config?.memory as Record<string, unknown> | undefined) ?? {}
         setMemEnabled(mem.memory_enabled !== false)
         setUserProfileEnabled(mem.user_profile_enabled !== false)
         // Build configured keys map
@@ -395,7 +396,8 @@ function HermesContent() {
         }
         setConfiguredKeys(keys)
         // Load custom provider config (may be stored as 'custom' or legacy 'manifest')
-        const cfgProviders = (d.config?.providers as Record<string, any>) || {}
+        const cfgProviders =
+          (d.config?.providers as Record<string, any> | undefined) ?? {}
         const customCfg = cfgProviders['custom'] || cfgProviders['manifest'] || {}
         if (customCfg.base_url) setCustomBaseUrl(customCfg.base_url)
         if (d.activeProvider === 'custom' && d.activeModel) {
@@ -596,7 +598,7 @@ function HermesContent() {
 
       throw new Error('OAuth authorization timed out')
     } catch (error) {
-      if ((error as { name?: string })?.name === 'AbortError') return
+      if ((error as { name?: string }).name === 'AbortError') return
       setOauthStatus('error')
       setOauthMessage(
         error instanceof Error ? error.message : 'OAuth authorization failed',
@@ -2095,7 +2097,9 @@ function AgentBehaviorContent() {
     fetch('/api/hermes-config')
       .then((r) => r.json())
       .then((d: any) => {
-        setConfig((d.config?.agent as Record<string, unknown>) || {})
+        setConfig(
+          (d.config?.agent as Record<string, unknown> | undefined) ?? {},
+        )
       })
       .catch(() => {})
   }, [])
@@ -2185,8 +2189,8 @@ function VoiceContent() {
     fetch('/api/hermes-config')
       .then((r) => r.json())
       .then((d: any) => {
-        setTts((d.config?.tts as Record<string, unknown>) || {})
-        setStt((d.config?.stt as Record<string, unknown>) || {})
+        setTts((d.config?.tts as Record<string, unknown> | undefined) ?? {})
+        setStt((d.config?.stt as Record<string, unknown> | undefined) ?? {})
       })
       .catch(() => {})
   }, [])
@@ -2266,11 +2270,11 @@ function VoiceContent() {
           <Row label="Voice">
             <select
               value={String(
-                (tts.openai as Record<string, unknown>)?.voice || 'nova',
+                (tts.openai as Record<string, unknown>).voice || 'nova',
               )}
               onChange={(e) =>
                 saveTts('openai', {
-                  ...((tts.openai as Record<string, unknown>) || {}),
+                  ...((tts.openai as Record<string, unknown> | undefined) ?? {}),
                   voice: e.target.value,
                 })
               }
@@ -2355,7 +2359,9 @@ function DisplayContent() {
     fetch('/api/hermes-config')
       .then((r) => r.json())
       .then((d: any) => {
-        setConfig((d.config?.display as Record<string, unknown>) || {})
+        setConfig(
+          (d.config?.display as Record<string, unknown> | undefined) ?? {},
+        )
       })
       .catch(() => {})
   }, [])

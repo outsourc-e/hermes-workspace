@@ -1177,7 +1177,7 @@ export function applySmartIntakeMatchToEtsyRoomLocal(
 }
 
 export function activeEtsyRoomCandidate(state: EtsyRoomState) {
-  return state.candidates.find((candidate) => candidate.candidateId === state.selectedCandidateId) ?? state.candidates[0]
+  return state.candidates.find((candidate) => candidate.candidateId === state.selectedCandidateId) ?? state.candidates.at(0)
 }
 
 export function selectEtsyCandidateLocal(state: EtsyRoomState, candidateId: string, nowMs = Date.now()): EtsyRoomState {
@@ -1642,20 +1642,22 @@ export function reduceEtsyRoomLocalIntent(state: EtsyRoomState, intent: EtsyRoom
   }
 }
 
-export function validateEtsyRoomPacket(packet: EtsyBaseRoomPacket) {
+export function validateEtsyRoomPacket(packet: unknown): packet is EtsyBaseRoomPacket {
+  if (!packet || typeof packet !== 'object') return false
+  const candidate = packet as Record<string, unknown>
   return Boolean(
-    packet.packetId
-    && packet.runId
-    && packet.createdAtMs
-    && packet.sourceStationId
-    && packet.targetStationId
-    && packet.status
-    && packet.dataOrigin
-    && Array.isArray(packet.sourceRecordIds)
-    && Array.isArray(packet.evidenceIds)
-    && Array.isArray(packet.missingFields)
-    && Array.isArray(packet.lockedActions)
-    && packet.nextHandoff
-    && typeof packet.humanApprovalRequired === 'boolean',
+    typeof candidate.packetId === 'string' && candidate.packetId
+    && typeof candidate.runId === 'string' && candidate.runId
+    && typeof candidate.createdAtMs === 'number' && candidate.createdAtMs
+    && typeof candidate.sourceStationId === 'string' && candidate.sourceStationId
+    && typeof candidate.targetStationId === 'string' && candidate.targetStationId
+    && typeof candidate.status === 'string' && candidate.status
+    && typeof candidate.dataOrigin === 'string' && candidate.dataOrigin
+    && Array.isArray(candidate.sourceRecordIds)
+    && Array.isArray(candidate.evidenceIds)
+    && Array.isArray(candidate.missingFields)
+    && Array.isArray(candidate.lockedActions)
+    && typeof candidate.nextHandoff === 'string' && candidate.nextHandoff
+    && typeof candidate.humanApprovalRequired === 'boolean',
   )
 }

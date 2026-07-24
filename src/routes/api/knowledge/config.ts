@@ -11,7 +11,7 @@ import type {KnowledgeBaseConfig} from '../../../server/knowledge-config';
 export const Route = createFileRoute('/api/knowledge/config')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/api/knowledge/config')({
             { status: 500 },
           )
         }
-      },
+      })()),
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })

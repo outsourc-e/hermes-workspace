@@ -162,8 +162,8 @@ export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
   }
 }
 
-export async function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
-  return []
+export function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
+  return Promise.resolve([])
 }
 
 function NavItem({

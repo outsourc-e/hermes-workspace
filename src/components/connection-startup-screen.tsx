@@ -131,7 +131,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         if (isDone.current) return
         isDone.current = true
         clearTimeout(failureTimer)
-        if (autoStartTimer) clearTimeout(autoStartTimer)
+        clearTimeout(autoStartTimer)
         if (pollTimer) clearTimeout(pollTimer)
         onConnectedRef.current(status)
       } catch {
@@ -145,7 +145,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
     return () => {
       isDone.current = true
       if (pollTimer) clearTimeout(pollTimer)
-      if (autoStartTimer) clearTimeout(autoStartTimer)
+      clearTimeout(autoStartTimer)
       clearTimeout(failureTimer)
     }
   }, [])

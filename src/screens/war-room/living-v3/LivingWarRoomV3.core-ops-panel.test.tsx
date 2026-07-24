@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { WorkspaceCoreOpsPanel } from './WorkspaceCoreOpsPanel'
+import type { WorkspaceCoreOpsSnapshot } from '../../../lib/workspace-core-ops'
 
 describe('LivingWarRoomV3 Core Ops panel', () => {
   it('adds a read-only global ops panel without changing map room phase/dimming mechanics', () => {
@@ -65,5 +68,37 @@ describe('LivingWarRoomV3 Core Ops panel', () => {
     expect(contract).not.toContain('phase:')
     expect(panelCss).not.toContain('living-v3__room--phase')
     expect(panelCss).not.toContain('filter: saturate')
+  })
+
+  it('renders the empty-artifact state without crashing', () => {
+    const snapshot = {
+      generatedAtMs: 1,
+      source: 'workspace-kernel-local-state',
+      safety: {
+        localOnly: true,
+        readOnly: true,
+        usageAllowed: false,
+        workerSpawnAllowed: false,
+        externalRequestsAllowed: false,
+        liveActionsAllowed: false,
+      },
+      counts: {
+        notifications: 0,
+        waitingApprovals: 0,
+        artifacts: 0,
+        failedRuns: 0,
+        blockedRuns: 0,
+        completedRuns: 0,
+      },
+      notifications: [],
+      approvals: [],
+      artifacts: [],
+    } satisfies WorkspaceCoreOpsSnapshot
+
+    const markup = renderToStaticMarkup(
+      <WorkspaceCoreOpsPanel snapshot={snapshot} storeStatus="ready" onOpenRoom={() => undefined} />,
+    )
+
+    expect(markup).toContain('None yet')
   })
 })

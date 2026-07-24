@@ -38,7 +38,7 @@ type SwarmTerminalProps = {
 
 type ConnectionState = 'idle' | 'connecting' | 'connected' | 'closed' | 'error'
 
-export const SwarmTerminal = memo(function SwarmTerminal({
+export const SwarmTerminal = memo(function SwarmTerminalView({
   workerId,
   command,
   cwd,
@@ -132,12 +132,15 @@ export const SwarmTerminal = memo(function SwarmTerminal({
   }, [stop])
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
+    const cancellationState = new Set<'cancelled'>()
+    const getMountedContainer = () => containerRef.current
 
     async function bootstrap() {
-      if (!containerRef.current) return
+      if (!getMountedContainer()) return
       await ensureXterm()
-      if (cancelled || !containerRef.current) return
+      const mountedContainer = getMountedContainer()
+      if (cancellationState.has('cancelled') || !mountedContainer) return
 
       const terminal = new TerminalCtor({
         cursorBlink: true,
@@ -160,7 +163,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
       fitRef.current = fit
       terminal.loadAddon(fit)
       terminal.loadAddon(links)
-      terminal.open(containerRef.current)
+      terminal.open(mountedContainer)
 
       try {
         fit.fit()
@@ -170,7 +173,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
 
       focusTerminal()
 
-      const viewport = containerRef.current.querySelector(
+      const viewport = mountedContainer.querySelector(
         '.xterm-viewport',
       )
       const wheelHandler: EventListener = (event) => {
@@ -193,6 +196,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
       setState('connecting')
       const response = await fetch('/api/terminal-stream', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           command,
@@ -202,7 +206,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         }),
       }).catch(() => null)
 
-      if (cancelled) return
+      if (cancellationState.has('cancelled')) return
       if (!response || !response.ok || !response.body) {
         setError(`Failed to start swarm terminal (${response?.status ?? 'no response'})`)
         setState('error')
@@ -293,14 +297,15 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         dataDisposable.dispose()
         resizeDisposable.dispose()
         window.removeEventListener('resize', handleResize)
-        if (!cancelled) setState('closed')
+        if (!cancellationState.has('cancelled')) setState('closed')
       }
     }
 
     void bootstrap()
 
     return () => {
-      cancelled = true
+      cancellationState.add('cancelled')
+      controller.abort()
       stop()
       const terminal = terminalRef.current
       terminalRef.current = null
@@ -401,7 +406,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
           const data = keyToData()
           if (!data) return
           const activeEl = document.activeElement as HTMLElement | null
-          const isXtermTextarea = activeEl?.classList?.contains('xterm-helper-textarea')
+          const isXtermTextarea = activeEl?.classList.contains('xterm-helper-textarea')
 
           if (isXtermTextarea) {
             // Prefer xterm's native onData path. On some macOS browser/input

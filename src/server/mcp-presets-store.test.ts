@@ -332,7 +332,6 @@ describe('readPresets', () => {
       : alt.slice(0, base.length)
     expect(padded.length).toBe(base.length)
 
-    const { mtime } = readFileSync(path) ? { mtime: new Date() } : { mtime: new Date() }
     // Get mtime before write
     const { statSync } = await import('node:fs')
     const beforeMtime = statSync(path).mtime

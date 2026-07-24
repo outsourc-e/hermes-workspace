@@ -18,7 +18,7 @@ describe('WorkspaceStationCta', () => {
     document.body.appendChild(container)
     const root = createRoot(container)
 
-    await React.act(async () => {
+    await React.act(() => {
       root.render(
         <WorkspaceStationCta
           actionId="atlantis.refresh-source-index"
@@ -57,7 +57,7 @@ describe('WorkspaceStationCta', () => {
     expect(cta?.querySelector('.workspace-station-cta__proof')).toBeNull()
     expect(cta?.textContent).not.toContain('Proof')
 
-    await React.act(async () => root.unmount())
+    await React.act(() => root.unmount())
     document.body.removeChild(container)
   })
 })

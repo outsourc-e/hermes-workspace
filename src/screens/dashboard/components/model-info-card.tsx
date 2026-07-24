@@ -249,7 +249,7 @@ function ModelInventoryModal({
   const [filter, setFilter] = useState('')
 
   useEffect(() => {
-    let cancelled = false
+    const requestState = { cancelled: false }
     ;(async () => {
       try {
         const res = await fetch('/api/models')
@@ -258,7 +258,7 @@ function ModelInventoryModal({
         const list = (data?.data ?? data?.models ?? []) as Array<
           Record<string, unknown>
         >
-        if (cancelled) return
+        if (requestState.cancelled) return
         setModels(
           list
             .map((m) => ({
@@ -269,15 +269,15 @@ function ModelInventoryModal({
             .filter((m) => m.id),
         )
       } catch (err) {
-        if (!cancelled) {
+        if (!requestState.cancelled) {
           setError(err instanceof Error ? err.message : 'failed to load')
         }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!requestState.cancelled) setLoading(false)
       }
     })()
     return () => {
-      cancelled = true
+      requestState.cancelled = true
     }
   }, [])
 

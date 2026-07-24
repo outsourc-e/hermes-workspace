@@ -62,13 +62,13 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
         }
       },
 
-      DELETE: async ({ request }) => {
+      DELETE: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
 
         return jsonResponse({ error: 'Delete is not supported by the shared Agent Kanban backend' }, 405)
-      },
+      })()),
 
       POST: async ({ request, params }) => {
         if (!isAuthenticated(request)) {

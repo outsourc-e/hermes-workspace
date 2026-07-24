@@ -110,8 +110,8 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
         const text = await res.text()
         throw new Error(text || `HTTP ${res.status}`)
       }
-      const data = (await res.json()) as { results?: Array<DispatchPingResult> }
-      const first = data.results && data.results[0] ? data.results[0] : null
+      const pingData = (await res.json()) as { results?: Array<DispatchPingResult> }
+      const first = pingData.results && pingData.results[0] ? pingData.results[0] : null
       setPingResult(first)
     } catch (err) {
       setPingError(err instanceof Error ? err.message : 'Ping failed')

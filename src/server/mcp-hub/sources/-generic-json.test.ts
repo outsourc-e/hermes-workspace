@@ -46,9 +46,9 @@ function mockFetch(status: number, body: unknown, headers?: Record<string, strin
 function mockFetchWithStream(chunks: Array<Uint8Array>): void {
   let idx = 0
   const reader = {
-    read: vi.fn(async () => {
-      if (idx >= chunks.length) return { done: true, value: undefined }
-      return { done: false, value: chunks[idx++] }
+    read: vi.fn(() => {
+      if (idx >= chunks.length) return Promise.resolve({ done: true, value: undefined })
+      return Promise.resolve({ done: false, value: chunks[idx++] })
     }),
     cancel: vi.fn().mockResolvedValue(undefined),
     releaseLock: vi.fn(),

@@ -59,7 +59,7 @@ export function canAgentPerformIntent(intent: AgentIntent) {
     return { ok: false as const, reason: `Unknown agentId: ${intent.agentId}` }
   }
   const required = capabilityForIntent(intent)
-  const capabilities = WAR_ROOM_CAPABILITY_REGISTRY[intent.agentId] ?? []
+  const capabilities = WAR_ROOM_CAPABILITY_REGISTRY[intent.agentId]
   if (!capabilities.includes(required)) {
     return { ok: false as const, reason: `${agent.label} cannot perform ${required}` }
   }

@@ -66,11 +66,11 @@ export function useSwipeNavigation() {
       gestureRef.current = null
       return
     }
-    const touch = event.touches[0]
-    if (!touch || shouldIgnoreTarget(event.target)) {
+    if (event.touches.length === 0 || shouldIgnoreTarget(event.target)) {
       gestureRef.current = null
       return
     }
+    const touch = event.touches[0]
 
     const screenWidth = window.innerWidth
     const isEdge =
@@ -89,8 +89,8 @@ export function useSwipeNavigation() {
     const gesture = gestureRef.current
     if (!gesture) return
 
+    if (event.touches.length === 0) return
     const touch = event.touches[0]
-    if (!touch) return
 
     if (!gesture.locked) {
       const dx = Math.abs(touch.clientX - gesture.startX)
@@ -115,8 +115,8 @@ export function useSwipeNavigation() {
       gestureRef.current = null
       if (!gesture) return
 
+      if (event.changedTouches.length === 0) return
       const touch = event.changedTouches[0]
-      if (!touch) return
 
       const dx = touch.clientX - gesture.startX
       const dy = touch.clientY - gesture.startY

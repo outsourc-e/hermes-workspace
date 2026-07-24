@@ -163,7 +163,7 @@ function KnowledgeRouterStrip() {
   const records = route?.records?.slice(0, 3) ?? []
   const packet = focusedPacket ?? route?.workflowPacket
   const statusLine = focusedPacket ? 'Opened from Atlantis packet' : loading ? 'Routing…' : error ? 'Router error' : `${records.length} DB links ready`
-  const shortGate = packet?.lockedActions?.[0] ?? 'External actions locked'
+  const shortGate = packet?.lockedActions[0] ?? 'External actions locked'
   return (
     <div className="mt-3 rounded-[20px] border border-cyan-100/14 bg-cyan-300/[.045] px-3 py-2" data-atlantis-knowledge-router-strip="true">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -388,7 +388,7 @@ function PromptStudio({ station, onClose }: { station: OlympusStation; onClose: 
               </div>
               <div className="flex items-center gap-2 rounded-[20px] border border-amber-100/10 bg-black/24 p-2 backdrop-blur-[1px]">
                 <img src={promptAnvilAssets.approval} alt="Generated approval shrine" className="h-14 w-14 object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,.55)]" />
-                <div className="min-w-0"><div className="text-[8px] font-black uppercase tracking-[.2em] text-rose-100/58">Gate</div><div className="truncate text-[14px] font-black text-white">{packet?.lockedActions?.[0] ?? 'external locked'}</div></div>
+                <div className="min-w-0"><div className="text-[8px] font-black uppercase tracking-[.2em] text-rose-100/58">Gate</div><div className="truncate text-[14px] font-black text-white">{packet?.lockedActions[0] ?? 'external locked'}</div></div>
               </div>
             </div>
 
@@ -400,7 +400,7 @@ function PromptStudio({ station, onClose }: { station: OlympusStation; onClose: 
               </div>
 
               <div className="grid min-h-0 grid-rows-[auto_1fr_auto] gap-2 rounded-[22px] border border-fuchsia-100/10 bg-black/30 p-4 shadow-[inset_0_0_38px_rgba(217,70,239,.045)]">
-                <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[.24em] text-fuchsia-100/54">Prompt Mold</div><div className="text-[20px] font-black uppercase tracking-[-.03em]">Forged draft</div></div><button type="button" onClick={() => navigator.clipboard?.writeText(improvedPrompt).catch(() => undefined)} className={`${primaryButton} bg-amber-200 px-5 py-2 text-black`}>copy</button></div>
+                <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[.24em] text-fuchsia-100/54">Prompt Mold</div><div className="text-[20px] font-black uppercase tracking-[-.03em]">Forged draft</div></div><button type="button" onClick={() => navigator.clipboard.writeText(improvedPrompt).catch(() => undefined)} className={`${primaryButton} bg-amber-200 px-5 py-2 text-black`}>copy</button></div>
                 <pre className="min-h-0 overflow-auto whitespace-pre-wrap rounded-[20px] border border-fuchsia-100/10 bg-black/42 p-4 font-mono text-[12px] font-semibold leading-relaxed text-fuchsia-50/90">{improvedPrompt}</pre>
                 <div className="grid gap-2 sm:grid-cols-2"><button type="button" className={`${primaryButton} bg-fuchsia-200 py-2 text-black`}>save local draft</button><button type="button" className={`${primaryButton} border border-amber-100/18 bg-black/32 py-2 text-amber-50`}>refresh context</button></div>
               </div>
@@ -504,7 +504,7 @@ function ApprovalShrineApp({ station, onClose }: { station: OlympusStation; onCl
   const sourcePacket = focusedPacket ?? route?.workflowPacket ?? null
   const evidenceRows = [
     { id: 'source', label: 'source proof', value: sourcePacket?.input ?? 'supplier/product evidence not attached yet', state: sourcePacket ? 'ready' : 'missing' },
-    { id: 'output', label: 'draft output', value: sourcePacket?.output ?? selectedPacket?.action ?? 'local draft packet only', state: selectedPacket?.state === 'locked' ? 'locked' : 'review' },
+    { id: 'output', label: 'draft output', value: sourcePacket?.output ?? selectedPacket.action, state: selectedPacket.state === 'locked' ? 'locked' : 'review' },
     { id: 'risk', label: 'risk line', value: sourcePacket?.risk ?? 'external marketplace / spend / account actions locked', state: 'locked' },
     { id: 'handoff', label: 'next handoff', value: sourcePacket?.nextHandoff ?? 'Treasury or Atlantis archive after DLV decision', state: decision === 'hold' ? 'waiting' : 'ready' },
   ]
@@ -537,8 +537,8 @@ function ApprovalShrineApp({ station, onClose }: { station: OlympusStation; onCl
           <div className="grid gap-2 [@media(max-height:700px)]:gap-1.5 lg:grid-cols-[1fr_auto]">
             <div className="min-w-0">
               <div className="text-[10px] font-black uppercase tracking-[.28em] text-amber-100/62">current decision</div>
-              <h3 className="mt-1 max-w-[470px] text-[clamp(22px,2.3vw,34px)] font-black uppercase leading-[.92] tracking-[-.055em] [@media(max-height:700px)]:text-[20px]">{selectedPacket?.title ?? 'Approval packet'}</h3>
-              <p className="mt-2 max-w-3xl text-[12px] font-bold leading-relaxed text-white/62 [@media(max-height:700px)]:mt-1 [@media(max-height:700px)]:line-clamp-1 [@media(max-height:700px)]:text-[10px]">{selectedPacket?.action ?? 'Select a packet. This console only writes a local decision state for review.'}</p>
+              <h3 className="mt-1 max-w-[470px] text-[clamp(22px,2.3vw,34px)] font-black uppercase leading-[.92] tracking-[-.055em] [@media(max-height:700px)]:text-[20px]">{selectedPacket.title}</h3>
+              <p className="mt-2 max-w-3xl text-[12px] font-bold leading-relaxed text-white/62 [@media(max-height:700px)]:mt-1 [@media(max-height:700px)]:line-clamp-1 [@media(max-height:700px)]:text-[10px]">{selectedPacket.action}</p>
             </div>
             <div className={`min-w-[168px] rounded-[22px] border p-2.5 text-center [@media(max-height:700px)]:p-2 ${decisionCopy.tone}`} data-approval-decision-badge="true">
               <div className="text-[9px] font-black uppercase tracking-[.22em] opacity-70">decision</div>
@@ -557,11 +557,11 @@ function ApprovalShrineApp({ station, onClose }: { station: OlympusStation; onCl
               </div>
               <div className="min-w-0 rounded-[18px] border border-cyan-100/16 bg-black/30 p-2.5">
                 <div className="text-[8px] font-black uppercase tracking-[.22em] text-cyan-100/70">living artifact packet</div>
-                <div className="mt-1 truncate text-[clamp(18px,1.8vw,26px)] font-black uppercase leading-none tracking-[-.045em] text-amber-50">{sourcePacket?.title ?? selectedPacket?.title ?? 'Approval packet'}</div>
+                <div className="mt-1 truncate text-[clamp(18px,1.8vw,26px)] font-black uppercase leading-none tracking-[-.045em] text-amber-50">{sourcePacket?.title ?? selectedPacket.title}</div>
                 <div className="mt-1.5 grid gap-1.5 text-[9px] font-bold leading-snug text-stone-200/78 md:grid-cols-3">
                   <div className="rounded-xl border border-white/10 bg-white/[.045] p-1.5"><span className="block text-[7px] font-black uppercase text-cyan-100/62">input</span><span className="line-clamp-2">{sourcePacket?.input ?? 'source evidence pending'}</span></div>
-                  <div className="rounded-xl border border-white/10 bg-white/[.045] p-1.5"><span className="block text-[7px] font-black uppercase text-emerald-100/62">output</span><span className="line-clamp-2">{sourcePacket?.output ?? selectedPacket?.action ?? 'local decision draft'}</span></div>
-                  <div className="rounded-xl border border-rose-100/14 bg-rose-500/[.08] p-1.5 text-rose-50"><span className="block text-[7px] font-black uppercase text-rose-100/70">locked</span><span className="line-clamp-2">{sourcePacket?.lockedActions?.[0] ?? 'live external action'}</span></div>
+                  <div className="rounded-xl border border-white/10 bg-white/[.045] p-1.5"><span className="block text-[7px] font-black uppercase text-emerald-100/62">output</span><span className="line-clamp-2">{sourcePacket?.output ?? selectedPacket.action}</span></div>
+                  <div className="rounded-xl border border-rose-100/14 bg-rose-500/[.08] p-1.5 text-rose-50"><span className="block text-[7px] font-black uppercase text-rose-100/70">locked</span><span className="line-clamp-2">{sourcePacket?.lockedActions[0] ?? 'live external action'}</span></div>
                 </div>
               </div>
               <div className="rounded-[18px] border border-rose-100/18 bg-rose-500/10 p-2 text-center">
@@ -617,10 +617,10 @@ function ApprovalShrineApp({ station, onClose }: { station: OlympusStation; onCl
             </div>
             <div className="rounded-[24px] border border-white/10 bg-white/[.045] p-4">
               <div className={tinyLabel}>decision packet preview</div>
-              <pre className="mt-3 max-h-44 overflow-auto whitespace-pre-wrap rounded-[18px] bg-black/36 p-3 font-mono text-[11px] font-semibold leading-relaxed text-white/68">{`decision: ${decision}\npacket: ${selectedPacket?.title ?? 'none'}\nnote: ${note}\nexternal: locked\nnext: ${decision === 'reject' ? 'Atlantis rejection archive' : decision === 'revise' ? 'return to responsible room brother' : 'local draft handoff only'}`}</pre>
+              <pre className="mt-3 max-h-44 overflow-auto whitespace-pre-wrap rounded-[18px] bg-black/36 p-3 font-mono text-[11px] font-semibold leading-relaxed text-white/68">{`decision: ${decision}\npacket: ${selectedPacket.title}\nnote: ${note}\nexternal: locked\nnext: ${decision === 'reject' ? 'Atlantis rejection archive' : decision === 'revise' ? 'return to responsible room brother' : 'local draft handoff only'}`}</pre>
             </div>
           </div>
-          <button type="button" onClick={() => navigator.clipboard?.writeText(`Decision: ${decision}\nPacket: ${selectedPacket?.title ?? 'none'}\nNote: ${note}\nExternal actions: locked`).catch(() => undefined)} className={`${primaryButton} mt-3 bg-amber-200 text-black`}>copy decision packet</button>
+          <button type="button" onClick={() => navigator.clipboard.writeText(`Decision: ${decision}\nPacket: ${selectedPacket.title}\nNote: ${note}\nExternal actions: locked`).catch(() => undefined)} className={`${primaryButton} mt-3 bg-amber-200 text-black`}>copy decision packet</button>
         </section>
       </main>
     </AppShell>
@@ -664,8 +664,10 @@ function AtlantisVaultApp({ station, onClose }: { station: OlympusStation; onClo
     const subset = allRecords.filter((record) => ids.has(record.kind))
     return subset.length ? subset : allRecords
   }, [allRecords, collectionId])
-  const [selectedRecordId, setSelectedRecordId] = useState(filteredRecords[0]?.id ?? allRecords[0]?.id ?? '')
-  const selectedRecord = filteredRecords.find((record) => record.id === selectedRecordId) ?? filteredRecords[0] ?? allRecords[0]
+  const [selectedRecordId, setSelectedRecordId] = useState(filteredRecords[0]?.id ?? allRecords[0]?.id)
+  const selectedRecord =
+    filteredRecords.find((record) => record.id === selectedRecordId) ??
+    filteredRecords.at(0)
   return (
     <AppShell station={station} onClose={onClose} appName="Olympus Data Vault" tag="Atlantis DB • collections → records → room handoffs" data="atlantis-vault-database-app" accent="bg-[radial-gradient(circle_at_18%_18%,rgba(45,212,191,.24),transparent_30%),radial-gradient(circle_at_82%_74%,rgba(59,130,246,.22),transparent_32%),linear-gradient(135deg,#03131a,#020812_64%,#000)]">
       <main className="grid min-h-0 flex-1 gap-4 pt-4 xl:grid-cols-[320px_390px_1fr]" data-atlantis-vault-database-app="true">

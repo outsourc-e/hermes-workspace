@@ -25,8 +25,8 @@ export type LocalMessage = {
 }
 
 type StoreData = {
-  sessions: Record<string, LocalSession>
-  messages: Record<string, Array<LocalMessage>>
+  sessions: Partial<Record<string, LocalSession>>
+  messages: Partial<Record<string, Array<LocalMessage>>>
 }
 
 let store: StoreData = { sessions: {}, messages: {} }
@@ -35,9 +35,22 @@ function loadFromDisk(): void {
   try {
     if (existsSync(SESSIONS_FILE)) {
       const raw = readFileSync(SESSIONS_FILE, 'utf-8')
-      const parsed = JSON.parse(raw) as StoreData
-      if (parsed.sessions && parsed.messages) {
-        store = parsed
+      const parsed: unknown = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        const record = parsed as Record<string, unknown>
+        if (
+          record.sessions &&
+          typeof record.sessions === 'object' &&
+          !Array.isArray(record.sessions) &&
+          record.messages &&
+          typeof record.messages === 'object' &&
+          !Array.isArray(record.messages)
+        ) {
+          store = {
+            sessions: record.sessions as StoreData['sessions'],
+            messages: record.messages as StoreData['messages'],
+          }
+        }
       }
     }
   } catch {
@@ -57,7 +70,9 @@ function saveToDisk(): void {
 loadFromDisk()
 
 export function listLocalSessions(): Array<LocalSession> {
-  return Object.values(store.sessions).sort((a, b) => b.updatedAt - a.updatedAt)
+  return Object.values(store.sessions)
+    .filter((session): session is LocalSession => session !== undefined)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
 export function getLocalSession(sessionId: string): LocalSession | null {
@@ -68,19 +83,20 @@ export function ensureLocalSession(
   sessionId: string,
   model?: string,
 ): LocalSession {
-  if (!store.sessions[sessionId]) {
-    store.sessions[sessionId] = {
-      id: sessionId,
-      title: null,
-      model: model ?? null,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messageCount: 0,
-    }
-    store.messages[sessionId] = []
-    saveToDisk()
+  const existing = store.sessions[sessionId]
+  if (existing) return existing
+  const session: LocalSession = {
+    id: sessionId,
+    title: null,
+    model: model ?? null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    messageCount: 0,
   }
-  return store.sessions[sessionId]
+  store.sessions[sessionId] = session
+  store.messages[sessionId] = []
+  saveToDisk()
+  return session
 }
 
 export function updateLocalSessionTitle(

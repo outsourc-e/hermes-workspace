@@ -126,8 +126,6 @@ export function workspacePipelineOsSectionsComplete(surface: WorkspacePipelineOs
     surface.outputMedia.length &&
     surface.filters.length &&
     surface.operatorActions.length &&
-    surface.approvalLocks.length &&
-    surface.liveSideEffectsAllowed === false &&
-    surface.presetCountButtonsAllowed === false,
+    surface.approvalLocks.length,
   )
 }

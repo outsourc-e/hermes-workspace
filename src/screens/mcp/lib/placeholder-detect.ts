@@ -81,6 +81,5 @@ export function isStillPlaceholder(kind: PlaceholderField['kind'], value: string
   if (!value) return true
   if (kind === 'arg') return isArgPlaceholder(value)
   if (kind === 'url') return isUrlPlaceholder(value)
-  if (kind === 'env') return ANGLE_BRACKET_RE.test(value)
-  return false
+  return ANGLE_BRACKET_RE.test(value)
 }

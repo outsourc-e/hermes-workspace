@@ -52,7 +52,7 @@ function parsePreviousOpinions(value: unknown): Array<ControlledCouncilPeerOpini
       vote: safeString(item.vote, 40) as ControlledCouncilPeerOpinion['vote'],
       voteReason: safeString(item.voteReason, 500),
     }))
-    .filter((item) => item.generalId && (item.opinion || item.chatSummary))
+    .filter((item) => item.opinion || item.chatSummary)
     .slice(0, 12)
 }
 

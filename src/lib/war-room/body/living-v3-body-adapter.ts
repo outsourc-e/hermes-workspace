@@ -44,7 +44,7 @@ function bodyAgentToTask(agent: AgentBodyState, events: Array<WarRoomEvent>, now
   const latest = latestEventForAgent(events, agent.agentId)
   const station = agent.stationId ? livingV3StationById(agent.stationId) : null
   const createdAtMs = latest?.createdAtMs ?? agent.updatedAtMs
-  const target = station?.operatorSpot ?? agent.position ?? definition.home.point
+  const target = station?.operatorSpot ?? agent.position
   const from = kind === 'move'
     ? definition.home
     : { roomId: agent.roomId, point: target }

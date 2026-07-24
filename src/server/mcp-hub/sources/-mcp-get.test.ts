@@ -59,7 +59,7 @@ function makeFetchMock(status: number, body: unknown, headers: Record<string, st
     status,
     ok: status >= 200 && status < 300,
     headers: {
-      get: (name: string) => headers[name] ?? headers[name.toLowerCase()] ?? null,
+      get: (name: string) => headers[name] ?? headers[name.toLowerCase()],
     },
     json: () => Promise.resolve(body),
   }) as unknown as typeof fetch

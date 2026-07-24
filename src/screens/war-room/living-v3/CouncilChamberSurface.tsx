@@ -1230,7 +1230,9 @@ function blockedCouncilSession(topic: string, error: string, discussionId?: stri
 
 function sessionFromRealCouncil(data: RealCouncilApiResponse): CouncilSession {
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  const realTurns = [...(data.openingTurns ?? []), ...(data.voteTurns ?? [])].map(turnFromRealCouncil)
+  const openingTurns = Array.isArray(data.openingTurns) ? data.openingTurns : []
+  const voteTurns = Array.isArray(data.voteTurns) ? data.voteTurns : []
+  const realTurns = [...openingTurns, ...voteTurns].map(turnFromRealCouncil)
   return sanitizeCouncilSessionForUi({
     packetId: data.decisionPacket?.packetId ?? data.runId,
     discussionId: data.drawingBoard?.discussionId,
@@ -1270,7 +1272,7 @@ function discussionRoundFromDrawingBoard(round: CouncilDrawingBoardRoundPayload)
     id: round.roundId,
     operatorOpinion: cleanCouncilUiText(round.question, 'שאלת המשך', 1_200),
     answers,
-    createdAtLabel: new Date(round.completedAtMs ?? round.startedAtMs ?? Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    createdAtLabel: new Date(round.completedAtMs ?? round.startedAtMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     targetGeneralId: councilRoundTargetForUi(round),
   }
 }
@@ -1376,9 +1378,9 @@ async function fetchRealCouncilSession(topic: string, options: { discussionId?: 
   }, COUNCIL_FULL_COUNCIL_HTTP_TIMEOUT_MS)
   const hasRoundPayload = typeof data.runId === 'string' && Array.isArray(data.openingTurns) && Boolean(data.stats)
   if (!response.ok || !data.ok) {
-    const message = data.error ?? data.summary ?? (response.ok ? 'Council API returned ok:false with HTTP 200.' : `Council API failed with HTTP ${response.status}`)
+    const message = data.error ?? data.summary
     return hasRoundPayload
-      ? sessionFromRealCouncil({ ...data, error: message, summary: data.summary ?? message })
+      ? sessionFromRealCouncil({ ...data, error: message, summary: data.summary })
       : blockedCouncilSession(topic, message)
   }
   return sessionFromRealCouncil(data)
@@ -1606,7 +1608,7 @@ export function CouncilChamberSurface({
   const [minimalView, setMinimalView] = useState<CouncilMinimalView>('council')
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiveEntries, setArchiveEntries] = useState<Array<CouncilArchivedSession>>(() => loadCouncilArchive())
-  const [drawingBoardStats, setDrawingBoardStats] = useState<Record<string, CouncilGeneralStats>>({})
+  const [drawingBoardStats, setDrawingBoardStats] = useState<Partial<Record<string, CouncilGeneralStats>>>({})
   const [drawingBoardStatus, setDrawingBoardStatus] = useState('Loading saved discussions')
   const mainChatRef = useRef<HTMLDivElement | null>(null)
   const chatRef = useRef<HTMLDivElement | null>(null)
@@ -1752,7 +1754,7 @@ export function CouncilChamberSurface({
       id: general.id,
       name: general.shortName,
       personaLabel: isChair ? 'ראש המועצה · מסכם ושומר מחלוקות' : general.personaLabel,
-      memoryLine: stats?.memoryNotes?.[0],
+      memoryLine: stats?.memoryNotes[0],
       statLine: stats ? `${stats.participated} דיונים · ${stats.wins} הובלות` : 'פרופיל חדש',
       isChair,
       accent: general.accent,
@@ -1884,18 +1886,18 @@ export function CouncilChamberSurface({
   }, [activeGeneralId, councilRunPending, flowStage, handoffState, motionState, operatorOpinion, selectedPlanningGeneralIds, session, topic])
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
     void (async () => {
       try {
         const payload = await fetchCouncilDrawingBoardState()
-        if (cancelled) return
+        if (controller.signal.aborted) return
         applyDrawingBoardPayload(payload)
         setDrawingBoardStatus(payload.ok ? 'נשמר מקומית במחשב' : 'נשמר רק בדפדפן')
       } catch {
-        if (!cancelled) setDrawingBoardStatus('ארכיון מקומי בלבד')
+        if (!controller.signal.aborted) setDrawingBoardStatus('ארכיון מקומי בלבד')
       }
     })()
-    return () => { cancelled = true }
+    return () => controller.abort()
   }, [])
 
   useEffect(() => {
@@ -1971,18 +1973,16 @@ export function CouncilChamberSurface({
     setVisibleMessageCount(0)
     setMinimalView('council')
     setArchiveOpen(false)
-    if (request.autoStart) {
-      void (async () => {
-        await fetch('/api/war-room/council/run', {
-          method: 'DELETE',
-          cache: 'no-store',
-          credentials: 'same-origin',
-        }).catch(() => undefined)
-        if (consumedLaunchRequestRef.current === request.requestId) {
-          await conveneCouncilTopic(askedTopic)
-        }
-      })()
-    }
+    void (async () => {
+      await fetch('/api/war-room/council/run', {
+        method: 'DELETE',
+        cache: 'no-store',
+        credentials: 'same-origin',
+      }).catch(() => undefined)
+      if (consumedLaunchRequestRef.current === request.requestId) {
+        await conveneCouncilTopic(askedTopic)
+      }
+    })()
   }, [councilRunPending, launchRequest?.requestId])
 
   const stateLabel = handoffState === 'sent'

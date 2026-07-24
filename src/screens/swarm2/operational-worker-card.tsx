@@ -500,9 +500,9 @@ export function OperationalWorkerCard({
               <HugeiconsIcon icon={ArrowLeft01Icon} size={11} />
             </button>
             <div className="min-w-0 flex-1 text-center">
-              <div className="truncate">{activeFocusPanel?.label ?? 'Panel'}</div>
+              <div className="truncate">{activeFocusPanel.label}</div>
               <div className="truncate text-[10px] font-medium normal-case tracking-normal text-[var(--theme-muted)]/80">
-                {activeFocusPanel?.meta ?? outputFreshness}
+                {activeFocusPanel.meta}
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -530,7 +530,7 @@ export function OperationalWorkerCard({
           </div>
 
           <p className="mb-2 mx-auto max-w-2xl text-center text-[11px] leading-relaxed text-[var(--theme-muted)]">
-            {activeFocusPanel?.helper ?? 'Worker details'}
+            {activeFocusPanel.helper}
           </p>
 
           {focusPanel === 'tasks' ? (

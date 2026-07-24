@@ -143,8 +143,11 @@ function extractContent(msg: { content?: string | Array<{ type?: string; text?: 
 
 function sanitizeArgsPreview(args?: string): string {
   if (!args) return 'No arguments'
-  const cleaned = args
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+  const withoutControlCharacters = Array.from(args, (character) => {
+    const code = character.charCodeAt(0)
+    return code <= 31 || code === 127 ? ' ' : character
+  }).join('')
+  const cleaned = withoutControlCharacters
     .replace(/\s+/g, ' ')
     .trim()
   if (!cleaned) return 'No arguments'
@@ -243,7 +246,7 @@ export function RunConsole({
     for (const key of sessionKeys) {
       try {
         const res = await fetchSessionHistory(key)
-        const msgs = res?.messages ?? []
+        const msgs = res.messages ?? []
         const agentName = agentNameMap?.[key] ?? 'Agent'
         for (const msg of msgs) {
           const content = extractContent(msg)
@@ -360,7 +363,7 @@ export function RunConsole({
 
   const copyArtifactContent = useCallback(async (artifact: RunArtifact) => {
     const textToCopy = artifact.content || artifact.path || artifact.name
-    if (!textToCopy || !navigator?.clipboard?.writeText) return
+    if (!('clipboard' in navigator)) return
     try {
       await navigator.clipboard.writeText(textToCopy)
       setCopiedArtifactId(artifact.id)
@@ -717,7 +720,7 @@ export function RunConsole({
               eventsByAgent.length >= 3 ? (
                 <div className="flex gap-3 overflow-x-auto pb-2">
                   {eventsByAgent.map((lane) => {
-                    const latestEvent = lane.events[lane.events.length - 1]
+                    const latestEvent = lane.events.at(-1)
                     const laneDotClass =
                       latestEvent?.eventType === 'error'
                         ? 'bg-red-400'
@@ -768,7 +771,7 @@ export function RunConsole({
                   )}
                 >
                   {eventsByAgent.map((lane) => {
-                    const latestEvent = lane.events[lane.events.length - 1]
+                    const latestEvent = lane.events.at(-1)
                     const laneDotClass =
                       latestEvent?.eventType === 'error'
                         ? 'bg-red-400'

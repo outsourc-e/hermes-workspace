@@ -4,6 +4,14 @@ import * as path from 'node:path'
 import * as os from 'node:os'
 import WebSocket from 'ws'
 import type { RawData } from 'ws'
+import type { ConnectionErrorKind } from '../lib/connection-errors'
+
+type ConnectionErrorsModule = {
+  classifyConnectionError: (
+    error?: string | Error | null,
+    status?: number | null,
+  ) => ConnectionErrorKind
+}
 
 export type GatewayFrame =
   | { type: 'req'; id: string; method: string; params?: unknown }
@@ -178,7 +186,7 @@ class GatewayClient {
   private reconnectAttempts = 0
   private authenticated = false
   private destroyed = false
-  private _lastErrorKind: import('../lib/connection-errors').ConnectionErrorKind | null = null
+  private _lastErrorKind: ConnectionErrorKind | null = null
 
   // Circuit breaker: prevent request floods when gateway is unreachable
   private circuitFailures = 0
@@ -198,7 +206,7 @@ class GatewayClient {
     }
   }
 
-  getConnectionSnapshot(): { readyState: number; authenticated: boolean; errorKind: import('../lib/connection-errors').ConnectionErrorKind | null } {
+  getConnectionSnapshot(): { readyState: number; authenticated: boolean; errorKind: ConnectionErrorKind | null } {
     return {
       readyState: this.ws?.readyState ?? WebSocket.CLOSED,
       authenticated: this.authenticated,
@@ -437,7 +445,7 @@ class GatewayClient {
         lastError = error instanceof Error ? error : new Error(String(error))
         // Classify the error for UI display
         try {
-          const { classifyConnectionError } = require('../lib/connection-errors') as typeof import('../lib/connection-errors')
+          const { classifyConnectionError } = require('../lib/connection-errors') as ConnectionErrorsModule
           this._lastErrorKind = classifyConnectionError(lastError)
         } catch { /* module may not be available in all contexts */ }
         if (this.ws) {
@@ -464,7 +472,7 @@ class GatewayClient {
     })
 
     ws.on('close', (code: number, reason: Buffer) => {
-      const reasonText = reason?.toString() || 'n/a'
+      const reasonText = reason.toString() || 'n/a'
       this.handleDisconnect(
         new Error(`Gateway connection closed (code=${code}, reason=${reasonText})`),
       )

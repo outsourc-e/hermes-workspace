@@ -107,21 +107,21 @@ const HERCULES_STYLE_MODEL = `${HERCULES_STYLE_ASSET_BASE}/hercules-model.png`
 const HERCULES_STYLE_WALK_STRIP = `${HERCULES_STYLE_ASSET_BASE}/hercules-walk-strip.png`
 const HERCULES_STYLE_WORK_STRIP = `${HERCULES_STYLE_ASSET_BASE}/hercules-work-strip.png`
 const HERCULES_RIGHT_FACING_WORK_STATIONS = new Set(['roster-board', 'model-statues'])
-const HERCULES_PANTHEON_TOOL_STRIPS: Record<string, string> = {
+const HERCULES_PANTHEON_TOOL_STRIPS: Partial<Record<string, string>> = {
   'agent-chambers': '/war-room/hercules-style/pantheon-tools-v1/agent-chambers-strip.png',
   'roster-board': '/war-room/hercules-style/pantheon-tools-v1/roster-board-strip.png',
   'review-table': '/war-room/hercules-style/pantheon-tools-v1/review-table-strip.png',
   'training-yard': '/war-room/hercules-style/pantheon-tools-v1/training-yard-strip.png',
   'model-statues': '/war-room/hercules-style/pantheon-tools-v1/model-statues-strip.png',
 }
-const ATHENA_AGORA_TOOL_STRIPS: Record<string, string> = {
+const ATHENA_AGORA_TOOL_STRIPS: Partial<Record<string, string>> = {
   'idea-stalls': '/war-room/agora-athena-v1/processed/idea-stalls-strip.png',
   'competitor-board': '/war-room/agora-athena-v1/processed/competitor-board-strip.png',
   'alura-etsy-counter': '/war-room/agora-athena-v1/processed/alura-etsy-counter-strip.png',
   'niche-scroll-rack': '/war-room/agora-athena-v1/processed/niche-scroll-rack-strip.png',
   'shop-expansion-stalls': '/war-room/agora-athena-v1/processed/shop-expansion-stalls-strip.png',
 }
-const HERMES_COMMAND_TOOL_STRIPS: Record<string, string> = {
+const HERMES_COMMAND_TOOL_STRIPS: Partial<Record<string, string>> = {
   'dispatch-beacon': '/war-room/olympus-command/hermes-90frame-v1/tools/dispatch-beacon-strip.png',
   'gateway-console': '/war-room/olympus-command/hermes-90frame-v1/tools/gateway-console-strip.png',
   'aegis-approval-seal': '/war-room/olympus-command/hermes-90frame-v1/tools/aegis-approval-seal-strip.png',
@@ -130,7 +130,7 @@ const HERMES_COMMAND_TOOL_STRIPS: Record<string, string> = {
 
 const HEPHAESTUS_PRO_ASSET_BASE = '/war-room/hephaestus-pro-v1/processed'
 const HEPHAESTUS_FORGE_ASSET_BASE = HEPHAESTUS_FULL_BODY_ASSET_BASE
-const HEPHAESTUS_FORGE_TOOL_STRIPS: Record<string, string> = {
+const HEPHAESTUS_FORGE_TOOL_STRIPS: Partial<Record<string, string>> = {
   'approval-shrine': '/war-room/forge-hephaestus-caesar-source-v1/tools-animated/approval-shrine-strip.png',
   'prompt-anvil': '/war-room/forge-hephaestus-caesar-source-v1/tools-animated/prompt-anvil-strip.png',
   'model-bellows': '/war-room/forge-hephaestus-caesar-source-v1/tools-animated/model-bellows-strip.png',
@@ -203,7 +203,7 @@ const ORACLE_90_WORK_STRIPS: Record<'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' |
   nw: `${ORACLE_ASSET_BASE}/oracle-work-nw-strip.png`,
 }
 
-const ORACLE_TOOL_STRIPS: Record<string, string> = {
+const ORACLE_TOOL_STRIPS: Partial<Record<string, string>> = {
   'signal-pool': `${ORACLE_TOOL_ASSET_BASE}/signal-pool-strip.png`,
   'keyword-crystal': `${ORACLE_TOOL_ASSET_BASE}/keyword-crystal-strip.png`,
   'trend-stars': `${ORACLE_TOOL_ASSET_BASE}/trend-stars-strip.png`,
@@ -256,7 +256,7 @@ const POSEIDON_360_WORK_STRIPS: Record<'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w
   nw: `${POSEIDON_ASSET_BASE}/poseidon-work-nw-strip.png`,
 }
 
-const TREASURY_TOOL_STRIPS: Record<string, string> = {
+const TREASURY_TOOL_STRIPS: Partial<Record<string, string>> = {
   'margin-chest': `${TREASURY_TOOL_ASSET_BASE}/margin-chest-strip.png`,
   'cost-scales': `${TREASURY_TOOL_ASSET_BASE}/cost-scales-strip.png`,
   'ad-spend-gate': `${TREASURY_TOOL_ASSET_BASE}/ad-spend-gate-strip.png`,
@@ -376,10 +376,6 @@ export function MiniGod({ agent, target, walking, direction = 'down', facingAngl
   const idleStrip = GOD_IDLE_STRIPS[agent.id]
   const walkStrip = GOD_WALK_STRIPS[agent.id]
   const workStrip = GOD_WORK_STRIPS[agent.id]
-  const fullBodyAsset = GOD_FULL_BODY[agent.id]
-  const herculesStyleSet = HERCULES_STYLE_GODS[agent.id]
-  const herculesStyleAsset = herculesStyleSet?.[direction] ?? herculesStyleSet?.down
-  const tone = godToneClasses(GOD_TONES[agent.id] ?? 'gold')
   const useHermes90FramePackage = agent.id === 'hermes'
   const useOracle90FramePackage = agent.id === 'oracle'
   const useTreasury360FramePackage = agent.id === 'treasury-watcher'
@@ -409,13 +405,8 @@ export function MiniGod({ agent, target, walking, direction = 'down', facingAngl
   // The side-view Hermes command operator was not true 360° and looked buggy
   // while walking. Keep the asset around for rollback, but render Hermes through
   // the same overhead rotating strip path as the room/council scale.
-  const useHerculesStyleGod = false
-  const useRejectedFullBodyModels = false
-  const useGodFigure = Boolean(fullBodyAsset && useRejectedFullBodyModels && !useHerculesStyleGod)
-  const usePortraitOperator = Boolean(portraitAsset && !useGodFigure && !useHerculesStyleGod)
-  const useWalkStrip = Boolean(useGodFigure && walking)
+  const usePortraitOperator = Boolean(portraitAsset)
   const facingFlip = 1
-  const lean = Math.max(-1.35, Math.min(1.35, Math.sin((facingAngle * Math.PI) / 180) * -1.35))
   const spriteScale = agent.id === 'hermes' ? 1 : agent.id === 'athena' ? 1 : agent.id === 'hephaestus' ? 1 : useHerculesStyleModel ? 1 : 0.96
   const visualScale = GOD_VISIBLE_SCALE[agent.id] ?? 1
   // Overhead strips are authored facing up/north. Rotate the whole token to
@@ -462,9 +453,7 @@ export function MiniGod({ agent, target, walking, direction = 'down', facingAngl
   const overheadGroundAnchorY = 82
   // Council commanders render at ~99px. Hermes should match them exactly and be
   // distinguished only by his light blue glow, not by being bigger.
-  const hermesCommandFrameSize = 108
-  const figureBox = useHerculesStyleGod ? ''  : useGodFigure ? 'h-[174px] w-[130px]' : usePortraitOperator ? '' : 'h-[66px] w-[58px]'
-  const portraitVisible = false
+  const figureBox = usePortraitOperator ? '' : 'h-[66px] w-[58px]'
 
   return (
     <div
@@ -498,21 +487,12 @@ export function MiniGod({ agent, target, walking, direction = 'down', facingAngl
           }
         }
       `}</style>
-      {portraitVisible ? (
-        <div
-          className={`absolute left-1/2 top-[-46px] h-[66px] w-[66px] overflow-hidden rounded-full border bg-black/44 ${tone.border} ${tone.shadow}`}
-          style={{ transform: 'translate(-50%, -58%)', animation: 'god-portrait-rise 3600ms ease-in-out infinite' }}
-        >
-          <img src={`${portraitAsset}?v=20260513-god-presence-1`} alt="" className="h-full w-full object-cover saturate-[1.08]" draggable={false} />
-          <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_45%_18%,rgba(255,255,255,.18),transparent_30%),linear-gradient(180deg,transparent,rgba(0,0,0,.32))]" />
-        </div>
-      ) : null}
       <div
-          className={`absolute left-1/2 top-[76%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/82 blur-md transition-all duration-200 ${useGodFigure ? (walking ? 'h-6 w-20 opacity-95' : 'h-5 w-16 opacity-88') : usePortraitOperator ? 'h-5 w-16 opacity-88' : 'h-4 w-12 opacity-82'}`}
+          className={`absolute left-1/2 top-[76%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/82 blur-md transition-all duration-200 ${usePortraitOperator ? 'h-5 w-16 opacity-88' : 'h-4 w-12 opacity-82'}`}
       />
       <div
         className={`relative grid place-items-center ${figureBox}`}
-        style={useHerculesStyleGod ? { width: hermesCommandFrameSize, height: hermesCommandFrameSize, transform: `scaleX(${facingFlip}) scale(${spriteScale * visualScale})` } : { transform: `scaleX(${facingFlip}) scale(${spriteScale * visualScale})` }}
+        style={{ transform: `scaleX(${facingFlip}) scale(${spriteScale * visualScale})` }}
       >
         {useAthenaSideStripModel ? (
         <div
@@ -571,54 +551,7 @@ export function MiniGod({ agent, target, walking, direction = 'down', facingAngl
             />
           )}
         </div>
-      ) : useHerculesStyleGod ? (
-          <div className="relative overflow-hidden" style={{ width: hermesCommandFrameSize, height: hermesCommandFrameSize }}>
-            {walking || working ? (
-              <div
-                className="absolute inset-0 drop-shadow-[0_16px_14px_rgba(0,0,0,.84)] will-change-transform"
-                style={{
-                  ['--lean' as string]: `${lean}deg`,
-                  animation: `hephaestus-body-bob ${working ? '920ms' : '720ms'} ease-in-out infinite`,
-                }}
-              >
-                <img
-                  src={`${working ? herculesStyleAsset?.workStrip : herculesStyleAsset?.walkStrip}?v=${HERMES_COMMAND_ASSET_VERSION}`}
-                  alt=""
-                  className="absolute left-0 top-0 h-full max-w-none object-fill"
-                  style={{ width: '600%', animation: `hermes-command-strip-cycle ${working ? '920ms' : '720ms'} steps(5, end) infinite` }}
-                  draggable={false}
-                />
-              </div>
-            ) : (
-              <img
-                src={`${herculesStyleAsset?.idle}?v=${HERMES_COMMAND_ASSET_VERSION}`}
-                alt=""
-                className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_16px_14px_rgba(0,0,0,.84)]"
-                style={{ animation: 'hephaestus-idle-breathe 2400ms ease-in-out infinite' }}
-                draggable={false}
-              />
-            )}
-          </div>
-        ) : useWalkStrip ? (
-          <div
-            className="relative h-[142px] w-[104px] bg-no-repeat drop-shadow-[0_22px_22px_rgba(0,0,0,.96)] will-change-[background-position,transform]"
-            style={{
-              ['--lean' as string]: `${lean}deg`,
-              backgroundImage: `url(${fullBodyAsset?.walkStrip}?v=20260513-fullbody-gods-4)`,
-              backgroundSize: '416px 142px',
-              backgroundPosition: '0% 0%',
-              animation: 'hephaestus-walk-cycle 680ms steps(4) infinite, hephaestus-body-bob 680ms ease-in-out infinite',
-            }}
-          />
-        ) : useGodFigure ? (
-          <img
-            src={`${fullBodyAsset?.idle}?v=20260513-fullbody-gods-4`}
-            alt=""
-            className="relative h-[150px] w-[118px] object-contain opacity-100 drop-shadow-[0_22px_22px_rgba(0,0,0,.96)]"
-            style={{ animation: 'hephaestus-idle-breathe 2800ms ease-in-out infinite' }}
-            draggable={false}
-          />
-        ) : usePortraitOperator ? (
+      ) : usePortraitOperator ? (
           <div
             className="relative"
             style={{ width: overheadGodSize, height: overheadGodSize, animation: !walking && !working ? 'hephaestus-idle-breathe 2600ms ease-in-out infinite' : undefined }}
@@ -667,9 +600,9 @@ export function MiniGod({ agent, target, walking, direction = 'down', facingAngl
           </div>
         ) : (
           <img
-            src={`${agent.idleFrame ?? agent.spriteSheet ?? coreAsset}?v=20260513-premium-god-presence-2`}
+            src={`${agent.idleFrame ?? agent.spriteSheet}?v=20260513-premium-god-presence-2`}
             alt=""
-            className={`relative object-contain opacity-100 drop-shadow-[0_18px_18px_rgba(0,0,0,.94)] ${useGodFigure ? 'h-[104px] w-[92px]' : 'h-[66px] w-[58px]'}`}
+            className="relative h-[66px] w-[58px] object-contain opacity-100 drop-shadow-[0_18px_18px_rgba(0,0,0,.94)]"
             style={agent.idleFrame || agent.spriteSheet ? { animation: 'hephaestus-idle-breathe 2600ms ease-in-out infinite' } : undefined}
             draggable={false}
           />
@@ -699,7 +632,7 @@ function badgeClasses(tone: StationBadge['tone']) {
 
 export function StationProp({ station, active, ambientActive = false, badges = [], onSelect }: StationPropProps) {
   void ambientActive
-  const primaryBadge = badges[0]
+  const primaryBadge = badges.at(0)
   const labelX = station.labelSpot?.x ?? station.position.x
   const labelY = Math.max(8, Math.min(88, station.position.y - station.size.h / 2 - 5))
   const avoidCenterOperator = station.position.y < 36 && station.position.x > 35 && station.position.x < 65
@@ -711,13 +644,12 @@ export function StationProp({ station, active, ambientActive = false, badges = [
   const agoraToolStrip = ATHENA_AGORA_TOOL_STRIPS[station.id]
   const oracleToolStrip = ORACLE_TOOL_STRIPS[station.id]
   const treasuryToolStrip = TREASURY_TOOL_STRIPS[station.id]
-  const animatedToolStrip = commandToolStrip ?? forgeToolStrip ?? pantheonToolStrip ?? agoraToolStrip ?? oracleToolStrip ?? treasuryToolStrip
+  const animatedToolStrip = commandToolStrip ?? forgeToolStrip ?? pantheonToolStrip
   const animatedToolAssetVersion = treasuryToolStrip ? TREASURY_DWARF_ASSET_VERSION : oracleToolStrip ? ORACLE_ASSET_VERSION : agoraToolStrip ? ATHENA_AGORA_ASSET_VERSION : forgeToolStrip ? HEPHAESTUS_ASSET_VERSION : pantheonToolStrip ? HERCULES_ASSET_VERSION : HERMES_COMMAND_ASSET_VERSION
   const animatedToolFrameCount = oracleToolStrip || treasuryToolStrip ? 6 : 10
   const toolHighlighted = Boolean(animatedToolStrip && active)
   // DLV reported Oracle tool flicker. Keep every Oracle tool on a stable base frame;
   // Oracle's own walk/work strip carries the interaction animation.
-  const shouldAnimateTool = false
   // Olympus Command has live council commanders walking at z=120. The station
   // hotspots still need to win clicks, otherwise a tool click opens a commander
   // chat and the room feels buggy.
@@ -751,7 +683,7 @@ export function StationProp({ station, active, ambientActive = false, badges = [
             backgroundPosition: '0% 0%',
             // Oracle tools are 6-frame real strips and should visibly work when selected.
             // Other rooms stay frozen here because their prior tool-strip motion was rejected as flicker.
-            animation: shouldAnimateTool ? `olympus-command-tool-strip-cycle 1100ms steps(${animatedToolFrameCount}, end) infinite` : 'none',
+            animation: 'none',
             filter: toolHighlighted ? 'saturate(1.18) contrast(1.08) brightness(1.08)' : undefined,
           }}
         />
@@ -778,7 +710,7 @@ export function StationProp({ station, active, ambientActive = false, badges = [
           style={{ left: `${badgeX}%`, top: `${badgeY}%`, transform: 'translate(-50%, -50%)' }}
         >
           <span className="grid h-4 min-w-4 place-items-center rounded-full bg-black/46 px-1 font-serif text-[10px]">◆</span>
-          <span className={active ? 'inline truncate' : 'hidden truncate md:inline'}>{primaryBadge.label}</span>
+          <span className="inline truncate">{primaryBadge.label}</span>
         </div>
       ) : null}
       <div

@@ -271,7 +271,7 @@ export function routeWorkspaceActionToBlueprint(
   rawAction: WorkspaceAction | unknown,
   registry: Array<WorkspaceBlueprint> = WORKSPACE_BLUEPRINT_REGISTRY,
 ): WorkspaceActionRouteResult {
-  const action = normalizeWorkspaceActionInput(rawAction, typeof (rawAction as { createdAtMs?: unknown })?.createdAtMs === 'number' ? (rawAction as { createdAtMs: number }).createdAtMs : Date.now())
+  const action = normalizeWorkspaceActionInput(rawAction, typeof (rawAction as { createdAtMs?: unknown }).createdAtMs === 'number' ? (rawAction as { createdAtMs: number }).createdAtMs : Date.now())
   const blueprint = routeBlueprint(action, registry)
   const approvalStatus = approvalStatusFor(action, blueprint)
   const requiresApproval = approvalStatus !== 'not_required'

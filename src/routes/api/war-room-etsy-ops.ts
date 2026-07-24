@@ -43,7 +43,7 @@ const ActionSchema = z.object({
 export const Route = createFileRoute('/api/war-room-etsy-ops')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -66,7 +66,7 @@ export const Route = createFileRoute('/api/war-room-etsy-ops')({
         return json(buildEtsyOpsRoomState(), {
           headers: { 'cache-control': 'no-store' },
         })
-      },
+      })()),
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })

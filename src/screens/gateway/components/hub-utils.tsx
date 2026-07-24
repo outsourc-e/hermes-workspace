@@ -376,7 +376,7 @@ function determineMissionOutcome(taskStats: MissionTaskStats, agentSummaries: Ar
   if (!hasOutput) return '**Outcome:** ❌ No output'
   if (taskStats.failed > 0) return '**Outcome:** ⚠️ Partial'
   if (taskStats.total > 0 && taskStats.completed >= taskStats.total) return '**Outcome:** ✅ Complete'
-  if (taskStats.total === 0 && hasOutput) return '**Outcome:** ✅ Complete'
+  if (taskStats.total === 0) return '**Outcome:** ✅ Complete'
   return '**Outcome:** ⚠️ Partial'
 }
 

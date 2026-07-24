@@ -55,7 +55,7 @@ function isAllowed(absPath: string): boolean {
 export const Route = createFileRoute('/api/preview-file')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return new Response('Unauthorized', { status: 401 })
         }
@@ -98,7 +98,7 @@ export const Route = createFileRoute('/api/preview-file')({
             { status: 500 },
           )
         }
-      },
+      })()),
     },
   },
 })

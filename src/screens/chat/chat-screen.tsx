@@ -235,7 +235,7 @@ function exportConversationTranscript(payload: {
       const text = textFromMessage(message).trim()
       const attachments = Array.isArray(message.attachments)
         ? message.attachments
-            .map((attachment) => attachment?.name?.trim())
+            .map((attachment) => attachment.name?.trim())
             .filter((value): value is string => Boolean(value))
         : []
 
@@ -293,11 +293,11 @@ function messageFallbackSignature(message: ChatMessage): string {
     ? message.attachments
         .map((attachment) => {
           const name =
-            typeof attachment?.name === 'string' ? attachment.name : ''
+            typeof attachment.name === 'string' ? attachment.name : ''
           const size =
-            typeof attachment?.size === 'number' ? String(attachment.size) : ''
+            typeof attachment.size === 'number' ? String(attachment.size) : ''
           const type =
-            typeof attachment?.contentType === 'string'
+            typeof attachment.contentType === 'string'
               ? attachment.contentType
               : ''
           return `${name}:${size}:${type}`
@@ -396,11 +396,11 @@ function getMessageAttachmentSignature(message: ChatMessage): string {
 
   return message.attachments
     .map((attachment) => {
-      const name = typeof attachment?.name === 'string' ? attachment.name : ''
+      const name = typeof attachment.name === 'string' ? attachment.name : ''
       const size =
-        typeof attachment?.size === 'number' ? String(attachment.size) : ''
+        typeof attachment.size === 'number' ? String(attachment.size) : ''
       const type =
-        typeof attachment?.contentType === 'string'
+        typeof attachment.contentType === 'string'
           ? attachment.contentType
           : ''
       return `${name}:${size}:${type}`
@@ -661,7 +661,7 @@ export function ChatScreen({
   // On remount, check if the server still has an active run for this session.
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
   useActiveRunCheck({
-    sessionKey: resolvedSessionKey ?? '',
+    sessionKey: resolvedSessionKey,
     enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
     onCheckComplete: useCallback(() => {
       setActiveRunCheckDone(true)
@@ -1038,7 +1038,7 @@ export function ChatScreen({
         const res = await fetch('/api/hermes-config')
         if (!res.ok) return 'low'
         const data = await res.json() as { config?: Record<string, unknown> }
-        const agentSection = data?.config?.agent
+        const agentSection = data.config?.agent
         if (agentSection && typeof agentSection === 'object' && !Array.isArray(agentSection)) {
           const effort = (agentSection as Record<string, unknown>).reasoning_effort
           if (effort === 'off' || effort === 'low' || effort === 'medium' || effort === 'high') return effort
@@ -1093,9 +1093,7 @@ export function ChatScreen({
     if (thinkingInitializedByUserRef.current) return
     const configEffort = reasoningEffortQuery.data
     if (!configEffort) return
-    if (configEffort === 'off' || configEffort === 'low' || configEffort === 'medium' || configEffort === 'high') {
-      setThinkingLevel(configEffort)
-    }
+    setThinkingLevel(configEffort)
   }, [reasoningEffortQuery.data])
 
   // Persist thinking level changes to sessionStorage
@@ -1129,7 +1127,7 @@ export function ChatScreen({
   } = useStreamingMessage({
     pinMainSession:
       activeFriendlyId === 'main' &&
-      (resolvedSessionKey || activeFriendlyId || 'main') === 'main',
+      (!resolvedSessionKey || resolvedSessionKey === 'main'),
     onSessionResolved: useCallback(
       ({
         sessionKey,
@@ -1163,14 +1161,14 @@ export function ChatScreen({
         updateHistoryMessageByClientIdEverywhere(
           queryClient,
           activeSend.clientId,
-          (message) => ({
-            ...message,
+          (completedMessage) => ({
+            ...completedMessage,
             status: 'sent',
             // Clear __optimisticId so isOptimisticUserMessage returns false.
             // Without this the message keeps being treated as pending and
             // gets re-persisted, causing transcript duplication. Fixes #506.
             __optimisticId: undefined,
-            runId: runId ?? message.runId,
+            runId: runId ?? completedMessage.runId,
           }),
         )
         setSending(false)
@@ -1183,8 +1181,8 @@ export function ChatScreen({
         updateHistoryMessageByClientIdEverywhere(
           queryClient,
           activeSend.clientId,
-          (message) => ({
-            ...message,
+          (completedMessage) => ({
+            ...completedMessage,
             status: 'done',
           }),
         )
@@ -1289,7 +1287,7 @@ export function ChatScreen({
   // wanted in either session).
   const navCancelKeyRef = useRef<string | null>(null)
   useEffect(() => {
-    const navKey = `${activeCanonicalKey ?? ''}::${isNewChat ? 'new' : activeFriendlyId}`
+    const navKey = `${activeCanonicalKey}::${isNewChat ? 'new' : activeFriendlyId}`
     if (navCancelKeyRef.current === null) {
       navCancelKeyRef.current = navKey
       return
@@ -1515,7 +1513,7 @@ export function ChatScreen({
 
   const derivedStreamingInfo = useMemo(() => {
     if (activeIsRealtimeStreaming) {
-      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
+      const last = finalDisplayMessages.at(-1)
       const id = isPortableMode
         ? localStreamingMessageId
         : last?.role === 'assistant'
@@ -1524,8 +1522,8 @@ export function ChatScreen({
       return { isStreaming: true, streamingMessageId: id }
     }
     if (waitingForResponse && finalDisplayMessages.length > 0) {
-      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-      if (last && last.role === 'assistant') {
+      const last = finalDisplayMessages.at(-1)
+      if (last?.role === 'assistant') {
         const isStreamingPlaceholder =
           (last as any).__streamingStatus === 'streaming'
         if (!isStreamingPlaceholder) {
@@ -1654,7 +1652,7 @@ export function ChatScreen({
   })
   // Don't show errors for new chats or when SSE is connected
   const statusError =
-    !isNewChat && connectionState !== 'connected'
+    !isNewChat && sseConnectionState !== 'connected'
       ? statusQuery.error instanceof Error
         ? {
             message: statusQuery.error.message,
@@ -2214,11 +2212,11 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
+    if (sseConnectionState === 'connected' && hasSeenDisconnectRef.current) {
       hasSeenDisconnectRef.current = false
       flushRetryableMessages()
     }
-  }, [connectionState, flushRetryableMessages])
+  }, [sseConnectionState, flushRetryableMessages])
 
   useEffect(() => {
     if (statusError) {
@@ -2296,11 +2294,11 @@ export function ChatScreen({
       queryClient.setQueryData(
         chatQueryKeys.sessions,
         function upsert(existing: unknown) {
-          const sessions = Array.isArray(existing)
+          const cachedSessions = Array.isArray(existing)
             ? (existing as Array<SessionMeta>)
             : []
           const now = Date.now()
-          const existingIndex = sessions.findIndex((session) => {
+          const existingIndex = cachedSessions.findIndex((session) => {
             return (
               session.friendlyId === friendlyId || session.key === friendlyId
             )
@@ -2315,11 +2313,11 @@ export function ChatScreen({
                 lastMessage,
                 titleStatus: 'idle',
               },
-              ...sessions,
+              ...cachedSessions,
             ]
           }
 
-          return sessions.map((session, index) => {
+          return cachedSessions.map((session, index) => {
             if (index !== existingIndex) return session
             return {
               ...session,
@@ -2554,7 +2552,7 @@ export function ChatScreen({
   useEffect(() => {
     function handleRunCommand(event: Event) {
       const detail = (event as CustomEvent<ChatRunCommandDetail>).detail
-      if (!detail?.command) return
+      if (!detail.command) return
       runPaletteSlashCommand(detail.command)
     }
 
@@ -2567,7 +2565,7 @@ export function ChatScreen({
   useEffect(() => {
     function handleSubmitSelection(event: Event) {
       const detail = (event as CustomEvent<ChatSubmitSelectionDetail>).detail
-      const text = detail?.text?.trim()
+      const text = detail.text.trim()
       if (!text) return
       send(text, [], false, commandHelpers)
     }
@@ -2651,7 +2649,7 @@ export function ChatScreen({
   }, [serverError, serverErrorStatus, handleRefetch, showErrorNotice])
 
   const mobileHeaderStatus: 'connected' | 'connecting' | 'disconnected' =
-    connectionState === 'connected'
+    sseConnectionState === 'connected'
       ? 'connected'
       : statusQuery.data?.ok === false || statusQuery.isError
         ? 'disconnected'
@@ -2754,7 +2752,7 @@ export function ChatScreen({
               renamingTitle={renamingSessionTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
-              sessions={sessions ?? []}
+              sessions={sessions}
               activeFriendlyId={activeFriendlyId}
               onSelectSession={(key) =>
                 void navigate({

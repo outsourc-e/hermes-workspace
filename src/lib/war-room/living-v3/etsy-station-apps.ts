@@ -48,12 +48,18 @@ export const ETSY_MARKET_LAB_STATION_OPERATOR_IDS: Record<EtsyMarketLabStationId
   'etsy-odin-draft-approval': 'odin',
 }
 
-export function etsyMarketLabStationAppId(stationId: LivingV3StationId) {
-  return ETSY_MARKET_LAB_STATION_APP_IDS[stationId as EtsyMarketLabStationId] ?? null
+export function etsyMarketLabStationAppId(stationId: EtsyMarketLabStationId): EtsyMarketLabStationAppId
+export function etsyMarketLabStationAppId(stationId: LivingV3StationId): EtsyMarketLabStationAppId | null
+export function etsyMarketLabStationAppId(stationId: LivingV3StationId): EtsyMarketLabStationAppId | null {
+  if (!isEtsyMarketLabStationId(stationId)) return null
+  return ETSY_MARKET_LAB_STATION_APP_IDS[stationId]
 }
 
-export function etsyMarketLabStationOperatorId(stationId: LivingV3StationId) {
-  return ETSY_MARKET_LAB_STATION_OPERATOR_IDS[stationId as EtsyMarketLabStationId] ?? null
+export function etsyMarketLabStationOperatorId(stationId: EtsyMarketLabStationId): EtsyMarketLabResidentAgentId
+export function etsyMarketLabStationOperatorId(stationId: LivingV3StationId): EtsyMarketLabResidentAgentId | null
+export function etsyMarketLabStationOperatorId(stationId: LivingV3StationId): EtsyMarketLabResidentAgentId | null {
+  if (!isEtsyMarketLabStationId(stationId)) return null
+  return ETSY_MARKET_LAB_STATION_OPERATOR_IDS[stationId]
 }
 
 export function isEtsyMarketLabStationId(stationId: LivingV3StationId): stationId is EtsyMarketLabStationId {

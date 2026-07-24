@@ -59,7 +59,6 @@ function eventTime(event: WorkspaceEvent) {
 export function collectWorkspaceKernelEvents(runs: Array<WorkspaceRun>, extraEvents: Array<WorkspaceEvent> = []) {
   const eventsById = new Map<string, WorkspaceEvent>()
   for (const event of [...runs.flatMap((run) => run.events), ...extraEvents]) {
-    if (!event?.eventId || !event.runId || !event.type) continue
     eventsById.set(event.eventId, event)
   }
   return [...eventsById.values()]

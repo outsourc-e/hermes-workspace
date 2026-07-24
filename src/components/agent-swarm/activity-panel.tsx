@@ -83,7 +83,7 @@ function AgentRosterItem({ session }: { session: SwarmSession }) {
       <div
         className="flex size-8 shrink-0 items-center justify-center rounded-full text-sm"
         style={{
-          backgroundColor: colors?.body ? `${colors.body}30` : '#6b728030',
+          backgroundColor: colors.body ? `${colors.body}30` : '#6b728030',
         }}
       >
         {persona.emoji}

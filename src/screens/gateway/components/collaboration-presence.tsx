@@ -32,13 +32,35 @@ function generateColor(): string {
   return `hsl(${hue} 72% 52%)`
 }
 
+function isPresenceMessage(value: unknown): value is PresenceMessage {
+  if (!value || typeof value !== 'object') return false
+  const message = value as Record<string, unknown>
+  if (
+    typeof message.userId !== 'string' ||
+    typeof message.timestamp !== 'number'
+  ) {
+    return false
+  }
+  if (message.type === 'leave') return true
+  return (
+    message.type === 'heartbeat' &&
+    typeof message.color === 'string' &&
+    message.name === 'User'
+  )
+}
+
 function readStoredUsers(): Record<string, PresenceHeartbeat> {
   if (typeof window === 'undefined') return {}
   try {
     const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY)
     if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, PresenceHeartbeat>
-    return parsed && typeof parsed === 'object' ? parsed : {}
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, PresenceHeartbeat] =>
+        isPresenceMessage(entry[1]) && entry[1].type === 'heartbeat',
+      ),
+    )
   } catch {
     return {}
   }
@@ -126,9 +148,9 @@ export function CollaborationPresence() {
     try {
       const channel = new BroadcastChannel(CHANNEL_NAME)
       channelRef.current = channel
-      channel.onmessage = (event: MessageEvent<PresenceMessage>) => {
+      channel.onmessage = (event: MessageEvent<unknown>) => {
         const message = event.data
-        if (!message || typeof message !== 'object') return
+        if (!isPresenceMessage(message)) return
         if (message.type === 'heartbeat') upsertHeartbeat(message)
         if (message.type === 'leave') removeUser(message.userId)
       }
@@ -201,7 +223,7 @@ export function CollaborationPresence() {
         })}
       </div>
       {overflowCount > 0 ? <span className="text-primary-400">+{overflowCount} more</span> : null}
-      <span className="hidden sm:inline text-primary-300">{isSolo ? 'Only you' : `${users.length} viewing`}</span>
+      <span className="hidden sm:inline text-primary-300">{users.length} viewing</span>
     </div>
   )
 }

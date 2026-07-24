@@ -101,7 +101,7 @@ export function AttentionCard({
                 : item.severity === 'warn'
                   ? 'var(--theme-warning)'
                   : 'var(--theme-muted)'
-            const Icon = SOURCE_ICON[item.source] ?? AlertCircleIcon
+            const Icon = SOURCE_ICON[item.source]
             const content = (
               <div className="flex items-start gap-2">
                 <HugeiconsIcon

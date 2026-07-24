@@ -590,7 +590,7 @@ function buildAmbientLivingV3AgentSnapshot(agentId: LivingV3AgentId, nowMs: numb
   const direction = isMoving ? directionBetween(sample.from.world, sample.to.world) : 'still'
   const activity = route.status === 'blocked' ? 'idle' : ambient.step.activity
   const animationState = ambient.step.animationState ?? livingV3AnimationFor(activity, direction, roomId)
-  const clip = agent.clips[animationState] ?? agent.clips.idle
+  const clip = agent.clips[animationState]
   const spriteFrameCount = clip.frameCount
   const spriteFrameIndex = Math.floor(nowMs / frameMsFor(animationState, activity)) % spriteFrameCount
   const baseLabel = route.status === 'blocked' ? `${agent.label} blocked at ${ambient.step.from.label}` : ambient.step.label
@@ -643,7 +643,7 @@ export function buildLivingV3AgentSnapshot(
   const direction = isMoving ? directionBetween(sample.from.world, sample.to.world) : 'still'
   const activity = route.status === 'blocked' ? 'idle' : taskActivity(task, isMoving)
   const animationState = livingV3AnimationFor(activity, direction, roomId)
-  const clip = agent.clips[animationState] ?? agent.clips.idle
+  const clip = agent.clips[animationState]
   const spriteFrameCount = clip.frameCount
   const spriteFrameIndex = Math.floor(nowMs / frameMsFor(animationState, activity)) % spriteFrameCount
   const baseLabel = task?.label ?? agent.role

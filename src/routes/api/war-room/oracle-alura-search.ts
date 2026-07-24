@@ -17,7 +17,7 @@ function parseSourceMode(value: string | null): OracleAluraSourceMode {
 export const Route = createFileRoute('/api/war-room/oracle-alura-search')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

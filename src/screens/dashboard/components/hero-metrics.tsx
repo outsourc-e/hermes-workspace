@@ -99,13 +99,13 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
   const deltaText = (() => {
     if (delta === null || delta === undefined) return null
     const sign = delta > 0 ? '+' : ''
-    const tone =
+    const deltaTone =
       Math.abs(delta) < 1
         ? 'var(--theme-muted)'
         : delta > 0
           ? 'var(--theme-success)'
           : 'var(--theme-warning)'
-    return { text: `${sign}${delta.toFixed(0)}%`, tone }
+    return { text: `${sign}${delta.toFixed(0)}%`, tone: deltaTone }
   })()
   return (
     <div

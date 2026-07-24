@@ -228,7 +228,7 @@ export function SkillsScreen() {
     const explicit = profilesQuery.data?.activeProfile
     if (explicit) return explicit
     const defaultProfile = profiles.find((p) => p.is_default)
-    return defaultProfile?.name ?? profiles[0]?.name ?? ''
+    return defaultProfile?.name ?? profiles[0]?.name
   }, [profiles, profilesQuery.data?.activeProfile])
 
   // Pick a sensible default once profiles arrive — match the dashboard's
@@ -405,17 +405,17 @@ export function SkillsScreen() {
         const author =
           skill.author ||
           (skill.repo ? skill.repo.split('/')[0] : null) ||
-          (skill.extra as Record<string, unknown>)?.author ||
+          (skill.extra as Record<string, unknown>).author ||
           skill.source ||
           'Community'
         const homepage =
           skill.homepage ||
           skill.repo ||
-          (skill.extra as Record<string, unknown>)?.homepage ||
+          (skill.extra as Record<string, unknown>).homepage ||
           null
         const resolvedCategory =
           skill.category ||
-          (skill.extra as Record<string, unknown>)?.category ||
+          (skill.extra as Record<string, unknown>).category ||
           'Productivity'
 
         return {
@@ -1065,8 +1065,6 @@ function SecurityBadge({
 }) {
   if (!security) return null
   const config = SECURITY_BADGE[security.level]
-  if (!config) return null
-
   const [expanded, setExpanded] = useState(false)
 
   // Compact badge for card grid
@@ -1107,8 +1105,6 @@ function SecurityBadge({
 function SecurityScanCard({ security }: { security: SecurityRisk }) {
   const [showDetails, setShowDetails] = useState(false)
   const config = SECURITY_BADGE[security.level]
-  if (!config) return null
-
   const summaryText =
     security.flags.length === 0
       ? 'No risky patterns detected. This skill appears safe to install.'

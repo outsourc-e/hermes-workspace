@@ -285,7 +285,7 @@ export function EtsyOpsRoom() {
 
   const selectedProduct = useMemo(() => {
     if (!state) return null
-    return state.products.find((product) => product.id === selectedProductId) ?? state.products[0] ?? null
+    return state.products.find((product) => product.id === selectedProductId) ?? state.products[0]
   }, [selectedProductId, state])
 
   const runtimeSnapshots = useMemo(() => buildAgentRuntimeSnapshots(state?.agents ?? [], elapsedMs), [elapsedMs, state?.agents])
@@ -512,7 +512,7 @@ export function EtsyOpsRoom() {
             <div className={`etsy-ops-v2-door west ${openDoors.west ? 'is-open' : ''}`} data-door-id="west" />
             <div className={`etsy-ops-v2-door east ${openDoors.east ? 'is-open' : ''}`} data-door-id="east" />
 
-            {(state.room.routes ?? []).map((route) => (
+            {(state.room.routes).map((route) => (
               <button
                 key={route.id}
                 type="button"
@@ -1134,9 +1134,9 @@ function ApprovalPanel({ state, product }: { state: EtsyOpsRoomState; product: E
   return (
     <div className="etsy-ops-v2-data-stack">
       <MetricRow label="Product" value={productLabel(product)} />
-      <MetricRow label="Etsy live actions" value={state.safety.liveEtsyEnabled ? 'Enabled' : 'Locked'} />
-      <MetricRow label="Supplier messages" value={state.safety.supplierMessagesEnabled ? 'Enabled' : 'Locked'} />
-      <MetricRow label="Paid generation" value={state.safety.paidGenerationEnabled ? 'Enabled' : 'Locked'} />
+      <MetricRow label="Etsy live actions" value="Locked" />
+      <MetricRow label="Supplier messages" value="Locked" />
+      <MetricRow label="Paid generation" value="Locked" />
       <div className="etsy-ops-v2-chip-rack is-locks">
         {state.safety.blockedWriteClasses.map((item) => <span key={item}>{item}</span>)}
       </div>

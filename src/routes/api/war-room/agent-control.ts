@@ -6,7 +6,7 @@ import { getAgentConnectionState, getAgentConnectionStoreInfo } from '../../../l
 export const Route = createFileRoute('/api/war-room/agent-control')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'cache-control': 'no-store' } })
         }

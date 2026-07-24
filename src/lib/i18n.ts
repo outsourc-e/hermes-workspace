@@ -342,5 +342,5 @@ export function setLocale(id: LocaleId): void {
 
 export function t(key: TranslationKey): string {
   const locale = getLocale()
-  return LOCALES[locale]?.[key] ?? LOCALES.en[key] ?? key
+  return LOCALES[locale][key]
 }

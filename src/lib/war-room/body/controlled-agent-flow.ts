@@ -517,43 +517,32 @@ export async function runControlledLiveAgentChatFlow(input: {
       updatedBy: 'ui',
       runId,
     })
-    if (primaryStationId) {
-      const station = livingV3StationById(primaryStationId)
-      if (station) {
-        dispatchWarRoomIntent({
-          type: 'move_to_station',
-          agentId: input.agentId,
-          roomId: station.roomId,
-          stationId: station.id,
-          source: 'hermes',
-          runId,
-          correlationId: `${correlationId}-move`,
-        })
-        dispatchWarRoomIntent({
-          type: 'work_at_station',
-          agentId: input.agentId,
-          roomId: station.roomId,
-          stationId: station.id,
-          taskId: `${runId}-chat-task`,
-          source: 'hermes',
-          runId,
-          correlationId: `${correlationId}-work`,
-        })
-      }
-    } else {
+    const primaryStation = livingV3StationById(primaryStationId)
+    if (primaryStation) {
       dispatchWarRoomIntent({
-        type: 'move_to_room',
+        type: 'move_to_station',
         agentId: input.agentId,
-        roomId: agent.home.roomId,
+        roomId: primaryStation.roomId,
+        stationId: primaryStation.id,
         source: 'hermes',
         runId,
         correlationId: `${correlationId}-move`,
+      })
+      dispatchWarRoomIntent({
+        type: 'work_at_station',
+        agentId: input.agentId,
+        roomId: primaryStation.roomId,
+        stationId: primaryStation.id,
+        taskId: `${runId}-chat-task`,
+        source: 'hermes',
+        runId,
+        correlationId: `${correlationId}-work`,
       })
     }
     dispatchWarRoomIntent({
       type: 'say',
       agentId: input.agentId,
-      roomId: primaryStationId ? livingV3StationById(primaryStationId)?.roomId : agent.home.roomId,
+      roomId: primaryStation?.roomId ?? agent.home.roomId,
       stationId: primaryStationId,
       text: actionSystemRun.status === 'waiting_operator'
         ? 'Hermes is waiting for DLV to approve or skip Council consultation. No Council run started.'
@@ -568,7 +557,7 @@ export async function runControlledLiveAgentChatFlow(input: {
       dispatchWarRoomIntent({
         type: 'say',
         agentId: input.agentId,
-        roomId: primaryStationId ? livingV3StationById(primaryStationId)?.roomId : agent.home.roomId,
+        roomId: primaryStation?.roomId ?? agent.home.roomId,
         stationId: primaryStationId,
         text: truncateForSpeech(result.output?.answer ?? actionSystemRun.readback),
         source: 'hermes',
@@ -662,7 +651,7 @@ export async function runControlledLiveAgentChatFlow(input: {
       dispatchWarRoomIntent({
         type: 'say',
         agentId: input.agentId,
-        roomId: primaryStationId ? livingV3StationById(primaryStationId)?.roomId : agent.home.roomId,
+        roomId: primaryStation?.roomId ?? agent.home.roomId,
         stationId: primaryStationId,
         text: truncateForSpeech(result.output.answer),
         source: 'hermes',

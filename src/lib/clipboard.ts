@@ -1,5 +1,5 @@
 export async function writeTextToClipboard(text: string): Promise<void> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+  if (typeof navigator !== 'undefined') {
     try {
       await navigator.clipboard.writeText(text)
       return

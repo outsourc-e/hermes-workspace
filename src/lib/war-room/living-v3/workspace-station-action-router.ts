@@ -228,7 +228,7 @@ function routeFor(event: WorkspaceStationActionEvent) {
 }
 
 function movementAgentFor(route: WorkspaceToolRoute): LivingV3AgentId {
-  if (route.target.stationId) return etsyMarketLabStationOperatorId(route.target.stationId)
+  if (route.target.stationId) return etsyMarketLabStationOperatorId(route.target.stationId) ?? 'hermes'
   return 'hermes'
 }
 

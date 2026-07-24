@@ -39,7 +39,7 @@ export function useVoiceRecorder(
   const isSupported =
     typeof window !== 'undefined' &&
     typeof navigator !== 'undefined' &&
-    Boolean(navigator.mediaDevices?.getUserMedia) &&
+    Boolean(navigator.mediaDevices.getUserMedia) &&
     typeof MediaRecorder !== 'undefined'
 
   const cleanup = useCallback(() => {

@@ -14,7 +14,7 @@ function taskTextFromBody(body: unknown) {
 export const Route = createFileRoute('/api/war-room/tool-router')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

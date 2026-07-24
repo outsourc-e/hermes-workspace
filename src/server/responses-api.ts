@@ -143,7 +143,7 @@ export async function* streamResponses(
   // events that only carry the item, not the call_id.
   const itemIdToCallId = new Map<string, string>()
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read()
     if (done) break
     buffer += decoder.decode(value, { stream: true })

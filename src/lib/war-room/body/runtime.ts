@@ -418,11 +418,11 @@ export function requestWarRoomApproval(input: {
   state = {
     ...state,
     approvals: [approval, ...state.approvals],
-    tasks: state.tasks.map((task) => task.taskId === input.taskId ? { ...task, status: 'waiting_approval', updatedAtMs: nowMs } : task),
+    tasks: state.tasks.map((candidateTask) => candidateTask.taskId === input.taskId ? { ...candidateTask, status: 'waiting_approval', updatedAtMs: nowMs } : candidateTask),
     updatedAtMs: nowMs,
   }
-  updateAgent(input.agentId, (agent) => ({
-    ...agent,
+  updateAgent(input.agentId, (currentAgent) => ({
+    ...currentAgent,
     state: 'waiting_approval',
     currentTaskId: input.taskId,
     badge: 'approval',

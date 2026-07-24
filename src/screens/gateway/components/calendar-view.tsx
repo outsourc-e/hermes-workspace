@@ -65,7 +65,7 @@ function parseHourMinute(schedule: string, fallbackDate: Date): { hour: number; 
   const match = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/)
   if (match) {
     let hour = Number(match[1])
-    const minute = Number(match[2] ?? '0')
+    const minute = Number(match[2])
     const meridiem = match[3]
     if (meridiem === 'pm' && hour < 12) hour += 12
     if (meridiem === 'am' && hour === 12) hour = 0

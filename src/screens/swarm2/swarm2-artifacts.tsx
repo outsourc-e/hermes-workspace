@@ -108,7 +108,7 @@ export function Swarm2Artifacts({
   showHeader = true,
   centered = false,
 }: Swarm2ArtifactsProps) {
-  const declaredArtifacts = artifacts ?? []
+  const declaredArtifacts = artifacts
   const changedFileArtifacts =
     changedFiles.length > 0 ? synthesizeFromChangedFiles(workerId, changedFiles) : []
   const showingChangedFiles = mode === 'files'
@@ -121,7 +121,7 @@ export function Swarm2Artifacts({
     : showingChangedFiles
       ? changedFileArtifacts
       : declaredArtifacts
-  const allPreviews = previews ?? []
+  const allPreviews = previews
   const limit = expanded ? expandedLimit : collapsedLimit
   const visibleArtifacts = allArtifacts.slice(0, limit)
   const visiblePreviews = allPreviews.slice(0, expanded ? 4 : 2)

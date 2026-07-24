@@ -182,7 +182,7 @@ function normalizeControlledScoutResult(
   runId: string,
   startedAtMs: number,
 ) {
-  if (!result.ok || !result.output?.productScout) {
+  if (!result.ok || !result.output.productScout) {
     return createBlockedEtsyLiveResearchRun({
       request,
       runId,
@@ -365,9 +365,9 @@ function titleFromProductUrl(url: string, source: ReadonlySearchHit['source']) {
   if (source !== 'etsy') return source === 'supplier' ? 'Supplier result' : 'Product result'
   try {
     const parsed = new URL(url)
-    const slug = parsed.pathname.match(/\/listing\/\d+\/([^/?#]+)/i)?.[1]
-    if (!slug) return 'Etsy listing result'
-    return slug
+    const listingSlug = parsed.pathname.match(/\/listing\/\d+\/([^/?#]+)/i)?.[1]
+    if (!listingSlug) return 'Etsy listing result'
+    return listingSlug
       .split('-')
       .filter(Boolean)
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -469,8 +469,9 @@ async function runBrowserSearchQuery(searchQuery: string, limit = 8, productQuer
   try {
     const { chromium } = await import('playwright')
     browser = await chromium.connectOverCDP('http://127.0.0.1:9222')
-    const context = chromium && (browser as Awaited<ReturnType<typeof chromium.connectOverCDP>>).contexts()[0]
-      ? (browser as Awaited<ReturnType<typeof chromium.connectOverCDP>>).contexts()[0]
+    const existingContext = (browser as Awaited<ReturnType<typeof chromium.connectOverCDP>>).contexts().at(0)
+    const context = existingContext
+      ? existingContext
       : await (browser as Awaited<ReturnType<typeof chromium.connectOverCDP>>).newContext()
     const page = await context.newPage()
     try {
@@ -579,7 +580,7 @@ async function runReadonlyInternetProductSearch(
     startedAt: new Date(context.startedAtMs).toISOString(),
     completedAt: new Date().toISOString(),
     candidates: etsyHits.slice(0, maxCandidates).map((hit, index) => {
-      const matchingSupplier = supplierHits[index]
+      const matchingSupplier = supplierHits.at(index)
       return {
         candidateId: `${context.runId}-internet-${index + 1}`,
         title: hit.title,

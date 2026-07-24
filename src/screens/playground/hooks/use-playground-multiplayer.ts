@@ -381,9 +381,10 @@ export function usePlaygroundMultiplayer({
       ((import.meta as any).env?.VITE_PLAYGROUND_STATS_URL as string | undefined)?.replace(/\/stats$/, '') ||
       'https://hermes-playground-ws.myaurora-agi.workers.dev'
     const controller = new AbortController()
+    const isCancelled = () => controller.signal.aborted
     let lastChatTs = 0
     const tick = async () => {
-      if (controller.signal.aborted) return
+      if (isCancelled()) return
       const pos = positionRef.current
       if (!pos) {
         window.setTimeout(tick, 1000)
@@ -408,9 +409,7 @@ export function usePlaygroundMultiplayer({
           }),
           keepalive: document.visibilityState === 'hidden', // helps survive bg throttle
         })
-        // AbortSignal may change while fetch is awaiting; static control-flow cannot model that.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (!controller.signal.aborted && r.ok) {
+        if (!isCancelled() && r.ok) {
           const data = await r.json() as { presences: Array<any>; chats: Array<any>; online: number; byWorld: Record<string, number>; peakToday: number }
           // Merge presences
           for (const p of data.presences) {
@@ -435,16 +434,12 @@ export function usePlaygroundMultiplayer({
           setTransport((t) => (t === 'ws' || t === 'both') ? t : 'ws')
         }
       } catch (err) {
-        // AbortSignal may change while fetch is awaiting; static control-flow cannot model that.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (!controller.signal.aborted) {
+        if (!isCancelled()) {
 
           console.warn('[Hermes MP] presence POST failed:', err)
         }
       }
-      // AbortSignal may change while fetch is awaiting; static control-flow cannot model that.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!controller.signal.aborted) window.setTimeout(tick, 1000)
+      if (!isCancelled()) window.setTimeout(tick, 1000)
     }
     tick()
     // Send a leave on tab close so others see us go away immediately

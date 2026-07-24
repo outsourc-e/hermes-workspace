@@ -36,6 +36,16 @@ type UpdateTaskInput = Partial<Omit<TaskRecord, 'id' | 'created_at' | 'created_b
 
 const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
 const TASKS_FILE = path.join(CLAUDE_HOME, 'tasks.json')
+const TASK_COLUMNS = new Set<TaskColumn>(['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done', 'deleted'])
+const TASK_PRIORITIES = new Set<TaskPriority>(['high', 'medium', 'low'])
+
+function taskColumn(value: unknown): TaskColumn {
+  return typeof value === 'string' && TASK_COLUMNS.has(value as TaskColumn) ? value as TaskColumn : 'backlog'
+}
+
+function taskPriority(value: unknown): TaskPriority {
+  return typeof value === 'string' && TASK_PRIORITIES.has(value as TaskPriority) ? value as TaskPriority : 'medium'
+}
 
 function ensureTasksFile(): void {
   fs.mkdirSync(CLAUDE_HOME, { recursive: true })
@@ -66,8 +76,8 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     id: task.id,
     title: task.title,
     description: task.description ?? '',
-    column: (task.column as TaskColumn) ?? 'backlog',
-    priority: (task.priority as TaskPriority) ?? 'medium',
+    column: taskColumn(task.column),
+    priority: taskPriority(task.priority),
     assignee: task.assignee ?? null,
     tags: Array.isArray(task.tags) ? task.tags.filter((tag): tag is string => typeof tag === 'string') : [],
     due_date: task.due_date ?? null,

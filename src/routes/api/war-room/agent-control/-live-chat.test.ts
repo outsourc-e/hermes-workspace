@@ -3,13 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isAuthenticated } from '../../../../server/auth-middleware'
 import { runControlledLiveAgentChatFlow } from '../../../../lib/war-room/body'
 import { Route, readLiveAgentChatRequestPayload } from './live-chat'
+import type * as WarRoomBodyModule from '../../../../lib/war-room/body'
 
 vi.mock('../../../../server/auth-middleware', () => ({
   isAuthenticated: vi.fn(),
 }))
 
 vi.mock('../../../../lib/war-room/body', async () => {
-  const actual = await vi.importActual<typeof import('../../../../lib/war-room/body')>('../../../../lib/war-room/body')
+  const actual = await vi.importActual<typeof WarRoomBodyModule>('../../../../lib/war-room/body')
   return {
     ...actual,
     getAgentConnectionState: vi.fn(() => ({

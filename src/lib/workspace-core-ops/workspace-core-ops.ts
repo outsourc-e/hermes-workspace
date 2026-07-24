@@ -236,7 +236,7 @@ function normalizeRuns(state: WorkspaceKernelState | undefined): Array<Workspace
 }
 
 function approvalRowsForRun(run: WorkspaceRun): Array<WorkspaceCoreOpsApprovalRow> {
-  return (run.approvals ?? []).map((approval) => ({
+  return (run.approvals).map((approval) => ({
     approvalId: approval.approvalId,
     runId: run.runId,
     status: approval.status,
@@ -254,7 +254,7 @@ function approvalRowsForRun(run: WorkspaceRun): Array<WorkspaceCoreOpsApprovalRo
 }
 
 function artifactRowsForRun(run: WorkspaceRun): Array<WorkspaceCoreOpsArtifactRow> {
-  return (run.artifacts ?? []).map((artifact) => ({
+  return (run.artifacts).map((artifact) => ({
     artifactId: artifact.artifactId,
     runId: run.runId,
     kind: artifact.kind,
@@ -290,7 +290,7 @@ function notificationsForRun(run: WorkspaceRun): Array<WorkspaceCoreOpsNotificat
     })
   }
 
-  for (const approval of run.approvals ?? []) {
+  for (const approval of run.approvals) {
     if (!WAITING_APPROVAL_STATUSES.has(approval.status)) continue
     notifications.push({
       notificationId: `approval:${approval.approvalId}`,
@@ -308,7 +308,7 @@ function notificationsForRun(run: WorkspaceRun): Array<WorkspaceCoreOpsNotificat
     })
   }
 
-  for (const artifact of run.artifacts ?? []) {
+  for (const artifact of run.artifacts) {
     notifications.push({
       notificationId: `artifact:${artifact.artifactId}`,
       source: 'artifact',

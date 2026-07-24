@@ -16,6 +16,30 @@ import type {AgoraAvatarId, AgoraProfile, AgoraStatus} from '../lib/agora-types'
 const FUNNY_ANIMALS = [
   'Owl', 'Fox', 'Wolf', 'Otter', 'Hawk', 'Lynx', 'Crow', 'Stag', 'Heron',
 ]
+const AGORA_AVATAR_IDS: ReadonlySet<string> = new Set([
+  'hermes', 'athena', 'apollo', 'artemis', 'iris', 'nike', 'eros', 'pan',
+  'chronos', 'owl', 'hermes-cat', 'robot', 'fox', 'ghost', 'wolf', 'octopus',
+  'dragon', 'panda',
+])
+const AGORA_STATUSES: ReadonlySet<string> = new Set(['online', 'away', 'busy'])
+
+function isAgoraProfile(value: unknown): value is AgoraProfile {
+  if (!value || typeof value !== 'object') return false
+  const profile = value as Record<string, unknown>
+  return (
+    typeof profile.id === 'string' &&
+    profile.id.length > 0 &&
+    typeof profile.handle === 'string' &&
+    profile.handle.length > 0 &&
+    typeof profile.displayName === 'string' &&
+    profile.displayName.length > 0 &&
+    typeof profile.avatarId === 'string' &&
+    AGORA_AVATAR_IDS.has(profile.avatarId) &&
+    typeof profile.bio === 'string' &&
+    typeof profile.status === 'string' &&
+    AGORA_STATUSES.has(profile.status)
+  )
+}
 
 function generateInitialProfile(): AgoraProfile {
   const id =
@@ -44,8 +68,8 @@ function loadProfile(): AgoraProfile {
       window.localStorage.setItem(AGORA_PROFILE_STORAGE_KEY, JSON.stringify(initial))
       return initial
     }
-    const parsed = JSON.parse(raw) as AgoraProfile
-    if (!parsed.id || !parsed.handle || !parsed.displayName || !parsed.avatarId) {
+    const parsed: unknown = JSON.parse(raw)
+    if (!isAgoraProfile(parsed)) {
       return generateInitialProfile()
     }
     return parsed

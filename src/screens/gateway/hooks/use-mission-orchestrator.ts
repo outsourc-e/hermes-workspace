@@ -64,7 +64,7 @@ function extractTextFromMessage(message: unknown): string {
   if (typeof msg.content === 'string') return msg.content
   if (Array.isArray(msg.content)) {
     return (msg.content as Array<Record<string, unknown>>)
-      .filter((block) => block?.type === 'text' && typeof block.text === 'string')
+      .filter((block) => block.type === 'text' && typeof block.text === 'string')
       .map((block) => block.text as string)
       .join('')
   }
@@ -166,7 +166,7 @@ export function useMissionOrchestrator() {
   const streamMapRef = useRef<Map<string, EventSource>>(new Map())
   const lastOutputByAgentRef = useRef<Record<string, string>>({})
   const activityMarkerRef = useRef<Map<string, string>>(new Map())
-  const retryPayloadRef = useRef<Record<string, RetryPayload>>({})
+  const retryPayloadRef = useRef<Partial<Record<string, RetryPayload>>>({})
   const completedSessionKeysRef = useRef<Set<string>>(new Set())
   const dispatchTokenRef = useRef<string | null>(null)
 
@@ -559,7 +559,8 @@ export function useMissionOrchestrator() {
       })
 
       if (mission.processType === 'hierarchical') {
-        const [leadMember, ...workerMembers] = mission.team
+        const leadMember = mission.team.at(0)
+        const workerMembers = mission.team.slice(1)
         if (leadMember) {
           const leadSessionKey = sessionMap[leadMember.id]
           if (!leadSessionKey) {
@@ -765,7 +766,10 @@ export function useMissionOrchestrator() {
 
     const member = missionRef.current?.team.find((entry) => entry.id === agentId)
     const agentName = member?.name ?? agentId
-    const previousStatus = useMissionStore.getState().agentSessionStatus[agentId]
+    const statuses = useMissionStore.getState().agentSessionStatus
+    const previousStatus = Object.hasOwn(statuses, agentId)
+      ? statuses[agentId]
+      : undefined
 
     setAgentStatus(agentId, {
       status: pause ? 'idle' : 'active',
@@ -915,12 +919,13 @@ export function useMissionOrchestrator() {
     const hasSessions = Object.keys(agentSessionMap).length > 0
     if (!activeMission || missionState !== 'running' || !hasSessions) return
 
-    let cancelled = false
+    const pollingState = { cancelled: false }
+    const isPollingCancelled = () => pollingState.cancelled
 
     const pollSessions = async () => {
       try {
         const response = await fetch('/api/sessions')
-        if (!response.ok || cancelled) return
+        if (!response.ok || isPollingCancelled()) return
 
         const payload = (await response.json().catch(() => ({}))) as { sessions?: Array<SessionRecord> }
         const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
@@ -952,7 +957,8 @@ export function useMissionOrchestrator() {
           const lastSeen = Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : now
           const lastMessage = readSessionLastMessage(session)
           const rawStatus = readString(session.status).toLowerCase()
-          const existing = useMissionStore.getState().agentSessionStatus[member.id]
+          const existing = Object.entries(useMissionStore.getState().agentSessionStatus)
+            .find(([agentId]) => agentId === member.id)?.[1]
           const isCompleted = completedSessionKeysRef.current.has(sessionKey)
           const activityMarker = `${String(session.updatedAt ?? '')}|${rawStatus}|${lastMessage}`
 
@@ -999,7 +1005,7 @@ export function useMissionOrchestrator() {
           }
         }
 
-        if (!cancelled) {
+        if (!isPollingCancelled()) {
           activityMarkerRef.current = nextActivityMarkers
           setAgentSessionStatus(nextStatus)
         }
@@ -1014,7 +1020,7 @@ export function useMissionOrchestrator() {
     }, 5_000)
 
     return () => {
-      cancelled = true
+      pollingState.cancelled = true
       window.clearInterval(intervalId)
     }
   }, [activeMission, agentSessionMap, missionState, setAgentSessionStatus])

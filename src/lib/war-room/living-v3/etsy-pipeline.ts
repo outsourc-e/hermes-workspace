@@ -333,7 +333,7 @@ function supplierLeadsFromDrafts(candidateId: string, drafts: Array<EtsyEvidence
 }
 
 function ensureCandidate(state: EtsyPipelineState) {
-  return activeEtsyProductCandidate(state) ?? state.candidates[0]
+  return activeEtsyProductCandidate(state) ?? state.candidates.at(0)
 }
 
 function ensureMetricPacket(state: EtsyPipelineState, nowMs = Date.now()): EtsyMetricPacket | undefined {
@@ -380,7 +380,7 @@ export function activeEtsyProductCandidate(state: EtsyPipelineState) {
 }
 
 export function activeEtsySupplierLead(state: EtsyPipelineState) {
-  return state.supplierLeads.find((lead) => lead.leadId === state.selectedSupplierLeadId) ?? state.supplierLeads[0] ?? null
+  return state.supplierLeads.find((lead) => lead.leadId === state.selectedSupplierLeadId) ?? state.supplierLeads.at(0)
 }
 
 export type EtsyExternalProductSyncInput = {
@@ -729,7 +729,7 @@ export function stageEtsySheetRowLocally(state: EtsyPipelineState, nowMs = Date.
   const metricPacket = ensureMetricPacket(state, nowMs)
   const candidate = ensureCandidate(state)
   if (!metricPacket || !candidate) return { ...state, lastReceipt: 'Select a candidate before staging a sheet row.' }
-  const strongest = [...metricPacket.rows].sort((a, b) => (b.keywordScore ?? -1) - (a.keywordScore ?? -1))[0]
+  const strongest = [...metricPacket.rows].sort((a, b) => (b.keywordScore ?? -1) - (a.keywordScore ?? -1)).at(0)
   const stagedSheetRow: EtsyStagedSheetRow = {
     rowId: `sheet-row-${candidate.candidateId}`,
     candidateId: candidate.candidateId,

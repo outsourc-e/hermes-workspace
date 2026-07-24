@@ -6,7 +6,7 @@ import { getToolArtifact } from '../../server/tool-artifacts-store'
 export const Route = createFileRoute('/api/artifacts/$artifactId')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -19,7 +19,7 @@ export const Route = createFileRoute('/api/artifacts/$artifactId')({
           )
         }
         return json({ ok: true, artifact })
-      },
+      })()),
     },
   },
 })

@@ -154,7 +154,7 @@ export function getConnectionErrorInfo(
   const kind = classifyConnectionError(error, status)
   const base = getConnectionErrorMessage(kind)
   const details =
-    typeof error === 'string' ? error.trim() : (error?.message?.trim() ?? '')
+    typeof error === 'string' ? error.trim() : (error?.message.trim() ?? '')
 
   const showDetails =
     details.length > 0 &&

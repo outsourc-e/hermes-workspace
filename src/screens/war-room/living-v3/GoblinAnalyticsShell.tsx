@@ -232,7 +232,6 @@ function isGoblinAnalyticsSnapshot(value: unknown): value is GoblinAnalyticsApiS
     && Boolean(snapshot.database)
     && snapshot.database?.workspaceFoundation === true
     && snapshot.safety?.readOnly === true
-    && snapshot.safety.getOnly === true
 }
 
 function isWorkspaceKernelSnapshot(value: unknown): value is WorkspaceKernelApiSnapshot {
@@ -271,7 +270,7 @@ function pickAgentResearchRun(snapshot?: WorkspaceKernelApiSnapshot) {
   const recent = hardResearchRuns.filter((run) => Date.now() - run.updatedAtMs < 1000 * 60 * 60 * 6)
   const active = recent.filter(isActiveRun)
   const candidates = active.length ? active : recent
-  return candidates.sort((left, right) => right.updatedAtMs - left.updatedAtMs)[0]
+  return candidates.sort((left, right) => right.updatedAtMs - left.updatedAtMs).at(0)
 }
 
 function money(value: number | null) {

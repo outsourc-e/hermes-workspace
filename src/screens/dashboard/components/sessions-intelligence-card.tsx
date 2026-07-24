@@ -46,7 +46,7 @@ function sessionGlyph(
   }
   const sourceKey = s.source?.toLowerCase()
   if (sourceKey && KIND_ICONS[sourceKey]) return KIND_ICONS[sourceKey]
-  const kindKey = s.kind?.toLowerCase()
+  const kindKey = s.kind.toLowerCase()
   if (kindKey && KIND_ICONS[kindKey]) return KIND_ICONS[kindKey]
   return KIND_ICONS.chat
 }
@@ -69,7 +69,7 @@ function formatTokens(n: number): string {
 }
 
 function shortTitle(s: SessionRowData): string {
-  const t = s.title?.trim()
+  const t = s.title.trim()
   if (t && t.length > 0 && t !== s.key) return t
   // Fall back to friendly slug from the key
   return `Session ${s.key.slice(0, 8)}`
@@ -110,7 +110,7 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
       title: `${formatTokens(s.tokenCount)} tokens`,
     })
   }
-  if (s.status?.toLowerCase() === 'error' || s.status?.toLowerCase() === 'failed') {
+  if (s.status.toLowerCase() === 'error' || s.status.toLowerCase() === 'failed') {
     badges.push({
       label: 'error',
       tone: 'var(--theme-danger)',

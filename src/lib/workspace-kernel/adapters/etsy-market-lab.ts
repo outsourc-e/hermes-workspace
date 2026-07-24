@@ -313,7 +313,7 @@ export function createEtsyKernelRunForPacket(
 export function createSmartIntakeMissionKernelRun(mission: SmartIntakeMission, inputText: string, createdAtMs = Date.now()) {
   const blueprint = getWorkspaceBlueprintById('etsy-smart-product-intake-v1')
   if (!blueprint) throw new Error('Missing etsy-smart-product-intake-v1 blueprint')
-  const match = mission.productMatches[0]
+  const match = mission.productMatches.at(0)
   const sourceRecordIds = Array.from(new Set([
     `smart-intake:${mission.missionId}`,
     ...mission.sources.map((source) => source.normalizedRef),

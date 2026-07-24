@@ -361,7 +361,7 @@ export function roomOpsSummary(roomId: string) {
     artifacts,
     queueTotal: queues.reduce((total, queue) => total + queue.count, 0),
     needsApproval: approvals.length > 0 || agents.some((agent) => agent.state === 'needs-approval') || workflowSteps.some((step) => step.state === 'locked'),
-    activeAgent: agents.find((agent) => agent.state === 'working' || agent.state === 'thinking' || agent.state === 'needs-approval') ?? agents[0] ?? null,
+    activeAgent: agents.find((agent) => agent.state === 'working' || agent.state === 'thinking' || agent.state === 'needs-approval') ?? agents.at(0),
   }
 }
 

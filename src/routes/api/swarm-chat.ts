@@ -26,7 +26,7 @@ function isValidWorkerId(value: string): boolean {
 export const Route = createFileRoute('/api/swarm-chat')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -49,7 +49,7 @@ export const Route = createFileRoute('/api/swarm-chat')({
           ...(result.error ? { error: result.error } : {}),
         }
         return json(response)
-      },
+      })()),
     },
   },
 })

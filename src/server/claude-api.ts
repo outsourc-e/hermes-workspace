@@ -427,7 +427,7 @@ export async function streamChat(
     }
   }
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read()
     if (done) break
 

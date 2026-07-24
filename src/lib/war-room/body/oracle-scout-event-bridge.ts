@@ -70,7 +70,7 @@ function latestRunEvents(runId: string) {
   return listWarRoomEvents().filter((event) => event.runId === runId)
 }
 
-export async function runOracleScoutLocalBridge(input: RunOracleScoutLocalIntent & { baseDir?: string; nowMs?: number }): Promise<OracleScoutLocalBridgeResult> {
+export function runOracleScoutLocalBridge(input: RunOracleScoutLocalIntent & { baseDir?: string; nowMs?: number }): Promise<OracleScoutLocalBridgeResult> {
   const runId = input.runId ?? bridgeRunId()
   const correlationId = input.correlationId ?? `${runId}-oracle-local-alura`
   const query = input.query?.trim() || 'gold initial necklace'
@@ -164,7 +164,7 @@ export async function runOracleScoutLocalBridge(input: RunOracleScoutLocalIntent
       sourceMode: 'alura_only',
       baseDir: input.baseDir,
     })
-    const topKeyword = search.keywordResults[0]
+    const topKeyword = search.keywordResults.at(0)
     if (!search.ok || !topKeyword) {
       throw new Error(search.error ?? 'Oracle local Alura search found no local cache match.')
     }
@@ -280,7 +280,7 @@ export async function runOracleScoutLocalBridge(input: RunOracleScoutLocalIntent
       runId,
     }, tick())
 
-    return {
+    return Promise.resolve({
       ok: true,
       runId,
       correlationId,
@@ -291,7 +291,7 @@ export async function runOracleScoutLocalBridge(input: RunOracleScoutLocalIntent
       events: latestRunEvents(runId),
       control: getAgentConnectionState(),
       state: getWarRoomBodyState(),
-    }
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     appendBridgeEvent({
@@ -312,7 +312,7 @@ export async function runOracleScoutLocalBridge(input: RunOracleScoutLocalIntent
       runId,
     }, tick())
 
-    return {
+    return Promise.resolve({
       ok: false,
       runId,
       correlationId,
@@ -323,6 +323,6 @@ export async function runOracleScoutLocalBridge(input: RunOracleScoutLocalIntent
       control: getAgentConnectionState(),
       state: getWarRoomBodyState(),
       error: message,
-    }
+    })
   }
 }

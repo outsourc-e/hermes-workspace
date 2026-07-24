@@ -6,7 +6,7 @@ import { buildKnowledgeGraph } from '../../../server/knowledge-browser'
 export const Route = createFileRoute('/api/knowledge/graph')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/api/knowledge/graph')({
             { status: 500 },
           )
         }
-      },
+      })()),
     },
   },
 })

@@ -174,7 +174,7 @@ function upsertAssistantStream(
   text: string,
   replace: boolean,
 ): Array<OutputMessage> {
-  const last = previous[previous.length - 1]
+  const last = previous.at(-1)
   if (last && last.role === 'assistant' && !last.done) {
     return [
       ...previous.slice(0, -1),
@@ -185,7 +185,7 @@ function upsertAssistantStream(
 }
 
 function appendAssistantMessage(previous: Array<OutputMessage>, text: string): Array<OutputMessage> {
-  const last = previous[previous.length - 1]
+  const last = previous.at(-1)
   if (last && last.role === 'assistant' && !last.done) {
     // Always finalize the last in-progress assistant message with the complete text.
     // This handles providers (e.g. Gemini via OpenRouter) that emit both streaming
@@ -384,8 +384,8 @@ export function AgentOutputPanel({
         const payload = parseSsePayload(event.data as string)
         if (!payload) return
         if (!payloadMatchesSession(payload, sessionKey)) return
-        const state = readString(payload?.state).toLowerCase()
-        const error = readString(payload?.errorMessage)
+        const state = readString(payload.state).toLowerCase()
+        const error = readString(payload.errorMessage)
         if (state === 'error') {
           doneLabel = error ? `Session ended with error: ${error}` : 'Session ended with error'
         } else if (state === 'aborted') {

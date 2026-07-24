@@ -83,7 +83,7 @@ export function assertWarRoomUsageAllowed(input: WarRoomUsageGuardInput): WarRoo
       return block(input, `Unknown agentId: ${input.agentId}`)
     }
     const required = input.requiredCapability ?? capabilityForIntentType(input.intentType)
-    const capabilities = listWarRoomCapabilities()[input.agentId] ?? []
+    const capabilities = listWarRoomCapabilities()[input.agentId]
     if (!capabilities.includes(required)) {
       return block(input, `${agent.label} cannot perform ${required}.`)
     }

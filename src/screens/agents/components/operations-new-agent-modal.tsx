@@ -55,7 +55,7 @@ function normalizeModel(model: GatewayModelCatalogEntry): AvailableModel | null 
 
   return {
     id,
-    provider: model.provider ?? id.split('/')[0] ?? 'model',
+    provider: model.provider ?? id.split('/')[0],
     name: model.label ?? model.displayName ?? model.name ?? id.split('/').pop() ?? id,
   }
 }

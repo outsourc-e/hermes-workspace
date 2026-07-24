@@ -33,7 +33,8 @@ const PROFILES_PATH = path.join(CLAUDE_HOME, 'profiles')
 
 function readConfig(): Record<string, unknown> {
   try {
-    return (YAML.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>) ?? {}
+    const parsed: unknown = YAML.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'))
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
   } catch {
     return {}
   }

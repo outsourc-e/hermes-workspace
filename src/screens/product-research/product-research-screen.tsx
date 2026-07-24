@@ -96,7 +96,7 @@ export function ProductResearchScreen() {
   })
   const data = query.data
   const niches = data?.store_niches ?? []
-  const selected = useMemo(() => niches.find((n) => n.id === selectedId) ?? niches[0], [niches, selectedId])
+  const selected = useMemo(() => niches.find((n) => n.id === selectedId) ?? niches.at(0), [niches, selectedId])
   const rows = data?.supplier_verified_products?.length ? data.supplier_verified_products : (data?.suggested_products ?? [])
 
   return <div className="min-h-full overflow-y-auto bg-[#070912] text-white">

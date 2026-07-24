@@ -361,7 +361,7 @@ async function getSupabaseGoblinAnalyticsSnapshot(
     'hard_blocks?select=id,resolved_at&resolved_at=is.null&limit=200',
   )
 
-  const health = healthRows[0]
+  const health = healthRows.at(0)
   const products = productRows.map(mapProductRow)
   const shops = shopRows.map(mapShopRow)
   const supplierMatches = supplierRows.map(mapSupplierRow)

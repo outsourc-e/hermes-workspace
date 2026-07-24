@@ -158,20 +158,18 @@ function AgentCard({ member }: { member: CrewMember }) {
           <p className="text-xs text-[var(--theme-muted)] mt-0.5">
             {member.model} · {member.provider}
           </p>
-          {telegramPlatform && (
-            <div className="flex items-center gap-1 mt-1">
-              <HugeiconsIcon
-                icon={telegramPlatform.state === 'connected' ? Wifi01Icon : WifiOffIcon}
-                size={10}
-                className={cn(
-                  telegramPlatform.state === 'connected' ? 'text-green-400' : 'text-gray-500',
-                )}
-              />
-              <span className="text-[10px] text-[var(--theme-muted)]">
-                Telegram: {telegramPlatform.state}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-1 mt-1">
+            <HugeiconsIcon
+              icon={telegramPlatform.state === 'connected' ? Wifi01Icon : WifiOffIcon}
+              size={10}
+              className={cn(
+                telegramPlatform.state === 'connected' ? 'text-green-400' : 'text-gray-500',
+              )}
+            />
+            <span className="text-[10px] text-[var(--theme-muted)]">
+              Telegram: {telegramPlatform.state}
+            </span>
+          </div>
         </div>
 
         {/* Last active */}

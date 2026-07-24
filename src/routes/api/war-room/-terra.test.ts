@@ -330,7 +330,7 @@ describe('/api/war-room/terra assets/printer', () => {
   })
 
   it('searches internet model candidates read-only with Printables proof and locked printer actions', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({
       data: {
         searchPrints2: {
           totalCount: 1,
@@ -350,7 +350,7 @@ describe('/api/war-room/terra assets/printer', () => {
           }],
         },
       },
-    }), { status: 200, headers: { 'content-type': 'application/json' } })))
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))))
 
     const response = await modelSearchHandler({
       request: new Request('http://localhost/api/war-room/terra-model-search', {

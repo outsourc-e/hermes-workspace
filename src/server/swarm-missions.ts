@@ -151,11 +151,11 @@ export function getSwarmMission(missionId: string): SwarmMission | null {
 
 export function archiveStaleMissions(staleMs: number = 6 * 60 * 60 * 1000): { archivedIds: Array<string>; count: number } {
   const store = readStore()
-  const now = Date.now()
+  const currentTime = Date.now()
   const archivedIds: Array<string> = []
   for (const mission of store.missions) {
     if (mission.state !== 'executing' && mission.state !== 'planning') continue
-    if ((now - mission.updatedAt) < staleMs) continue
+    if ((currentTime - mission.updatedAt) < staleMs) continue
     if (!mission.assignments.every(a => ['done', 'checkpointed', 'blocked', 'needs_input'].includes(a.state))) continue
     mission.state = 'complete'
     mission.events.push(event('continuation', `Archived as stale (>${Math.round(staleMs / 3600000)}h, all assignments terminal)`))
@@ -534,8 +534,8 @@ export function listSwarmReports(input?: {
 
   return missions
     .flatMap((entry) => entry.events)
-    .filter((event) => event.type === 'checkpoint' && event.data)
-    .map((event) => event.data as SwarmCheckpointReport)
+    .filter((missionEvent) => missionEvent.type === 'checkpoint' && missionEvent.data)
+    .map((missionEvent) => missionEvent.data as SwarmCheckpointReport)
     .filter((report) => !input?.workerId || report.workerId === input.workerId)
     .sort((a, b) => b.recordedAt - a.recordedAt)
     .slice(0, limit)

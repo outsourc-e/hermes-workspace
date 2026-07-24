@@ -73,7 +73,7 @@ export function WorkspaceCoreOpsPanel({
   const actionableCount = actionableNotifications.length
   const suppressedNotificationCount = Math.max(0, visibleNotifications.length - actionableNotifications.length)
   const topApproval = snapshot.approvals.find((approval) => approval.status === 'waiting_operator' || approval.status === 'needs_edit')
-  const latestArtifact = snapshot.artifacts[0]
+  const latestArtifact = snapshot.artifacts.at(0)
   const badgeCount = Math.min(99, actionableCount)
 
   useEffect(() => {

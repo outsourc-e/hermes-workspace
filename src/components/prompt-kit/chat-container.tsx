@@ -98,7 +98,6 @@ function ChatContainerRoot({
 
       resizeObserver = new ResizeObserver((entries) => {
         const entry = entries[0]
-        if (!entry) return
         const nextHeight = entry.contentRect.height
         const heightDelta = nextHeight - previousHeight
         if (heightDelta === 0) return

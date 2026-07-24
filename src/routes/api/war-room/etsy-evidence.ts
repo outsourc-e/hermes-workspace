@@ -6,7 +6,7 @@ import { getEtsyMarketLabEvidence } from '../../../server/etsy-market-lab-eviden
 export const Route = createFileRoute('/api/war-room/etsy-evidence')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

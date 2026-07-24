@@ -96,7 +96,7 @@ function normalizeGatewayApproval(entry: GatewayApprovalEntry): UnifiedApproval 
 }
 
 function normalizeAgentApproval(entry: ApprovalRequest): UnifiedApproval {
-  const preview = entry.context?.trim() || entry.action
+  const preview = entry.context.trim() || entry.action
   const toolName = entry.action.trim().split(/[\s:(]/)[0]?.slice(0, 32) || 'agent-action'
   return {
     key: `agent:${entry.id}`,

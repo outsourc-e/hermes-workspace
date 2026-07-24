@@ -41,7 +41,9 @@ function formatMessageTime(ts: number | null | undefined): string {
 
 function parseTodoSummary(content: string): { total: number; pending: number; inProgress: number; completed: number; cancelled: number } | null {
   try {
-    const parsed = JSON.parse(content) as {
+    const parsed: unknown = JSON.parse(content)
+    if (!parsed || typeof parsed !== 'object') return null
+    const summary = (parsed as {
       todos?: Array<unknown>
       summary?: {
         total?: number
@@ -50,14 +52,14 @@ function parseTodoSummary(content: string): { total: number; pending: number; in
         completed?: number
         cancelled?: number
       }
-    }
-    if (!parsed || typeof parsed !== 'object' || !parsed.summary) return null
+    }).summary
+    if (!summary) return null
     return {
-      total: parsed.summary.total ?? 0,
-      pending: parsed.summary.pending ?? 0,
-      inProgress: parsed.summary.in_progress ?? 0,
-      completed: parsed.summary.completed ?? 0,
-      cancelled: parsed.summary.cancelled ?? 0,
+      total: summary.total ?? 0,
+      pending: summary.pending ?? 0,
+      inProgress: summary.in_progress ?? 0,
+      completed: summary.completed ?? 0,
+      cancelled: summary.cancelled ?? 0,
     }
   } catch {
     return null

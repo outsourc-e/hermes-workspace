@@ -53,7 +53,7 @@ export function AgoraProfileDrawer({
   useEffect(() => {
     if (user) {
       setEditName(user.profile.displayName)
-      setEditBio(user.profile.bio ?? '')
+      setEditBio(user.profile.bio)
       setEditStatus(user.profile.status)
     }
   }, [user?.profile.id])

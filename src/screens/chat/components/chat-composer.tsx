@@ -1120,7 +1120,7 @@ function ChatComposerComponent({
   // dead onError handler were removed alongside it.
 
   const handleModelSelect = useCallback(
-    function handleModelSelect(nextModel: string, provider?: string) {
+    function selectModel(nextModel: string, provider?: string) {
       const model = nextModel.trim()
       if (!model) return
       const normalizedSessionKey =
@@ -1156,7 +1156,7 @@ function ChatComposerComponent({
   )
 
   const handleThinkingSelect = useCallback(
-    function handleThinkingSelect(level: ThinkingLevel) {
+    function selectThinkingLevel(level: ThinkingLevel) {
       if (onThinkingLevelChange) {
         onThinkingLevelChange(level)
       } else {
@@ -1255,14 +1255,14 @@ function ChatComposerComponent({
     }
   }, [attachments.length, value])
 
-  const cancelFocusPromptFrame = useCallback(function cancelFocusPromptFrame() {
+  const cancelFocusPromptFrame = useCallback(function cancelPromptFocusFrame() {
     if (focusFrameRef.current === null) return
     window.cancelAnimationFrame(focusFrameRef.current)
     focusFrameRef.current = null
   }, [])
 
   const focusPrompt = useCallback(
-    function focusPrompt() {
+    function focusPromptInput() {
       if (typeof window === 'undefined') return
       cancelFocusPromptFrame()
       focusFrameRef.current = window.requestAnimationFrame(
@@ -1374,7 +1374,7 @@ function ChatComposerComponent({
   ])
 
   const persistDraft = useCallback(
-    function persistDraft(nextValue: string) {
+    function saveDraft(nextValue: string) {
       if (typeof window === 'undefined') return
       if (nextValue.length === 0) {
         window.sessionStorage.removeItem(draftStorageKey)
@@ -1386,7 +1386,7 @@ function ChatComposerComponent({
   )
 
   const clearDraft = useCallback(
-    function clearDraft() {
+    function removeDraft() {
       if (typeof window === 'undefined') return
       window.sessionStorage.removeItem(draftStorageKey)
     },
@@ -1394,7 +1394,7 @@ function ChatComposerComponent({
   )
 
   const handleValueChange = useCallback(
-    function handleValueChange(nextValue: string) {
+    function updateComposerValue(nextValue: string) {
       setIsSlashMenuDismissed(false)
       setValue(nextValue)
       persistDraft(nextValue)
@@ -1890,14 +1890,14 @@ function ChatComposerComponent({
   }, [voiceRecorder])
 
   const handleAbort = useCallback(
-    function handleAbort() {
+    function abortResponse() {
       onAbort?.()
     },
     [onAbort],
   )
 
   const handleOpenAttachmentPicker = useCallback(
-    function handleOpenAttachmentPicker(
+    function openAttachmentPicker(
       event: React.MouseEvent<HTMLButtonElement>,
     ) {
       event.preventDefault()
@@ -1908,7 +1908,7 @@ function ChatComposerComponent({
   )
 
   const handleAttachmentInputChange = useCallback(
-    function handleAttachmentInputChange(
+    function updateAttachmentsFromInput(
       event: React.ChangeEvent<HTMLInputElement>,
     ) {
       const files = Array.from(event.target.files ?? [])
@@ -1921,7 +1921,7 @@ function ChatComposerComponent({
   )
 
   const handleSelectSlashCommand = useCallback(
-    function handleSelectSlashCommand(command: SlashCommandDefinition) {
+    function selectSlashCommand(command: SlashCommandDefinition) {
       if (command.command === '/fast') {
         setIsSlashMenuDismissed(false)
         setFastMode((previous) => !previous)

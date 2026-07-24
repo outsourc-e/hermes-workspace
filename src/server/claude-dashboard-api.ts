@@ -255,18 +255,18 @@ export async function saveConfig(
 ): Promise<{ ok: boolean }> {
   let merged: Record<string, unknown> = config
   try {
-    const current = await getConfig()
+    const current: unknown = await getConfig()
     // Dashboards have historically wrapped the config in `{ config: {...} }`.
     // Support both shapes defensively.
     const base =
       current && typeof current === 'object' && 'config' in current
-        ? ((current).config as Record<
+        ? (current.config as Record<
             string,
             unknown
           >)
-        : (current)
-    if (base && typeof base === 'object') {
-      merged = deepMerge(base, config)
+        : current
+    if (base && typeof base === 'object' && !Array.isArray(base)) {
+      merged = deepMerge(base as Record<string, unknown>, config)
     }
   } catch {
     // If we can't read the current config, fall back to sending the raw patch.

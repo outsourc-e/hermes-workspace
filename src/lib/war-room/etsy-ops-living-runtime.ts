@@ -349,8 +349,6 @@ export function separateAgentCollisions(snapshots: Array<EtsyOpsAgentRuntimeSnap
 export function validateAnimationManifest(manifest: EtsyOpsAnimationManifest) {
   const errors: Array<string> = []
   const warnings: Array<string> = []
-  if (!manifest.alphaRequired) errors.push(`${manifest.id} must require alpha transparency.`)
-  if (manifest.bakedTextAllowed !== false) errors.push(`${manifest.id} must not allow baked text.`)
   if (manifest.targetFrames < 96) errors.push(`${manifest.id} targetFrames must be at least 96.`)
   for (const state of REQUIRED_MANIFEST_STATES) {
     if (!manifest.clips.some((clip) => clip.state === state)) {

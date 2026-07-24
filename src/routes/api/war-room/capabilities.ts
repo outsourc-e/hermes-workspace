@@ -6,7 +6,7 @@ import { WAR_ROOM_WORKER_PROFILES, listWarRoomRuntimeCapabilities } from '../../
 export const Route = createFileRoute('/api/war-room/capabilities')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

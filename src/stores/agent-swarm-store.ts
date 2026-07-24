@@ -138,16 +138,16 @@ export const useSwarmStore = create<SwarmState>((set, get) => ({
 
       // Sort: running/thinking first, then by updatedAt desc
       swarmSessions.sort((a, b) => {
-        const priority = {
-          thinking: 0,
-          running: 1,
-          idle: 2,
-          complete: 3,
-          failed: 4,
-          error: 5,
-        }
-        const pa = priority[a.swarmStatus] ?? 2
-        const pb = priority[b.swarmStatus] ?? 2
+        const priority = new Map([
+          ['thinking', 0],
+          ['running', 1],
+          ['idle', 2],
+          ['complete', 3],
+          ['failed', 4],
+          ['error', 5],
+        ])
+        const pa = priority.get(a.swarmStatus) ?? 2
+        const pb = priority.get(b.swarmStatus) ?? 2
         if (pa !== pb) return pa - pb
         return a.staleness - b.staleness
       })

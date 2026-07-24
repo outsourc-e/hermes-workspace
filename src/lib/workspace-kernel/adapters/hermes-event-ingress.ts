@@ -169,13 +169,13 @@ function replaceRun(state: WorkspaceKernelPersistedState, run: WorkspaceRun): Wo
 }
 
 function normalizeArtifact(input: WorkspaceKernelEventIngressInput, run: WorkspaceRun, nowMs: number) {
-  if (input.artifact && input.artifact.artifactId && input.artifact.kind) {
+  if (input.artifact) {
     return {
       ...input.artifact,
       runId: run.runId,
-      roomId: input.artifact.roomId ?? run.ownerRoomId,
+      roomId: input.artifact.roomId,
       stationId: input.artifact.stationId ?? run.ownerStationId,
-      lockedActions: input.artifact.lockedActions?.length ? input.artifact.lockedActions : run.lockedActions,
+      lockedActions: input.artifact.lockedActions.length ? input.artifact.lockedActions : run.lockedActions,
       createdAtMs: input.artifact.createdAtMs || nowMs,
     } satisfies WorkspaceArtifact
   }
@@ -189,7 +189,7 @@ function normalizeApproval(input: WorkspaceKernelEventIngressInput, run: Workspa
     return {
       ...input.approval,
       runId: run.runId,
-      lockedActions: input.approval.lockedActions?.length ? input.approval.lockedActions : run.lockedActions,
+      lockedActions: input.approval.lockedActions.length ? input.approval.lockedActions : run.lockedActions,
       createdAtMs: input.approval.createdAtMs || nowMs,
     } satisfies WorkspaceApproval
   }

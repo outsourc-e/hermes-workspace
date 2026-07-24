@@ -225,7 +225,7 @@ export function buildSwarm2ReportRows({
         workerName: runtime?.displayName || workerId,
         state,
         stateLabel: stateLabel(state),
-        updatedAt: assignment.completedAt ?? mission.updatedAt ?? runtime?.lastOutputAt ?? null,
+        updatedAt: assignment.completedAt ?? mission.updatedAt,
         summary: compact(checkpoint?.result ?? checkpoint?.blocker ?? checkpoint?.nextAction ?? assignment.task),
         checkpointStatus: checkpoint?.checkpointStatus ?? checkpoint?.stateLabel ?? null,
         blocker: checkpoint?.blocker ?? null,
@@ -547,7 +547,7 @@ export function Swarm2ReportsView({
     const candidates = rows
       .filter((row) => row.state === 'ready' || row.state === 'blocked' || row.state === 'needs_review')
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-    return candidates[0] ?? rows[0] ?? null
+    return candidates.at(0) ?? rows.at(0)
   }, [rows])
   const latestReadableResult = latestReadableRow
     ? cleanDetail(latestReadableRow.details.find((detail) => detail.label === 'Result')?.value) ?? latestReadableRow.summary
@@ -682,9 +682,9 @@ export function Swarm2ReportsView({
     )
   }
 
-  function renderRowActions(row: Swarm2InboxItem, compact = false) {
+  function renderRowActions(row: Swarm2InboxItem, useCompactStyle = false) {
     const prUrl = extractPullRequestUrl(row)
-    const buttonClass = compact
+    const buttonClass = useCompactStyle
       ? 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
       : 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
     return (

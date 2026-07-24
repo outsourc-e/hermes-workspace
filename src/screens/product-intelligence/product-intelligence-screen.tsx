@@ -235,7 +235,7 @@ export function ProductIntelligenceScreen() {
   const actionQueue = data?.action_queue ?? []
   const workflowFunnel = data?.workflow_funnel ?? []
   const counts = data?.counts ?? {}
-  const selectedProduct = useMemo(() => products.find((product) => product.id === selectedProductId) ?? products[0], [products, selectedProductId])
+  const selectedProduct = useMemo(() => products.find((product) => product.id === selectedProductId) ?? products.at(0), [products, selectedProductId])
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()

@@ -78,11 +78,11 @@ function parseContextPercent(payload: unknown): number {
     (root.totals as Record<string, unknown> | undefined) ??
     root
   return readPercent(
-    (usage)?.contextPercent ??
-      (usage)?.context_percent ??
-      (usage)?.context ??
-      root?.contextPercent ??
-      root?.context_percent,
+    (usage).contextPercent ??
+      (usage).context_percent ??
+      (usage).context ??
+      root.contextPercent ??
+      root.context_percent,
   )
 }
 
@@ -155,7 +155,6 @@ export function UsageMeterCompact() {
     const currentIdx = okProviders.findIndex((p) => p.provider === preferredProvider)
     const nextIdx = (currentIdx + 1) % okProviders.length
     const next = okProviders[nextIdx]
-    if (!next) return
     setPreferredProvider(next.provider)
     setStoredPreferredProvider(next.provider)
 

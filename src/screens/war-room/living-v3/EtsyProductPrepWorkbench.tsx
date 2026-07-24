@@ -114,6 +114,7 @@ export type EtsyPrepChatMemorySnippet = {
 }
 
 type EtsyPrepMemoryKind = 'search' | 'action' | 'packet' | 'chat' | 'system'
+const ETSY_PREP_MEMORY_KINDS = new Set<EtsyPrepMemoryKind>(['search', 'action', 'packet', 'chat', 'system'])
 
 type EtsyPrepMemoryEvent = {
   id: string
@@ -235,10 +236,20 @@ function loadStoredPrepMemory(): Array<EtsyPrepMemoryEvent> {
   try {
     const raw = window.localStorage.getItem(ETSY_PREP_MEMORY_STORAGE_KEY)
     if (!raw) return []
-    const parsed = JSON.parse(raw) as Array<EtsyPrepMemoryEvent>
+    const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     return parsed
-      .filter((event) => event && typeof event.id === 'string' && typeof event.label === 'string')
+      .filter((event): event is EtsyPrepMemoryEvent => {
+        if (!event || typeof event !== 'object') return false
+        const candidate = event as Record<string, unknown>
+        return typeof candidate.id === 'string'
+          && typeof candidate.kind === 'string'
+          && ETSY_PREP_MEMORY_KINDS.has(candidate.kind as EtsyPrepMemoryKind)
+          && typeof candidate.label === 'string'
+          && typeof candidate.detail === 'string'
+          && typeof candidate.createdAtMs === 'number'
+          && (candidate.entityId === undefined || typeof candidate.entityId === 'string')
+      })
       .slice(0, ETSY_PREP_MEMORY_LIMIT)
   } catch {
     return []
@@ -408,7 +419,7 @@ function nextActionForStage(input: {
 function initials(value: string) {
   const words = value.trim().split(/\s+/).filter(Boolean)
   const first = words[0]?.[0] ?? 'P'
-  const second = words[1]?.[0] ?? words[0]?.[1] ?? 'R'
+  const second = words[1]?.[0] ?? words[0]?.[1]
   return `${first}${second}`.toUpperCase()
 }
 
@@ -520,7 +531,7 @@ function findSelectedCandidate(candidates: Array<CandidateView>, roomState: Etsy
     ?? candidates.find((candidate) => candidate.id === roomState.selectedCandidateId)
     ?? candidates.find((candidate) => candidate.id === pipeline.selectedCandidateId)
     ?? candidates.find((candidate) => candidate.selected)
-    ?? candidates[0]
+    ?? candidates.at(0)
 }
 
 function WorkbenchButton({
@@ -708,7 +719,7 @@ export function EtsyProductPrepWorkbench({
     sourceRecordIds: roomState.selectedProductPacket.sourceRecordIds,
     evidenceIds: roomState.selectedProductPacket.evidenceIds,
   }) ? roomState.selectedProductPacket.selectedProductTitle : undefined
-  const selectedTitle = storedSelectedTitle ?? selectedCandidate?.title ?? 'Choose a candidate'
+  const selectedTitle = storedSelectedTitle ?? selectedCandidate?.title ?? 'No product selected'
   const selectedMissing = selectedCandidate?.missingFields ?? []
   const selectedEvidence = selectedCandidate?.evidenceIds ?? []
   const selectedSources = selectedCandidate?.sourceRecordIds ?? []
@@ -722,7 +733,7 @@ export function EtsyProductPrepWorkbench({
   const currentStageIndex = stageSteps.findIndex((stage) => stage.id === currentStage)
   const nextAction = nextActionForStage({ stage: currentStage, candidates, selectedCandidate, roomState, actions })
   const stationTools = buildStationToolStories(roomState, liveScout)
-  const latestChat = chatMemory[chatMemory.length - 1]
+  const latestChat = chatMemory.at(-1)
   const lastSearchMemory = prepMemory.find((event) => event.kind === 'search')
   const lastActionMemory = prepMemory.find((event) => event.kind === 'packet' || event.kind === 'action')
 
@@ -802,9 +813,9 @@ export function EtsyProductPrepWorkbench({
   const activeTool = stationTools.find((tool) => tool.id === activeToolId) ?? stationTools[0]
   const activeToolAction = stationToolActions[activeTool.id]
   const activeStageCopy = stageWorkbenchCopy(currentStage)
-  const activeActionDisabled = Boolean(activeToolAction?.primaryDisabled || !activeToolAction?.primaryRun)
+  const activeActionDisabled = Boolean(activeToolAction.primaryDisabled || !activeToolAction.primaryRun)
   const activeStatus = activeActionDisabled
-    ? activeToolAction?.blockedReason ?? 'Waiting for previous step.'
+    ? activeToolAction.blockedReason ?? 'Waiting for previous step.'
     : 'Ready now'
   const surfaceCards = [
     {
@@ -943,7 +954,7 @@ export function EtsyProductPrepWorkbench({
     ?? roomState.scoutPacket?.query
     ?? ''
   const boardState = productCards.length ? 'has-products' : 'waiting-oracle'
-  const selectedOrigin = selectedCandidate?.dataOrigin ?? 'none'
+  const selectedOrigin = selectedCandidate?.dataOrigin ?? 'local-user-input'
   const selectedSupplierBlockers = selectedMissing.filter((field) => /supplier|source|image|material|variant|proof/i.test(field))
   const supplierGateState = !selectedCandidate
     ? 'waiting'

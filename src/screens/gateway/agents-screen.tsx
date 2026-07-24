@@ -98,7 +98,7 @@ type AgentConfigDraft = {
   modelOverride: string
   tools: Record<string, boolean>
   skills: Record<string, boolean>
-  channels: Record<string, { enabled: boolean | null; config: Record<string, unknown> }>
+  channels: Partial<Record<string, { enabled: boolean | null; config: Record<string, unknown> }>>
 }
 
 type AgentConfigPatchPayload = {
@@ -115,7 +115,7 @@ type AgentsScreenProps = {
 
 const CATEGORY_ORDER = ['Core', 'Coding', 'System', 'Integrations'] as const
 
-const STATUS_SORT_ORDER: Record<AgentRegistryStatus, number> = {
+const STATUS_SORT_ORDER: Partial<Record<AgentRegistryStatus, number>> = {
   active: 0,
   idle: 1,
   available: 2,
@@ -320,13 +320,17 @@ function buildAgentConfigPatchPayload(
     tools: draft.tools,
     skills: draft.skills,
     channels: Object.fromEntries(
-      Object.entries(draft.channels).map(([id, value]) => [
-        id,
-        {
-          ...value.config,
-          ...(value.enabled === null ? {} : { enabled: value.enabled }),
-        },
-      ]),
+      Object.entries(draft.channels).flatMap(([id, value]) =>
+        value
+          ? [[
+              id,
+              {
+                ...value.config,
+                ...(value.enabled === null ? {} : { enabled: value.enabled }),
+              },
+            ]]
+          : [],
+      ),
     ),
   }
 }
@@ -811,7 +815,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
         })
         .map((candidate) => candidate.session)
 
-      const primarySession = matchedSessions[0]
+      const primarySession = matchedSessions.at(0)
       const hasOverride = Object.prototype.hasOwnProperty.call(
         optimisticPausedByAgentId,
         definition.id,
@@ -1319,7 +1323,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
         ) : null}
 
         <div className="flex-1 overflow-auto">
-          {agentsQuery.isLoading && !agentsQuery.data ? (
+          {agentsQuery.isLoading ? (
             <div className="flex h-32 items-center justify-center">
               <div className="flex items-center gap-2 text-primary-500">
                 <div className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />

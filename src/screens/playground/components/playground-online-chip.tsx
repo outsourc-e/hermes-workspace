@@ -38,6 +38,7 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
 
   useEffect(() => {
     const controller = new AbortController()
+    const isCancelled = () => controller.signal.aborted
 
     const onCount = (ev: Event) => {
       const detail = (ev as CustomEvent).detail as Stats
@@ -59,7 +60,7 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
 
     // Fallback: one-shot /stats fetch if no push arrives in 3s.
     const fallbackId = window.setTimeout(async () => {
-      if (controller.signal.aborted || stats) return
+      if (isCancelled() || stats) return
       if (!STATS_URL) {
         setReachable(false)
         return
@@ -68,15 +69,11 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
         const r = await fetch(STATS_URL, { cache: 'no-store' })
         if (!r.ok) throw new Error(String(r.status))
         const data = (await r.json()) as Stats
-        // AbortSignal may change while fetch is awaiting; static control-flow cannot model that.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (controller.signal.aborted) return
+        if (isCancelled()) return
         setStats(data)
         setReachable(true)
       } catch {
-        // AbortSignal may change while fetch is awaiting; static control-flow cannot model that.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (controller.signal.aborted) return
+        if (isCancelled()) return
         setReachable(false)
       }
     }, 3000)

@@ -12,7 +12,7 @@ import { applyWorkspaceUpdate } from '../../../server/update-system'
 export const Route = createFileRoute('/api/update/workspace')({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: ({ request }) => Promise.resolve((() => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/api/update/workspace')({
             { status: 500 },
           )
         }
-      },
+      })()),
     },
   },
 })

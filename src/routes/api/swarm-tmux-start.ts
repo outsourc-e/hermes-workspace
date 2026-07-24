@@ -121,7 +121,7 @@ function startSession(
         if (error) {
           resolve({
             ok: false,
-            error: stderr?.toString().trim() || error.message,
+            error: stderr.toString().trim() || error.message,
           })
           return
         }
