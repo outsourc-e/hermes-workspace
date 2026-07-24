@@ -101,7 +101,7 @@ describe('Workspace station action router', () => {
     expect(result.route.stationHandoff.toolId).toBe('approval-inbox')
     expect(result.route.target).toMatchObject({
       roomId: 'olympus-command',
-      stationId: 'approval-dais',
+      stationId: 'mission-router',
       surfaceId: 'approval-inbox',
     })
     expect(actionTypes(result)).toContain('request_approval_local')

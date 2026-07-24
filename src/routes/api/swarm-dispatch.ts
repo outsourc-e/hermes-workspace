@@ -1,17 +1,19 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { newestCheckpointFromMessages, parseSwarmCheckpoint, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
+import {  newestCheckpointFromMessages, parseSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { createOrUpdateMission, getSwarmMission, markMissionAssignmentDispatched, recordMissionAssignmentBlocked, recordMissionCheckpoint } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent, buildSwarmStartupSnapshot } from '../../server/swarm-memory'
-import { rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
+import {  rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import type {SwarmRosterWorker} from '../../server/swarm-roster';
+import type {ParsedSwarmCheckpoint} from '../../server/swarm-checkpoints';
 
 const HERMES_BIN_CANDIDATES = [
   process.env.HERMES_CLI_BIN,
@@ -164,7 +166,7 @@ function execFileAsync(
   return new Promise((resolve) => {
     const child = execFile(cmd, args, { timeout, maxBuffer: MAX_OUTPUT_CHARS }, (error, stdout, stderr) => {
       if (error) {
-        resolve({ ok: false, error: stderr?.toString().trim() || error.message })
+        resolve({ ok: false, error: stderr.toString().trim() || error.message })
         return
       }
       resolve({
@@ -225,7 +227,7 @@ function parseAssignments(value: unknown): Array<AssignmentRequest> {
     const workerId = typeof obj.workerId === 'string' ? obj.workerId.trim() : ''
     const task = typeof obj.task === 'string' ? obj.task.trim() : ''
     const rationale = typeof obj.rationale === 'string' ? obj.rationale.trim() : undefined
-    const dependsOn = Array.isArray(obj.dependsOn) ? obj.dependsOn.filter((value): value is string => typeof value === 'string' && value.trim().length > 0) : undefined
+    const dependsOn = Array.isArray(obj.dependsOn) ? obj.dependsOn.filter((dependency): dependency is string => typeof dependency === 'string' && dependency.trim().length > 0) : undefined
     const reviewRequired = typeof obj.reviewRequired === 'boolean' ? obj.reviewRequired : undefined
     const direct = typeof obj.direct === 'boolean' ? obj.direct : undefined
     if (!workerId || !task || !validateWorkerId(workerId)) continue
@@ -405,11 +407,11 @@ export function buildWorkerPrompt(input: {
 }): string {
   if (input.direct && input.raw) return input.task
   const roster = input.roster
-  const displayName = roster?.name?.trim() || input.workerId
+  const displayName = roster?.name.trim() || input.workerId
   const role = roster?.role || 'Worker'
   const humanLabel = `${displayName} — ${role}`
-  const skills = roster?.skills?.length ? roster.skills.join(', ') : 'swarm-worker-core'
-  const capabilities = roster?.capabilities?.length ? roster.capabilities.join(', ') : 'not declared'
+  const skills = roster?.skills.length ? roster.skills.join(', ') : 'swarm-worker-core'
+  const capabilities = roster?.capabilities.length ? roster.capabilities.join(', ') : 'not declared'
   const mission = roster?.mission || 'Execute assigned swarm tasks and checkpoint progress.'
   const specialty = roster?.specialty || 'General execution'
 
@@ -503,7 +505,7 @@ function markDispatchResult(workerId: string, result: WorkerResult): void {
 }
 
 export function dispatchBlockReason(result: Pick<WorkerResult, 'ok' | 'error' | 'output' | 'checkpointStatus'>): string | null {
-  if (!result.ok) return result.error?.trim() || result.output?.trim() || 'Dispatch failed before a worker checkpoint was recorded.'
+  if (!result.ok) return result.error?.trim() || result.output.trim() || 'Dispatch failed before a worker checkpoint was recorded.'
   if (result.checkpointStatus === 'timeout') return 'No fresh checkpoint before poll timeout.'
   return null
 }
@@ -784,7 +786,7 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
   }
 }
 
-export function buildHermesChatQueryArgs(prompt: string): string[] {
+export function buildHermesChatQueryArgs(prompt: string): Array<string> {
   // `hermes chat -q` requires the query as the *immediate* next argv item.
   // Keeping the prompt adjacent to -q prevents argparse from interpreting
   // following flags (for example -Q) as a missing query and failing with:
@@ -793,8 +795,9 @@ export function buildHermesChatQueryArgs(prompt: string): string[] {
 }
 
 function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: SwarmRosterWorker | undefined, options?: { waitForCheckpoint?: boolean; checkpointPollMs?: number; missionId?: string | null; notifySessionKey?: string | null }): Promise<WorkerResult> {
-  return new Promise(async (resolve) => {
-    const workerId = assignment.workerId
+  return new Promise((resolve) => {
+    void (async () => {
+      const workerId = assignment.workerId
     const prompt = buildWorkerPrompt({
       workerId,
       task: assignment.task,
@@ -847,9 +850,9 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
           options.checkpointPollMs ?? 90_000,
         )
         if (checkpoint) {
-          markCheckpointResult(workerId, checkpoint, options?.notifySessionKey ?? 'main')
+          markCheckpointResult(workerId, checkpoint, options.notifySessionKey ?? 'main')
           const updatedMission = recordMissionCheckpoint({
-            missionId: options?.missionId,
+            missionId: options.missionId,
             assignmentId: assignment.assignmentId ?? null,
             workerId,
             checkpoint,
@@ -888,7 +891,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
             missionId: options?.missionId ?? null,
             assignmentId: assignment.assignmentId ?? null,
             checkpoint,
-            notifySessionKey: options?.notifySessionKey ?? 'main',
+            notifySessionKey: options.notifySessionKey ?? 'main',
           })
           liveResult.checkpoint = checkpoint
           liveResult.checkpointStatus = 'checkpointed'
@@ -980,9 +983,9 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
         if (options?.waitForCheckpoint) {
           const checkpoint = parseSwarmCheckpoint(out)
           if (checkpoint) {
-            markCheckpointResult(workerId, checkpoint, options?.notifySessionKey ?? 'main')
+            markCheckpointResult(workerId, checkpoint, options.notifySessionKey ?? 'main')
             recordMissionCheckpoint({
-              missionId: options?.missionId,
+              missionId: options.missionId,
               assignmentId: assignment.assignmentId ?? null,
               workerId,
               checkpoint,
@@ -1008,7 +1011,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
               missionId: options?.missionId ?? null,
               assignmentId: assignment.assignmentId ?? null,
               checkpoint,
-              notifySessionKey: options?.notifySessionKey ?? 'main',
+              notifySessionKey: options.notifySessionKey ?? 'main',
             })
             result.checkpoint = checkpoint
             result.checkpointStatus = 'checkpointed'
@@ -1025,20 +1028,21 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
       },
     )
 
-    proc.on('error', (error) => {
-      const result: WorkerResult = {
-        workerId,
-        ok: false,
-        output: '',
-        error: error.message,
-        durationMs: Date.now() - startedAt,
-        exitCode: null,
-        delivery: 'oneshot',
-      }
-      markDispatchResult(workerId, result)
-      recordDispatchBlock(workerId, assignment, result, options)
-      resolve(result)
-    })
+      proc.on('error', (error) => {
+        const result: WorkerResult = {
+          workerId,
+          ok: false,
+          output: '',
+          error: error.message,
+          durationMs: Date.now() - startedAt,
+          exitCode: null,
+          delivery: 'oneshot',
+        }
+        markDispatchResult(workerId, result)
+        recordDispatchBlock(workerId, assignment, result, options)
+        resolve(result)
+      })
+    })()
   })
 }
 

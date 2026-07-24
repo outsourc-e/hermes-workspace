@@ -39,7 +39,9 @@ const SWARM2_ROOM_STORAGE_KEY = 'claude-swarm2-room-v1'
 // live terminals/log tails or unapproved profiles that have repeatedly crashed
 // this Workspace setup.
 const SWARM2_SAFE_MODE = true
-const APPROVED_SWARM_WORKER_IDS = new Set(['chatgptheavy', 'workerkimi', 'swarm1', 'swarm6', 'swarm11', 'swarm12'])
+// Kimi remains configured but is intentionally non-dispatchable until DLV
+// explicitly re-enables it after renewing balance.
+const APPROVED_SWARM_WORKER_IDS = new Set(['chatgptheavy', 'swarm1', 'swarm6', 'swarm11', 'swarm12'])
 
 const SWARM2_OPERATION_THEME: CSSProperties = {
   ['--theme-bg' as string]: 'var(--color-surface)',

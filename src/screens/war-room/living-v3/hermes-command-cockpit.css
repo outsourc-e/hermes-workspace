@@ -1,467 +1,1583 @@
+.living-v3--command-focus-mode .living-v3__hud,
+.living-v3--command-focus-mode .living-v3__ops-rail {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.living-v3--command-focus-mode .living-v3__station-layer {
+  z-index: 43;
+}
+
+.living-v3--command-focus-mode .living-v3__drawer--manager {
+  background: #05080b;
+  backdrop-filter: none;
+}
+
+.living-v3--command-focus-mode .living-v3__drawer--manager > .station-workbench-header {
+  display: none;
+}
+
+.living-v3--command-focus-mode .living-v3__drawer--manager > .living-v3__manager-shell.living-v3__manager-shell--chat {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.living-v3__station-workbench--command-table,
+.living-v3__station-workbench--mission-router {
+  width: min(1720px, calc(100vw - 28px));
+  max-width: none;
+}
+
+.living-v3__station-workbench--command-table .living-v3__station-workbench-header,
+.living-v3__station-workbench--mission-router .living-v3__station-workbench-header {
+  display: none;
+}
+
+.living-v3__manager-shell--chat {
+  display: block;
+  width: 100%;
+  max-width: none;
+}
+
+.living-v3__manager-shell--chat > .living-v3__manager-main {
+  min-width: 0;
+}
+
+.living-v3__hermes-command-panel--primary {
+  width: 100%;
+  max-width: none;
+}
+
+.living-v3__manager-shell--chat > .living-v3__manager-advanced {
+  display: none;
+}
+
+.living-v3__command-desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
 .hermes-command-cockpit {
-  --hermes-gold: #f4c86a;
-  --hermes-mint: #71ebcb;
-  --hermes-ink: #061316;
+  --hc-bg: #070a0d;
+  --hc-panel: #0b0f13;
+  --hc-panel-2: #10151a;
+  --hc-line: rgba(255, 255, 255, 0.075);
+  --hc-line-strong: rgba(202, 164, 95, 0.28);
+  --hc-text: #f1eee7;
+  --hc-muted: #8e969b;
+  --hc-soft: #626b70;
+  --hc-gold: #caa45f;
+  --hc-gold-soft: rgba(202, 164, 95, 0.12);
+  --hc-blue: #78a6c8;
+  --hc-green: #72b68a;
+  --hc-yellow: #d6a757;
+  --hc-red: #d27b72;
   display: grid;
-  grid-template-rows: auto auto auto minmax(190px, 1fr) auto;
-  gap: 12px;
-  min-width: 0;
-  min-height: 0;
-  border: 1px solid rgba(244, 200, 106, 0.34);
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at 12% 4%, rgba(244, 200, 106, 0.12), transparent 34%),
-    linear-gradient(145deg, rgba(7, 28, 31, 0.98), rgba(3, 15, 19, 0.98));
-  box-shadow: inset 0 1px 0 rgba(255, 244, 215, 0.08), 0 24px 50px rgba(0, 0, 0, 0.28);
-  padding: 16px;
-  color: #f7ecd3;
+  grid-template-rows: 62px minmax(0, 1fr) auto;
+  width: 100%;
+  height: min(820px, calc(100dvh - 108px));
+  min-height: 600px;
   overflow: hidden;
+  border: 1px solid var(--hc-line-strong);
+  border-radius: 18px;
+  background: var(--hc-bg);
+  box-shadow: 0 24px 68px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.025);
+  color: var(--hc-text);
+  font-family: Inter, "SF Pro Display", "Segoe UI", Arial, sans-serif;
 }
 
-.living-v3 .living-v3__command-desk[data-command-desk-layout='action-v2'] {
+.hermes-command-cockpit *,
+.hermes-command-cockpit *::before,
+.hermes-command-cockpit *::after {
+  box-sizing: border-box;
+}
+
+.hermes-command-cockpit button,
+.hermes-command-cockpit textarea {
+  font: inherit;
+}
+
+.hermes-command-cockpit button {
+  color: inherit;
+}
+
+.hermes-command-cockpit__header {
+  position: relative;
+  z-index: 3;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 318px);
-  gap: 12px;
-  min-width: 0;
-  min-height: 0;
-  align-items: start;
-}
-
-.living-v3 .living-v3__command-desk[data-command-desk-layout='action-v2'] > .living-v3__command-side-stack {
-  min-width: 0;
-  max-width: 318px;
-}
-
-.hermes-command-cockpit__hero {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
   align-items: center;
-  gap: 13px;
+  gap: 18px;
+  padding: 0 17px;
+  border-bottom: 1px solid var(--hc-line);
+  background: #090d11;
+}
+
+.hermes-command-cockpit__identity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
 }
 
 .hermes-command-cockpit__portrait {
   position: relative;
   display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
   place-items: center;
-  width: 72px;
-  height: 72px;
-  border: 1px solid rgba(244, 200, 106, 0.38);
-  border-radius: 20px;
-  background: radial-gradient(circle, rgba(38, 97, 87, 0.54), rgba(8, 27, 30, 0.86));
-  overflow: visible;
+  overflow: hidden;
+  border: 1px solid rgba(202, 164, 95, 0.38);
+  border-radius: 12px;
+  background: #11171c;
 }
 
 .hermes-command-cockpit__portrait img {
-  width: 64px;
-  height: 64px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  image-rendering: pixelated;
-  filter: drop-shadow(0 7px 11px rgba(0, 0, 0, 0.35));
 }
 
-.hermes-command-cockpit__portrait i {
+.hermes-command-cockpit__portrait span {
   position: absolute;
-  inset-block-end: -2px;
-  inset-inline-start: -2px;
-  width: 14px;
-  height: 14px;
-  border: 3px solid #092124;
-  border-radius: 50%;
-  background: var(--hermes-mint);
-  box-shadow: 0 0 16px rgba(113, 235, 203, 0.62);
-}
-
-.hermes-command-cockpit__portrait i.is-running {
-  animation: hermes-cockpit-pulse 1.6s ease-in-out infinite;
-}
-
-.hermes-command-cockpit__identity {
-  min-width: 0;
-}
-
-.hermes-command-cockpit__identity span,
-.hermes-command-cockpit__canvas-state span,
-.hermes-command-cockpit__ask label > span,
-.hermes-command-cockpit__canvas footer span {
-  color: var(--hermes-mint);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.68rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  inset: 0;
+  display: none;
+  place-items: center;
+  color: var(--hc-gold);
+  font: 800 14px/1 Georgia, serif;
 }
 
 .hermes-command-cockpit__identity h2,
-.hermes-command-cockpit__identity p,
-.hermes-command-cockpit__canvas h3,
-.hermes-command-cockpit__canvas p,
-.hermes-command-cockpit__canvas blockquote {
+.hermes-command-cockpit__identity p {
   margin: 0;
 }
 
 .hermes-command-cockpit__identity h2 {
-  margin-block: 3px;
-  color: #fff1c7;
-  font-size: clamp(1.2rem, 1.8vw, 1.7rem);
-  line-height: 1.1;
-}
-
-.hermes-command-cockpit__identity p {
-  max-width: 680px;
-  color: rgba(225, 239, 229, 0.7);
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-
-.hermes-command-cockpit__safety {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 2px 7px;
-  min-width: 170px;
-  border: 1px solid rgba(113, 235, 203, 0.2);
-  border-radius: 14px;
-  background: rgba(5, 26, 28, 0.74);
-  padding: 9px 11px;
-}
-
-.hermes-command-cockpit__safety i {
-  grid-row: 1 / 3;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--hermes-mint);
-  box-shadow: 0 0 12px rgba(113, 235, 203, 0.6);
-}
-
-.hermes-command-cockpit__safety span {
-  color: var(--hermes-mint);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.62rem;
-  font-weight: 900;
-}
-
-.hermes-command-cockpit__safety b {
-  color: rgba(237, 246, 237, 0.78);
-  font-size: 0.72rem;
-}
-
-.hermes-command-cockpit__spine {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.hermes-command-cockpit__spine > span {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  border-block: 1px solid rgba(136, 178, 166, 0.14);
-  padding: 7px 8px;
-  color: rgba(211, 229, 217, 0.42);
-}
-
-.hermes-command-cockpit__spine i {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid rgba(159, 192, 179, 0.2);
-  border-radius: 50%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.58rem;
-  font-style: normal;
-}
-
-.hermes-command-cockpit__spine b {
   overflow: hidden;
-  font-size: 0.72rem;
+  color: var(--hc-text);
+  font: 680 15px/1.1 Inter, sans-serif;
+  letter-spacing: -0.02em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.hermes-command-cockpit__spine > span.is-active,
-.hermes-command-cockpit__spine > span.is-done {
-  color: #f9edce;
+.hermes-command-cockpit__identity p {
+  margin-top: 4px;
+  color: var(--hc-muted);
+  font-size: 10px;
+  letter-spacing: 0.02em;
 }
 
-.hermes-command-cockpit__spine > span.is-active i {
-  border-color: rgba(244, 200, 106, 0.62);
-  background: rgba(244, 200, 106, 0.12);
-  color: var(--hermes-gold);
-  box-shadow: 0 0 16px rgba(244, 200, 106, 0.14);
-}
-
-.hermes-command-cockpit__spine > span.is-done i {
-  border-color: rgba(113, 235, 203, 0.48);
-  background: rgba(113, 235, 203, 0.14);
-  color: var(--hermes-mint);
-}
-
-.hermes-command-cockpit__ask {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+.hermes-command-cockpit__header-center {
+  display: flex;
+  align-items: center;
   gap: 9px;
-  align-items: stretch;
+  color: var(--hc-muted);
+  font-size: 10px;
 }
 
-.hermes-command-cockpit__ask label {
-  display: grid;
-  grid-template-columns: 1fr auto;
+.hermes-command-cockpit__header-center strong {
+  color: #d9dde0;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.hermes-command-cockpit__header-center span {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+}
+
+.hermes-command-cockpit__header-center span::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hc-green);
+  box-shadow: 0 0 12px rgba(114, 182, 138, 0.5);
+  content: "";
+}
+
+.hermes-command-cockpit__team-peek {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+}
+
+.hermes-command-cockpit__team-peek > span {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid var(--hc-line);
+  border-radius: 8px;
+  color: var(--hc-muted);
+  font-size: 10px;
+}
+
+.hermes-command-cockpit__team-peek > div {
+  display: flex;
+  direction: ltr;
+}
+
+.hermes-command-cockpit__team-peek img {
+  width: 27px;
+  height: 27px;
+  margin-left: -6px;
+  object-fit: contain;
+  border: 1px solid #222a30;
+  border-radius: 50%;
+  background: #12181d;
+}
+
+.hermes-command-cockpit__bridge {
+  display: grid;
+  grid-template-areas: "threads chat workbench operations";
+  grid-template-columns: 210px minmax(360px, 1fr) minmax(310px, 390px) 280px;
+  min-height: 0;
+  direction: ltr;
+}
+
+.hermes-command-cockpit__threads,
+.hermes-command-cockpit__chat,
+.hermes-command-cockpit__workbench,
+.hermes-command-cockpit__operations {
   min-width: 0;
-  border: 1px solid rgba(113, 235, 203, 0.24);
-  border-radius: 15px;
-  background: rgba(2, 15, 18, 0.72);
-  padding: 9px 12px 11px;
+  min-height: 0;
+  direction: rtl;
+  background: var(--hc-panel);
 }
 
-.hermes-command-cockpit__ask kbd {
-  color: rgba(225, 238, 227, 0.42);
-  font-size: 0.64rem;
+.hermes-command-cockpit__threads {
+  grid-area: threads;
+  overflow: hidden;
+  border-right: 1px solid var(--hc-line);
+  background: #080c0f;
 }
 
-.hermes-command-cockpit__ask textarea {
-  grid-column: 1 / -1;
+.hermes-command-cockpit__chat {
+  grid-area: chat;
+  display: grid;
+  grid-template-rows: 54px minmax(0, 1fr) auto;
+  background: #0c1115;
+}
+
+.hermes-command-cockpit__workbench {
+  grid-area: workbench;
+  display: grid;
+  grid-template-rows: 54px minmax(0, 1fr);
+  border-left: 1px solid var(--hc-line);
+  border-right: 1px solid var(--hc-line);
+  background: #0a0e12;
+}
+
+.hermes-command-cockpit__operations {
+  grid-area: operations;
+  display: grid;
+  grid-template-rows: 54px minmax(0, 1fr);
+  background: #080c0f;
+}
+
+.hermes-command-cockpit__panel-head,
+.hermes-command-cockpit__chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  height: 54px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--hc-line);
+}
+
+.hermes-command-cockpit__panel-head strong,
+.hermes-command-cockpit__chat-head strong {
+  color: #dfe3e5;
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: 0.04em;
+}
+
+.hermes-command-cockpit__panel-head > span {
+  color: var(--hc-soft);
+  font-size: 9px;
+}
+
+.hermes-command-cockpit__chat-head > div {
+  min-width: 0;
+}
+
+.hermes-command-cockpit__chat-head div > span {
+  display: block;
+  max-width: 240px;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--hc-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermes-command-cockpit__chat-head > small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  color: var(--hc-muted);
+  font-size: 9px;
+}
+
+.hermes-command-cockpit__chat-head > small::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hc-green);
+  content: "";
+}
+
+.hermes-command-cockpit__chat-head > small.is-running::before {
+  background: var(--hc-blue);
+  box-shadow: 0 0 10px rgba(120, 166, 200, 0.6);
+}
+
+.hermes-command-cockpit__chat-head > small.is-waiting_operator::before {
+  background: var(--hc-yellow);
+}
+
+.hermes-command-cockpit__thread-current {
+  margin: 12px;
+  padding: 12px;
+  border: 1px solid var(--hc-line-strong);
+  border-radius: 12px;
+  background: var(--hc-gold-soft);
+}
+
+.hermes-command-cockpit__thread-current span,
+.hermes-command-cockpit__thread-current small,
+.hermes-command-cockpit__thread-current strong {
+  display: block;
+}
+
+.hermes-command-cockpit__thread-current span {
+  color: var(--hc-gold);
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hermes-command-cockpit__thread-current strong {
+  margin-top: 7px;
+  color: #eceae4;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.hermes-command-cockpit__thread-current small {
+  margin-top: 7px;
+  color: var(--hc-muted);
+  font-size: 9px;
+}
+
+.hermes-command-cockpit__section-label {
+  margin: 17px 13px 8px;
+  color: var(--hc-soft);
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.hermes-command-cockpit__thread-list {
+  max-height: calc(100% - 175px);
+  padding: 0 7px 12px;
+  overflow: auto;
+}
+
+.hermes-command-cockpit__thread-list button {
+  display: block;
   width: 100%;
-  min-height: 68px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  text-align: right;
+  cursor: pointer;
+}
+
+.hermes-command-cockpit__thread-list button + button {
+  margin-top: 3px;
+}
+
+.hermes-command-cockpit__thread-list button:hover,
+.hermes-command-cockpit__thread-list button.is-selected {
+  border-color: var(--hc-line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.hermes-command-cockpit__thread-list strong,
+.hermes-command-cockpit__thread-list small,
+.hermes-command-cockpit__thread-list span {
+  display: block;
+}
+
+.hermes-command-cockpit__thread-list strong {
+  color: #d3d7d8;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.hermes-command-cockpit__thread-list small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--hc-muted);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermes-command-cockpit__thread-list span {
+  margin-top: 5px;
+  color: var(--hc-soft);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__conversation {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 11px;
+  padding: 18px 22px 20px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.hermes-command-cockpit__empty {
+  display: grid;
+  max-width: 360px;
+  margin: auto;
+  place-items: center;
+  text-align: center;
+}
+
+.hermes-command-cockpit__empty img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.38));
+}
+
+.hermes-command-cockpit__empty h3,
+.hermes-command-cockpit__empty p {
+  margin: 0;
+}
+
+.hermes-command-cockpit__empty h3 {
+  margin-top: 14px;
+  color: #eeece6;
+  font: 640 18px/1.2 Inter, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.hermes-command-cockpit__empty p {
+  margin-top: 8px;
+  color: var(--hc-muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.hermes-command-cockpit__message {
+  max-width: min(82%, 580px);
+  padding: 11px 13px;
+  border: 1px solid var(--hc-line);
+  border-radius: 13px;
+  background: var(--hc-panel-2);
+}
+
+.hermes-command-cockpit__message--operator {
+  align-self: flex-start;
+  border-color: rgba(120, 166, 200, 0.22);
+  background: rgba(120, 166, 200, 0.09);
+}
+
+.hermes-command-cockpit__message--agent,
+.hermes-command-cockpit__message--receipt {
+  align-self: flex-end;
+}
+
+.hermes-command-cockpit__message > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--hc-gold);
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: 0.06em;
+}
+
+.hermes-command-cockpit__message p {
+  margin: 0;
+  color: #d7dcde;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.hermes-command-cockpit__message details {
+  margin-top: 8px;
+}
+
+.hermes-command-cockpit__message summary {
+  color: var(--hc-muted);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.hermes-command-cockpit__message details p {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hc-line);
+}
+
+.hermes-command-cockpit__chat-receipt {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  width: min(88%, 620px);
+  align-self: flex-end;
+  padding: 12px;
+  border: 1px solid rgba(202, 164, 95, 0.22);
+  border-radius: 13px;
+  background: rgba(202, 164, 95, 0.075);
+}
+
+.hermes-command-cockpit__receipt-mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(202, 164, 95, 0.14);
+  color: var(--hc-gold);
+  font-weight: 800;
+}
+
+.hermes-command-cockpit__chat-receipt small,
+.hermes-command-cockpit__chat-receipt strong,
+.hermes-command-cockpit__chat-receipt p {
+  display: block;
+  margin: 0;
+}
+
+.hermes-command-cockpit__chat-receipt small {
+  color: var(--hc-muted);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__chat-receipt strong {
+  margin-top: 4px;
+  color: #e7e6e1;
+  font-size: 11px;
+}
+
+.hermes-command-cockpit__chat-receipt p {
+  margin-top: 5px;
+  color: #aeb5b8;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.hermes-command-cockpit__composer {
+  display: grid;
+  gap: 8px;
+  margin: 0 15px 14px;
+  padding: 10px 11px 9px;
+  border: 1px solid rgba(202, 164, 95, 0.25);
+  border-radius: 14px;
+  background: #10161b;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.hermes-command-cockpit__composer:focus-within {
+  border-color: rgba(202, 164, 95, 0.52);
+  box-shadow: 0 0 0 3px rgba(202, 164, 95, 0.08), 0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.hermes-command-cockpit__composer textarea {
+  width: 100%;
+  min-height: 42px;
+  max-height: 112px;
   resize: vertical;
   border: 0;
   outline: 0;
   background: transparent;
-  color: #fff4d8;
-  font: inherit;
-  font-size: 0.94rem;
-  line-height: 1.5;
+  color: var(--hc-text);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
-.hermes-command-cockpit__ask textarea::placeholder {
-  color: rgba(214, 229, 219, 0.42);
+.hermes-command-cockpit__composer textarea::placeholder {
+  color: #6d757a;
 }
 
-.hermes-command-cockpit__ask label:focus-within {
-  border-color: rgba(113, 235, 203, 0.58);
-  box-shadow: 0 0 0 3px rgba(113, 235, 203, 0.07);
-}
-
-.hermes-command-cockpit__run {
+.hermes-command-cockpit__composer-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  min-width: 180px;
-  min-height: 72px;
-  border: 1px solid rgba(244, 200, 106, 0.42);
-  border-radius: 15px;
-  background: linear-gradient(145deg, rgba(244, 200, 106, 0.22), rgba(38, 87, 80, 0.42));
-  color: #fff0c4;
-  padding: 13px 16px;
-  font-weight: 900;
+  gap: 12px;
+}
+
+.hermes-command-cockpit__composer-foot > span {
+  color: var(--hc-soft);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__send,
+.hermes-command-cockpit__primary,
+.hermes-command-cockpit__secondary {
+  min-height: 32px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 730;
   cursor: pointer;
 }
 
-.hermes-command-cockpit__run b {
-  font-size: 1.2rem;
+.hermes-command-cockpit__send,
+.hermes-command-cockpit__primary {
+  border: 1px solid #d5b16b;
+  background: #caa45f;
+  color: #11100d !important;
 }
 
-.hermes-command-cockpit__run:disabled {
-  opacity: 0.42;
+.hermes-command-cockpit__send {
+  min-width: 58px;
+  padding: 0 14px;
+}
+
+.hermes-command-cockpit__send:disabled {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #252c30;
+  color: #70777a !important;
   cursor: not-allowed;
 }
 
-.hermes-command-cockpit__canvas {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: 1fr auto;
-  gap: 12px 16px;
-  min-height: 190px;
-  border: 1px solid rgba(136, 178, 166, 0.2);
-  border-radius: 17px;
-  background:
-    linear-gradient(90deg, rgba(113, 235, 203, 0.025) 1px, transparent 1px),
-    linear-gradient(rgba(113, 235, 203, 0.025) 1px, transparent 1px),
-    rgba(2, 13, 16, 0.8);
-  background-size: 28px 28px;
-  padding: 18px;
+.hermes-command-cockpit__secondary {
+  border: 1px solid var(--hc-line);
+  background: rgba(255, 255, 255, 0.035);
+  color: #c4cacc;
+}
+
+.hermes-command-cockpit__workbench-body,
+.hermes-command-cockpit__operations-scroll {
+  min-height: 0;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
-.hermes-command-cockpit__canvas.is-running {
-  border-color: rgba(113, 235, 203, 0.48);
+.hermes-command-cockpit__workbench-body {
+  padding: 15px;
 }
 
-.hermes-command-cockpit__canvas.is-blocked,
-.hermes-command-cockpit__canvas.is-failed {
-  border-color: rgba(255, 137, 105, 0.45);
+.hermes-command-cockpit__workbench-empty {
+  display: grid;
+  height: 100%;
+  min-height: 300px;
+  place-content: center;
+  place-items: center;
+  text-align: center;
 }
 
-.hermes-command-cockpit__canvas-state {
+.hermes-command-cockpit__workbench-empty > span {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(202, 164, 95, 0.3);
+  border-radius: 13px;
+  color: var(--hc-gold);
+  font-size: 18px;
+}
+
+.hermes-command-cockpit__workbench-empty h3,
+.hermes-command-cockpit__workbench-empty p {
+  margin: 0;
+}
+
+.hermes-command-cockpit__workbench-empty h3 {
+  margin-top: 14px;
+  color: #e4e2dc;
+  font-size: 16px;
+}
+
+.hermes-command-cockpit__workbench-empty p {
+  max-width: 240px;
+  margin-top: 7px;
+  color: var(--hc-muted);
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.hermes-command-cockpit__workbench-empty > div {
   display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  writing-mode: vertical-rl;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  color: var(--hc-soft);
+  font-size: 8px;
 }
 
-.hermes-command-cockpit__canvas-state i {
-  width: 1px;
-  min-height: 48px;
-  background: linear-gradient(var(--hermes-mint), transparent);
+.hermes-command-cockpit__workbench-empty i {
+  width: 23px;
+  height: 1px;
+  background: rgba(202, 164, 95, 0.25);
 }
 
-.hermes-command-cockpit__canvas-copy {
+.hermes-command-cockpit__result,
+.hermes-command-cockpit__task-focus {
+  padding: 15px;
+  border: 1px solid var(--hc-line);
+  border-radius: 14px;
+  background: #0e1418;
+}
+
+.hermes-command-cockpit__result--waiting_operator {
+  border-color: rgba(214, 167, 87, 0.42);
+  box-shadow: inset 0 3px 0 rgba(214, 167, 87, 0.55);
+}
+
+.hermes-command-cockpit__result--completed {
+  border-color: rgba(114, 182, 138, 0.3);
+}
+
+.hermes-command-cockpit__result-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.hermes-command-cockpit__result-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid rgba(202, 164, 95, 0.25);
+  border-radius: 11px;
+  background: var(--hc-gold-soft);
+  color: var(--hc-gold);
+  font-weight: 800;
+}
+
+.hermes-command-cockpit__result-head span,
+.hermes-command-cockpit__result-head h3 {
+  display: block;
+  margin: 0;
+}
+
+.hermes-command-cockpit__result-head span {
+  color: var(--hc-muted);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__result-head h3 {
+  margin-top: 4px;
+  color: #efede8;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.hermes-command-cockpit__target {
+  display: inline-flex;
+  margin-top: 14px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: rgba(120, 166, 200, 0.09);
+  color: var(--hc-blue);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__readback {
+  margin: 15px 0 0;
+  color: #bac1c4;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.hermes-command-cockpit__decision {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid rgba(214, 167, 87, 0.2);
+  border-radius: 11px;
+  background: rgba(214, 167, 87, 0.07);
+}
+
+.hermes-command-cockpit__decision p {
+  margin: 0;
+  color: #b9bec0;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.hermes-command-cockpit__decision > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.hermes-command-cockpit__next {
+  margin-top: 16px;
+  padding: 11px;
+  border-right: 2px solid var(--hc-gold);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.hermes-command-cockpit__next span {
+  display: block;
+  color: var(--hc-gold);
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+}
+
+.hermes-command-cockpit__next p {
+  margin: 5px 0 0;
+  color: #b5bbbd;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.hermes-command-cockpit__details {
+  margin-top: 14px;
+  border-top: 1px solid var(--hc-line);
+}
+
+.hermes-command-cockpit__details summary,
+.hermes-command-cockpit__advanced summary {
+  padding: 11px 0 0;
+  color: var(--hc-muted);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.hermes-command-cockpit__details > div {
+  padding-top: 11px;
+}
+
+.hermes-command-cockpit__details dl,
+.hermes-command-cockpit__task-focus dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.hermes-command-cockpit__details dl > div,
+.hermes-command-cockpit__task-focus dl > div {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 8px;
+  color: var(--hc-muted);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__details dt,
+.hermes-command-cockpit__task-focus dt {
+  color: var(--hc-soft);
+}
+
+.hermes-command-cockpit__details dd,
+.hermes-command-cockpit__task-focus dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.hermes-command-cockpit__details p,
+.hermes-command-cockpit__details li {
+  color: var(--hc-muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.hermes-command-cockpit__source-details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hc-line);
+}
+
+.hermes-command-cockpit__task-focus .hermes-command-cockpit__eyebrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--hc-muted);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__task-focus .hermes-command-cockpit__eyebrow span {
+  color: var(--hc-gold);
+  font-weight: 750;
+}
+
+.hermes-command-cockpit__task-focus h3 {
+  margin: 11px 0 0;
+  color: #eceae5;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.hermes-command-cockpit__task-focus > p {
+  margin: 10px 0 15px;
+  color: #b8bec0;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.hermes-command-cockpit__task-focus > button {
+  width: 100%;
+  margin-top: 15px;
+}
+
+.hermes-command-cockpit__operations-scroll {
+  padding: 11px 9px 14px;
+}
+
+.hermes-command-cockpit__needs-you {
+  display: block;
+  width: 100%;
+  padding: 11px;
+  border: 1px solid rgba(214, 167, 87, 0.32);
+  border-radius: 11px;
+  background: rgba(214, 167, 87, 0.09);
+  text-align: right;
+  cursor: pointer;
+}
+
+.hermes-command-cockpit__needs-you span,
+.hermes-command-cockpit__needs-you strong,
+.hermes-command-cockpit__needs-you small {
+  display: block;
+}
+
+.hermes-command-cockpit__needs-you span {
+  color: var(--hc-yellow);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.hermes-command-cockpit__needs-you strong {
+  margin-top: 5px;
+  color: #ece7dc;
+  font-size: 10px;
+}
+
+.hermes-command-cockpit__needs-you small {
+  margin-top: 5px;
+  color: var(--hc-muted);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__task-list,
+.hermes-command-cockpit__agent-list {
+  display: grid;
+  gap: 5px;
+}
+
+.hermes-command-cockpit__task-list button,
+.hermes-command-cockpit__agent-list button {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  text-align: right;
+  cursor: pointer;
+}
+
+.hermes-command-cockpit__task-list button:hover,
+.hermes-command-cockpit__task-list button.is-selected,
+.hermes-command-cockpit__agent-list button:hover,
+.hermes-command-cockpit__agent-list button.is-selected {
+  border-color: var(--hc-line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.hermes-command-cockpit__task-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px;
+}
+
+.hermes-command-cockpit__task-list button > div {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr);
+  min-width: 0;
+  gap: 0 8px;
+}
+
+.hermes-command-cockpit__task-list strong,
+.hermes-command-cockpit__task-list small {
+  grid-column: 2;
+}
+
+.hermes-command-cockpit__task-list strong {
+  color: #d9ddde;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.hermes-command-cockpit__task-list small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--hc-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermes-command-cockpit__task-list button > span {
+  flex: 0 0 auto;
+  color: var(--hc-muted);
+  font-size: 9px;
+}
+
+.hermes-command-cockpit__status-dot {
+  grid-row: 1 / span 2;
+  width: 6px;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--hc-soft);
+}
+
+.hermes-command-cockpit__task-list button.is-running .hermes-command-cockpit__status-dot {
+  background: var(--hc-blue);
+  box-shadow: 0 0 9px rgba(120, 166, 200, 0.55);
+}
+
+.hermes-command-cockpit__task-list button.is-waiting .hermes-command-cockpit__status-dot {
+  background: var(--hc-yellow);
+}
+
+.hermes-command-cockpit__task-list button.is-completed .hermes-command-cockpit__status-dot {
+  background: var(--hc-green);
+}
+
+.hermes-command-cockpit__task-list button.is-blocked .hermes-command-cockpit__status-dot,
+.hermes-command-cockpit__task-list button.is-failed .hermes-command-cockpit__status-dot {
+  background: var(--hc-red);
+}
+
+.hermes-command-cockpit__agent-list button {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+
+.hermes-command-cockpit__agent-list img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border: 1px solid var(--hc-line);
+  border-radius: 9px;
+  background: #11171c;
+}
+
+.hermes-command-cockpit__agent-list div {
   min-width: 0;
 }
 
-.hermes-command-cockpit__canvas-copy small {
-  color: rgba(177, 211, 199, 0.56);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.66rem;
+.hermes-command-cockpit__agent-list strong,
+.hermes-command-cockpit__agent-list small,
+.hermes-command-cockpit__agent-list p {
+  display: block;
+  margin: 0;
 }
 
-.hermes-command-cockpit__canvas h3 {
-  margin-block: 7px;
-  color: #fff1c4;
-  font-size: clamp(1.1rem, 1.4vw, 1.45rem);
+.hermes-command-cockpit__agent-list strong {
+  color: #dbe0e1;
+  font-size: 10px;
 }
 
-.hermes-command-cockpit__canvas p {
-  max-width: 950px;
-  color: rgba(239, 246, 237, 0.84);
-  font-size: 0.9rem;
-  line-height: 1.62;
-  white-space: pre-wrap;
+.hermes-command-cockpit__agent-list small {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--hc-muted);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.hermes-command-cockpit__canvas blockquote {
-  margin-block-start: 12px;
-  border-inline-start: 2px solid rgba(244, 200, 106, 0.42);
-  background: rgba(244, 200, 106, 0.06);
-  padding: 8px 11px;
-  color: rgba(255, 236, 190, 0.7);
-  font-size: 0.78rem;
+.hermes-command-cockpit__agent-list p {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--hc-soft);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.hermes-command-cockpit__canvas footer {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
+.hermes-command-cockpit__agent-list button > span {
+  position: relative;
+  padding-right: 10px;
+  color: var(--hc-muted);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__agent-list button > span::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--hc-soft);
+  transform: translateY(-50%);
+  content: "";
+}
+
+.hermes-command-cockpit__agent-list button.is-active > span::before {
+  background: var(--hc-green);
+}
+
+.hermes-command-cockpit__agent-list button.is-moving > span::before {
+  background: var(--hc-blue);
+}
+
+.hermes-command-cockpit__agent-list button.is-approval > span::before {
+  background: var(--hc-yellow);
+}
+
+.hermes-command-cockpit__agent-list button.is-resting > span::before,
+.hermes-command-cockpit__agent-list button.is-visual > span::before {
+  background: #778086;
+}
+
+.hermes-command-cockpit__quiet-empty {
+  margin: 12px 4px;
+  color: var(--hc-soft);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.hermes-command-cockpit__advanced {
+  border-top: 1px solid var(--hc-line);
+  background: #080c0f;
+}
+
+.hermes-command-cockpit__advanced > summary {
+  padding: 9px 15px;
+  list-style-position: inside;
+}
+
+.hermes-command-cockpit__advanced > div {
+  max-height: 260px;
+  padding: 0 12px 12px;
+  overflow: auto;
+}
+
+.living-v3__command-side-stack--collapsed {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  border: 0;
+  color: rgba(220, 226, 228, 0.68);
+}
+
+.living-v3__command-side-stack--collapsed > summary {
+  width: max-content;
+  margin-right: auto;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(8, 12, 15, 0.68);
+  color: rgba(220, 226, 228, 0.48);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.living-v3__command-side-stack--collapsed[open] > summary {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 1480px) {
+  .hermes-command-cockpit__bridge {
+    grid-template-columns: 190px minmax(340px, 1fr) minmax(290px, 350px) 255px;
+  }
+}
+
+@media (max-width: 1240px) {
+  .hermes-command-cockpit__bridge {
+    grid-template-areas: "chat workbench operations";
+    grid-template-columns: minmax(360px, 1fr) minmax(290px, 340px) 250px;
+  }
+
+  .hermes-command-cockpit__threads {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .living-v3__station-workbench--command-table,
+.living-v3__station-workbench--mission-router {
+    width: min(940px, calc(100vw - 18px));
+  }
+
+  .hermes-command-cockpit {
+    height: min(900px, calc(100dvh - 84px));
+  }
+
+  .hermes-command-cockpit__header-center {
+    display: none;
+  }
+
+  .hermes-command-cockpit__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .hermes-command-cockpit__bridge {
+    grid-template-areas:
+      "chat operations"
+      "workbench operations";
+    grid-template-columns: minmax(0, 1fr) 250px;
+    grid-template-rows: minmax(330px, 1fr) minmax(260px, 0.72fr);
+  }
+
+  .hermes-command-cockpit__workbench {
+    border-top: 1px solid var(--hc-line);
+    border-right: 0;
+  }
+}
+
+@media (min-width: 760px) {
+  .hermes-command-cockpit__send:hover:not(:disabled),
+  .hermes-command-cockpit__primary:hover {
+    background: #d7b66f;
+  }
+
+  .hermes-command-cockpit__secondary:hover {
+    border-color: rgba(202, 164, 95, 0.3);
+    background: rgba(202, 164, 95, 0.08);
+  }
+}
+
+@media (max-width: 759px) {
+  .living-v3__station-workbench--command-table,
+.living-v3__station-workbench--mission-router {
+    width: calc(100vw - 12px);
+  }
+
+  .hermes-command-cockpit {
+    height: auto;
+    min-height: 0;
+    max-height: calc(100dvh - 40px);
+    overflow: auto;
+    border-radius: 13px;
+  }
+
+  .hermes-command-cockpit__header {
+    position: sticky;
+    top: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .hermes-command-cockpit__team-peek > div {
+    display: none;
+  }
+
+  .hermes-command-cockpit__bridge {
+    display: block;
+  }
+
+  .hermes-command-cockpit__threads {
+    display: none;
+  }
+
+  .hermes-command-cockpit__chat {
+    min-height: 560px;
+  }
+
+  .hermes-command-cockpit__workbench,
+  .hermes-command-cockpit__operations {
+    min-height: 420px;
+    border-top: 1px solid var(--hc-line);
+    border-right: 0;
+  }
+}
+
+/* Two tools, two purposes: conversation vs. operations. */
+.hermes-command-cockpit__tool-switch {
+  display: flex;
   align-items: center;
-  border-block-start: 1px solid rgba(136, 178, 166, 0.16);
-  padding-block-start: 11px;
+  justify-self: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.2);
 }
 
-.hermes-command-cockpit__canvas footer b {
-  color: rgba(246, 238, 212, 0.8);
-  font-size: 0.78rem;
+.hermes-command-cockpit__tool-switch button {
+  min-height: 30px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #778187;
+  font-size: 9px;
+  font-weight: 760;
+  cursor: pointer;
 }
 
-.hermes-command-cockpit__sources details {
-  border-color: rgba(136, 178, 166, 0.18);
-  background: rgba(2, 14, 17, 0.52);
+.hermes-command-cockpit__tool-switch button.is-active {
+  background: rgba(202, 164, 95, 0.14);
+  color: #e7d1a4;
+  box-shadow: inset 0 0 0 1px rgba(202, 164, 95, 0.18);
 }
 
-@keyframes hermes-cockpit-pulse {
-  50% { transform: scale(1.18); opacity: 0.72; }
+.hermes-command-cockpit.is-mission-control {
+  --hc-gold: #69c3dd;
+  --hc-yellow: #d9b66e;
 }
 
-@media (max-width: 1120px) {
-  .living-v3 .living-v3__command-desk[data-command-desk-layout='action-v2'] {
+.hermes-command-cockpit.is-mission-control .hermes-command-cockpit__tool-switch button.is-active {
+  background: rgba(105, 195, 221, 0.14);
+  color: #bceafa;
+  box-shadow: inset 0 0 0 1px rgba(105, 195, 221, 0.2);
+}
+
+.hermes-command-cockpit__bridge--command {
+  grid-template-areas: "threads chat workbench";
+  grid-template-columns: 210px minmax(420px, 1fr) minmax(360px, 0.82fr);
+}
+
+.hermes-command-cockpit__bridge--mission-control {
+  grid-template-areas: "mission-tasks mission-workbench mission-agents";
+  grid-template-columns: minmax(270px, 0.72fr) minmax(430px, 1.25fr) minmax(290px, 0.82fr);
+}
+
+.hermes-command-cockpit__mission-tasks,
+.hermes-command-cockpit__mission-agents,
+.hermes-command-cockpit__mission-workbench {
+  min-width: 0;
+  min-height: 0;
+  background: #0b1014;
+}
+
+.hermes-command-cockpit__mission-tasks,
+.hermes-command-cockpit__mission-agents {
+  display: flex;
+  flex-direction: column;
+}
+
+.hermes-command-cockpit__mission-tasks {
+  grid-area: mission-tasks;
+  border-left: 1px solid var(--hc-line);
+}
+
+.hermes-command-cockpit__mission-workbench {
+  grid-area: mission-workbench;
+}
+
+.hermes-command-cockpit__mission-agents {
+  grid-area: mission-agents;
+  border-right: 1px solid var(--hc-line);
+}
+
+.hermes-command-cockpit__mission-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 10px 11px 5px;
+}
+
+.hermes-command-cockpit__mission-summary > div {
+  display: grid;
+  gap: 2px;
+  padding: 9px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  text-align: center;
+}
+
+.hermes-command-cockpit__mission-summary strong {
+  color: #e3e8e9;
+  font-size: 17px;
+}
+
+.hermes-command-cockpit__mission-summary span {
+  color: var(--hc-muted);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__approval-queue {
+  display: grid;
+  gap: 6px;
+  margin: 7px 11px 3px;
+  padding: 10px;
+  border: 1px solid rgba(217, 182, 110, 0.18);
+  border-radius: 11px;
+  background: rgba(217, 182, 110, 0.055);
+}
+
+.hermes-command-cockpit__approval-queue > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hermes-command-cockpit__approval-queue > div strong,
+.hermes-command-cockpit__approval-queue > div span {
+  color: #ddc994;
+  font-size: 9px;
+}
+
+.hermes-command-cockpit__approval-queue > div span {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(217, 182, 110, 0.12);
+}
+
+.hermes-command-cockpit__approval-queue button {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  color: #dfe3e4;
+  text-align: right;
+  cursor: pointer;
+}
+
+.hermes-command-cockpit__approval-queue button small,
+.hermes-command-cockpit__approval-queue p {
+  margin: 0;
+  color: var(--hc-muted);
+  font-size: 8px;
+}
+
+.hermes-command-cockpit__mission-task-list,
+.hermes-command-cockpit__mission-agent-list {
+  min-height: 0;
+  padding: 0 10px 12px;
+  overflow: auto;
+}
+
+.hermes-command-cockpit__mission-task-list {
+  flex: 1;
+}
+
+.hermes-command-cockpit__mission-agent-list {
+  padding-top: 10px;
+}
+
+.hermes-command-cockpit__mission-workbench .hermes-command-cockpit__workbench-body {
+  height: calc(100% - 48px);
+}
+
+.hermes-command-cockpit__task-focus > .hermes-command-cockpit__primary,
+.hermes-command-cockpit__task-focus > .hermes-command-cockpit__secondary {
+  width: 100%;
+  margin-top: 15px;
+}
+
+.hermes-command-cockpit .hermes-command-cockpit__task-focus > .hermes-command-cockpit__primary {
+  border-color: #d5b16b !important;
+  background: #caa45f !important;
+  color: #11100d !important;
+}
+
+.hermes-command-cockpit.is-mission-control .hermes-command-cockpit__task-focus > .hermes-command-cockpit__primary {
+  border-color: #8ad6ea !important;
+  background: #69c3dd !important;
+  color: #061014 !important;
+}
+
+@media (max-width: 1240px) {
+  .hermes-command-cockpit__bridge--command {
+    grid-template-areas: "chat workbench";
+    grid-template-columns: minmax(390px, 1fr) minmax(330px, 0.8fr);
+  }
+
+  .hermes-command-cockpit__bridge--mission-control {
+    grid-template-columns: minmax(250px, 0.68fr) minmax(380px, 1.2fr) minmax(260px, 0.72fr);
+  }
+
+  .hermes-command-cockpit__bridge--command .hermes-command-cockpit__threads {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .hermes-command-cockpit__tool-switch {
+    justify-self: end;
+  }
+
+  .hermes-command-cockpit__team-peek {
+    display: none;
+  }
+
+  .hermes-command-cockpit__bridge--command {
+    grid-template-areas:
+      "chat"
+      "workbench";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(360px, 1fr) minmax(280px, 0.72fr);
+  }
+
+  .hermes-command-cockpit__bridge--mission-control {
+    grid-template-areas:
+      "mission-tasks mission-workbench"
+      "mission-agents mission-workbench";
+    grid-template-columns: minmax(250px, 0.72fr) minmax(380px, 1fr);
+    grid-template-rows: minmax(340px, 1fr) minmax(300px, 0.85fr);
+  }
+
+  .hermes-command-cockpit__mission-agents {
+    border-top: 1px solid var(--hc-line);
+    border-right: 0;
+  }
+}
+
+@media (max-width: 759px) {
+  .hermes-command-cockpit__header {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .living-v3 .living-v3__command-desk[data-command-desk-layout='action-v2'] > .living-v3__command-side-stack {
-    max-width: none;
-  }
-}
-
-@media (max-width: 900px) {
-  .hermes-command-cockpit {
-    padding: 13px;
+  .hermes-command-cockpit__tool-switch {
+    width: 100%;
+    justify-self: stretch;
   }
 
-  .hermes-command-cockpit__hero {
-    grid-template-columns: auto minmax(0, 1fr);
+  .hermes-command-cockpit__tool-switch button {
+    flex: 1;
   }
 
-  .hermes-command-cockpit__safety {
-    grid-column: 1 / -1;
-    min-width: 0;
-  }
-}
-
-@media (max-width: 620px) {
-  .hermes-command-cockpit {
-    grid-template-rows: auto auto auto minmax(180px, 1fr) auto;
-    gap: 9px;
-    border-radius: 16px;
-    padding: 10px;
+  .hermes-command-cockpit__bridge--command,
+  .hermes-command-cockpit__bridge--mission-control {
+    display: block;
   }
 
-  .hermes-command-cockpit__portrait {
-    width: 54px;
-    height: 54px;
-    border-radius: 15px;
-  }
-
-  .hermes-command-cockpit__portrait img {
-    width: 49px;
-    height: 49px;
-  }
-
-  .hermes-command-cockpit__identity p {
-    display: none;
-  }
-
-  .hermes-command-cockpit__safety {
-    display: flex;
-    min-height: 44px;
-  }
-
-  .hermes-command-cockpit__spine b {
-    display: none;
-  }
-
-  .hermes-command-cockpit__spine > span {
-    justify-content: center;
-    padding-inline: 2px;
-  }
-
-  .hermes-command-cockpit__ask {
-    grid-template-columns: 1fr;
-  }
-
-  .hermes-command-cockpit__ask textarea {
-    min-height: 76px;
-  }
-
-  .hermes-command-cockpit__run {
-    min-width: 0;
-    min-height: 48px;
-  }
-
-  .hermes-command-cockpit__canvas {
-    grid-template-columns: 1fr;
-    gap: 8px;
-    min-height: 180px;
-    padding: 13px;
-  }
-
-  .hermes-command-cockpit__canvas-state {
-    align-items: center;
-    writing-mode: initial;
-  }
-
-  .hermes-command-cockpit__canvas-state i {
-    width: 46px;
-    min-height: 1px;
-  }
-
-  .hermes-command-cockpit__canvas footer {
-    grid-template-columns: 1fr;
-    gap: 4px;
+  .hermes-command-cockpit__mission-tasks,
+  .hermes-command-cockpit__mission-workbench,
+  .hermes-command-cockpit__mission-agents {
+    min-height: 420px;
+    border-top: 1px solid var(--hc-line);
+    border-right: 0;
+    border-left: 0;
   }
 }
 
@@ -470,30 +1586,7 @@
   .hermes-command-cockpit *::before,
   .hermes-command-cockpit *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* Canonical desktop command hierarchy: cockpit first, utilities collapsed below. */
-@media (min-width: 1121px) {
-  .living-v3 .living-v3__command-desk[data-command-desk-layout='action-v2'] {
-    grid-template-columns: minmax(0, 1fr) !important;
-    align-items: stretch !important;
-  }
-
-  .living-v3 .living-v3__command-desk[data-command-desk-layout='action-v2'] > .living-v3__command-side-stack {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    width: 100% !important;
-    max-width: none !important;
-  }
-
-  .living-v3 .living-v3__command-side-stack > details {
-    width: 100%;
-    min-width: 0;
-    margin: 0 !important;
+    transition: none !important;
+    animation: none !important;
   }
 }

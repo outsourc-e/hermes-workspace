@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { NPC_DIALOG, type DialogChoice } from '../lib/npc-dialog'
+import {  NPC_DIALOG } from '../lib/npc-dialog'
 import { SpeechBubble } from './speech-bubble'
+import type {DialogChoice} from '../lib/npc-dialog';
+import type {
+  PlaygroundItemId,
+  PlaygroundQuest,
+  PlaygroundSkillId,
+} from '../lib/playground-rpg'
 
 // Tiny in-memory cache for ASCII portraits.
-const ASCII_PORTRAIT_CACHE: Record<string, string> = {}
+const ASCII_PORTRAIT_CACHE: Partial<Record<string, string>> = {}
 function useAsciiPortrait(npcId: string | null) {
   const [art, setArt] = useState<string | null>(null)
   useEffect(() => {
@@ -23,17 +29,12 @@ function useAsciiPortrait(npcId: string | null) {
   }, [npcId])
   return art
 }
-import type {
-  PlaygroundItemId,
-  PlaygroundSkillId,
-  PlaygroundQuest,
-} from '../lib/playground-rpg'
 
 type Props = {
   npcId: string | null
   onClose: () => void
   onCompleteQuest: (questId: string) => void
-  onGrantItems: (items: PlaygroundItemId[]) => void
+  onGrantItems: (items: Array<PlaygroundItemId>) => void
   onGrantSkillXp: (skillXp: Partial<Record<PlaygroundSkillId, number>>) => void
   activeQuest: PlaygroundQuest | null
   onChoice?: (npcId: string, choiceId: string) => void
@@ -55,7 +56,7 @@ export function PlaygroundDialog({
   const [showLore, setShowLore] = useState(false)
   const [askingLLM, setAskingLLM] = useState(false)
   const [llmFreeform, setLlmFreeform] = useState('')
-  const [chatLog, setChatLog] = useState<ChatTurn[]>([])
+  const [chatLog, setChatLog] = useState<Array<ChatTurn>>([])
   const inFlight = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -78,8 +79,9 @@ export function PlaygroundDialog({
   const asciiArt = useAsciiPortrait(npcId)
   if (!npcId) return null
   const activeNpcId = npcId
-  const npc = NPC_DIALOG[activeNpcId]
+  const npc = (NPC_DIALOG as Partial<typeof NPC_DIALOG>)[activeNpcId]
   if (!npc) return null
+  const activeNpc = npc
 
   function handleChoice(c: DialogChoice) {
     setReply(c.reply)
@@ -95,7 +97,7 @@ export function PlaygroundDialog({
 
   function handleNextLore() {
     setShowLore(true)
-    setReply(npc.lore[loreIdx % npc.lore.length])
+    setReply(activeNpc.lore[loreIdx % activeNpc.lore.length])
     setLoreIdx((i) => i + 1)
   }
 
@@ -137,9 +139,9 @@ export function PlaygroundDialog({
       if (e?.name === 'AbortError') return
       // Never surface raw provider errors (401, JSON dumps, etc.) to the player.
       const fallbackLines = [
-        `*${npc.name} pauses* — "The chronicle is silent. Speak with me through the scripted scrolls below."`,
-        `*${npc.name} cocks their head* — "Live agent dialog is offline. Try one of the prepared replies."`,
-        `*${npc.name} sighs* — "The aether between worlds is unstable. Let us speak in the old tongue — pick a reply."`,
+        `*${activeNpc.name} pauses* — "The chronicle is silent. Speak with me through the scripted scrolls below."`,
+        `*${activeNpc.name} cocks their head* — "Live agent dialog is offline. Try one of the prepared replies."`,
+        `*${activeNpc.name} sighs* — "The aether between worlds is unstable. Let us speak in the old tongue — pick a reply."`,
       ]
       const t: ChatTurn = {
         role: 'assistant',
@@ -164,41 +166,41 @@ export function PlaygroundDialog({
       style={{
         borderColor: '#d9b35f',
         background: 'linear-gradient(180deg, rgba(54,36,16,0.96), rgba(12,8,4,0.97))',
-        boxShadow: `0 0 36px ${npc.color}66, 0 18px 60px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,244,205,.16)`,
+        boxShadow: `0 0 36px ${activeNpc.color}66, 0 18px 60px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,244,205,.16)`,
       }}
     >
       {/* Ornate header strip */}
       <div
         className="relative flex items-center gap-3 border-b-2 px-4 py-3"
         style={{
-          borderColor: npc.color,
-          background: `linear-gradient(90deg, ${npc.color}22, transparent)`,
+          borderColor: activeNpc.color,
+          background: `linear-gradient(90deg, ${activeNpc.color}22, transparent)`,
         }}
       >
         <img
-          src={`/avatars/${npc.id}.png`}
-          alt={npc.name}
+          src={`/avatars/${activeNpc.id}.png`}
+          alt={activeNpc.name}
           loading="lazy"
           decoding="async"
           width={56}
           height={56}
           className="rounded-full"
-          style={{ border: `2px solid ${npc.color}`, boxShadow: `0 0 14px ${npc.color}88` }}
+          style={{ border: `2px solid ${activeNpc.color}`, boxShadow: `0 0 14px ${activeNpc.color}88` }}
           onError={(e) => {
             ;(e.currentTarget as HTMLImageElement).src = '/avatars/hermes.png'
           }}
         />
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <div className="text-base font-bold" style={{ color: npc.color }}>
-              {npc.name}
+            <div className="text-base font-bold" style={{ color: activeNpc.color }}>
+              {activeNpc.name}
             </div>
             {asciiArt && (
               <pre
                 className="hidden rounded border bg-black/30 px-2 py-1 text-[8px] leading-[1.05] md:block"
                 style={{
-                  color: npc.color,
-                  borderColor: `${npc.color}55`,
+                  color: activeNpc.color,
+                  borderColor: `${activeNpc.color}55`,
                   fontFamily: '"Menlo", "Monaco", "Courier New", monospace',
                   whiteSpace: 'pre',
                   margin: 0,
@@ -214,7 +216,7 @@ export function PlaygroundDialog({
             )}
           </div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/55">
-            {npc.title}
+            {activeNpc.title}
           </div>
         </div>
         <button
@@ -228,8 +230,8 @@ export function PlaygroundDialog({
       {/* Speech body / chat history */}
       {!showChat ? (
         <div className="px-4 py-4">
-          <SpeechBubble variant="npc" tail="left" accent={npc.color} name={npc.name} portraitSrc={npc.portraitSrc} portraitAlt={npc.portraitAlt}>
-            {reply ?? npc.opening}
+          <SpeechBubble variant="npc" tail="left" accent={activeNpc.color} name={activeNpc.name} portraitSrc={activeNpc.portraitSrc} portraitAlt={activeNpc.portraitAlt}>
+            {reply ?? activeNpc.opening}
           </SpeechBubble>
         </div>
       ) : (
@@ -239,8 +241,8 @@ export function PlaygroundDialog({
         >
           {/* Show opening line as an initial assistant turn for context */}
           <div className="mb-3">
-            <SpeechBubble variant="npc" tail="left" accent={npc.color} name={npc.name} portraitSrc={npc.portraitSrc} portraitAlt={npc.portraitAlt} compact>
-              {reply ?? npc.opening}
+            <SpeechBubble variant="npc" tail="left" accent={activeNpc.color} name={activeNpc.name} portraitSrc={activeNpc.portraitSrc} portraitAlt={activeNpc.portraitAlt} compact>
+              {reply ?? activeNpc.opening}
             </SpeechBubble>
           </div>
           {chatLog.map((t, i) => (
@@ -252,7 +254,7 @@ export function PlaygroundDialog({
                   </SpeechBubble>
                 </div>
               ) : (
-                <SpeechBubble variant={t.fallback ? 'system' : 'npc'} tail="left" accent={npc.color} name={npc.name} portraitSrc={npc.portraitSrc} portraitAlt={npc.portraitAlt} compact>
+                <SpeechBubble variant={t.fallback ? 'system' : 'npc'} tail="left" accent={activeNpc.color} name={activeNpc.name} portraitSrc={activeNpc.portraitSrc} portraitAlt={activeNpc.portraitAlt} compact>
                   {t.content}
                   {t.fallback && (
                     <span className="ml-2 rounded bg-amber-800/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-amber-900/75">
@@ -265,8 +267,8 @@ export function PlaygroundDialog({
           ))}
           {askingLLM && (
             <div className="text-white/55 italic">
-              <span className="mr-2 font-bold" style={{ color: npc.color }}>
-                {npc.name}:
+              <span className="mr-2 font-bold" style={{ color: activeNpc.color }}>
+                {activeNpc.name}:
               </span>
               <span className="opacity-70">…</span>
             </div>
@@ -291,7 +293,7 @@ export function PlaygroundDialog({
               // Stop WASD movement keys from being captured by the world.
               e.stopPropagation()
             }}
-            placeholder={`Ask ${npc.name} anything…`}
+            placeholder={`Ask ${activeNpc.name} anything…`}
             disabled={askingLLM}
             className="flex-1 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[12px] text-white placeholder:text-white/40 outline-none focus:border-white/30"
             autoFocus
@@ -300,7 +302,7 @@ export function PlaygroundDialog({
             type="submit"
             disabled={askingLLM || !llmFreeform.trim()}
             className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/85 transition hover:bg-white/15 disabled:opacity-40"
-            style={{ borderColor: askingLLM ? '#94a3b8' : npc.color, color: askingLLM ? '#94a3b8' : npc.color }}
+            style={{ borderColor: askingLLM ? '#94a3b8' : activeNpc.color, color: askingLLM ? '#94a3b8' : activeNpc.color }}
           >
             {askingLLM ? '…' : 'Speak'}
           </button>
@@ -316,7 +318,7 @@ export function PlaygroundDialog({
           </div>
         </div>
         <div className="space-y-1.5">
-          {npc.choices.map((c) => {
+          {activeNpc.choices.map((c) => {
             const quest = isQuestRelated(c)
             return (
               <button
@@ -341,7 +343,7 @@ export function PlaygroundDialog({
             onClick={handleNextLore}
             className="block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left text-[12px] text-white/70 transition hover:border-white/30 hover:bg-white/10"
           >
-            <span className="opacity-60">›</span> Tell me more {showLore ? `(${loreIdx % npc.lore.length + 1}/${npc.lore.length})` : ''}
+            <span className="opacity-60">›</span> Tell me more {showLore ? `(${loreIdx % activeNpc.lore.length + 1}/${activeNpc.lore.length})` : ''}
           </button>
           <button
             onClick={onClose}

@@ -2,11 +2,22 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
+import { createInitialEtsyPipelineState } from '../living-v3/etsy-pipeline'
+import {
+  applyEtsyProductWorkspaceCommand,
+  migrateEtsyProductWorkspaceStateV2,
+  parseEtsyProductWorkspaceStateV2,
+} from '../living-v3/etsy-product-model'
 import { createInitialEtsyRoomState } from '../living-v3/etsy-room-contracts'
+import type {
+  EtsyProductWorkspaceCommand,
+  EtsyProductWorkspaceStateV2,
+} from '../living-v3/etsy-product-model'
 import type { EtsyProductCandidate, EtsyRoomEvent, EtsyRoomState } from '../living-v3/etsy-room-contracts'
 import type { EtsyLiveSourceDetail } from '../living-v3/etsy-live-research'
 
-export const SHARED_ETSY_ROOM_STORE_SCHEMA_VERSION = 'war-room-etsy-shared-room-v1'
+export const SHARED_ETSY_ROOM_STORE_SCHEMA_VERSION = 'war-room-etsy-product-workspace-v2'
+export const LEGACY_SHARED_ETSY_ROOM_STORE_SCHEMA_VERSION = 'war-room-etsy-shared-room-v1'
 export const SHARED_ETSY_ROOM_STATE_FILE = 'shared-room-state.json'
 export const SHARED_ETSY_ROOM_CANDIDATE_SOFT_SAFETY_LIMIT = 5_000
 export const SHARED_ETSY_ROOM_EVENT_SOFT_SAFETY_LIMIT = 20_000
@@ -41,6 +52,8 @@ export type SharedEtsyRoomStore = {
   lastReason?: string
   empty: boolean
   retention: SharedEtsyRoomRetentionPolicy
+  workspaceState: EtsyProductWorkspaceStateV2
+  /** @deprecated Compatibility projection. Use workspaceState.roomState. */
   roomState: EtsyRoomState
 }
 
@@ -53,6 +66,11 @@ export type SaveSharedEtsyRoomStateOptions = SharedEtsyRoomStoreOptions & {
 export type SaveSharedEtsyRoomStateResult = SharedEtsyRoomStore & {
   saved: boolean
   skippedReason?: string
+}
+
+export type ApplySharedEtsyProductWorkspaceCommandResult = SaveSharedEtsyRoomStateResult & {
+  commandStatus: 'applied' | 'replayed' | 'conflict'
+  expectedRevision?: number
 }
 
 const DEFAULT_SHARED_ETSY_ROOM_STORE_DIR = path.join(process.cwd(), 'data', 'war-room', 'etsy-room')
@@ -81,8 +99,8 @@ function sharedStatePath(options?: SharedEtsyRoomStoreOptions) {
   return path.join(sharedStoreDir(options), SHARED_ETSY_ROOM_STATE_FILE)
 }
 
-function stateVersion(nowMs: number) {
-  return `${SHARED_ETSY_ROOM_STORE_SCHEMA_VERSION}:${nowMs}`
+function stateVersion(revision: number, nowMs: number) {
+  return `${SHARED_ETSY_ROOM_STORE_SCHEMA_VERSION}:${revision}:${nowMs}`
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -125,17 +143,23 @@ function compactSourceDetails(sourceDetails?: Array<EtsyLiveSourceDetail>) {
     if (!url || seen.has(url)) continue
     seen.add(url)
     compacted.push({
-      kind: detail.kind === 'etsy' || detail.kind === 'supplier' || detail.kind === 'other' ? detail.kind : 'other',
+      kind: detail.kind,
       label: compactText(detail.label, 'Source', 80),
       url,
       title: detail.title ? compactText(detail.title, '', 180) : undefined,
       imageUrl: compactUrl(detail.imageUrl),
+      localImageRef: typeof detail.localImageRef === 'string'
+        && detail.localImageRef.startsWith('/war-room/etsy-product-media/')
+        && !detail.localImageRef.includes('..')
+        ? compactText(detail.localImageRef, '', 1_000)
+        : undefined,
       priceText: detail.priceText ? compactText(detail.priceText, '', 80) : undefined,
       shopName: detail.shopName ? compactText(detail.shopName, '', 100) : undefined,
       marketplace: detail.marketplace ? compactText(detail.marketplace, '', 80) : undefined,
       salesText: detail.salesText ? compactText(detail.salesText, '', 80) : undefined,
       demandText: detail.demandText ? compactText(detail.demandText, '', 120) : undefined,
       tags: compactStringList(detail.tags, SHARED_ETSY_ROOM_TAG_SOFT_SAFETY_LIMIT, 80),
+      variantOptions: compactStringList(detail.variantOptions, 24, 80),
     })
     if (compacted.length >= SHARED_ETSY_ROOM_SOURCE_DETAIL_SOFT_SAFETY_LIMIT) break
   }
@@ -185,7 +209,7 @@ function compactEvents(events: Array<EtsyRoomEvent>) {
 
 export function compactSharedEtsyRoomState(roomState: EtsyRoomState, nowMs = Date.now()): EtsyRoomState {
   const compacted = jsonClone(roomState)
-  const candidates = compactCandidates(compacted.candidates ?? [], compacted.selectedCandidateId)
+  const candidates = compactCandidates(compacted.candidates, compacted.selectedCandidateId)
   const selectedCandidateId = compacted.selectedCandidateId && candidates.some((candidate) => candidate.candidateId === compacted.selectedCandidateId)
     ? compacted.selectedCandidateId
     : undefined
@@ -193,22 +217,22 @@ export function compactSharedEtsyRoomState(roomState: EtsyRoomState, nowMs = Dat
     ...compacted,
     run: {
       ...compacted.run,
-      updatedAtMs: Number.isFinite(compacted.run?.updatedAtMs) ? compacted.run.updatedAtMs : nowMs,
+      updatedAtMs: Number.isFinite(compacted.run.updatedAtMs) ? compacted.run.updatedAtMs : nowMs,
       usageAllowed: false,
       workerSpawnAllowed: false,
     },
     prompt: compactText(compacted.prompt, '', 500),
     candidates,
     selectedCandidateId,
-    events: compactEvents(compacted.events ?? []),
+    events: compactEvents(compacted.events),
     allowedNow: compactStringList(compacted.allowedNow, 12, 120),
     lockedActions: compactStringList(compacted.lockedActions, 20, 180),
     lastReceipt: compacted.lastReceipt ? compactText(compacted.lastReceipt, '', 500) : undefined,
     shotLabDraft: {
-      preset: compacted.shotLabDraft?.preset ?? 'Boutique Premium',
-      imageCount: Math.max(1, Math.min(12, Number(compacted.shotLabDraft?.imageCount) || 6)),
-      sourceImageRequirements: compactText(compacted.shotLabDraft?.sourceImageRequirements, 'front, detail, scale/context, variant proof', 500),
-      variantNotes: compactText(compacted.shotLabDraft?.variantNotes, 'Treat personalization, stone, and recycled material as No unless evidence proves otherwise.', 500),
+      preset: compacted.shotLabDraft.preset,
+      imageCount: Math.max(1, Math.min(12, Number(compacted.shotLabDraft.imageCount) || 6)),
+      sourceImageRequirements: compactText(compacted.shotLabDraft.sourceImageRequirements, 'front, detail, scale/context, variant proof', 500),
+      variantNotes: compactText(compacted.shotLabDraft.variantNotes, 'Treat personalization, stone, and recycled material as No unless evidence proves otherwise.', 500),
     },
   }
 }
@@ -226,36 +250,85 @@ function roomStateHasSharedValue(roomState: EtsyRoomState) {
   )
 }
 
+function pipelineStateHasSharedValue(pipelineState: EtsyProductWorkspaceStateV2['pipelineState']) {
+  return Boolean(
+    pipelineState.candidates.length
+    || pipelineState.selectedCandidateId
+    || pipelineState.searchPacket
+    || pipelineState.productTruthPacket
+    || pipelineState.draftPacket
+    || pipelineState.draftApprovalPacket,
+  )
+}
+
+function workspaceHasSharedValue(workspaceState: EtsyProductWorkspaceStateV2) {
+  return roomStateHasSharedValue(workspaceState.roomState)
+    || pipelineStateHasSharedValue(workspaceState.pipelineState)
+}
+
+export function compactSharedEtsyProductWorkspaceState(
+  workspaceState: EtsyProductWorkspaceStateV2,
+  nowMs = Date.now(),
+): EtsyProductWorkspaceStateV2 {
+  return migrateEtsyProductWorkspaceStateV2({
+    roomState: compactSharedEtsyRoomState(workspaceState.roomState, nowMs),
+    pipelineState: jsonClone(workspaceState.pipelineState),
+    nowMs,
+    previous: workspaceState,
+    revision: workspaceState.revision,
+    events: workspaceState.events,
+    appliedCommandIds: workspaceState.appliedCommandIds,
+  })
+}
+
 export function createEmptySharedEtsyRoomStore(nowMs = Date.now()): SharedEtsyRoomStore {
+  const workspaceState = migrateEtsyProductWorkspaceStateV2({
+    roomState: createInitialEtsyRoomState(nowMs),
+    pipelineState: createInitialEtsyPipelineState(),
+    nowMs,
+  })
   return {
     schemaVersion: SHARED_ETSY_ROOM_STORE_SCHEMA_VERSION,
     updatedAtMs: nowMs,
-    stateVersion: stateVersion(nowMs),
+    stateVersion: stateVersion(workspaceState.revision, nowMs),
     source: 'empty',
     empty: true,
     retention: SHARED_ETSY_ROOM_RETENTION_POLICY,
-    roomState: createInitialEtsyRoomState(nowMs),
+    workspaceState,
+    roomState: workspaceState.roomState,
   }
 }
 
 function normalizeSharedEtsyRoomStore(raw: unknown, nowMs = Date.now()): SharedEtsyRoomStore {
-  if (!isObject(raw) || !isObject(raw.roomState)) return createEmptySharedEtsyRoomStore(nowMs)
+  if (!isObject(raw)) return createEmptySharedEtsyRoomStore(nowMs)
   const rawUpdatedAtMs = typeof raw.updatedAtMs === 'number' && Number.isFinite(raw.updatedAtMs)
     ? raw.updatedAtMs
     : nowMs
-  const roomState = compactSharedEtsyRoomState(raw.roomState as EtsyRoomState, rawUpdatedAtMs)
+  const parsedWorkspace = parseEtsyProductWorkspaceStateV2(raw.workspaceState, rawUpdatedAtMs)
+  const legacyRoomState = !parsedWorkspace && isObject(raw.roomState)
+    ? compactSharedEtsyRoomState(raw.roomState as EtsyRoomState, rawUpdatedAtMs)
+    : undefined
+  const workspaceState = compactSharedEtsyProductWorkspaceState(
+    parsedWorkspace ?? migrateEtsyProductWorkspaceStateV2({
+      roomState: legacyRoomState ?? createInitialEtsyRoomState(rawUpdatedAtMs),
+      pipelineState: createInitialEtsyPipelineState(),
+      nowMs: rawUpdatedAtMs,
+    }),
+    rawUpdatedAtMs,
+  )
   const source = raw.source === 'ui' || raw.source === 'scout-api' || raw.source === 'test' || raw.source === 'empty'
     ? raw.source
     : 'unknown'
   return {
     schemaVersion: SHARED_ETSY_ROOM_STORE_SCHEMA_VERSION,
     updatedAtMs: rawUpdatedAtMs,
-    stateVersion: typeof raw.stateVersion === 'string' ? raw.stateVersion : stateVersion(rawUpdatedAtMs),
+    stateVersion: stateVersion(workspaceState.revision, rawUpdatedAtMs),
     source,
     lastReason: typeof raw.lastReason === 'string' ? compactText(raw.lastReason, '', 240) : undefined,
-    empty: !roomStateHasSharedValue(roomState),
+    empty: !workspaceHasSharedValue(workspaceState),
     retention: SHARED_ETSY_ROOM_RETENTION_POLICY,
-    roomState,
+    workspaceState,
+    roomState: workspaceState.roomState,
   }
 }
 
@@ -265,6 +338,8 @@ async function atomicWriteJson(filePath: string, value: unknown) {
   await writeFile(tmpPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
   await rename(tmpPath, filePath)
 }
+
+let sharedStoreWriteQueue: Promise<void> = Promise.resolve()
 
 export async function loadSharedEtsyRoomStore(options?: SharedEtsyRoomStoreOptions): Promise<SharedEtsyRoomStore> {
   const nowMs = options?.nowMs ?? Date.now()
@@ -276,7 +351,49 @@ export async function loadSharedEtsyRoomStore(options?: SharedEtsyRoomStoreOptio
   }
 }
 
-export async function saveSharedEtsyRoomState(
+async function persistWorkspaceState(
+  previous: SharedEtsyRoomStore,
+  workspaceState: EtsyProductWorkspaceStateV2,
+  options?: SaveSharedEtsyRoomStateOptions,
+): Promise<SharedEtsyRoomStore> {
+  const nowMs = options?.nowMs ?? Date.now()
+  const compactedWorkspace = compactSharedEtsyProductWorkspaceState(workspaceState, nowMs)
+  const next: SharedEtsyRoomStore = {
+    schemaVersion: SHARED_ETSY_ROOM_STORE_SCHEMA_VERSION,
+    updatedAtMs: nowMs,
+    stateVersion: stateVersion(compactedWorkspace.revision, nowMs),
+    source: options?.source ?? 'ui',
+    lastReason: options?.reason ? compactText(options.reason, '', 240) : previous.lastReason,
+    empty: !workspaceHasSharedValue(compactedWorkspace),
+    retention: SHARED_ETSY_ROOM_RETENTION_POLICY,
+    workspaceState: compactedWorkspace,
+    roomState: compactedWorkspace.roomState,
+  }
+  await atomicWriteJson(sharedStatePath(options), next)
+  return next
+}
+
+async function applySharedEtsyProductWorkspaceCommandUnlocked(
+  command: EtsyProductWorkspaceCommand,
+  options?: SaveSharedEtsyRoomStateOptions,
+): Promise<ApplySharedEtsyProductWorkspaceCommandResult> {
+  const nowMs = options?.nowMs ?? Date.now()
+  const previous = await loadSharedEtsyRoomStore(options)
+  const result = applyEtsyProductWorkspaceCommand(previous.workspaceState, command, nowMs)
+  if (result.status !== 'applied') {
+    return {
+      ...previous,
+      saved: false,
+      skippedReason: result.status === 'conflict' ? 'workspace-revision-conflict' : 'idempotent-command-replay',
+      commandStatus: result.status,
+      expectedRevision: result.expectedRevision,
+    }
+  }
+  const next = await persistWorkspaceState(previous, result.state, options)
+  return { ...next, saved: true, commandStatus: 'applied' }
+}
+
+async function saveSharedEtsyRoomStateUnlocked(
   roomState: EtsyRoomState,
   options?: SaveSharedEtsyRoomStateOptions,
 ): Promise<SaveSharedEtsyRoomStateResult> {
@@ -291,25 +408,59 @@ export async function saveSharedEtsyRoomState(
       skippedReason: 'existing-shared-room-state-is-newer',
     }
   }
-  const next: SharedEtsyRoomStore = {
-    schemaVersion: SHARED_ETSY_ROOM_STORE_SCHEMA_VERSION,
-    updatedAtMs: nowMs,
-    stateVersion: stateVersion(nowMs),
-    source: options?.source ?? 'ui',
-    lastReason: options?.reason ? compactText(options.reason, '', 240) : previous.lastReason,
-    empty: !roomStateHasSharedValue(compacted),
-    retention: SHARED_ETSY_ROOM_RETENTION_POLICY,
+  const result = applyEtsyProductWorkspaceCommand(previous.workspaceState, {
+    type: 'replace_projections',
+    commandId: `legacy-room-save-${randomUUID()}`,
+    baseRevision: previous.workspaceState.revision,
+    reason: options?.reason ?? 'Legacy room projection save',
     roomState: compacted,
+    pipelineState: previous.workspaceState.pipelineState,
+  }, nowMs)
+  if (result.status !== 'applied') {
+    return { ...previous, saved: false, skippedReason: 'workspace-revision-conflict' }
   }
-  await atomicWriteJson(sharedStatePath(options), next)
+  const next = await persistWorkspaceState(previous, result.state, options)
   return { ...next, saved: true }
 }
 
-export async function resetSharedEtsyRoomStore(options?: SaveSharedEtsyRoomStateOptions): Promise<SaveSharedEtsyRoomStateResult> {
-  return saveSharedEtsyRoomState(createInitialEtsyRoomState(options?.nowMs ?? Date.now()), {
-    ...options,
-    force: true,
-    reason: options?.reason ?? 'reset shared Etsy room state',
-    source: options?.source ?? 'ui',
+function enqueueSharedStoreWrite<T>(operation: () => Promise<T>) {
+  const request = sharedStoreWriteQueue.then(operation)
+  sharedStoreWriteQueue = request.then(() => undefined, () => undefined)
+  return request
+}
+
+export function applySharedEtsyProductWorkspaceCommand(
+  command: EtsyProductWorkspaceCommand,
+  options?: SaveSharedEtsyRoomStateOptions,
+): Promise<ApplySharedEtsyProductWorkspaceCommandResult> {
+  return enqueueSharedStoreWrite(() => applySharedEtsyProductWorkspaceCommandUnlocked(command, options))
+}
+
+export function saveSharedEtsyRoomState(
+  roomState: EtsyRoomState,
+  options?: SaveSharedEtsyRoomStateOptions,
+): Promise<SaveSharedEtsyRoomStateResult> {
+  return enqueueSharedStoreWrite(() => saveSharedEtsyRoomStateUnlocked(roomState, options))
+}
+
+export function resetSharedEtsyRoomStore(options?: SaveSharedEtsyRoomStateOptions): Promise<SaveSharedEtsyRoomStateResult> {
+  return enqueueSharedStoreWrite(async () => {
+    const nowMs = options?.nowMs ?? Date.now()
+    const previous = await loadSharedEtsyRoomStore(options)
+    const result = applyEtsyProductWorkspaceCommand(previous.workspaceState, {
+      type: 'reset_workspace',
+      commandId: `workspace-reset-${randomUUID()}`,
+      baseRevision: previous.workspaceState.revision,
+      reason: options?.reason ?? 'reset shared Etsy product workspace',
+    }, nowMs)
+    if (result.status !== 'applied') {
+      return { ...previous, saved: false, skippedReason: 'workspace-revision-conflict' }
+    }
+    const next = await persistWorkspaceState(previous, result.state, {
+      ...options,
+      reason: options?.reason ?? 'reset shared Etsy product workspace',
+      source: options?.source ?? 'ui',
+    })
+    return { ...next, saved: true }
   })
 }

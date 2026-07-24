@@ -235,7 +235,7 @@ export function SkillsScreen() {
   // pattern (active first, then default, then any).
   useEffect(() => {
     if (!profiles.length || selectedProfile) return
-    setSelectedProfile(activeProfileName || profiles[0]!.name)
+    setSelectedProfile(activeProfileName || profiles[0].name)
   }, [profiles, activeProfileName, selectedProfile])
 
   const effectiveProfile = selectedProfile || activeProfileName
@@ -288,7 +288,7 @@ export function SkillsScreen() {
         if (!response.ok) {
           throw new Error(payload.error || 'Failed to fetch profile skills')
         }
-        const normalized = (payload.items || []).map(normalizeProfileSkill)
+        const normalized = payload.items.map(normalizeProfileSkill)
         const lowered = searchInput.trim().toLowerCase()
         const filtered = normalized.filter((skill) => {
           if (category !== 'All' && skill.category !== category) return false
@@ -413,7 +413,7 @@ export function SkillsScreen() {
           skill.repo ||
           (skill.extra as Record<string, unknown>)?.homepage ||
           null
-        const category =
+        const resolvedCategory =
           skill.category ||
           (skill.extra as Record<string, unknown>)?.category ||
           'Productivity'
@@ -427,7 +427,7 @@ export function SkillsScreen() {
           triggers: skill.tags,
           tags: skill.tags,
           homepage: typeof homepage === 'string' ? homepage : null,
-          category: String(category),
+          category: String(resolvedCategory),
           icon:
             skill.source === 'github'
               ? '🐙'

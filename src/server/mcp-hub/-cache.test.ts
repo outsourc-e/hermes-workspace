@@ -68,8 +68,8 @@ describe('getCache / setCache', () => {
   it('isolates different source keys', () => {
     setCache('mcp-get', { payload: 'a' })
     setCache('local', { payload: 'b' })
-    expect((getCache('mcp-get') as { payload: unknown })?.payload).toBe('a')
-    expect((getCache('local') as { payload: unknown })?.payload).toBe('b')
+    expect((getCache('mcp-get') as { payload: unknown }).payload).toBe('a')
+    expect((getCache('local') as { payload: unknown }).payload).toBe('b')
   })
 
   it('persists to disk (survives memory clear)', () => {
@@ -77,8 +77,9 @@ describe('getCache / setCache', () => {
     __resetHubCacheForTests()
     const result = getCache('mcp-get')
     expect(result).not.toBeNull()
-    expect(result?.etag).toBe('"v1"')
-    expect((result?.payload as Record<string, unknown>)?.data).toBe('persisted')
+    if (!result) throw new Error('Expected persisted MCP cache entry')
+    expect(result.etag).toBe('"v1"')
+    expect((result.payload as Record<string, unknown>).data).toBe('persisted')
   })
 })
 

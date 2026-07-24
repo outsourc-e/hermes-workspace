@@ -1,7 +1,7 @@
 import { useState } from 'react'
+import { WORKSPACE_PIPELINE_OS_SCHEMA_VERSION } from '../../../lib/war-room/living-v3/workspace-pipeline-os-contract'
 import type { CSSProperties, ReactNode } from 'react'
 
-import { WORKSPACE_PIPELINE_OS_SCHEMA_VERSION } from '../../../lib/war-room/living-v3/workspace-pipeline-os-contract'
 import './workspace-pipeline-workbench.css'
 
 export type WorkspacePipelineTone = 'ready' | 'active' | 'waiting' | 'blocked' | 'locked' | 'done'

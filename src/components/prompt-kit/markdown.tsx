@@ -23,7 +23,7 @@ export function rewriteLocalMediaSources(content: string): string {
     return `/api/media?path=${encodeURIComponent(path)}`
   }
 
-  const markdownImage = /(!\[[^\]]*\]\()MEDIA:([^\)\s]+)(\))/g
+  const markdownImage = /(!\[[^\]]*\]\()MEDIA:([^\s)]+)(\))/g
   const withMarkdownImages = content.replace(
     markdownImage,
     (_match, prefix: string, mediaPath: string, suffix: string) => {

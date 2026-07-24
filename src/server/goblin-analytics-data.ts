@@ -491,11 +491,11 @@ function createGoblinAnalyticsSnapshot(input: {
   }
 }
 
-async function fetchSupabaseRows<Row>(
+async function fetchSupabaseRows<TRow>(
   config: SupabaseConfig,
   schema: 'workspace_core' | 'goblin_analytics',
   pathAndQuery: string,
-): Promise<Array<Row>> {
+): Promise<Array<TRow>> {
   const response = await fetch(`${config.url}/rest/v1/${pathAndQuery}`, {
     method: 'GET',
     headers: {
@@ -516,7 +516,7 @@ async function fetchSupabaseRows<Row>(
   if (!Array.isArray(payload)) {
     throw new Error(`Supabase ${schema} response was not an array`)
   }
-  return payload as Array<Row>
+  return payload as Array<TRow>
 }
 
 function getSupabaseConfig(): SupabaseConfig | null {

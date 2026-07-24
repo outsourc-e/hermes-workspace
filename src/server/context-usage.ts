@@ -1,3 +1,5 @@
+import { getLocalMessages, getLocalSession } from './local-session-store'
+import { getActiveRunForSession } from './run-store'
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -6,8 +8,6 @@ import {
   getCapabilities,
 } from '@/server/gateway-capabilities'
 import { listSessions } from '@/server/claude-api'
-import { getLocalMessages, getLocalSession } from './local-session-store'
-import { getActiveRunForSession } from './run-store'
 import {
   resolveMainChatSessionId,
   shouldBindMainToPortableSession,
@@ -341,7 +341,7 @@ async function resolveMirroredRuntimeSessionId(
     const sessions = await listSessions(20, 0)
     const candidate = sessions
       .filter((session) => {
-        if (!session?.id || session.id === sessionId) return false
+        if (!session.id || session.id === sessionId) return false
         if (session.source === 'local') return false
 
         const startedAt = Number(session.started_at) || 0
@@ -365,7 +365,7 @@ async function resolveMirroredRuntimeSessionId(
           return aStartDistance - bStartDistance
         }
         return bUpdated - aUpdated
-      })[0]
+      }).at(0)
 
     return candidate?.id ?? null
   } catch {

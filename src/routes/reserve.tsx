@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import {  useEffect, useMemo, useState } from 'react'
+import type {FormEvent} from 'react';
 import { usePageTitle } from '@/hooks/use-page-title'
 
 type CounterState = {

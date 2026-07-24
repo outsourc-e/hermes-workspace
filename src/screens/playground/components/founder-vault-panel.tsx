@@ -7,11 +7,11 @@ type FounderReward = {
 
 type FounderVaultPanelProps = {
   eligible?: boolean
-  claimedRewardIds?: string[]
+  claimedRewardIds?: Array<string>
   onClaim?: () => void
 }
 
-const REWARDS: FounderReward[] = [
+const REWARDS: Array<FounderReward> = [
   { id: 'founder-cape', name: 'Founder Cape', icon: '🧥', description: 'Animated gold-trim cloak cosmetic.' },
   { id: 'founder-banner', name: 'Founder Banner', icon: '🏳️', description: 'Guild banner for house halls.' },
   { id: 'aether-50', name: 'Aether x50', icon: '💠', description: 'Premium crafting currency.' },

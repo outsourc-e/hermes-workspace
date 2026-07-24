@@ -8,10 +8,11 @@ import {
 import { loadWorkspaceKernelState, saveWorkspaceKernelState } from '../../../../lib/workspace-kernel/store'
 import { isAuthenticated } from '../../../../server/auth-middleware'
 import {
-  type WorkspaceCorePersistenceSnapshot,
+
   mergeWorkspaceKernelStateWithSupabase,
-  persistWorkspaceKernelRunsToSupabase,
+  persistWorkspaceKernelRunsToSupabase
 } from '../../../../server/workspace-core-db'
+import type {WorkspaceCorePersistenceSnapshot} from '../../../../server/workspace-core-db';
 
 const noStoreHeaders = { 'cache-control': 'no-store' }
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { itemById, PLAYGROUND_QUESTS } from '../lib/playground-rpg'
+import { PLAYGROUND_QUESTS, itemById } from '../lib/playground-rpg'
 import type { PlaygroundRpgState } from '../hooks/use-playground-rpg'
 
 export function PlaygroundJournal({
@@ -28,7 +28,7 @@ export function PlaygroundJournal({
     () => Array.from(grouped.keys()),
     [grouped],
   )
-  const activeChapter = activeQuest?.chapter ?? chapters[0] ?? 'Training Grounds Tutorial'
+  const activeChapter = activeQuest?.chapter ?? chapters[0]
   const [selectedChapter, setSelectedChapter] = useState(activeChapter)
   const chapter = chapters.includes(selectedChapter) ? selectedChapter : activeChapter
   const quests = grouped.get(chapter) ?? []
@@ -142,7 +142,7 @@ export function PlaygroundJournal({
                   )}
                   <div className="mt-3 space-y-1.5 text-[12px]">
                     {quest.objectives.map((objective) => {
-                      const completed = progress?.completedObjectives.includes(objective.id)
+                      const completed = progress.completedObjectives.includes(objective.id)
                       return (
                         <div
                           key={objective.id}

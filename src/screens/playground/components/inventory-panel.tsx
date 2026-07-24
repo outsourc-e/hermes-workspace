@@ -11,7 +11,7 @@ type InventoryItem = {
 }
 
 type InventoryPanelProps = {
-  items?: InventoryItem[]
+  items?: Array<InventoryItem>
   onEquip?: (item: InventoryItem) => void
 }
 
@@ -23,7 +23,7 @@ const RARITY_STYLES: Record<InventoryRarity, { label: string; border: string; gl
   legendary: { label: 'Legendary', border: '#fbbf24', glow: 'rgba(251,191,36,.35)', text: '#fde68a' },
 }
 
-const DEFAULT_ITEMS: InventoryItem[] = [
+const DEFAULT_ITEMS: Array<InventoryItem> = [
   { id: 'training-blade', name: 'Training Blade', icon: '🗡️', rarity: 'rare', slot: 'Weapon', description: 'Rare quest reward. Drag into weapon slot to equip.' },
   { id: 'novice-cloak', name: 'Novice Cloak', icon: '🧥', rarity: 'uncommon', slot: 'Armor', description: 'Light cloak stitched with starter-zone wards.' },
   { id: 'hermes-sigil', name: 'Hermes Sigil', icon: '✦', rarity: 'epic', slot: 'Relic', description: 'A charged sigil that unlocks fast-travel whispers.' },
@@ -32,7 +32,7 @@ const DEFAULT_ITEMS: InventoryItem[] = [
   { id: 'map-fragment', name: 'Map Fragment', icon: '🗺️', rarity: 'uncommon', description: 'Reveals one hidden grove path.' },
 ]
 
-function inventorySlots(items: InventoryItem[]): Array<InventoryItem | null> {
+function inventorySlots(items: Array<InventoryItem>): Array<InventoryItem | null> {
   return Array.from({ length: 24 }, (_, index) => items[index] ?? null)
 }
 

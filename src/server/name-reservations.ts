@@ -62,17 +62,17 @@ export type NameReservationRecord = {
 }
 
 export type NameReservationStore = {
-  findByNormalizedName(normalizedName: string): Promise<NameReservationRecord | null>
-  insertReservation(input: {
+  findByNormalizedName: (normalizedName: string) => Promise<NameReservationRecord | null>
+  insertReservation: (input: {
     desiredName: string
     normalizedName: string
     email: string
     wallet: string | null
     confirmationToken: string
     createdAt: string
-  }): Promise<NameReservationRecord>
-  countReservations(): Promise<number>
-  confirmByToken(token: string): Promise<NameReservationRecord | null>
+  }) => Promise<NameReservationRecord>
+  countReservations: () => Promise<number>
+  confirmByToken: (token: string) => Promise<NameReservationRecord | null>
 }
 
 export type ConfirmationEmailPayload = {

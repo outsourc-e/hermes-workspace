@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { EtsySheetIntakeRunManifest } from '../lib/war-room/living-v3/etsy-sheet-intake'
 import type { EtsyLiveResearchRequest, EtsyLiveResearchRun } from '../lib/war-room/living-v3/etsy-live-research'
+import type { EtsyProductWorkspaceCommand, EtsyProductWorkspaceStateV2 } from '../lib/war-room/living-v3/etsy-product-model'
 import type { EtsyRoomLocalIntent, EtsyRoomState } from '../lib/war-room/living-v3/etsy-room-contracts'
 import type { KernelAgentDisplayState, WorkspaceArtifact, WorkspaceKernelPersistedState, WorkspaceKernelTelemetrySnapshot, WorkspaceRun } from '../lib/workspace-kernel'
 import type { SmartIntakeMission } from '../lib/war-room/living-v3/smart-intake-v2'
@@ -55,7 +56,9 @@ export type EtsyRoomLocalIntentResult = {
   ok: boolean
   runId: string
   correlationId: string
+  workspaceState?: EtsyProductWorkspaceStateV2
   etsyRoomState?: EtsyRoomState
+  commandStatus?: 'applied' | 'replayed' | 'conflict'
   events?: Array<WarRoomEvent>
   control?: AgentConnectionState
   state?: WarRoomBodyState
@@ -108,6 +111,7 @@ export type EtsyLiveScoutClientResult = {
 
 export type SharedEtsyRoomClientResult = {
   ok: boolean
+  schemaVersion: 'war-room-etsy-product-workspace-v2'
   updatedAtMs: number
   stateVersion: string
   source: 'empty' | 'ui' | 'scout-api' | 'test' | 'unknown'
@@ -125,9 +129,12 @@ export type SharedEtsyRoomClientResult = {
     storesFiles: false
     note: string
   }
+  workspaceState: EtsyProductWorkspaceStateV2
   roomState: EtsyRoomState
   saved?: boolean
   skippedReason?: string
+  commandStatus?: 'applied' | 'replayed' | 'conflict'
+  expectedRevision?: number
   error?: string
 }
 
@@ -147,6 +154,19 @@ export async function saveSharedEtsyRoomState(roomState: EtsyRoomState, reason?:
     method: 'POST',
     body: JSON.stringify({ roomState, reason }),
   })
+}
+
+export async function applySharedEtsyProductWorkspaceCommandClient(command: EtsyProductWorkspaceCommand) {
+  const response = await fetch('/api/war-room/etsy-live/shared-room', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ command }),
+  })
+  const body = await response.json() as SharedEtsyRoomClientResult
+  if (!response.ok && response.status !== 409) {
+    throw new Error(body.error ?? `Request failed: ${response.status}`)
+  }
+  return { ...body, httpStatus: response.status }
 }
 
 export async function resetSharedEtsyRoomState(reason?: string) {

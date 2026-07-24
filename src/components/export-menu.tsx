@@ -35,7 +35,7 @@ const formats: Array<{ format: ExportFormat; label: string; ext: string }> = [
 export function ExportMenu({ onExport, disabled }: ExportMenuProps) {
   const [open, setOpen] = useState(false)
   const handleOpenChange = useCallback(
-    function handleOpenChange(nextOpen: boolean) {
+    function handleMenuOpenChange(nextOpen: boolean) {
       if (disabled) return
       setOpen(nextOpen)
     },

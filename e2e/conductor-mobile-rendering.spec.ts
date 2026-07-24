@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 const BASE = process.env.HERMES_WORKSPACE_URL || 'http://localhost:3002'
 
@@ -92,8 +92,8 @@ test.describe('Conductor mobile rendering', () => {
     // The last visible element on the page should have bottom >= 0
     const lastElBottom = await page.evaluate(() => {
       const all = document.querySelectorAll('main > div, main > section')
+      if (all.length === 0) return -1
       const last = all[all.length - 1]
-      if (!last) return -1
       const rect = last.getBoundingClientRect()
       return rect.bottom
     })

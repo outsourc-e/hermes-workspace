@@ -16,12 +16,14 @@ export type EtsyLiveSourceDetail = {
   url: string
   title?: string
   imageUrl?: string
+  localImageRef?: string
   priceText?: string
   shopName?: string
   marketplace?: string
   salesText?: string
   demandText?: string
   tags?: Array<string>
+  variantOptions?: Array<string>
 }
 
 export type EtsyLiveCandidate = {
@@ -124,6 +126,12 @@ function cleanOptionalUrl(value: unknown) {
   return /^https?:\/\//i.test(text) ? text : undefined
 }
 
+function cleanLocalImageRef(value: unknown) {
+  const text = cleanText(value, '', 1_000)
+  if (!text.startsWith('/war-room/etsy-product-media/') || text.includes('..')) return undefined
+  return /^\/[A-Za-z0-9._/-]+$/.test(text) ? text : undefined
+}
+
 function cleanSourceDetails(value: unknown, sourceUrls: Array<string>) {
   const rawList = Array.isArray(value) ? value : []
   const details = rawList
@@ -141,12 +149,14 @@ function cleanSourceDetails(value: unknown, sourceUrls: Array<string>) {
         url,
         title: cleanText(item.title, '', 180) || undefined,
         imageUrl: cleanOptionalUrl(item.imageUrl),
+        localImageRef: cleanLocalImageRef(item.localImageRef),
         priceText: cleanText(item.priceText, '', 80) || undefined,
         shopName: cleanText(item.shopName, '', 120) || undefined,
         marketplace,
         salesText: cleanText(item.salesText, '', 80) || undefined,
         demandText: cleanText(item.demandText, '', 120) || undefined,
         tags: cleanTextArray(item.tags, [], 8, 36),
+        variantOptions: cleanTextArray(item.variantOptions, [], 24, 80),
       }
     })
     .filter((item): item is EtsyLiveSourceDetail => Boolean(item))

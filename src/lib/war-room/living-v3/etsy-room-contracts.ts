@@ -522,7 +522,7 @@ function firstImageRef(imageRefs: Array<string>, fallback?: string) {
 }
 
 function imageRefsFromSourceDetails(details: Array<EtsyLiveSourceDetail> | undefined, fallback: Array<string> = []) {
-  return cleanList(details?.map((detail) => detail.imageUrl), fallback, 10)
+  return cleanList(details?.map((detail) => detail.localImageRef ?? detail.imageUrl), fallback, 12)
 }
 
 function imageRefsFromSmartIntake(input: {

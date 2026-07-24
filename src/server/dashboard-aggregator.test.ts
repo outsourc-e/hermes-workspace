@@ -11,6 +11,7 @@ function jsonResponse(payload: unknown, status = 200): Response {
 
 function makeFetcher(routes: Record<string, unknown>): DashboardFetcher {
   return async (path: string) => {
+    await Promise.resolve()
     const key = Object.keys(routes).find((p) => path.startsWith(p))
     if (key === undefined) {
       return new Response('not found', { status: 404 })
@@ -23,8 +24,8 @@ function makeFetcher(routes: Record<string, unknown>): DashboardFetcher {
 
 describe('buildDashboardOverview', () => {
   it('returns null sections when every upstream call fails', async () => {
-    const fetcher: DashboardFetcher = async () =>
-      new Response('boom', { status: 500 })
+    const fetcher: DashboardFetcher = () =>
+      Promise.resolve(new Response('boom', { status: 500 }))
     const overview = await buildDashboardOverview({ fetcher })
     expect(overview.status).toBeNull()
     expect(overview.platforms).toEqual([])
@@ -144,6 +145,7 @@ describe('buildDashboardOverview', () => {
       },
     })
     const gatewayFetcher: DashboardFetcher = async (p) => {
+      await Promise.resolve()
       if (p === '/health/detailed') {
         return jsonResponse({ active_agents: 2 })
       }
@@ -484,6 +486,7 @@ describe('buildDashboardOverview', () => {
 
   it('survives mixed-status inputs (some succeed, some fail)', async () => {
     const fetcher: DashboardFetcher = async (path) => {
+      await Promise.resolve()
       if (path.startsWith('/api/status')) {
         return jsonResponse({
           gateway_state: 'running',

@@ -17,7 +17,7 @@ const DIALOG_LINES = [
   'Find the glowing pins on the world map, inspect your inventory, then return with the founder sigil intact.',
 ]
 
-const CHOICES: QuestChoice[] = [
+const CHOICES: Array<QuestChoice> = [
   { id: 'ask-lore', label: 'Ask about the static', tone: 'Lore' },
   { id: 'promise', label: 'Promise to recover the sigil', tone: 'Heroic' },
   { id: 'request-reward', label: 'Request the reward terms', tone: 'Pragmatic' },

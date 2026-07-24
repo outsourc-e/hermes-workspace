@@ -22,7 +22,7 @@ export type DialogChoice = {
   /** Optional: progress this quest by id */
   completeQuest?: string
   /** Optional: grant items */
-  grantItems?: PlaygroundItemId[]
+  grantItems?: Array<PlaygroundItemId>
   /** Optional: grant skill XP */
   grantSkillXp?: Partial<Record<PlaygroundSkillId, number>>
   /** Optional: ends conversation */
@@ -40,9 +40,9 @@ export type NpcDialogTree = {
   /** Opening line shown when dialog starts */
   opening: string
   /** Lore line shown if player keeps talking */
-  lore: string[]
+  lore: Array<string>
   /** Quest/action choices the player can pick */
-  choices: DialogChoice[]
+  choices: Array<DialogChoice>
 }
 
 export const NPC_DIALOG: Record<string, NpcDialogTree> = {

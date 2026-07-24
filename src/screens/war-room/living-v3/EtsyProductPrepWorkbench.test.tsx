@@ -138,7 +138,7 @@ function query(container: HTMLElement, selector: string) {
 }
 
 function buttonNamed(container: HTMLElement, label: string) {
-  const button = Array.from(container.querySelectorAll('button')).find((item) => item.textContent?.trim() === label)
+  const button = Array.from(container.querySelectorAll('button')).find((item) => item.textContent.trim() === label)
   expect(button).toBeTruthy()
   return button as HTMLButtonElement
 }
@@ -179,7 +179,7 @@ describe('EtsyProductPrepWorkbench', () => {
     expect(proof.textContent).toContain('Readback / packets')
     expect(container.textContent).toContain('Live read-only research connector is not enabled.')
 
-    const buttonText = Array.from(container.querySelectorAll('button')).map((button) => button.textContent ?? '').join(' ')
+    const buttonText = Array.from(container.querySelectorAll('button')).map((button) => button.textContent).join(' ')
     expect(buttonText).not.toMatch(/upload|publish/i)
 
     await unmount()

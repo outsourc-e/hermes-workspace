@@ -6,7 +6,7 @@ import { getHermesRoot, getLocalBinDir, getProfilesDir } from './claude-paths'
 export const SWARM_CANONICAL_REPO = resolve(process.cwd())
 export const SWARM_MEMORY_ROOT = process.env.HERMES_SWARM_MEMORY_ROOT || join(homedir(), 'hermes-workspace')
 export const SWARM_MEMORY_HANDOFFS = join(SWARM_MEMORY_ROOT, 'memory')
-export const SWARM_FORBIDDEN_PATHS: string[] = []
+export const SWARM_FORBIDDEN_PATHS: Array<string> = []
 
 export type SwarmEnvironment = {
   canonicalRepo: string

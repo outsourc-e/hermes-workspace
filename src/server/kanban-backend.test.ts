@@ -280,7 +280,7 @@ describe('kanban-backend', () => {
     vi.stubEnv('HERMES_HOME', '/Users/aurora/.claude/profiles/swarm2')
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     vi.stubEnv('CLAUDE_KANBAN_BACKEND', 'claude')
-    const sqliteCalls: string[] = []
+    const sqliteCalls: Array<string> = []
     const mod = await loadKanbanBackend({
       existsSync: (target) => target === '/Users/aurora/.claude/kanban.db',
       execFileSync: (command, args = []) => {

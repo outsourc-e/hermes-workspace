@@ -44,9 +44,9 @@ export function SteerModal({
       setMessage('')
       onOpenChange(false)
     } catch (error) {
-      const message =
+      const errorMessage =
         error instanceof Error ? error.message : 'Failed to send directive'
-      toast(message, { type: 'error' })
+      toast(errorMessage, { type: 'error' })
     } finally {
       setPending(false)
     }

@@ -4,7 +4,7 @@ type PlaygroundPlayerGlbProps = {
   avatarId?: string
 }
 
-function candidateUrls(avatarId?: string): string[] {
+function candidateUrls(avatarId?: string): Array<string> {
   const id = (avatarId || 'player-adventurer').trim()
   const safe = id.replace(/[^a-z0-9_-]+/gi, '') || 'player-adventurer'
   return [

@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Folder01Icon,
 } from '@hugeicons/core-free-icons'
+import type { FileEntry } from '@/components/file-explorer/file-explorer-sidebar'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import {
   ScrollAreaCorner,
@@ -17,7 +18,6 @@ import {
 } from '@/components/ui/scroll-area'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { FileExplorerSidebar } from '@/components/file-explorer'
-import type { FileEntry } from '@/components/file-explorer/file-explorer-sidebar'
 import { resolveTheme, useSettings } from '@/hooks/use-settings'
 
 const PLACEHOLDER_VALUE = `// Files workspace

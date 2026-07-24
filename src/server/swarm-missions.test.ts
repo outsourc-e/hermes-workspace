@@ -283,7 +283,7 @@ describe('swarm-missions', () => {
       reason: 'Only one bad lane',
     })
 
-    expect(cancelled?.assignment?.state).toBe('cancelled')
+    expect(cancelled?.assignment.state).toBe('cancelled')
     expect(cancelled?.mission.state).toBe('planning')
     expect(cancelled?.mission.assignments.map((assignment) => assignment.state)).toEqual(['cancelled', 'queued'])
     expect(cancelled?.mission.events.at(-1)?.type).toBe('assignment_cancelled')

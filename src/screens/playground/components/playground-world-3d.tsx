@@ -4,18 +4,21 @@
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html, Sparkles } from '@react-three/drei'
-import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
-import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import type { PlaygroundWorldId } from '../lib/playground-rpg'
-import { botsFor, type BotProfile } from '../lib/playground-bots'
+import {  botsFor } from '../lib/playground-bots'
+import {   usePlaygroundMultiplayer } from '../hooks/use-playground-multiplayer'
+import {  loadAvatarConfig } from '../lib/avatar-config'
 import { ScatteredScenery } from './playground-environment'
-import { usePlaygroundMultiplayer, type RemotePlayer as MpRemotePlayer, type IncomingChat } from '../hooks/use-playground-multiplayer'
-import { loadAvatarConfig, type AvatarConfig } from '../lib/avatar-config'
 import { PlaygroundNpcGlb } from './playground-npc-glb'
 import { SpeechBubble } from './speech-bubble'
 import { useHermesWorldSettings } from './hermesworld-settings'
+import type {AvatarConfig} from '../lib/avatar-config';
+import type {IncomingChat, RemotePlayer as MpRemotePlayer} from '../hooks/use-playground-multiplayer';
+import type {BotProfile} from '../lib/playground-bots';
+import type { PlaygroundWorldId } from '../lib/playground-rpg'
 
 /**
  * Module-level GLB presence probe. Returns:
@@ -344,7 +347,7 @@ function ClassicalPillars({ world }: { world: WorldDef }) {
   return (
     <>
       {pillars.map((pos, i) => (
-        <group key={i} position={pos as [number, number, number]}>
+        <group key={i} position={pos}>
           <mesh castShadow receiveShadow position={[0, 1.5, 0]}>
             <cylinderGeometry args={[0.4, 0.5, 3, 12]} />
             <meshStandardMaterial color={world.pillarColor} roughness={0.6} />
@@ -397,7 +400,7 @@ function TechPillars({ world }: { world: WorldDef }) {
   return (
     <>
       {cubes.map((pos, i) => (
-        <group key={i} position={pos as [number, number, number]}>
+        <group key={i} position={pos}>
           <mesh castShadow position={[0, 0.9, 0]}>
             <boxGeometry args={[1.6, 1.8, 1.6]} />
             <meshStandardMaterial color="#0f172a" emissive={world.pillarColor} emissiveIntensity={0.4} roughness={0.3} />
@@ -1168,7 +1171,7 @@ function NpcAccessories({ role = '', color }: { role?: string; color: string }) 
 
 /* ── NPC billboard with proximity sensing ── */
 // Per-NPC ambient lines (cycles when nobody clicks them).
-const NPC_AMBIENT_LINES: Record<string, string[]> = {
+const NPC_AMBIENT_LINES: Record<string, Array<string>> = {
   athena: [
     'Welcome, builder. The road begins here.',
     'Hermes carries your prompts — wisely.',
@@ -1252,7 +1255,7 @@ function NPC({
   // Ambient speech bubble — cycles every ~12-22s with NPC lore lines.
   const [ambient, setAmbient] = useState<string | null>(null)
   useEffect(() => {
-    const lines = (npcId && NPC_AMBIENT_LINES[npcId]) || NPC_AMBIENT_LINES[avatar] || []
+    const lines = NPC_AMBIENT_LINES[npcId ?? avatar]
     if (lines.length === 0) return
     let stop = false
     const tick = () => {
@@ -1615,7 +1618,7 @@ function PlayerAndCamera({
     }
     const onJump = () => tryJump()
     const onCrouch = (event: Event) => {
-      mobileCrouch.current = !!(event as CustomEvent<{ active?: boolean }>).detail?.active
+      mobileCrouch.current = !!(event as CustomEvent<{ active?: boolean }>).detail.active
     }
     window.addEventListener('hermes-playground-dash', onDash)
     window.addEventListener('hermesworld-mobile-jump', onJump)
@@ -1716,7 +1719,6 @@ function PlayerAndCamera({
     spawnedRef.current = true
     positionRef.current.set(spawn[0], spawn[1], spawn[2])
     if (groupRef.current) groupRef.current.position.copy(positionRef.current)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Cinematic camera mode — Tab cycles through preset angles useful for filming.
@@ -3194,7 +3196,7 @@ export function PlaygroundWorld3D({
   useEffect(() => {
     // Sample player position at presence cadence (~5Hz). The hook
     // skip-sends when delta < epsilon, so this is cheap.
-    const isMobile = window.matchMedia?.('(pointer: coarse), (max-width: 760px)').matches ?? false
+    const isMobile = window.matchMedia('(pointer: coarse), (max-width: 760px)').matches
     const id = window.setInterval(() => {
       const p = { x: playerPos.current.x, y: playerPos.current.y, z: playerPos.current.z }
       positionForMp.current = p
@@ -3240,7 +3242,7 @@ export function PlaygroundWorld3D({
     if (!onRemotePlayersChange) return
     const sig = Object.values(remotePlayers).map((player) => `${player.id}:${player.world}:${player.x.toFixed(1)}:${player.z.toFixed(1)}:${player.ts}:${player.lastChatAt ?? 0}`).sort().join('|')
     if (sig === remotePublishRef.current.sig) return
-    const isMobile = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse), (max-width: 760px)').matches
+    const isMobile = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse), (max-width: 760px)').matches
     const minDelay = isMobile ? Math.ceil(1000 / 30) : Math.ceil(1000 / 60)
     const elapsed = Date.now() - remotePublishRef.current.ts
     const publish = () => {

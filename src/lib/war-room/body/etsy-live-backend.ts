@@ -204,6 +204,7 @@ function normalizeControlledScoutResult(
       title: candidate.title,
       summary: candidate.niche,
       sourceUrls: candidate.sourceUrls,
+      sourceDetails: candidate.sourceDetails,
       evidenceIds: candidate.evidence,
       evidenceQuality: candidate.sourceUrls.length ? 'partial' : 'blocked',
       score: candidate.score ?? undefined,
@@ -623,7 +624,8 @@ async function runReadonlyInternetProductSearch(
         missingEvidence: [
           'Alura monthly sales proof / 40+ monthly units not verified yet',
           'exact AliExpress/Alibaba visual match proof',
-          'source image reference for ShotLab',
+          ...(!hit.imageUrl ? ['source image reference for ShotLab'] : []),
+          'variant truth',
           'competitor tags/title/description extraction',
           'supplier price/cost proof',
         ],

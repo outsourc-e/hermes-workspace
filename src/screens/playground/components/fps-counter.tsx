@@ -4,7 +4,7 @@ type Props = { enabled: boolean }
 
 export function FpsCounter({ enabled }: Props) {
   const [stats, setStats] = useState({ fps: 0, low: 0, ms: 0 })
-  const frameTimesRef = useRef<number[]>([])
+  const frameTimesRef = useRef<Array<number>>([])
   const lastRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
 

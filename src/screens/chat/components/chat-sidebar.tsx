@@ -4,7 +4,6 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   BrainIcon,
-  Building01Icon,
   Castle02Icon,
   Chat01Icon,
   CheckListIcon,
@@ -20,6 +19,7 @@ import {
   Rocket01Icon,
   Search01Icon,
   Settings01Icon,
+  SpartanHelmetIcon,
   Sun02Icon,
   UserGroupIcon,
   UserMultipleIcon,
@@ -782,6 +782,8 @@ function ChatSidebarComponent({
   }
 
   const isDashboardActive = pathname === '/dashboard'
+  const isWarRoomActive =
+    pathname === '/war-room' || pathname.startsWith('/war-room/')
 
   const mainItems: Array<NavItemDef> = [
     {
@@ -790,6 +792,15 @@ function ChatSidebarComponent({
       icon: DashboardSquare01Icon,
       label: t('nav.dashboard'),
       active: isDashboardActive,
+    },
+    {
+      kind: 'link',
+      to: '/war-room',
+      search: { etsyOps: 1 },
+      icon: SpartanHelmetIcon,
+      label: 'War Room',
+      active: isWarRoomActive,
+      dataTour: 'war-room',
     },
     {
       kind: 'link',

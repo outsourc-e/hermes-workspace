@@ -25,9 +25,9 @@ import {
 import { dirname, join, resolve as pathResolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomBytes } from 'node:crypto'
-import type { McpClientInput } from '../types/mcp'
 import { parseMcpServerInput } from './mcp-input-validate'
 import { getStateDir } from './workspace-state-dir'
+import type { McpClientInput } from '../types/mcp'
 
 export interface McpPreset {
   id: string

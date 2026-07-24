@@ -206,6 +206,12 @@ export type CouncilDecisionHandoff = {
   planningGeneralNames: Array<string>
 }
 
+export type CouncilLaunchRequest = {
+  requestId: string
+  topic: string
+  autoStart: true
+}
+
 const COUNCIL_ASSET_VERSION = 'petdex-fixed-20260626-v8-png-council-v1'
 const COUNCIL_CHAIR_ASSET_VERSION = 'petdex-fixed-20260626-v8-png-chatgpt-rowwise-v2'
 const COUNCIL_ATLAS_ROOT = '/war-room/living-v3/generals-council'
@@ -1579,9 +1585,11 @@ function TypingBubble({ message }: { message: CouncilChatMessage | null }) {
 
 export function CouncilChamberSurface({
   onTransferToHermes,
+  launchRequest,
   navigationSlot,
 }: {
   onTransferToHermes: (handoff: CouncilDecisionHandoff) => void
+  launchRequest?: CouncilLaunchRequest | null
   navigationSlot?: ReactNode
 }) {
   const [initialCouncilState] = useState(() => loadStoredCouncilState())
@@ -1604,6 +1612,7 @@ export function CouncilChamberSurface({
   const chatRef = useRef<HTMLDivElement | null>(null)
   const advisorChatRef = useRef<HTMLDivElement | null>(null)
   const sessionRef = useRef<CouncilSession | null>(initialCouncilState?.session ?? null)
+  const consumedLaunchRequestRef = useRef<string | null>(null)
   const handoffUnlocked = Boolean(session && handoffState !== 'idle')
   const activeGeneral = councilGenerals.find((general) => general.id === activeGeneralId) ?? councilGenerals[0]
   const latestRound = session?.discussionRounds[session.discussionRounds.length - 1] ?? null
@@ -1943,6 +1952,39 @@ export function CouncilChamberSurface({
     node.scrollTop = node.scrollHeight
   }, [activeGeneral.id, advisorPendingMessage?.id, session?.packetId, visibleAdvisorChatMessages.length])
 
+  useEffect(() => {
+    const request = launchRequest
+    if (!request || consumedLaunchRequestRef.current === request.requestId || councilRunPending) return
+    const askedTopic = request.topic.trim()
+    if (!askedTopic) return
+    consumedLaunchRequestRef.current = request.requestId
+    const currentSession = sessionRef.current
+    if (currentSession) setArchiveEntries(upsertCouncilArchiveSession(currentSession))
+    clearStoredCouncilState()
+    sessionRef.current = null
+    setSession(null)
+    setTopic(askedTopic)
+    setOperatorOpinion('')
+    setHandoffState('idle')
+    setFlowStage('discussion')
+    setSelectedPlanningGeneralIds([])
+    setVisibleMessageCount(0)
+    setMinimalView('council')
+    setArchiveOpen(false)
+    if (request.autoStart) {
+      void (async () => {
+        await fetch('/api/war-room/council/run', {
+          method: 'DELETE',
+          cache: 'no-store',
+          credentials: 'same-origin',
+        }).catch(() => undefined)
+        if (consumedLaunchRequestRef.current === request.requestId) {
+          await conveneCouncilTopic(askedTopic)
+        }
+      })()
+    }
+  }, [councilRunPending, launchRequest?.requestId])
+
   const stateLabel = handoffState === 'sent'
     ? 'נשלח להרמס'
     : handoffUnlocked
@@ -2010,16 +2052,17 @@ export function CouncilChamberSurface({
     return nextSession
   }
 
-  async function conveneCouncil() {
-    if (!canWakeCouncil || councilRunPending) {
+  async function conveneCouncilTopic(askedTopicInput: string) {
+    const askedTopic = askedTopicInput.trim()
+    if (!askedTopic || councilRunPending) {
       setMotionState('roaming')
       return
     }
-    const askedTopic = topic.trim()
     const discussionId = `discussion-${Date.now().toString(36)}`
     setCouncilRunPending(true)
     const pendingSession = pendingCouncilSession(askedTopic, discussionId)
     sessionRef.current = pendingSession
+    setTopic(askedTopic)
     setSession(pendingSession)
     setActiveGeneralId(councilGenerals[0].id)
     setMotionState('seated')
@@ -2042,6 +2085,10 @@ export function CouncilChamberSurface({
     } finally {
       setCouncilRunPending(false)
     }
+  }
+
+  async function conveneCouncil() {
+    await conveneCouncilTopic(topic)
   }
 
   function releaseCouncilToRoam() {

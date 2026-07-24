@@ -55,7 +55,7 @@ describe('War Room Etsy Ops server policy', () => {
     expect(state.mode).toBe('etsy-ops-room-v2')
     expect(state.plugin.safety.liveExternalMutation).toBe(false)
     expect(state.agents).toHaveLength(3)
-    expect(state.agents.every((agent) => agent.chat.modelProfileId === 'chatgpt-5.5')).toBe(true)
+    for (const agent of state.agents) expect(agent.chat.modelProfileId).toBe('chatgpt-5.5')
     expect(state.agents.every((agent) => agent.animation.targetFrames === 96)).toBe(true)
   })
 

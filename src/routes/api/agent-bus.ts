@@ -18,7 +18,7 @@ const AGENT_BUS_SCRIPT =
   process.env.AGENT_BUS_SCRIPT ||
   '/opt/central-inteligencia/services/hermes-agent-bus/agent_bus.py'
 
-const HANDOFF_CONTRACTS: Record<string, { businessScope: string; reason: string }> = {
+const HANDOFF_CONTRACTS: Partial<Record<string, { businessScope: string; reason: string }>> = {
   'dona-helena->larissinha': {
     businessScope: 'DES',
     reason: 'duvida_juridica_interna',
@@ -211,7 +211,7 @@ async function handleAction(request: Request) {
 export const Route = createFileRoute('/api/agent-bus')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!requireLocalOrAuth(request)) {
           return Response.json({ error: 'Unauthorized' }, { status: 401 })
         }

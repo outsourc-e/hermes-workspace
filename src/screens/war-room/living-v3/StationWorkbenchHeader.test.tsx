@@ -16,7 +16,7 @@ it('shows room, station role, and safety state without duplicating the root clos
     root.render(
       <StationWorkbenchHeader
         roomLabel="Olympus Command"
-        stationLabel="Mission Router"
+        stationLabel="Mission Control"
         role="Routes work to the correct room and operator"
         modeLabel="Command workbench"
         localOnly
@@ -27,7 +27,7 @@ it('shows room, station role, and safety state without duplicating the root clos
 
   expect(container.querySelector('[data-station-workbench-header="v2"]')).toBeTruthy()
   expect(container.textContent).toContain('Olympus Command')
-  expect(container.textContent).toContain('Mission Router')
+  expect(container.textContent).toContain('Mission Control')
   expect(container.textContent).toContain('Local-only mode')
   expect(container.textContent).toContain('Readback ready')
 

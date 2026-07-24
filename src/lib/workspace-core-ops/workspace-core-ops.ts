@@ -1,4 +1,6 @@
 import { WORKSPACE_WORKER_PROFILES } from '../workspace-kernel'
+import { etsyMarketLabStationOperatorId } from '../war-room/living-v3/etsy-station-apps'
+import { livingV3AgentById } from '../war-room/living-v3/living-v3-contract'
 import type {
   WorkspaceApproval,
   WorkspaceArtifact,
@@ -7,8 +9,6 @@ import type {
   WorkspaceRun,
   WorkspaceRunStatus,
 } from '../workspace-kernel'
-import { etsyMarketLabStationOperatorId } from '../war-room/living-v3/etsy-station-apps'
-import { livingV3AgentById } from '../war-room/living-v3/living-v3-contract'
 import type { LivingV3AgentId, LivingV3RoomId, LivingV3StationId } from '../war-room/living-v3/living-v3-contract'
 
 export type WorkspaceCoreOpsSeverity = 'info' | 'success' | 'warning' | 'danger'

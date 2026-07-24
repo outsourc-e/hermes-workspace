@@ -194,7 +194,7 @@ describe('War Room body contract/runtime', () => {
       agentId: 'athena',
       packetId: 'blocked-packet',
       fromStationId: 'agora-intake',
-      toStationId: 'approval-dais',
+      toStationId: 'mission-router',
     })).toThrow(/cannot perform carryPacket/)
     expect(listWarRoomEvents().some((event) => event.type === 'safety.blocked')).toBe(true)
   })
@@ -213,7 +213,7 @@ describe('War Room body contract/runtime', () => {
     requestWarRoomApproval({
       agentId: 'hermes',
       roomId: 'olympus-command',
-      stationId: 'approval-dais',
+      stationId: 'mission-router',
       reason: 'Approve a local draft only.',
       requestedAction: 'Review local draft',
       lockedAction: 'Publish Etsy listing',

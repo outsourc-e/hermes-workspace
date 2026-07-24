@@ -78,7 +78,7 @@ describe('POST /api/war-room/etsy-live/scout', () => {
   })
 
   it('records a blocked kernel run when the injected read-only runner is unavailable', async () => {
-    setEtsyLiveResearchRunnerForTests(async (request, context) => ({
+    setEtsyLiveResearchRunnerForTests((request, context) => Promise.resolve({
       runId: context.runId,
       status: 'blocked',
       query: request.query,
@@ -123,7 +123,7 @@ describe('POST /api/war-room/etsy-live/scout', () => {
   })
 
   it('records a successful fake controlled-runner fixture without live side effects', async () => {
-    setEtsyLiveResearchRunnerForTests(async (request, context) => ({
+    setEtsyLiveResearchRunnerForTests((request, context) => Promise.resolve({
       runId: context.runId,
       status: 'completed',
       query: request.query,
@@ -242,11 +242,68 @@ describe('GET/POST /api/war-room/etsy-live/shared-room', () => {
     expect(resetBody).toMatchObject({ ok: true, saved: true, empty: true })
     expect(resetBody.roomState.candidates).toEqual([])
   })
+
+  it('accepts V2 commands and returns 409 with the authoritative workspace for stale clients', async () => {
+    const initialResponse = await sharedRoomGetHandler({
+      request: new Request('http://localhost/api/war-room/etsy-live/shared-room'),
+    })
+    const initial = await initialResponse.json() as {
+      workspaceState: {
+        revision: number
+        roomState: ReturnType<typeof createInitialEtsyRoomState>
+        pipelineState: Record<string, unknown>
+      }
+    }
+    const roomState = structuredClone(initial.workspaceState.roomState)
+    roomState.prompt = 'V2 route command'
+    const command = {
+      type: 'replace_projections',
+      commandId: 'route-v2-command',
+      baseRevision: initial.workspaceState.revision,
+      reason: 'Route V2 test',
+      roomState,
+      pipelineState: initial.workspaceState.pipelineState,
+    }
+
+    const appliedResponse = await sharedRoomPostHandler({ request: postSharedRoom({ command }) })
+    const applied = await appliedResponse.json() as {
+      ok: boolean
+      commandStatus: string
+      workspaceState: { revision: number; roomState: { prompt: string } }
+    }
+    const staleResponse = await sharedRoomPostHandler({
+      request: postSharedRoom({ command: { ...command, commandId: 'route-stale-command' } }),
+    })
+    const stale = await staleResponse.json() as {
+      ok: boolean
+      commandStatus: string
+      expectedRevision: number
+      workspaceState: { revision: number; roomState: { prompt: string } }
+    }
+    const malformedResponse = await sharedRoomPostHandler({
+      request: postSharedRoom({ command: { type: 'replace_projections', commandId: '' } }),
+    })
+
+    expect(appliedResponse.status).toBe(200)
+    expect(applied).toMatchObject({
+      ok: true,
+      commandStatus: 'applied',
+      workspaceState: { revision: 1, roomState: { prompt: 'V2 route command' } },
+    })
+    expect(staleResponse.status).toBe(409)
+    expect(stale).toMatchObject({
+      ok: false,
+      commandStatus: 'conflict',
+      expectedRevision: 1,
+      workspaceState: { revision: 1, roomState: { prompt: 'V2 route command' } },
+    })
+    expect(malformedResponse.status).toBe(400)
+  })
 })
 
 describe('GET /api/war-room/etsy-live/state', () => {
   it('returns latest live scout kernel state', async () => {
-    setEtsyLiveResearchRunnerForTests(async (request, context) => ({
+    setEtsyLiveResearchRunnerForTests((request, context) => Promise.resolve({
       runId: context.runId,
       status: 'completed',
       query: request.query,

@@ -207,8 +207,8 @@ export type LiveAgentActionSystemRun = {
   actionRunId: string
   requestedByAgentId: LivingV3AgentId
   assignedAgentId: LivingV3AgentId
-  status: 'chat_only' | 'running_host_tool' | 'completed_host_tool' | 'blocked_missing_capability' | 'blocked_tool_error'
-  intent: 'chat' | 'terra_model_search' | 'unsupported_action'
+  status: 'chat_only' | 'waiting_operator' | 'running_host_tool' | 'completed_host_tool' | 'blocked_missing_capability' | 'blocked_tool_error'
+  intent: 'chat' | 'council_consultation_offer' | 'terra_model_search' | 'unsupported_action'
   capability: 'available' | 'missing' | 'not_needed'
   targetRoomId?: string
   targetStationId?: string
@@ -275,8 +275,19 @@ function shouldRunTerraReadOnlyModelSearch(agentId: LivingV3AgentId, operatorNot
   return false
 }
 
+function shouldOfferCouncilConsultation(agentId: LivingV3AgentId, operatorNote?: string) {
+  if (agentId !== 'hermes') return false
+  const text = operatorNote?.trim() ?? ''
+  if (!text) return false
+  const explicitCouncilRequest = /(?:שאל|תשאל|התייעץ|תתייעץ|כנס|תכנס|העבר|תעביר).{0,28}(?:מועצ|יועצ|גנרל)|(?:council|advisors?|generals?).{0,28}(?:ask|consult|convene|debate)/i.test(text)
+  const strategicDecision = /(?:אסטרטג|החלטה|כיוון|חלופה|עדיפות|סיכון|trade[ -]?off|strateg|decision|direction|priority|risk)/i.test(text)
+    && /(?:מה|האם|כדאי|נכון|עדיף|צריך|לבחור|להחליט|which|what|should|choose|decide|worth)/i.test(text)
+  return explicitCouncilRequest || strategicDecision
+}
+
 export function liveAgentActionIntentFor(agentId: LivingV3AgentId, operatorNote?: string): LiveAgentActionSystemRun['intent'] {
   if (shouldRunTerraReadOnlyModelSearch(agentId, operatorNote)) return 'terra_model_search'
+  if (shouldOfferCouncilConsultation(agentId, operatorNote)) return 'council_consultation_offer'
   return isExplicitWorkspaceAction(operatorNote) ? 'unsupported_action' : 'chat'
 }
 
@@ -290,15 +301,16 @@ export function requestedTerraSearchLimit(operatorNote?: string) {
 }
 
 function localActionSystemUsage(actionRun: LiveAgentActionSystemRun): ControlledAgentUsage {
+  const localOnly = actionRun.status === 'waiting_operator' || actionRun.status === 'blocked_missing_capability'
   return {
     mode: 'dry_run',
-    budget: 'one Hermes CLI model call, max-turns=1',
+    budget: localOnly ? 'local routing only; 0 model calls' : 'one Hermes CLI model call, max-turns=1',
     timeoutMs: 0,
     toolsets: 'none',
     commandPreview: `workspace-action-system ${actionRun.intent} --capability ${actionRun.capability}`,
-    reportedCost: '0 model calls; capability check stopped before agent execution',
+    reportedCost: '0 model calls; capability/approval check stopped before agent execution',
     reportedUsageLine: null,
-    note: 'Workspace Action System V1 local capability/proposal result. No Hermes CLI process spawned.',
+    note: 'Workspace Action System V1 local routing result. No Hermes CLI process spawned.',
   }
 }
 
@@ -338,6 +350,44 @@ function createChatOnlyActionSystemRun(runId: string, agentId: LivingV3AgentId, 
     operatorRequest: operatorNote ?? '',
     readback: 'שיחה רגילה: אין כלי להריץ ואין שינוי במסך מעבר לתשובה.',
     visualNextStep: 'אם זו פעולה אמיתית, כתוב חפש / הכן / בנה / תציג / שלח וכו׳.',
+  }
+}
+
+function createCouncilConsultationOfferActionSystemRun(runId: string, operatorNote?: string): LiveAgentActionSystemRun {
+  return {
+    actionRunId: `${runId}-action-system`,
+    requestedByAgentId: 'hermes',
+    assignedAgentId: 'hermes',
+    status: 'waiting_operator',
+    intent: 'council_consultation_offer',
+    capability: 'available',
+    targetRoomId: 'council-strategists',
+    targetStationId: 'council-table',
+    toolId: 'controlled-council-one-shot',
+    operatorRequest: operatorNote ?? '',
+    readback: 'זה נראה כמו נושא שכדאי לבחון מכמה זוויות.',
+    visualNextStep: 'להתייעץ עם המועצה? אתה מחליט.',
+  }
+}
+
+function createCouncilConsultationOfferResult(runId: string, actionRun: LiveAgentActionSystemRun): ControlledLiveAgentChatResult {
+  return {
+    ok: true,
+    runId,
+    agentId: 'hermes',
+    durationMs: 0,
+    usage: localActionSystemUsage(actionRun),
+    output: {
+      agentId: 'hermes',
+      status: 'completed_local_only',
+      answer: `${actionRun.readback}\n${actionRun.visualNextStep}`,
+      summary: actionRun.readback,
+      nextSafeStep: actionRun.visualNextStep,
+      blockedActions: ['council_run_until_operator_approval'],
+      confidence: 100,
+    },
+    rawStdout: '',
+    rawStderr: '',
   }
 }
 
@@ -452,14 +502,18 @@ export async function runControlledLiveAgentChatFlow(input: {
   const actionIntent = liveAgentActionIntentFor(input.agentId, input.operatorNote)
   let actionSystemRun: LiveAgentActionSystemRun = actionIntent === 'terra_model_search'
     ? createTerraModelSearchActionSystemRun(runId, input.agentId, input.operatorNote)
-    : actionIntent === 'unsupported_action'
-      ? createMissingCapabilityActionSystemRun(runId, input.agentId, input.operatorNote)
-      : createChatOnlyActionSystemRun(runId, input.agentId, input.operatorNote)
+    : actionIntent === 'council_consultation_offer'
+      ? createCouncilConsultationOfferActionSystemRun(runId, input.operatorNote)
+      : actionIntent === 'unsupported_action'
+        ? createMissingCapabilityActionSystemRun(runId, input.agentId, input.operatorNote)
+        : createChatOnlyActionSystemRun(runId, input.agentId, input.operatorNote)
   let terraModelSearch: TerraInternetModelSearchResult | undefined
 
   try {
     setWarRoomAgentsLocalOnly({
-      reason: `${agent.label} live chat started: one model call only because DLV sent a message. Idle roaming stays local/free.`,
+      reason: actionSystemRun.status === 'waiting_operator'
+        ? 'Hermes detected a possible Council consultation and stopped locally for DLV approval. 0 model calls.'
+        : `${agent.label} live chat started: one model call only because DLV sent a message. Idle roaming stays local/free.`,
       updatedBy: 'ui',
       runId,
     })
@@ -501,7 +555,9 @@ export async function runControlledLiveAgentChatFlow(input: {
       agentId: input.agentId,
       roomId: primaryStationId ? livingV3StationById(primaryStationId)?.roomId : agent.home.roomId,
       stationId: primaryStationId,
-      text: `${agent.label} is answering one live-on-message AI call. Idle background usage remains off.`,
+      text: actionSystemRun.status === 'waiting_operator'
+        ? 'Hermes is waiting for DLV to approve or skip Council consultation. No Council run started.'
+        : `${agent.label} is answering one live-on-message AI call. Idle background usage remains off.`,
       source: 'hermes',
       runId,
       correlationId: `${correlationId}-start`,
@@ -526,6 +582,34 @@ export async function runControlledLiveAgentChatFlow(input: {
       })
       return {
         ok: false,
+        runId,
+        agentId: input.agentId,
+        result,
+        control: getAgentConnectionState(),
+        state: getWarRoomBodyState(),
+        actionSystemRun,
+      } satisfies ControlledLiveAgentChatFlowResult
+    }
+
+    if (actionSystemRun.status === 'waiting_operator') {
+      const result = createCouncilConsultationOfferResult(runId, actionSystemRun)
+      dispatchWarRoomIntent({
+        type: 'say',
+        agentId: 'hermes',
+        roomId: 'olympus-command',
+        stationId: 'command-table',
+        text: truncateForSpeech(result.output?.answer ?? actionSystemRun.readback),
+        source: 'hermes',
+        runId,
+        correlationId: `${correlationId}-council-offer`,
+      })
+      freezeWarRoomAgents({
+        reason: 'Hermes proposed Council consultation and stopped for DLV approval. No Council or model run started.',
+        updatedBy: 'system',
+        runId,
+      })
+      return {
+        ok: true,
         runId,
         agentId: input.agentId,
         result,

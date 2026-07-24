@@ -43,7 +43,6 @@ export type LivingV3AgentId =
 export type LivingV3StationId =
   | 'command-table'
   | 'mission-router'
-  | 'approval-dais'
   | 'agora-intake'
   | 'oracle-signal-basin'
   | 'forge-workbench'
@@ -714,8 +713,8 @@ export const LIVING_V3_WORLD_CONFIG: LivingV3WorldConfig = {
     {
       id: 'command-table',
       roomId: 'olympus-command',
-      label: 'Command Table',
-      role: 'Mission overview and Hermes task assignment surface.',
+      label: 'Hermes Command',
+      role: 'כתוב מטרה אחת. Hermes ינהל את הדרך.',
       bounds: { x: 24, y: 32, w: 24, h: 22 },
       operatorSpot: { x: 52, y: 58 },
       assetPath: livingV3AssetPath('stations/command-table.png'),
@@ -726,26 +725,14 @@ export const LIVING_V3_WORLD_CONFIG: LivingV3WorldConfig = {
     {
       id: 'mission-router',
       roomId: 'olympus-command',
-      label: 'Mission Router',
-      role: 'Routes packets to rooms without performing live external actions.',
-      bounds: { x: 54, y: 28, w: 22, h: 22 },
-      operatorSpot: { x: 50, y: 62 },
+      label: 'Mission Control',
+      role: 'Manage active tasks, room routing, agents, approvals, artifacts, and readbacks.',
+      bounds: { x: 54, y: 34, w: 26, h: 28 },
+      operatorSpot: { x: 52, y: 68 },
       assetPath: livingV3AssetPath('stations/mission-router.png'),
       frameCount: 8,
       badge: 'active-task',
       hermesIntent: 'command',
-    },
-    {
-      id: 'approval-dais',
-      roomId: 'olympus-command',
-      label: 'Approval Dais',
-      role: 'Manual approval packet gate.',
-      bounds: { x: 58, y: 66, w: 22, h: 20 },
-      operatorSpot: { x: 52, y: 76 },
-      assetPath: livingV3AssetPath('stations/approval-dais.png'),
-      frameCount: 8,
-      badge: 'approval',
-      hermesIntent: 'approval',
     },
     {
       id: 'agora-intake',
@@ -1033,7 +1020,7 @@ export const LIVING_V3_WORLD_CONFIG: LivingV3WorldConfig = {
       persona: 'Fast, clear, and safety-aware. Routes work without changing the body directly.',
       accent: '#73e2d5',
       home: { roomId: 'olympus-command', point: { x: 50, y: 72 } },
-      primaryStationIds: ['command-table', 'mission-router', 'approval-dais'],
+      primaryStationIds: ['command-table', 'mission-router'],
       visualStatus: 'primary-roaming-companion',
       ...expandedAgentAssets('hermes'),
     },
@@ -1259,7 +1246,7 @@ export const LIVING_V3_HIDDEN_AGENT_DEFINITIONS: Array<LivingV3AgentDefinition> 
     persona: 'Protective and numbers-first. Locks spend until the case is clear.',
     accent: '#ffc75f',
     home: { roomId: 'treasury-commerce', point: { x: 50, y: 72 } },
-    primaryStationIds: ['treasury-ledger', 'approval-dais'],
+    primaryStationIds: ['treasury-ledger'],
     ...borrowedAgentAssets('julius'),
   },
   {

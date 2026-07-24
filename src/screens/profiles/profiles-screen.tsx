@@ -183,8 +183,8 @@ export function ProfilesScreen() {
   }, [createOpen, wizardStep, allModels.length, fetchAllModels])
 
   useEffect(() => {
-    setDescriptionDraft(detailQuery.data?.profile?.description ?? '')
-  }, [detailQuery.data?.profile?.description, detailsName])
+    setDescriptionDraft(detailQuery.data?.profile.description ?? '')
+  }, [detailQuery.data?.profile.description, detailsName])
 
   const nameValid =
     /^[A-Za-z0-9_-]+$/.test(newProfileName.trim()) &&

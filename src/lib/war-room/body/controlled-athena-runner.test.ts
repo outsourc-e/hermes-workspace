@@ -35,6 +35,8 @@ describe('controlled agent runner helpers', () => {
       if (agentId === 'scout') {
         expect(prompt).toContain('Use only read-only web/search tools')
         expect(prompt).toContain('productScout')
+        expect(prompt).toContain('sourceDetails')
+        expect(prompt).toContain('variantOptions')
         expect(prompt).toContain('worker fan-out')
       } else if (agentId === 'smart-intake') {
         expect(prompt).toContain('Toolsets are none')
@@ -190,6 +192,49 @@ describe('controlled agent runner helpers', () => {
     }) + '\nsession_id: nested')
     expect(parsed).toMatchObject({ agentId: 'scout', confidence: 77 })
     expect((parsed.productScout as { candidates?: Array<unknown> }).candidates).toHaveLength(1)
+  })
+
+  it('normalizes scout source media and variants while rejecting unsafe URLs', () => {
+    const output = normalizeControlledAgentOutput('scout', {
+      status: 'completed_local_only',
+      productScout: {
+        query: 'ceramic tumbler',
+        candidates: [{
+          title: 'Stoneware tumbler',
+          niche: 'ceramic drinkware',
+          score: 78,
+          sourceUrls: ['https://www.etsy.com/listing/1/tumbler'],
+          sourceDetails: [
+            {
+              kind: 'etsy',
+              label: 'Etsy reference',
+              marketplace: 'Etsy',
+              url: 'https://www.etsy.com/listing/1/tumbler',
+              imageUrl: 'https://i.etsystatic.com/example.jpg',
+              variantOptions: ['Capacity: 6 fl oz', 'Capacity: 8 fl oz'],
+            },
+            {
+              kind: 'other',
+              label: 'Unsafe source',
+              marketplace: 'Unknown',
+              url: 'javascript:alert(1)',
+              imageUrl: 'javascript:alert(2)',
+            },
+          ],
+          evidence: ['public listing'],
+          missingFields: ['supplier proof'],
+          riskNotes: ['supplier match not verified'],
+        }],
+      },
+    })
+
+    expect(output.productScout?.candidates[0]?.sourceDetails).toEqual([
+      expect.objectContaining({
+        kind: 'etsy',
+        imageUrl: 'https://i.etsystatic.com/example.jpg',
+        variantOptions: ['Capacity: 6 fl oz', 'Capacity: 8 fl oz'],
+      }),
+    ])
   })
 
   it('normalizes generic output defensively', () => {

@@ -20,6 +20,7 @@ import {
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { useEffect, useState } from 'react'
+import type { WorkspaceRouteId } from '@/lib/workspace-navigation'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
@@ -28,7 +29,6 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { useSettingsStore } from '@/hooks/use-settings'
-import type { WorkspaceRouteId } from '@/lib/workspace-navigation'
 import {
   getWorkspaceNavigationItems,
   matchesWorkspaceRoute,

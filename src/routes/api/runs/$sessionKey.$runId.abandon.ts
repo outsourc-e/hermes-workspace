@@ -11,8 +11,8 @@ export const Route = createFileRoute('/api/runs/$sessionKey/$runId/abandon')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
 
-        const sessionKey = params.sessionKey?.trim()
-        const runId = params.runId?.trim()
+        const sessionKey = params.sessionKey.trim()
+        const runId = params.runId.trim()
         if (!sessionKey || !runId) {
           return json(
             { ok: false, error: 'sessionKey and runId required' },

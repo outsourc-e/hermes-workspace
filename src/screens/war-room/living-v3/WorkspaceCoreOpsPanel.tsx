@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { livingV3RoomById } from '../../../lib/war-room/living-v3/living-v3-contract'
 import type { CSSProperties, MouseEvent } from 'react'
 import type { WorkspaceCoreOpsNotification, WorkspaceCoreOpsSnapshot } from '../../../lib/workspace-core-ops'
-import { livingV3RoomById } from '../../../lib/war-room/living-v3/living-v3-contract'
 import type { LivingV3RoomId } from '../../../lib/war-room/living-v3/living-v3-contract'
 import './workspace-core-ops-panel.css'
 

@@ -124,7 +124,7 @@ describe('workspace kernel action router', () => {
 
     expect(result.blueprint.blueprintId).toBe('approval-gate-v1')
     expect(result.blueprint.roomId).toBe('olympus-command')
-    expect(result.blueprint.stationId).toBe('approval-dais')
+    expect(result.blueprint.stationId).toBe('mission-router')
     expect(result.approvalStatus).toBe('waiting_operator')
     expect(result.safety).toMatchObject({
       usageAllowed: false,

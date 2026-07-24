@@ -149,7 +149,7 @@ export function BackgroundRunsSection() {
               const isStale = run.stalenessMs >= STALE_THRESHOLD_MS
               const isBusy = busyRunId === run.runId
               const snippet =
-                run.lastAssistantText?.trim() ||
+                run.lastAssistantText.trim() ||
                 run.lastLifecycleEvent ||
                 (run.lastToolName ? `tool: ${run.lastToolName}` : '') ||
                 'no output yet'

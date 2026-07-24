@@ -1,0 +1,151 @@
+{
+  "assetId": "stoneware-ceramic-tumbler-688153021",
+  "title": "Stoneware Ceramic Tumbler 6oz/8oz Latte",
+  "createdAt": "2026-07-23T23:11:00+03:00",
+  "usage": "local read-only product research evidence; not listing-owned media",
+  "variants": [
+    {
+      "name": "Capacity",
+      "options": [
+        "6 Fluid ounces",
+        "8 Fluid ounces",
+        "10 Fluid ounces"
+      ],
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte"
+    }
+  ],
+  "items": [
+    {
+      "id": "etsy-01-hero",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-01-hero.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/0c09dc/3712958542/il_fullxfull.3712958542_anlt.jpg",
+      "altText": "A speckled ceramic mug with coffee on a saucer.",
+      "bytes": 972691,
+      "sha256": "d9f68b8b6a64feeece9ce89bd3353c0e07ee0e16bfbce314291c15cc04906e24"
+    },
+    {
+      "id": "etsy-02-pour",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-02-pour.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/24ef8b/4518767458/il_fullxfull.4518767458_t46i.jpg",
+      "altText": "Milk poured into the ceramic mug.",
+      "bytes": 2296919,
+      "sha256": "14ff2491230248a3d12f1a68579037ef07ca36fa561d1c8fbd7719739fbc469d"
+    },
+    {
+      "id": "etsy-03-detail",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-03-detail.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/25b2ea/7811714321/il_fullxfull.7811714321_6c2d.jpg",
+      "altText": "Ceramic tumbler source image.",
+      "bytes": 671422,
+      "sha256": "a543f847bd4c4460584bff5384ce1ec66a570867227758d394cb316bf4cfb80e"
+    },
+    {
+      "id": "etsy-04-size-set",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-04-size-set.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/051eb9/4382085226/il_fullxfull.4382085226_n07l.jpg",
+      "altText": "Ceramic vessels arranged by size.",
+      "bytes": 1054022,
+      "sha256": "2e83623b25aae1e4a6aae633bce1c7e241a6716e968da640ac9ac46a6e3c7676"
+    },
+    {
+      "id": "etsy-05-detail",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-05-detail.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/fe7cc4/7236568844/il_fullxfull.7236568844_8plh.jpg",
+      "altText": "Ceramic tumbler detail source image.",
+      "bytes": 422975,
+      "sha256": "357c6f5d61c7d8219189e2b696e11b81b20b7d6af8bedc51eeb8f15ad8a7a835"
+    },
+    {
+      "id": "etsy-06-coffee",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-06-coffee.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/dcc3a4/2957894224/il_fullxfull.2957894224_og1k.jpg",
+      "altText": "Speckled ceramic mug filled with coffee.",
+      "bytes": 123688,
+      "sha256": "e8516b6f5a636bd3a275f90bfc64bf0c2c6f4c9ec8e0b1faea1f95a44310caf0"
+    },
+    {
+      "id": "etsy-07-latte-art",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-07-latte-art.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/6437f7/2258754309/il_fullxfull.2258754309_2ahw.jpg",
+      "altText": "Latte art close-up in the ceramic mug.",
+      "bytes": 115378,
+      "sha256": "4677f93b2ddde904d05b481c346e9dde61eed763c2eee39caa2c4068426ef657"
+    },
+    {
+      "id": "etsy-08-pour-close",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-08-pour-close.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/74e48d/2211160558/il_fullxfull.2211160558_4yss.jpg",
+      "altText": "Close-up milk pour into the ceramic mug.",
+      "bytes": 102817,
+      "sha256": "8d49313fcc17fee6c2f177c4d3188a97ec5d011a1e69bd97b6580f8d13f8ab5b"
+    },
+    {
+      "id": "etsy-09-latte-leaf",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-09-latte-leaf.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/06ffe7/2258754253/il_fullxfull.2258754253_75gr.jpg",
+      "altText": "Leaf latte art in the ceramic mug.",
+      "bytes": 95254,
+      "sha256": "fb597f1814c01a45533a8a9977935835dd333aa60cb8fe12fe85ab4619c8516c"
+    },
+    {
+      "id": "etsy-10-barista",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-10-barista.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/c212e9/2211164940/il_fullxfull.2211164940_fysj.jpg",
+      "altText": "Barista pouring milk into a ceramic cup.",
+      "bytes": 97278,
+      "sha256": "30a891734385298c55e1073b3b48a7e8c6a763259b64cc52c5e9e8260ae99cb2"
+    },
+    {
+      "id": "etsy-11-packaging",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/etsy-11-packaging.jpg",
+      "sourceKind": "etsy",
+      "sourceLabel": "Etsy competitor",
+      "sourcePageUrl": "https://www.etsy.com/listing/688153021/stoneware-ceramic-tumbler-6oz8oz-latte",
+      "sourceImageUrl": "https://i.etsystatic.com/13724564/r/il/c00ba0/2241583500/il_fullxfull.2241583500_c0ct.jpg",
+      "altText": "Eco-friendly packaging evidence.",
+      "bytes": 240954,
+      "sha256": "937e719d4020a18b3ba6bcef9ffe662ff6838f319702442acb418e6db3f08511"
+    },
+    {
+      "id": "supplier-01-reference",
+      "ref": "/war-room/etsy-product-media/stoneware-ceramic-tumbler-688153021/supplier-01-reference.jpg",
+      "sourceKind": "supplier",
+      "sourceLabel": "AliExpress supplier lead",
+      "sourcePageUrl": "https://he.aliexpress.com/item/1005012292794867.html",
+      "sourceImageUrl": "https://ae01.alicdn.com/kf/S280e5f1c2e744613b1e33a07a785557cR.jpg",
+      "altText": "AliExpress supplier reference image; visual match not verified.",
+      "bytes": 179759,
+      "sha256": "4f9361b5ee3cbf53c33c415ab5802425941764f0bbf3928c66f65e520c4c8bac"
+    }
+  ]
+}

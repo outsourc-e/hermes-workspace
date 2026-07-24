@@ -2,18 +2,18 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import type {
-  WorkspaceApproval,
-  WorkspaceKernelPersistedState,
-  WorkspaceKernelTelemetrySnapshot,
-  WorkspaceRun,
-} from '../lib/workspace-kernel'
 import { workspaceExecutorPlanForRun, workspaceExecutorReadbackForRun } from '../lib/workspace-kernel/action-registry'
 import {
   createEmptyWorkspaceKernelPersistedState,
   mergeWorkspaceKernelRuns,
   prepareWorkspaceKernelPersistedState,
 } from '../lib/workspace-kernel/store'
+import type {
+  WorkspaceApproval,
+  WorkspaceKernelPersistedState,
+  WorkspaceKernelTelemetrySnapshot,
+  WorkspaceRun,
+} from '../lib/workspace-kernel'
 
 export type WorkspaceCorePersistenceProvider = 'supabase' | 'local-file'
 
@@ -187,12 +187,12 @@ function connectedSnapshot(input: {
   }
 }
 
-export async function workspaceSupabaseJson<Row>(
+export async function workspaceSupabaseJson<TRow>(
   config: SupabaseConfig,
   schema: 'workspace_core',
   pathAndQuery: string,
   init: RequestInit & { body?: BodyInit | null } = {},
-): Promise<Array<Row>> {
+): Promise<Array<TRow>> {
   const headers = new Headers(init.headers)
   headers.set('apikey', config.apiKey)
   headers.set('authorization', `Bearer ${config.apiKey}`)
@@ -215,7 +215,7 @@ export async function workspaceSupabaseJson<Row>(
   const text = await response.text()
   if (!text.trim()) return []
   const payload = JSON.parse(text) as unknown
-  return Array.isArray(payload) ? payload as Array<Row> : [payload as Row]
+  return Array.isArray(payload) ? payload as Array<TRow> : [payload as TRow]
 }
 
 export function stableWorkspaceCoreUuid(namespace: string, value: string): string {

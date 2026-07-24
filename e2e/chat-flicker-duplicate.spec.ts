@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 test.describe('Chat UI flicker #441', () => {
   test('chat messages should not contain duplicates after stream completion', async ({ page }) => {

@@ -70,7 +70,7 @@ describe('Etsy Ops room contract', () => {
     expect(Object.values(ETSY_OPS_AGENT_ANIMATION_MANIFESTS).every((manifest) => manifest.targetFrames === 96)).toBe(true)
     expect(Object.values(ETSY_OPS_AGENT_ANIMATION_MANIFESTS).every((manifest) => manifest.availableFrames === 96)).toBe(true)
     expect(Object.values(ETSY_OPS_AGENT_ANIMATION_MANIFESTS).every((manifest) => manifest.status === 'runtime-ready')).toBe(true)
-    expect(Object.values(ETSY_OPS_AGENT_ANIMATION_MANIFESTS).every((manifest) => manifest.bakedTextAllowed === false)).toBe(true)
+    for (const manifest of Object.values(ETSY_OPS_AGENT_ANIMATION_MANIFESTS)) expect(manifest.bakedTextAllowed).toBe(false)
     expect(ETSY_OPS_AGENT_ANIMATION_MANIFESTS['athena-market-strategist'].clips.every((clip) => clip.assetPath?.includes('/war-room/etsy-ops-v4/'))).toBe(true)
     expect(ETSY_OPS_AGENT_ANIMATION_MANIFESTS['hephaestus-shotlab-artificer'].clips.every((clip) => clip.assetPath?.includes('/war-room/etsy-ops-v4/'))).toBe(true)
     expect(ETSY_OPS_AGENT_ANIMATION_MANIFESTS['caesar-hermes-approval-commander'].clips.every((clip) => clip.assetPath?.includes('/war-room/etsy-ops-julius-v1/'))).toBe(true)
@@ -166,7 +166,7 @@ describe('Etsy Ops room contract', () => {
   })
 
   it('does not expose any policy that can mutate external systems live', () => {
-    expect(ETSY_OPS_ACTION_POLICIES.every((policy) => policy.liveExternalMutation === false)).toBe(true)
+    for (const policy of ETSY_OPS_ACTION_POLICIES) expect(policy.liveExternalMutation).toBe(false)
     expect(ETSY_OPS_ACTION_POLICIES.filter((policy) => policy.targetSystem === 'etsy-shop').every((policy) => policy.mode === 'manual-approval-packet')).toBe(true)
     expect(ETSY_OPS_ACTION_POLICIES.filter((policy) => policy.targetSystem === 'supplier-marketplace').every((policy) => policy.mode === 'manual-approval-packet')).toBe(true)
   })

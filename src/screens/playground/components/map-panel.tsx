@@ -14,7 +14,7 @@ type MapPanelProps = {
   playerPosition?: { x: number; y: number }
 }
 
-const ZONES: MapZone[] = [
+const ZONES: Array<MapZone> = [
   { id: 'agora', name: 'Agora Commons', x: 42, y: 38, w: 24, h: 22, accent: '#d9b35f', description: 'Market plaza and social hub.' },
   { id: 'forge', name: 'The Forge', x: 68, y: 18, w: 20, h: 21, accent: '#22d3ee', description: 'Crafting labs and prompt anvils.' },
   { id: 'grove', name: 'Grove of Echoes', x: 14, y: 26, w: 24, h: 24, accent: '#34d399', description: 'Bioluminescent music quests.' },

@@ -1711,7 +1711,7 @@ export function ChatScreen({
       void historyQuery.refetch()
     }, 2000)
     return () => window.clearTimeout(timer)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only
+  }, [])
 
   useEffect(() => {
     function handleSSEDrop() {
@@ -1911,7 +1911,7 @@ export function ChatScreen({
    * Response arrives via SSE stream, not via this function.
    */
   const sendMessage = useCallback(
-    function sendMessage(
+    function sendMessageTask(
       sessionKey: string,
       friendlyId: string,
       body: string,
@@ -2128,7 +2128,7 @@ export function ChatScreen({
   ])
 
   const retryQueuedMessage = useCallback(
-    function retryQueuedMessage(message: ChatMessage, mode: 'manual' | 'auto') {
+    function retryQueuedMessageTask(message: ChatMessage, mode: 'manual' | 'auto') {
       if (!isRetryableQueuedMessage(message)) return false
 
       const body = textFromMessage(message).trim()
@@ -2196,7 +2196,7 @@ export function ChatScreen({
   )
 
   const flushRetryableMessages = useCallback(
-    function flushRetryableMessages() {
+    function flushRetryableMessagesTask() {
       for (const message of finalDisplayMessages) {
         retryQueuedMessage(message, 'auto')
       }
@@ -2205,7 +2205,7 @@ export function ChatScreen({
   )
 
   const handleRetryMessage = useCallback(
-    function handleRetryMessage(message: ChatMessage) {
+    function handleRetryMessageTask(message: ChatMessage) {
       const retryKey = getRetryMessageKey(message)
       retriedQueuedMessageKeysRef.current.delete(retryKey)
       retryQueuedMessage(message, 'manual')
@@ -2214,13 +2214,6 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (false) {
-      // Server connection checks removed — Hermes Agent uses direct API
-      hasSeenDisconnectRef.current = true
-      retriedQueuedMessageKeysRef.current.clear()
-      return
-    }
-
     if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
       hasSeenDisconnectRef.current = false
       flushRetryableMessages()

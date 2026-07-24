@@ -3,8 +3,8 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { AtlantisVaultSnapshot } from '../../../lib/war-room/living-v3/atlantis-vault-contract'
 import { AtlantisVaultSurface } from './AtlantisVaultSurface'
+import type { AtlantisVaultSnapshot } from '../../../lib/war-room/living-v3/atlantis-vault-contract'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -136,7 +136,7 @@ async function renderSurface() {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  await React.act(async () => {
+  await React.act(() => {
     root.render(<AtlantisVaultSurface />)
   })
   await React.act(async () => {
@@ -145,7 +145,7 @@ async function renderSurface() {
   return {
     container,
     unmount: async () => {
-      await React.act(async () => root.unmount())
+      await React.act(() => root.unmount())
       document.body.removeChild(container)
     },
   }
@@ -155,7 +155,7 @@ describe('AtlantisVaultSurface', () => {
   it('loads the read-only Atlantis API and renders real-readback status without fake data labels', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => snapshot,
+      json: () => Promise.resolve(snapshot),
     })
     vi.stubGlobal('fetch', fetchMock)
 

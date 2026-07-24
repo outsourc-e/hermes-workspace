@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+
   ReservationValidationError,
   confirmReservation,
   countReservations,
   createReservation,
-  validateReservationInput,
-  type NameReservationStore,
+  validateReservationInput
 } from './name-reservations'
+import type {NameReservationStore} from './name-reservations';
 
 function makeStore(seed: {
   reservations?: Array<{
@@ -24,10 +25,10 @@ function makeStore(seed: {
   const reservations = [...(seed.reservations || [])]
 
   return {
-    async findByNormalizedName(normalizedName) {
-      return reservations.find((entry) => entry.normalizedName === normalizedName) || null
+    findByNormalizedName(normalizedName) {
+      return Promise.resolve(reservations.find((entry) => entry.normalizedName === normalizedName) || null)
     },
-    async insertReservation(input) {
+    insertReservation(input) {
       const created = {
         id: `res_${reservations.length + 1}`,
         desiredName: input.desiredName,
@@ -39,18 +40,18 @@ function makeStore(seed: {
         createdAt: '2026-05-06T12:00:00.000Z',
       }
       reservations.push(created)
-      return created
+      return Promise.resolve(created)
     },
-    async countReservations() {
-      return reservations.length
+    countReservations() {
+      return Promise.resolve(reservations.length)
     },
-    async confirmByToken(token) {
+    confirmByToken(token) {
       const found = reservations.find((entry) => entry.confirmationToken === token)
-      if (!found) return null
+      if (!found) return Promise.resolve(null)
       if (!found.confirmedAt) {
         found.confirmedAt = '2026-05-06T12:05:00.000Z'
       }
-      return found
+      return Promise.resolve(found)
     },
   }
 }
@@ -160,8 +161,9 @@ describe('createReservation', () => {
       },
       {
         store,
-        sendConfirmationEmail: async (payload) => {
+        sendConfirmationEmail: (payload) => {
           sent.push(payload)
+          return Promise.resolve()
         },
         baseUrl: 'https://hermes-world.ai',
         now: () => new Date('2026-05-06T12:00:00.000Z'),
@@ -183,7 +185,7 @@ describe('createReservation', () => {
 
   it('supports three sequential successful reservations', async () => {
     const store = makeStore()
-    const sent: string[] = []
+    const sent: Array<string> = []
     const attempts = [
       { desiredName: 'AtlasOne', email: 'player1@example.com', token: 'tok_1' },
       { desiredName: 'BeaconTwo', email: 'player2@example.com', token: 'tok_2' },
@@ -199,8 +201,9 @@ describe('createReservation', () => {
         },
         {
           store,
-          sendConfirmationEmail: async (payload) => {
+          sendConfirmationEmail: (payload) => {
             sent.push(payload.desiredName)
+            return Promise.resolve()
           },
           baseUrl: 'https://hermes-world.ai',
           now: () => new Date('2026-05-06T12:00:00.000Z'),

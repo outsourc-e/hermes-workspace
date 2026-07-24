@@ -64,7 +64,9 @@ function usesClaude(worker: WorkerHint): boolean {
     .includes('claude')
 }
 
-const APPROVED_WORKER_IDS = new Set(['chatgptheavy', 'workerkimi', 'swarm1', 'swarm6', 'swarm11', 'swarm12'])
+// Kimi is temporarily excluded from every executable Workspace route until DLV
+// explicitly re-enables it. Keep the profile/config/history intact for restore.
+const APPROVED_WORKER_IDS = new Set(['chatgptheavy', 'swarm1', 'swarm6', 'swarm11', 'swarm12'])
 
 function isDisabledWorker(worker: WorkerHint): boolean {
   const id = worker.id.toLowerCase()

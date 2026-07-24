@@ -344,14 +344,14 @@ export function useRealtimeChatHistory({
             const store = useChatStore.getState()
             const realtimeMessages =
               store.realtimeMessages.get(effectiveSessionKey) ?? []
-            const historyMessages = prevData?.messages as
+            const cachedHistoryMessages = prevData?.messages as
               | Array<unknown>
               | undefined
 
-            if (realtimeMessages.length > 0 && Array.isArray(historyMessages)) {
+            if (realtimeMessages.length > 0 && Array.isArray(cachedHistoryMessages)) {
               // Deduplicate: remove any realtime messages already in history
               const historyTexts = new Set(
-                historyMessages.map((m: unknown) => {
+                cachedHistoryMessages.map((m: unknown) => {
                   const raw = m as Record<string, unknown>
                   const content = raw.content ?? raw.text ?? ''
                   return `${raw.role ?? ''}:${JSON.stringify(content)}`
@@ -365,7 +365,7 @@ export function useRealtimeChatHistory({
               })
 
               if (dedupedRealtime.length > 0) {
-                const merged = [...historyMessages, ...dedupedRealtime].sort(
+                const merged = [...cachedHistoryMessages, ...dedupedRealtime].sort(
                   (a: unknown, b: unknown) => {
                     const aTs = (a as Record<string, unknown>).createdAt as
                       | number
@@ -408,8 +408,9 @@ export function useRealtimeChatHistory({
               if (completedAssistant) {
                 const refetchData =
                   queryClient.getQueryData<Record<string, unknown>>(key)
-                const refetchedMessages =
-                  (refetchData?.messages as Array<Record<string, unknown>>) ?? []
+                const refetchedMessages = Array.isArray(refetchData?.messages)
+                  ? refetchData.messages as Array<Record<string, unknown>>
+                  : []
                 const assistantTail = (completedAssistant.content ?? completedAssistant.text ?? '')
                   .toString()
                   .slice(-64)

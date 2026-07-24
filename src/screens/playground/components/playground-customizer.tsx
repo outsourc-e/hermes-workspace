@@ -4,17 +4,18 @@
  */
 import { useEffect, useState } from 'react'
 import {
-  AVATAR_PRESETS,
   ACCENT_COLORS,
+  AVATAR_PRESETS,
+
   EYE_COLORS,
   HAIR_COLORS,
   OUTFIT_COLORS,
   PORTRAITS,
   SKIN_TONES,
   loadAvatarConfig,
-  saveAvatarConfig,
-  type AvatarConfig,
+  saveAvatarConfig
 } from '../lib/avatar-config'
+import type {AvatarConfig} from '../lib/avatar-config';
 
 type Props = {
   open: boolean
@@ -34,8 +35,8 @@ export function PlaygroundCustomizer({ open, onClose, value, onChange }: Props) 
     if (open) setCfg(value ?? loadAvatarConfig())
   }, [open, value])
 
-  function update<K extends keyof AvatarConfig>(key: K, value: AvatarConfig[K]) {
-    const next = { ...cfg, [key]: value }
+  function update<TKey extends keyof AvatarConfig>(key: TKey, nextValue: AvatarConfig[TKey]) {
+    const next = { ...cfg, [key]: nextValue }
     setCfg(next)
     saveAvatarConfig(next)
     onChange?.(next)
@@ -43,7 +44,6 @@ export function PlaygroundCustomizer({ open, onClose, value, onChange }: Props) 
 
   function loadPreset(name: string) {
     const preset = AVATAR_PRESETS[name]
-    if (!preset) return
     setCfg(preset)
     saveAvatarConfig(preset)
     onChange?.(preset)
@@ -157,7 +157,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-function Swatches({ values, active, onPick }: { values: string[]; active: string; onPick: (v: string) => void }) {
+function Swatches({ values, active, onPick }: { values: Array<string>; active: string; onPick: (v: string) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {values.map((v) => (
@@ -177,7 +177,7 @@ function Swatches({ values, active, onPick }: { values: string[]; active: string
   )
 }
 
-function Toggles<T extends string>({ values, active, onPick }: { values: T[]; active: T; onPick: (v: T) => void }) {
+function Toggles<T extends string>({ values, active, onPick }: { values: Array<T>; active: T; onPick: (v: T) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {values.map((v) => (

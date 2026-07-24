@@ -2,7 +2,6 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { ControlledCouncilFollowUpResult, ControlledCouncilRoundResult, ControlledCouncilTurn } from './controlled-council-runner'
 import {
   clearActiveCouncilDiscussion,
   loadCouncilDrawingBoardStore,
@@ -10,6 +9,7 @@ import {
   recordCouncilReconsiderationRoundResult,
   recordCouncilRoundResult,
 } from './council-discussion-store'
+import type { ControlledCouncilFollowUpResult, ControlledCouncilRoundResult, ControlledCouncilTurn } from './controlled-council-runner'
 
 let tempDirs: Array<string> = []
 

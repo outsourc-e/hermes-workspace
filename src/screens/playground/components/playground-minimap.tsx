@@ -61,7 +61,7 @@ export function PlaygroundMinimap({ worldId, worldName, worldAccent }: Props) {
   useEffect(() => {
     let raf = 0
     let last = 0
-    const isMobile = window.matchMedia?.('(pointer: coarse), (max-width: 760px)').matches ?? false
+    const isMobile = window.matchMedia('(pointer: coarse), (max-width: 760px)').matches
     const minFrameMs = isMobile ? 1000 / 30 : 1000 / 60
     const sync = (now: number) => {
       if (now - last >= minFrameMs) {

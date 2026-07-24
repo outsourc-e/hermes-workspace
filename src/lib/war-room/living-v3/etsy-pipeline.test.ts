@@ -172,12 +172,12 @@ describe('Etsy Market Lab local product pipeline', () => {
 
     const lead = visibleEtsySupplierLeads(state)[0]
     state = saveEtsySupplierLead(state, lead, 13_000)
-    expect(activeEtsySupplierLead(state)?.leadId).toBe(lead.leadId)
+    expect(activeEtsySupplierLead(state).leadId).toBe(lead.leadId)
     expect(state.supplierLeads[0].saved).toBe(true)
 
     state = sendEtsySupplierLeadToAnubis(state, lead, 14_000)
     expect(state.stage).toBe('product_truth')
-    expect(activeEtsySupplierLead(state)?.sourceType).toBe(lead.sourceType)
+    expect(activeEtsySupplierLead(state).sourceType).toBe(lead.sourceType)
   })
 
   it('creates product truth, QA report, and a draft approval packet for the active product', () => {

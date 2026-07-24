@@ -11,7 +11,7 @@ type PlaygroundNpcGlbProps = {
   avatar?: string
 }
 
-function candidateUrls(avatar?: string): string[] {
+function candidateUrls(avatar?: string): Array<string> {
   const id = (avatar || 'villager-common').trim()
   const safe = id.replace(/[^a-z0-9_-]+/gi, '') || 'villager-common'
   return [

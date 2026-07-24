@@ -102,7 +102,7 @@ function mergeSettings(value: Partial<HermesWorldSettings> | null): HermesWorldS
 }
 
 function prefersReducedMotion() {
-  try { return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches } catch { return false }
+  try { return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false }
 }
 
 function withReducedMotionDefaults(settings: HermesWorldSettings, hasStoredSettings: boolean): HermesWorldSettings {
@@ -150,11 +150,11 @@ export function useHermesWorldSettings() {
     const onStorage = () => setSettings(loadHermesWorldSettings())
     const onChange = (event: Event) => {
       const detail = (event as CustomEvent<HermesWorldSettings>).detail
-      if (detail) setSettings(detail)
+      setSettings(detail)
     }
-    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
     const onMedia = () => {
-      if (!media?.matches) return
+      if (!media.matches) return
       update((current) => ({
         ...current,
         performance: { ...current.performance, reducedMotion: true },
@@ -163,11 +163,11 @@ export function useHermesWorldSettings() {
     }
     window.addEventListener('storage', onStorage)
     window.addEventListener('hermesworld-settings-changed', onChange)
-    media?.addEventListener?.('change', onMedia)
+    media.addEventListener('change', onMedia)
     return () => {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('hermesworld-settings-changed', onChange)
-      media?.removeEventListener?.('change', onMedia)
+      media.removeEventListener('change', onMedia)
     }
   }, [settings])
 

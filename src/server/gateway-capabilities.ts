@@ -688,7 +688,7 @@ const DASHBOARD_BACKED_APIS = new Set([
 
 export function getCapabilityWarningMessage(
   next: GatewayCapabilities,
-  criticalMissing: string[],
+  criticalMissing: Array<string>,
 ): string | null {
   if (criticalMissing.length === 0 || (!next.health && !next.dashboard.available)) {
     return null

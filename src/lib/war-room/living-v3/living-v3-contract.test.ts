@@ -63,6 +63,18 @@ function assertBridgeTouchesRoomEdges(bridge: LivingV3BridgeDefinition, from: Li
 }
 
 describe('Living War Room V3 contract', () => {
+  it('exposes exactly two Olympus tools: Hermes Command and Mission Control', () => {
+    const olympusStations = LIVING_V3_WORLD_CONFIG.stations.filter((station) => station.roomId === 'olympus-command')
+    expect(olympusStations.map((station) => [station.id, station.label])).toEqual([
+      ['command-table', 'Hermes Command'],
+      ['mission-router', 'Mission Control'],
+    ])
+    expect(WAR_ROOM_STATION_MANIFESTS.filter((station) => station.roomId === 'olympus-command').map((station) => station.stationId)).toEqual([
+      'command-table',
+      'mission-router',
+    ])
+  })
+
   it('uses only approved V3/current War Room art roots', () => {
     expect(LIVING_V3_WORLD_CONFIG.id).toBe('living-war-room-v3')
     expect(LIVING_V3_WORLD_CONFIG.assetRoot).toBe(LIVING_V3_ASSET_ROOT)

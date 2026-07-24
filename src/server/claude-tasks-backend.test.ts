@@ -9,8 +9,8 @@ async function loadBackend(options?: {
   cards?: Array<Record<string, unknown>>
   updatedCard?: Record<string, unknown> | null
 }) {
-  const listKanbanCards = vi.fn(async () => options?.cards ?? [])
-  const createKanbanCard = vi.fn(async (input) => ({
+  const listKanbanCards = vi.fn(() => Promise.resolve(options?.cards ?? []))
+  const createKanbanCard = vi.fn((input) => Promise.resolve({
     id: 'card-created',
     title: input.title,
     spec: input.spec ?? '',
@@ -24,7 +24,7 @@ async function loadBackend(options?: {
     createdAt: 1_700_000_000_000,
     updatedAt: 1_700_000_000_000,
   }))
-  const updateKanbanCard = vi.fn(async (_taskId, _updates) => options?.updatedCard ?? null)
+  const updateKanbanCard = vi.fn((_taskId, _updates) => Promise.resolve(options?.updatedCard ?? null))
   const getKanbanBackendMeta = vi.fn(() => ({
     id: 'hermes-proxy',
     label: 'Hermes Dashboard kanban',

@@ -51,7 +51,7 @@ export const WORKSPACE_DOMAIN_ROOM_MAP: Record<WorkspaceDomain, { roomId: Worksp
   'cad-3d-print': { roomId: 'terra-forge', label: 'Terra Forge' },
   'content-news': { roomId: 'gateway-cockpit', label: 'Gateway Cockpit' },
   'gateway-discord': { roomId: 'gateway-cockpit', label: 'Gateway Cockpit' },
-  approval: { roomId: 'olympus-command', label: 'Olympus Command / Approval Dais' },
+  approval: { roomId: 'olympus-command', label: 'Olympus Command / Mission Control · Approvals' },
   'agent-ops': { roomId: 'council-strategists', label: 'Council of Strategists' },
 }
 
@@ -454,7 +454,7 @@ export const WORKSPACE_BLUEPRINT_REGISTRY: Array<WorkspaceBlueprint> = [
     label: 'Approval Gate',
     domain: 'approval',
     roomId: 'olympus-command',
-    stationId: 'approval-dais',
+    stationId: 'mission-router',
     acceptedIntents: ['approval', 'publish', 'upload', 'purchase', 'paid action', 'live edit'],
     inputKinds: ['approval-request', 'freeform-text', 'generic-payload'],
     outputKinds: ['approval-packet'],

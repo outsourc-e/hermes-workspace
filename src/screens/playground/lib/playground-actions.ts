@@ -33,8 +33,8 @@ export type PlaygroundActionResult = {
   actor: PlaygroundActorRef
   message: string
   statePatch?: unknown
-  emittedEvents?: PlaygroundWorldEvent[]
-  suggestedNextActions?: PlaygroundAction[]
+  emittedEvents?: Array<PlaygroundWorldEvent>
+  suggestedNextActions?: Array<PlaygroundAction>
   errorCode?: 'invalid_action' | 'locked' | 'out_of_range' | 'missing_item' | 'cooldown' | 'not_found'
 }
 
@@ -68,15 +68,15 @@ export type PlaygroundAgentWorldState = {
   sp?: number
   activeQuestId?: string
   activeObjectiveId?: string
-  unlockedWorlds: PlaygroundWorldId[]
-  inventory: PlaygroundItemId[]
+  unlockedWorlds: Array<PlaygroundWorldId>
+  inventory: Array<PlaygroundItemId>
   equipped: Partial<Record<'weapon' | 'cloak' | 'head' | 'artifact', PlaygroundItemId>>
   nearby: Array<{
     id: string
     kind: 'npc' | 'player' | 'item' | 'portal' | 'objective' | 'enemy'
     label: string
     distance: number
-    verbs: PlaygroundAction['kind'][]
+    verbs: Array<PlaygroundAction['kind']>
   }>
 }
 

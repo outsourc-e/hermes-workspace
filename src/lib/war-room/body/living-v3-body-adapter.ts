@@ -83,7 +83,7 @@ function approvalStationId(approval: ApprovalRequest, state: WarRoomBodyState): 
   if (approval.stationId && livingV3StationById(approval.stationId)) return approval.stationId
   const agent = state.agents.find((candidate) => candidate.agentId === approval.agentId)
   if (agent?.stationId && livingV3StationById(agent.stationId)) return agent.stationId
-  return 'approval-dais'
+  return 'mission-router'
 }
 
 function bodyApprovalToLivingApproval(approval: ApprovalRequest, state: WarRoomBodyState): LivingV3ApprovalPacket {

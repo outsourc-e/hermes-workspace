@@ -65,6 +65,11 @@ function fmtAge(ts?: number) {
   return `${Math.floor(minutes / 60)}h ago`
 }
 
+function worldLabel(worldId?: string) {
+  if (!worldId) return 'unknown'
+  return WORLD_LABELS[worldId] ?? worldId
+}
+
 export function PlaygroundAdminPanel() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -75,7 +80,7 @@ export function PlaygroundAdminPanel() {
       try {
         const r = await fetch('/api/playground-admin', { cache: 'no-store' })
         const data = (await r.json()) as AdminStats
-        if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`)
+        if (!r.ok || data.ok === false) throw new Error(data.error || `HTTP ${r.status}`)
         if (!cancelled) {
           setStats(data)
           setError(null)
@@ -176,7 +181,7 @@ export function PlaygroundAdminPanel() {
                         {player.chats > 0 ? <span className="rounded bg-cyan-300/12 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-cyan-100">chatter</span> : null}
                       </div>
                       <div className="mt-0.5 truncate text-[10px] text-white/45">
-                        {WORLD_LABELS[player.lastWorld || ''] ?? player.lastWorld ?? 'unknown'} · {fmtAge(player.lastSeen)} · joined {player.joins}x · chats {player.chats}
+                        {worldLabel(player.lastWorld)} · {fmtAge(player.lastSeen)} · joined {player.joins}x · chats {player.chats}
                       </div>
                     </div>
                     <div className="text-right text-[10px] text-white/42">

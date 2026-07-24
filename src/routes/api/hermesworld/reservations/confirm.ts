@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import {
+  ReservationValidationError,
   confirmReservation,
   createSupabaseReservationStore,
-  ReservationValidationError,
 } from '@/server/name-reservations'
 import { safeErrorMessage } from '@/server/rate-limit'
 

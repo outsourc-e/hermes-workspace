@@ -102,7 +102,7 @@ export function AgentChatModal({
   )
 
   const loadHistory = useCallback(
-    async function loadHistory() {
+    async function loadHistoryTask() {
       if (!open || isDemoModeRef.current) return
 
       try {

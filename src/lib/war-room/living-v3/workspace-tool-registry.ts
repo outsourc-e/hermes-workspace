@@ -148,7 +148,7 @@ export const WORKSPACE_TOOL_REGISTRY: Array<WorkspaceToolContract> = [
     ],
     allowedActions: ['route to existing local tool', 'explain missing tool', 'recommend local-only next step'],
     lockedActions: baseLockedActions,
-    owningSurface: { roomId: 'olympus-command', stationId: 'mission-router', label: 'Olympus Command / Mission Router' },
+    owningSurface: { roomId: 'olympus-command', stationId: 'mission-router', label: 'Olympus Command / Mission Control' },
     needs: noLiveNeeds,
   },
   {
@@ -279,7 +279,7 @@ export const WORKSPACE_TOOL_REGISTRY: Array<WorkspaceToolContract> = [
     ],
     allowedActions: ['review local approval packets'],
     lockedActions: baseLockedActions,
-    owningSurface: { roomId: 'olympus-command', stationId: 'approval-dais', label: 'Olympus Command / Approval Dais' },
+    owningSurface: { roomId: 'olympus-command', stationId: 'mission-router', label: 'Olympus Command / Mission Control · Approvals' },
     needs: { ...noLiveNeeds, approval: true },
   },
   {

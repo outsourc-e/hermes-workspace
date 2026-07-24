@@ -225,7 +225,7 @@ export function createInitialLivingV3HermesState(nowMs = Date.now()): LivingV3He
       {
         id: 'alert-live-approval-lock',
         roomId: 'olympus-command',
-        stationId: 'approval-dais',
+        stationId: 'mission-router',
         agentId: 'hermes',
         badge: 'approval',
         label: 'Live external action gate locked',
@@ -296,7 +296,7 @@ export function createInitialLivingV3HermesState(nowMs = Date.now()): LivingV3He
 
   return createLivingV3ApprovalPacket(state, {
     agentId: 'hermes',
-    stationId: 'approval-dais',
+    stationId: 'mission-router',
     label: 'Live external actions remain locked',
   }, nowMs + 900)
 }

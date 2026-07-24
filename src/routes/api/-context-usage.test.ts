@@ -1,22 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../server/gateway-capabilities', () => ({
-  BEARER_TOKEN: '',
-  CLAUDE_API: 'http://127.0.0.1:8642',
-  dashboardFetch: vi.fn(),
-  ensureGatewayProbed: vi.fn(async () => ({ dashboard: { available: false } })),
-  getCapabilities: vi.fn(() => ({ dashboard: { available: false } })),
-}))
-
-vi.mock('../../server/claude-api', () => ({
-  listSessions: vi.fn(async () => []),
-}))
-
-vi.mock('../../server/local-session-store', () => ({
-  getLocalMessages: vi.fn(() => []),
-  getLocalSession: vi.fn(() => null),
-}))
-
 import {
   dashboardFetch,
   ensureGatewayProbed,
@@ -31,6 +14,23 @@ import {
   readContextUsage,
 } from '../../server/context-usage'
 
+vi.mock('../../server/gateway-capabilities', () => ({
+  BEARER_TOKEN: '',
+  CLAUDE_API: 'http://127.0.0.1:8642',
+  dashboardFetch: vi.fn(),
+  ensureGatewayProbed: vi.fn(() => Promise.resolve({ dashboard: { available: false } })),
+  getCapabilities: vi.fn(() => ({ dashboard: { available: false } })),
+}))
+
+vi.mock('../../server/claude-api', () => ({
+  listSessions: vi.fn(() => Promise.resolve([])),
+}))
+
+vi.mock('../../server/local-session-store', () => ({
+  getLocalMessages: vi.fn(() => []),
+  getLocalSession: vi.fn(() => null),
+}))
+
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.clearAllMocks()
@@ -38,8 +38,8 @@ afterEach(() => {
 
 describe('context usage estimation', () => {
   it('prefers live gateway runtime snapshots when the vanilla runtime endpoint is available', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response(
         JSON.stringify({
           model: 'anthropic/claude-sonnet-4-20250514',
           context_tokens: 4321,
@@ -50,7 +50,7 @@ describe('context usage estimation', () => {
           total_tokens: 133,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+      )),
     )
     vi.stubGlobal('fetch', fetchMock)
 
@@ -80,6 +80,7 @@ describe('context usage estimation', () => {
     ] as any)
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      await Promise.resolve()
       const url = String(input)
       if (url.includes('/api/sessions/session-abc/runtime')) {
         return new Response(
@@ -125,6 +126,7 @@ describe('context usage estimation', () => {
     } as any)
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      await Promise.resolve()
       const url = String(input)
       if (url.includes('/api/sessions/local-1/runtime')) {
         return new Response('not found', { status: 404 })
@@ -186,6 +188,7 @@ describe('context usage estimation', () => {
     ] as any)
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      await Promise.resolve()
       const url = String(input)
       if (url.includes('/api/sessions/local-mirror/runtime')) {
         return new Response('not found', { status: 404 })
@@ -237,7 +240,7 @@ describe('context usage estimation', () => {
       dashboard: { available: true },
     } as any)
 
-    const fetchMock = vi.fn(async () => new Response('not found', { status: 404 }))
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('not found', { status: 404 })))
     vi.stubGlobal('fetch', fetchMock)
     vi.mocked(dashboardFetch).mockResolvedValue(
       new Response(
@@ -293,7 +296,7 @@ describe('context usage estimation', () => {
       dashboard: { available: true },
     } as any)
 
-    const fetchMock = vi.fn(async () => new Response('not found', { status: 404 }))
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('not found', { status: 404 })))
     vi.stubGlobal('fetch', fetchMock)
     vi.mocked(dashboardFetch).mockResolvedValue(
       new Response(

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 test.describe('Chat thinking state #449', () => {
   test('should not show stale thinking state after page refresh for completed session', async ({ page }) => {

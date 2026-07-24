@@ -195,11 +195,27 @@ export const CONTROLLED_SMART_INTAKE_REQUIRED_BLOCKED_ACTIONS = [
   'worker fan-out',
 ] as const
 
+export type ControlledScoutSourceDetail = {
+  kind: 'etsy' | 'supplier' | 'other'
+  label: string
+  marketplace: string
+  url: string
+  title?: string | undefined
+  imageUrl?: string | undefined
+  priceText?: string | undefined
+  shopName?: string | undefined
+  salesText?: string | undefined
+  demandText?: string | undefined
+  tags: Array<string>
+  variantOptions: Array<string>
+}
+
 export type ControlledScoutCandidate = {
   title: string
   niche: string
   score: number | null
   sourceUrls: Array<string>
+  sourceDetails: Array<ControlledScoutSourceDetail>
   evidence: Array<string>
   missingFields: Array<string>
   riskNotes: Array<string>
@@ -402,7 +418,7 @@ export type ControlledAgentOutput = {
 
 export type ControlledAgentUsage = {
   mode: 'real_hermes_one_shot' | 'dry_run'
-  budget: 'one Hermes CLI model call, max-turns=1'
+  budget: 'one Hermes CLI model call, max-turns=1' | 'local routing only; 0 model calls'
   timeoutMs: number
   toolsets: string
   commandPreview: string
@@ -703,6 +719,45 @@ export function normalizeControlledSmartIntakeContext(input: {
   }
 }
 
+function cleanOptionalHttpUrl(value: unknown) {
+  const text = cleanTextLimit(value, '', 1_500)
+  if (!text) return undefined
+  try {
+    const parsed = new URL(text)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.toString() : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function normalizeControlledScoutSourceDetails(value: unknown): Array<ControlledScoutSourceDetail> {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .map((item): ControlledScoutSourceDetail | null => {
+      const url = cleanOptionalHttpUrl(item.url)
+      if (!url) return null
+      const rawKind = cleanTextLimit(item.kind, 'other', 24).toLowerCase()
+      const kind: ControlledScoutSourceDetail['kind'] = rawKind === 'etsy' || rawKind === 'supplier' ? rawKind : 'other'
+      return {
+        kind,
+        label: cleanTextLimit(item.label, kind === 'etsy' ? 'Etsy reference' : kind === 'supplier' ? 'Supplier reference' : 'Public source', 80),
+        marketplace: cleanTextLimit(item.marketplace, kind === 'etsy' ? 'Etsy' : 'Public web', 80),
+        url,
+        title: cleanTextLimit(item.title, '', 180) || undefined,
+        imageUrl: cleanOptionalHttpUrl(item.imageUrl),
+        priceText: cleanTextLimit(item.priceText, '', 80) || undefined,
+        shopName: cleanTextLimit(item.shopName, '', 120) || undefined,
+        salesText: cleanTextLimit(item.salesText, '', 80) || undefined,
+        demandText: cleanTextLimit(item.demandText, '', 120) || undefined,
+        tags: cleanTextArray(item.tags, [], 12),
+        variantOptions: cleanTextArray(item.variantOptions, [], 24),
+      }
+    })
+    .filter((item): item is ControlledScoutSourceDetail => Boolean(item))
+    .slice(0, 8)
+}
+
 function normalizeControlledProductScout(value: unknown): ControlledProductScoutOutput | undefined {
   if (!value || typeof value !== 'object') return undefined
   const scout = value as Record<string, unknown>
@@ -714,6 +769,7 @@ function normalizeControlledProductScout(value: unknown): ControlledProductScout
       niche: cleanText(candidate.niche, 'jewelry opportunity'),
       score: cleanNullableScore(candidate.score),
       sourceUrls: cleanTextArray(candidate.sourceUrls, [], 5),
+      sourceDetails: normalizeControlledScoutSourceDetails(candidate.sourceDetails),
       evidence: cleanTextArray(candidate.evidence, [], 6),
       missingFields: cleanTextArray(candidate.missingFields, ['supplier proof', 'source product images', 'materials proof'], 8),
       riskNotes: cleanTextArray(candidate.riskNotes, ['No live action; verify supplier/source proof before handoff.'], 6),
@@ -885,7 +941,7 @@ Return JSON only with this shape:
     "answer": "short Hebrew answer for DLV",
     "recommendedRoute": {
       "roomId": "olympus-command | etsy-market-lab | terra-forge | oracle-signals | forge-hephaestus | merchant-harbor | atlantis-vault | treasury-commerce | gateway-cockpit | council-strategists | daedalus-workshop | pantheon-quarters",
-      "stationId": "command-table | mission-router | approval-dais | etsy-loki-product-hunt | terra-modeling-studio | terra-model-hunt | terra-printer-control | oracle-signal-basin | forge-workbench",
+      "stationId": "command-table | mission-router | etsy-loki-product-hunt | terra-modeling-studio | terra-model-hunt | terra-printer-control | oracle-signal-basin | forge-workbench",
       "workerProfileId": "hermes-command | terra/Terra | loki/Loki | thor/Thor | odin/Odin | codex | scout",
       "actionLabel": "button/action label"
     },
@@ -1155,6 +1211,7 @@ Return JSON only with these exact top-level keys:
         "niche": "specific jewelry niche",
         "score": 0-100,
         "sourceUrls": ["https://public-read-only-source.example"],
+        "sourceDetails": [{"kind":"etsy","label":"Etsy reference","marketplace":"Etsy","url":"https://public-read-only-source.example","title":"source title","imageUrl":"https://public-image.example/product.jpg","priceText":"$00.00","shopName":"source shop","salesText":"public sales text if visible","demandText":"public demand text if visible","tags":["tag"],"variantOptions":["Size: small"]}],
         "evidence": ["short evidence note tied to source"],
         "missingFields": ["supplier proof", "source product images"],
         "riskNotes": ["truthful risk note"]

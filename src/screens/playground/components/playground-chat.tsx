@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { useWorkspaceStore } from '@/stores/workspace-store'
-import type { PlaygroundWorldId } from '../lib/playground-rpg'
 import { botsFor } from '../lib/playground-bots'
+import type { PlaygroundWorldId } from '../lib/playground-rpg'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 
 export type ChatMessage = {
   id: string
@@ -14,7 +14,7 @@ export type ChatMessage = {
 
 type Props = {
   worldId: PlaygroundWorldId
-  messages: ChatMessage[]
+  messages: Array<ChatMessage>
   onSend: (body: string) => void
   collapsed?: boolean
   onToggle?: () => void
@@ -63,8 +63,8 @@ function PlaygroundChatInner({ worldId, messages, onSend, collapsed = false, onT
   const liveConnected = transport === 'ws' || transport === 'both'
   const npcCount = botsFor(worldId).length
   const { humanMessages, npcMessages } = useMemo(() => {
-    const humans: ChatMessage[] = []
-    const npcs: ChatMessage[] = []
+    const humans: Array<ChatMessage> = []
+    const npcs: Array<ChatMessage> = []
     for (const message of messages) {
       if (typeof message.authorId === 'string' && message.authorId.startsWith('bot:')) npcs.push(message)
       else humans.push(message)

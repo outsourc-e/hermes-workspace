@@ -36,7 +36,7 @@ type HealthResponse = {
   workspaceModel: string | null
   agentApiUrl?: string | null
   claudeApiUrl?: string | null
-  workers: WorkerHealth[]
+  workers: Array<WorkerHealth>
   summary: {
     totalWorkers: number
     wrappersConfigured: number
@@ -45,9 +45,9 @@ type HealthResponse = {
     workersUsingFallback: number
     workersPrimaryAuthFailed: number
     degraded: boolean
-    warnings: string[]
-    distinctModels: string[]
-    distinctProviders: string[]
+    warnings: Array<string>
+    distinctModels: Array<string>
+    distinctProviders: Array<string>
   }
 }
 

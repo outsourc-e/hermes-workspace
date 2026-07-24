@@ -37,17 +37,16 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
   const [reachable, setReachable] = useState<boolean | null>(null)
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
 
     const onCount = (ev: Event) => {
       const detail = (ev as CustomEvent).detail as Stats
-      if (!detail) return
       setStats(detail)
       setReachable(true)
     }
     const onTransport = (ev: Event) => {
       const detail = (ev as CustomEvent).detail as Transport
-      if (detail) setTransport(detail)
+      setTransport(detail)
     }
     window.addEventListener('hermes-playground-count', onCount)
     window.addEventListener('hermes-playground-transport', onTransport)
@@ -60,7 +59,7 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
 
     // Fallback: one-shot /stats fetch if no push arrives in 3s.
     const fallbackId = window.setTimeout(async () => {
-      if (cancelled || stats) return
+      if (controller.signal.aborted || stats) return
       if (!STATS_URL) {
         setReachable(false)
         return
@@ -69,22 +68,25 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
         const r = await fetch(STATS_URL, { cache: 'no-store' })
         if (!r.ok) throw new Error(String(r.status))
         const data = (await r.json()) as Stats
-        if (cancelled) return
+        // AbortSignal may change while fetch is awaiting; static control-flow cannot model that.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (controller.signal.aborted) return
         setStats(data)
         setReachable(true)
       } catch {
-        if (cancelled) return
+        // AbortSignal may change while fetch is awaiting; static control-flow cannot model that.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (controller.signal.aborted) return
         setReachable(false)
       }
     }, 3000)
 
     return () => {
-      cancelled = true
+      controller.abort()
       window.clearTimeout(fallbackId)
       window.removeEventListener('hermes-playground-count', onCount)
       window.removeEventListener('hermes-playground-transport', onTransport)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Hide entirely when no stats URL configured AND no WS event ever arrived.

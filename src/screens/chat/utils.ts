@@ -1,3 +1,4 @@
+import { stripWorkspaceDirective } from '../../lib/workspace-message-scope'
 import type {
   ChatMessage,
   SessionMeta,
@@ -6,7 +7,6 @@ import type {
   SessionTitleStatus,
   ToolCallContent,
 } from './types'
-import { stripWorkspaceDirective } from '../../lib/workspace-message-scope'
 
 export function deriveFriendlyIdFromKey(key: string | undefined): string {
   if (!key) return 'main'
@@ -38,7 +38,7 @@ const KNOWN_CHANNELS = [
 function stripChannelPrefix(text: string): string {
   const match = text.match(CHANNEL_PREFIX_REGEX)
   if (!match) return text
-  const bracket = match[1] ?? ''
+  const bracket = match[1]
   // Strip if it contains a timestamp or known channel name
   const hasTimestamp =
     /\d{4}-\d{2}-\d{2}/.test(bracket) || /\d{2}:\d{2}/.test(bracket)

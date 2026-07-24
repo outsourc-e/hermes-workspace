@@ -19,7 +19,7 @@ describe('Etsy Ops living runtime', () => {
       'hephaestus-shotlab-artificer',
       'caesar-hermes-approval-commander',
     ])
-    expect(state.agents.every((agent) => agent.modelProfileId === 'chatgpt-5.5')).toBe(true)
+    for (const agent of state.agents) expect(agent.modelProfileId).toBe('chatgpt-5.5')
     expect(state.agents.every((agent) => agent.route.length >= 6)).toBe(true)
   })
 

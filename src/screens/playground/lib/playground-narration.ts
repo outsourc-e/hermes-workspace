@@ -14,7 +14,7 @@ import type { PlaygroundWorldId } from './playground-rpg'
 const STORAGE_KEY = 'hermes.playground.narration.played'
 const MUTE_KEY = 'hermes.playground.narration.muted'
 
-const NARRATION: Record<PlaygroundWorldId, { name: string; lines: string[] }> = {
+const NARRATION: Record<PlaygroundWorldId, { name: string; lines: Array<string> }> = {
   training: {
     name: 'Training Grounds',
     lines: [
@@ -148,7 +148,7 @@ export function cancelNarration() {
   state.utterance = null
 }
 
-export function speakLines(lines: string[], opts: { rate?: number; pitch?: number; volume?: number } = {}) {
+export function speakLines(lines: Array<string>, opts: { rate?: number; pitch?: number; volume?: number } = {}) {
   if (!state.enabled || state.muted) return
   if (typeof window === 'undefined') return
   cancelNarration()
@@ -175,7 +175,6 @@ export function autoNarrateWorld(world: PlaygroundWorldId): boolean {
   if (!state.enabled || state.muted) return false
   if (state.played.has(world)) return false
   const data = NARRATION[world]
-  if (!data) return false
   state.played.add(world)
   persistPlayed()
   // Slight delay so it doesn't collide with the world transition sound.
@@ -186,12 +185,11 @@ export function autoNarrateWorld(world: PlaygroundWorldId): boolean {
 /** Force-play a world's narration (e.g. from a "What is this?" button). */
 export function narrateWorldNow(world: PlaygroundWorldId) {
   const data = NARRATION[world]
-  if (!data) return
   speakLines(data.lines)
 }
 
-export function narrationLinesFor(world: PlaygroundWorldId): string[] {
-  return NARRATION[world]?.lines ?? []
+export function narrationLinesFor(world: PlaygroundWorldId): Array<string> {
+  return NARRATION[world].lines
 }
 
 /** Reset session-played state (useful for a fresh demo recording). */

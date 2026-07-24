@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { WorkspaceRun } from '../workspace-kernel'
 import { WORKSPACE_KERNEL_SAFETY } from '../workspace-kernel'
 import { buildWorkspaceCoreOpsSnapshot } from './workspace-core-ops'
+import type { WorkspaceRun } from '../workspace-kernel'
 
 function baseRun(overrides: Partial<WorkspaceRun> = {}): WorkspaceRun {
   return {

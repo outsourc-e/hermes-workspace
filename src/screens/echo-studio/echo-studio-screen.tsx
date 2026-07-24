@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import {  useState } from 'react'
+import type {ReactNode} from 'react';
 import { cn } from '@/lib/utils'
 
 type Tab = 'create' | 'manage' | 'theme'
@@ -57,11 +58,9 @@ export function EchoStudioScreen() {
       },
     }
     const t = templates[id]
-    if (t) {
-      setPageId(t.id)
-      setPageTitle(t.title)
-      setPrompt(t.prompt)
-    }
+    setPageId(t.id)
+    setPageTitle(t.title)
+    setPrompt(t.prompt)
   }
 
   return (
@@ -77,7 +76,7 @@ export function EchoStudioScreen() {
 
         {/* Tabs */}
         <div className="mb-6 flex gap-1 rounded-lg border border-primary-200 bg-primary-50/85 p-1 backdrop-blur-xl">
-          {(['create', 'manage', 'theme'] as Tab[]).map((t) => (
+          {(['create', 'manage', 'theme'] as Array<Tab>).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}

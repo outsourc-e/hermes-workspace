@@ -12,6 +12,48 @@ import {
   parseEtsyRoomIntentApiPayload,
   runEtsyRoomLocalIntentBridge,
 } from '../../../lib/war-room/body/etsy-room-event-bridge'
+import {
+  applySharedEtsyProductWorkspaceCommand,
+  loadSharedEtsyRoomStore,
+} from '../../../lib/war-room/body/etsy-room-shared-store'
+
+export async function runPersistedEtsyRoomLocalIntent(
+  input: Parameters<typeof runEtsyRoomLocalIntentBridge>[0],
+) {
+  const shared = await loadSharedEtsyRoomStore()
+  const bridgeResult = await runEtsyRoomLocalIntentBridge(input, shared.workspaceState.roomState)
+  if (!bridgeResult.ok) return { status: 400 as const, result: bridgeResult }
+  const commandResult = await applySharedEtsyProductWorkspaceCommand({
+    type: 'replace_projections',
+    commandId: `etsy-intent:${bridgeResult.correlationId}:${input.type}`,
+    baseRevision: shared.workspaceState.revision,
+    reason: `Etsy local intent: ${input.type}`,
+    roomState: bridgeResult.etsyRoomState,
+    pipelineState: shared.workspaceState.pipelineState,
+  }, { source: 'ui' })
+  if (commandResult.commandStatus === 'conflict') {
+    return {
+      status: 409 as const,
+      result: {
+        ...bridgeResult,
+        ok: false,
+        error: `Etsy workspace revision conflict; expected ${commandResult.expectedRevision}.`,
+        commandStatus: commandResult.commandStatus,
+        workspaceState: commandResult.workspaceState,
+        etsyRoomState: commandResult.roomState,
+      },
+    }
+  }
+  return {
+    status: 200 as const,
+    result: {
+      ...bridgeResult,
+      commandStatus: commandResult.commandStatus,
+      workspaceState: commandResult.workspaceState,
+      etsyRoomState: commandResult.roomState,
+    },
+  }
+}
 
 export const Route = createFileRoute('/api/war-room/intents')({
   server: {
@@ -41,19 +83,19 @@ export const Route = createFileRoute('/api/war-room/intents')({
             const state = dispatchWarRoomIntent({ ...parsedAgentIntent.data, source: parsedAgentIntent.data.source ?? 'ui' })
             return json({ ok: true, state }, { status: 200, headers: { 'cache-control': 'no-store' } })
           }
-          let result
           if (parsedOracle.success) {
-            result = await runOracleScoutLocalBridge(parsedOracle.data)
-          } else if (parsedEtsy.success) {
-            result = await runEtsyRoomLocalIntentBridge(parsedEtsy.data)
-          } else {
-            return json({
-              ok: false,
-              error: 'Unsupported War Room intent.',
-              state: getWarRoomBodyState(),
-            }, { status: 400, headers: { 'cache-control': 'no-store' } })
+            const result = await runOracleScoutLocalBridge(parsedOracle.data)
+            return json(result, { status: result.ok ? 200 : 400, headers: { 'cache-control': 'no-store' } })
           }
-          return json(result, { status: result.ok ? 200 : 400, headers: { 'cache-control': 'no-store' } })
+          if (parsedEtsy.success) {
+            const persisted = await runPersistedEtsyRoomLocalIntent(parsedEtsy.data)
+            return json(persisted.result, { status: persisted.status, headers: { 'cache-control': 'no-store' } })
+          }
+          return json({
+            ok: false,
+            error: 'Unsupported War Room intent.',
+            state: getWarRoomBodyState(),
+          }, { status: 400, headers: { 'cache-control': 'no-store' } })
         } catch (error) {
           return json({
             ok: false,

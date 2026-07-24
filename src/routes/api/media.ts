@@ -60,7 +60,7 @@ function isAllowed(absPath: string): boolean {
 export const Route = createFileRoute('/api/media')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!requireLocalOrAuth(request)) {
           return new Response('Unauthorized', { status: 401 })
         }

@@ -52,7 +52,8 @@ describe('Wave chat RPG panels', () => {
     for (const reward of ['Founder Cape', 'Founder Banner', 'Aether x50', 'Coins x1000', 'Trader Agent Trial', 'Founder Title', 'Founder Pet']) {
       expect(screen.getByText(reward)).not.toBeNull()
     }
-    expect((screen.getByRole('button', { name: /claim founder vault/i }) as HTMLButtonElement).disabled).toBe(false)
+    const claimButton = screen.getByRole<HTMLButtonElement>('button', { name: /claim founder vault/i })
+    expect(claimButton.disabled).toBe(false)
   })
 
   it('exposes a storybook-style showcase with all four panels for dev server screenshots', () => {

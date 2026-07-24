@@ -148,6 +148,7 @@ describe('gateway-capabilities', () => {
     process.env.HERMES_DASHBOARD_URL = 'http://127.0.0.1:9120'
     // A default-port dashboard is up and would answer the auto-detect probe.
     fetchMock.mockImplementation(async (url: string) => {
+      await Promise.resolve()
       if (url === 'http://127.0.0.1:9119/api/status') {
         return new Response(JSON.stringify({ ok: true }), { status: 200 })
       }
@@ -177,7 +178,7 @@ describe('gateway-capabilities', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        text: async () => '<html><head><script>window.__HERMES_SESSION_TOKEN__="fresh-token";</script></head></html>',
+        text: () => Promise.resolve('<html><head><script>window.__HERMES_SESSION_TOKEN__="fresh-token";</script></head></html>'),
       })
 
       const mod = await loadMod()
@@ -193,7 +194,7 @@ describe('gateway-capabilities', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        text: async () => '<html><head><script>window.__HERMES_SESSION_TOKEN__="live-token";</script></head></html>',
+        text: () => Promise.resolve('<html><head><script>window.__HERMES_SESSION_TOKEN__="live-token";</script></head></html>'),
       })
 
       const mod = await loadMod()
@@ -205,7 +206,7 @@ describe('gateway-capabilities', () => {
       fetchMock.mockResolvedValue({
         ok: false,
         status: 500,
-        text: async () => 'Internal Server Error',
+        text: () => Promise.resolve('Internal Server Error'),
       })
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -222,7 +223,8 @@ describe('gateway-capabilities', () => {
   it('does not mark Conductor available when dashboard returns SPA HTML fallback', async () => {
     process.env.HERMES_API_URL = 'http://gateway.test'
     process.env.CLAUDE_DASHBOARD_URL = 'http://dashboard.test'
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const probeFetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      await Promise.resolve()
       const url = String(input)
       if (url === 'http://dashboard.test/api/status') {
         return new Response(JSON.stringify({ version: '0.12.0' }), {
@@ -267,14 +269,14 @@ describe('gateway-capabilities', () => {
         headers: { 'content-type': 'application/json' },
       })
     })
-    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('fetch', probeFetchMock)
 
     const mod = await loadMod()
     const caps = await mod.probeGateway({ force: true })
 
     expect(caps.dashboard.available).toBe(true)
     expect(caps.conductor).toBe(false)
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(probeFetchMock).toHaveBeenCalledWith(
       'http://dashboard.test/api/conductor/missions',
       expect.objectContaining({ method: 'GET' }),
     )
@@ -284,6 +286,7 @@ describe('gateway-capabilities', () => {
     process.env.HERMES_API_URL = 'http://gateway.test'
     process.env.CLAUDE_DASHBOARD_URL = 'http://dashboard.test'
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      await Promise.resolve()
       const url = String(input)
       if (url === 'http://dashboard.test/api/status') {
         return new Response(JSON.stringify({ version: '0.12.0' }), {

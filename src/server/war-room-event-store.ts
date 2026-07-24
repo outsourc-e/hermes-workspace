@@ -87,17 +87,17 @@ function snapshotState(events: Array<WarRoomEvent>): Array<WarRoomRoomSnapshot> 
 
     return {
       roomId,
-      updatedAt: latest?.timestamp ?? Date.now(),
-      status: latest?.state ?? 'info',
+      updatedAt: latest.timestamp,
+      status: latest.state,
       activeAgentCount: activeAgents.size,
       pendingActionCount,
       blockedCount,
-      lastSignal: latest?.title ?? 'No events yet',
+      lastSignal: latest.title,
       snapshot: {
         eventCount: roomEvents.length,
-        latestEventId: latest?.id ?? null,
-        latestSource: latest?.source ?? null,
-        latestEventType: latest?.eventType ?? null,
+        latestEventId: latest.id,
+        latestSource: latest.source,
+        latestEventType: latest.eventType,
       },
     }
   })

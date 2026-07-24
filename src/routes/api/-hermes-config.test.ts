@@ -48,7 +48,7 @@ afterEach(() => {
 
 async function loadHandlers(modulePath: string) {
   const mod = await import(modulePath)
-  return (mod as any).Route.server.handlers
+  return (mod).Route.server.handlers
 }
 
 describe('canonical /api/hermes-config route', () => {

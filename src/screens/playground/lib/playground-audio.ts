@@ -36,7 +36,11 @@ function applyMute() {
 function ensureContext() {
   if (typeof window === 'undefined') return null
   if (!audioContext) {
-    const Ctor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    const audioWindow = window as unknown as Omit<typeof window, 'AudioContext'> & {
+      AudioContext?: typeof AudioContext
+      webkitAudioContext?: typeof AudioContext
+    }
+    const Ctor = audioWindow.AudioContext || audioWindow.webkitAudioContext
     if (!Ctor) return null
     audioContext = new Ctor()
     masterGain = audioContext.createGain()
@@ -314,11 +318,7 @@ export const playgroundAudio = {
       void startTrainingAmbient()
       return
     }
-    if (zone === 'forge') {
-      void startForgeAmbient()
-      return
-    }
-    stopAmbient()
+    void startForgeAmbient()
   },
   getMuted() {
     mutedCache = readMuted()

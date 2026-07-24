@@ -29,7 +29,7 @@ function isTaskPriority(value: unknown): value is TaskPriority {
 export const Route = createFileRoute('/api/hermes-tasks')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

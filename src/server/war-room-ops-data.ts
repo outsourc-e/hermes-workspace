@@ -113,12 +113,12 @@ const WORKER_ROOM_BOOK: Record<string, Omit<WarRoomAgentWorkerSummary, 'status' 
   },
   workerkimi: {
     id: 'workerkimi',
-    label: 'Kimi K3 Worker',
+    label: 'Kimi K3 Worker — temporarily paused',
     role: 'Long-horizon coding, visual/code analysis, research and comparison',
     model: 'kimi-k3',
     provider: 'kimi-coding',
     roomId: 'oracle',
-    qualityRule: 'Frontier Kimi worker; manager still combines, verifies, and owns final actions.',
+    qualityRule: 'Configured history is preserved, but execution is blocked until DLV explicitly re-enables Kimi.',
   },
   swarm1: {
     id: 'swarm1',
@@ -161,16 +161,16 @@ const WORKER_ROOM_BOOK: Record<string, Omit<WarRoomAgentWorkerSummary, 'status' 
 const ROOM_LEAD_WORKER: Record<string, string> = {
   olympus: 'default',
   pantheon: 'chatgptheavy',
-  agora: 'workerkimi',
-  oracle: 'workerkimi',
+  agora: 'chatgptheavy',
+  oracle: 'chatgptheavy',
   harbor: 'swarm6',
   shotlab: 'swarm11',
   atlantis: 'swarm1',
   treasury: 'swarm12',
 }
 
-const APPROVED_SWARM_WORKERS = new Set(Object.keys(WORKER_ROOM_BOOK))
-const BLOCKED_SWARM_WORKERS = /^(workspace|dashboard|swarm4|swarm7|claude|managerclaude|anthropic)/i
+const APPROVED_SWARM_WORKERS = new Set(Object.keys(WORKER_ROOM_BOOK).filter((id) => id !== 'workerkimi'))
+const BLOCKED_SWARM_WORKERS = /^(workspace|dashboard|workerkimi|swarm4|swarm7|claude|managerclaude|anthropic)/i
 
 function asNumber(value: unknown, fallback = 0): number {
   const n = Number(value)

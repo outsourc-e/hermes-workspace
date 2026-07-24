@@ -1608,15 +1608,15 @@ export function useConductorGateway() {
 
       // native-swarm mode: local swarm workers handle the mission, no orchestrator session
       if (result.mode === 'native-swarm') {
-        const missionId = result.missionId ?? null
-        setMissionId(missionId)
+        const launchedMissionId = result.missionId ?? null
+        setMissionId(launchedMissionId)
         setMissionJobId(result.jobId ?? null)
-        setOrchestratorSessionKey(missionId)
-        if (missionId) {
+        setOrchestratorSessionKey(launchedMissionId)
+        if (launchedMissionId) {
           setMissionWorkerKeys((current) => {
-            if (current.has(missionId)) return current
+            if (current.has(launchedMissionId)) return current
             const next = new Set(current)
-            next.add(missionId)
+            next.add(launchedMissionId)
             return next
           })
         }

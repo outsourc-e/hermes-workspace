@@ -89,7 +89,7 @@ describe('workspace mission spine', () => {
     ])
     expect(spine.find((step) => step.stepId === 'council')).toMatchObject({ status: 'done', packetId: 'council-packet-3d' })
     expect(spine.find((step) => step.stepId === 'routed_room')).toMatchObject({ ownerAgentId: 'terra', roomId: 'terra-forge' })
-    expect(spine.find((step) => step.stepId === 'approval')).toMatchObject({ status: 'waiting', ownerAgentId: 'odin', roomId: 'olympus-command', stationId: 'approval-dais' })
+    expect(spine.find((step) => step.stepId === 'approval')).toMatchObject({ status: 'waiting', ownerAgentId: 'odin', roomId: 'olympus-command', stationId: 'mission-router' })
 
     const minds = workspaceAgentMindsForRun(run)
     expect(minds.map((mind) => mind.mindId)).toEqual([

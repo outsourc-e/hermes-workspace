@@ -70,6 +70,11 @@ import {
   visibleEtsySupplierLeads
 } from '../../../lib/war-room/living-v3/etsy-pipeline'
 import {
+  migrateEtsyProductWorkspaceStateV2,
+  parseEtsyProductWorkspaceStateV2,
+  replaceEtsyProductWorkspaceProjectionsLocally,
+} from '../../../lib/war-room/living-v3/etsy-product-model'
+import {
 
 
 
@@ -100,7 +105,6 @@ import {
 
   filterSheetIntakeProducts
 } from '../../../lib/war-room/living-v3/etsy-sheet-intake'
-import type {EtsySheetIntakeGalleryFilter, EtsySheetIntakeNormalizedProduct, EtsySheetIntakeRunManifest} from '../../../lib/war-room/living-v3/etsy-sheet-intake';
 import {
 
 
@@ -111,7 +115,6 @@ import {
   smartIntakeSourceKindLabels,
   smartIntakeStationLabels
 } from '../../../lib/war-room/living-v3/smart-intake-v2'
-import type {SmartIntakeImageItem, SmartIntakeMission} from '../../../lib/war-room/living-v3/smart-intake-v2';
 import {
 
 
@@ -119,13 +122,11 @@ import {
   recommendWorkspaceTool,
   routeWorkspaceToolIntent
 } from '../../../lib/war-room/living-v3/workspace-tool-registry'
-import type {WorkspaceToolContract, WorkspaceToolRoute} from '../../../lib/war-room/living-v3/workspace-tool-registry';
 import {
 
 
   routeWorkspaceStationActionEvent
 } from '../../../lib/war-room/living-v3/workspace-station-action-router'
-import type {WorkspaceStationActionRouterResult, WorkspaceStationUiAction} from '../../../lib/war-room/living-v3/workspace-station-action-router';
 import {
 
 
@@ -160,8 +161,6 @@ import {
   workspaceRunToLivingV3Task,
   workspaceRunToStationAction
 } from '../../../lib/workspace-kernel'
-import type {KernelAgentDisplayState, WorkspaceAgentMindProfile, WorkspaceArtifactKind, WorkspaceContextPacket, WorkspaceEvent, WorkspaceKernelPersistedState, WorkspaceKernelTelemetrySnapshot, WorkspacePacketMissionRailItem, WorkspacePacketMissionResult, WorkspaceRun} from '../../../lib/workspace-kernel';
-import type {WorkspaceCoreOpsNotification} from '../../../lib/workspace-core-ops';
 import { buildWorkspaceCoreOpsSnapshot } from '../../../lib/workspace-core-ops'
 import { bidiClassNameFor, textDirectionFor } from '../../../lib/war-room/living-v3/bidi-text'
 import { livingV3AdapterStateFromBodyRuntime } from '../../../lib/war-room/body/living-v3-body-adapter'
@@ -171,15 +170,16 @@ import {
 
 
   freezeWarRoomAgents,
+  applySharedEtsyProductWorkspaceCommandClient,
   readSharedEtsyRoomState,
   requestWarRoomApproval,
-  resetSharedEtsyRoomState,
+
   runControlledAgent,
   runEtsyLiveScoutClient,
   runEtsySheetIntakeClient,
   runLiveAgentChat,
   runOracleScoutLocalIntent,
-  saveSharedEtsyRoomState,
+
   sendEtsyRoomLocalIntent,
   sendWarRoomIntent,
   setWarRoomAgentsLocalOnly,
@@ -187,27 +187,36 @@ import {
   useWarRoomEvents,
   useWarRoomState
 } from '../../../hooks/use-war-room-body'
-import type {ControlledAgentUiResult, ControlledUiAgentId, EtsyLiveScoutClientResult, LiveAgentChatUiResult} from '../../../hooks/use-war-room-body';
 import { AgentWorkbenchPanel } from './AgentWorkbenchPanel'
 import { AtlantisVaultSurface } from './AtlantisVaultSurface'
 import { HermesCommandCockpit } from './HermesCommandCockpit'
 import { CouncilChamberSurface  } from './CouncilChamberSurface'
+import { EtsyProductMissionWorkspace } from './EtsyProductMissionWorkspace'
 import { GoblinAnalyticsShell } from './GoblinAnalyticsShell'
 import { OracleWorkbench } from './OracleWorkbench'
 import { PacketHandoffRail } from './PacketHandoffRail'
-import type { PacketHandoffRailStatus } from './PacketHandoffRail'
 import { StationWorkbenchHeader } from './StationWorkbenchHeader'
 import { TerraModelPrintStudio } from './TerraModelPrintStudio'
 import { WorkspaceCoreOpsPanel } from './WorkspaceCoreOpsPanel'
 import { WorkspacePipelineWorkbench } from './WorkspacePipelineWorkbench'
 import { WorkspaceStationCta } from './WorkspaceStationCta'
-import type {WorkspaceCoreOpsApprovalDecision, WorkspaceCoreOpsPersistenceView} from './WorkspaceCoreOpsPanel';
-import type {CouncilDecisionHandoff} from './CouncilChamberSurface';
 import { EtsyProductPrepWorkbench } from './EtsyProductPrepWorkbench'
+import type {WorkspaceCoreOpsApprovalDecision, WorkspaceCoreOpsPersistenceView} from './WorkspaceCoreOpsPanel';
+import type {CouncilDecisionHandoff, CouncilLaunchRequest} from './CouncilChamberSurface';
+import type { PacketHandoffRailStatus } from './PacketHandoffRail'
+import type { HermesCommandAgentSummary, HermesCommandMessage, HermesCommandTaskSummary } from './HermesCommandCockpit'
+import type {ControlledAgentUiResult, ControlledUiAgentId, EtsyLiveScoutClientResult, LiveAgentChatUiResult} from '../../../hooks/use-war-room-body';
+import type {WorkspaceCoreOpsNotification} from '../../../lib/workspace-core-ops';
+import type {KernelAgentDisplayState, WorkspaceAgentMindProfile, WorkspaceArtifactKind, WorkspaceContextPacket, WorkspaceEvent, WorkspaceKernelPersistedState, WorkspaceKernelTelemetrySnapshot, WorkspacePacketMissionRailItem, WorkspacePacketMissionResult, WorkspaceRun} from '../../../lib/workspace-kernel';
+import type {WorkspaceStationActionRouterResult, WorkspaceStationUiAction} from '../../../lib/war-room/living-v3/workspace-station-action-router';
+import type {WorkspaceToolContract, WorkspaceToolRoute} from '../../../lib/war-room/living-v3/workspace-tool-registry';
+import type {SmartIntakeImageItem, SmartIntakeMission} from '../../../lib/war-room/living-v3/smart-intake-v2';
+import type {EtsySheetIntakeGalleryFilter, EtsySheetIntakeNormalizedProduct, EtsySheetIntakeRunManifest} from '../../../lib/war-room/living-v3/etsy-sheet-intake';
 import type {EtsyPrepChatMemorySnippet} from './EtsyProductPrepWorkbench';
 import type {EtsyProductCandidate as EtsyRoomProductCandidate, EtsyRoomState} from '../../../lib/war-room/living-v3/etsy-room-contracts';
 import type {OracleAluraKeywordResult, OracleAluraSearchResult, OracleAluraSourceMode, OracleSignalPacket} from '../../../lib/war-room/living-v3/oracle-alura';
 import type {EtsyPipelineState, EtsyProductCandidate, EtsyProductSearchMode, EtsyQaStatus, EtsySupplierFilter, EtsySupplierLead, EtsyTruthField} from '../../../lib/war-room/living-v3/etsy-pipeline';
+import type {EtsyProductWorkspaceStateV2} from '../../../lib/war-room/living-v3/etsy-product-model';
 import type {EtsyMarketLabStationId} from '../../../lib/war-room/living-v3/etsy-station-apps';
 import type {LivingV3AgentSnapshot} from '../../../lib/war-room/living-v3/living-v3-runtime';
 import type {LivingV3HermesAdapterState} from '../../../lib/war-room/living-v3/hermes-adapter';
@@ -265,6 +274,7 @@ const INITIAL_OFFSET_MS = 12_000
 const INITIAL_VIEWPORT = { w: 1280, h: 820 }
 const ETSY_PIPELINE_STORAGE_KEY = 'war-room-etsy-market-lab-pipeline-v1'
 const ETSY_ROOM_STORAGE_KEY = 'war-room-etsy-market-lab-room-flow-v1'
+const ETSY_PRODUCT_WORKSPACE_STORAGE_KEY = 'war-room-etsy-product-workspace-v2'
 const LIVING_V3_MESSAGES_STORAGE_KEY = 'war-room-living-v3-chat-history-v1'
 const HERMES_COMMAND_PROMPT_STORAGE_KEY = 'war-room-hermes-command-prompt-v1'
 const HERMES_COMMAND_ACTION_RUN_STORAGE_KEY = 'war-room-hermes-command-action-run-v1'
@@ -311,7 +321,7 @@ function defaultLivingV3Messages(): Array<AgentMessage> {
       id: 'welcome-hermes',
       agentId: 'hermes',
       from: 'agent',
-      text: 'Hermes is the master router. Agents answer when you talk to them; if you ask for a real action, each agent stays in its own room and Hermes routes anything global.',
+      text: 'כתוב מטרה אחת. Hermes ינתב אותה לכלי, לסוכן או לחדר הנכון.',
     },
   ]
 }
@@ -493,6 +503,38 @@ function loadStoredEtsyRoomState() {
   }
 }
 
+function loadStoredEtsyProductWorkspaceState() {
+  const nowMs = Date.now()
+  if (typeof window === 'undefined') {
+    return migrateEtsyProductWorkspaceStateV2({
+      roomState: createInitialEtsyRoomState(nowMs),
+      pipelineState: createInitialEtsyPipelineState(),
+      nowMs,
+    })
+  }
+  try {
+    const raw = window.localStorage.getItem(ETSY_PRODUCT_WORKSPACE_STORAGE_KEY)
+    const parsed = raw ? parseEtsyProductWorkspaceStateV2(JSON.parse(raw), nowMs) : undefined
+    if (parsed && !isLegacyEtsyDemoState(parsed.roomState) && !isLegacyEtsyDemoState(parsed.pipelineState)) {
+      return parsed
+    }
+    if (raw) window.localStorage.removeItem(ETSY_PRODUCT_WORKSPACE_STORAGE_KEY)
+  } catch {
+    // Fall through to the deterministic V1 migration below.
+  }
+  return migrateEtsyProductWorkspaceStateV2({
+    roomState: loadStoredEtsyRoomState(),
+    pipelineState: loadStoredEtsyPipeline(),
+    nowMs,
+  })
+}
+
+function resolveEtsyProjectionState<T>(current: T, update: T | ((value: T) => T)) {
+  return typeof update === 'function'
+    ? (update as (value: T) => T)(current)
+    : update
+}
+
 const activityLabels: Record<LivingV3AgentSnapshot['activity'], string> = {
   idle: 'Idle',
   walking: 'Walking',
@@ -506,7 +548,7 @@ const activityLabels: Record<LivingV3AgentSnapshot['activity'], string> = {
 type ControlledRunStatus = 'idle' | 'running' | 'completed' | 'failed'
 type ControlledRunState = { status: ControlledRunStatus; label: string; runId?: string }
 type HermesCommandRunState = { status: ControlledRunStatus; label: string; result?: ControlledAgentUiResult | LiveAgentChatUiResult; answer?: string; error?: string }
-type HermesCommandActionRunStatus = 'idle' | 'running' | 'completed' | 'blocked' | 'failed'
+type HermesCommandActionRunStatus = 'idle' | 'running' | 'waiting_operator' | 'completed' | 'blocked' | 'failed'
 type HermesCommandActionRunCard = {
   runId: string
   status: HermesCommandActionRunStatus
@@ -2855,8 +2897,8 @@ type EtsyPipelineHandlers = {
   createQaReport: () => void
   setShotLabPreset: (value: EtsyRoomState['shotLabDraft']['preset']) => void
   setShotLabImageCount: (value: number) => void
-  setShotLabSourceImageRequirements: (value: string) => void
-  setShotLabVariantNotes: (value: string) => void
+  setShotLabSourceImageRequirements: (value: string | ((current: string) => string)) => void
+  setShotLabVariantNotes: (value: string | ((current: string) => string)) => void
   createShotLabHandoffPacket: () => void
   createSeoPacket: () => void
   createDraftPayload: () => void
@@ -3463,8 +3505,8 @@ function EtsyStationInteractionDeck({
 
 function EtsyMarketLabPrimaryWorkspace({
   selectedStation,
-  pipeline,
-  roomState,
+  workspaceState,
+  handlers,
   operatorLabel,
   operatorStatus,
   stationSurface,
@@ -3474,8 +3516,8 @@ function EtsyMarketLabPrimaryWorkspace({
   onResetPipeline,
 }: {
   selectedStation: LivingV3StationDefinition
-  pipeline: EtsyPipelineState
-  roomState: EtsyRoomState
+  workspaceState: EtsyProductWorkspaceStateV2
+  handlers: EtsyPipelineHandlers
   operatorLabel: string
   operatorStatus: string
   stationSurface: ReactNode
@@ -3484,100 +3526,31 @@ function EtsyMarketLabPrimaryWorkspace({
   onSelectStation: (stationId: EtsyMarketLabStationId) => void
   onResetPipeline: () => void
 }) {
-  const [proofOpen, setProofOpen] = useState(false)
-  const currentProduct = etsyWorkspaceProductTitle(pipeline, roomState)
-  const nextAction = etsyWorkspaceNextAction(pipeline, roomState)
-  const packetId = etsyWorkspacePacketId(roomState)
-  const stationMeta = etsyStationLibraryMeta(selectedStation.id)
-  const stageLabel = etsyRoomStageLabels[roomState.stage] ?? etsyPipelineStageLabel(pipeline.stage)
-  const receipt = roomState.lastReceipt ?? pipeline.lastReceipt ?? stationReceipt ?? 'No run yet'
-  const stationReady = etsyStationReadyState(selectedStation.id as EtsyMarketLabStationId, pipeline, roomState)
-  const activeArtifact = currentProduct
-  const activeNextAction = nextAction
   return (
-    <section
-      className="living-v3__etsy-workspace-mode living-v3__etsy-workspace-mode--canonical-desktop"
-      aria-label="Etsy Market Lab execution workspace"
-      data-etsy-workspace-mode="primary"
-      data-etsy-desktop-ui="single-frame-v1"
-      data-room-ownership="etsy-execution-only"
-      data-research-lab-primary="moved-to-goblin"
-      data-selected-station-id={selectedStation.id}
-      data-etsy-packet-id={packetId}
-      data-etsy-stage={roomState.stage}
-      style={styleVars({ '--etsy-station-accent': stationMeta.accent })}
-    >
-      <header className="living-v3__etsy-desktop-appbar">
-        <div className="living-v3__etsy-desktop-title">
-          <span>{stationMeta.toolNoun}</span>
-          <h2>{stationMeta.label}</h2>
-          <small>{stationReady.label} · {stageLabel}</small>
-        </div>
-        <div className="living-v3__etsy-desktop-context">
-          <span><b>Product</b>{activeArtifact}</span>
-          <span><b>Next</b>{activeNextAction}</span>
-          <span className="is-locked">Local only · live actions locked</span>
-          <button type="button" data-open-research-lab="goblin-opportunity-room" onClick={onOpenOpportunityResearch}>
-            Open Goblin Research
-          </button>
-        </div>
-      </header>
-
-      <nav className="living-v3__etsy-desktop-rail" aria-label="Etsy execution stages">
-        {ETSY_MARKET_LAB_STATION_IDS.map((stationId) => {
-          const station = livingV3StationById(stationId)
-          const meta = etsyStationLibraryMeta(stationId)
-          const readiness = etsyStationReadyState(stationId, pipeline, roomState)
-          return station ? (
-            <button
-              key={stationId}
-              className={selectedStation.id === stationId ? 'is-active' : ''}
-              type="button"
-              aria-label={`${meta.label}: ${readiness.label}`}
-              data-etsy-stage-link={stationId}
-              data-station-ready-state={readiness.state}
-              style={styleVars({ '--etsy-stage-accent': meta.accent })}
-              onClick={() => onSelectStation(stationId)}
-            >
-              <b aria-hidden="true">{meta.sigil}</b>
-              <span>{meta.tab}</span>
-              <small>{readiness.label}</small>
-            </button>
-          ) : null
-        })}
-      </nav>
-
-      <main className="living-v3__etsy-desktop-canvas" aria-label={`${stationMeta.label} workbench`}>
-        {stationSurface}
-        {stationReceipt && selectedStation.id !== 'etsy-loki-product-hunt' && (
-          <div
-            className="living-v3__etsy-workspace-receipt"
-            role="status"
-            data-hermes-action-bridge={stationReceipt.includes('Hermes Action Bridge V3') ? 'v3' : undefined}
-          >
-            {stationReceipt}
-          </div>
-        )}
-      </main>
-
-      <details
-        className="living-v3__etsy-desktop-proof"
-        data-etsy-context-collapsed={proofOpen ? 'false' : 'true'}
-        onToggle={(event) => setProofOpen(event.currentTarget.open)}
-      >
-        <summary>
-          <span>Context & proof</span>
-          <small>{operatorLabel} · {operatorStatus} · {packetId || 'no packet'}</small>
-        </summary>
-        <div className="living-v3__etsy-desktop-proof-grid">
-          <article><span>Product</span><b>{activeArtifact}</b></article>
-          <article><span>Next action</span><b>{activeNextAction}</b></article>
-          <article><span>Receipt</span><b>{receipt}</b></article>
-          <article><span>Boundaries</span><b>Research in Goblin · media in ShotLab · publish locked</b></article>
-          <button type="button" onClick={onResetPipeline}>Reset local pipeline</button>
-        </div>
-      </details>
-    </section>
+    <EtsyProductMissionWorkspace
+      selectedStationId={selectedStation.id as EtsyMarketLabStationId}
+      workspaceState={workspaceState}
+      operatorLabel={operatorLabel}
+      operatorStatus={operatorStatus}
+      stationSurface={stationSurface}
+      stationReceipt={stationReceipt}
+      actions={{
+        onOpenOpportunityResearch,
+        onSelectStation,
+        onResetPipeline,
+        selectCandidate: handlers.selectCandidate,
+        createTruthPacket: handlers.createTruthPacket,
+        setShotLabPreset: handlers.setShotLabPreset,
+        setShotLabImageCount: handlers.setShotLabImageCount,
+        setShotLabSourceImageRequirements: handlers.setShotLabSourceImageRequirements,
+        setShotLabVariantNotes: handlers.setShotLabVariantNotes,
+        createShotLabHandoffPacket: handlers.createShotLabHandoffPacket,
+        createSeoPacket: handlers.createSeoPacket,
+        createDraftPayload: handlers.createDraftPayload,
+        createDraftApprovalPacket: handlers.createDraftApprovalPacket,
+        updateQaItemStatus: handlers.updateQaItemStatus,
+      }}
+    />
   )
 }
 
@@ -3641,7 +3614,23 @@ function workspaceKernelDomainLabel(run: WorkspaceRun) {
   return blueprint?.domain ?? 'command'
 }
 
+function hermesCommandTaskStatus(status: WorkspaceRun['status']): HermesCommandTaskSummary['status'] {
+  if (status === 'waiting_approval') return 'waiting'
+  if (status === 'cancelled') return 'blocked'
+  return status
+}
+
+function hermesCommandTaskTitle(run: WorkspaceRun) {
+  const source = (run.actionInput.text?.trim() || run.actionSummary).replace(/\s+/g, ' ')
+  const withoutCounters = source.replace(/\s*;\s*(?:missing|locked)\s+\d+\b.*$/i, '')
+  const withoutFallbackOrigin = withoutCounters.replace(/\s+Origin\s+fallback[-\w;: ]*$/i, '')
+  return withoutFallbackOrigin.trim() || 'משימה ללא כותרת'
+}
+
 function CommandRoomManagerSurface({
+  surfaceMode,
+  onOpenHermesCommand,
+  onOpenMissionControl,
   prompt,
   onPromptChange,
   onRoute,
@@ -3654,6 +3643,9 @@ function CommandRoomManagerSurface({
   stationActionResult,
   hermesCommandRun,
   actionRun,
+  conversation,
+  onApproveCouncil,
+  onSkipCouncil,
   contextPacket,
   contextStatus,
   kernelTelemetry,
@@ -3679,6 +3671,9 @@ function CommandRoomManagerSurface({
   onRestAgent,
   onRunControlledAgent,
 }: {
+  surfaceMode: 'command' | 'mission-control'
+  onOpenHermesCommand: (taskId?: string) => void
+  onOpenMissionControl: () => void
   prompt: string
   onPromptChange: (value: string) => void
   onRoute: () => void
@@ -3691,6 +3686,9 @@ function CommandRoomManagerSurface({
   stationActionResult: WorkspaceStationActionRouterResult | null
   hermesCommandRun: HermesCommandRunState
   actionRun: HermesCommandActionRunCard
+  conversation: Array<HermesCommandMessage>
+  onApproveCouncil: () => void
+  onSkipCouncil: () => void
   contextPacket: WorkspaceContextPacket | null
   contextStatus: string | null
   kernelTelemetry: WorkspaceKernelTelemetrySnapshot | null
@@ -3741,6 +3739,7 @@ function CommandRoomManagerSurface({
   const actionStatusLabel: Record<HermesCommandActionRunStatus, string> = {
     idle: 'מוכן',
     running: 'בודק עכשיו',
+    waiting_operator: 'מחכה לך',
     completed: 'הסתיים',
     blocked: 'חסום בטוח',
     failed: 'נכשל בטוח',
@@ -3758,15 +3757,17 @@ function CommandRoomManagerSurface({
   }
   const commandFocusTitle = actionRun.status === 'running'
     ? 'Hermes בודק את זה עכשיו'
-    : actionRun.status === 'completed'
-      ? 'יש תשובה / תוצר'
-      : actionRun.status === 'blocked'
-        ? 'זה חסום — צריך לבנות יכולת'
-        : actionRun.status === 'failed'
-          ? 'נכשל בלי פעולה חיצונית'
-          : commandHasPrompt
-            ? 'מוכן להרצה'
-            : 'כתוב בקשה אחת במרכז'
+    : actionRun.status === 'waiting_operator'
+      ? 'החלטה שלך'
+      : actionRun.status === 'completed'
+        ? 'יש תשובה / תוצר'
+        : actionRun.status === 'blocked'
+          ? 'זה חסום — צריך לבנות יכולת'
+          : actionRun.status === 'failed'
+            ? 'נכשל בלי פעולה חיצונית'
+            : commandHasPrompt
+              ? 'מוכן להרצה'
+              : 'כתוב בקשה אחת במרכז'
   const commandFocusBody = hermesCommandAnswer
     ?? (actionRun.status !== 'idle' ? actionRun.readback : undefined)
     ?? stationActionResult?.route.stationHandoff.readback
@@ -3784,6 +3785,32 @@ function CommandRoomManagerSurface({
     actionStationLabel,
     commandActionAgentLabel,
   ].filter(Boolean).join(' · ')
+  const commandAgentSummaries: Array<HermesCommandAgentSummary> = agentRoster.map((agent) => ({
+    id: agent.agentId,
+    label: agent.label,
+    shortLabel: agent.shortLabel,
+    portraitPath: agent.portraitPath,
+    roomLabel: agent.roomLabel,
+    activityLabel: agent.activityLabel,
+    statusTone: agent.statusTone,
+    lastMessage: agent.lastMessage,
+  }))
+  const commandTaskSummaries: Array<HermesCommandTaskSummary> = kernelRuns
+    .slice(-8)
+    .reverse()
+    .map((run) => {
+      const displayState = kernelDisplayStates.find((display) => display.currentRunId === run.runId)
+      const visualAgent = displayState ? agentRoster.find((agent) => agent.agentId === displayState.agentId) : undefined
+      return {
+        id: run.runId,
+        title: hermesCommandTaskTitle(run),
+        status: hermesCommandTaskStatus(run.status),
+        roomLabel: livingV3RoomById(run.ownerRoomId)?.label ?? run.ownerRoomId,
+        agentLabel: visualAgent?.label ?? run.assignedWorkerProfileId ?? 'Hermes',
+        readback: run.readback,
+        updatedAtMs: run.updatedAtMs,
+      }
+    })
   return (
     <div
       className="living-v3__manager-shell living-v3__manager-shell--chat"
@@ -3805,24 +3832,25 @@ function CommandRoomManagerSurface({
       >
         <div className="living-v3__command-desk" data-command-desk-layout="action-v2">
           <HermesCommandCockpit
+            surfaceMode={surfaceMode}
+            onOpenHermesCommand={onOpenHermesCommand}
+            onOpenMissionControl={onOpenMissionControl}
             prompt={prompt}
             onPromptChange={onPromptChange}
             onRun={onAskHermesCommand}
-            canRun={canAskHermes}
-            runStatus={actionRun.status}
-            runLabel={hermesCommandRun.label}
-            frozen={frozen}
-            controlTitle={controlTitle}
-            focusMeta={commandFocusMeta}
+            runDisabled={!canAskHermes || actionRun.status === 'running'}
+            actionRun={actionRun}
             focusTitle={commandFocusTitle}
             focusBody={commandFocusBody}
-            focusNext={commandFocusNext}
-            actionIntent={actionRun.intent}
-            actionCapability={actionRun.capability}
-            assignedAgentId={actionRun.assignedAgentId}
-            targetRoomId={actionRun.targetRoomId}
-            targetStationId={actionRun.targetStationId}
-            hasHermesAnswer={Boolean(hermesCommandAnswer)}
+            conversation={conversation}
+            onApproveCouncil={onApproveCouncil}
+            onSkipCouncil={onSkipCouncil}
+            agents={commandAgentSummaries}
+            tasks={commandTaskSummaries}
+            activeAgentId={activeRosterRow?.agentId}
+            onSelectAgent={(agentId) => {
+              selectAgentInCommandRoster(agentId as LivingV3AgentId)
+            }}
             sourceDetails={(
             <>
               <PacketHandoffRail
@@ -3853,7 +3881,9 @@ function CommandRoomManagerSurface({
             </>
             )}
           />
-          <div className="living-v3__command-side-stack">
+          <details className="living-v3__command-side-stack living-v3__command-side-stack--collapsed">
+            <summary>פרטים טכניים</summary>
+            <div>
             <details className="living-v3__command-debug-drawer" data-command-debug-drawer="collapsed-v1">
               <summary>
                 <span>Agent team</span>
@@ -3967,7 +3997,8 @@ function CommandRoomManagerSurface({
               </LocalOnlyButton>
               </aside>
             </details>
-          </div>
+            </div>
+          </details>
         </div>
       </section>
       {(contextPacket || contextStatus) && (
@@ -5724,43 +5755,126 @@ export function LivingWarRoomV3({
     () => ({} as Record<LivingV3StationDefinition['id'], string>),
   )
   const [oracleSearch, setOracleSearch] = useState<OracleSearchUiState>(initialOracleSearchState)
-  const [etsyPipeline, setEtsyPipeline] = useState(loadStoredEtsyPipeline)
-  const [etsyRoomState, setEtsyRoomState] = useState(loadStoredEtsyRoomState)
+  const [etsyWorkspaceState, setEtsyWorkspaceState] = useState(loadStoredEtsyProductWorkspaceState)
+  const etsyWorkspaceStateRef = useRef(etsyWorkspaceState)
+  const etsyRoomState = etsyWorkspaceState.roomState
+  const etsyPipeline = etsyWorkspaceState.pipelineState
+  const etsyRoomStateRef = useRef(etsyRoomState)
+  const etsyWorkspaceSyncQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const etsyWorkspaceLocalMutationRef = useRef(0)
+  const etsyWorkspaceSyncedMutationRef = useRef(0)
   const bodyRuntimeEnabled = bodyRuntimeMode === 'body-runtime'
 
-  function etsyRoomHasVisibleSharedState(state: EtsyRoomState) {
+  function etsyWorkspaceHasVisibleSharedState(state: EtsyProductWorkspaceStateV2) {
     return Boolean(
-      state.prompt.trim()
-      || state.candidates.length
-      || state.selectedCandidateId
-      || state.selectedProductPacket
-      || state.shotLabHandoffPacket
-      || state.seoPacket
-      || state.draftPayload
-      || state.approvalPacket,
+      state.productOrder.length
+      || state.roomState.prompt.trim()
+      || state.pipelineState.candidates.length
+      || state.pipelineState.searchPacket
+      || state.pipelineState.productTruthPacket,
     )
   }
 
-  function shouldApplySharedEtsyRoomState(current: EtsyRoomState, shared: EtsyRoomState) {
-    if (!etsyRoomHasVisibleSharedState(shared)) return false
-    if (!etsyRoomHasVisibleSharedState(current)) return true
-    return shared.run.updatedAtMs >= current.run.updatedAtMs
+  function replaceEtsyWorkspaceLocally(
+    projections: { roomState?: EtsyRoomState; pipelineState?: EtsyPipelineState },
+    reason: string,
+    sync = true,
+  ) {
+    const current = etsyWorkspaceStateRef.current
+    const next = replaceEtsyProductWorkspaceProjectionsLocally(current, projections, Date.now())
+    etsyWorkspaceStateRef.current = next
+    etsyRoomStateRef.current = next.roomState
+    etsyWorkspaceLocalMutationRef.current += 1
+    setEtsyWorkspaceState(next)
+    if (sync) scheduleEtsyWorkspaceSync(reason)
+    return next
+  }
+
+  function setEtsyRoomState(
+    update: EtsyRoomState | ((current: EtsyRoomState) => EtsyRoomState),
+    options?: { reason?: string; sync?: boolean },
+  ) {
+    const current = etsyWorkspaceStateRef.current
+    const roomState = resolveEtsyProjectionState(current.roomState, update)
+    if (roomState === current.roomState) return
+    replaceEtsyWorkspaceLocally({ roomState }, options?.reason ?? 'Etsy room projection updated', options?.sync ?? true)
+  }
+
+  function setEtsyPipeline(update: EtsyPipelineState | ((current: EtsyPipelineState) => EtsyPipelineState)) {
+    const current = etsyWorkspaceStateRef.current
+    const pipelineState = resolveEtsyProjectionState(current.pipelineState, update)
+    if (pipelineState === current.pipelineState) return
+    replaceEtsyWorkspaceLocally({ pipelineState }, 'Etsy pipeline projection updated')
+  }
+
+  function applyAuthoritativeEtsyWorkspaceState(workspaceState: EtsyProductWorkspaceStateV2) {
+    const normalized = parseEtsyProductWorkspaceStateV2(workspaceState) ?? workspaceState
+    etsyWorkspaceStateRef.current = normalized
+    etsyRoomStateRef.current = normalized.roomState
+    setEtsyWorkspaceState(normalized)
+  }
+
+  function scheduleEtsyWorkspaceSync(reason: string) {
+    const request = etsyWorkspaceSyncQueueRef.current.then(async () => {
+      const sentMutation = etsyWorkspaceLocalMutationRef.current
+      if (etsyWorkspaceSyncedMutationRef.current >= sentMutation) return
+      const desired = etsyWorkspaceStateRef.current
+      const commandId = typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `etsy-workspace-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const result = await applySharedEtsyProductWorkspaceCommandClient({
+        type: 'replace_projections',
+        commandId,
+        baseRevision: desired.revision,
+        reason,
+        roomState: desired.roomState,
+        pipelineState: desired.pipelineState,
+      })
+      const authoritative = result.workspaceState
+      if (result.commandStatus === 'conflict') {
+        etsyWorkspaceSyncedMutationRef.current = etsyWorkspaceLocalMutationRef.current
+        applyAuthoritativeEtsyWorkspaceState(authoritative)
+        setStationActionReceipts((current) => ({
+          ...current,
+          'etsy-loki-product-hunt': `Sync conflict blocked safely at revision ${result.expectedRevision ?? authoritative.revision}. Server state restored; reapply the last local action.`,
+        }))
+        return
+      }
+      etsyWorkspaceSyncedMutationRef.current = sentMutation
+      if (etsyWorkspaceLocalMutationRef.current === sentMutation) {
+        applyAuthoritativeEtsyWorkspaceState(authoritative)
+      } else {
+        const local = etsyWorkspaceStateRef.current
+        const rebased = migrateEtsyProductWorkspaceStateV2({
+          roomState: local.roomState,
+          pipelineState: local.pipelineState,
+          nowMs: Date.now(),
+          previous: authoritative,
+          revision: authoritative.revision,
+          events: authoritative.events,
+          appliedCommandIds: authoritative.appliedCommandIds,
+        })
+        etsyWorkspaceStateRef.current = rebased
+        etsyRoomStateRef.current = rebased.roomState
+        setEtsyWorkspaceState(rebased)
+        scheduleEtsyWorkspaceSync('Rebased Etsy workspace update')
+      }
+    })
+    etsyWorkspaceSyncQueueRef.current = request.then(() => undefined, () => undefined)
+    void request.catch((error) => {
+      setStationActionReceipts((current) => ({
+        ...current,
+        'etsy-loki-product-hunt': `Shared workspace sync failed safely: ${error instanceof Error ? error.message : String(error)}`,
+      }))
+    })
   }
 
   function syncSharedEtsyRoomState(next: EtsyRoomState, reason: string) {
-    void saveSharedEtsyRoomState(next, reason)
-      .then((result) => {
-        if (!result.saved || result.empty) return
-        setEtsyRoomState((current) =>
-          shouldApplySharedEtsyRoomState(current, result.roomState) ? result.roomState : current,
-        )
-      })
-      .catch((error) => {
-        setStationActionReceipts((current) => ({
-          ...current,
-          'etsy-loki-product-hunt': `Shared room sync failed safely: ${error instanceof Error ? error.message : String(error)}`,
-        }))
-      })
+    if (next !== etsyWorkspaceStateRef.current.roomState) {
+      replaceEtsyWorkspaceLocally({ roomState: next }, reason)
+      return
+    }
+    scheduleEtsyWorkspaceSync(reason)
   }
 
   useEffect(() => {
@@ -5786,28 +5900,78 @@ export function LivingWarRoomV3({
     void readSharedEtsyRoomState()
       .then((result) => {
         if (cancelled) return
+        const local = etsyWorkspaceStateRef.current
         if (result.empty) {
-          if (etsyRoomHasVisibleSharedState(etsyRoomState)) {
-            syncSharedEtsyRoomState(etsyRoomState, 'Browser local Etsy room state migrated to shared store')
+          if (etsyWorkspaceHasVisibleSharedState(local)) {
+            etsyWorkspaceLocalMutationRef.current += 1
+            scheduleEtsyWorkspaceSync('Browser local Etsy V1 state migrated to the V2 shared workspace')
+          } else {
+            applyAuthoritativeEtsyWorkspaceState(result.workspaceState)
           }
           return
         }
-        if (etsyRoomHasVisibleSharedState(etsyRoomState) && etsyRoomState.run.updatedAtMs > result.roomState.run.updatedAtMs) {
-          syncSharedEtsyRoomState(etsyRoomState, 'Browser local Etsy room state was newer than shared store')
+        const authoritative = result.workspaceState
+        const serverHasPipeline = Boolean(
+          authoritative.pipelineState.candidates.length
+          || authoritative.pipelineState.searchPacket
+          || authoritative.pipelineState.productTruthPacket,
+        )
+        const localHasPipeline = Boolean(
+          local.pipelineState.candidates.length
+          || local.pipelineState.searchPacket
+          || local.pipelineState.productTruthPacket,
+        )
+        if (authoritative.revision === 0 && localHasPipeline && !serverHasPipeline) {
+          const migrated = migrateEtsyProductWorkspaceStateV2({
+            roomState: etsyWorkspaceHasVisibleSharedState(authoritative) ? authoritative.roomState : local.roomState,
+            pipelineState: local.pipelineState,
+            nowMs: Date.now(),
+            previous: authoritative,
+            revision: authoritative.revision,
+            events: authoritative.events,
+            appliedCommandIds: authoritative.appliedCommandIds,
+          })
+          applyAuthoritativeEtsyWorkspaceState(migrated)
+          etsyWorkspaceLocalMutationRef.current += 1
+          scheduleEtsyWorkspaceSync('Merged browser pipeline projection into the V2 shared workspace')
           return
         }
-        setEtsyRoomState((current) =>
-          shouldApplySharedEtsyRoomState(current, result.roomState) ? result.roomState : current,
-        )
+        etsyWorkspaceSyncedMutationRef.current = etsyWorkspaceLocalMutationRef.current
+        applyAuthoritativeEtsyWorkspaceState(authoritative)
         setStationActionReceipts((current) => ({
           ...current,
-          'etsy-loki-product-hunt': `Loaded shared Etsy room state: ${result.roomState.candidates.length} candidate${result.roomState.candidates.length === 1 ? '' : 's'}.`,
+          'etsy-loki-product-hunt': `Loaded Etsy V2 workspace revision ${authoritative.revision}: ${authoritative.productOrder.length} product${authoritative.productOrder.length === 1 ? '' : 's'}.`,
         }))
       })
       .catch(() => {
         // Shared room state is best-effort. The local browser state still works if the server store is unavailable.
       })
     return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const poll = () => {
+      void readSharedEtsyRoomState()
+        .then((result) => {
+          if (cancelled || result.empty) return
+          const current = etsyWorkspaceStateRef.current
+          const hasUnsyncedLocalWork = etsyWorkspaceLocalMutationRef.current > etsyWorkspaceSyncedMutationRef.current
+          if (!hasUnsyncedLocalWork && result.workspaceState.revision > current.revision) {
+            applyAuthoritativeEtsyWorkspaceState(result.workspaceState)
+            setStationActionReceipts((receipts) => ({
+              ...receipts,
+              'etsy-loki-product-hunt': `Synced Etsy V2 workspace revision ${result.workspaceState.revision} from another client.`,
+            }))
+          }
+        })
+        .catch(() => undefined)
+    }
+    const timer = window.setInterval(poll, 3_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [])
 
   useEffect(() => {
@@ -5840,6 +6004,7 @@ export function LivingWarRoomV3({
     initialControlledAgentRunStates,
   )
   const [managerPrompt, setManagerPrompt] = useState(loadStoredHermesCommandPrompt)
+  const [councilLaunchRequest, setCouncilLaunchRequest] = useState<CouncilLaunchRequest | null>(null)
   const [managerRoute, setManagerRoute] = useState<WorkspaceToolRoute | null>(null)
   const [managerStationActionResult, setManagerStationActionResult] = useState<WorkspaceStationActionRouterResult | null>(null)
   const [hermesCommandRun, setHermesCommandRun] = useState<HermesCommandRunState>({
@@ -6309,20 +6474,18 @@ export function LivingWarRoomV3({
   }, [etsyRoomState.candidates, etsyRoomState.selectedCandidateId])
 
   useEffect(() => {
+    etsyWorkspaceStateRef.current = etsyWorkspaceState
+    etsyRoomStateRef.current = etsyWorkspaceState.roomState
     try {
-      window.localStorage.setItem(ETSY_PIPELINE_STORAGE_KEY, JSON.stringify(etsyPipeline))
+      window.localStorage.setItem(ETSY_PRODUCT_WORKSPACE_STORAGE_KEY, JSON.stringify(etsyWorkspaceState))
+      if (etsyWorkspaceState.revision > 0) {
+        window.localStorage.removeItem(ETSY_PIPELINE_STORAGE_KEY)
+        window.localStorage.removeItem(ETSY_ROOM_STORAGE_KEY)
+      }
     } catch {
-      // Local persistence is best-effort only; the pipeline stays in component state.
+      // Local V2 persistence is best-effort; the server-authoritative workspace remains available.
     }
-  }, [etsyPipeline])
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(ETSY_ROOM_STORAGE_KEY, JSON.stringify(etsyRoomState))
-    } catch {
-      // Local persistence is best-effort only; the Hermes-ready room flow stays in component state.
-    }
-  }, [etsyRoomState])
+  }, [etsyWorkspaceState])
 
   useEffect(() => {
     try {
@@ -6447,7 +6610,9 @@ export function LivingWarRoomV3({
     || selectedStationUsesOracleWorkspace
   ))
   const selectedStationSuppressesGlobalOverlays = selectedStationUsesPrimaryWorkspace || selectedStationUsesGatewayLayer
-  const selectedStationIsCommandManager = selectedStation?.id === 'command-table' || selectedStation?.id === 'mission-router' || selectedStation?.id === 'approval-dais'
+  const selectedStationIsHermesCommand = selectedStation?.id === 'command-table'
+  const selectedStationIsMissionControl = selectedStation?.id === 'mission-router'
+  const selectedStationIsCommandManager = selectedStationIsHermesCommand || selectedStationIsMissionControl
   const commandFocusModeActive = selectedStationIsCommandManager
   const selectedEtsyOperatorId = selectedStationIsEtsy && selectedStation ? etsyMarketLabStationOperatorId(selectedStation.id) : null
   const selectedEtsyOperator = selectedEtsyOperatorId ? livingV3AgentById(selectedEtsyOperatorId) : null
@@ -7158,19 +7323,25 @@ export function LivingWarRoomV3({
     updater: (state: EtsyRoomState) => EtsyRoomState,
     apiIntent?: Parameters<typeof sendEtsyRoomLocalIntent>[0],
   ) {
-    const next = updater(etsyRoomState)
-    setEtsyRoomState(next)
+    const next = updater(etsyWorkspaceStateRef.current.roomState)
+    const backendPersists = Boolean(apiIntent && bodyRuntimeEnabled)
+    setEtsyRoomState(next, { reason: actionLabel, sync: !backendPersists })
     syncEtsyRoomKernelRuns(next, Date.now(), etsyKernelArtifactKindForAction(actionLabel))
-    syncSharedEtsyRoomState(next, actionLabel)
+    if (!backendPersists) syncSharedEtsyRoomState(next, actionLabel)
     recordEtsyStationAction(stationId, actionLabel, next.lastReceipt)
     if (apiIntent && bodyRuntimeEnabled) {
       void sendEtsyRoomLocalIntent(apiIntent)
         .then((result) => {
           if (result.etsyRoomState) {
             if (result.etsyRoomState.run.runId === next.run.runId) {
-              setEtsyRoomState(result.etsyRoomState)
+              if (result.workspaceState) {
+                etsyWorkspaceSyncedMutationRef.current = etsyWorkspaceLocalMutationRef.current
+                applyAuthoritativeEtsyWorkspaceState(result.workspaceState)
+              } else {
+                setEtsyRoomState(result.etsyRoomState, { reason: `${actionLabel} backend result` })
+                syncSharedEtsyRoomState(result.etsyRoomState, `${actionLabel} backend result`)
+              }
               syncEtsyRoomKernelRuns(result.etsyRoomState, Date.now(), etsyKernelArtifactKindForAction(actionLabel))
-              syncSharedEtsyRoomState(result.etsyRoomState, `${actionLabel} backend result`)
             } else {
               setStationActionReceipts((current) => ({
                 ...current,
@@ -7183,8 +7354,30 @@ export function LivingWarRoomV3({
         })
         .catch((error) => {
           setBodyActionError(error instanceof Error ? error.message : String(error))
+          void readSharedEtsyRoomState()
+            .then((shared) => {
+              etsyWorkspaceSyncedMutationRef.current = etsyWorkspaceLocalMutationRef.current
+              applyAuthoritativeEtsyWorkspaceState(shared.workspaceState)
+            })
+            .catch(() => undefined)
         })
     }
+  }
+
+  function updateShotLabDraftLocally(
+    patch: Partial<EtsyRoomState['shotLabDraft']> | ((current: EtsyRoomState['shotLabDraft']) => Partial<EtsyRoomState['shotLabDraft']>),
+    reason: string,
+  ) {
+    const current = etsyRoomStateRef.current
+    const resolvedPatch = typeof patch === 'function' ? patch(current.shotLabDraft) : patch
+    const next = {
+      ...current,
+      run: { ...current.run, updatedAtMs: Math.max(Date.now(), current.run.updatedAtMs + 1) },
+      shotLabDraft: { ...current.shotLabDraft, ...resolvedPatch },
+    }
+    etsyRoomStateRef.current = next
+    setEtsyRoomState(next)
+    syncSharedEtsyRoomState(next, reason)
   }
 
   function runSmartIntakeMission() {
@@ -7500,18 +7693,33 @@ export function LivingWarRoomV3({
     runScoutWorker: () => activateControlledAgentRun('scout'),
     runLiveScout: runEtsyLiveScout,
     resetPipeline: () => {
-      const initial = createInitialEtsyPipelineState()
-      const initialRoom = createInitialEtsyRoomState()
-      setEtsyPipeline(initial)
-      setEtsyRoomState(initialRoom)
-      void resetSharedEtsyRoomState('Local Etsy pipeline reset')
-      setStationActionReceipts((current) => ({ ...current, 'etsy-loki-product-hunt': 'Local Etsy pipeline reset. No external data was changed.' }))
-      try {
-        window.localStorage.removeItem(ETSY_PIPELINE_STORAGE_KEY)
-        window.localStorage.removeItem(ETSY_ROOM_STORAGE_KEY)
-      } catch {
-        // Local persistence reset is best-effort only.
-      }
+      const current = etsyWorkspaceStateRef.current
+      const commandId = typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `etsy-workspace-reset-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      setStationActionReceipts((receipts) => ({ ...receipts, 'etsy-loki-product-hunt': 'Resetting the shared Etsy V2 workspace…' }))
+      void applySharedEtsyProductWorkspaceCommandClient({
+        type: 'reset_workspace',
+        commandId,
+        baseRevision: current.revision,
+        reason: 'Operator reset the Etsy product workspace',
+      })
+        .then((result) => {
+          etsyWorkspaceSyncedMutationRef.current = etsyWorkspaceLocalMutationRef.current
+          applyAuthoritativeEtsyWorkspaceState(result.workspaceState)
+          setStationActionReceipts((receipts) => ({
+            ...receipts,
+            'etsy-loki-product-hunt': result.commandStatus === 'conflict'
+              ? 'Reset conflict blocked safely; the latest server workspace was restored.'
+              : 'Shared Etsy V2 workspace reset. No external marketplace data was changed.',
+          }))
+        })
+        .catch((error) => {
+          setStationActionReceipts((receipts) => ({
+            ...receipts,
+            'etsy-loki-product-hunt': `Workspace reset failed safely: ${error instanceof Error ? error.message : String(error)}`,
+          }))
+        })
     },
     evidenceLoading: false,
     selectCandidate: (candidateId) => {
@@ -7587,10 +7795,16 @@ export function LivingWarRoomV3({
     createQaReport: () => applyEtsyPipelineAction('etsy-thor-qa-review', 'Create QA Report', (current) =>
       createEtsyVisualQaReport(current),
     ),
-    setShotLabPreset: (value) => setEtsyRoomState((current) => ({ ...current, shotLabDraft: { ...current.shotLabDraft, preset: value } })),
-    setShotLabImageCount: (value) => setEtsyRoomState((current) => ({ ...current, shotLabDraft: { ...current.shotLabDraft, imageCount: value } })),
-    setShotLabSourceImageRequirements: (value) => setEtsyRoomState((current) => ({ ...current, shotLabDraft: { ...current.shotLabDraft, sourceImageRequirements: value } })),
-    setShotLabVariantNotes: (value) => setEtsyRoomState((current) => ({ ...current, shotLabDraft: { ...current.shotLabDraft, variantNotes: value } })),
+    setShotLabPreset: (value) => updateShotLabDraftLocally({ preset: value }, 'ShotLab preset updated locally'),
+    setShotLabImageCount: (value) => updateShotLabDraftLocally({ imageCount: value }, 'ShotLab image recipe updated locally'),
+    setShotLabSourceImageRequirements: (value) => updateShotLabDraftLocally(
+      (current) => ({ sourceImageRequirements: typeof value === 'function' ? value(current.sourceImageRequirements) : value }),
+      'ShotLab source requirements updated locally',
+    ),
+    setShotLabVariantNotes: (value) => updateShotLabDraftLocally(
+      (current) => ({ variantNotes: typeof value === 'function' ? value(current.variantNotes) : value }),
+      'ShotLab variant notes updated locally',
+    ),
     createShotLabHandoffPacket: () => {
       if (!etsyRoomState.selectedProductPacket) {
         recordEtsyStationAction('etsy-thor-shotlab-prep', 'Create ShotLab Handoff blocked', 'Choose a product before creating a ShotLab handoff.')
@@ -7809,14 +8023,14 @@ export function LivingWarRoomV3({
       createLivingV3ApprovalPacket(
         raiseLivingV3Alert(state, {
           roomId: 'olympus-command',
-          stationId: 'approval-dais',
+          stationId: 'mission-router',
           agentId: 'hermes',
           badge: 'approval',
           label: 'New local approval packet',
         }, createdAt),
         {
           agentId: 'hermes',
-          stationId: 'approval-dais',
+          stationId: 'mission-router',
           label: 'Manual operator approval required',
         },
         createdAt + 1,
@@ -7831,7 +8045,7 @@ export function LivingWarRoomV3({
         await requestWarRoomApproval({
           agentId: 'hermes',
           roomId: 'olympus-command',
-          stationId: 'approval-dais',
+          stationId: 'mission-router',
           reason: 'Manual operator approval required.',
           requestedAction: 'Operator local decision',
           allowedAction: 'Create local approval packet only',
@@ -7933,6 +8147,8 @@ export function LivingWarRoomV3({
           : output?.answer ?? result.result?.error ?? result.error ?? 'Hermes finished without parsed output.'
         const completedLabel = actionRun?.intent === 'terra_model_search'
           ? 'Hermes sent Terra to Model Hunt'
+          : actionRun?.intent === 'council_consultation_offer'
+            ? 'Hermes is waiting for your Council decision'
           : actionRun?.status === 'blocked_missing_capability'
             ? 'Missing tool — build plan ready'
             : `Hermes answered ${output?.confidence ?? '?'}%`
@@ -7945,7 +8161,9 @@ export function LivingWarRoomV3({
         })
         setHermesCommandActionRun({
           runId: actionRun?.actionRunId ?? result.runId ?? `command-${Date.now()}`,
-          status: actionRun?.status === 'blocked_missing_capability' || actionRun?.status === 'blocked_tool_error'
+          status: actionRun?.status === 'waiting_operator'
+            ? 'waiting_operator'
+            : actionRun?.status === 'blocked_missing_capability' || actionRun?.status === 'blocked_tool_error'
             ? 'blocked'
             : result.ok || actionRun
               ? 'completed'
@@ -8056,6 +8274,58 @@ export function LivingWarRoomV3({
 
   function askHermesCommand() {
     runHermesCommandPrompt(managerPrompt)
+  }
+
+  function approveCouncilConsultation() {
+    if (hermesCommandActionRun.intent !== 'council_consultation_offer' || hermesCommandActionRun.status !== 'waiting_operator') return
+    const approvedAt = Date.now()
+    setCouncilLaunchRequest({
+      requestId: `${hermesCommandActionRun.runId}-approved-${approvedAt}`,
+      topic: hermesCommandActionRun.prompt,
+      autoStart: true,
+    })
+    setHermesCommandActionRun((current) => ({
+      ...current,
+      status: 'completed',
+      assignedAgentId: 'julius',
+      readback: 'אישרת התייעצות. Hermes פתח את המועצה ומפקח על הדיון.',
+      visualNextStep: 'המועצה רצה עכשיו. בסיום ההחלטה תחזור ל-Hermes כתוכנית עבודה.',
+      updatedAtMs: approvedAt,
+    }))
+    setHermesCommandRun({ status: 'completed', label: 'Council consultation approved by DLV' })
+    setMessages((current) => [
+      ...current,
+      {
+        id: `hermes-council-approved-${approvedAt}`,
+        agentId: 'hermes' as const,
+        from: 'receipt' as const,
+        text: 'אישרת התייעצות. Hermes פתח את המועצה ומפקח על הדיון.',
+      },
+    ].slice(-LIVING_V3_MESSAGES_LIMIT))
+    focusRoom('council-strategists', { kind: 'station', id: 'council-table' })
+  }
+
+  function skipCouncilConsultation() {
+    if (hermesCommandActionRun.intent !== 'council_consultation_offer' || hermesCommandActionRun.status !== 'waiting_operator') return
+    const skippedAt = Date.now()
+    setCouncilLaunchRequest(null)
+    setHermesCommandActionRun((current) => ({
+      ...current,
+      status: 'completed',
+      readback: 'בחרת להמשיך בלי המועצה. לא הופעל אף Agent נוסף.',
+      visualNextStep: 'Hermes נשאר מנהל המשימה. אפשר לדייק את המטרה או לבחור פעולה אחרת.',
+      updatedAtMs: skippedAt,
+    }))
+    setHermesCommandRun({ status: 'completed', label: 'Council consultation skipped by DLV' })
+    setMessages((current) => [
+      ...current,
+      {
+        id: `hermes-council-skipped-${skippedAt}`,
+        agentId: 'hermes' as const,
+        from: 'receipt' as const,
+        text: 'ממשיכים בלי המועצה. לא הופעל אף Agent נוסף.',
+      },
+    ].slice(-LIVING_V3_MESSAGES_LIMIT))
   }
 
   function executeManagerRoute() {
@@ -8228,11 +8498,11 @@ export function LivingWarRoomV3({
       } else if (action.type === 'request_approval_local') {
         setStationActionReceipts((current) => ({
           ...current,
-          'approval-dais': action.reason,
+          'mission-router': action.reason,
         }))
         setAdapterState((state) => createLivingV3ApprovalPacket(state, {
           agentId: result.movement.agentId,
-          stationId: 'approval-dais',
+          stationId: 'mission-router',
           label: action.reason,
         }, createdAt))
       } else if (action.type === 'record_receipt') {
@@ -9160,8 +9430,8 @@ export function LivingWarRoomV3({
       {selectedStationUsesEtsyWorkspace && selectedStation && (
         <EtsyMarketLabPrimaryWorkspace
           selectedStation={selectedStation}
-          pipeline={etsyPipeline}
-          roomState={etsyRoomState}
+          workspaceState={etsyWorkspaceState}
+          handlers={etsyPipelineHandlers}
           operatorLabel={selectedEtsyOperator?.label ?? 'Local operator'}
           operatorStatus={activityLabels[selectedEtsyOperatorSnapshot?.activity ?? 'idle']}
           stationSurface={renderEtsyStationApp(selectedStation.id, etsyPipeline, etsyPipelineHandlers)}
@@ -9250,6 +9520,7 @@ export function LivingWarRoomV3({
 
       {selectedStationUsesCouncilWorkspace && (
         <CouncilChamberSurface
+          launchRequest={councilLaunchRequest}
           onTransferToHermes={transferCouncilDecisionToHermes}
         />
       )}
@@ -9389,6 +9660,13 @@ export function LivingWarRoomV3({
                 />
               ) : selectedStationIsCommandManager ? (
                 <CommandRoomManagerSurface
+                  surfaceMode={selectedStationIsMissionControl ? 'mission-control' : 'command'}
+                  onOpenHermesCommand={(taskId) => {
+                    const task = taskId ? workspaceKernelRuns.find((run) => run.runId === taskId) : undefined
+                    if (task) setManagerPrompt(`המשך את המשימה: ${hermesCommandTaskTitle(task)}`)
+                    focusRoom('olympus-command', { kind: 'station', id: 'command-table' })
+                  }}
+                  onOpenMissionControl={() => focusRoom('olympus-command', { kind: 'station', id: 'mission-router' })}
                   prompt={managerPrompt}
                   onPromptChange={setManagerPrompt}
                   onRoute={executeManagerRoute}
@@ -9401,6 +9679,12 @@ export function LivingWarRoomV3({
                   stationActionResult={managerStationActionResult}
                   hermesCommandRun={hermesCommandRun}
                   actionRun={hermesCommandActionRun}
+                  conversation={messages
+                    .filter((message) => message.agentId === 'hermes')
+                    .slice(-6)
+                    .map(({ id, from, text }) => ({ id, from, text }))}
+                  onApproveCouncil={approveCouncilConsultation}
+                  onSkipCouncil={skipCouncilConsultation}
                   contextPacket={obsidianContextPacket}
                   contextStatus={obsidianContextStatus}
                   kernelTelemetry={workspaceKernelTelemetry}

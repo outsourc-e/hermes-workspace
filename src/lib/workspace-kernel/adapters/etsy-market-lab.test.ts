@@ -38,7 +38,10 @@ describe('Etsy Market Lab workspace kernel adapter', () => {
     expect(artifactKinds).toContain('selected-product-packet')
     expect(result.runs).toHaveLength(2)
     expect(result.runs.every((run) => run.ownerRoomId === 'etsy-market-lab')).toBe(true)
-    expect(result.runs.every((run) => run.safety.usageAllowed === false && run.safety.workerSpawnAllowed === false)).toBe(true)
+    for (const run of result.runs) {
+      expect(run.safety.usageAllowed).toBe(false)
+      expect(run.safety.workerSpawnAllowed).toBe(false)
+    }
   })
 
   it('maps ShotLab, SEO, Draft, and Approval packets to kernel artifacts and approval state', () => {

@@ -125,10 +125,6 @@ export function getEtsyRoomBridgeState() {
   return etsyRoomBridgeState
 }
 
-function bridgeRunId() {
-  return `etsy-room-local-${Date.now().toString(36)}`
-}
-
 function latestRunEvents(runId: string) {
   return listWarRoomEvents().filter((event) => event.runId === runId)
 }
@@ -157,10 +153,12 @@ function newEvents(previous: EtsyRoomState, next: EtsyRoomState) {
   return next.events.filter((event) => !previousIds.has(event.eventId))
 }
 
-export async function runEtsyRoomLocalIntentBridge(
+export function runEtsyRoomLocalIntentBridge(
   input: EtsyRoomIntentApiPayload & { nowMs?: number },
-): Promise<EtsyRoomLocalBridgeResult> {
-  const runId = input.runId ?? etsyRoomBridgeState.run.runId ?? bridgeRunId()
+  baseState: EtsyRoomState = etsyRoomBridgeState,
+): EtsyRoomLocalBridgeResult {
+  const previous = baseState
+  const runId = input.runId ?? previous.run.runId
   const correlationId = input.correlationId ?? `${runId}-${input.type}`
   let clock = input.nowMs ?? Date.now()
   const tick = () => {
@@ -175,7 +173,6 @@ export async function runEtsyRoomLocalIntentBridge(
       runId,
     }, tick())
 
-    const previous = etsyRoomBridgeState
     const normalizedIntent: EtsyRoomLocalIntent = {
       ...input,
       runId,

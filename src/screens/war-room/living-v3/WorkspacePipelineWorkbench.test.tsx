@@ -14,7 +14,7 @@ describe('WorkspacePipelineWorkbench', () => {
     document.body.appendChild(container)
     const root = createRoot(container)
 
-    await React.act(async () => {
+    await React.act(() => {
       root.render(
         <WorkspacePipelineWorkbench
           id="test-shotlab"
@@ -61,7 +61,7 @@ describe('WorkspacePipelineWorkbench', () => {
     expect(container.querySelectorAll('[data-workspace-pipeline-output]').length).toBe(1)
     expect((container.querySelector('[data-pipeline-readback-collapsed="true"]') as HTMLDetailsElement).open).toBe(false)
 
-    await React.act(async () => root.unmount())
+    await React.act(() => root.unmount())
     document.body.removeChild(container)
   })
 })

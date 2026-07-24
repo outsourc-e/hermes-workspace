@@ -200,9 +200,11 @@ describe('Etsy Market Lab Hermes-ready room contracts', () => {
                 url: 'https://www.etsy.com/listing/123/gold-initial-necklace',
                 title: 'Gold Initial Pendant Gift Necklace',
                 imageUrl: 'https://img.example.com/gold-initial.jpg',
+                localImageRef: '/war-room/etsy-product-media/gold-initial.jpg',
                 priceText: '$38.00',
                 salesText: '420 sales',
                 tags: ['gold', 'initial', 'necklace'],
+                variantOptions: ['Initial: A', 'Initial: B'],
               },
               {
                 kind: 'supplier',
@@ -246,15 +248,20 @@ describe('Etsy Market Lab Hermes-ready room contracts', () => {
       nextHandoff: 'select_etsy_candidate_local',
       selected: false,
     })
-    expect(state.candidates[0].sourceDetails?.[0]).toMatchObject({ priceText: '$38.00', salesText: '420 sales', tags: ['gold', 'initial', 'necklace'] })
-    expect(state.candidates[0].imageRefs).toEqual(['https://img.example.com/gold-initial.jpg'])
-    expect(state.candidates[0].thumbnailRef).toBe('https://img.example.com/gold-initial.jpg')
+    expect(state.candidates[0].sourceDetails?.[0]).toMatchObject({
+      priceText: '$38.00',
+      salesText: '420 sales',
+      tags: ['gold', 'initial', 'necklace'],
+      variantOptions: ['Initial: A', 'Initial: B'],
+    })
+    expect(state.candidates[0].imageRefs).toEqual(['/war-room/etsy-product-media/gold-initial.jpg'])
+    expect(state.candidates[0].thumbnailRef).toBe('/war-room/etsy-product-media/gold-initial.jpg')
     expect(state.candidates[0].sourceDetails?.[1]).toMatchObject({ marketplace: 'AliExpress', priceText: '$4.20' })
 
     state = selectEtsyCandidateLocal(state, state.candidates[0].candidateId, 2_320)
     expect(state.stage).toBe('candidate_selected')
     expect(state.selectedProductPacket?.selectedProductTitle).toBe('Gold Initial Pendant Gift Necklace')
-    expect(state.selectedProductPacket?.thumbnailRef).toBe('https://img.example.com/gold-initial.jpg')
+    expect(state.selectedProductPacket?.thumbnailRef).toBe('/war-room/etsy-product-media/gold-initial.jpg')
     expect(state.selectedProductPacket?.lockedActions).toEqual(expect.arrayContaining([
       'Etsy publish',
       'Etsy upload draft',

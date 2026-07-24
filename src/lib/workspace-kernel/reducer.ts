@@ -314,7 +314,7 @@ export function requestWorkspaceApproval(state: WorkspaceKernelState, runId: str
     type: 'approval.requested',
     createdAtMs: approval.createdAtMs,
     roomId: 'olympus-command',
-    stationId: 'approval-dais',
+    stationId: 'mission-router',
     message: `Approval requested for ${approval.requestedAction}.`,
     payload: {
       riskClass: approval.riskClass,

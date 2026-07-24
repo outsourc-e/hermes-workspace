@@ -88,7 +88,6 @@ const TOOL_HINTS: Record<WorkspaceToolId, string> = {
 
 const STATION_HINTS: Partial<Record<LivingV3StationId, string>> = {
   'mission-router': TOOL_HINTS['command-room-manager'],
-  'approval-dais': TOOL_HINTS['approval-inbox'],
   'etsy-loki-product-hunt': TOOL_HINTS['smart-intake-v2'],
   'etsy-loki-source-leads': TOOL_HINTS['smart-intake-v2'],
   'etsy-thor-seo-metrics': TOOL_HINTS['seo-workbench'],
