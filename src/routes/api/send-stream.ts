@@ -46,6 +46,7 @@ import {
   createSyntheticLiveToolTracker,
 } from './-send-stream-live-tools'
 import { createSseHeartbeatLifecycle } from './-send-stream-heartbeat'
+import { createRunTerminalTransitionCoordinator } from './-send-stream-terminal'
 import type {
   OpenAICompatContentPart,
   OpenAICompatMessage,
@@ -424,6 +425,19 @@ export const Route = createFileRoute('/api/send-stream')({
           abortController.abort()
         }
 
+        const terminalRunTransition = createRunTerminalTransitionCoordinator({
+          sealTranscript: async () => {
+            await runTextBuffer?.seal()
+          },
+          persist: async (status, errorMessage) => {
+            const runId = persistedRunId
+            const runSessionKey = activeRunSessionKey
+            if (!runId || !runSessionKey) return
+            await (persistedRunReady ?? Promise.resolve())
+            await markRunStatus(runSessionKey, runId, status, errorMessage)
+          },
+        })
+
         // When the client hits Stop / navigates away / closes the tab, the
         // request.signal fires abort.  Stop the upstream agent (closeStream)
         // and clean up run tracking so we don't burn API credits on an orphan.
@@ -465,6 +479,7 @@ export const Route = createFileRoute('/api/send-stream')({
         const persistActiveRun = (
           write: (sessionKey: string, runId: string) => Promise<unknown>,
         ) => {
+          if (terminalRunTransition.isSealed()) return
           if (!activeRunId || !activeRunSessionKey) return
           const runId = activeRunId
           const runSessionKey = activeRunSessionKey
@@ -474,6 +489,7 @@ export const Route = createFileRoute('/api/send-stream')({
         }
 
         const persistRunText = (text: string, replace = false) => {
+          if (terminalRunTransition.isSealed()) return
           if (replace) runTextBuffer?.replace(text)
           else runTextBuffer?.append(text)
         }
@@ -482,21 +498,7 @@ export const Route = createFileRoute('/api/send-stream')({
           status: 'handoff' | 'complete' | 'error',
           errorMessage?: string,
         ): Promise<void> {
-          const runId = persistedRunId
-          const runSessionKey = activeRunSessionKey
-          const textBuffer = runTextBuffer
-          if (!runId || !runSessionKey) return
-          try {
-            await textBuffer?.flush()
-          } catch {
-            // Best effort: terminal status must still be persisted.
-          }
-          try {
-            await (persistedRunReady ?? Promise.resolve())
-            await markRunStatus(runSessionKey, runId, status, errorMessage)
-          } catch {
-            // Persistence must not break the response stream.
-          }
+          await terminalRunTransition.transition(status, errorMessage)
         }
 
         const stream = new ReadableStream({

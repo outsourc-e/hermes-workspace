@@ -80,6 +80,54 @@ describe('run text persistence buffer', () => {
     await vi.advanceTimersByTimeAsync(500)
     expect(write).toHaveBeenCalledTimes(1)
   })
+
+  it('retries a rejected batch before newer pending text in original order', async () => {
+    const { createRunTextPersistenceBuffer } = await import('./run-store')
+    const write = vi
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValueOnce(new Error('temporary persistence failure'))
+      .mockResolvedValue(null)
+    const buffer = createRunTextPersistenceBuffer(write)
+
+    buffer.replace('authoritative snapshot')
+    await expect(buffer.flush()).rejects.toThrow(
+      'temporary persistence failure',
+    )
+
+    buffer.append(' plus newer delta')
+    await buffer.flush()
+
+    expect(write.mock.calls).toEqual([
+      ['authoritative snapshot', { replace: true }],
+      ['authoritative snapshot', { replace: true }],
+      [' plus newer delta', { replace: false }],
+    ])
+  })
+
+  it('retries a timer-rejected batch during the terminal seal and rejects later text', async () => {
+    vi.useFakeTimers()
+    const { createRunTextPersistenceBuffer } = await import('./run-store')
+    const write = vi
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValueOnce(new Error('temporary persistence failure'))
+      .mockResolvedValue(null)
+    const buffer = createRunTextPersistenceBuffer(write)
+
+    buffer.append('persist me')
+    await vi.advanceTimersByTimeAsync(500)
+    buffer.append(' before terminal')
+
+    await buffer.seal()
+    buffer.append(' discarded after terminal')
+    await buffer.flush()
+
+    expect(write.mock.calls).toEqual([
+      ['persist me', { replace: false }],
+      ['persist me', { replace: false }],
+      [' before terminal', { replace: false }],
+    ])
+    expect(vi.getTimerCount()).toBe(0)
+  })
 })
 
 describe('run-store persistence', () => {

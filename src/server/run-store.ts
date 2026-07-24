@@ -159,17 +159,22 @@ export type RunTextPersistenceBuffer = {
   append: (text: string) => void
   replace: (text: string) => void
   flush: () => Promise<void>
+  seal: () => Promise<void>
 }
 
 const RUN_TEXT_PERSIST_INTERVAL_MS = 500
+
+type PendingRunTextBatch = { text: string; replace: boolean }
 
 export function createRunTextPersistenceBuffer(
   write: RunTextWriter,
   intervalMs = RUN_TEXT_PERSIST_INTERVAL_MS,
 ): RunTextPersistenceBuffer {
-  let pending: { text: string; replace: boolean } | null = null
+  let pending: PendingRunTextBatch | null = null
+  const queuedBatches: Array<PendingRunTextBatch> = []
   let flushTimer: ReturnType<typeof setTimeout> | null = null
-  let writeQueue = Promise.resolve()
+  let writeQueue: Promise<void> | null = null
+  let sealed = false
 
   const clearFlushTimer = () => {
     if (!flushTimer) return
@@ -177,21 +182,36 @@ export function createRunTextPersistenceBuffer(
     flushTimer = null
   }
 
+  const queuePendingBatch = () => {
+    if (!pending) return
+    queuedBatches.push(pending)
+    pending = null
+  }
+
+  const drainQueuedBatches = async (): Promise<void> => {
+    try {
+      while (queuedBatches.length > 0) {
+        const batch = queuedBatches[0]
+        if (!batch) break
+        await write(batch.text, { replace: batch.replace })
+        queuedBatches.shift()
+      }
+    } finally {
+      writeQueue = null
+    }
+  }
+
   const flush = async (): Promise<void> => {
     clearFlushTimer()
-    const batch = pending
-    pending = null
-    if (batch) {
-      writeQueue = writeQueue
-        .catch(() => undefined)
-        .then(() => write(batch.text, { replace: batch.replace }))
-        .then(() => undefined)
+    queuePendingBatch()
+    if (!writeQueue && queuedBatches.length > 0) {
+      writeQueue = drainQueuedBatches()
     }
     await writeQueue
   }
 
   const scheduleFlush = () => {
-    if (flushTimer) return
+    if (flushTimer || sealed) return
     flushTimer = setTimeout(() => {
       flushTimer = null
       void flush().catch(() => undefined)
@@ -199,17 +219,24 @@ export function createRunTextPersistenceBuffer(
   }
 
   const append = (text: string) => {
+    if (sealed) return
     if (pending) pending.text += text
     else pending = { text, replace: false }
     scheduleFlush()
   }
 
   const replace = (text: string) => {
+    if (sealed) return
     pending = { text, replace: true }
     scheduleFlush()
   }
 
-  return { append, replace, flush }
+  const seal = async (): Promise<void> => {
+    sealed = true
+    await flush()
+  }
+
+  return { append, replace, flush, seal }
 }
 
 export async function setRunThinking(
