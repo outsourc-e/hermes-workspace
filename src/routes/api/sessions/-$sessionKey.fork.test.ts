@@ -172,4 +172,23 @@ describe('POST /api/sessions/$sessionKey/fork', () => {
       },
     })
   })
+
+  it('does not publish a child returned for a different parent', async () => {
+    mocks.forkSession.mockResolvedValue({
+      session: {
+        id: 'unrelated-child',
+        parent_session_id: 'different-parent',
+      },
+      forkedFrom: 'requested-parent',
+    })
+
+    const response = await handler({
+      request: request('{}'),
+      params: { sessionKey: 'requested-parent' },
+    })
+
+    expect(response.status).toBe(502)
+    expect(await response.json()).toMatchObject({ ok: false })
+    expect(mocks.toSessionSummary).not.toHaveBeenCalled()
+  })
 })

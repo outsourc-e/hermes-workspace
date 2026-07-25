@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { fireEvent, screen, within } from '@testing-library/dom'
+import { fireEvent, screen, waitFor, within } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -16,6 +16,7 @@ reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 const pinnedState = vi.hoisted(() => ({
   keys: [] as Array<string>,
   toggle: vi.fn<(key: string) => void>(),
+  migrate: vi.fn<(fromKey: string, toKey: string) => void>(),
 }))
 
 vi.mock('@/hooks/use-pinned-sessions', () => ({
@@ -31,6 +32,18 @@ vi.mock('@/hooks/use-pinned-sessions', () => ({
           current.includes(key)
             ? current.filter((currentKey) => currentKey !== key)
             : [...current, key],
+        )
+      },
+      migratePinnedSession: (fromKey: string, toKey: string) => {
+        pinnedState.migrate(fromKey, toKey)
+        setPinnedSessionKeys((current) =>
+          current.includes(fromKey)
+            ? [
+                ...new Set(
+                  current.map((key) => (key === fromKey ? toKey : key)),
+                ),
+              ]
+            : current,
         )
       },
     }
@@ -135,6 +148,9 @@ function renderSidebar(
     sessionForkAvailable?: boolean
     forkingSessionKey?: string | null
     onFork?: (session: SessionMeta) => void
+    loading?: boolean
+    fetching?: boolean
+    error?: string | null
   } = {},
 ) {
   const container = document.createElement('div')
@@ -142,6 +158,9 @@ function renderSidebar(
   const root = createRoot(container)
   let currentSessions = sessions
   let currentActiveFriendlyId = options.activeFriendlyId ?? ''
+  let currentLoading = options.loading ?? false
+  let currentFetching = options.fetching ?? false
+  let currentError = options.error ?? null
   const renderCurrent = () => {
     React.act(() => {
       root.render(
@@ -153,9 +172,9 @@ function renderSidebar(
           sessionForkAvailable={options.sessionForkAvailable}
           forkingSessionKey={options.forkingSessionKey}
           onFork={options.onFork}
-          loading={false}
-          fetching={false}
-          error={null}
+          loading={currentLoading}
+          fetching={currentFetching}
+          error={currentError}
           onRetry={vi.fn()}
         />,
       )
@@ -176,6 +195,16 @@ function renderSidebar(
       currentSessions = nextSessions
       renderCurrent()
     },
+    rerenderWithRefreshState(next: {
+      loading?: boolean
+      fetching?: boolean
+      error?: string | null
+    }) {
+      if (next.loading !== undefined) currentLoading = next.loading
+      if (next.fetching !== undefined) currentFetching = next.fetching
+      if (next.error !== undefined) currentError = next.error
+      renderCurrent()
+    },
   }
 }
 
@@ -184,6 +213,7 @@ const mountedRoots: Array<() => void> = []
 beforeEach(() => {
   pinnedState.keys = []
   pinnedState.toggle.mockReset()
+  pinnedState.migrate.mockReset()
 })
 
 afterEach(() => {
@@ -288,7 +318,7 @@ describe('SidebarSessions lineage projection', () => {
     expect(screen.queryByRole('treeitem')).toBeNull()
   })
 
-  it('keeps a pinned continuation as one logical row and unpins its stored ancestor key', () => {
+  it('keeps a pinned continuation as one logical row and unpins its migrated tip key', () => {
     pinnedState.keys = ['root']
     const root = session('root', 'Hidden pinned snapshot', {
       lineageRootId: 'root',
@@ -310,7 +340,49 @@ describe('SidebarSessions lineage projection', () => {
     React.act(() =>
       fireEvent.click(within(pinnedSessions).getByText('Unpin session')),
     )
-    expect(pinnedState.toggle).toHaveBeenCalledWith('root')
+    expect(pinnedState.toggle).toHaveBeenCalledWith('tip')
+  })
+
+  it('persists a cold hidden continuation pin under the only loaded visible tip', async () => {
+    pinnedState.keys = ['root']
+    const tip = session('tip', 'Pinned conversation', {
+      parentSessionId: 'root',
+      lineageRootId: 'root',
+      lineageTipId: 'tip',
+    })
+
+    renderSidebar([tip])
+
+    await waitFor(() =>
+      expect(pinnedState.migrate).toHaveBeenCalledWith('root', 'tip'),
+    )
+
+    const pinnedSessions = screen.getByRole('region', {
+      name: 'Pinned sessions',
+    })
+    expect(within(pinnedSessions).getByText('Pinned conversation')).toBeTruthy()
+    expect(within(pinnedSessions).getByRole('link').getAttribute('href')).toBe(
+      '/chat/tip-route',
+    )
+  })
+
+  it('does not migrate a stale hidden pin when refresh fails', async () => {
+    pinnedState.keys = ['root']
+    const staleTip = session('tip', 'Cached conversation', {
+      parentSessionId: 'root',
+      lineageRootId: 'root',
+      lineageTipId: 'tip',
+    })
+    const view = renderSidebar([staleTip], { fetching: true })
+
+    view.rerenderWithRefreshState({
+      fetching: false,
+      error: 'refresh failed',
+    })
+    await React.act(async () => Promise.resolve())
+
+    expect(screen.getByText('Failed to load sessions.')).toBeTruthy()
+    expect(pinnedState.migrate).not.toHaveBeenCalled()
   })
 
   it('moves a newly pinned nested child into a discrete pinned row without moving its root or siblings', () => {

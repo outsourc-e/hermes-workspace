@@ -260,6 +260,153 @@ describe('send-stream bootstrap session handoff', () => {
     )
   })
 
+  it('invalidates an origin poll and terminally backfills successor-only tool activity after handoff', async () => {
+    let resolveOriginPoll:
+      | ((messages: Array<Record<string, unknown>>) => void)
+      | undefined
+    const originPollResult = new Promise<Array<Record<string, unknown>>>(
+      (resolve) => {
+        resolveOriginPoll = resolve
+      },
+    )
+    let observeOriginPoll: (() => void) | undefined
+    const originPollStarted = new Promise<void>((resolve) => {
+      observeOriginPoll = resolve
+    })
+    let resolveTerminalPersistence: (() => void) | undefined
+    const terminalPersistence = new Promise<void>((resolve) => {
+      resolveTerminalPersistence = resolve
+    })
+    let observeSuccessorBackfill: (() => void) | undefined
+    const successorBackfillStarted = new Promise<void>((resolve) => {
+      observeSuccessorBackfill = resolve
+    })
+    let originReads = 0
+    let completionStarted = false
+    let successorReads = 0
+    const sourceMessages = Array.from({ length: 6 }, (_, index) => ({
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      content: `old-${index}`,
+    }))
+    const successorMessages = [
+      { role: 'user', content: 'current turn' },
+      {
+        role: 'assistant',
+        tool_calls: [
+          {
+            id: 'handoff-tool',
+            function: { name: 'search', arguments: { query: 'lineage' } },
+          },
+        ],
+      },
+      {
+        role: 'tool',
+        tool_call_id: 'handoff-tool',
+        content: 'successor result',
+      },
+    ]
+    const staleOriginMessages = [
+      ...sourceMessages,
+      {
+        role: 'assistant',
+        tool_calls: [
+          {
+            id: 'stale-origin-tool',
+            function: { name: 'read_file', arguments: { path: '/stale' } },
+          },
+        ],
+      },
+      {
+        role: 'tool',
+        tool_call_id: 'stale-origin-tool',
+        content: 'must not cross the handoff',
+      },
+    ]
+    mocks.getMessages.mockImplementation((sessionKey: string) => {
+      if (sessionKey === 'successor-session') {
+        successorReads += 1
+        expect(completionStarted).toBe(true)
+        observeSuccessorBackfill?.()
+        return Promise.resolve(successorMessages)
+      }
+      originReads += 1
+      if (originReads === 1) return Promise.resolve(sourceMessages)
+      observeOriginPoll?.()
+      return originPollResult
+    })
+    mocks.markRunStatus.mockReturnValueOnce(terminalPersistence)
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'run-tools', session_id: 'created-session' },
+        })
+        await originPollStarted
+        await options.onEvent({
+          event: 'assistant.delta',
+          data: {
+            run_id: 'run-tools',
+            session_id: 'successor-session',
+            delta: 'continued',
+          },
+        })
+        completionStarted = true
+        const completion = options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'run-tools', session_id: 'successor-session' },
+        })
+        await successorBackfillStarted
+        await Promise.resolve()
+        await Promise.resolve()
+        resolveOriginPoll?.(staleOriginMessages)
+        await Promise.resolve()
+        await Promise.resolve()
+        resolveTerminalPersistence?.()
+        await completion
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(originReads).toBe(2)
+    expect(successorReads).toBe(1)
+    const toolEvents = events
+      .filter(({ event }) => event === 'tool')
+      .map(({ data }) => data)
+    expect(toolEvents).toEqual([
+      expect.objectContaining({
+        toolCallId: 'handoff-tool',
+        phase: 'complete',
+        result: 'successor result',
+        sessionKey: 'successor-session',
+        runId: 'run-tools',
+      }),
+    ])
+    expect(events.findIndex(({ event }) => event === 'tool')).toBeLessThan(
+      events.findIndex(({ event }) => event === 'done'),
+    )
+  })
+
   it('keeps the handoff stream and persistence chain alive when run migration rejects', async () => {
     mocks.migratePersistedRun.mockRejectedValueOnce(
       new Error('recovery store unavailable'),

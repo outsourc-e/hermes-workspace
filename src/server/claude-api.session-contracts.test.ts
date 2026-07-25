@@ -153,6 +153,31 @@ describe('forkSession', () => {
     )
   })
 
+  it('rejects a fork child whose returned parent does not match the requested session', async () => {
+    const caps = capabilities({ sessionFork: true })
+    gatewayMocks.getCapabilities.mockReturnValue(caps)
+    gatewayMocks.ensureGatewayProbed.mockResolvedValue(caps)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            object: 'hermes.session',
+            session: {
+              id: 'unrelated-child',
+              parent_session_id: 'different-parent',
+            },
+          }),
+          { status: 201, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    )
+
+    await expect(forkSession('requested-parent')).rejects.toThrow(
+      'did not identify the requested parent',
+    )
+  })
+
   it('does not mutate either transport when sessionFork is unavailable', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)

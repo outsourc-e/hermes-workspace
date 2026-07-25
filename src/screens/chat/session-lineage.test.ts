@@ -171,6 +171,33 @@ describe('classifySessionRelationship', () => {
     expect(classifySessionRelationship(malformedChild, byId)).toBe('orphan')
   })
 
+  it('trusts the loaded parent source over contradictory child parent-source metadata', () => {
+    const parent = session('parent', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 200,
+      lineageRootId: 'parent',
+      lineageTipId: 'metadata-child',
+    })
+    const metadataChild = session('metadata-child', {
+      parentSessionId: 'parent',
+      source: 'telegram',
+      parentSource: 'telegram',
+      lineageRootId: 'parent',
+      lineageTipId: 'metadata-child',
+    })
+    const lifecycleChild = session('lifecycle-child', {
+      parentSessionId: 'parent',
+      source: 'telegram',
+      parentSource: 'telegram',
+      startedAt: 200,
+    })
+    const byId = lookup([parent, metadataChild, lifecycleChild])
+
+    expect(classifySessionRelationship(metadataChild, byId)).toBe('orphan')
+    expect(classifySessionRelationship(lifecycleChild, byId)).toBe('orphan')
+  })
+
   it('keeps missing parents and cycles visible as orphans', () => {
     const missing = session('missing', { parentSessionId: 'not-loaded' })
     const childWithoutParentId = session('child-without-parent-id', {
@@ -293,6 +320,35 @@ describe('buildSessionTree', () => {
     ]
 
     expect(buildSessionTree(rows).roots[0]?.key).toBe('non-snapshot-new')
+  })
+
+  it('maps a declared missing continuation ancestor to its cold-loaded visible tip', () => {
+    const tip = session('tip', {
+      parentSessionId: 'previous-segment',
+      lineageRootId: 'paged-out-root',
+      lineageTipId: 'tip',
+      compressionSegmentCount: 3,
+    })
+
+    const tree = buildSessionTree([tip])
+
+    expect(tree.rows.map((row) => row.key)).toEqual(['tip'])
+    expect(tree.visibleKeyBySessionKey.get('paged-out-root')).toBe('tip')
+    expect(tree.visibleKeyBySessionKey.get('previous-segment')).toBe('tip')
+  })
+
+  it('does not alias a missing ancestor from branch metadata', () => {
+    const branch = session('branch', {
+      parentSessionId: 'parent',
+      source: 'cli',
+      sessionSource: 'fork',
+      lineageRootId: 'parent',
+      lineageTipId: 'branch',
+    })
+
+    const tree = buildSessionTree([branch])
+
+    expect(tree.visibleKeyBySessionKey.has('parent')).toBe(false)
   })
 
   it('retains branch and nested child rows under a collapsed conversation', () => {

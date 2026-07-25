@@ -110,6 +110,18 @@ export const Route = createFileRoute('/api/sessions/$sessionKey/fork')({
             sessionKey,
             title ? { title } : undefined,
           )
+          const returnedParentId =
+            typeof result.session.parent_session_id === 'string'
+              ? result.session.parent_session_id.trim()
+              : ''
+          if (
+            result.forkedFrom !== sessionKey ||
+            (returnedParentId && returnedParentId !== sessionKey)
+          ) {
+            throw new Error(
+              'Hermes fork response did not identify the requested parent session.',
+            )
+          }
           const summary = toSessionSummary(result.session)
           const entry = {
             ...summary,

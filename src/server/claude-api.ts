@@ -349,13 +349,32 @@ export async function forkSession(
   if (typeof childId !== 'string' || childId.trim().length === 0) {
     throw new Error('Hermes fork response did not include a child session ID.')
   }
+  if (childId.trim() === sessionId) {
+    throw new Error('Hermes fork response identified the parent as its child.')
+  }
+
+  const explicitParent =
+    typeof result.forked_from === 'string' && result.forked_from.trim()
+      ? result.forked_from.trim()
+      : undefined
+  const sessionParent =
+    typeof result.session.parent_session_id === 'string' &&
+    result.session.parent_session_id.trim()
+      ? result.session.parent_session_id.trim()
+      : undefined
+  if (
+    (!explicitParent && !sessionParent) ||
+    (explicitParent !== undefined && explicitParent !== sessionId) ||
+    (sessionParent !== undefined && sessionParent !== sessionId)
+  ) {
+    throw new Error(
+      'Hermes fork response did not identify the requested parent session.',
+    )
+  }
 
   return {
     session: result.session as ClaudeSession,
-    forkedFrom:
-      typeof result.forked_from === 'string' && result.forked_from.trim()
-        ? result.forked_from
-        : sessionId,
+    forkedFrom: sessionId,
   }
 }
 

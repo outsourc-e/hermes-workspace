@@ -1069,6 +1069,7 @@ export const Route = createFileRoute('/api/send-stream')({
               // tool_calls" can resolve to the previous turn, surfacing stale
               // tool cards (off-by-one-turn bug).
               let liveBaselineCount = 0
+              let liveBaselineSessionKey = sessionKey
               try {
                 const baseline = (await getSessionMessagesFromAgent(
                   sessionKey,
@@ -1084,9 +1085,15 @@ export const Route = createFileRoute('/api/send-stream')({
                 while (liveRunState.active) {
                   if (streamClosed) break
                   try {
+                    const polledSessionKey = sessionKey
+                    const polledBaselineCount =
+                      polledSessionKey === liveBaselineSessionKey
+                        ? liveBaselineCount
+                        : 0
                     const allMsgs = (await getSessionMessagesFromAgent(
-                      sessionKey,
+                      polledSessionKey,
                     )) as unknown as Array<Record<string, unknown>>
+                    if (polledSessionKey !== sessionKey) continue
                     if (!Array.isArray(allMsgs) || allMsgs.length === 0) {
                       await new Promise((r) =>
                         setTimeout(r, livePollIntervalMs),
@@ -1094,7 +1101,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       continue
                     }
                     // Only inspect messages added on or after this run started.
-                    const msgs = allMsgs.slice(liveBaselineCount)
+                    const msgs = allMsgs.slice(polledBaselineCount)
                     if (msgs.length === 0) {
                       await new Promise((r) =>
                         setTimeout(r, livePollIntervalMs),
@@ -1104,7 +1111,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     const syntheticEvents = collectSyntheticLiveToolEvents({
                       messages: msgs,
                       tracker: syntheticLiveToolTracker,
-                      sessionKey,
+                      sessionKey: polledSessionKey,
                       runId: activeRunId ?? undefined,
                     })
                     if (syntheticEvents.length === 0) {
@@ -1151,6 +1158,8 @@ export const Route = createFileRoute('/api/send-stream')({
                           sessionHandoff.sessionKey,
                         )
                         sessionKey = sessionHandoff.sessionKey
+                        liveBaselineSessionKey = sessionHandoff.sessionKey
+                        liveBaselineCount = 0
                         resolvedFriendlyId = sessionHandoff.sessionKey
                         sendEvent('session_handoff', {
                           ...sessionHandoff,
@@ -1477,6 +1486,11 @@ export const Route = createFileRoute('/api/send-stream')({
                       }
 
                       if (event === 'run.completed') {
+                        // The terminal history read below is the authoritative
+                        // final tool refresh. Stop scheduling live polls before
+                        // it starts; an origin poll already in flight is still
+                        // discarded by the session-key check above.
+                        liveRunState.active = false
                         // Claim completion before any asynchronous backfill so
                         // a later abort cannot overwrite the observed winner.
                         const terminalPersistence =
@@ -1512,8 +1526,10 @@ export const Route = createFileRoute('/api/send-stream')({
                             // this run; tool_calls are siblings on it. Also
                             // collect tool_result entries that immediately
                             // follow it so we can pair input/output.
-                            // Use the per-run baseline so we never read tool
-                            // calls from a previous turn.
+                            // Use the rebased per-run baseline so we never read
+                            // tool calls from a previous turn. A session handoff
+                            // resets this count before any successor event is
+                            // translated.
                             const sliceFrom = Math.max(
                               0,
                               Math.min(

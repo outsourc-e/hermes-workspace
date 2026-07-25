@@ -68,9 +68,9 @@ function lineageSourcesConflict(
     session.lineage?.source ?? session.lineage?.sessionSource,
   )
   const parentSource = normalizedSource(
-    session.lineage?.parentSource ??
-      parent.lineage?.source ??
-      parent.lineage?.sessionSource,
+    parent.lineage?.source ??
+      parent.lineage?.sessionSource ??
+      session.lineage?.parentSource,
   )
   return Boolean(childSource && parentSource && childSource !== parentSource)
 }
@@ -110,9 +110,9 @@ function hasValidLifecycleContinuation(
     childLineage.source ?? childLineage.sessionSource,
   )
   const parentSource = normalizedSource(
-    childLineage.parentSource ??
-      parentLineage.source ??
-      parentLineage.sessionSource,
+    parentLineage.source ??
+      parentLineage.sessionSource ??
+      childLineage.parentSource,
   )
   if (!childSource || !parentSource || childSource !== parentSource)
     return false
@@ -234,6 +234,34 @@ function compareLogicalNodes(a: LogicalNode, b: LogicalNode): number {
   return a.key.localeCompare(b.key)
 }
 
+function missingContinuationAliases(session: SessionMeta): Array<string> {
+  const lineage = session.lineage
+  const rootId = lineage?.lineageRootId?.trim()
+  const tipId = lineage?.lineageTipId?.trim()
+  if (!lineage || !rootId || tipId !== session.key || rootId === session.key) {
+    return []
+  }
+
+  const source = normalizedSource(lineage.source)
+  const sessionSource = normalizedSource(lineage.sessionSource)
+  const relationshipType = lineage.relationshipType?.trim().toLowerCase()
+  if (
+    (source && LOCAL_SOURCES.has(source)) ||
+    (sessionSource &&
+      (LOCAL_SOURCES.has(sessionSource) || sessionSource === 'fork')) ||
+    lineage.relationshipKind === 'branch' ||
+    lineage.relationshipKind === 'child' ||
+    lineage.isCrossSurfaceChild === true ||
+    (relationshipType && !CONTINUATION_RELATIONSHIP_TYPES.has(relationshipType))
+  ) {
+    return []
+  }
+
+  return [rootId, lineage.parentSessionId?.trim()]
+    .filter((key): key is string => Boolean(key && key !== session.key))
+    .filter((key, index, aliases) => aliases.indexOf(key) === index)
+}
+
 /**
  * Collapse only confirmed continuation components and project all remaining
  * relationships into a stable, bounded tree suitable for presentation.
@@ -346,6 +374,27 @@ export function buildSessionTree(
       continuationCount: Math.max(members.length, declaredSegmentCount),
       activity,
     })
+  }
+
+  // A cold first page can contain only the current continuation tip while a
+  // persisted pin still names an older, paged-out segment. Preserve no phantom
+  // row, but expose an unambiguous server-declared ancestor alias so callers can
+  // migrate that pin to the real visible session.
+  const coldAliasTargets = new Map<string, Set<string>>()
+  for (const session of uniqueSessions) {
+    const visibleKey = visibleKeyBySessionKey.get(session.key)
+    if (!visibleKey) continue
+    for (const alias of missingContinuationAliases(session)) {
+      if (sessionsById.has(alias)) continue
+      const targets = coldAliasTargets.get(alias) ?? new Set<string>()
+      targets.add(visibleKey)
+      coldAliasTargets.set(alias, targets)
+    }
+  }
+  for (const [alias, targets] of coldAliasTargets) {
+    if (targets.size !== 1) continue
+    const [visibleKey] = targets
+    if (visibleKey) visibleKeyBySessionKey.set(alias, visibleKey)
   }
 
   for (const node of logicalNodes.values()) {

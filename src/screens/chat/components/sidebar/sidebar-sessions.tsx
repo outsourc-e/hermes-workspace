@@ -2,7 +2,7 @@
 
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { buildSessionTree } from '../../session-lineage'
 import { SessionTreeRow } from './session-tree-row'
 import type {
@@ -54,7 +54,8 @@ export const SidebarSessions = memo(function SidebarSessions({
   error,
   onRetry,
 }: SidebarSessionsProps) {
-  const { pinnedSessionKeys, togglePinnedSession } = usePinnedSessions()
+  const { pinnedSessionKeys, togglePinnedSession, migratePinnedSession } =
+    usePinnedSessions()
 
   const [collapsedLogicalRootKeys, setCollapsedLogicalRootKeys] = useState<
     Set<string>
@@ -113,6 +114,22 @@ export const SidebarSessions = memo(function SidebarSessions({
     }
     return keys
   }, [pinnedSessionKeys, tree.visibleKeyBySessionKey])
+  useEffect(() => {
+    if (loading || fetching || error) return
+    for (const pinnedKey of pinnedSessionKeys) {
+      const visibleKey = tree.visibleKeyBySessionKey.get(pinnedKey)
+      if (visibleKey && visibleKey !== pinnedKey) {
+        migratePinnedSession(pinnedKey, visibleKey)
+      }
+    }
+  }, [
+    error,
+    fetching,
+    loading,
+    migratePinnedSession,
+    pinnedSessionKeys,
+    tree.visibleKeyBySessionKey,
+  ])
   const pinnedRows = useMemo(
     () =>
       tree.rows
