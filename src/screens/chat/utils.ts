@@ -1,7 +1,9 @@
 import { stripWorkspaceDirective } from '../../lib/workspace-message-scope'
 import type {
   ChatMessage,
+  SessionLineage,
   SessionMeta,
+  SessionRelationshipKind,
   SessionSummary,
   SessionTitleSource,
   SessionTitleStatus,
@@ -207,6 +209,85 @@ function deriveTitleSource(
   return undefined
 }
 
+const RELATIONSHIP_KINDS = new Set<SessionRelationshipKind>([
+  'root',
+  'continuation',
+  'branch',
+  'child',
+  'orphan',
+])
+
+function normalizedOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
+function normalizeSessionLineage(
+  value: unknown,
+  source: unknown,
+): SessionLineage | undefined {
+  const raw =
+    value !== null && typeof value === 'object'
+      ? (value as Record<string, unknown>)
+      : {}
+  const relationshipKindCandidate = normalizedOptionalString(
+    raw.relationshipKind,
+  )
+  const relationshipKind =
+    relationshipKindCandidate &&
+    RELATIONSHIP_KINDS.has(relationshipKindCandidate as SessionRelationshipKind)
+      ? (relationshipKindCandidate as SessionRelationshipKind)
+      : undefined
+  const compressionSegmentCount =
+    typeof raw.compressionSegmentCount === 'number' &&
+    Number.isFinite(raw.compressionSegmentCount) &&
+    raw.compressionSegmentCount > 0
+      ? Math.floor(raw.compressionSegmentCount)
+      : undefined
+  const startedAt = normalizeTimestamp(raw.startedAt)
+  const endedAt = normalizeTimestamp(raw.endedAt)
+
+  const parentSessionId = normalizedOptionalString(raw.parentSessionId)
+  const relationshipType = normalizedOptionalString(raw.relationshipType)
+  const parentTitle = normalizedOptionalString(raw.parentTitle)
+  const parentSource = normalizedOptionalString(raw.parentSource)
+  const sessionSource = normalizedOptionalString(raw.sessionSource)
+  const lineageRootId = normalizedOptionalString(raw.lineageRootId)
+  const lineageTipId = normalizedOptionalString(raw.lineageTipId)
+  const parentLineageRootId = normalizedOptionalString(raw.parentLineageRootId)
+  const parentLineageTipId = normalizedOptionalString(raw.parentLineageTipId)
+  const normalizedLineageSource =
+    normalizedOptionalString(raw.source) ?? normalizedOptionalString(source)
+  const endReason = normalizedOptionalString(raw.endReason)
+
+  const lineage: SessionLineage = {
+    ...(parentSessionId ? { parentSessionId } : {}),
+    ...(relationshipType ? { relationshipType } : {}),
+    ...(relationshipKind ? { relationshipKind } : {}),
+    ...(parentTitle ? { parentTitle } : {}),
+    ...(parentSource ? { parentSource } : {}),
+    ...(sessionSource ? { sessionSource } : {}),
+    ...(lineageRootId ? { lineageRootId } : {}),
+    ...(lineageTipId ? { lineageTipId } : {}),
+    ...(compressionSegmentCount ? { compressionSegmentCount } : {}),
+    ...(parentLineageRootId ? { parentLineageRootId } : {}),
+    ...(parentLineageTipId ? { parentLineageTipId } : {}),
+    ...(typeof raw.isCrossSurfaceChild === 'boolean'
+      ? { isCrossSurfaceChild: raw.isCrossSurfaceChild }
+      : {}),
+    ...(typeof raw.isPreCompressionSnapshot === 'boolean'
+      ? { isPreCompressionSnapshot: raw.isPreCompressionSnapshot }
+      : {}),
+    ...(normalizedLineageSource ? { source: normalizedLineageSource } : {}),
+    ...(endReason ? { endReason } : {}),
+    ...(startedAt !== null ? { startedAt } : {}),
+    ...(endedAt !== null ? { endedAt } : {}),
+  }
+
+  return Object.keys(lineage).length > 0 ? lineage : undefined
+}
+
 export function normalizeSessions(
   rows: Array<SessionSummary> | undefined,
 ): Array<SessionMeta> {
@@ -251,6 +332,7 @@ export function normalizeSessions(
       derivedTitle,
       session.titleSource,
     )
+    const lineage = normalizeSessionLineage(session.lineage, session.source)
 
     return {
       key,
@@ -268,6 +350,7 @@ export function normalizeSessions(
         typeof session.preview === 'string'
           ? cleanUserText(session.preview) || session.preview.trim() || null
           : null,
+      ...(lineage ? { lineage } : {}),
     }
   })
 }

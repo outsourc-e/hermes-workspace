@@ -16,6 +16,17 @@ export type DashboardSession = {
   cache_read_tokens?: number
   reasoning_tokens?: number
   parent_session_id?: string | null
+  relationship_type?: string | null
+  parent_title?: string | null
+  parent_source?: string | null
+  session_source?: string | null
+  _lineage_root_id?: string | null
+  _lineage_tip_id?: string | null
+  _compression_segment_count?: number | null
+  _parent_lineage_root_id?: string | null
+  _parent_lineage_tip_id?: string | null
+  _cross_surface_child_session?: boolean | null
+  pre_compression_snapshot?: boolean | null
   last_active?: number | null
   is_active?: boolean
   preview?: string | null

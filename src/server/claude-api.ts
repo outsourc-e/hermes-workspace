@@ -24,6 +24,7 @@ import {
   searchSessions as searchDashboardSessions,
   updateSession as updateDashboardSession,
 } from './claude-dashboard-api'
+import type { SessionLineage, SessionSummary } from '../screens/chat/types'
 
 const _authHeaders = (): Record<string, string> =>
   BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
@@ -46,8 +47,25 @@ export type ClaudeSession = {
   input_tokens?: number
   output_tokens?: number
   parent_session_id?: string | null
+  relationship_type?: string | null
+  parent_title?: string | null
+  parent_source?: string | null
+  session_source?: string | null
+  _lineage_root_id?: string | null
+  _lineage_tip_id?: string | null
+  _compression_segment_count?: number | null
+  _parent_lineage_root_id?: string | null
+  _parent_lineage_tip_id?: string | null
+  _cross_surface_child_session?: boolean | null
+  pre_compression_snapshot?: boolean | null
   last_active?: number | null
   preview?: string | null
+}
+
+export type ClaudeSessionSummary = SessionSummary & {
+  key: string
+  friendlyId: string
+  [key: string]: unknown
 }
 
 export type ClaudeMessage = {
@@ -320,9 +338,70 @@ export function toChatMessage(
 }
 
 /** Convert a ClaudeSession to the session summary format the frontend expects */
-export function toSessionSummary(
-  session: ClaudeSession,
-): Record<string, unknown> {
+export function toSessionSummary(session: ClaudeSession): ClaudeSessionSummary {
+  const hasLineageFacts =
+    session.parent_session_id != null ||
+    session.relationship_type != null ||
+    session.parent_title != null ||
+    session.parent_source != null ||
+    session.session_source != null ||
+    session._lineage_root_id != null ||
+    session._lineage_tip_id != null ||
+    session._compression_segment_count != null ||
+    session._parent_lineage_root_id != null ||
+    session._parent_lineage_tip_id != null ||
+    session._cross_surface_child_session != null ||
+    session.pre_compression_snapshot != null ||
+    session.source != null ||
+    session.end_reason != null
+
+  const lineage: SessionLineage | undefined = hasLineageFacts
+    ? {
+        ...(session.parent_session_id
+          ? { parentSessionId: session.parent_session_id }
+          : {}),
+        ...(session.relationship_type
+          ? { relationshipType: session.relationship_type }
+          : {}),
+        ...(session.parent_title ? { parentTitle: session.parent_title } : {}),
+        ...(session.parent_source
+          ? { parentSource: session.parent_source }
+          : {}),
+        ...(session.session_source
+          ? { sessionSource: session.session_source }
+          : {}),
+        ...(session._lineage_root_id
+          ? { lineageRootId: session._lineage_root_id }
+          : {}),
+        ...(session._lineage_tip_id
+          ? { lineageTipId: session._lineage_tip_id }
+          : {}),
+        ...(typeof session._compression_segment_count === 'number'
+          ? { compressionSegmentCount: session._compression_segment_count }
+          : {}),
+        ...(session._parent_lineage_root_id
+          ? { parentLineageRootId: session._parent_lineage_root_id }
+          : {}),
+        ...(session._parent_lineage_tip_id
+          ? { parentLineageTipId: session._parent_lineage_tip_id }
+          : {}),
+        ...(typeof session._cross_surface_child_session === 'boolean'
+          ? { isCrossSurfaceChild: session._cross_surface_child_session }
+          : {}),
+        ...(typeof session.pre_compression_snapshot === 'boolean'
+          ? { isPreCompressionSnapshot: session.pre_compression_snapshot }
+          : {}),
+        ...(session.source ? { source: session.source } : {}),
+        ...(session.end_reason ? { endReason: session.end_reason } : {}),
+        ...(typeof session.started_at === 'number'
+          ? { startedAt: session.started_at * 1000 }
+          : {}),
+        ...(typeof session.ended_at === 'number'
+          ? { endedAt: session.ended_at * 1000 }
+          : {}),
+      }
+    : undefined
+
   return {
     key: session.id,
     friendlyId: session.id,
@@ -354,6 +433,7 @@ export function toSessionSummary(
       completionTokens: session.output_tokens ?? 0,
       totalTokens: (session.input_tokens ?? 0) + (session.output_tokens ?? 0),
     },
+    ...(lineage ? { lineage } : {}),
   }
 }
 

@@ -81,6 +81,34 @@ export type ChatMessage = {
 export type SessionTitleStatus = 'idle' | 'generating' | 'ready' | 'error'
 export type SessionTitleSource = 'auto' | 'manual'
 
+export type SessionRelationshipKind =
+  | 'root'
+  | 'continuation'
+  | 'branch'
+  | 'child'
+  | 'orphan'
+
+/** List-safe relationship facts normalized at the Workspace server boundary. */
+export type SessionLineage = {
+  parentSessionId?: string
+  relationshipType?: string
+  relationshipKind?: SessionRelationshipKind
+  parentTitle?: string
+  parentSource?: string
+  sessionSource?: string
+  lineageRootId?: string
+  lineageTipId?: string
+  compressionSegmentCount?: number
+  parentLineageRootId?: string
+  parentLineageTipId?: string
+  isCrossSurfaceChild?: boolean
+  isPreCompressionSnapshot?: boolean
+  source?: string
+  endReason?: string
+  startedAt?: number
+  endedAt?: number
+}
+
 export type SessionSummary = {
   key?: string
   label?: string
@@ -93,6 +121,8 @@ export type SessionSummary = {
   titleSource?: SessionTitleSource
   titleError?: string | null
   preview?: string | null
+  source?: string | null
+  lineage?: SessionLineage
 }
 
 export type SessionListResponse = {
@@ -117,6 +147,28 @@ export type SessionMeta = {
   titleSource?: SessionTitleSource
   titleError?: string | null
   preview?: string | null
+  lineage?: SessionLineage
+}
+
+export type SessionTreeRow = {
+  key: string
+  session: SessionMeta
+  relationshipKind: SessionRelationshipKind
+  depth: number
+  isExpandable: boolean
+  isExpanded: boolean
+  childCount: number
+  continuationCount: number
+  parentKey?: string
+  isOrphan: boolean
+}
+
+export type SessionTree = {
+  roots: Array<SessionTreeRow>
+  rows: Array<SessionTreeRow>
+  indexByKey: ReadonlyMap<string, SessionTreeRow>
+  visibleKeyBySessionKey: ReadonlyMap<string, string>
+  expandedAncestorIds: ReadonlySet<string>
 }
 
 export type PathsPayload = {
