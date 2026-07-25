@@ -137,7 +137,7 @@ function hasValidLifecycleContinuation(
     typeof endedAt === 'number' &&
     Number.isFinite(endedAt) &&
     endedAt > 0 &&
-    startedAt > endedAt
+    startedAt >= endedAt
   )
 }
 

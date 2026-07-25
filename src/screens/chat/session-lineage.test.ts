@@ -173,7 +173,7 @@ describe('classifySessionRelationship', () => {
     ])
 
     expect(classifySessionRelationship(tooEarly, byId)).toBe('orphan')
-    expect(classifySessionRelationship(atBoundary, byId)).toBe('orphan')
+    expect(classifySessionRelationship(atBoundary, byId)).toBe('continuation')
     expect(classifySessionRelationship(wrongSource, byId)).toBe('orphan')
     expect(classifySessionRelationship(conflictingMetadataSource, byId)).toBe(
       'orphan',
