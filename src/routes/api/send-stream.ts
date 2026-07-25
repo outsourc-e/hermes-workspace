@@ -512,9 +512,17 @@ export const Route = createFileRoute('/api/send-stream')({
               friendlyId,
             ),
           )
-          const migrationReady = migration.catch(() => null)
+          const migrationReady = migration
+            .then((migratedRun) => {
+              if (
+                migratedRun?.sessionKey === toSessionKey &&
+                migratedRun.runId === runId
+              ) {
+                activeRunSessionKey = toSessionKey
+              }
+            })
+            .catch(() => undefined)
           persistedRunReady = migrationReady
-          activeRunSessionKey = toSessionKey
           await migrationReady
         }
 

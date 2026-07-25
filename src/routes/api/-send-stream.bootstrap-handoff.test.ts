@@ -138,7 +138,13 @@ describe('send-stream bootstrap session handoff', () => {
     mocks.getMessages.mockResolvedValue([])
     mocks.appendRunText.mockResolvedValue(null)
     mocks.createPersistedRun.mockResolvedValue(undefined)
-    mocks.migratePersistedRun.mockResolvedValue(undefined)
+    mocks.migratePersistedRun.mockImplementation(
+      (_fromSessionKey, toSessionKey, runId) =>
+        Promise.resolve({
+          sessionKey: toSessionKey,
+          runId,
+        }),
+    )
     mocks.markRunStatus.mockResolvedValue(null)
     mocks.streamChat.mockImplementation(
       async (
@@ -257,6 +263,18 @@ describe('send-stream bootstrap session handoff', () => {
     )
     expect(mocks.createPersistedRun.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.migratePersistedRun.mock.invocationCallOrder[0]!,
+    )
+    expect(mocks.appendRunText).toHaveBeenCalledWith(
+      'successor-session',
+      'run-migrate',
+      'continued',
+      { replace: false },
+    )
+    expect(mocks.markRunStatus).toHaveBeenCalledWith(
+      'successor-session',
+      'run-migrate',
+      'complete',
+      undefined,
     )
   })
 
@@ -408,6 +426,32 @@ describe('send-stream bootstrap session handoff', () => {
   })
 
   it('keeps the handoff stream and persistence chain alive when run migration rejects', async () => {
+    const durableRuns = new Map<
+      string,
+      { assistantText: string; status: string }
+    >()
+    mocks.createPersistedRun.mockImplementationOnce(({ sessionKey }) => {
+      const run = { assistantText: '', status: 'accepted' }
+      durableRuns.set(sessionKey, run)
+      return Promise.resolve(run)
+    })
+    mocks.appendRunText.mockImplementation(
+      (sessionKey, _runId, text, options) => {
+        const run = durableRuns.get(sessionKey)
+        if (!run) return Promise.resolve(null)
+        run.assistantText = options?.replace
+          ? text
+          : `${run.assistantText}${text}`
+        run.status = 'active'
+        return Promise.resolve(run)
+      },
+    )
+    mocks.markRunStatus.mockImplementation((sessionKey, _runId, status) => {
+      const run = durableRuns.get(sessionKey)
+      if (!run) return Promise.resolve(null)
+      run.status = status
+      return Promise.resolve(run)
+    })
     mocks.migratePersistedRun.mockRejectedValueOnce(
       new Error('recovery store unavailable'),
     )
@@ -501,17 +545,22 @@ describe('send-stream bootstrap session handoff', () => {
     )
     expect(mocks.appendRunText).toHaveBeenNthCalledWith(
       2,
-      'successor-session',
+      'created-session',
       'run-recovery-failure',
       'after handoff',
       { replace: false },
     )
     expect(mocks.markRunStatus).toHaveBeenCalledWith(
-      'successor-session',
+      'created-session',
       'run-recovery-failure',
       'complete',
       undefined,
     )
+    expect(durableRuns.get('created-session')).toEqual({
+      assistantText: 'before handoff; after handoff',
+      status: 'complete',
+    })
+    expect(durableRuns.has('successor-session')).toBe(false)
     expect(mocks.appendRunText.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.migratePersistedRun.mock.invocationCallOrder[0]!,
     )

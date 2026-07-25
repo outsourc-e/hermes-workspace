@@ -99,7 +99,7 @@ describe('GET /api/sessions lineage projection', () => {
       {
         id: 'continuation',
         source: 'cli',
-        started_at: 2,
+        started_at: 2.001,
         parent_session_id: 'parent',
       },
       {

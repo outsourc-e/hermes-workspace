@@ -34,7 +34,7 @@ describe('projectSessionListLineage', () => {
         lineage: {
           parentSessionId: 'parent',
           source: 'cli',
-          startedAt: 2_000,
+          startedAt: 2_001,
         },
       }),
       session('fork', {

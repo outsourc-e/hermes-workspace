@@ -122,12 +122,22 @@ function hasValidLifecycleContinuation(
 
   const endedAt = parentLineage.endedAt
   const startedAt = childLineage.startedAt
+  if (
+    typeof startedAt !== 'number' ||
+    !Number.isFinite(startedAt) ||
+    startedAt <= 0
+  ) {
+    return false
+  }
+
+  // Legacy continuation records can omit the parent's lifecycle boundary.
+  // When it is present, keep requiring a valid, ordered boundary.
+  if (endedAt === undefined) return true
   return (
     typeof endedAt === 'number' &&
     Number.isFinite(endedAt) &&
-    typeof startedAt === 'number' &&
-    Number.isFinite(startedAt) &&
-    startedAt >= endedAt
+    endedAt > 0 &&
+    startedAt > endedAt
   )
 }
 

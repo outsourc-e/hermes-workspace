@@ -97,7 +97,7 @@ describe('classifySessionRelationship', () => {
     const lifecycleChild = session('lifecycle-child', {
       parentSessionId: 'lifecycle-parent',
       source: 'cli',
-      startedAt: 200,
+      startedAt: 201,
     })
     const byId = lookup([
       metadataParent,
@@ -114,7 +114,7 @@ describe('classifySessionRelationship', () => {
     )
   })
 
-  it('rejects invalid timing, incompatible sources, and missing lifecycle timing', () => {
+  it('rejects invalid timing, incompatible sources, and invalid child starts', () => {
     const parent = session('parent', {
       source: 'cli',
       endReason: 'compression',
@@ -124,6 +124,11 @@ describe('classifySessionRelationship', () => {
       parentSessionId: 'parent',
       source: 'cli',
       startedAt: 199,
+    })
+    const atBoundary = session('at-boundary', {
+      parentSessionId: 'parent',
+      source: 'cli',
+      startedAt: 200,
     })
     const wrongSource = session('wrong-source', {
       parentSessionId: 'parent',
@@ -150,25 +155,34 @@ describe('classifySessionRelationship', () => {
       source: 'cli',
       startedAt: Number.NaN,
     })
+    const nonpositiveChild = session('nonpositive-child', {
+      parentSessionId: 'missing-boundary',
+      source: 'cli',
+      startedAt: 0,
+    })
     const byId = lookup([
       parent,
       tooEarly,
+      atBoundary,
       wrongSource,
       conflictingMetadataSource,
       missingBoundaryParent,
       missingBoundaryChild,
       malformedChild,
+      nonpositiveChild,
     ])
 
     expect(classifySessionRelationship(tooEarly, byId)).toBe('orphan')
+    expect(classifySessionRelationship(atBoundary, byId)).toBe('orphan')
     expect(classifySessionRelationship(wrongSource, byId)).toBe('orphan')
     expect(classifySessionRelationship(conflictingMetadataSource, byId)).toBe(
       'orphan',
     )
     expect(classifySessionRelationship(missingBoundaryChild, byId)).toBe(
-      'orphan',
+      'continuation',
     )
     expect(classifySessionRelationship(malformedChild, byId)).toBe('orphan')
+    expect(classifySessionRelationship(nonpositiveChild, byId)).toBe('orphan')
   })
 
   it('trusts the loaded parent source over contradictory child parent-source metadata', () => {
@@ -224,6 +238,61 @@ describe('classifySessionRelationship', () => {
 })
 
 describe('buildSessionTree', () => {
+  it.each(['compression', 'cli_close'] as const)(
+    'collapses a legacy same-source %s continuation when the parent has no endedAt',
+    (endReason) => {
+      const parent = session('legacy-parent', {
+        source: 'cli',
+        endReason,
+      })
+      const child = session('legacy-child', {
+        parentSessionId: 'legacy-parent',
+        source: 'cli',
+        startedAt: 300,
+      })
+
+      const tree = buildSessionTree([parent, child])
+
+      expect(tree.rows).toHaveLength(1)
+      expect(tree.roots).toHaveLength(1)
+      expect(tree.roots[0]).toMatchObject({
+        key: 'legacy-child',
+        relationshipKind: 'root',
+        continuationCount: 2,
+      })
+      expect(tree.visibleKeyBySessionKey.get('legacy-parent')).toBe(
+        'legacy-child',
+      )
+      expect(tree.visibleKeyBySessionKey.get('legacy-child')).toBe(
+        'legacy-child',
+      )
+    },
+  )
+
+  it('does not collapse a lifecycle child that starts before an existing parent boundary', () => {
+    const parent = session('ordered-parent', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 300,
+    })
+    const child = session('too-early-child', {
+      parentSessionId: 'ordered-parent',
+      source: 'cli',
+      startedAt: 299,
+    })
+
+    const tree = buildSessionTree([parent, child])
+
+    expect(tree.rows).toHaveLength(2)
+    expect(tree.indexByKey.get('too-early-child')).toMatchObject({
+      relationshipKind: 'orphan',
+      isOrphan: true,
+    })
+    expect(tree.visibleKeyBySessionKey.get('ordered-parent')).toBe(
+      'ordered-parent',
+    )
+  })
+
   it('collapses continuation segments to the declared current tip', () => {
     const first = session(
       'first',
