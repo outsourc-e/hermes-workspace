@@ -163,6 +163,8 @@ export type RunTextPersistenceBuffer = {
 }
 
 const RUN_TEXT_PERSIST_INTERVAL_MS = 500
+const RUN_TEXT_SEAL_MAX_ATTEMPTS = 3
+const RUN_TEXT_SEAL_RETRY_BASE_DELAY_MS = 25
 
 type PendingRunTextBatch = { text: string; replace: boolean }
 
@@ -174,6 +176,7 @@ export function createRunTextPersistenceBuffer(
   const queuedBatches: Array<PendingRunTextBatch> = []
   let flushTimer: ReturnType<typeof setTimeout> | null = null
   let writeQueue: Promise<void> | null = null
+  let sealPromise: Promise<void> | null = null
   let sealed = false
 
   const clearFlushTimer = () => {
@@ -231,9 +234,27 @@ export function createRunTextPersistenceBuffer(
     scheduleFlush()
   }
 
-  const seal = async (): Promise<void> => {
+  const seal = (): Promise<void> => {
     sealed = true
-    await flush()
+    if (sealPromise) return sealPromise
+
+    sealPromise = (async () => {
+      for (let attempt = 1; attempt <= RUN_TEXT_SEAL_MAX_ATTEMPTS; attempt++) {
+        try {
+          await flush()
+          return
+        } catch (error) {
+          if (attempt === RUN_TEXT_SEAL_MAX_ATTEMPTS) throw error
+          await new Promise((resolve) =>
+            setTimeout(
+              resolve,
+              RUN_TEXT_SEAL_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
+            ),
+          )
+        }
+      }
+    })()
+    return sealPromise
   }
 
   return { append, replace, flush, seal }

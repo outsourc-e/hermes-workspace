@@ -1381,6 +1381,14 @@ export const Route = createFileRoute('/api/send-stream')({
                       }
 
                       if (event === 'run.completed') {
+                        // Claim completion before any asynchronous backfill so
+                        // a later abort cannot overwrite the observed winner.
+                        const terminalPersistence =
+                          persistTerminalRun('complete')
+                        // Backfill can outlive bounded sealing retries; attach a
+                        // handler now, then re-observe any failure below.
+                        void terminalPersistence.catch(() => undefined)
+
                         // Backfill tool calls from session history.
                         // Hermes Agent currently does not stream tool.* events
                         // reliably, but it persists tool calls on the assistant
@@ -1473,7 +1481,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           sessionKey: sessionKeyFromEvent,
                           runId,
                         }
-                        await persistTerminalRun('complete')
+                        await terminalPersistence
                         sendEvent('done', translated)
                         closeStream()
                       }

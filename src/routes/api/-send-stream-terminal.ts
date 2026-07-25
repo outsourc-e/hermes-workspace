@@ -33,11 +33,9 @@ export function createRunTerminalTransitionCoordinator(
     const selected = { status, errorMessage }
     winner = selected
     terminalPersistence = (async () => {
-      try {
-        await options.sealTranscript()
-      } catch {
-        // Best effort: terminal status must still be persisted.
-      }
+      // Never persist a terminal status if transcript sealing was exhausted:
+      // retained text must not be hidden behind an apparently terminal run.
+      await options.sealTranscript()
       try {
         await options.persist(selected.status, selected.errorMessage)
       } catch {

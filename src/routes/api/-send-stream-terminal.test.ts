@@ -73,4 +73,42 @@ describe('run terminal transition coordinator', () => {
     expect(persist).toHaveBeenCalledTimes(1)
     expect(persist).toHaveBeenCalledWith('complete', undefined)
   })
+
+  it('claims completion before asynchronous backfill so later cancellation cannot win', async () => {
+    const backfill = createDeferred()
+    const persist = vi.fn(() => Promise.resolve())
+    const coordinator = createRunTerminalTransitionCoordinator({
+      sealTranscript: () => Promise.resolve(),
+      persist,
+    })
+
+    const runCompletedHandler = async () => {
+      const terminalPersistence = coordinator.transition('complete')
+      await backfill.promise
+      await terminalPersistence
+    }
+    const completion = runCompletedHandler()
+    expect(coordinator.isSealed()).toBe(true)
+
+    const cancellationDuringBackfill = coordinator.transition('handoff')
+    backfill.resolve()
+    await Promise.all([completion, cancellationDuringBackfill])
+
+    expect(persist).toHaveBeenCalledTimes(1)
+    expect(persist).toHaveBeenCalledWith('complete', undefined)
+  })
+
+  it('does not persist a terminal status when transcript sealing is exhausted', async () => {
+    const persist = vi.fn(() => Promise.resolve())
+    const coordinator = createRunTerminalTransitionCoordinator({
+      sealTranscript: () =>
+        Promise.reject(new Error('text remained unwritten')),
+      persist,
+    })
+
+    await expect(coordinator.transition('complete')).rejects.toThrow(
+      'text remained unwritten',
+    )
+    expect(persist).not.toHaveBeenCalled()
+  })
 })

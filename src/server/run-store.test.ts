@@ -8,6 +8,16 @@ const originalHermesHome = process.env.HERMES_HOME
 
 let tempHome: string | null = null
 
+function createDeferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 beforeEach(() => {
   vi.resetModules()
   tempHome = mkdtempSync(join(tmpdir(), 'hermes-run-store-'))
@@ -127,6 +137,33 @@ describe('run text persistence buffer', () => {
       [' before terminal', { replace: false }],
     ])
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('retries an in-flight rejection during seal before newer text in original order', async () => {
+    const { createRunTextPersistenceBuffer } = await import('./run-store')
+    const inFlightWrite = createDeferred()
+    const write = vi
+      .fn<(text: string, options: { replace: boolean }) => Promise<unknown>>()
+      .mockImplementationOnce(() => inFlightWrite.promise)
+      .mockResolvedValue(null)
+    const buffer = createRunTextPersistenceBuffer(write)
+
+    buffer.replace('authoritative snapshot')
+    const timerFlush = buffer.flush()
+    expect(write).toHaveBeenCalledTimes(1)
+
+    buffer.append(' plus newer delta')
+    const terminalSeal = buffer.seal()
+    inFlightWrite.reject(new Error('in-flight persistence failure'))
+
+    await expect(timerFlush).rejects.toThrow('in-flight persistence failure')
+    await terminalSeal
+
+    expect(write.mock.calls).toEqual([
+      ['authoritative snapshot', { replace: true }],
+      ['authoritative snapshot', { replace: true }],
+      [' plus newer delta', { replace: false }],
+    ])
   })
 })
 
