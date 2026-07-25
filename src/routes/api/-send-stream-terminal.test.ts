@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { createRunTextPersistenceBuffer } from '../../server/run-store'
 import { createSseHeartbeatLifecycle } from './-send-stream-heartbeat'
 import {
   createRunTerminalTransitionCoordinator,
@@ -179,4 +180,53 @@ describe('run terminal transition coordinator', () => {
       })
     },
   )
+
+  it('closes the route stream when the real text buffer exhausts sealing retries', async () => {
+    vi.useFakeTimers()
+    const persist = vi.fn(() => Promise.resolve())
+    const write = vi.fn(() =>
+      Promise.reject(new Error('persistent text write failure')),
+    )
+    const buffer = createRunTextPersistenceBuffer(write)
+    buffer.append('must not be silently lost')
+
+    const heartbeat = createSseHeartbeatLifecycle({
+      intervalMs: 10_000,
+      getActivity: () => null,
+      sendActivityHeartbeat: vi.fn(),
+      sendProxyKeepalive: vi.fn(),
+    })
+    const stopHeartbeat = vi.spyOn(heartbeat, 'stop')
+    let closeStream!: ReturnType<typeof vi.fn<() => void>>
+    const stream = new ReadableStream({
+      start(controller) {
+        heartbeat.start()
+        closeStream = vi.fn(() => {
+          heartbeat.stop()
+          controller.close()
+        })
+      },
+    })
+    const coordinator = createRunTerminalTransitionCoordinator({
+      sealTranscript: () => buffer.seal(),
+      persist,
+    })
+
+    const finalized = finalizeRunTerminalStream({
+      terminalPersistence: coordinator.transition('complete'),
+      closeStream,
+    })
+    await vi.runAllTimersAsync()
+    await finalized
+
+    expect(write).toHaveBeenCalledTimes(3)
+    expect(persist).not.toHaveBeenCalled()
+    expect(closeStream).toHaveBeenCalledTimes(1)
+    expect(stopHeartbeat).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+    await expect(stream.getReader().read()).resolves.toEqual({
+      done: true,
+      value: undefined,
+    })
+  })
 })
