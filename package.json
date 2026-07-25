@@ -69,7 +69,7 @@
     "xterm-addon-fit": "^0.8.0",
     "xterm-addon-search": "^0.13.0",
     "xterm-addon-web-links": "^0.9.0",
-    "yaml": "^2.8.2",
+    "yaml": "^2.8.3",
     "zod": "^3.25.76",
     "zustand": "^5.0.11"
   },
@@ -85,7 +85,7 @@
     "concurrently": "^8.2.2",
     "electron": "^40.8.2",
     "electron-builder": "^26.8.1",
-    "esbuild": "^0.27.0",
+    "esbuild": "^0.28.1",
     "eslint": "9.37.0",
     "jsdom": "^27.0.0",
     "prettier": "^3.5.3",
