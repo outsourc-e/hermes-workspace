@@ -68,3 +68,53 @@ describe('chat-store history merge ordering', () => {
     ])
   })
 })
+
+describe('chat-store session handoff', () => {
+  it('moves active stream state and deduplicates terminal messages across ids', () => {
+    const store = useChatStore.getState()
+    store.clearSession('parent-handoff')
+    store.clearSession('child-handoff')
+
+    const finalMessage = textMessage(
+      'assistant-final',
+      'assistant',
+      'Canonical response',
+      1,
+    )
+    store.processEvent({
+      type: 'chunk',
+      text: 'Canonical response',
+      runId: 'run-handoff',
+      sessionKey: 'parent-handoff',
+      transport: 'send-stream',
+    })
+    store.processEvent({
+      type: 'message',
+      message: finalMessage,
+      runId: 'run-handoff',
+      sessionKey: 'parent-handoff',
+      transport: 'send-stream',
+    })
+    store.processEvent({
+      type: 'message',
+      message: finalMessage,
+      runId: 'run-handoff',
+      sessionKey: 'child-handoff',
+      transport: 'send-stream',
+    })
+    store.setSessionWaiting('parent-handoff', 'run-handoff')
+
+    store.handoffSession('parent-handoff', 'child-handoff')
+
+    const next = useChatStore.getState()
+    expect(next.getRealtimeMessages('parent-handoff')).toEqual([])
+    expect(next.getRealtimeMessages('child-handoff')).toHaveLength(1)
+    expect(next.getStreamingState('parent-handoff')).toBeNull()
+    expect(next.getStreamingState('child-handoff')).toMatchObject({
+      runId: 'run-handoff',
+      text: 'Canonical response',
+    })
+    expect(next.isSessionWaiting('parent-handoff')).toBe(false)
+    expect(next.isSessionWaiting('child-handoff')).toBe(true)
+  })
+})

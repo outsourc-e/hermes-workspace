@@ -1,4 +1,11 @@
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
 import path from 'node:path'
 
 import { getHermesRoot } from './claude-paths'
@@ -119,6 +126,42 @@ export async function getPersistedRun(
   } catch {
     return null
   }
+}
+
+export async function migratePersistedRun(
+  fromSessionKey: string,
+  toSessionKey: string,
+  runId: string,
+  friendlyId?: string,
+): Promise<PersistedRunState | null> {
+  const normalizedFrom = fromSessionKey.trim()
+  const normalizedTo = toSessionKey.trim()
+  const normalizedRunId = runId.trim()
+  if (!normalizedFrom || !normalizedTo || !normalizedRunId) return null
+  if (normalizedFrom === normalizedTo) {
+    return getPersistedRun(normalizedTo, normalizedRunId)
+  }
+
+  return enqueueRunUpdate(normalizedFrom, normalizedRunId, async () => {
+    const current = await getPersistedRun(normalizedFrom, normalizedRunId)
+    if (!current) {
+      return getPersistedRun(normalizedTo, normalizedRunId)
+    }
+
+    const migrated: PersistedRunState = {
+      ...current,
+      sessionKey: normalizedTo,
+      friendlyId: friendlyId?.trim() || current.friendlyId || normalizedTo,
+      updatedAt: Date.now(),
+    }
+    await writeRun(migrated)
+    try {
+      await unlink(runPath(normalizedFrom, normalizedRunId))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    return migrated
+  })
 }
 
 export async function updatePersistedRun(

@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { shouldResolveStreamSession } from './use-streaming-message'
+import {
+  resolveAuthoritativeSessionHandoffEvent,
+  shouldResolveStreamSession,
+} from './use-streaming-message'
 
 describe('shouldResolveStreamSession', () => {
-  it('does not promote backend api session ids over concrete Workspace sessions', () => {
+  it('hands concrete sessions off to an authoritative successor session', () => {
     expect(
       shouldResolveStreamSession({
         requestedSessionKey: 'api-original-workspace',
         currentSessionKey: 'api-original-workspace',
         resolvedSessionKey: 'api-derived-backend',
       }),
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('allows bootstrap new chats to resolve once to a concrete session', () => {
@@ -42,5 +45,52 @@ describe('shouldResolveStreamSession', () => {
         pinMainSession: false,
       }),
     ).toBe(true)
+  })
+})
+
+describe('stream session handoff authority', () => {
+  it('accepts only a concrete authoritative handoff event', () => {
+    expect(
+      resolveAuthoritativeSessionHandoffEvent('session_handoff', {
+        fromSessionKey: ' backend-parent ',
+        sessionKey: ' successor ',
+        friendlyId: ' friendly ',
+        runId: ' run-1 ',
+      }),
+    ).toEqual({
+      fromSessionKey: 'backend-parent',
+      sessionKey: 'successor',
+      friendlyId: 'friendly',
+      runId: 'run-1',
+    })
+  })
+
+  it.each(['main', 'new'])(
+    'accepts bootstrap source %s when the target is concrete',
+    (fromSessionKey) => {
+      expect(
+        resolveAuthoritativeSessionHandoffEvent('session_handoff', {
+          fromSessionKey,
+          sessionKey: 'concrete-session',
+        }),
+      ).toEqual({
+        fromSessionKey,
+        sessionKey: 'concrete-session',
+        friendlyId: 'concrete-session',
+        runId: null,
+      })
+    },
+  )
+
+  it.each([
+    ['started', { sessionKey: 'successor' }],
+    ['session_handoff', { parent_session_id: 'successor' }],
+    ['session_handoff', { fromSessionKey: 'parent', sessionKey: '   ' }],
+    ['session_handoff', { fromSessionKey: 'parent', sessionKey: 'main' }],
+    ['session_handoff', { fromSessionKey: 'parent', sessionKey: 'new' }],
+    ['session_handoff', { sessionKey: 'successor' }],
+    ['session_handoff', null],
+  ])('ignores non-authoritative or malformed %s payloads', (event, data) => {
+    expect(resolveAuthoritativeSessionHandoffEvent(event, data)).toBeNull()
   })
 })

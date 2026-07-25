@@ -117,6 +117,7 @@ type ChatState = {
   getRealtimeMessages: (sessionKey: string) => Array<ChatMessage>
   getStreamingState: (sessionKey: string) => StreamingState | null
   clearSession: (sessionKey: string) => void
+  handoffSession: (fromSessionKey: string, toSessionKey: string) => void
   clearRealtimeBuffer: (sessionKey: string) => void
   clearStreamingSession: (sessionKey: string) => void
   clearAllStreaming: () => void
@@ -1208,6 +1209,102 @@ export const useChatStore = create<ChatState>((set, get) => ({
     messages.delete(sessionKey)
     streaming.delete(sessionKey)
     set({ realtimeMessages: messages, streamingState: streaming })
+  },
+
+  handoffSession: (fromSessionKey, toSessionKey) => {
+    if (!fromSessionKey || !toSessionKey || fromSessionKey === toSessionKey)
+      return
+
+    const state = get()
+    const messages = new Map(state.realtimeMessages)
+    const sourceMessages = messages.get(fromSessionKey) ?? []
+    const targetMessages = messages.get(toSessionKey) ?? []
+    const mergedMessages = [...sourceMessages]
+    for (const message of targetMessages) {
+      const messageId = getMessageId(message)
+      const messageText = extractMessageText(message)
+      const isDuplicate = mergedMessages.some((existing) => {
+        if (existing.role !== message.role) return false
+        const existingId = getMessageId(existing)
+        if (messageId && existingId && messageId === existingId) return true
+        return Boolean(
+          messageText && messageText === extractMessageText(existing),
+        )
+      })
+      if (!isDuplicate) mergedMessages.push(message)
+    }
+    messages.delete(fromSessionKey)
+    if (mergedMessages.length > 0) {
+      messages.set(toSessionKey, sortMessagesChronologically(mergedMessages))
+    }
+
+    const streaming = new Map(state.streamingState)
+    const sourceStreaming = streaming.get(fromSessionKey)
+    const targetStreaming = streaming.get(toSessionKey)
+    streaming.delete(fromSessionKey)
+    if (sourceStreaming || targetStreaming) {
+      const primary = (sourceStreaming ?? targetStreaming) as StreamingState
+      const secondary = (targetStreaming ?? sourceStreaming) as StreamingState
+      const toolCalls = [...primary.toolCalls]
+      for (const toolCall of secondary.toolCalls) {
+        const index = toolCalls.findIndex(
+          (candidate) => candidate.id === toolCall.id,
+        )
+        if (index >= 0) toolCalls[index] = { ...toolCalls[index], ...toolCall }
+        else toolCalls.push(toolCall)
+      }
+      const lifecycleEvents = [...primary.lifecycleEvents]
+      for (const lifecycleEvent of secondary.lifecycleEvents) {
+        const isDuplicate = lifecycleEvents.some(
+          (candidate) =>
+            candidate.text === lifecycleEvent.text &&
+            candidate.timestamp === lifecycleEvent.timestamp,
+        )
+        if (!isDuplicate) lifecycleEvents.push(lifecycleEvent)
+      }
+      const nextStreaming: StreamingState = {
+        ...primary,
+        runId: primary.runId ?? secondary.runId ?? null,
+        text:
+          primary.text.length >= secondary.text.length
+            ? primary.text
+            : secondary.text,
+        thinking: primary.thinking || secondary.thinking,
+        toolCalls,
+        lifecycleEvents,
+      }
+      streaming.set(toSessionKey, nextStreaming)
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(`claude_streaming_${fromSessionKey}`)
+      }
+      persistStreamingState(toSessionKey, nextStreaming)
+    }
+
+    const waitingSessionKeys = new Set(state.waitingSessionKeys)
+    const waitingSessionMeta = { ...state.waitingSessionMeta }
+    const sourceWaiting = waitingSessionMeta[fromSessionKey]
+    if (waitingSessionKeys.delete(fromSessionKey)) {
+      waitingSessionKeys.add(toSessionKey)
+      waitingSessionMeta[toSessionKey] =
+        waitingSessionMeta[toSessionKey] ?? sourceWaiting
+      delete waitingSessionMeta[fromSessionKey]
+      removeWaitingState(fromSessionKey)
+      const nextWaitingMeta = waitingSessionMeta[toSessionKey]
+      if (nextWaitingMeta) persistWaitingState(toSessionKey, nextWaitingMeta)
+    }
+
+    const recoveryMessage = readRecoveryMessage(fromSessionKey)
+    if (recoveryMessage && !readRecoveryMessage(toSessionKey)) {
+      persistRecoveryMessage(toSessionKey, recoveryMessage)
+    }
+    clearRecoveryMessage(fromSessionKey)
+
+    set({
+      realtimeMessages: messages,
+      streamingState: streaming,
+      waitingSessionKeys,
+      waitingSessionMeta,
+    })
   },
 
   clearRealtimeBuffer: (sessionKey) => {

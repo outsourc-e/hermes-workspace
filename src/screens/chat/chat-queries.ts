@@ -50,6 +50,9 @@ function isMatchingClientMessage(
 
 export const chatQueryKeys = {
   sessions: ['chat', 'sessions'] as const,
+  latestDescendant: function latestDescendant(sessionKey: string) {
+    return ['chat', 'latest-descendant', sessionKey] as const
+  },
   history: function history(friendlyId: string, sessionKey: string) {
     return ['chat', 'history', friendlyId, sessionKey] as const
   },
@@ -65,11 +68,14 @@ export async function fetchSessions(): Promise<Array<SessionMeta>> {
 export async function fetchHistory(payload: {
   sessionKey: string
   friendlyId: string
+  signal?: AbortSignal
 }): Promise<HistoryResponse> {
   const query = new URLSearchParams({ limit: '1000' })
   if (payload.sessionKey) query.set('sessionKey', payload.sessionKey)
   if (payload.friendlyId) query.set('friendlyId', payload.friendlyId)
-  const res = await fetch(`/api/history?${query.toString()}`)
+  const res = await fetch(`/api/history?${query.toString()}`, {
+    signal: payload.signal,
+  })
   if (!res.ok) throw new Error(await readError(res))
   return (await res.json()) as HistoryResponse
 }
@@ -474,10 +480,29 @@ export function moveHistoryMessages(
   const toKey = chatQueryKeys.history(toFriendlyId, toSessionKey)
   const fromData = queryClient.getQueryData<HistoryResponse>(fromKey)
   if (!fromData) return
-  const messages = Array.isArray(fromData.messages) ? fromData.messages : []
+  const fromMessages = Array.isArray(fromData.messages) ? fromData.messages : []
+  const toData = queryClient.getQueryData<HistoryResponse>(toKey)
+  const toMessages = Array.isArray(toData?.messages) ? toData.messages : []
+  const messages = [...fromMessages]
+  const seen = new Set(
+    fromMessages.map((message) => {
+      const id = normalizeId((message as Record<string, unknown>).id)
+      if (id) return `${message.role ?? ''}:id:${id}`
+      return `${message.role ?? ''}:content:${JSON.stringify(message.content ?? [])}`
+    }),
+  )
+  for (const message of toMessages) {
+    const id = normalizeId((message as Record<string, unknown>).id)
+    const signature = id
+      ? `${message.role ?? ''}:id:${id}`
+      : `${message.role ?? ''}:content:${JSON.stringify(message.content ?? [])}`
+    if (seen.has(signature)) continue
+    seen.add(signature)
+    messages.push(message)
+  }
   queryClient.setQueryData(toKey, {
     sessionKey: toSessionKey,
-    sessionId: (fromData as any).sessionId,
+    sessionId: fromData.sessionId ?? toData?.sessionId,
     messages,
   })
   queryClient.removeQueries({ queryKey: fromKey, exact: true })

@@ -168,6 +168,40 @@ describe('run text persistence buffer', () => {
 })
 
 describe('run-store persistence', () => {
+  it('moves an active run to the authoritative successor for recovery polling', async () => {
+    const {
+      appendRunText,
+      createPersistedRun,
+      getActiveRunForSession,
+      getPersistedRun,
+      migratePersistedRun,
+    } = await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'run-handoff',
+      sessionKey: 'session-a',
+      friendlyId: 'friendly-a',
+    })
+    await appendRunText('session-a', 'run-handoff', 'persisted before handoff')
+
+    await migratePersistedRun(
+      'session-a',
+      'session-b',
+      'run-handoff',
+      'friendly-b',
+    )
+    await appendRunText('session-b', 'run-handoff', ' and after handoff')
+
+    expect(await getPersistedRun('session-a', 'run-handoff')).toBeNull()
+    expect(await getActiveRunForSession('session-b')).toMatchObject({
+      runId: 'run-handoff',
+      sessionKey: 'session-b',
+      friendlyId: 'friendly-b',
+      status: 'active',
+      assistantText: 'persisted before handoff and after handoff',
+    })
+  })
+
   it('preserves concurrent updates to the same run', async () => {
     const { addRunLifecycleEvent, createPersistedRun, getPersistedRun } =
       await import('./run-store')

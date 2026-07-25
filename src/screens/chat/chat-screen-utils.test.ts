@@ -3,9 +3,97 @@ import { describe, expect, it } from 'vitest'
 import {
   advanceStickyStreamingText,
   createResponseWaitSnapshot,
+  getChatSessionSourceState,
+  isNonRemoteSessionSource,
   isTerminalActiveRunStatus,
   shouldClearWaitingForAssistantMessage,
+  shouldPinMainSession,
 } from './chat-screen-utils'
+
+describe('isNonRemoteSessionSource', () => {
+  it.each(['local', 'LOCAL', ' portable '])(
+    'excludes %j sessions from remote canonicalization',
+    (source) => {
+      expect(isNonRemoteSessionSource(source)).toBe(true)
+    },
+  )
+
+  it.each(['remote', '', undefined, null])(
+    'keeps remotely backed source %j eligible',
+    (source) => {
+      expect(isNonRemoteSessionSource(source)).toBe(false)
+    },
+  )
+})
+
+describe('getChatSessionSourceState', () => {
+  it('keeps absent cold metadata unknown only while the session list is pending', () => {
+    expect(
+      getChatSessionSourceState({
+        embedded: false,
+        sessionsStatus: 'pending',
+        source: undefined,
+      }),
+    ).toBe('unknown')
+    expect(
+      getChatSessionSourceState({
+        embedded: false,
+        sessionsStatus: 'error',
+        source: undefined,
+      }),
+    ).toBe('remote')
+  })
+
+  it('classifies known local and portable metadata without waiting', () => {
+    expect(
+      getChatSessionSourceState({
+        embedded: false,
+        sessionsStatus: 'pending',
+        source: 'local',
+      }),
+    ).toBe('local')
+    expect(
+      getChatSessionSourceState({
+        embedded: false,
+        sessionsStatus: 'success',
+        source: 'portable',
+      }),
+    ).toBe('local')
+  })
+})
+
+describe('shouldPinMainSession', () => {
+  it.each(['unknown', 'remote'] as const)(
+    'does not pin an unresolved %s main bootstrap route',
+    (sessionSource) => {
+      expect(
+        shouldPinMainSession({
+          activeFriendlyId: 'main',
+          resolvedSessionKey: 'main',
+          portableMode: false,
+          sessionSource,
+        }),
+      ).toBe(false)
+    },
+  )
+
+  it.each([
+    { portableMode: true, sessionSource: 'remote' as const },
+    { portableMode: false, sessionSource: 'local' as const },
+  ])(
+    'pins main when its semantics are portable/local',
+    ({ portableMode, sessionSource }) => {
+      expect(
+        shouldPinMainSession({
+          activeFriendlyId: 'main',
+          resolvedSessionKey: 'main',
+          portableMode,
+          sessionSource,
+        }),
+      ).toBe(true)
+    },
+  )
+})
 
 describe('advanceStickyStreamingText', () => {
   it('preserves the last non-empty streaming text when a tool phase temporarily reports empty text', () => {

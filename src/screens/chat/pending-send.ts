@@ -173,6 +173,32 @@ export function persistPendingMessage(payload: PendingSendPayload) {
   writePendingSendToStorage(payload)
 }
 
+export function handoffPendingSend(
+  fromSessionKey: string,
+  toSessionKey: string,
+  toFriendlyId: string,
+) {
+  const normalizedFrom = fromSessionKey.trim()
+  const normalizedTo = toSessionKey.trim()
+  const normalizedFriendlyId = toFriendlyId.trim() || normalizedTo
+  if (!normalizedFrom || !normalizedTo || normalizedFrom === normalizedTo)
+    return
+
+  const persisted = readPendingMessage(normalizedFrom)
+  const source =
+    pendingSend?.sessionKey === normalizedFrom ? pendingSend : persisted
+  if (!source) return
+
+  const next: PendingSendPayload = {
+    ...source,
+    sessionKey: normalizedTo,
+    friendlyId: normalizedFriendlyId,
+  }
+  pendingSend = pendingSend?.sessionKey === normalizedFrom ? next : pendingSend
+  writePendingSendToStorage(next)
+  clearPendingMessage(normalizedFrom)
+}
+
 export function readPendingMessage(
   sessionKey: string,
   friendlyId?: string,

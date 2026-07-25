@@ -1,10 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  moveHistoryMessages,
-  reconcileSessionDraft,
-} from '../../screens/chat/chat-queries'
+import { applySessionRouteResolution } from './-session-route-state'
+import type { SessionRouteResolutionPayload } from './-session-route-state'
 import { ErrorBoundary } from '@/components/error-boundary'
 
 const ChatScreen = lazy(async () => {
@@ -73,6 +71,17 @@ function ChatRoute() {
     forcedSession?.friendlyId === activeFriendlyId
       ? forcedSession.sessionKey
       : undefined
+  const latestResolvedRouteRef = useRef({
+    friendlyId: activeFriendlyId,
+    sessionKey: forcedSessionKey ?? activeFriendlyId,
+  })
+
+  useEffect(() => {
+    latestResolvedRouteRef.current = {
+      friendlyId: activeFriendlyId,
+      sessionKey: forcedSessionKey ?? activeFriendlyId,
+    }
+  }, [activeFriendlyId, forcedSessionKey])
 
   // Clear history cache when navigating to new chat
   useEffect(() => {
@@ -82,26 +91,15 @@ function ChatRoute() {
   }, [isNewChat, queryClient])
 
   const handleSessionResolved = useCallback(
-    function handleSessionResolved(payload: {
-      friendlyId: string
-      sessionKey: string
-    }) {
-      const sourceFriendlyId = activeFriendlyId
-      const sourceSessionKey = forcedSessionKey ?? activeFriendlyId
-      moveHistoryMessages(
+    function handleSessionResolved(payload: SessionRouteResolutionPayload) {
+      const currentRoute = latestResolvedRouteRef.current
+      const transition = applySessionRouteResolution({
         queryClient,
-        sourceFriendlyId,
-        sourceSessionKey,
-        payload.friendlyId,
-        payload.sessionKey,
-      )
-      reconcileSessionDraft(
-        queryClient,
-        sourceFriendlyId,
-        sourceSessionKey,
-        payload.friendlyId,
-        payload.sessionKey,
-      )
+        activeFriendlyId: currentRoute.friendlyId,
+        fallbackSessionKey: currentRoute.sessionKey,
+        payload,
+      })
+      latestResolvedRouteRef.current = transition.resolvedRoute
       queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] })
       setForcedSession({
         friendlyId: payload.friendlyId,
@@ -111,13 +109,9 @@ function ChatRoute() {
       try {
         localStorage.setItem('claude-last-session', payload.friendlyId)
       } catch {}
-      navigate({
-        to: '/chat/$sessionKey',
-        params: { sessionKey: payload.friendlyId },
-        replace: true,
-      })
+      navigate(transition.navigation)
     },
-    [activeFriendlyId, forcedSessionKey, navigate, queryClient],
+    [navigate, queryClient],
   )
 
   if (!mounted) {
@@ -141,11 +135,7 @@ function ChatRoute() {
           activeFriendlyId={activeFriendlyId}
           isNewChat={isNewChat}
           forcedSessionKey={forcedSessionKey}
-          onSessionResolved={
-            isNewChat || activeFriendlyId === 'main'
-              ? handleSessionResolved
-              : undefined
-          }
+          onSessionResolved={handleSessionResolved}
         />
       </Suspense>
     </ErrorBoundary>

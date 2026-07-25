@@ -14,6 +14,7 @@ import {
   createPersistedRun,
   createRunTextPersistenceBuffer,
   markRunStatus,
+  migratePersistedRun,
   setRunThinking,
   upsertRunToolCall,
 } from '../../server/run-store'
@@ -50,6 +51,10 @@ import {
   createRunTerminalTransitionCoordinator,
   finalizeRunTerminalStream,
 } from './-send-stream-terminal'
+import {
+  resolveAuthoritativeBootstrapHandoff,
+  resolveAuthoritativeStreamHandoff,
+} from './-send-stream-session-handoff'
 import type {
   OpenAICompatContentPart,
   OpenAICompatMessage,
@@ -434,9 +439,10 @@ export const Route = createFileRoute('/api/send-stream')({
           },
           persist: async (status, errorMessage) => {
             const runId = persistedRunId
-            const runSessionKey = activeRunSessionKey
-            if (!runId || !runSessionKey) return
+            if (!runId) return
             await (persistedRunReady ?? Promise.resolve())
+            const runSessionKey = activeRunSessionKey
+            if (!runSessionKey) return
             await markRunStatus(runSessionKey, runId, status, errorMessage)
           },
         })
@@ -480,9 +486,36 @@ export const Route = createFileRoute('/api/send-stream')({
           runTextBuffer = createRunTextPersistenceBuffer(
             async (text, options) => {
               await (persistedRunReady ?? Promise.resolve())
-              return appendRunText(runSessionKey, runId, text, options)
+              const targetRunSessionKey = activeRunSessionKey
+              if (!targetRunSessionKey) return null
+              return appendRunText(targetRunSessionKey, runId, text, options)
             },
           )
+        }
+
+        const migrateActivePersistedRun = async (
+          fromSessionKey: string,
+          toSessionKey: string,
+          friendlyId: string,
+        ) => {
+          const runId = persistedRunId
+          if (!runId || !persistedRunReady || fromSessionKey === toSessionKey) {
+            return
+          }
+
+          await runTextBuffer?.flush()
+          const migration = persistedRunReady.then(() =>
+            migratePersistedRun(
+              fromSessionKey,
+              toSessionKey,
+              runId,
+              friendlyId,
+            ),
+          )
+          const migrationReady = migration.catch(() => null)
+          persistedRunReady = migrationReady
+          activeRunSessionKey = toSessionKey
+          await migrationReady
         }
 
         const persistActiveRun = (
@@ -492,7 +525,7 @@ export const Route = createFileRoute('/api/send-stream')({
           if (!activeRunId || !activeRunSessionKey) return
           const runId = activeRunId
           const runSessionKey = activeRunSessionKey
-          void (persistedRunReady ?? Promise.resolve())
+          persistedRunReady = (persistedRunReady ?? Promise.resolve())
             .then(() => write(runSessionKey, runId))
             .catch(() => null)
         }
@@ -954,6 +987,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 throw new Error(SESSIONS_API_UNAVAILABLE_MESSAGE)
               }
 
+              const requestedPreStreamSessionKey = sessionKey
               if (SESSION_BOOTSTRAP_KEYS.has(sessionKey)) {
                 // 'main' should land in the user's existing main chat,
                 // not spin up a brand new session every time. Skip cron
@@ -999,6 +1033,18 @@ export const Route = createFileRoute('/api/send-stream')({
                   sessionKey = session.id
                   resolvedFriendlyId = session.id
                 }
+              }
+
+              const bootstrapHandoff = resolveAuthoritativeBootstrapHandoff(
+                requestedPreStreamSessionKey,
+                sessionKey,
+              )
+              if (bootstrapHandoff) {
+                sendEvent('session_handoff', {
+                  ...bootstrapHandoff,
+                  friendlyId: bootstrapHandoff.sessionKey,
+                  runId: activeRunId,
+                })
               }
 
               let startedSent = false
@@ -1090,15 +1136,29 @@ export const Route = createFileRoute('/api/send-stream')({
                   {
                     signal: abortController.signal,
                     async onEvent({ event, data }) {
-                      const sessionKeyFromEvent =
-                        typeof data.session_id === 'string' &&
-                        data.session_id.trim()
-                          ? data.session_id
-                          : sessionKey
                       const runId =
                         typeof data.run_id === 'string' && data.run_id.trim()
                           ? data.run_id
                           : (activeRunId ?? undefined)
+                      const sessionHandoff = resolveAuthoritativeStreamHandoff(
+                        sessionKey,
+                        data,
+                      )
+                      if (sessionHandoff) {
+                        await migrateActivePersistedRun(
+                          sessionHandoff.fromSessionKey,
+                          sessionHandoff.sessionKey,
+                          sessionHandoff.sessionKey,
+                        )
+                        sessionKey = sessionHandoff.sessionKey
+                        resolvedFriendlyId = sessionHandoff.sessionKey
+                        sendEvent('session_handoff', {
+                          ...sessionHandoff,
+                          friendlyId: sessionHandoff.sessionKey,
+                          runId,
+                        })
+                      }
+                      const sessionKeyFromEvent = sessionKey
 
                       if (runId && !activeRunId) {
                         activeRunId = runId

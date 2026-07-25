@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChatAttachment, ChatMessage } from '../types'
-import { readResolvedSessionHeaders } from '@/lib/send-stream-session-headers'
 import { useChatStore } from '@/stores/chat-store'
 import { pushActivity } from '@/components/inspector/activity-store'
 
+const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
+
 /**
- * Determine whether a stream-resolved session key change should trigger
- * onSessionResolved (which navigates the route). Only bootstrap keys
- * ("new", "main") should promote a backend-returned session ID to the
- * Workspace route identity. Concrete sessions must never be overridden
- * by a backend-derived api-* ID — that causes session splits (#297).
+ * Determine whether authoritative stream session data should trigger a route
+ * handoff. Portable `main` remains pinned, but remote concrete sessions may
+ * legitimately continue under a successor session identifier.
  */
 export function shouldResolveStreamSession({
   requestedSessionKey,
@@ -29,8 +28,45 @@ export function shouldResolveStreamSession({
   // "main" only stays pinned when the current route is intentionally bound to
   // the portable Workspace session in zero-fork mode.
   if (requestedSessionKey === 'main') return !pinMainSession
-  // Concrete session → never promote a different backend ID
-  return false
+  // Concrete remote sessions hand off when the stream names a successor.
+  return true
+}
+
+export function resolveAuthoritativeSessionHandoffEvent(
+  event: string,
+  data: unknown,
+): {
+  fromSessionKey: string
+  sessionKey: string
+  friendlyId: string
+  runId: string | null
+} | null {
+  if (event !== 'session_handoff' || !data || typeof data !== 'object') {
+    return null
+  }
+  const payload = data as Record<string, unknown>
+  const fromSessionKey =
+    typeof payload.fromSessionKey === 'string'
+      ? payload.fromSessionKey.trim()
+      : ''
+  const sessionKey =
+    typeof payload.sessionKey === 'string' ? payload.sessionKey.trim() : ''
+  if (
+    !fromSessionKey ||
+    !sessionKey ||
+    SESSION_BOOTSTRAP_KEYS.has(sessionKey) ||
+    fromSessionKey === sessionKey
+  )
+    return null
+  const friendlyId =
+    typeof payload.friendlyId === 'string' && payload.friendlyId.trim()
+      ? payload.friendlyId.trim()
+      : sessionKey
+  const runId =
+    typeof payload.runId === 'string' && payload.runId.trim()
+      ? payload.runId.trim()
+      : null
+  return { fromSessionKey, sessionKey, friendlyId, runId }
 }
 
 type StreamingState = {
@@ -85,8 +121,10 @@ type UseStreamingMessageOptions = {
   ) => void
   onAbort?: () => void
   onSessionResolved?: (payload: {
+    fromSessionKey: string
     sessionKey: string
     friendlyId: string
+    reason: 'bootstrap' | 'stream-handoff'
   }) => void
   acceptedTimeoutMs?: number
   handoffTimeoutMs?: number
@@ -150,6 +188,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const unregisterSendStreamRun = useChatStore((s) => s.unregisterSendStreamRun)
   const processStoreEvent = useChatStore((s) => s.processEvent)
   const clearStreamingSession = useChatStore((s) => s.clearStreamingSession)
+  const handoffSession = useChatStore((s) => s.handoffSession)
 
   const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = acceptedTimeoutMs ?? 120_000
   const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = handoffTimeoutMs ?? 300_000
@@ -435,6 +474,39 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     [clearHandoffTimer, onComplete, stopFrame, unregisterSendStreamRun],
   )
 
+  const applySessionHandoff = useCallback(
+    (
+      fromSessionKey: string,
+      resolvedSessionKey: string,
+      resolvedFriendlyId: string,
+    ) => {
+      const currentSessionKey = activeSessionKeyRef.current
+      if (fromSessionKey !== currentSessionKey) return
+      if (
+        !shouldResolveStreamSession({
+          requestedSessionKey: requestedSessionKeyRef.current,
+          currentSessionKey,
+          resolvedSessionKey,
+          pinMainSession,
+        })
+      ) {
+        return
+      }
+
+      handoffSession(fromSessionKey, resolvedSessionKey)
+      activeSessionKeyRef.current = resolvedSessionKey
+      onSessionResolved?.({
+        fromSessionKey,
+        sessionKey: resolvedSessionKey,
+        friendlyId: resolvedFriendlyId || resolvedSessionKey,
+        reason: SESSION_BOOTSTRAP_KEYS.has(fromSessionKey)
+          ? 'bootstrap'
+          : 'stream-handoff',
+      })
+    },
+    [handoffSession, onSessionResolved, pinMainSession],
+  )
+
   const processEvent = useCallback(
     (event: string, data: unknown) => {
       const payload = data as Record<string, unknown>
@@ -469,31 +541,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       switch (event) {
         case 'started': {
-          const resolvedSessionKey =
-            typeof payload.sessionKey === 'string' && payload.sessionKey.trim()
-              ? payload.sessionKey.trim()
-              : activeSessionKeyRef.current
-          const resolvedFriendlyId =
-            typeof payload.friendlyId === 'string' && payload.friendlyId.trim()
-              ? payload.friendlyId.trim()
-              : resolvedSessionKey
-          if (resolvedSessionKey !== activeSessionKeyRef.current) {
-            // Guard: only promote backend session IDs for bootstrap keys.
-            // Concrete Workspace sessions must never be overridden (#297).
-            if (
-              shouldResolveStreamSession({
-                requestedSessionKey: requestedSessionKeyRef.current,
-                currentSessionKey: activeSessionKeyRef.current,
-                resolvedSessionKey,
-              })
-            ) {
-              activeSessionKeyRef.current = resolvedSessionKey
-              onSessionResolved?.({
-                sessionKey: resolvedSessionKey,
-                friendlyId: resolvedFriendlyId,
-              })
-            }
-          }
           // Register runId so chat-events skips duplicate chunks for this run
           const runId = payload.runId as string | undefined
           if (runId) {
@@ -514,6 +561,20 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             transport: 'send-stream',
           })
           onStarted?.({ runId: runId ?? null })
+          break
+        }
+        case 'session_handoff': {
+          const handoff = resolveAuthoritativeSessionHandoffEvent(event, data)
+          if (!handoff) break
+          if (handoff.runId) {
+            activeRunIdRef.current = handoff.runId
+            registerSendStreamRun(handoff.runId)
+          }
+          applySessionHandoff(
+            handoff.fromSessionKey,
+            handoff.sessionKey,
+            handoff.friendlyId,
+          )
           break
         }
         case 'assistant': {
@@ -782,10 +843,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
     },
     [
+      applySessionHandoff,
       finishStream,
       markFailed,
       onStarted,
-      onSessionResolved,
       onThinking,
       onTool,
       markActivity,
@@ -889,32 +950,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           throw new Error(errorText || 'Stream request failed')
         }
 
-        const resolvedHeaders = readResolvedSessionHeaders(response.headers, {
-          sessionKey: params.sessionKey,
-          friendlyId: params.friendlyId || params.sessionKey,
-        })
-        const resolvedSessionKey = resolvedHeaders.sessionKey
-        const resolvedFriendlyId = resolvedHeaders.friendlyId
-        if (resolvedSessionKey !== activeSessionKeyRef.current) {
-          // Only promote a backend-returned session ID when the original
-          // request was a bootstrap key ("new"/"main"). Concrete Workspace
-          // sessions must never be overridden — that causes splits (#297).
-          if (
-            shouldResolveStreamSession({
-              requestedSessionKey: params.sessionKey,
-              currentSessionKey: activeSessionKeyRef.current,
-              resolvedSessionKey,
-              pinMainSession,
-            })
-          ) {
-            activeSessionKeyRef.current = resolvedSessionKey
-            onSessionResolved?.({
-              sessionKey: resolvedSessionKey,
-              friendlyId: resolvedFriendlyId,
-            })
-          }
-        }
-
         markAccepted()
         schedulePostAcceptanceTimeout('accepted')
 
@@ -924,7 +959,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         if (params.idempotencyKey && onMessageAccepted) {
           onMessageAccepted(
             activeSessionKeyRef.current,
-            resolvedFriendlyId,
+            params.friendlyId || activeSessionKeyRef.current,
             params.idempotencyKey,
           )
         }
@@ -1032,13 +1067,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
     },
     [
+      applySessionHandoff,
       finishStream,
       markAccepted,
       markFailed,
       onAbort,
       onMessageAccepted,
-      onSessionResolved,
-      pinMainSession,
       processEvent,
       resetActiveStreamState,
       schedulePostAcceptanceTimeout,
@@ -1046,22 +1080,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   )
 
   const cancelStreaming = useCallback(() => {
-    if (
-      lifecyclePhaseRef.current === 'accepted' ||
-      lifecyclePhaseRef.current === 'active' ||
-      lifecyclePhaseRef.current === 'handoff'
-    ) {
-      transitionToHandoff()
-    }
     if (eventSourceRef.current) {
       eventSourceRef.current.abort()
       eventSourceRef.current = null
     }
-    finishedRef.current = lifecyclePhaseRef.current !== 'handoff'
-    if (lifecyclePhaseRef.current !== 'handoff') {
-      resetActiveStreamState()
-    }
-  }, [resetActiveStreamState, transitionToHandoff])
+    finishedRef.current = true
+    resetActiveStreamState()
+  }, [resetActiveStreamState])
 
   const resetStreaming = useCallback(() => {
     cancelStreaming()

@@ -14,7 +14,9 @@ import {
   readRecoveryMessage,
 } from '../../../stores/chat-store'
 import { useChatSettingsStore } from '../../../hooks/use-chat-settings'
+import { resolveLatestDescendant } from '../latest-descendant'
 import type { PendingSendPayload } from '../pending-send'
+import type { ChatSessionSourceState } from '../chat-screen-utils'
 import type { QueryClient } from '@tanstack/react-query'
 import type { ChatMessage, HistoryResponse } from '../types'
 
@@ -33,6 +35,36 @@ type UseChatHistoryInput = {
   historyRefetchInterval?: number
   /** When true, skip all server history fetching (portable mode). */
   portableMode?: boolean
+  /** Unknown cold metadata defers both lineage and history until classified. */
+  sessionSource?: ChatSessionSourceState
+  onCanonicalSessionResolved?: (payload: {
+    requestedSessionKey: string
+    sessionKey: string
+  }) => void
+}
+
+export function shouldResolveCanonicalHistory(payload: {
+  shouldFetchHistory: boolean
+  sessionSource: ChatSessionSourceState
+  sessionKey: string
+}): boolean {
+  return (
+    payload.shouldFetchHistory &&
+    payload.sessionSource === 'remote' &&
+    payload.sessionKey !== 'new'
+  )
+}
+
+export function isCanonicalHistoryResolutionReady(payload: {
+  shouldFetchHistory: boolean
+  sessionSource: ChatSessionSourceState
+  resolverSucceeded: boolean
+}): boolean {
+  return (
+    !payload.shouldFetchHistory ||
+    payload.sessionSource === 'local' ||
+    payload.resolverSucceeded
+  )
 }
 
 function normalizeSessionCandidate(value: string | undefined): string {
@@ -267,6 +299,8 @@ export function useChatHistory({
   queryClient,
   historyRefetchInterval,
   portableMode = false,
+  sessionSource = 'remote',
+  onCanonicalSessionResolved,
 }: UseChatHistoryInput) {
   const explicitRouteSessionKey = useMemo(() => {
     const normalizedFriendlyId = normalizeSessionCandidate(activeFriendlyId)
@@ -314,6 +348,39 @@ export function useChatHistory({
       (!isRedirecting &&
         (hasDirectSessionKey || !sessionsReady || activeExists)))
 
+  const shouldResolveCanonicalSession = shouldResolveCanonicalHistory({
+    shouldFetchHistory,
+    sessionSource,
+    sessionKey: sessionKeyForHistory,
+  })
+  const latestDescendantQuery = useQuery({
+    queryKey: chatQueryKeys.latestDescendant(sessionKeyForHistory),
+    queryFn: ({ signal }) =>
+      resolveLatestDescendant(sessionKeyForHistory, { signal }),
+    enabled: shouldResolveCanonicalSession,
+    retry: false,
+    staleTime: 30_000,
+    gcTime: 1000 * 60 * 10,
+  })
+  const canonicalResolution = latestDescendantQuery.data
+  const canonicalChanged =
+    canonicalResolution?.requestedSessionKey === sessionKeyForHistory &&
+    canonicalResolution.changed
+  const canonicalResolutionReady = isCanonicalHistoryResolutionReady({
+    shouldFetchHistory,
+    sessionSource,
+    resolverSucceeded:
+      shouldResolveCanonicalSession && latestDescendantQuery.isSuccess,
+  })
+
+  useEffect(() => {
+    if (!canonicalChanged) return
+    onCanonicalSessionResolved?.({
+      requestedSessionKey: canonicalResolution.requestedSessionKey,
+      sessionKey: canonicalResolution.sessionKey,
+    })
+  }, [canonicalChanged, canonicalResolution, onCanonicalSessionResolved])
+
   const effectiveFriendlyId = portableMode ? 'main' : activeFriendlyId
   const effectiveSessionKeyForHistory = portableMode
     ? 'main'
@@ -329,7 +396,7 @@ export function useChatHistory({
 
   const historyQuery = useQuery({
     queryKey: historyKey,
-    queryFn: async function fetchHistoryForSession() {
+    queryFn: async function fetchHistoryForSession({ signal }) {
       if (portableMode) {
         return readPortableHistory()
       }
@@ -346,6 +413,7 @@ export function useChatHistory({
       const serverData = await fetchHistory({
         sessionKey: sessionKeyForHistory,
         friendlyId: activeFriendlyId,
+        signal,
       })
 
       let dataWithRecovery = serverData
@@ -380,7 +448,8 @@ export function useChatHistory({
         messages: merged,
       }
     },
-    enabled: shouldFetchHistory,
+    enabled:
+      shouldFetchHistory && canonicalResolutionReady && !canonicalChanged,
     initialData: function useInitialHistory(): HistoryResponse | undefined {
       if (portableMode) {
         return (
@@ -415,10 +484,11 @@ export function useChatHistory({
   }, [activeFriendlyId, sessionKeyForHistory])
 
   const rawHistoryMessages = useMemo(() => {
+    if (!canonicalResolutionReady || canonicalChanged) return []
     return Array.isArray(historyQuery.data?.messages)
       ? historyQuery.data.messages
       : []
-  }, [historyQuery.data?.messages])
+  }, [canonicalChanged, canonicalResolutionReady, historyQuery.data?.messages])
 
   useEffect(() => {
     if (!sessionKeyForHistory || sessionKeyForHistory === 'new') return
@@ -466,11 +536,9 @@ export function useChatHistory({
       : rawHistoryMessages
     const last = messages[messages.length - 1]
     const lastId =
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
       last && typeof (last as { id?: string }).id === 'string'
         ? (last as { id?: string }).id
         : ''
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     const signature = `${messages.length}:${last?.role ?? ''}:${lastId}:${textFromMessage(last ?? { role: 'user', content: [] }).slice(-32)}`
     if (signature === stableHistorySignatureRef.current) {
       return stableHistoryMessagesRef.current
@@ -617,6 +685,7 @@ export function useChatHistory({
 
   return {
     historyQuery,
+    latestDescendantQuery,
     historyMessages,
     displayMessages,
     messageCount,

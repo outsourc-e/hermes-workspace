@@ -17,6 +17,46 @@ export function isTerminalActiveRunStatus(status: unknown): boolean {
   )
 }
 
+export function isNonRemoteSessionSource(source: unknown): boolean {
+  if (typeof source !== 'string') return false
+  const normalized = source.trim().toLowerCase()
+  return normalized === 'local' || normalized === 'portable'
+}
+
+export type ChatSessionSourceState = 'unknown' | 'local' | 'remote'
+
+export function getChatSessionSourceState({
+  embedded,
+  sessionsStatus,
+  source,
+}: {
+  embedded: boolean
+  sessionsStatus: 'pending' | 'success' | 'error'
+  source: unknown
+}): ChatSessionSourceState {
+  if (embedded || isNonRemoteSessionSource(source)) return 'local'
+  if (sessionsStatus === 'pending' && source == null) return 'unknown'
+  return 'remote'
+}
+
+export function shouldPinMainSession({
+  activeFriendlyId,
+  resolvedSessionKey,
+  portableMode,
+  sessionSource,
+}: {
+  activeFriendlyId: string
+  resolvedSessionKey: string | undefined
+  portableMode: boolean
+  sessionSource: ChatSessionSourceState
+}): boolean {
+  return (
+    activeFriendlyId === 'main' &&
+    (resolvedSessionKey || activeFriendlyId) === 'main' &&
+    (portableMode || sessionSource === 'local')
+  )
+}
+
 function assistantMessageIdentity(message: ChatMessage): string {
   return String(
     message.__optimisticId ??

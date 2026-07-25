@@ -21,8 +21,10 @@ import {
   advanceStickyStreamingText,
   createOptimisticMessage,
   createResponseWaitSnapshot,
+  getChatSessionSourceState,
   isTerminalActiveRunStatus,
   shouldClearWaitingForAssistantMessage,
+  shouldPinMainSession,
 } from './chat-screen-utils'
 import {
   appendHistoryMessage,
@@ -120,10 +122,20 @@ export function setLocalModelOverride(model: string) {
 type ChatScreenProps = {
   activeFriendlyId: string
   isNewChat?: boolean
-  onSessionResolved?: (payload: {
-    sessionKey: string
-    friendlyId: string
-  }) => void
+  onSessionResolved?: (
+    payload:
+      | {
+          sessionKey: string
+          friendlyId: string
+          reason: 'canonical'
+        }
+      | {
+          fromSessionKey: string
+          sessionKey: string
+          friendlyId: string
+          reason: 'bootstrap' | 'stream-handoff'
+        },
+  ) => void
   forcedSessionKey?: string
   /** Hide header + file explorer + terminal for panel mode */
   compact?: boolean
@@ -540,6 +552,10 @@ export function ChatScreen({
     friendlyId: string
     clientId: string
   } | null>(null)
+  const streamHandoffRouteRef = useRef<{
+    sessionKey: string
+    friendlyId: string
+  } | null>(null)
   const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
     const stored = localStorage.getItem('claude-file-explorer-collapsed')
@@ -573,6 +589,11 @@ export function ChatScreen({
     sessionsFetching: _sessionsFetching,
     refetchSessions: _refetchSessions,
   } = useChatSessions({ activeFriendlyId, isNewChat, forcedSessionKey })
+  const sessionSource = getChatSessionSourceState({
+    embedded,
+    sessionsStatus: sessionsQuery.status,
+    source: activeSession?.lineage?.source,
+  })
   const {
     historyQuery,
     historyMessages,
@@ -592,6 +613,28 @@ export function ChatScreen({
     queryClient,
     historyRefetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
     portableMode: isPortableMode,
+    sessionSource,
+    onCanonicalSessionResolved: useCallback(
+      ({
+        requestedSessionKey,
+        sessionKey,
+      }: {
+        requestedSessionKey: string
+        sessionKey: string
+      }) => {
+        const currentRequestedSessionKey =
+          forcedSessionKey || activeSessionKey || activeFriendlyId
+        if (requestedSessionKey !== currentRequestedSessionKey) return
+        if (!onSessionResolved) return
+        setIsRedirecting(true)
+        onSessionResolved({
+          sessionKey,
+          friendlyId: sessionKey,
+          reason: 'canonical',
+        })
+      },
+      [activeFriendlyId, activeSessionKey, forcedSessionKey, onSessionResolved],
+    ),
   })
 
   // --- Waiting state management (Issue #43 + #449) ---
@@ -1150,18 +1193,36 @@ export function ChatScreen({
     startStreaming,
     cancelStreaming,
   } = useStreamingMessage({
-    pinMainSession:
-      activeFriendlyId === 'main' &&
-      (resolvedSessionKey || activeFriendlyId) === 'main',
+    pinMainSession: shouldPinMainSession({
+      activeFriendlyId,
+      resolvedSessionKey,
+      portableMode: isPortableMode,
+      sessionSource,
+    }),
     onSessionResolved: useCallback(
       ({
+        fromSessionKey,
         sessionKey,
         friendlyId,
+        reason,
       }: {
+        fromSessionKey: string
         sessionKey: string
         friendlyId: string
+        reason: 'bootstrap' | 'stream-handoff'
       }) => {
         const activeSend = activeSendRef.current
+        const currentAuthoritativeSessionKey =
+          forcedSessionKey ||
+          activeSend?.sessionKey ||
+          resolvedSessionKey ||
+          activeCanonicalKey ||
+          activeSessionKey ||
+          activeFriendlyId
+        const alreadyResolved =
+          sessionKey === activeFriendlyId &&
+          friendlyId === activeFriendlyId &&
+          currentAuthoritativeSessionKey === sessionKey
         if (activeSend) {
           activeSendRef.current = {
             ...activeSend,
@@ -1169,15 +1230,23 @@ export function ChatScreen({
             friendlyId,
           }
         }
-        if (
-          sessionKey === activeFriendlyId &&
-          friendlyId === activeFriendlyId
-        ) {
-          return
-        }
-        onSessionResolved?.({ sessionKey, friendlyId })
+        if (alreadyResolved) return
+        streamHandoffRouteRef.current = { sessionKey, friendlyId }
+        onSessionResolved?.({
+          fromSessionKey,
+          sessionKey,
+          friendlyId,
+          reason,
+        })
       },
-      [activeFriendlyId, onSessionResolved],
+      [
+        activeCanonicalKey,
+        activeFriendlyId,
+        activeSessionKey,
+        forcedSessionKey,
+        onSessionResolved,
+        resolvedSessionKey,
+      ],
     ),
     onStarted: useCallback(
       ({ runId }: { runId: string | null }) => {
@@ -1295,6 +1364,10 @@ export function ChatScreen({
       [queryClient],
     ),
     onAbort: useCallback(() => {
+      const activeSend = activeSendRef.current
+      if (activeSend?.sessionKey) {
+        useChatStore.getState().clearSessionWaiting(activeSend.sessionKey)
+      }
       activeSendRef.current = null
       setSending(false)
       setPendingGeneration(false)
@@ -1322,6 +1395,16 @@ export function ChatScreen({
     }
     if (navCancelKeyRef.current !== navKey) {
       navCancelKeyRef.current = navKey
+      const expectedHandoff = streamHandoffRouteRef.current
+      if (
+        expectedHandoff &&
+        activeFriendlyId === expectedHandoff.friendlyId &&
+        (activeCanonicalKey === expectedHandoff.sessionKey ||
+          activeCanonicalKey === expectedHandoff.friendlyId)
+      ) {
+        streamHandoffRouteRef.current = null
+        return
+      }
       cancelStreaming()
     }
   }, [activeCanonicalKey, activeFriendlyId, isNewChat, cancelStreaming])

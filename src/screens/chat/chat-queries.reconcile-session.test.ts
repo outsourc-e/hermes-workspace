@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
-import { reconcileSessionDraft } from './chat-queries'
-import type { SessionMeta } from './types'
+import {
+  chatQueryKeys,
+  moveHistoryMessages,
+  reconcileSessionDraft,
+} from './chat-queries'
+import type { HistoryResponse, SessionMeta } from './types'
 
 function makeSession(overrides: Partial<SessionMeta> = {}): SessionMeta {
   return {
@@ -96,6 +100,49 @@ describe('reconcileSessionDraft', () => {
     })
     expect(sessions[0]?.lastMessage).toMatchObject({
       timestamp: 500,
+    })
+  })
+})
+
+describe('moveHistoryMessages', () => {
+  it('merges old and canonical cache entries without duplicate terminal messages', () => {
+    const queryClient = new QueryClient()
+    const oldKey = chatQueryKeys.history('parent', 'parent')
+    const canonicalKey = chatQueryKeys.history('child', 'child')
+    const assistant = {
+      id: 'assistant-1',
+      role: 'assistant',
+      content: [{ type: 'text' as const, text: 'Done' }],
+    }
+    queryClient.setQueryData<HistoryResponse>(oldKey, {
+      sessionKey: 'parent',
+      messages: [
+        {
+          id: 'user-1',
+          role: 'user',
+          content: [{ type: 'text', text: 'Continue' }],
+        },
+      ],
+    })
+    queryClient.setQueryData<HistoryResponse>(canonicalKey, {
+      sessionKey: 'child',
+      messages: [assistant],
+    })
+
+    moveHistoryMessages(queryClient, 'parent', 'parent', 'child', 'child')
+
+    expect(queryClient.getQueryData(oldKey)).toBeUndefined()
+    expect(queryClient.getQueryData<HistoryResponse>(canonicalKey)).toEqual({
+      sessionKey: 'child',
+      sessionId: undefined,
+      messages: [
+        {
+          id: 'user-1',
+          role: 'user',
+          content: [{ type: 'text', text: 'Continue' }],
+        },
+        assistant,
+      ],
     })
   })
 })
