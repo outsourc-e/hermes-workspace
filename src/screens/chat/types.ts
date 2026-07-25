@@ -174,6 +174,37 @@ export type SessionTree = {
   expandedAncestorIds: ReadonlySet<string>
 }
 
+export type SessionCardRelationshipKind = Exclude<
+  SessionRelationshipKind,
+  'continuation'
+>
+export type SessionCardTitleSource = 'default' | 'auto' | 'manual'
+export type SessionCardChildStatus = 'idle' | 'running' | 'complete' | 'error'
+
+export type SessionCardChild = {
+  cardId: string
+  sessionKey: string
+  relationshipKind: 'branch' | 'child'
+  title: string
+  status: SessionCardChildStatus
+  updatedAt: number
+  continuationCount: number
+}
+
+export type SessionCard = {
+  cardId: string
+  title: string
+  titleSource: SessionCardTitleSource
+  canonicalSegmentKey: string
+  continuationSegmentKeys: Array<string>
+  continuationCount: number
+  relationshipKind: SessionCardRelationshipKind
+  parentCardId?: string
+  childNodes: Array<SessionCardChild>
+  updatedAt: number
+  archived: boolean
+}
+
 export type PathsPayload = {
   agentId: string
   stateDir: string
