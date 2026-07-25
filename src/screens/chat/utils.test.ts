@@ -127,6 +127,7 @@ describe('normalizeSessions lineage', () => {
 
     expect(legacy).toEqual({
       key: 'legacy',
+      backendKey: 'legacy',
       friendlyId: 'legacy',
       title: 'Legacy',
       derivedTitle: undefined,

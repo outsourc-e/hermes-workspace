@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Delete01Icon,
+  GitForkIcon,
   MoreHorizontalIcon,
   Pen01Icon,
   PinIcon,
@@ -26,6 +27,9 @@ type SessionItemProps = {
   contextLabel?: string
   onSelect?: () => void
   onTogglePin: (session: SessionMeta) => void
+  canFork: boolean
+  isForking: boolean
+  onFork: (session: SessionMeta) => void
   onRename: (session: SessionMeta) => void
   onDelete: (session: SessionMeta) => void
 }
@@ -104,6 +108,9 @@ function SessionItemComponent({
   contextLabel,
   onSelect,
   onTogglePin,
+  canFork,
+  isForking,
+  onFork,
   onRename,
   onDelete,
 }: SessionItemProps) {
@@ -204,6 +211,21 @@ function SessionItemComponent({
             <HugeiconsIcon icon={PinIcon} size={20} strokeWidth={1.5} />{' '}
             {isPinned ? 'Unpin session' : 'Pin session'}
           </MenuItem>
+          {canFork ? (
+            <MenuItem
+              disabled={isForking}
+              aria-busy={isForking ? true : undefined}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                if (!isForking) onFork(session)
+              }}
+              className="gap-2"
+            >
+              <HugeiconsIcon icon={GitForkIcon} size={20} strokeWidth={1.5} />{' '}
+              Branch conversation
+            </MenuItem>
+          ) : null}
           <MenuItem
             onClick={(event) => {
               event.preventDefault()
@@ -238,11 +260,15 @@ function areSessionItemsEqual(prev: SessionItemProps, next: SessionItemProps) {
   if (prev.contextLabel !== next.contextLabel) return false
   if (prev.onSelect !== next.onSelect) return false
   if (prev.onTogglePin !== next.onTogglePin) return false
+  if (prev.canFork !== next.canFork) return false
+  if (prev.isForking !== next.isForking) return false
+  if (prev.onFork !== next.onFork) return false
   if (prev.onRename !== next.onRename) return false
   if (prev.onDelete !== next.onDelete) return false
   if (prev.session === next.session) return true
   return (
     prev.session.key === next.session.key &&
+    prev.session.backendKey === next.session.backendKey &&
     prev.session.friendlyId === next.session.friendlyId &&
     prev.session.label === next.session.label &&
     prev.session.title === next.session.title &&

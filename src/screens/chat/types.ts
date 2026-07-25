@@ -137,6 +137,8 @@ export type HistoryResponse = {
 
 export type SessionMeta = {
   key: string
+  /** Authoritative server session key. Absent when `key` is only a route fallback. */
+  backendKey?: string
   friendlyId: string
   title?: string
   derivedTitle?: string

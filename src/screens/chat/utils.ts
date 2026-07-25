@@ -293,10 +293,12 @@ export function normalizeSessions(
 ): Array<SessionMeta> {
   if (!Array.isArray(rows)) return []
   return rows.map((session) => {
-    const key =
+    const backendKey =
       typeof session.key === 'string' && session.key.trim().length > 0
         ? session.key.trim()
-        : deriveFriendlyIdFromKey(session.friendlyId ?? session.key)
+        : undefined
+    const key =
+      backendKey ?? deriveFriendlyIdFromKey(session.friendlyId ?? session.key)
     const friendlyIdCandidate =
       typeof session.friendlyId === 'string' &&
       session.friendlyId.trim().length > 0
@@ -336,6 +338,7 @@ export function normalizeSessions(
 
     return {
       key,
+      ...(backendKey ? { backendKey } : {}),
       friendlyId: friendlyIdCandidate,
       title: explicitTitle,
       derivedTitle,

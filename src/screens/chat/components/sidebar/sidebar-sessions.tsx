@@ -30,6 +30,9 @@ type SidebarSessionsProps = {
   onSelect?: () => void
   onRename: (session: SessionMeta) => void
   onDelete: (session: SessionMeta) => void
+  sessionForkAvailable?: boolean
+  forkingSessionKey?: string | null
+  onFork?: (session: SessionMeta) => void
   loading: boolean
   fetching: boolean
   error: string | null
@@ -43,6 +46,9 @@ export const SidebarSessions = memo(function SidebarSessions({
   onSelect,
   onRename,
   onDelete,
+  sessionForkAvailable = false,
+  forkingSessionKey,
+  onFork = () => {},
   loading,
   fetching,
   error,
@@ -198,6 +204,9 @@ export const SidebarSessions = memo(function SidebarSessions({
         onToggleExpanded={handleToggleExpanded}
         onSelect={onSelect}
         onTogglePin={handleTogglePin}
+        sessionForkAvailable={sessionForkAvailable}
+        forkingSessionKey={forkingSessionKey}
+        onFork={onFork}
         onRename={onRename}
         onDelete={onDelete}
       />
@@ -300,6 +309,9 @@ function areSidebarSessionsEqual(
   if (prev.onSelect !== next.onSelect) return false
   if (prev.onRename !== next.onRename) return false
   if (prev.onDelete !== next.onDelete) return false
+  if (prev.sessionForkAvailable !== next.sessionForkAvailable) return false
+  if (prev.forkingSessionKey !== next.forkingSessionKey) return false
+  if (prev.onFork !== next.onFork) return false
   if (prev.loading !== next.loading) return false
   if (prev.fetching !== next.fetching) return false
   if (prev.error !== next.error) return false
@@ -311,6 +323,7 @@ function areSidebarSessionsEqual(
     const nextSession = next.sessions[i]
     if (!prevSession || !nextSession) return false
     if (prevSession.key !== nextSession.key) return false
+    if (prevSession.backendKey !== nextSession.backendKey) return false
     if (prevSession.friendlyId !== nextSession.friendlyId) return false
     if (prevSession.label !== nextSession.label) return false
     if (prevSession.title !== nextSession.title) return false

@@ -3,6 +3,7 @@
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useId } from 'react'
+import { isSessionForkEligible } from '../../session-fork'
 import { SessionItem } from './session-item'
 import type {
   SessionMeta,
@@ -19,6 +20,9 @@ type SessionTreeRowProps = {
   onToggleExpanded: (sessionKey: string, expanded: boolean) => void
   onSelect?: () => void
   onTogglePin: (session: SessionMeta) => void
+  sessionForkAvailable?: boolean
+  forkingSessionKey?: string | null
+  onFork?: (session: SessionMeta) => void
   onRename: (session: SessionMeta) => void
   onDelete: (session: SessionMeta) => void
   ancestorKeys?: ReadonlySet<string>
@@ -52,6 +56,9 @@ function SessionTreeRow({
   onToggleExpanded,
   onSelect,
   onTogglePin,
+  sessionForkAvailable = false,
+  forkingSessionKey,
+  onFork = () => {},
   onRename,
   onDelete,
   ancestorKeys = new Set<string>(),
@@ -108,6 +115,9 @@ function SessionTreeRow({
             contextLabel={relationshipLabel}
             onSelect={onSelect}
             onTogglePin={onTogglePin}
+            canFork={sessionForkAvailable && isSessionForkEligible(row.session)}
+            isForking={forkingSessionKey === row.session.backendKey}
+            onFork={onFork}
             onRename={onRename}
             onDelete={onDelete}
           />
@@ -133,6 +143,9 @@ function SessionTreeRow({
                     onToggleExpanded={onToggleExpanded}
                     onSelect={onSelect}
                     onTogglePin={onTogglePin}
+                    sessionForkAvailable={sessionForkAvailable}
+                    forkingSessionKey={forkingSessionKey}
+                    onFork={onFork}
                     onRename={onRename}
                     onDelete={onDelete}
                     ancestorKeys={nextAncestorKeys}

@@ -118,6 +118,7 @@ function session(
 ): SessionMeta {
   return {
     key,
+    backendKey: key,
     friendlyId: `${key}-route`,
     title,
     updatedAt,
@@ -131,6 +132,9 @@ function renderSidebar(
     activeFriendlyId?: string
     onRename?: (session: SessionMeta) => void
     onDelete?: (session: SessionMeta) => void
+    sessionForkAvailable?: boolean
+    forkingSessionKey?: string | null
+    onFork?: (session: SessionMeta) => void
   } = {},
 ) {
   const container = document.createElement('div')
@@ -146,6 +150,9 @@ function renderSidebar(
           activeFriendlyId={currentActiveFriendlyId}
           onRename={options.onRename ?? vi.fn()}
           onDelete={options.onDelete ?? vi.fn()}
+          sessionForkAvailable={options.sessionForkAvailable}
+          forkingSessionKey={options.forkingSessionKey}
+          onFork={options.onFork}
           loading={false}
           fetching={false}
           error={null}
@@ -184,6 +191,82 @@ afterEach(() => {
 })
 
 describe('SidebarSessions lineage projection', () => {
+  it('shows whole-conversation branching only for supported eligible remote sessions', () => {
+    const onFork = vi.fn()
+    const remote = session('remote-parent', 'Remote parent')
+
+    renderSidebar([remote], {
+      sessionForkAvailable: true,
+      onFork,
+    })
+
+    const action = screen.getByRole('button', {
+      name: 'Branch conversation',
+    })
+    React.act(() => fireEvent.click(action))
+    expect(onFork).toHaveBeenCalledTimes(1)
+    expect(onFork).toHaveBeenCalledWith(remote)
+  })
+
+  it.each(['local', 'portable'] as const)(
+    'omits branching for %s sessions without activating a mutation',
+    (source) => {
+      const onFork = vi.fn()
+      renderSidebar([session(source, `${source} session`, { source })], {
+        sessionForkAvailable: true,
+        onFork,
+      })
+
+      expect(screen.queryByText('Branch conversation')).toBeNull()
+      expect(onFork).not.toHaveBeenCalled()
+    },
+  )
+
+  it('omits branching when support is unconfirmed', () => {
+    const onFork = vi.fn()
+    const unsupported = session('unsupported', 'Unsupported')
+
+    renderSidebar([unsupported], {
+      sessionForkAvailable: false,
+      onFork,
+    })
+
+    expect(screen.queryByText('Branch conversation')).toBeNull()
+    expect(onFork).not.toHaveBeenCalled()
+  })
+
+  it('omits branching when the authoritative backend key is absent', () => {
+    const onFork = vi.fn()
+    const routeOnly = {
+      ...session('route-only', 'Route only'),
+      backendKey: undefined,
+    }
+
+    renderSidebar([routeOnly], {
+      sessionForkAvailable: true,
+      onFork,
+    })
+
+    expect(screen.queryByText('Branch conversation')).toBeNull()
+    expect(onFork).not.toHaveBeenCalled()
+  })
+
+  it('disables duplicate activation while the session fork is pending', () => {
+    const onFork = vi.fn()
+    renderSidebar([session('pending', 'Pending')], {
+      sessionForkAvailable: true,
+      forkingSessionKey: 'pending',
+      onFork,
+    })
+
+    const action = screen.getByRole('button', {
+      name: 'Branch conversation',
+    })
+    expect((action as HTMLButtonElement).disabled).toBe(true)
+    React.act(() => fireEvent.click(action))
+    expect(onFork).not.toHaveBeenCalled()
+  })
+
   it('renders one logical continuation row with an accessible segment count', () => {
     const root = session('root', 'Hidden snapshot', {
       lineageRootId: 'root',

@@ -29,6 +29,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { CHAT_OPEN_SETTINGS_EVENT } from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
+import { useForkSession } from '../hooks/use-fork-session'
 import { useRenameSession } from '../hooks/use-rename-session'
 import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
@@ -65,6 +66,7 @@ import {
   MenuTrigger,
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
 type WorkspaceStats = Record<string, unknown>
 
@@ -536,6 +538,9 @@ function ChatSidebarComponent({
   )
   const { deleteSession } = useDeleteSession()
   const { renameSession } = useRenameSession()
+  const sessionForkAvailable = useFeatureAvailable('sessionFork')
+  const { forkSession, forkingSessionKey } =
+    useForkSession(sessionForkAvailable)
   const openSearchModal = useSearchModal((state) => state.openModal)
   const isSearchModalOpen = useSearchModal((state) => state.isOpen)
   const pathname = useRouterState({
@@ -1116,6 +1121,9 @@ function ChatSidebarComponent({
                     onSelect={onSelectSession}
                     onRename={handleOpenRename}
                     onDelete={handleOpenDelete}
+                    sessionForkAvailable={sessionForkAvailable}
+                    forkingSessionKey={forkingSessionKey}
+                    onFork={forkSession}
                     loading={sessionsLoading}
                     fetching={sessionsFetching}
                     error={sessionsError}
