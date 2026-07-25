@@ -4,6 +4,8 @@
 
 export type EnhancedFeature =
   | 'sessions'
+  | 'latestDescendant'
+  | 'sessionFork'
   | 'skills'
   | 'memory'
   | 'config'
@@ -14,6 +16,8 @@ export type EnhancedFeature =
 
 const FEATURE_LABELS: Record<EnhancedFeature, string> = {
   sessions: 'Sessions',
+  latestDescendant: 'Latest session descendant',
+  sessionFork: 'Session branching',
   skills: 'Skills',
   memory: 'Memory',
   config: 'Configuration',
@@ -25,6 +29,8 @@ const FEATURE_LABELS: Record<EnhancedFeature, string> = {
 
 const FEATURE_PROBES: Record<EnhancedFeature, Array<string>> = {
   sessions: ['/api/sessions'],
+  latestDescendant: ['/api/sessions/:sessionKey/latest-descendant'],
+  sessionFork: ['/api/sessions/:sessionKey/fork'],
   skills: ['/api/gateway-status', '/api/skills'],
   memory: ['/api/gateway-status', '/api/memory/list'],
   config: ['/api/gateway-status', '/api/claude-config'],
@@ -40,6 +46,8 @@ function normalizeFeature(
   const normalized = feature.trim().toLowerCase()
   if (
     normalized === 'sessions' ||
+    normalized === 'latestdescendant' ||
+    normalized === 'sessionfork' ||
     normalized === 'skills' ||
     normalized === 'memory' ||
     normalized === 'config' ||
@@ -48,7 +56,10 @@ function normalizeFeature(
     normalized === 'mcpfallback' ||
     normalized === 'kanban'
   ) {
-    return normalized === 'mcpfallback' ? 'mcpFallback' : normalized
+    if (normalized === 'mcpfallback') return 'mcpFallback'
+    if (normalized === 'latestdescendant') return 'latestDescendant'
+    if (normalized === 'sessionfork') return 'sessionFork'
+    return normalized
   }
 
   return null

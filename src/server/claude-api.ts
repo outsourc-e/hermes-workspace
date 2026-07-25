@@ -17,7 +17,7 @@ import {
 import {
   createSession as createDashboardSession,
   deleteSession as deleteDashboardSession,
-  forkSession as forkDashboardSession,
+  getLatestDescendant as getDashboardLatestDescendant,
   getSession as getDashboardSession,
   getSessionMessages as getDashboardSessionMessages,
   listSessions as listDashboardSessions,
@@ -242,16 +242,121 @@ export async function searchSessions(
   )
 }
 
+export type LatestDescendantResolution = {
+  requestedSessionId: string
+  sessionId: string
+  path: Array<string>
+  changed: boolean
+  supported: boolean
+}
+
+function unsupportedDescendant(
+  requestedSessionId: string,
+): LatestDescendantResolution {
+  return {
+    requestedSessionId,
+    sessionId: requestedSessionId,
+    path: [requestedSessionId],
+    changed: false,
+    supported: false,
+  }
+}
+
+/**
+ * Resolve through the dashboard's read-only lineage endpoint when explicitly
+ * advertised. History navigation must remain usable on older or broken
+ * deployments, so every unsupported/error/malformed path safely returns the
+ * requested ID.
+ */
+export async function getLatestDescendant(
+  sessionId: string,
+): Promise<LatestDescendantResolution> {
+  try {
+    const capabilities = await ensureGatewayProbed()
+    if (!capabilities.latestDescendant || !capabilities.dashboard.available) {
+      return unsupportedDescendant(sessionId)
+    }
+
+    const result = await getDashboardLatestDescendant(sessionId)
+    const validPath =
+      Array.isArray(result.path) &&
+      result.path.length > 0 &&
+      result.path.every(
+        (entry): entry is string =>
+          typeof entry === 'string' && entry.trim().length > 0,
+      )
+    const valid =
+      result.requested_session_id === sessionId &&
+      typeof result.session_id === 'string' &&
+      result.session_id.trim().length > 0 &&
+      validPath &&
+      result.path[0] === sessionId &&
+      result.path[result.path.length - 1] === result.session_id &&
+      typeof result.changed === 'boolean' &&
+      result.changed === (result.session_id !== sessionId)
+
+    if (!valid) return unsupportedDescendant(sessionId)
+    return {
+      requestedSessionId: sessionId,
+      sessionId: result.session_id,
+      path: result.path,
+      changed: result.changed,
+      supported: true,
+    }
+  } catch {
+    return unsupportedDescendant(sessionId)
+  }
+}
+
+export type ForkSessionOptions = {
+  title?: string
+}
+
+export type ForkSessionResult = {
+  session: ClaudeSession
+  forkedFrom: string
+}
+
+export class SessionForkUnavailableError extends Error {
+  constructor() {
+    super('Whole-session fork is unavailable on this Hermes backend.')
+    this.name = 'SessionForkUnavailableError'
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/** Whole-session fork deliberately targets only the advertised gateway API. */
 export async function forkSession(
   sessionId: string,
-): Promise<{ session: ClaudeSession; forked_from: string }> {
-  if (getCapabilities().dashboard.available) {
-    return forkDashboardSession(sessionId) as Promise<{
-      session: ClaudeSession
-      forked_from: string
-    }>
+  options?: ForkSessionOptions,
+): Promise<ForkSessionResult> {
+  const capabilities = await ensureGatewayProbed()
+  if (!capabilities.sessionFork) {
+    throw new SessionForkUnavailableError()
   }
-  return claudePost(`/api/sessions/${sessionId}/fork`)
+
+  const result = await claudePost<unknown>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/fork`,
+    options ?? {},
+  )
+  if (!isRecord(result) || !isRecord(result.session)) {
+    throw new Error('Hermes fork response was malformed.')
+  }
+  const childId = result.session.id
+  if (typeof childId !== 'string' || childId.trim().length === 0) {
+    throw new Error('Hermes fork response did not include a child session ID.')
+  }
+
+  return {
+    session: result.session as ClaudeSession,
+    forkedFrom:
+      typeof result.forked_from === 'string' && result.forked_from.trim()
+        ? result.forked_from
+        : sessionId,
+  }
 }
 
 // ── Conversion helpers (Claude → Chat format) ─────────────────

@@ -155,6 +155,8 @@ import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-pro
 import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
+import { Route as ApiSessionsSessionKeyLatestDescendantRouteImport } from './routes/api/sessions/$sessionKey.latest-descendant'
+import { Route as ApiSessionsSessionKeyForkRouteImport } from './routes/api/sessions/$sessionKey.fork'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
@@ -894,6 +896,18 @@ const ApiSessionsSessionKeyStatusRoute =
     path: '/$sessionKey/status',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
+const ApiSessionsSessionKeyLatestDescendantRoute =
+  ApiSessionsSessionKeyLatestDescendantRouteImport.update({
+    id: '/$sessionKey/latest-descendant',
+    path: '/$sessionKey/latest-descendant',
+    getParentRoute: () => ApiSessionsRoute,
+  } as any)
+const ApiSessionsSessionKeyForkRoute =
+  ApiSessionsSessionKeyForkRouteImport.update({
+    id: '/$sessionKey/fork',
+    path: '/$sessionKey/fork',
+    getParentRoute: () => ApiSessionsRoute,
+  } as any)
 const ApiSessionsSessionKeyActiveRunRoute =
   ApiSessionsSessionKeyActiveRunRouteImport.update({
     id: '/$sessionKey/active-run',
@@ -1066,6 +1080,8 @@ export interface FileRoutesByFullPath {
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
+  '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
+  '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
 }
@@ -1217,6 +1233,8 @@ export interface FileRoutesByTo {
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
+  '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
+  '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
 }
@@ -1370,6 +1388,8 @@ export interface FileRoutesById {
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
+  '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
+  '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
 }
@@ -1524,6 +1544,8 @@ export interface FileRouteTypes {
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
+    | '/api/sessions/$sessionKey/fork'
+    | '/api/sessions/$sessionKey/latest-descendant'
     | '/api/sessions/$sessionKey/status'
     | '/api/runs/$sessionKey/$runId/abandon'
   fileRoutesByTo: FileRoutesByTo
@@ -1675,6 +1697,8 @@ export interface FileRouteTypes {
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
+    | '/api/sessions/$sessionKey/fork'
+    | '/api/sessions/$sessionKey/latest-descendant'
     | '/api/sessions/$sessionKey/status'
     | '/api/runs/$sessionKey/$runId/abandon'
   id:
@@ -1827,6 +1851,8 @@ export interface FileRouteTypes {
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
+    | '/api/sessions/$sessionKey/fork'
+    | '/api/sessions/$sessionKey/latest-descendant'
     | '/api/sessions/$sessionKey/status'
     | '/api/runs/$sessionKey/$runId/abandon'
   fileRoutesById: FileRoutesById
@@ -2979,6 +3005,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSessionKeyStatusRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/sessions/$sessionKey/latest-descendant': {
+      id: '/api/sessions/$sessionKey/latest-descendant'
+      path: '/$sessionKey/latest-descendant'
+      fullPath: '/api/sessions/$sessionKey/latest-descendant'
+      preLoaderRoute: typeof ApiSessionsSessionKeyLatestDescendantRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/sessions/$sessionKey/fork': {
+      id: '/api/sessions/$sessionKey/fork'
+      path: '/$sessionKey/fork'
+      fullPath: '/api/sessions/$sessionKey/fork'
+      preLoaderRoute: typeof ApiSessionsSessionKeyForkRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
     '/api/sessions/$sessionKey/active-run': {
       id: '/api/sessions/$sessionKey/active-run'
       path: '/$sessionKey/active-run'
@@ -3140,6 +3180,8 @@ interface ApiSessionsRouteChildren {
   ApiSessionsSearchRoute: typeof ApiSessionsSearchRoute
   ApiSessionsSendRoute: typeof ApiSessionsSendRoute
   ApiSessionsSessionKeyActiveRunRoute: typeof ApiSessionsSessionKeyActiveRunRoute
+  ApiSessionsSessionKeyForkRoute: typeof ApiSessionsSessionKeyForkRoute
+  ApiSessionsSessionKeyLatestDescendantRoute: typeof ApiSessionsSessionKeyLatestDescendantRoute
   ApiSessionsSessionKeyStatusRoute: typeof ApiSessionsSessionKeyStatusRoute
 }
 
@@ -3147,6 +3189,9 @@ const ApiSessionsRouteChildren: ApiSessionsRouteChildren = {
   ApiSessionsSearchRoute: ApiSessionsSearchRoute,
   ApiSessionsSendRoute: ApiSessionsSendRoute,
   ApiSessionsSessionKeyActiveRunRoute: ApiSessionsSessionKeyActiveRunRoute,
+  ApiSessionsSessionKeyForkRoute: ApiSessionsSessionKeyForkRoute,
+  ApiSessionsSessionKeyLatestDescendantRoute:
+    ApiSessionsSessionKeyLatestDescendantRoute,
   ApiSessionsSessionKeyStatusRoute: ApiSessionsSessionKeyStatusRoute,
 }
 

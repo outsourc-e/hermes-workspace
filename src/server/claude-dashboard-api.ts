@@ -180,12 +180,19 @@ export async function updateSession(
   })
 }
 
-export async function forkSession(
+export type SessionLatestDescendantResponse = {
+  requested_session_id: string
+  session_id: string
+  path: Array<string>
+  changed: boolean
+}
+
+export async function getLatestDescendant(
   id: string,
-): Promise<{ session: DashboardSession; forked_from: string }> {
-  return dashboardJson(`/api/sessions/${encodeURIComponent(id)}/fork`, {
-    method: 'POST',
-  })
+): Promise<SessionLatestDescendantResponse> {
+  return dashboardJson(
+    `/api/sessions/${encodeURIComponent(id)}/latest-descendant`,
+  )
 }
 
 export async function getSkills(): Promise<Array<SkillInfo>> {

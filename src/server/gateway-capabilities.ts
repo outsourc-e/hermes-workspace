@@ -179,6 +179,10 @@ export type CoreCapabilities = {
 export type EnhancedCapabilities = {
   sessions: boolean
   enhancedChat: boolean
+  /** Dashboard can resolve a persisted session to its current descendant. */
+  latestDescendant: boolean
+  /** Enhanced gateway advertises whole-session fork support. */
+  sessionFork: boolean
   skills: boolean
   memory: boolean
   config: boolean
@@ -245,6 +249,8 @@ let capabilities: GatewayCapabilities = {
   streaming: false,
   sessions: false,
   enhancedChat: false,
+  latestDescendant: false,
+  sessionFork: false,
   skills: false,
   memory: false,
   config: false,
@@ -470,6 +476,74 @@ async function probeEnhancedChatStream(): Promise<boolean> {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/**
+ * Read the enhanced gateway's machine-readable contract. Fork probing must be
+ * non-mutating: never POST a synthetic fork merely to discover the endpoint.
+ */
+async function probeApiServerSessionFork(): Promise<boolean> {
+  try {
+    const res = await fetch(`${CLAUDE_API}/v1/capabilities`, {
+      method: 'GET',
+      headers: authHeaders(),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
+    if (!res.ok) return false
+    const body = (await res.json().catch(() => null)) as unknown
+    if (!isRecord(body)) return false
+    const features = body.features
+    const endpoints = body.endpoints
+    if (!isRecord(features) || features.session_fork !== true) return false
+    if (!isRecord(endpoints)) return false
+    const endpoint = endpoints.session_fork
+    if (!isRecord(endpoint)) return false
+    return (
+      typeof endpoint.method === 'string' &&
+      endpoint.method.toUpperCase() === 'POST' &&
+      endpoint.path === '/api/sessions/{session_id}/fork'
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Probe the current dashboard resolver with a read-only, deliberately missing
+ * session ID. Its specific 404 differs from FastAPI's generic missing-route
+ * response, so deployments without the resolver remain safely disabled.
+ */
+async function probeLatestDescendant(
+  dashboardAvailable: boolean,
+): Promise<boolean> {
+  if (!dashboardAvailable) return false
+  try {
+    const probeId = '__workspace_capability_probe__'
+    const res = await dashboardFetch(
+      `/api/sessions/${probeId}/latest-descendant`,
+      {
+        method: 'GET',
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      },
+    )
+    const body = (await res.json().catch(() => null)) as unknown
+    if (res.status === 404) {
+      return isRecord(body) && body.detail === 'Session not found'
+    }
+    if (!res.ok || !isRecord(body)) return false
+    return (
+      body.requested_session_id === probeId &&
+      typeof body.session_id === 'string' &&
+      Array.isArray(body.path) &&
+      typeof body.changed === 'boolean'
+    )
+  } catch {
+    return false
+  }
+}
+
 async function probeChatCompletions(): Promise<boolean> {
   try {
     const getRes = await fetch(`${CLAUDE_API}/v1/chat/completions`, {
@@ -682,12 +756,15 @@ const OPTIONAL_APIS = new Set([
   'memory',
   'dashboard',
   'enhancedChat',
+  'latestDescendant',
+  'sessionFork',
   'mcp',
   'mcpFallback',
 ])
 
 const DASHBOARD_BACKED_APIS = new Set([
   'sessions',
+  'latestDescendant',
   'skills',
   'config',
   'jobs',
@@ -737,6 +814,8 @@ function logCapabilities(next: GatewayCapabilities): void {
   const enhancedKeys: Array<keyof EnhancedCapabilities> = [
     'sessions',
     'enhancedChat',
+    'latestDescendant',
+    'sessionFork',
     'skills',
     'memory',
     'config',
@@ -851,6 +930,7 @@ export async function probeGateway(options?: {
       models,
       legacySessions,
       enhancedChat,
+      sessionFork,
       legacySkills,
       legacyConfig,
       legacyJobs,
@@ -861,6 +941,7 @@ export async function probeGateway(options?: {
       probe('/v1/models'),
       probe('/api/sessions'),
       probeEnhancedChatStream(),
+      probeApiServerSessionFork(),
       probe('/api/skills'),
       probe('/api/config'),
       probe('/api/jobs'),
@@ -871,6 +952,7 @@ export async function probeGateway(options?: {
     // resolution (in-page HTML scrape fallback) has had a chance to populate
     // the cache when the dashboard is up.
     const mcp = await probeMcp()
+    const latestDescendant = await probeLatestDescendant(dashboard.available)
 
     // Conductor probe runs after dashboard probe.
     const conductor = await probeConductor(dashboard.available)
@@ -895,6 +977,8 @@ export async function probeGateway(options?: {
       probed: true,
       sessions: dashboard.available || legacySessions,
       enhancedChat,
+      latestDescendant,
+      sessionFork,
       skills: dashboard.available || legacySkills,
       // Memory is always available: workspace reads $HERMES_HOME/MEMORY.md +
       // memory/*.md + memories/*.md directly from the local filesystem.
@@ -957,6 +1041,8 @@ export function getEnhancedCapabilities(): EnhancedCapabilities {
   return {
     sessions: capabilities.sessions,
     enhancedChat: capabilities.enhancedChat,
+    latestDescendant: capabilities.latestDescendant,
+    sessionFork: capabilities.sessionFork,
     skills: capabilities.skills,
     memory: capabilities.memory,
     config: capabilities.config,
