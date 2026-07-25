@@ -208,19 +208,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const activeFriendlyId = chatMatch?.[1] ?? 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
-  const isOnPlaygroundRoute =
-    pathname === '/playground' || pathname.startsWith('/playground/')
-  const isOnHermesWorldLandingRoute =
-    pathname === '/hermes-world' ||
-    pathname.startsWith('/hermes-world/') ||
-    pathname === '/world' ||
-    pathname.startsWith('/world/')
   const shellSearch = readShellSearch(search)
   const isEmbeddedSurface =
     shellSearch.embed === '1' ||
     shellSearch.embed === 'true' ||
     shellSearch.mode === 'embed'
-  const isChromeFreeSurface = isEmbeddedSurface || isOnHermesWorldLandingRoute
+  const isChromeFreeSurface = isEmbeddedSurface
   const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
     !isChromeFreeSurface && !isMobile && !isOnChatRoute && !sidebarCollapsed
@@ -317,9 +310,6 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
   }, [isMobile, setSidebarCollapsed, toggleSidebar])
 
-  // Public/launch surfaces should behave like normal web pages, not app-shell panes.
-  // This keeps /hermes-world and /world scrollable at the document level and avoids
-  // local-only workspace chrome for X/GitHub traffic.
   if (isChromeFreeSurface) {
     return <>{children}</>
   }
@@ -465,18 +455,14 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             </div>
           </main>
 
-          {/* Chat panel — visible on non-chat routes (but not in HermesWorld, which has its own in-game chat) */}
-          {!isOnChatRoute && !isOnPlaygroundRoute && !isMobile && (
+          {!isOnChatRoute && !isMobile && (
             <Suspense fallback={null}>
               <ChatPanel />
             </Suspense>
           )}
         </div>
 
-        {/* Floating chat toggle — visible on non-chat routes (but not in HermesWorld) */}
-        {!isOnChatRoute && !isOnPlaygroundRoute && !isMobile && (
-          <ChatPanelToggle />
-        )}
+        {!isOnChatRoute && !isMobile && <ChatPanelToggle />}
 
         {showDesktopSidebarBackdrop ? (
           <button
