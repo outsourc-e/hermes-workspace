@@ -24,12 +24,26 @@ export type LocalMessage = {
   toolName?: string
 }
 
+type LocalHistoryState = {
+  generation: number
+  truncated: boolean
+}
+
+export type LocalMessagesResult = {
+  messages: Array<LocalMessage>
+  source: 'local'
+  generation: number
+  truncated: boolean
+  snapshot: string
+}
+
 type StoreData = {
   sessions: Partial<Record<string, LocalSession>>
   messages: Record<string, Array<LocalMessage>>
+  history: Record<string, LocalHistoryState>
 }
 
-let store: StoreData = { sessions: {}, messages: {} }
+let store: StoreData = { sessions: {}, messages: {}, history: {} }
 
 function loadFromDisk(): void {
   try {
@@ -44,7 +58,35 @@ function loadFromDisk(): void {
           candidate.messages &&
           typeof candidate.messages === 'object'
         ) {
-          store = candidate as StoreData
+          const messages = candidate.messages
+          const persistedHistory =
+            candidate.history && typeof candidate.history === 'object'
+              ? candidate.history
+              : {}
+          const history: StoreData['history'] = {}
+          for (const [sessionId, retainedMessages] of Object.entries(
+            messages,
+          )) {
+            const persisted = persistedHistory[sessionId]
+            history[sessionId] =
+              persisted &&
+              Number.isSafeInteger(persisted.generation) &&
+              persisted.generation >= 0 &&
+              typeof persisted.truncated === 'boolean'
+                ? persisted
+                : {
+                    generation: retainedMessages.length,
+                    // A legacy full window cannot prove that no older row was
+                    // evicted, so migrate it conservatively as truncated.
+                    truncated:
+                      retainedMessages.length >= MAX_MESSAGES_PER_SESSION,
+                  }
+          }
+          store = {
+            sessions: candidate.sessions,
+            messages,
+            history,
+          }
         }
       }
     }
@@ -90,7 +132,13 @@ export function ensureLocalSession(
     }
     store.sessions[sessionId] = session
     store.messages[sessionId] = []
+    store.history[sessionId] = { generation: 0, truncated: false }
     saveToDisk()
+  }
+  store.history[sessionId] ??= {
+    generation: store.messages[sessionId]?.length ?? 0,
+    truncated:
+      (store.messages[sessionId]?.length ?? 0) >= MAX_MESSAGES_PER_SESSION,
   }
   return session
 }
@@ -115,11 +163,33 @@ export function touchLocalSession(sessionId: string): void {
 export function deleteLocalSession(sessionId: string): void {
   delete store.sessions[sessionId]
   delete store.messages[sessionId]
+  delete store.history[sessionId]
   saveToDisk()
 }
 
 export function getLocalMessages(sessionId: string): Array<LocalMessage> {
   return store.messages[sessionId] ?? []
+}
+
+export function getLocalMessagesResult(sessionId: string): LocalMessagesResult {
+  const messages = [...(store.messages[sessionId] ?? [])]
+  const state = store.history[sessionId] ?? {
+    generation: messages.length,
+    truncated: messages.length >= MAX_MESSAGES_PER_SESSION,
+  }
+  return {
+    messages,
+    source: 'local',
+    generation: state.generation,
+    truncated: state.truncated,
+    snapshot: JSON.stringify([
+      state.generation,
+      state.truncated,
+      messages.length,
+      messages[0]?.id ?? null,
+      messages[messages.length - 1]?.id ?? null,
+    ]),
+  }
 }
 
 export function searchLocalSessions(
@@ -162,7 +232,13 @@ export function appendLocalMessage(
   const messages = store.messages[sessionId] ?? []
   store.messages[sessionId] = messages
   messages.push(message)
+  const history = (store.history[sessionId] ??= {
+    generation: messages.length - 1,
+    truncated: false,
+  })
+  history.generation += 1
   if (store.messages[sessionId].length > MAX_MESSAGES_PER_SESSION) {
+    history.truncated = true
     store.messages[sessionId] = store.messages[sessionId].slice(
       -MAX_MESSAGES_PER_SESSION,
     )

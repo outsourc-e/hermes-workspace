@@ -69,7 +69,8 @@ export type ClaudeSessionSummary = SessionSummary & {
 }
 
 export type ClaudeMessage = {
-  id: number
+  /** Stable when supplied by the upstream; some dashboard rows omit it. */
+  id?: number | string
   session_id: string
   role: string
   content: string | null
@@ -79,6 +80,25 @@ export type ClaudeMessage = {
   timestamp: number
   token_count?: number | null
   finish_reason?: string | null
+}
+
+export type ClaudeSessionSource = 'dashboard' | 'gateway'
+
+export type ClaudeSessionPage = {
+  sessions: Array<ClaudeSession>
+  source: ClaudeSessionSource
+  limit: number
+  offset: number
+  total?: number
+  snapshot?: string
+  hasMore: boolean
+  pagination: 'supported'
+}
+
+export type ClaudeMessagesResult = {
+  messages: Array<ClaudeMessage>
+  source: ClaudeSessionSource
+  resolvedSessionId?: string
 }
 
 export type ClaudeConfig = {
@@ -143,23 +163,59 @@ export async function checkHealth(): Promise<{ status: string }> {
 
 // ── Sessions ─────────────────────────────────────────────────────
 
-export async function listSessions(
+export async function listSessionsPage(
   limit = 50,
   offset = 0,
-): Promise<Array<ClaudeSession>> {
-  if (getCapabilities().dashboard.available) {
+  pinnedSource?: ClaudeSessionSource,
+): Promise<ClaudeSessionPage> {
+  const source =
+    pinnedSource ??
+    (getCapabilities().dashboard.available ? 'dashboard' : 'gateway')
+  if (source === 'dashboard') {
     const resp = await listDashboardSessions(limit, offset)
-    return resp.sessions as Array<ClaudeSession>
+    const sessions = resp.sessions as Array<ClaudeSession>
+    return {
+      sessions,
+      source: 'dashboard',
+      limit: resp.limit,
+      offset: resp.offset,
+      total: resp.total,
+      ...(typeof resp.snapshot === 'string' ? { snapshot: resp.snapshot } : {}),
+      hasMore: resp.offset + sessions.length < resp.total,
+      pagination: 'supported',
+    }
   }
   const resp = await claudeGet<{
     items?: Array<ClaudeSession>
     data?: Array<ClaudeSession>
     total?: number
+    snapshot?: string
   }>(`/api/sessions?limit=${limit}&offset=${offset}`)
   // The gateway (OpenAI-compat) returns { object: 'list', data: [...] }, while the
   // dashboard / older gateway shape uses { items: [...] }. Accept either, and never
   // return undefined (callers .map over this).
-  return resp.items ?? resp.data ?? []
+  const sessions = resp.items ?? resp.data ?? []
+  return {
+    sessions,
+    source: 'gateway',
+    limit,
+    offset,
+    ...(typeof resp.total === 'number' ? { total: resp.total } : {}),
+    ...(typeof resp.snapshot === 'string' ? { snapshot: resp.snapshot } : {}),
+    hasMore:
+      typeof resp.total === 'number'
+        ? offset + sessions.length < resp.total
+        : sessions.length >= limit,
+    pagination: 'supported',
+  }
+}
+
+/** Preserve the existing array-returning wrapper for all non-card callers. */
+export async function listSessions(
+  limit = 50,
+  offset = 0,
+): Promise<Array<ClaudeSession>> {
+  return (await listSessionsPage(limit, offset)).sessions
 }
 
 export async function getSession(sessionId: string): Promise<ClaudeSession> {
@@ -211,23 +267,47 @@ export async function deleteSession(sessionId: string): Promise<void> {
   return claudeDeleteReq(`/api/sessions/${sessionId}`)
 }
 
-export async function getMessages(
+export async function getMessagesResult(
   sessionId: string,
-): Promise<Array<ClaudeMessage>> {
-  if (getCapabilities().dashboard.available) {
+  pinnedSource?: ClaudeSessionSource,
+): Promise<ClaudeMessagesResult> {
+  const source =
+    pinnedSource ??
+    (getCapabilities().dashboard.available ? 'dashboard' : 'gateway')
+  if (source === 'dashboard') {
     const resp = await getDashboardSessionMessages(sessionId)
-    return resp.messages as Array<ClaudeMessage>
+    return {
+      messages: resp.messages as Array<ClaudeMessage>,
+      source: 'dashboard',
+      ...(typeof resp.session_id === 'string'
+        ? { resolvedSessionId: resp.session_id }
+        : {}),
+    }
   }
   const resp = await claudeGet<{
     items?: Array<ClaudeMessage>
     data?: Array<ClaudeMessage>
     messages?: Array<ClaudeMessage>
     total?: number
+    session_id?: string
   }>(`/api/sessions/${sessionId}/messages`)
   // Gateway (OpenAI-compat) returns { object: 'list', data: [...] }; dashboard / older
   // shape uses { items: [...] }; some message endpoints use { messages: [...] }.
   // Accept any, and never return undefined (callers read .length / .map / .slice).
-  return resp.items ?? resp.data ?? resp.messages ?? []
+  return {
+    messages: resp.items ?? resp.data ?? resp.messages ?? [],
+    source: 'gateway',
+    ...(typeof resp.session_id === 'string'
+      ? { resolvedSessionId: resp.session_id }
+      : {}),
+  }
+}
+
+/** Preserve the existing array-returning wrapper for all non-card callers. */
+export async function getMessages(
+  sessionId: string,
+): Promise<Array<ClaudeMessage>> {
+  return (await getMessagesResult(sessionId)).messages
 }
 
 export async function searchSessions(

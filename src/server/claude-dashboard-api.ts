@@ -131,6 +131,7 @@ export async function listSessions(
   total: number
   limit: number
   offset: number
+  snapshot?: string
 }> {
   return dashboardJson(`/api/sessions?limit=${limit}&offset=${offset}`)
 }
@@ -141,6 +142,7 @@ export async function getSession(id: string): Promise<DashboardSession> {
 
 export async function getSessionMessages(id: string): Promise<{
   messages: Array<DashboardMessage>
+  session_id?: string
   session_started?: number
   model?: string
 }> {

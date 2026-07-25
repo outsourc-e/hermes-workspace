@@ -3,6 +3,10 @@ import {
   SessionForkUnavailableError,
   forkSession,
   getLatestDescendant,
+  getMessages,
+  getMessagesResult,
+  listSessions,
+  listSessionsPage,
 } from './claude-api'
 import type { GatewayCapabilities } from './gateway-capabilities'
 
@@ -66,6 +70,122 @@ beforeEach(() => {
   const caps = capabilities()
   gatewayMocks.getCapabilities.mockReturnValue(caps)
   gatewayMocks.ensureGatewayProbed.mockResolvedValue(caps)
+})
+
+describe('Session Card adapter foundations', () => {
+  it('preserves dashboard page metadata while retaining the generic list wrapper', async () => {
+    dashboardMocks.listSessions.mockResolvedValue({
+      sessions: [{ id: 'first' }, { id: 'second' }],
+      total: 3,
+      limit: 2,
+      offset: 0,
+      snapshot: 'sessions-v1',
+    })
+
+    await expect(listSessionsPage(2, 0)).resolves.toEqual({
+      sessions: [{ id: 'first' }, { id: 'second' }],
+      source: 'dashboard',
+      total: 3,
+      limit: 2,
+      offset: 0,
+      snapshot: 'sessions-v1',
+      hasMore: true,
+      pagination: 'supported',
+    })
+    await expect(listSessions(2, 0)).resolves.toEqual([
+      { id: 'first' },
+      { id: 'second' },
+    ])
+  })
+
+  it('keeps using an explicitly pinned page source when capabilities change', async () => {
+    dashboardMocks.listSessions
+      .mockResolvedValueOnce({
+        sessions: [{ id: 'first' }],
+        total: 2,
+        limit: 1,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        sessions: [{ id: 'second' }],
+        total: 2,
+        limit: 1,
+        offset: 1,
+      })
+    const first = await listSessionsPage(1, 0)
+    gatewayMocks.getCapabilities.mockReturnValue(
+      capabilities({ dashboard: { available: false, url: 'offline' } }),
+    )
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const second = await listSessionsPage(1, 1, first.source)
+
+    expect(second).toMatchObject({
+      sessions: [{ id: 'second' }],
+      source: 'dashboard',
+      offset: 1,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('preserves optional stable message IDs, source, and retrieval failures', async () => {
+    dashboardMocks.getSessionMessages.mockResolvedValue({
+      session_id: 'resolved-tip',
+      messages: [
+        { id: 'stable-string', role: 'user', content: 'one' },
+        { role: 'assistant', content: 'two' },
+      ],
+    })
+
+    await expect(getMessagesResult('session')).resolves.toEqual({
+      messages: [
+        { id: 'stable-string', role: 'user', content: 'one' },
+        { role: 'assistant', content: 'two' },
+      ],
+      source: 'dashboard',
+      resolvedSessionId: 'resolved-tip',
+    })
+    await expect(getMessages('session')).resolves.toEqual([
+      { id: 'stable-string', role: 'user', content: 'one' },
+      { role: 'assistant', content: 'two' },
+    ])
+
+    const failure = new Error('message backend unavailable')
+    dashboardMocks.getSessionMessages.mockRejectedValue(failure)
+    await expect(getMessagesResult('session')).rejects.toBe(failure)
+    await expect(getMessages('session')).rejects.toBe(failure)
+  })
+
+  it('preserves the gateway canonical session identity without changing the legacy wrapper', async () => {
+    gatewayMocks.getCapabilities.mockReturnValue(
+      capabilities({ dashboard: { available: false, url: 'offline' } }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              object: 'list',
+              session_id: 'resolved-tip',
+              data: [{ id: 'tip-message', role: 'assistant' }],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+        ),
+      ),
+    )
+
+    await expect(getMessagesResult('requested-root')).resolves.toEqual({
+      messages: [{ id: 'tip-message', role: 'assistant' }],
+      source: 'gateway',
+      resolvedSessionId: 'resolved-tip',
+    })
+    await expect(getMessages('requested-root')).resolves.toEqual([
+      { id: 'tip-message', role: 'assistant' },
+    ])
+  })
 })
 
 describe('getLatestDescendant', () => {
