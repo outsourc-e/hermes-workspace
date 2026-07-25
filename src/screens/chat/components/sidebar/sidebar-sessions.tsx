@@ -2,9 +2,13 @@
 
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
-import { memo, useMemo } from 'react'
-import { SessionItem } from './session-item'
-import type { SessionMeta } from '../../types'
+import { memo, useMemo, useState } from 'react'
+import { buildSessionTree } from '../../session-lineage'
+import { SessionTreeRow } from './session-tree-row'
+import type {
+  SessionMeta,
+  SessionTreeRow as SessionTreeRowModel,
+} from '../../types'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -46,22 +50,158 @@ export const SidebarSessions = memo(function SidebarSessions({
 }: SidebarSessionsProps) {
   const { pinnedSessionKeys, togglePinnedSession } = usePinnedSessions()
 
-  const [pinnedSessions, unpinnedSessions] = useMemo(() => {
-    const pinnedKeys = new Set(pinnedSessionKeys)
-    const pinned: Array<SessionMeta> = []
-    const unpinned: Array<SessionMeta> = []
-    for (const session of sessions) {
-      if (pinnedKeys.has(session.key)) {
-        pinned.push(session)
-      } else {
-        unpinned.push(session)
-      }
+  const [collapsedLogicalRootKeys, setCollapsedLogicalRootKeys] = useState<
+    Set<string>
+  >(() => new Set())
+  const activeSessionKey = useMemo(
+    () =>
+      sessions.find(
+        (session) =>
+          session.friendlyId === activeFriendlyId ||
+          session.key === activeFriendlyId,
+      )?.key,
+    [activeFriendlyId, sessions],
+  )
+  const projectionTree = useMemo(
+    () => buildSessionTree(sessions, { activeSessionKey }),
+    [activeSessionKey, sessions],
+  )
+  const expandedSessionKeys = useMemo(
+    () =>
+      sessions
+        .filter(
+          (session) =>
+            !collapsedLogicalRootKeys.has(
+              projectionTree.logicalRootKeyBySessionKey.get(session.key) ??
+                session.key,
+            ),
+        )
+        .map((session) => session.key),
+    [collapsedLogicalRootKeys, projectionTree, sessions],
+  )
+  const tree = useMemo(
+    () =>
+      buildSessionTree(sessions, {
+        activeSessionKey,
+        expandedSessionKeys,
+      }),
+    [activeSessionKey, expandedSessionKeys, sessions],
+  )
+  const childrenByParent = useMemo(() => {
+    const children = new Map<string, Array<SessionTreeRowModel>>()
+    for (const row of tree.rows) {
+      if (!row.parentKey) continue
+      const siblings = children.get(row.parentKey) ?? []
+      siblings.push(row)
+      children.set(row.parentKey, siblings)
     }
-    return [pinned, unpinned] as const
-  }, [pinnedSessionKeys, sessions])
+    return children
+  }, [tree.rows])
+  const activeTreeKey = activeSessionKey
+    ? (tree.visibleKeyBySessionKey.get(activeSessionKey) ?? activeSessionKey)
+    : undefined
+  const logicalPinnedKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const pinnedKey of pinnedSessionKeys) {
+      keys.add(tree.visibleKeyBySessionKey.get(pinnedKey) ?? pinnedKey)
+    }
+    return keys
+  }, [pinnedSessionKeys, tree.visibleKeyBySessionKey])
+  const pinnedRows = useMemo(
+    () =>
+      tree.rows
+        .filter((row) => logicalPinnedKeys.has(row.key))
+        .map((row) => ({
+          ...row,
+          depth: 0,
+          isExpandable: false,
+          isExpanded: false,
+          childCount: 0,
+          parentKey: undefined,
+        })),
+    [logicalPinnedKeys, tree.rows],
+  )
+  const unpinnedProjection = useMemo(() => {
+    const roots: Array<SessionTreeRowModel> = []
+    const children = new Map<string, Array<SessionTreeRowModel>>()
+
+    function appendRows(
+      rows: Array<SessionTreeRowModel>,
+      depth: number,
+      parentKey?: string,
+    ): Array<SessionTreeRowModel> {
+      const projectedRows: Array<SessionTreeRowModel> = []
+      for (const row of rows) {
+        const childRows = childrenByParent.get(row.key) ?? []
+        if (logicalPinnedKeys.has(row.key)) {
+          projectedRows.push(...appendRows(childRows, depth, parentKey))
+          continue
+        }
+
+        const projectedChildren = appendRows(childRows, depth + 1, row.key)
+        const projectedRow: SessionTreeRowModel = {
+          ...row,
+          depth,
+          isExpandable: projectedChildren.length > 0,
+          isExpanded: projectedChildren.length > 0 && row.isExpanded,
+          childCount: projectedChildren.length,
+          ...(parentKey ? { parentKey } : { parentKey: undefined }),
+        }
+        projectedRows.push(projectedRow)
+        if (projectedChildren.length > 0) {
+          children.set(projectedRow.key, projectedChildren)
+        }
+      }
+      return projectedRows
+    }
+
+    roots.push(...appendRows(tree.roots, 0))
+    return { roots, children }
+  }, [childrenByParent, logicalPinnedKeys, tree.roots])
 
   function handleTogglePin(session: SessionMeta) {
+    const storedKeys = pinnedSessionKeys.filter(
+      (pinnedKey) =>
+        (tree.visibleKeyBySessionKey.get(pinnedKey) ?? pinnedKey) ===
+        session.key,
+    )
+    if (storedKeys.length > 0) {
+      for (const key of storedKeys) togglePinnedSession(key)
+      return
+    }
     togglePinnedSession(session.key)
+  }
+
+  function handleToggleExpanded(sessionKey: string, expanded: boolean) {
+    const logicalRootKey =
+      tree.logicalRootKeyBySessionKey.get(sessionKey) ?? sessionKey
+    setCollapsedLogicalRootKeys((current) => {
+      const next = new Set(current)
+      if (expanded) next.delete(logicalRootKey)
+      else next.add(logicalRootKey)
+      return next
+    })
+  }
+
+  function renderRoots(
+    roots: Array<SessionTreeRowModel>,
+    rowChildren: ReadonlyMap<string, Array<SessionTreeRowModel>>,
+  ) {
+    return roots.map((row) => (
+      <SessionTreeRow
+        key={row.key}
+        row={row}
+        childrenByParent={rowChildren}
+        activeFriendlyId={activeFriendlyId}
+        activeSessionKey={activeTreeKey}
+        pinnedSessionKeys={logicalPinnedKeys}
+        onToggleExpanded={handleToggleExpanded}
+        onSelect={onSelect}
+        onTogglePin={handleTogglePin}
+        onRename={onRename}
+        onDelete={onDelete}
+      />
+    ))
   }
 
   return (
@@ -82,21 +222,13 @@ export const SidebarSessions = memo(function SidebarSessions({
       </CollapsibleTrigger>
 
       {/* Pinned sessions — always visible (outside collapsible panel) */}
-      {pinnedSessions.length > 0 ? (
-        <div className="flex shrink-0 flex-col gap-px pl-3 pr-2 pt-1">
-          {pinnedSessions.map((session) => (
-            <SessionItem
-              key={session.key}
-              session={session}
-              active={session.friendlyId === activeFriendlyId}
-              isPinned
-              onSelect={onSelect}
-              onTogglePin={handleTogglePin}
-              onRename={onRename}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
+      {pinnedRows.length > 0 ? (
+        <section
+          aria-label="Pinned sessions"
+          className="flex shrink-0 flex-col gap-px pl-3 pr-2 pt-1"
+        >
+          {renderRoots(pinnedRows, new Map())}
+        </section>
       ) : null}
 
       <CollapsiblePanel
@@ -124,27 +256,21 @@ export const SidebarSessions = memo(function SidebarSessions({
                     Retry
                   </Button>
                 </div>
-              ) : unpinnedSessions.length > 0 ? (
+              ) : unpinnedProjection.roots.length > 0 ? (
                 <>
-                  {pinnedSessions.length > 0 ? (
+                  {pinnedRows.length > 0 ? (
                     <div className="my-1 border-t border-primary-200/80" />
                   ) : null}
-                  {unpinnedSessions.map((session) => (
-                    <SessionItem
-                      key={session.key}
-                      session={session}
-                      active={session.friendlyId === activeFriendlyId}
-                      isPinned={false}
-                      onSelect={onSelect}
-                      onTogglePin={handleTogglePin}
-                      onRename={onRename}
-                      onDelete={onDelete}
-                    />
-                  ))}
+                  <section aria-label="Sessions">
+                    {renderRoots(
+                      unpinnedProjection.roots,
+                      unpinnedProjection.children,
+                    )}
+                  </section>
                 </>
               ) : (
                 <div className="px-2 py-2 text-xs text-primary-500">
-                  {pinnedSessions.length > 0
+                  {pinnedRows.length > 0
                     ? 'All sessions are pinned.'
                     : 'No sessions yet. Start a conversation →'}
                 </div>
@@ -193,6 +319,39 @@ function areSidebarSessionsEqual(
     if (prevSession.titleStatus !== nextSession.titleStatus) return false
     if (prevSession.titleSource !== nextSession.titleSource) return false
     if (prevSession.titleError !== nextSession.titleError) return false
+    if (prevSession.lastMessage !== nextSession.lastMessage) return false
+    if (!areSessionLineagesEqual(prevSession, nextSession)) return false
   }
   return true
 }
+
+function areSessionLineagesEqual(
+  prevSession: SessionMeta,
+  nextSession: SessionMeta,
+): boolean {
+  const prev = prevSession.lineage
+  const next = nextSession.lineage
+  if (prev === next) return true
+  if (!prev || !next) return false
+  return (
+    prev.parentSessionId === next.parentSessionId &&
+    prev.relationshipType === next.relationshipType &&
+    prev.relationshipKind === next.relationshipKind &&
+    prev.parentTitle === next.parentTitle &&
+    prev.parentSource === next.parentSource &&
+    prev.sessionSource === next.sessionSource &&
+    prev.lineageRootId === next.lineageRootId &&
+    prev.lineageTipId === next.lineageTipId &&
+    prev.compressionSegmentCount === next.compressionSegmentCount &&
+    prev.parentLineageRootId === next.parentLineageRootId &&
+    prev.parentLineageTipId === next.parentLineageTipId &&
+    prev.isCrossSurfaceChild === next.isCrossSurfaceChild &&
+    prev.isPreCompressionSnapshot === next.isPreCompressionSnapshot &&
+    prev.source === next.source &&
+    prev.endReason === next.endReason &&
+    prev.startedAt === next.startedAt &&
+    prev.endedAt === next.endedAt
+  )
+}
+
+export { areSessionLineagesEqual }

@@ -168,6 +168,7 @@ export type SessionTree = {
   rows: Array<SessionTreeRow>
   indexByKey: ReadonlyMap<string, SessionTreeRow>
   visibleKeyBySessionKey: ReadonlyMap<string, string>
+  logicalRootKeyBySessionKey: ReadonlyMap<string, string>
   expandedAncestorIds: ReadonlySet<string>
 }
 

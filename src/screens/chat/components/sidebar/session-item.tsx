@@ -23,6 +23,7 @@ type SessionItemProps = {
   session: SessionMeta
   active: boolean
   isPinned: boolean
+  contextLabel?: string
   onSelect?: () => void
   onTogglePin: (session: SessionMeta) => void
   onRename: (session: SessionMeta) => void
@@ -100,6 +101,7 @@ function SessionItemComponent({
   session,
   active,
   isPinned,
+  contextLabel,
   onSelect,
   onTogglePin,
   onRename,
@@ -130,6 +132,7 @@ function SessionItemComponent({
     <Link
       to="/chat/$sessionKey"
       params={{ sessionKey: session.friendlyId }}
+      aria-current={active ? 'page' : undefined}
       onClick={() => {
         try {
           localStorage.setItem('claude-last-session', session.friendlyId)
@@ -162,6 +165,10 @@ function SessionItemComponent({
             isError ? 'text-red-600' : undefined,
           )}
         >
+          {contextLabel ? <span>{contextLabel}</span> : null}
+          {contextLabel && subtitle ? (
+            <span aria-hidden="true"> • </span>
+          ) : null}
           {subtitle}
         </div>
       </div>
@@ -228,6 +235,7 @@ function SessionItemComponent({
 function areSessionItemsEqual(prev: SessionItemProps, next: SessionItemProps) {
   if (prev.active !== next.active) return false
   if (prev.isPinned !== next.isPinned) return false
+  if (prev.contextLabel !== next.contextLabel) return false
   if (prev.onSelect !== next.onSelect) return false
   if (prev.onTogglePin !== next.onTogglePin) return false
   if (prev.onRename !== next.onRename) return false
@@ -240,6 +248,7 @@ function areSessionItemsEqual(prev: SessionItemProps, next: SessionItemProps) {
     prev.session.title === next.session.title &&
     prev.session.derivedTitle === next.session.derivedTitle &&
     prev.session.updatedAt === next.session.updatedAt &&
+    prev.session.lastMessage === next.session.lastMessage &&
     prev.session.titleStatus === next.session.titleStatus &&
     prev.session.titleSource === next.session.titleSource &&
     prev.session.titleError === next.session.titleError

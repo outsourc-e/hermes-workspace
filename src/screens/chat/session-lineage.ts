@@ -297,6 +297,7 @@ export function buildSessionTree(
   }
 
   const visibleKeyBySessionKey = new Map<string, string>()
+  const logicalRootKeyBySessionKey = new Map<string, string>()
   const logicalNodes = new Map<string, LogicalNode>()
   for (const members of components.values()) {
     const declaredTipIds = new Set(
@@ -324,6 +325,9 @@ export function buildSessionTree(
       ) ??
       selected
     const anchorKind = kinds.get(anchor.key) ?? 'orphan'
+    for (const member of members) {
+      logicalRootKeyBySessionKey.set(member.key, anchor.key)
+    }
     const declaredSegmentCount = members.reduce(
       (largest, member) =>
         Math.max(largest, member.lineage?.compressionSegmentCount ?? 0),
@@ -458,6 +462,7 @@ export function buildSessionTree(
     rows,
     indexByKey,
     visibleKeyBySessionKey,
+    logicalRootKeyBySessionKey,
     expandedAncestorIds,
   }
 }

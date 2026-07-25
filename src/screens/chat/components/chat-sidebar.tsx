@@ -33,7 +33,10 @@ import { useRenameSession } from '../hooks/use-rename-session'
 import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
-import { SidebarSessions } from './sidebar/sidebar-sessions'
+import {
+  SidebarSessions,
+  areSessionLineagesEqual,
+} from './sidebar/sidebar-sessions'
 import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionMeta } from '../types'
 import { t } from '@/lib/i18n'
@@ -1265,6 +1268,8 @@ function areSessionsEqual(
     if (prev.titleStatus !== next.titleStatus) return false
     if (prev.titleSource !== next.titleSource) return false
     if (prev.titleError !== next.titleError) return false
+    if (prev.lastMessage !== next.lastMessage) return false
+    if (!areSessionLineagesEqual(prev, next)) return false
   }
   return true
 }
