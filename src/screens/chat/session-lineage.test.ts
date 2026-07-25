@@ -83,11 +83,17 @@ describe('classifySessionRelationship', () => {
   })
 
   it('accepts authoritative server lineage and valid lifecycle fallback edges', () => {
-    const metadataParent = session('metadata-parent')
+    const metadataParent = session('metadata-parent', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 100,
+    })
     const metadataChild = session('metadata-child', {
       parentSessionId: 'metadata-parent',
+      source: 'cli',
       lineageRootId: 'metadata-parent',
       lineageTipId: 'metadata-child',
+      startedAt: 100,
     })
     const lifecycleParent = session('lifecycle-parent', {
       source: 'cli',
@@ -238,6 +244,132 @@ describe('classifySessionRelationship', () => {
 })
 
 describe('buildSessionTree', () => {
+  const authoritativeContinuationMetadata = [
+    {
+      label: 'matching root/tip metadata',
+      parentLineage: {
+        lineageRootId: 'parent',
+        lineageTipId: 'child',
+      },
+      childLineage: {
+        lineageRootId: 'parent',
+        lineageTipId: 'child',
+      },
+    },
+    {
+      label: 'an explicit continuation relationship',
+      parentLineage: {},
+      childLineage: { relationshipType: 'continuation' as const },
+    },
+  ]
+
+  it.each(
+    authoritativeContinuationMetadata.flatMap(
+      ({ label, parentLineage, childLineage }) =>
+        [undefined, 'user_exit'].map((endReason) => ({
+          label,
+          parentLineage,
+          childLineage,
+          endReason,
+        })),
+    ),
+  )(
+    'does not collapse $label without a valid continuation end reason ($endReason)',
+    ({ parentLineage, childLineage, endReason }) => {
+      const parent = session('parent', {
+        source: 'cli',
+        ...(endReason ? { endReason } : {}),
+        endedAt: 100,
+        ...parentLineage,
+      })
+      const child = session('child', {
+        parentSessionId: 'parent',
+        source: 'cli',
+        startedAt: 100,
+        ...childLineage,
+      })
+
+      const tree = buildSessionTree([parent, child])
+
+      expect(tree.rows).toHaveLength(2)
+      expect(tree.indexByKey.get('child')).toMatchObject({
+        relationshipKind: 'orphan',
+        isOrphan: true,
+      })
+    },
+  )
+
+  it.each(authoritativeContinuationMetadata)(
+    'does not collapse $label when the child starts before the parent boundary',
+    ({ parentLineage, childLineage }) => {
+      const parent = session('parent', {
+        source: 'cli',
+        endReason: 'compression',
+        endedAt: 100,
+        ...parentLineage,
+      })
+      const child = session('child', {
+        parentSessionId: 'parent',
+        source: 'cli',
+        startedAt: 99,
+        ...childLineage,
+      })
+
+      const tree = buildSessionTree([parent, child])
+
+      expect(tree.rows).toHaveLength(2)
+      expect(tree.indexByKey.get('child')?.relationshipKind).toBe('orphan')
+    },
+  )
+
+  it.each(
+    authoritativeContinuationMetadata.flatMap(
+      ({ label, parentLineage, childLineage }) => [
+        {
+          label,
+          parentLineage,
+          childLineage,
+          endReason: 'compression',
+          endedAt: 100,
+          startedAt: 100,
+        },
+        {
+          label,
+          parentLineage,
+          childLineage,
+          endReason: 'cli_close',
+          endedAt: undefined,
+          startedAt: 200,
+        },
+      ],
+    ),
+  )(
+    'collapses valid same-source $endReason records with $label',
+    ({ parentLineage, childLineage, endReason, endedAt, startedAt }) => {
+      const parent = session('parent', {
+        source: 'cli',
+        endReason,
+        ...(endedAt === undefined ? {} : { endedAt }),
+        ...parentLineage,
+      })
+      const child = session('child', {
+        parentSessionId: 'parent',
+        source: 'cli',
+        startedAt,
+        ...childLineage,
+      })
+
+      const tree = buildSessionTree([parent, child])
+
+      expect(tree.rows).toHaveLength(1)
+      expect(tree.roots[0]).toMatchObject({
+        key: 'child',
+        relationshipKind: 'root',
+        continuationCount: 2,
+      })
+    },
+  )
+
   it.each(['compression', 'cli_close'] as const)(
     'collapses a legacy same-source %s continuation when the parent has no endedAt',
     (endReason) => {
@@ -310,6 +442,10 @@ describe('buildSessionTree', () => {
       'second',
       {
         parentSessionId: 'first',
+        source: 'cli',
+        startedAt: 100,
+        endReason: 'compression',
+        endedAt: 200,
         lineageRootId: 'first',
         lineageTipId: 'third',
         compressionSegmentCount: 20,
@@ -321,6 +457,8 @@ describe('buildSessionTree', () => {
       'third',
       {
         parentSessionId: 'second',
+        source: 'cli',
+        startedAt: 200,
         lineageRootId: 'first',
         compressionSegmentCount: 3,
         isPreCompressionSnapshot: true,
@@ -441,6 +579,8 @@ describe('buildSessionTree', () => {
   it('retains branch and nested child rows under a collapsed conversation', () => {
     const root = session('root', {
       source: 'cli',
+      endReason: 'compression',
+      endedAt: 10,
       lineageRootId: 'root',
       lineageTipId: 'tip',
     })
@@ -448,6 +588,8 @@ describe('buildSessionTree', () => {
       'tip',
       {
         parentSessionId: 'root',
+        source: 'cli',
+        startedAt: 10,
         lineageRootId: 'root',
         lineageTipId: 'tip',
       },
@@ -562,11 +704,16 @@ describe('buildSessionTree', () => {
 
   it('expands the active path for hidden continuations and nested children', () => {
     const root = session('root', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 10,
       lineageRootId: 'root',
       lineageTipId: 'tip',
     })
     const tip = session('tip', {
       parentSessionId: 'root',
+      source: 'cli',
+      startedAt: 10,
       lineageRootId: 'root',
       lineageTipId: 'tip',
     })

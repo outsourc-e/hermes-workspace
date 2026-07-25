@@ -82,20 +82,24 @@ function hasAuthoritativeContinuationMetadata(
   const lineage = session.lineage
   if (!lineage || lineageSourcesConflict(session, parent)) return false
 
-  if (
+  const hasContinuationRelationship = Boolean(
     lineage.relationshipType &&
-    CONTINUATION_RELATIONSHIP_TYPES.has(lineage.relationshipType)
-  ) {
-    return true
-  }
-  if (parent.lineage?.lineageTipId === session.key) return true
+    CONTINUATION_RELATIONSHIP_TYPES.has(lineage.relationshipType),
+  )
+  const parentDeclaresChildAsTip = parent.lineage?.lineageTipId === session.key
 
   const parentRoot = parent.lineage?.lineageRootId ?? parent.key
   const hasMatchingRoot = lineage.lineageRootId === parentRoot
   const hasLineageDeclaration =
     Boolean(lineage.lineageTipId) ||
     typeof lineage.compressionSegmentCount === 'number'
-  return hasMatchingRoot && hasLineageDeclaration
+  const hasContinuationLineage =
+    parentDeclaresChildAsTip || (hasMatchingRoot && hasLineageDeclaration)
+
+  return (
+    (hasContinuationRelationship || hasContinuationLineage) &&
+    hasValidLifecycleContinuation(session, parent)
+  )
 }
 
 function hasValidLifecycleContinuation(

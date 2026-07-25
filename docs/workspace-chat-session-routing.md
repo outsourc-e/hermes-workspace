@@ -4,33 +4,43 @@
 
 Hermes Workspace supports a portable chat path through OpenAI-compatible `/v1/chat/completions`. In this mode, the browser route alone is not enough to preserve conversational context: Workspace must forward a stable server-side session identifier to the Hermes Agent gateway.
 
-This document records the routing contract and the failure mode that caused related turns and attachments to be stored as separate `api-*` sessions.
+This same-ID gateway contract is distinct from Workspace lineage canonicalization, where backend compression can create a descendant with a new session ID. See [Session Lineage](./session-lineage.md) for the complete UI and degradation contract.
 
 ## Routing Contract
 
 There are two distinct header layers:
 
-| Layer | Headers | Purpose |
-| --- | --- | --- |
-| Workspace UI route resolution | `X-Hermes-Session-Key`, `X-Hermes-Friendly-Id` | Tells the browser which Workspace chat route/friendly ID is resolved for the visible conversation. |
-| Hermes Agent gateway continuation | `X-Hermes-Session-Id`, `X-Claude-Session-Id` | Tells the gateway which server-side Hermes session should receive the next chat completion request. |
+| Layer                             | Headers                                        | Purpose                                                                                             |
+| --------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Workspace UI route resolution     | `X-Hermes-Session-Key`, `X-Hermes-Friendly-Id` | Tells the browser which Workspace chat route/friendly ID is resolved for the visible conversation.  |
+| Hermes Agent gateway continuation | `X-Hermes-Session-Id`, `X-Claude-Session-Id`   | Tells the gateway which server-side Hermes session should receive the next chat completion request. |
 
 Do not conflate these. A response can correctly resolve a Workspace route while the next gateway request still loses server-side context if `X-Hermes-Session-Id` is missing.
 
-## Portable OpenAI-Compatible Flow
+## Two Continuity Mechanisms
+
+### Stable same-ID gateway continuation
+
+This is the portable OpenAI-compatible path. Workspace sends the same persistent session key on every gateway request, and Hermes Agent continues that server-side session under the same ID. It does not depend on lineage metadata or latest-descendant support.
 
 1. `src/routes/api/send-stream.ts` receives `sessionKey`, `friendlyId`, `message`, `history`, and optional `attachments` from the UI.
 2. It resolves a persistent Workspace `sessionKey`.
 3. It builds OpenAI-compatible messages, including multimodal image parts when attachments are present.
 4. It calls `openaiChat(..., { sessionId: portableSessionKey })`.
-5. `src/server/openai-compat-api.ts` forwards that session ID to the gateway via:
-   - `X-Hermes-Session-Id`
-   - `X-Claude-Session-Id` as a legacy/back-compat alias.
-6. Hermes Agent uses the provided session ID for continuity instead of deriving a fresh deterministic `api-*` session from the request payload.
+5. `src/server/openai-compat-api.ts` forwards that session ID via `X-Hermes-Session-Id` and the legacy/back-compat `X-Claude-Session-Id` alias.
+6. Hermes Agent continues the supplied ID instead of deriving a fresh deterministic `api-*` session from request content.
 
-## Failure Mode
+### Compression-driven descendant canonicalization
 
-The bug was coupling session-continuity headers to bearer-token presence:
+A lineage-capable backend can store a compressed continuation under a new descendant ID. Workspace then asks `GET /api/sessions/:sessionKey/latest-descendant` for the canonical tip and changes routes only for a supported, explicitly changed, matching response.
+
+If the capability is unavailable, the request fails, or the response is malformed, Workspace keeps the requested key so ordinary history navigation can proceed. This fallback does not recreate the same-ID gateway contract. Conversely, stable gateway headers do not cause Workspace to invent or merge descendant transcripts.
+
+The lineage tree can collapse confirmed continuation segments into one visible tip, but history still comes from the selected backend session. There is no client-side transcript concatenation.
+
+## Original Failure Mode
+
+The same-ID bug was coupling session-continuity headers to bearer-token presence:
 
 ```ts
 if (options.sessionId && bearer) {
@@ -39,11 +49,11 @@ if (options.sessionId && bearer) {
 }
 ```
 
-That made routing depend on auth configuration. If a bearer token was unavailable or not used, Workspace still had a local session key, but the gateway never received it. The gateway then derived sessions such as `api-*` from request content, which could split related turns and attachment-only/image requests across separate API sessions.
+If a bearer token was unavailable or unused, Workspace still had a local session key, but the gateway never received it. The gateway then derived sessions such as `api-*` from request content, splitting related turns and attachment-only/image requests across separate API sessions.
 
-## Correct Behavior
+## Correct Same-ID Behavior
 
-Session routing is independent of whether a bearer token is configured. If the gateway requires auth, its auth check enforces the bearer token separately.
+Session routing is independent of whether a bearer token is configured. If the gateway requires authentication, it enforces that separately.
 
 ```ts
 const bearer = getBearerToken()
@@ -57,42 +67,31 @@ if (options.sessionId) {
 }
 ```
 
-## Regression Coverage
+`src/server/openai-compat-api.test.ts` covers session headers with and without a bearer token. `src/server/chat-backends.ts` forwards `options.sessionId` into `openaiChat(...)` for streaming and non-streaming OpenAI-compatible calls.
 
-`src/server/openai-compat-api.test.ts` should cover both cases:
+## Credential-Free Manual Verification
 
-- session headers are sent when a bearer token is present
-- session headers are still sent when no bearer token is present
+Reuse the canonical gateway on `127.0.0.1:8642` and Dashboard on `127.0.0.1:9119`. Do not start duplicate backends.
 
-`src/server/chat-backends.ts` should forward `options.sessionId` into `openaiChat(...)` for both streaming and non-streaming OpenAI-compatible calls.
-
-## Manual Verification Recipe
-
-1. Run the targeted test:
+1. Probe the existing services and Workspace endpoint without supplying credentials:
 
    ```bash
-   pnpm vitest run src/server/openai-compat-api.test.ts
+   curl -i --max-time 2 http://127.0.0.1:8642/health
+   curl -i --max-time 2 http://127.0.0.1:9119/
+   curl -i --max-time 2 http://127.0.0.1:3000/api/sessions
    ```
 
-2. Build production assets:
+2. If Workspace is not already listening, start only Workspace on `:3000`:
 
    ```bash
-   pnpm build
+   pnpm dev --host 127.0.0.1 --port 3000
    ```
 
-3. Restart Workspace where deployed:
+   Do not use `pnpm start:all`; it also starts another gateway.
 
-   ```bash
-   systemctl --user restart hermes-workspace.service
-   systemctl --user is-active hermes-workspace.service
-   ```
+3. Use a disposable session and non-sensitive marker text:
+   - send two `/api/send-stream` turns with the same Workspace `sessionKey` and confirm both remain under that same backend ID rather than separate `api-*` sessions;
+   - send an image attachment with that same key and confirm it remains in the same session;
+   - separately open an existing compressed session, refresh, and confirm Workspace selects the reported descendant tip rather than treating the old and new IDs as two portable same-ID turns.
 
-4. Send two `/api/send-stream` turns with the same `sessionKey` and a unique token in the first prompt.
-5. Search session history for that token. Both turns should appear under the same `session_id` equal to the supplied Workspace session key, not separate `api-*` sessions.
-6. Send an image attachment with the same `sessionKey`; session history should show `[screenshot]` in that same session.
-
-## Operational Notes
-
-- Keep credentials redacted when inspecting `.env`, service files, or built bundles.
-- In zero-fork deployments, Workspace commonly talks to Hermes Agent gateway on `127.0.0.1:8642` and Dashboard on `127.0.0.1:9119`.
-- A successful `/health` probe means the gateway is reachable; it does not prove session continuity is wired correctly. Verify the actual chat path.
+A successful health or listener probe proves reachability only. Verify the actual chat path, and do not record credentials, transcript content, attachment data, or tool output.

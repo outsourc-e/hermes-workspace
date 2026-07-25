@@ -73,11 +73,16 @@ afterEach(() => {
 describe('MobileSessionsPanel lineage projection', () => {
   it('renders a continuation as one selectable logical row with its segment count', () => {
     const root = session('root', 'Hidden snapshot', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip',
     })
     const tip = session('tip', 'Current conversation', {
       parentSessionId: 'root',
+      source: 'cli',
+      startedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip',
       compressionSegmentCount: 2,

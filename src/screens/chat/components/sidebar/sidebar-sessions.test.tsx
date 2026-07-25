@@ -326,11 +326,16 @@ describe('SidebarSessions lineage projection', () => {
 
   it('renders one logical continuation row with an accessible segment count', () => {
     const root = session('root', 'Hidden snapshot', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip',
     })
     const tip = session('tip', 'Current conversation', {
       parentSessionId: 'root',
+      source: 'cli',
+      startedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip',
       compressionSegmentCount: 2,
@@ -348,11 +353,16 @@ describe('SidebarSessions lineage projection', () => {
   it('keeps a pinned continuation as one logical row and unpins its migrated tip key', () => {
     pinnedState.keys = ['root']
     const root = session('root', 'Hidden pinned snapshot', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip',
     })
     const tip = session('tip', 'Pinned conversation', {
       parentSessionId: 'root',
+      source: 'cli',
+      startedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip',
     })
@@ -397,11 +407,18 @@ describe('SidebarSessions lineage projection', () => {
     pinnedState.useActual = true
     usePinnedSessionsStore.getState().pinSession('root')
     const root = session('root', 'Original snapshot', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip-1',
     })
     const firstTip = session('tip-1', 'First continuation', {
       parentSessionId: 'root',
+      source: 'cli',
+      startedAt: 100,
+      endReason: 'compression',
+      endedAt: 200,
       lineageRootId: 'root',
       lineageTipId: 'tip-1',
       compressionSegmentCount: 2,
@@ -418,6 +435,8 @@ describe('SidebarSessions lineage projection', () => {
     const secondTip = session('tip-2', 'Second continuation', {
       parentSessionId: 'root',
       relationshipType: 'continuation',
+      source: 'cli',
+      startedAt: 200,
       lineageRootId: 'root',
       lineageTipId: 'tip-2',
       compressionSegmentCount: 3,
@@ -572,11 +591,18 @@ describe('SidebarSessions lineage projection', () => {
 
   it('keeps a logical conversation collapsed when a newer continuation tip replaces the visible row', () => {
     const root = session('root', 'Snapshot', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip-1',
     })
     const firstTip = session('tip-1', 'First tip', {
       parentSessionId: 'root',
+      source: 'cli',
+      startedAt: 100,
+      endReason: 'compression',
+      endedAt: 200,
       lineageRootId: 'root',
       lineageTipId: 'tip-1',
       compressionSegmentCount: 2,
@@ -597,11 +623,16 @@ describe('SidebarSessions lineage projection', () => {
     expect(screen.queryByText('Related child')).toBeNull()
 
     const updatedRoot = session('root', 'Snapshot', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip-2',
     })
     const secondTip = session('tip-2', 'Second tip', {
       parentSessionId: 'tip-1',
+      source: 'cli',
+      startedAt: 200,
       lineageRootId: 'root',
       lineageTipId: 'tip-2',
       compressionSegmentCount: 3,
@@ -621,11 +652,16 @@ describe('SidebarSessions lineage projection', () => {
 
   it('marks the visible continuation tip active when the active route is an older compressed segment', () => {
     const root = session('root', 'Older active snapshot', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip',
     })
     const tip = session('tip', 'Visible conversation', {
       parentSessionId: 'root',
+      source: 'cli',
+      startedAt: 100,
       lineageRootId: 'root',
       lineageTipId: 'tip',
       compressionSegmentCount: 2,
