@@ -267,7 +267,21 @@ function missingContinuationAliases(session: SessionMeta): Array<string> {
     return []
   }
 
-  return [rootId, lineage.parentSessionId?.trim()]
+  const parentSessionId = lineage.parentSessionId?.trim()
+  const parentLineageRootId = lineage.parentLineageRootId?.trim()
+  const parentLineageTipId = lineage.parentLineageTipId?.trim()
+  const validatedPredecessorAlias =
+    parentLineageRootId === rootId &&
+    parentLineageTipId &&
+    parentLineageTipId !== session.key &&
+    (parentSessionId === parentLineageTipId ||
+      (parentSessionId === parentLineageRootId &&
+        relationshipType &&
+        CONTINUATION_RELATIONSHIP_TYPES.has(relationshipType)))
+      ? parentLineageTipId
+      : undefined
+
+  return [rootId, validatedPredecessorAlias]
     .filter((key): key is string => Boolean(key && key !== session.key))
     .filter((key, index, aliases) => aliases.indexOf(key) === index)
 }

@@ -158,7 +158,35 @@ export async function migratePersistedRun(
     try {
       await unlink(runPath(normalizedFrom, normalizedRunId))
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return migrated
+
+      try {
+        await unlink(runPath(normalizedTo, normalizedRunId))
+      } catch (rollbackError) {
+        if ((rollbackError as NodeJS.ErrnoException).code !== 'ENOENT') {
+          const now = Date.now()
+          try {
+            await writeRun({
+              ...migrated,
+              status: 'error',
+              updatedAt: now,
+              lastEventAt: now,
+              errorMessage:
+                'Run migration failed; recover from the original session.',
+            })
+          } catch (terminalizationError) {
+            throw new AggregateError(
+              [error, rollbackError, terminalizationError],
+              `Failed to remove persisted run ${normalizedRunId} from ${normalizedFrom}, roll back ${normalizedTo}, or terminalize the successor`,
+            )
+          }
+          throw new AggregateError(
+            [error, rollbackError],
+            `Failed to remove persisted run ${normalizedRunId} from ${normalizedFrom} and roll back ${normalizedTo}`,
+          )
+        }
+      }
+      throw error
     }
     return migrated
   })

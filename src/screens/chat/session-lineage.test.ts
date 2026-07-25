@@ -391,19 +391,21 @@ describe('buildSessionTree', () => {
     expect(buildSessionTree(rows).roots[0]?.key).toBe('non-snapshot-new')
   })
 
-  it('maps a declared missing continuation ancestor to its cold-loaded visible tip', () => {
-    const tip = session('tip', {
-      parentSessionId: 'previous-segment',
+  it('maps a validated missing predecessor to its cold-loaded visible tip', () => {
+    const tip = session('tip-2', {
+      parentSessionId: 'tip-1',
       lineageRootId: 'paged-out-root',
-      lineageTipId: 'tip',
+      lineageTipId: 'tip-2',
+      parentLineageRootId: 'paged-out-root',
+      parentLineageTipId: 'tip-1',
       compressionSegmentCount: 3,
     })
 
     const tree = buildSessionTree([tip])
 
-    expect(tree.rows.map((row) => row.key)).toEqual(['tip'])
-    expect(tree.visibleKeyBySessionKey.get('paged-out-root')).toBe('tip')
-    expect(tree.visibleKeyBySessionKey.get('previous-segment')).toBe('tip')
+    expect(tree.rows.map((row) => row.key)).toEqual(['tip-2'])
+    expect(tree.visibleKeyBySessionKey.get('paged-out-root')).toBe('tip-2')
+    expect(tree.visibleKeyBySessionKey.get('tip-1')).toBe('tip-2')
   })
 
   it('does not alias a missing ancestor from branch metadata', () => {
@@ -418,6 +420,22 @@ describe('buildSessionTree', () => {
     const tree = buildSessionTree([branch])
 
     expect(tree.visibleKeyBySessionKey.has('parent')).toBe(false)
+  })
+
+  it('does not alias a predecessor whose parent lineage root conflicts', () => {
+    const tip = session('tip-2', {
+      parentSessionId: 'tip-1',
+      relationshipType: 'continuation',
+      lineageRootId: 'root',
+      lineageTipId: 'tip-2',
+      parentLineageRootId: 'different-root',
+      parentLineageTipId: 'tip-1',
+    })
+
+    const tree = buildSessionTree([tip])
+
+    expect(tree.visibleKeyBySessionKey.get('root')).toBe('tip-2')
+    expect(tree.visibleKeyBySessionKey.has('tip-1')).toBe(false)
   })
 
   it('retains branch and nested child rows under a collapsed conversation', () => {

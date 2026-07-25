@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SidebarSessions } from './sidebar-sessions'
 import type { SessionLineage, SessionMeta } from '../../types'
+import type * as PinnedSessions from '@/hooks/use-pinned-sessions'
+import { usePinnedSessionsStore } from '@/hooks/use-pinned-sessions'
 
 const reactActEnvironment = globalThis as {
   IS_REACT_ACT_ENVIRONMENT?: boolean
@@ -17,38 +19,55 @@ const pinnedState = vi.hoisted(() => ({
   keys: [] as Array<string>,
   toggle: vi.fn<(key: string) => void>(),
   migrate: vi.fn<(fromKey: string, toKey: string) => void>(),
+  useActual: false,
 }))
 
-vi.mock('@/hooks/use-pinned-sessions', () => ({
-  usePinnedSessions: () => {
-    const [pinnedSessionKeys, setPinnedSessionKeys] = React.useState(() => [
-      ...pinnedState.keys,
-    ])
-    return {
-      pinnedSessionKeys,
-      togglePinnedSession: (key: string) => {
-        pinnedState.toggle(key)
-        setPinnedSessionKeys((current) =>
-          current.includes(key)
-            ? current.filter((currentKey) => currentKey !== key)
-            : [...current, key],
-        )
-      },
-      migratePinnedSession: (fromKey: string, toKey: string) => {
-        pinnedState.migrate(fromKey, toKey)
-        setPinnedSessionKeys((current) =>
-          current.includes(fromKey)
-            ? [
-                ...new Set(
-                  current.map((key) => (key === fromKey ? toKey : key)),
-                ),
-              ]
-            : current,
-        )
-      },
-    }
-  },
-}))
+vi.mock('@/hooks/use-pinned-sessions', async (importOriginal) => {
+  const actual = await importOriginal<typeof PinnedSessions>()
+  return {
+    ...actual,
+    usePinnedSessions: () => {
+      const actualPinnedSessionKeys = React.useSyncExternalStore(
+        actual.usePinnedSessionsStore.subscribe,
+        () => actual.usePinnedSessionsStore.getState().pinnedSessionKeys,
+        () => actual.usePinnedSessionsStore.getState().pinnedSessionKeys,
+      )
+      const actualPinnedState = actual.usePinnedSessionsStore.getState()
+      const actualPinnedSessions = {
+        pinnedSessionKeys: actualPinnedSessionKeys,
+        togglePinnedSession: actualPinnedState.togglePinnedSession,
+        migratePinnedSession: actualPinnedState.migratePinnedSession,
+      }
+      const [pinnedSessionKeys, setPinnedSessionKeys] = React.useState(() => [
+        ...pinnedState.keys,
+      ])
+      const mockedPinnedSessions = {
+        pinnedSessionKeys,
+        togglePinnedSession: (key: string) => {
+          pinnedState.toggle(key)
+          setPinnedSessionKeys((current) =>
+            current.includes(key)
+              ? current.filter((currentKey) => currentKey !== key)
+              : [...current, key],
+          )
+        },
+        migratePinnedSession: (fromKey: string, toKey: string) => {
+          pinnedState.migrate(fromKey, toKey)
+          setPinnedSessionKeys((current) =>
+            current.includes(fromKey)
+              ? [
+                  ...new Set(
+                    current.map((key) => (key === fromKey ? toKey : key)),
+                  ),
+                ]
+              : current,
+          )
+        },
+      }
+      return pinnedState.useActual ? actualPinnedSessions : mockedPinnedSessions
+    },
+  }
+})
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
@@ -181,12 +200,17 @@ function renderSidebar(
     })
   }
   renderCurrent()
-  mountedRoots.push(() => {
+  let mounted = true
+  const unmount = () => {
+    if (!mounted) return
+    mounted = false
     React.act(() => root.unmount())
     container.remove()
-  })
+  }
+  mountedRoots.push(unmount)
   return {
     container,
+    unmount,
     rerenderWithActiveSession(activeFriendlyId: string) {
       currentActiveFriendlyId = activeFriendlyId
       renderCurrent()
@@ -211,9 +235,12 @@ function renderSidebar(
 const mountedRoots: Array<() => void> = []
 
 beforeEach(() => {
+  localStorage.clear()
+  usePinnedSessionsStore.setState({ pinnedSessionKeys: [] })
   pinnedState.keys = []
   pinnedState.toggle.mockReset()
   pinnedState.migrate.mockReset()
+  pinnedState.useActual = false
 })
 
 afterEach(() => {
@@ -364,6 +391,54 @@ describe('SidebarSessions lineage projection', () => {
     expect(within(pinnedSessions).getByRole('link').getAttribute('href')).toBe(
       '/chat/tip-route',
     )
+  })
+
+  it('migrates a persisted pin through a second cold continuation generation', async () => {
+    pinnedState.useActual = true
+    usePinnedSessionsStore.getState().pinSession('root')
+    const root = session('root', 'Original snapshot', {
+      lineageRootId: 'root',
+      lineageTipId: 'tip-1',
+    })
+    const firstTip = session('tip-1', 'First continuation', {
+      parentSessionId: 'root',
+      lineageRootId: 'root',
+      lineageTipId: 'tip-1',
+      compressionSegmentCount: 2,
+    })
+
+    const firstMount = renderSidebar([root, firstTip])
+    await waitFor(() =>
+      expect(usePinnedSessionsStore.getState().pinnedSessionKeys).toEqual([
+        'tip-1',
+      ]),
+    )
+    firstMount.unmount()
+
+    const secondTip = session('tip-2', 'Second continuation', {
+      parentSessionId: 'root',
+      relationshipType: 'continuation',
+      lineageRootId: 'root',
+      lineageTipId: 'tip-2',
+      compressionSegmentCount: 3,
+      parentLineageRootId: 'root',
+      parentLineageTipId: 'tip-1',
+    })
+    renderSidebar([secondTip])
+
+    await waitFor(() =>
+      expect(usePinnedSessionsStore.getState().pinnedSessionKeys).toEqual([
+        'tip-2',
+      ]),
+    )
+    expect(
+      JSON.parse(localStorage.getItem('pinned-sessions') ?? '{}'),
+    ).toMatchObject({ state: { pinnedSessionKeys: ['tip-2'] } })
+    expect(
+      within(screen.getByRole('region', { name: 'Pinned sessions' })).getByText(
+        'Second continuation',
+      ),
+    ).toBeTruthy()
   })
 
   it('does not migrate a stale hidden pin when refresh fails', async () => {

@@ -3,6 +3,31 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as FsPromises from 'node:fs/promises'
+
+const fsPromiseState = vi.hoisted(() => ({
+  rejectedUnlinks: [] as Array<{ suffix: string; message: string }>,
+}))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof FsPromises>()
+  return {
+    ...actual,
+    unlink: (filePath: Parameters<typeof actual.unlink>[0]) => {
+      const rejection = fsPromiseState.rejectedUnlinks.find(({ suffix }) =>
+        String(filePath).endsWith(suffix),
+      )
+      if (rejection) {
+        return Promise.reject(
+          Object.assign(new Error(rejection.message), {
+            code: 'EACCES',
+          }),
+        )
+      }
+      return actual.unlink(filePath)
+    },
+  }
+})
 
 const originalHermesHome = process.env.HERMES_HOME
 
@@ -20,6 +45,7 @@ function createDeferred<T = void>() {
 
 beforeEach(() => {
   vi.resetModules()
+  fsPromiseState.rejectedUnlinks = []
   tempHome = mkdtempSync(join(tmpdir(), 'hermes-run-store-'))
   process.env.HERMES_HOME = tempHome
 })
@@ -200,6 +226,131 @@ describe('run-store persistence', () => {
       status: 'active',
       assistantText: 'persisted before handoff and after handoff',
     })
+  })
+
+  it('does not leave a successor recovery clone when source unlink fails', async () => {
+    const {
+      appendRunText,
+      createPersistedRun,
+      getActiveRunForSession,
+      getPersistedRun,
+      listAllActiveRuns,
+      markRunStatus,
+      migratePersistedRun,
+    } = await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'run-partial-migration',
+      sessionKey: 'session-a',
+      friendlyId: 'friendly-a',
+    })
+    await appendRunText('session-a', 'run-partial-migration', 'before handoff')
+    fsPromiseState.rejectedUnlinks = [
+      {
+        suffix: join('session-a', 'run-partial-migration.json'),
+        message: 'forced source unlink failure',
+      },
+    ]
+
+    await expect(
+      migratePersistedRun(
+        'session-a',
+        'session-b',
+        'run-partial-migration',
+        'friendly-b',
+      ),
+    ).rejects.toThrow('forced source unlink failure')
+    fsPromiseState.rejectedUnlinks = []
+
+    expect(await getActiveRunForSession('session-a')).toMatchObject({
+      runId: 'run-partial-migration',
+      sessionKey: 'session-a',
+      assistantText: 'before handoff',
+    })
+    expect(
+      await getPersistedRun('session-b', 'run-partial-migration'),
+    ).toBeNull()
+    expect(await listAllActiveRuns()).toEqual([
+      expect.objectContaining({
+        runId: 'run-partial-migration',
+        sessionKey: 'session-a',
+      }),
+    ])
+
+    await appendRunText('session-a', 'run-partial-migration', ' after fallback')
+    await markRunStatus('session-a', 'run-partial-migration', 'complete')
+    expect(
+      await getPersistedRun('session-a', 'run-partial-migration'),
+    ).toMatchObject({
+      status: 'complete',
+      assistantText: 'before handoff after fallback',
+    })
+    expect(
+      await getPersistedRun('session-b', 'run-partial-migration'),
+    ).toBeNull()
+    expect(await listAllActiveRuns()).toEqual([])
+  })
+
+  it('terminalizes the successor when source and rollback unlink both fail', async () => {
+    const {
+      appendRunText,
+      createPersistedRun,
+      getActiveRunForSession,
+      getPersistedRun,
+      listAllActiveRuns,
+      migratePersistedRun,
+    } = await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'run-double-unlink',
+      sessionKey: 'session-a',
+      friendlyId: 'friendly-a',
+    })
+    await appendRunText('session-a', 'run-double-unlink', 'before handoff')
+    fsPromiseState.rejectedUnlinks = [
+      {
+        suffix: join('session-a', 'run-double-unlink.json'),
+        message: 'forced source unlink failure',
+      },
+      {
+        suffix: join('session-b', 'run-double-unlink.json'),
+        message: 'forced rollback unlink failure',
+      },
+    ]
+
+    const migrationError = await migratePersistedRun(
+      'session-a',
+      'session-b',
+      'run-double-unlink',
+      'friendly-b',
+    ).catch((error: unknown) => error)
+    fsPromiseState.rejectedUnlinks = []
+
+    expect(migrationError).toBeInstanceOf(AggregateError)
+    expect((migrationError as AggregateError).errors).toEqual([
+      expect.objectContaining({ message: 'forced source unlink failure' }),
+      expect.objectContaining({ message: 'forced rollback unlink failure' }),
+    ])
+    expect(await getActiveRunForSession('session-a')).toMatchObject({
+      runId: 'run-double-unlink',
+      sessionKey: 'session-a',
+      status: 'active',
+      assistantText: 'before handoff',
+    })
+    expect(
+      await getPersistedRun('session-b', 'run-double-unlink'),
+    ).toMatchObject({
+      runId: 'run-double-unlink',
+      sessionKey: 'session-b',
+      status: 'error',
+    })
+    expect(await getActiveRunForSession('session-b')).toBeNull()
+    expect(await listAllActiveRuns()).toEqual([
+      expect.objectContaining({
+        runId: 'run-double-unlink',
+        sessionKey: 'session-a',
+      }),
+    ])
   })
 
   it('preserves concurrent updates to the same run', async () => {
