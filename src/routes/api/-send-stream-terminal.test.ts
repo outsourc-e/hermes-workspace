@@ -1,6 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createRunTerminalTransitionCoordinator } from './-send-stream-terminal'
+import { createSseHeartbeatLifecycle } from './-send-stream-heartbeat'
+import {
+  createRunTerminalTransitionCoordinator,
+  finalizeRunTerminalStream,
+} from './-send-stream-terminal'
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 function createDeferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -111,4 +119,64 @@ describe('run terminal transition coordinator', () => {
     )
     expect(persist).not.toHaveBeenCalled()
   })
+
+  it.each([
+    {
+      closeBeforePersistence: false,
+      path: 'completion, upstream error, timeout, and outer catch',
+    },
+    {
+      closeBeforePersistence: true,
+      path: 'request abort and stream cancellation',
+    },
+  ])(
+    'closes the route stream and stops its heartbeat once when sealing rejects on $path',
+    async ({ closeBeforePersistence }) => {
+      vi.useFakeTimers()
+      const persist = vi.fn(() => Promise.resolve())
+      const onPersisted = vi.fn()
+      const heartbeat = createSseHeartbeatLifecycle({
+        intervalMs: 10_000,
+        getActivity: () => null,
+        sendActivityHeartbeat: vi.fn(),
+        sendProxyKeepalive: vi.fn(),
+      })
+      const stopHeartbeat = vi.spyOn(heartbeat, 'stop')
+      let closeStream!: ReturnType<typeof vi.fn<() => void>>
+      const stream = new ReadableStream({
+        start(controller) {
+          heartbeat.start()
+          closeStream = vi.fn(() => {
+            heartbeat.stop()
+            controller.close()
+          })
+        },
+      })
+      const coordinator = createRunTerminalTransitionCoordinator({
+        sealTranscript: () =>
+          Promise.reject(new Error('bounded sealing retries exhausted')),
+        persist,
+      })
+
+      expect(vi.getTimerCount()).toBe(1)
+      await expect(
+        finalizeRunTerminalStream({
+          terminalPersistence: coordinator.transition('complete'),
+          onPersisted,
+          closeStream,
+          closeBeforePersistence,
+        }),
+      ).resolves.toBeUndefined()
+
+      expect(persist).not.toHaveBeenCalled()
+      expect(onPersisted).not.toHaveBeenCalled()
+      expect(closeStream).toHaveBeenCalledTimes(1)
+      expect(stopHeartbeat).toHaveBeenCalledTimes(1)
+      expect(vi.getTimerCount()).toBe(0)
+      await expect(stream.getReader().read()).resolves.toEqual({
+        done: true,
+        value: undefined,
+      })
+    },
+  )
 })

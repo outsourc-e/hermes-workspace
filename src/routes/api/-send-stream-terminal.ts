@@ -13,6 +13,45 @@ export type RunTerminalTransitionCoordinator = {
   ) => Promise<void>
 }
 
+type FinalizeRunTerminalStreamOptions = {
+  terminalPersistence: Promise<void>
+  closeStream: () => void
+  onPersisted?: () => void
+  closeBeforePersistence?: boolean
+}
+
+/**
+ * Complete the route-owned stream lifecycle after a terminal transition.
+ * Sealing failures intentionally suppress the client terminal event and terminal
+ * status, but they must never escape into an outer stream catch or bypass cleanup.
+ */
+export async function finalizeRunTerminalStream({
+  terminalPersistence,
+  closeStream,
+  onPersisted,
+  closeBeforePersistence = false,
+}: FinalizeRunTerminalStreamOptions): Promise<void> {
+  let streamCloseRequested = false
+  const closeStreamOnce = () => {
+    if (streamCloseRequested) return
+    streamCloseRequested = true
+    closeStream()
+  }
+
+  try {
+    // Abort and consumer cancellation must stop upstream work immediately;
+    // completion/error paths keep the stream open long enough for their event.
+    if (closeBeforePersistence) closeStreamOnce()
+    await terminalPersistence
+    onPersisted?.()
+  } catch {
+    // A rejected seal is observable through skipped terminal persistence. The
+    // transport still closes below, without re-entering another terminal path.
+  } finally {
+    closeStreamOnce()
+  }
+}
+
 /**
  * Terminal precedence is first-observed: cancellation, completion, or error
  * claims the run synchronously before persistence begins. Every later terminal

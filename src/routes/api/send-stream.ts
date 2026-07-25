@@ -46,7 +46,10 @@ import {
   createSyntheticLiveToolTracker,
 } from './-send-stream-live-tools'
 import { createSseHeartbeatLifecycle } from './-send-stream-heartbeat'
-import { createRunTerminalTransitionCoordinator } from './-send-stream-terminal'
+import {
+  createRunTerminalTransitionCoordinator,
+  finalizeRunTerminalStream,
+} from './-send-stream-terminal'
 import type {
   OpenAICompatContentPart,
   OpenAICompatMessage,
@@ -439,17 +442,23 @@ export const Route = createFileRoute('/api/send-stream')({
         })
 
         // When the client hits Stop / navigates away / closes the tab, the
-        // request.signal fires abort.  Stop the upstream agent (closeStream)
-        // and clean up run tracking so we don't burn API credits on an orphan.
+        // request.signal fires abort. Stop the upstream agent immediately, then
+        // observe terminal persistence without allowing seal rejection to leak.
         function handleAbort() {
           if (!streamClosed) {
-            if (persistedRunId) void persistTerminalRun('handoff')
+            const terminalPersistence = persistedRunId
+              ? persistTerminalRun('handoff')
+              : Promise.resolve()
             if (activeRunId) {
               unregisterActiveSendRun(activeRunId)
               activeRunId = null
             }
+            void finalizeTerminalPersistence(
+              terminalPersistence,
+              undefined,
+              true,
+            )
           }
-          closeStream()
         }
         request.signal.addEventListener('abort', () => handleAbort(), {
           once: true,
@@ -499,6 +508,19 @@ export const Route = createFileRoute('/api/send-stream')({
           errorMessage?: string,
         ): Promise<void> {
           await terminalRunTransition.transition(status, errorMessage)
+        }
+
+        async function finalizeTerminalPersistence(
+          terminalPersistence: Promise<void>,
+          onPersisted?: () => void,
+          closeBeforePersistence = false,
+        ): Promise<void> {
+          await finalizeRunTerminalStream({
+            terminalPersistence,
+            onPersisted,
+            closeStream,
+            closeBeforePersistence,
+          })
         }
 
         const stream = new ReadableStream({
@@ -778,17 +800,20 @@ export const Route = createFileRoute('/api/send-stream')({
                         timestamp: Date.now(),
                       })
                       touchLocalSession(portableSessionKey)
-                      await persistTerminalRun('complete')
-                      sendEvent('done', {
-                        state: 'complete',
-                        sessionKey: portableSessionKey,
-                        runId,
-                        message: {
-                          role: 'assistant',
-                          content: [{ type: 'text', text: accumulated }],
+                      await finalizeTerminalPersistence(
+                        persistTerminalRun('complete'),
+                        () => {
+                          sendEvent('done', {
+                            state: 'complete',
+                            sessionKey: portableSessionKey,
+                            runId,
+                            message: {
+                              role: 'assistant',
+                              content: [{ type: 'text', text: accumulated }],
+                            },
+                          })
                         },
-                      })
-                      closeStream()
+                      )
                       return
                     } catch (err) {
                       // Log and fall through to the openaiChat path so a
@@ -888,30 +913,38 @@ export const Route = createFileRoute('/api/send-stream')({
                   })
                   touchLocalSession(portableSessionKey)
 
-                  await persistTerminalRun('complete')
-                  sendEvent('done', {
-                    state: 'complete',
-                    sessionKey: portableSessionKey,
-                    runId,
-                    message: {
-                      role: 'assistant',
-                      content: [
-                        ...(thinking ? [{ type: 'thinking', thinking }] : []),
-                        { type: 'text', text: accumulated },
-                      ],
+                  await finalizeTerminalPersistence(
+                    persistTerminalRun('complete'),
+                    () => {
+                      sendEvent('done', {
+                        state: 'complete',
+                        sessionKey: portableSessionKey,
+                        runId,
+                        message: {
+                          role: 'assistant',
+                          content: [
+                            ...(thinking
+                              ? [{ type: 'thinking', thinking }]
+                              : []),
+                            { type: 'text', text: accumulated },
+                          ],
+                        },
+                      })
                     },
-                  })
-                  closeStream()
+                  )
                 } catch (err) {
                   if (!streamClosed) {
                     const errorMessage = normalizeClaudeErrorMessage(err)
-                    await persistTerminalRun('error', errorMessage)
-                    sendEvent('error', {
-                      message: errorMessage,
-                      sessionKey: portableSessionKey,
-                      runId,
-                    })
-                    closeStream()
+                    await finalizeTerminalPersistence(
+                      persistTerminalRun('error', errorMessage),
+                      () => {
+                        sendEvent('error', {
+                          message: errorMessage,
+                          sessionKey: portableSessionKey,
+                          runId,
+                        })
+                      },
+                    )
                   }
                 }
                 return
@@ -1370,13 +1403,16 @@ export const Route = createFileRoute('/api/send-stream')({
                           ) ||
                           readString(data.message) ||
                           'Hermes stream error'
-                        await persistTerminalRun('error', errorMessage)
-                        sendEvent('error', {
-                          message: errorMessage,
-                          sessionKey: sessionKeyFromEvent,
-                          runId,
-                        })
-                        closeStream()
+                        await finalizeTerminalPersistence(
+                          persistTerminalRun('error', errorMessage),
+                          () => {
+                            sendEvent('error', {
+                              message: errorMessage,
+                              sessionKey: sessionKeyFromEvent,
+                              runId,
+                            })
+                          },
+                        )
                         return
                       }
 
@@ -1481,9 +1517,10 @@ export const Route = createFileRoute('/api/send-stream')({
                           sessionKey: sessionKeyFromEvent,
                           runId,
                         }
-                        await terminalPersistence
-                        sendEvent('done', translated)
-                        closeStream()
+                        await finalizeTerminalPersistence(
+                          terminalPersistence,
+                          () => sendEvent('done', translated),
+                        )
                       }
                     },
                   },
@@ -1502,35 +1539,45 @@ export const Route = createFileRoute('/api/send-stream')({
               streamTimeoutTimer = setTimeout(() => {
                 void (async () => {
                   if (streamClosed) return
-                  await persistTerminalRun('error', 'Stream timeout')
-                  sendEvent('error', { message: 'Stream timeout' })
-                  closeStream()
+                  await finalizeTerminalPersistence(
+                    persistTerminalRun('error', 'Stream timeout'),
+                    () => {
+                      sendEvent('error', { message: 'Stream timeout' })
+                    },
+                  )
                 })()
               }, SEND_STREAM_RUN_TIMEOUT_MS)
             } catch (err) {
-              // Only send error if stream hasn't already completed successfully
+              // Only send error if stream hasn't already completed successfully.
+              // Finalization consumes a sealing failure so this catch cannot loop
+              // by requesting the already-rejected terminal transition again.
               if (!streamClosed) {
                 const errorMsg = normalizeClaudeErrorMessage(err)
-                await persistTerminalRun('error', errorMsg)
-                sendEvent('error', {
-                  message: errorMsg,
-                  sessionKey,
-                })
-                closeStream()
+                await finalizeTerminalPersistence(
+                  persistTerminalRun('error', errorMsg),
+                  () => {
+                    sendEvent('error', {
+                      message: errorMsg,
+                      sessionKey,
+                    })
+                  },
+                )
               }
             }
           },
           async cancel() {
             // User clicked Stop, navigated away, or browser closed the tab.
-            // Persist the interrupted run as 'handoff', then delegate to
-            // closeStream() for timer/controller cleanup. Delegate instead
-            // of duplicating cleanup logic to keep the two paths in sync.
+            // Stop transport work immediately, then observe bounded sealing
+            // without allowing exhaustion to reject stream cancellation.
             const terminalPersistence =
               persistedRunId && !streamClosed
                 ? persistTerminalRun('handoff')
                 : Promise.resolve()
-            closeStream()
-            await terminalPersistence
+            await finalizeTerminalPersistence(
+              terminalPersistence,
+              undefined,
+              true,
+            )
           },
         })
 
