@@ -10,8 +10,6 @@
     "vite.config.ts"
   ],
 
-  "exclude": ["playground-ws-worker"],
-
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
