@@ -37,6 +37,8 @@ import {
   createSession,
   ensureGatewayProbed,
   getGatewayCapabilities,
+  getLatestDescendant,
+  getSession,
   getMessages as getSessionMessagesFromAgent,
   listSessions,
   streamChat,
@@ -52,7 +54,10 @@ import {
   finalizeRunTerminalStream,
 } from './-send-stream-terminal'
 import {
+  createStreamEventProvenanceTracker,
+  hasNonParentStreamFacts,
   resolveAuthoritativeBootstrapHandoff,
+  resolveAuthoritativeSessionSource,
   resolveAuthoritativeStreamHandoff,
 } from './-send-stream-session-handoff'
 import type {
@@ -303,6 +308,89 @@ export const Route = createFileRoute('/api/send-stream')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Establish the route lifetime before any await. Request aborts during
+        // gateway probing, body parsing, or session/workspace resolution must
+        // prevent the SSE stream (and all of its timers/work) from starting.
+        let streamClosed = false
+        let activeRunId: string | null = null
+        let persistedRunId: string | null = null
+        let activeRunSessionKey: string | null = null
+        let persistedRunReady: Promise<unknown> | null = null
+        let runTextBuffer: ReturnType<
+          typeof createRunTextPersistenceBuffer
+        > | null = null
+        let unregisterTimer: ReturnType<typeof setTimeout> | null = null
+        let streamTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+        let stopLivePolling: () => void = () => undefined
+        const abortController = new AbortController()
+        const streamTimeoutError = new Error('Stream timeout')
+        const streamAbortError = new Error('Stream aborted')
+        let rejectStreamLifetime: ((reason: Error) => void) | null = null
+        let streamLifetimeSettled = false
+        const streamLifetime = new Promise<never>((_resolve, reject) => {
+          rejectStreamLifetime = reject
+        })
+        // The lifetime signal is also rejected on ordinary terminal closure, when
+        // no route-owned await may still be racing it.
+        void streamLifetime.catch(() => undefined)
+        const settleStreamLifetime = (reason: Error) => {
+          if (streamLifetimeSettled) return
+          streamLifetimeSettled = true
+          rejectStreamLifetime?.(reason)
+          rejectStreamLifetime = null
+        }
+        const streamTransportUnavailable = () =>
+          streamClosed || abortController.signal.aborted
+        const ensureStreamTransportAvailable = () => {
+          if (streamTransportUnavailable()) throw streamAbortError
+        }
+        const waitWithinStreamLifetime = <T>(pending: Promise<T>): Promise<T> =>
+          Promise.race([pending, streamLifetime])
+        const streamTimeoutResponse = () =>
+          new Response(
+            JSON.stringify({ ok: false, error: streamTimeoutError.message }),
+            {
+              status: 504,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
+        // Close out the SSE stream — stop enqueueing, clear timers, and
+        // abort the upstream Hermes gateway request so the agent stops
+        // processing. Does not touch persisted run status.
+        let closeStream = () => {
+          if (streamClosed) return
+          streamClosed = true
+          stopLivePolling()
+          if (unregisterTimer) {
+            clearTimeout(unregisterTimer)
+            unregisterTimer = null
+          }
+          if (streamTimeoutTimer) {
+            clearTimeout(streamTimeoutTimer)
+            streamTimeoutTimer = null
+          }
+          settleStreamLifetime(streamAbortError)
+          abortController.abort()
+        }
+        let handleStreamDeadline = () => {
+          settleStreamLifetime(streamTimeoutError)
+          closeStream()
+        }
+        const finishPreStreamResponse = (response: Response) => {
+          closeStream()
+          return response
+        }
+        let handleObservedRequestAbort = () => closeStream()
+        const observeRequestAbort = () => handleObservedRequestAbort()
+        request.signal.addEventListener('abort', observeRequestAbort, {
+          once: true,
+        })
+        const abortedResponse = () => new Response(null, { status: 499 })
+        if (request.signal.aborted) {
+          observeRequestAbort()
+          return abortedResponse()
+        }
+
         // Auth check
         if (!isAuthenticated(request)) {
           return new Response(
@@ -312,15 +400,41 @@ export const Route = createFileRoute('/api/send-stream')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
-        await ensureGatewayProbed()
+        // One absolute deadline owns the complete route lifetime. Start it
+        // before the first preflight await so gateway/body/session/workspace
+        // stalls consume the same budget as production and terminal writes.
+        streamTimeoutTimer = setTimeout(
+          () => handleStreamDeadline(),
+          SEND_STREAM_RUN_TIMEOUT_MS,
+        )
+        try {
+          await waitWithinStreamLifetime(ensureGatewayProbed())
+          ensureStreamTransportAvailable()
+        } catch (error) {
+          if (error === streamTimeoutError) {
+            return finishPreStreamResponse(streamTimeoutResponse())
+          }
+          if (error === streamAbortError || streamTransportUnavailable()) {
+            return finishPreStreamResponse(abortedResponse())
+          }
+          closeStream()
+          throw error
+        }
 
         // Read body manually to handle large payloads (image attachments
         // can push the JSON body above the default ~1MB parse limit).
         let body: Record<string, unknown> = {}
         try {
-          const rawBody = await request.text()
+          const rawBody = await waitWithinStreamLifetime(request.text())
+          ensureStreamTransportAvailable()
           body = JSON.parse(rawBody) as Record<string, unknown>
-        } catch {
+        } catch (error) {
+          if (error === streamTimeoutError) {
+            return finishPreStreamResponse(streamTimeoutResponse())
+          }
+          if (error === streamAbortError || streamTransportUnavailable()) {
+            return finishPreStreamResponse(abortedResponse())
+          }
           // Fall through — body stays empty, will hit 'message required' below
         }
 
@@ -334,12 +448,14 @@ export const Route = createFileRoute('/api/send-stream')({
         const attachments = normalizeAttachments(body.attachments)
         const history = normalizePortableHistory(body.history)
         if (!message.trim() && (!attachments || attachments.length === 0)) {
-          return new Response(
-            JSON.stringify({ ok: false, error: 'message required' }),
-            {
-              status: 400,
-              headers: { 'Content-Type': 'application/json' },
-            },
+          return finishPreStreamResponse(
+            new Response(
+              JSON.stringify({ ok: false, error: 'message required' }),
+              {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
           )
         }
 
@@ -347,28 +463,41 @@ export const Route = createFileRoute('/api/send-stream')({
         let sessionKey: string
         let resolvedFriendlyId: string
         try {
-          const resolved = await resolveSessionKey({
-            rawSessionKey,
-            friendlyId: requestedFriendlyId,
-            defaultKey: 'main',
-          })
+          const resolved = await waitWithinStreamLifetime(
+            resolveSessionKey({
+              rawSessionKey,
+              friendlyId: requestedFriendlyId,
+              defaultKey: 'main',
+            }),
+          )
+          ensureStreamTransportAvailable()
           sessionKey = resolved.sessionKey
           resolvedFriendlyId = resolved.sessionKey
         } catch (err) {
+          if (err === streamTimeoutError) {
+            return finishPreStreamResponse(streamTimeoutResponse())
+          }
+          if (err === streamAbortError || streamTransportUnavailable()) {
+            return finishPreStreamResponse(abortedResponse())
+          }
           const errorMsg = normalizeClaudeErrorMessage(err)
           if (errorMsg === 'session not found') {
-            return new Response(
-              JSON.stringify({ ok: false, error: 'session not found' }),
-              {
-                status: 404,
-                headers: { 'Content-Type': 'application/json' },
-              },
+            return finishPreStreamResponse(
+              new Response(
+                JSON.stringify({ ok: false, error: 'session not found' }),
+                {
+                  status: 404,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              ),
             )
           }
-          return new Response(JSON.stringify({ ok: false, error: errorMsg }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-          })
+          return finishPreStreamResponse(
+            new Response(JSON.stringify({ ok: false, error: errorMsg }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
         }
 
         // Check if the selected model is a local provider model — force portable + direct routing
@@ -396,7 +525,22 @@ export const Route = createFileRoute('/api/send-stream')({
           resolvedFriendlyId = sessionKey
         }
 
-        const workspaceScope = await loadWorkspaceCatalog().catch(() => null)
+        let workspaceScope: Awaited<
+          ReturnType<typeof loadWorkspaceCatalog>
+        > | null = null
+        try {
+          workspaceScope = await waitWithinStreamLifetime(
+            loadWorkspaceCatalog(),
+          )
+          ensureStreamTransportAvailable()
+        } catch (error) {
+          if (error === streamTimeoutError) {
+            return finishPreStreamResponse(streamTimeoutResponse())
+          }
+          if (error === streamAbortError || streamTransportUnavailable()) {
+            return finishPreStreamResponse(abortedResponse())
+          }
+        }
         const scopedMessage = buildWorkspaceScopedTextMessage(
           getChatMessage(message, attachments),
           workspaceScope,
@@ -404,34 +548,6 @@ export const Route = createFileRoute('/api/send-stream')({
 
         // Create streaming response using the SHARED server connection
         const encoder = new TextEncoder()
-        let streamClosed = false
-        let activeRunId: string | null = null
-        let persistedRunId: string | null = null
-        let activeRunSessionKey: string | null = null
-        let persistedRunReady: Promise<unknown> | null = null
-        let runTextBuffer: ReturnType<
-          typeof createRunTextPersistenceBuffer
-        > | null = null
-        let unregisterTimer: ReturnType<typeof setTimeout> | null = null
-        let streamTimeoutTimer: ReturnType<typeof setTimeout> | null = null
-        const abortController = new AbortController()
-        // Close out the SSE stream — stop enqueueing, clear timers, and
-        // abort the upstream Hermes gateway request so the agent stops
-        // processing.  Does NOT touch run status (persistActiveRun etc.).
-        // The abort path (request.signal / handleAbort) owns run cleanup.
-        let closeStream = () => {
-          if (streamClosed) return
-          streamClosed = true
-          if (unregisterTimer) {
-            clearTimeout(unregisterTimer)
-            unregisterTimer = null
-          }
-          if (streamTimeoutTimer) {
-            clearTimeout(streamTimeoutTimer)
-            streamTimeoutTimer = null
-          }
-          abortController.abort()
-        }
 
         const terminalRunTransition = createRunTerminalTransitionCoordinator({
           sealTranscript: async () => {
@@ -466,9 +582,7 @@ export const Route = createFileRoute('/api/send-stream')({
             )
           }
         }
-        request.signal.addEventListener('abort', () => handleAbort(), {
-          once: true,
-        })
+        handleObservedRequestAbort = handleAbort
 
         const persistRunStarted = (
           runId: string | undefined,
@@ -499,31 +613,61 @@ export const Route = createFileRoute('/api/send-stream')({
           friendlyId: string,
         ) => {
           const runId = persistedRunId
-          if (!runId || !persistedRunReady || fromSessionKey === toSessionKey) {
+          if (
+            !runId ||
+            !persistedRunReady ||
+            fromSessionKey === toSessionKey ||
+            streamTransportUnavailable()
+          ) {
             return
           }
 
-          await runTextBuffer?.flush()
-          const migration = persistedRunReady.then(() =>
-            migratePersistedRun(
-              fromSessionKey,
-              toSessionKey,
-              runId,
-              friendlyId,
-            ),
-          )
-          const migrationReady = migration
-            .then((migratedRun) => {
+          try {
+            await waitWithinStreamLifetime(
+              runTextBuffer?.flush() ?? Promise.resolve(),
+            )
+            if (streamTransportUnavailable()) return
+
+            const priorRunReady = persistedRunReady
+            const migrationReady = (async () => {
+              await waitWithinStreamLifetime(priorRunReady)
+              if (streamTransportUnavailable()) return
+
+              const migration = migratePersistedRun(
+                fromSessionKey,
+                toSessionKey,
+                runId,
+                friendlyId,
+              )
+              // The underlying file operation is not cancellable. Observe a late
+              // rejection, while the shared lifetime race prevents it from keeping
+              // this route or a successor run alive after transport closure.
+              void migration.catch(() => undefined)
+              const migratedRun = await waitWithinStreamLifetime(migration)
+              if (streamTransportUnavailable()) return
               if (
                 migratedRun?.sessionKey === toSessionKey &&
                 migratedRun.runId === runId
               ) {
                 activeRunSessionKey = toSessionKey
               }
-            })
-            .catch(() => undefined)
-          persistedRunReady = migrationReady
-          await migrationReady
+            })().catch(() => undefined)
+            // Publish the serialization barrier synchronously so polling writes
+            // cannot slip between the prior queue and the migration.
+            persistedRunReady = migrationReady
+            await waitWithinStreamLifetime(migrationReady)
+            if (streamTransportUnavailable()) return
+          } catch (error) {
+            if (
+              error === streamTimeoutError ||
+              error === streamAbortError ||
+              streamTransportUnavailable()
+            ) {
+              return
+            }
+            // Persisted-run migration is best effort. Keep subsequent writes on
+            // the last authoritative durable owner when migration fails.
+          }
         }
 
         const persistActiveRun = (
@@ -612,6 +756,7 @@ export const Route = createFileRoute('/api/send-stream')({
               streamClosed = true
               heartbeatLifecycle?.stop()
               heartbeatLifecycle = null
+              stopLivePolling()
               if (unregisterTimer) {
                 clearTimeout(unregisterTimer)
                 unregisterTimer = null
@@ -624,12 +769,27 @@ export const Route = createFileRoute('/api/send-stream')({
                 unregisterActiveSendRun(activeRunId)
                 activeRunId = null
               }
+              settleStreamLifetime(streamAbortError)
               abortController.abort()
               try {
                 controller.close()
               } catch {
                 // ignore
               }
+            }
+
+            handleStreamDeadline = () => {
+              if (streamClosed) return
+              const terminalPersistence = persistedRunId
+                ? persistTerminalRun('error', streamTimeoutError.message)
+                : Promise.resolve()
+              void terminalPersistence.catch(() => undefined)
+              sendEvent('error', {
+                message: streamTimeoutError.message,
+                sessionKey,
+              })
+              settleStreamLifetime(streamTimeoutError)
+              closeStream()
             }
 
             try {
@@ -1004,7 +1164,10 @@ export const Route = createFileRoute('/api/send-stream')({
                 let reused: string | null = null
                 if (sessionKey === 'main') {
                   try {
-                    const recent = await listSessions(30, 0)
+                    const recent = await waitWithinStreamLifetime(
+                      listSessions(30, 0),
+                    )
+                    ensureStreamTransportAvailable()
                     const isInternal = (id: string) =>
                       id.startsWith('cron_') ||
                       id.startsWith('cron:') ||
@@ -1029,7 +1192,14 @@ export const Route = createFileRoute('/api/send-stream')({
                         )
                     const candidate = titled ?? fallback
                     if (candidate) reused = candidate.id
-                  } catch {
+                  } catch (error) {
+                    if (
+                      error === streamTimeoutError ||
+                      error === streamAbortError ||
+                      streamTransportUnavailable()
+                    ) {
+                      throw error
+                    }
                     // fall through to createSession()
                   }
                 }
@@ -1037,11 +1207,15 @@ export const Route = createFileRoute('/api/send-stream')({
                   sessionKey = reused
                   resolvedFriendlyId = reused
                 } else {
-                  const session = await createSession()
+                  const session =
+                    await waitWithinStreamLifetime(createSession())
+                  ensureStreamTransportAvailable()
                   sessionKey = session.id
                   resolvedFriendlyId = session.id
                 }
               }
+
+              ensureStreamTransportAvailable()
 
               const bootstrapHandoff = resolveAuthoritativeBootstrapHandoff(
                 requestedPreStreamSessionKey,
@@ -1070,6 +1244,43 @@ export const Route = createFileRoute('/api/send-stream')({
               // any real live events that might arrive.
               const syntheticLiveToolTracker = createSyntheticLiveToolTracker()
               const liveRunState: { active: boolean } = { active: true }
+              let livePollDelayTimer: ReturnType<typeof setTimeout> | null =
+                null
+              let finishLivePollDelay: (() => void) | null = null
+              const waitForLivePoll = (delayMs: number): Promise<void> =>
+                new Promise((resolve) => {
+                  if (!liveRunState.active) {
+                    resolve()
+                    return
+                  }
+                  finishLivePollDelay = () => {
+                    if (livePollDelayTimer) clearTimeout(livePollDelayTimer)
+                    livePollDelayTimer = null
+                    finishLivePollDelay = null
+                    resolve()
+                  }
+                  livePollDelayTimer = setTimeout(
+                    () => finishLivePollDelay?.(),
+                    delayMs,
+                  )
+                })
+              stopLivePolling = () => {
+                liveRunState.active = false
+                finishLivePollDelay?.()
+              }
+              const livePollingStopped = () => !liveRunState.active
+              const streamEventProvenance = createStreamEventProvenanceTracker()
+              const activeParentSource = await waitWithinStreamLifetime(
+                getSession(sessionKey)
+                  .then((parentSession) =>
+                    resolveAuthoritativeSessionSource(
+                      sessionKey,
+                      parentSession,
+                    ),
+                  )
+                  .catch(() => null),
+              )
+              ensureStreamTransportAvailable()
               const livePollIntervalMs = 800
               // Snapshot the session message count at run-start so the poller
               // and the post-run backfill only consider messages persisted by
@@ -1079,17 +1290,26 @@ export const Route = createFileRoute('/api/send-stream')({
               let liveBaselineCount = 0
               let liveBaselineSessionKey = sessionKey
               try {
-                const baseline = (await getSessionMessagesFromAgent(
-                  sessionKey,
+                const baseline = (await waitWithinStreamLifetime(
+                  getSessionMessagesFromAgent(sessionKey),
                 )) as unknown as Array<Record<string, unknown>>
+                ensureStreamTransportAvailable()
                 if (Array.isArray(baseline)) liveBaselineCount = baseline.length
-              } catch {
+              } catch (error) {
+                if (
+                  error === streamTimeoutError ||
+                  error === streamAbortError ||
+                  streamTransportUnavailable()
+                ) {
+                  throw error
+                }
                 liveBaselineCount = 0
               }
               const livePollerPromise = (async () => {
                 // Initial small delay so the agent has time to ingest the
                 // user message before we start asking for session state.
-                await new Promise((r) => setTimeout(r, 600))
+                await waitForLivePoll(600)
+                if (streamTransportUnavailable()) return
                 while (liveRunState.active) {
                   if (streamClosed) break
                   try {
@@ -1098,22 +1318,21 @@ export const Route = createFileRoute('/api/send-stream')({
                       polledSessionKey === liveBaselineSessionKey
                         ? liveBaselineCount
                         : 0
-                    const allMsgs = (await getSessionMessagesFromAgent(
-                      polledSessionKey,
+                    const allMsgs = (await waitWithinStreamLifetime(
+                      getSessionMessagesFromAgent(polledSessionKey),
                     )) as unknown as Array<Record<string, unknown>>
+                    if (livePollingStopped() || streamTransportUnavailable()) {
+                      break
+                    }
                     if (polledSessionKey !== sessionKey) continue
                     if (!Array.isArray(allMsgs) || allMsgs.length === 0) {
-                      await new Promise((r) =>
-                        setTimeout(r, livePollIntervalMs),
-                      )
+                      await waitForLivePoll(livePollIntervalMs)
                       continue
                     }
                     // Only inspect messages added on or after this run started.
                     const msgs = allMsgs.slice(polledBaselineCount)
                     if (msgs.length === 0) {
-                      await new Promise((r) =>
-                        setTimeout(r, livePollIntervalMs),
-                      )
+                      await waitForLivePoll(livePollIntervalMs)
                       continue
                     }
                     const syntheticEvents = collectSyntheticLiveToolEvents({
@@ -1123,23 +1342,22 @@ export const Route = createFileRoute('/api/send-stream')({
                       runId: activeRunId ?? undefined,
                     })
                     if (syntheticEvents.length === 0) {
-                      await new Promise((r) =>
-                        setTimeout(r, livePollIntervalMs),
-                      )
+                      await waitForLivePoll(livePollIntervalMs)
                       continue
                     }
                     for (const synthetic of syntheticEvents) {
                       sendEvent('tool', synthetic)
                     }
                   } catch {
+                    if (streamTransportUnavailable()) break
                     // Best-effort polling; ignore transient errors.
                   }
-                  await new Promise((r) => setTimeout(r, livePollIntervalMs))
+                  await waitForLivePoll(livePollIntervalMs)
                 }
               })()
 
               try {
-                await streamChat(
+                const upstreamStream = streamChat(
                   sessionKey,
                   {
                     message: scopedMessage,
@@ -1151,30 +1369,106 @@ export const Route = createFileRoute('/api/send-stream')({
                   {
                     signal: abortController.signal,
                     async onEvent({ event, data }) {
-                      const runId =
-                        typeof data.run_id === 'string' && data.run_id.trim()
-                          ? data.run_id
-                          : (activeRunId ?? undefined)
-                      const sessionHandoff = resolveAuthoritativeStreamHandoff(
-                        sessionKey,
+                      if (streamTransportUnavailable()) return
+                      const upstreamRunId = readString(data.run_id)
+                      const runId = upstreamRunId || activeRunId || undefined
+                      const upstreamSessionKey = readString(data.session_id)
+                      const hasExplicitNonParentFacts = hasNonParentStreamFacts(
                         data,
+                        activeParentSource,
                       )
-                      if (sessionHandoff) {
-                        await migrateActivePersistedRun(
-                          sessionHandoff.fromSessionKey,
-                          sessionHandoff.sessionKey,
-                          sessionHandoff.sessionKey,
-                        )
-                        sessionKey = sessionHandoff.sessionKey
-                        liveBaselineSessionKey = sessionHandoff.sessionKey
-                        liveBaselineCount = 0
-                        resolvedFriendlyId = sessionHandoff.sessionKey
-                        sendEvent('session_handoff', {
-                          ...sessionHandoff,
-                          friendlyId: sessionHandoff.sessionKey,
-                          runId,
+                      let parentLifecycleEligible = false
+
+                      if (hasExplicitNonParentFacts) {
+                        // Every explicit conflict is sticky for metadata-poor
+                        // tails. The active parent ID itself is never globally
+                        // rejected, so later explicit parent events still work.
+                        streamEventProvenance.quarantine({
+                          sessionKey: upstreamSessionKey,
+                          runId: upstreamRunId,
+                          sourceIsExplicitlyNonParent:
+                            upstreamSessionKey !== sessionKey,
                         })
+                      } else if (upstreamSessionKey === sessionKey) {
+                        // Explicit current-parent ownership applies to this event
+                        // even when another source aliases the same run ID.
+                        parentLifecycleEligible = true
+                      } else if (upstreamSessionKey) {
+                        const mayVerifyContinuation =
+                          !SESSION_BOOTSTRAP_KEYS.has(upstreamSessionKey) &&
+                          !streamEventProvenance.isExplicitlyRejectedSession(
+                            upstreamSessionKey,
+                          )
+                        const [continuationVerification, targetSessionSource] =
+                          mayVerifyContinuation
+                            ? await waitWithinStreamLifetime(
+                                Promise.all([
+                                  getLatestDescendant(sessionKey),
+                                  getSession(upstreamSessionKey)
+                                    .then((targetSession) =>
+                                      resolveAuthoritativeSessionSource(
+                                        upstreamSessionKey,
+                                        targetSession,
+                                      ),
+                                    )
+                                    .catch(() => null),
+                                ]),
+                              )
+                            : [null, null]
+                        if (streamTransportUnavailable()) return
+                        const sessionHandoff =
+                          resolveAuthoritativeStreamHandoff(
+                            sessionKey,
+                            data,
+                            continuationVerification,
+                            activeParentSource,
+                            targetSessionSource,
+                          )
+                        if (sessionHandoff) {
+                          await migrateActivePersistedRun(
+                            sessionHandoff.fromSessionKey,
+                            sessionHandoff.sessionKey,
+                            sessionHandoff.sessionKey,
+                          )
+                          if (streamTransportUnavailable()) {
+                            return
+                          }
+                          sessionKey = sessionHandoff.sessionKey
+                          liveBaselineSessionKey = sessionHandoff.sessionKey
+                          liveBaselineCount = 0
+                          resolvedFriendlyId = sessionHandoff.sessionKey
+                          sendEvent('session_handoff', {
+                            ...sessionHandoff,
+                            friendlyId: sessionHandoff.sessionKey,
+                            runId,
+                          })
+                          parentLifecycleEligible = true
+                        } else {
+                          streamEventProvenance.quarantine({
+                            sessionKey: upstreamSessionKey,
+                            runId: upstreamRunId,
+                            sourceIsExplicitlyNonParent: false,
+                          })
+                        }
+                      } else {
+                        parentLifecycleEligible =
+                          streamEventProvenance.isImplicitParentEligible(
+                            upstreamRunId,
+                            activeRunId,
+                          )
+                        if (!parentLifecycleEligible) {
+                          streamEventProvenance.quarantine({
+                            runId: upstreamRunId,
+                            sourceIsExplicitlyNonParent: false,
+                          })
+                        }
                       }
+
+                      // Rejected provenance is server-local. It must never emit
+                      // an event carrying the parent session key or mutate any
+                      // parent lifecycle/activity/persistence state.
+                      if (!parentLifecycleEligible) return
+                      streamEventProvenance.recordParentRun(upstreamRunId)
                       const sessionKeyFromEvent = sessionKey
 
                       if (runId && !activeRunId) {
@@ -1498,7 +1792,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         // final tool refresh. Stop scheduling live polls before
                         // it starts; an origin poll already in flight is still
                         // discarded by the session-key check above.
-                        liveRunState.active = false
+                        stopLivePolling()
                         // Claim completion before any asynchronous backfill so
                         // a later abort cannot overwrite the observed winner.
                         const terminalPersistence =
@@ -1524,10 +1818,18 @@ export const Route = createFileRoute('/api/send-stream')({
                             > = []
                             try {
                               persistedMessages =
-                                (await getSessionMessagesFromAgent(
-                                  sid,
+                                (await waitWithinStreamLifetime(
+                                  getSessionMessagesFromAgent(sid),
                                 )) as unknown as Array<Record<string, unknown>>
-                            } catch {
+                              if (streamTransportUnavailable()) return
+                            } catch (error) {
+                              if (
+                                error === streamTimeoutError ||
+                                error === streamAbortError ||
+                                streamTransportUnavailable()
+                              ) {
+                                return
+                              }
                               persistedMessages = []
                             }
                             // Walk back to the most recent assistant message in
@@ -1609,28 +1911,23 @@ export const Route = createFileRoute('/api/send-stream')({
                     },
                   },
                 )
+                // A producer may ignore abort and remain pending forever. Keep
+                // its eventual rejection observed, but let the bounded race own
+                // this HTTP stream's lifetime.
+                void upstreamStream.catch(() => undefined)
+                await waitWithinStreamLifetime(upstreamStream)
+                // A producer that resolves without a terminal event still owns
+                // no authority to leave this SSE response open indefinitely.
+                if (!streamTransportUnavailable()) await streamLifetime
               } finally {
-                // Stop the mid-run tool poller and let it drain.
-                liveRunState.active = false
-                try {
-                  await livePollerPromise
-                } catch {
-                  // ignore
-                }
+                stopLivePolling()
+                // Do not clear the shared deadline here: a producer rejection still
+                // has to finish terminal persistence in the outer catch. closeStream
+                // clears it after persistence or when the absolute deadline wins.
+                // History providers may ignore route closure. The detached poller
+                // still exits through the shared lifetime race and closed guards.
+                void livePollerPromise.catch(() => undefined)
               }
-
-              // Set a timeout to close the stream if no completion event
-              streamTimeoutTimer = setTimeout(() => {
-                void (async () => {
-                  if (streamClosed) return
-                  await finalizeTerminalPersistence(
-                    persistTerminalRun('error', 'Stream timeout'),
-                    () => {
-                      sendEvent('error', { message: 'Stream timeout' })
-                    },
-                  )
-                })()
-              }, SEND_STREAM_RUN_TIMEOUT_MS)
             } catch (err) {
               // Only send error if stream hasn't already completed successfully.
               // Finalization consumes a sealing failure so this catch cannot loop
