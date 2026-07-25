@@ -279,17 +279,32 @@ function readOptionalString(value: unknown): string | null {
 function normalizeStatus(
   raw: unknown,
   health: unknown,
+  detailedHealth: unknown,
 ): DashboardStatusSection | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
-  const state = readString(r.gateway_state) || readString(r.state)
+  const reportedState = readString(r.gateway_state) || readString(r.state)
+  // A Docker/supervisor-managed gateway may be live without the PID/service
+  // metadata that the dashboard's CLI-backed status command expects. Trust
+  // the gateway's own unauthenticated health contract over a stale `stopped`
+  // record, but only for that exact contradictory state; lifecycle states such
+  // as `draining` and `startup_failed` remain dashboard-authoritative.
+  const healthState =
+    health && typeof health === 'object'
+      ? readString((health as Record<string, unknown>).status).toLowerCase()
+      : ''
+  const state =
+    reportedState === 'stopped' &&
+    (healthState === 'ok' || healthState === 'healthy')
+      ? 'running'
+      : reportedState
   if (!state) return null
   // `/health/detailed` is the canonical source for currently-running
   // agent count. Falls back to legacy fields when the gateway endpoint
   // is missing/unreachable.
   let activeAgents: number | null = null
-  if (health && typeof health === 'object') {
-    const h = health as Record<string, unknown>
+  if (detailedHealth && typeof detailedHealth === 'object') {
+    const h = detailedHealth as Record<string, unknown>
     if (typeof h.active_agents === 'number') {
       activeAgents = h.active_agents
     }
@@ -1096,6 +1111,7 @@ export async function buildDashboardOverview(
   const [
     statusRaw,
     healthRaw,
+    detailedHealthRaw,
     cronRaw,
     achRecentRaw,
     achAllRaw,
@@ -1105,6 +1121,9 @@ export async function buildDashboardOverview(
     logsRaw,
   ] = await Promise.all([
     safeJson<unknown>(fetcher, '/api/status'),
+    options.gatewayFetcher
+      ? safeJson<unknown>(options.gatewayFetcher, '/health')
+      : Promise.resolve(null),
     options.gatewayFetcher
       ? safeJson<unknown>(options.gatewayFetcher, '/health/detailed')
       : Promise.resolve(null),
@@ -1123,7 +1142,7 @@ export async function buildDashboardOverview(
     safeJson<unknown>(fetcher, `/api/logs?lines=${logsLimit}`),
   ])
 
-  const status = normalizeStatus(statusRaw, healthRaw)
+  const status = normalizeStatus(statusRaw, healthRaw, detailedHealthRaw)
   const platforms = normalizePlatforms(statusRaw)
   const cron = normalizeCron(cronRaw)
   const analytics = normalizeAnalytics(analyticsRaw, analyticsWindowDays)

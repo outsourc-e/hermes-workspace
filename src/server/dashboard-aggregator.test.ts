@@ -157,6 +157,45 @@ describe('buildDashboardOverview', () => {
     expect(overview.status?.activeAgents).toBe(2)
   })
 
+  it('recognizes a healthy externally supervised gateway when dashboard state is stale', async () => {
+    const fetcher = makeFetcher({
+      '/api/status': {
+        gateway_state: 'stopped',
+        active_sessions: 4,
+        platforms: {},
+      },
+    })
+    const gatewayFetcher: DashboardFetcher = (path) =>
+      Promise.resolve(
+        path === '/health'
+          ? jsonResponse({ status: 'ok' })
+          : path === '/health/detailed'
+            ? new Response('unauthorized', { status: 401 })
+            : new Response('not found', { status: 404 }),
+      )
+
+    const overview = await buildDashboardOverview({ fetcher, gatewayFetcher })
+
+    expect(overview.status?.gatewayState).toBe('running')
+    expect(overview.status?.activeAgents).toBe(0)
+  })
+
+  it('does not override a stopped dashboard state from an unhealthy gateway response', async () => {
+    const fetcher = makeFetcher({
+      '/api/status': { gateway_state: 'stopped', platforms: {} },
+    })
+    const gatewayFetcher: DashboardFetcher = (path) =>
+      Promise.resolve(
+        path === '/health'
+          ? jsonResponse({ status: 'degraded' })
+          : new Response('not found', { status: 404 }),
+      )
+
+    const overview = await buildDashboardOverview({ fetcher, gatewayFetcher })
+
+    expect(overview.status?.gatewayState).toBe('stopped')
+  })
+
   it('parses skills usage and emits a top-skill insight', async () => {
     const fetcher = makeFetcher({
       '/api/analytics/usage': {
