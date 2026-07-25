@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Add01Icon, Chat01Icon } from '@hugeicons/core-free-icons'
-import type { SessionMeta } from '@/screens/chat/types'
+import type { SessionMeta, SessionTreeRow } from '@/screens/chat/types'
+import { buildSessionTree } from '@/screens/chat/session-lineage'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -27,6 +28,26 @@ function getSessionTitle(session: SessionMeta): string {
   const title = normalizeLabel(session.title)
   if (title) return title
   return `Session ${session.friendlyId.slice(0, 8)}`
+}
+
+function getRelationshipLabel(row: SessionTreeRow): string | undefined {
+  const identityLabel =
+    row.relationshipKind === 'branch'
+      ? 'Branch'
+      : row.relationshipKind === 'child'
+        ? 'Delegated session'
+        : row.isOrphan
+          ? 'Original session unavailable'
+          : undefined
+  if (identityLabel) {
+    return row.continuationCount > 1
+      ? `${identityLabel} · ${row.continuationCount} segments`
+      : identityLabel
+  }
+  if (row.continuationCount > 1) {
+    return `Continued · ${row.continuationCount} segments`
+  }
+  return undefined
 }
 
 const dayFormatter = new Intl.DateTimeFormat(undefined, {
@@ -57,6 +78,23 @@ export function MobileSessionsPanel({
   onSelectSession,
   onNewChat,
 }: Props) {
+  const activeSessionKey = useMemo(
+    () =>
+      sessions.find(
+        (session) =>
+          session.friendlyId === activeFriendlyId ||
+          session.key === activeFriendlyId,
+      )?.key,
+    [activeFriendlyId, sessions],
+  )
+  const tree = useMemo(
+    () => buildSessionTree(sessions, { activeSessionKey }),
+    [activeSessionKey, sessions],
+  )
+  const activeTreeKey = activeSessionKey
+    ? (tree.visibleKeyBySessionKey.get(activeSessionKey) ?? activeSessionKey)
+    : undefined
+
   useEffect(() => {
     if (!open) return
     function handleKeyDown(event: KeyboardEvent) {
@@ -118,24 +156,43 @@ export function MobileSessionsPanel({
               </div>
             ) : (
               <div className="space-y-1">
-                {sessions.map((session) => {
-                  const active = session.friendlyId === activeFriendlyId
+                {tree.rows.map((row) => {
+                  const { session } = row
+                  const active = activeTreeKey
+                    ? row.key === activeTreeKey
+                    : session.friendlyId === activeFriendlyId
                   const timestamp = formatUpdatedAt(session.updatedAt)
+                  const relationshipLabel = getRelationshipLabel(row)
                   return (
                     <button
-                      key={session.key}
+                      key={row.key}
                       type="button"
                       onClick={() => onSelectSession(session.friendlyId)}
+                      aria-current={active ? 'page' : undefined}
+                      data-session-key={row.key}
+                      data-session-depth={row.depth}
                       className={cn(
                         'w-full rounded-lg border px-3 py-2 text-left transition-colors',
                         active
                           ? 'border-accent-300 bg-accent-50'
                           : 'border-transparent bg-primary-50 hover:border-primary-200',
                       )}
+                      style={
+                        row.depth > 0
+                          ? {
+                              paddingInlineStart: `${12 + Math.min(row.depth, 8) * 16}px`,
+                            }
+                          : undefined
+                      }
                     >
                       <div className="truncate text-sm font-medium text-ink">
                         {getSessionTitle(session)}
                       </div>
+                      {relationshipLabel ? (
+                        <div className="mt-0.5 truncate text-[11px] font-medium text-primary-600">
+                          {relationshipLabel}
+                        </div>
+                      ) : null}
                       <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-primary-500">
                         <span className="truncate">{session.friendlyId}</span>
                         {timestamp ? <span>{timestamp}</span> : null}

@@ -1,6 +1,9 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Folder01Icon } from '@hugeicons/core-free-icons'
+import { buildSessionTree } from '../session-lineage'
+import type { SessionMeta } from '../types'
 import { Button } from '@/components/ui/button'
 import {
   TooltipContent,
@@ -65,6 +68,61 @@ function formatMobileSessionTitle(rawTitle: string): string {
   return title
 }
 
+function getSessionTitle(session: SessionMeta): string {
+  const candidates = [
+    session.label,
+    session.derivedTitle,
+    session.title,
+    session.friendlyId,
+  ]
+  for (const candidate of candidates) {
+    const title = candidate?.trim()
+    if (title) return title
+  }
+  return 'Session'
+}
+
+type ActiveLineageContextProps = {
+  parentSession?: SessionMeta
+  continuationCount: number
+  onOpenParent?: () => void
+}
+
+function ActiveLineageContext({
+  parentSession,
+  continuationCount,
+  onOpenParent,
+}: ActiveLineageContextProps) {
+  const segmentStatus =
+    continuationCount > 1 ? (
+      <span
+        className="shrink-0 whitespace-nowrap text-[10px] font-medium text-primary-500"
+        aria-label={`Logical conversation with ${continuationCount} segments`}
+      >
+        {continuationCount} segments
+      </span>
+    ) : null
+
+  if (!parentSession) return segmentStatus
+
+  const parentTitle = getSessionTitle(parentSession)
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 text-[10px] text-primary-500">
+      <Link
+        to="/chat/$sessionKey"
+        params={{ sessionKey: parentSession.friendlyId }}
+        onClick={onOpenParent}
+        aria-label={`Open parent session ${parentTitle}`}
+        className="min-w-0 truncate rounded-sm underline decoration-primary-300 underline-offset-2 hover:text-accent-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
+        title={`Parent: ${parentTitle}`}
+      >
+        Parent: {parentTitle}
+      </Link>
+      {segmentStatus}
+    </span>
+  )
+}
+
 type ThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'adaptive'
 
 type ChatHeaderProps = {
@@ -73,13 +131,7 @@ type ChatHeaderProps = {
   renamingTitle?: boolean
   wrapperRef?: React.Ref<HTMLDivElement>
   onOpenSessions?: () => void
-  sessions?: Array<{
-    key?: string
-    friendlyId?: string
-    label?: string
-    derivedTitle?: string
-    title?: string
-  }>
+  sessions?: Array<SessionMeta>
   activeFriendlyId?: string
   onSelectSession?: (key: string) => void
   showFileExplorerButton?: boolean
@@ -140,16 +192,47 @@ function ChatHeaderComponent({
   const [sessionPopoverOpen, setSessionPopoverOpen] = useState(false)
   const [sessionSearch, setSessionSearch] = useState('')
   const sessionPopoverRef = useRef<HTMLDivElement | null>(null)
+  const closeSessionPopover = useCallback(() => {
+    setSessionPopoverOpen(false)
+    setSessionSearch('')
+  }, [])
+  const activeSessionKey = useMemo(
+    () =>
+      sessions.find(
+        (session) =>
+          session.friendlyId === activeFriendlyId ||
+          session.key === activeFriendlyId,
+      )?.key,
+    [activeFriendlyId, sessions],
+  )
+  const sessionTree = useMemo(
+    () => buildSessionTree(sessions, { activeSessionKey }),
+    [activeSessionKey, sessions],
+  )
+  const activeTreeKey = activeSessionKey
+    ? (sessionTree.visibleKeyBySessionKey.get(activeSessionKey) ??
+      activeSessionKey)
+    : undefined
+  const activeTreeRow = activeTreeKey
+    ? sessionTree.indexByKey.get(activeTreeKey)
+    : undefined
+  const parentSession =
+    activeTreeRow?.parentKey &&
+    (activeTreeRow.relationshipKind === 'branch' ||
+      activeTreeRow.relationshipKind === 'child')
+      ? sessionTree.indexByKey.get(activeTreeRow.parentKey)?.session
+      : undefined
+  const continuationCount = activeTreeRow?.continuationCount ?? 1
+
   useEffect(() => {
     if (!sessionPopoverOpen) return
     const handler = (e: MouseEvent) => {
       if (sessionPopoverRef.current?.contains(e.target as Node)) return
-      setSessionPopoverOpen(false)
-      setSessionSearch('')
+      closeSessionPopover()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [sessionPopoverOpen])
+  }, [closeSessionPopover, sessionPopoverOpen])
   const [titleDraft, setTitleDraft] = useState(activeTitle)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const isSavingTitleRef = useRef(false)
@@ -272,32 +355,38 @@ function ChatHeaderComponent({
             </svg>
           </button>
 
-          {/* Session name — centered pill, tappable */}
-          <button
-            type="button"
-            onClick={onOpenSessions}
-            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-primary-100/70 hover:bg-primary-200/80 dark:bg-neutral-700/80 dark:hover:bg-neutral-600/80 transition-colors"
-            aria-label="Switch session"
-          >
-            <span className="truncate text-[13px] font-medium text-primary-600 dark:text-primary-300">
-              {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
-            </span>
-            <svg
-              width="8"
-              height="5"
-              viewBox="0 0 8 5"
-              fill="none"
-              className="shrink-0 opacity-40"
+          {/* Session name and compact lineage context */}
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenSessions}
+              className="flex min-w-0 max-w-[55vw] items-center gap-1 rounded-full bg-primary-100/70 px-3 py-1.5 transition-colors hover:bg-primary-200/80 dark:bg-neutral-700/80 dark:hover:bg-neutral-600/80"
+              aria-label="Switch session"
             >
-              <path
-                d="M1 1L4 4L7 1"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+              <span className="truncate text-[13px] font-medium text-primary-600 dark:text-primary-300">
+                {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
+              </span>
+              <svg
+                width="8"
+                height="5"
+                viewBox="0 0 8 5"
+                fill="none"
+                className="shrink-0 opacity-40"
+              >
+                <path
+                  d="M1 1L4 4L7 1"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <ActiveLineageContext
+              parentSession={parentSession}
+              continuationCount={continuationCount}
+            />
+          </div>
 
           <div className="flex-1" />
         </div>
@@ -383,6 +472,11 @@ function ChatHeaderComponent({
                   ✏️
                 </button>
               )}
+              <ActiveLineageContext
+                parentSession={parentSession}
+                continuationCount={continuationCount}
+                onOpenParent={closeSessionPopover}
+              />
               {sessionPopoverOpen && (
                 <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 overflow-hidden rounded-xl border border-[var(--theme-border)] shadow-2xl">
                   <div
@@ -432,7 +526,7 @@ function ChatHeaderComponent({
                           (s.label || s.derivedTitle || s.title || '')
                             .toLowerCase()
                             .includes(q) ||
-                          s.friendlyId?.toLowerCase().includes(q)
+                          s.friendlyId.toLowerCase().includes(q)
                         )
                       })
                       .slice(0, 20)
@@ -441,19 +535,18 @@ function ChatHeaderComponent({
                           s.label ||
                           s.derivedTitle ||
                           s.title ||
-                          s.friendlyId?.slice(0, 8) ||
+                          s.friendlyId.slice(0, 8) ||
                           'Session'
                         const isActive =
                           Boolean(activeFriendlyId) &&
                           (s.friendlyId === activeFriendlyId ||
-                            s.key?.endsWith(`:${activeFriendlyId}`))
+                            s.key.endsWith(`:${activeFriendlyId}`))
                         return (
                           <button
                             key={s.key || s.friendlyId}
                             type="button"
                             onClick={() => {
-                              setSessionPopoverOpen(false)
-                              setSessionSearch('')
+                              closeSessionPopover()
                               onSelectSession?.(s.key || s.friendlyId || '')
                             }}
                             className={cn(
