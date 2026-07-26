@@ -82,7 +82,7 @@ function ChatRoute() {
   const activeFriendlyId =
     typeof params.sessionKey === 'string' ? params.sessionKey : 'main'
   const isNewChat = activeFriendlyId === 'new'
-  const shouldResolveCard = !isNewChat && activeFriendlyId !== 'main'
+  const shouldResolveCard = !isNewChat
   const sessionCardsQuery = useQuery({
     queryKey: sessionCardQueryKeys.list(false),
     queryFn: () => fetchSessionCards(),
@@ -112,6 +112,7 @@ function ChatRoute() {
     friendlyId: activeFriendlyId,
     sessionKey: forcedSessionKey ?? activeFriendlyId,
   })
+  const canonicalizedCardAliasRef = useRef('')
 
   useEffect(() => {
     latestResolvedRouteRef.current = {
@@ -119,6 +120,14 @@ function ChatRoute() {
       sessionKey: forcedSessionKey ?? activeFriendlyId,
     }
   }, [activeFriendlyId, forcedSessionKey])
+
+  useEffect(() => {
+    if (!selectedCardId || selectedCardId === activeFriendlyId) return
+    const transitionKey = `${activeFriendlyId}\u0000${selectedCardId}`
+    if (canonicalizedCardAliasRef.current === transitionKey) return
+    canonicalizedCardAliasRef.current = transitionKey
+    void navigate(buildSessionReplaceNavigation(selectedCardId))
+  }, [activeFriendlyId, navigate, selectedCardId])
 
   useEffect(() => {
     if (!selectedCardId) return

@@ -165,22 +165,39 @@ describe('Session Card route resolution', () => {
     ).toEqual({ status: 'rejected', reason: 'missing' })
   })
 
-  it.each(['new', 'main'])(
-    'preserves the explicit bootstrap route %j',
-    (routeKey) => {
-      expect(
-        resolveSessionCardRoute({
-          routeKey,
-          response: {
-            cards: [rootCard],
-            completeness: 'complete',
-            retryable: false,
-            sources: [],
-          },
-        }),
-      ).toEqual({ status: 'bootstrap' })
-    },
-  )
+  it('preserves new as the only explicit bootstrap route', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'new',
+        response: {
+          cards: [rootCard],
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        },
+      }),
+    ).toEqual({ status: 'bootstrap' })
+  })
+
+  it('resolves the former main alias only through its authoritative Card', () => {
+    const mainCard = {
+      ...rootCard,
+      cardId: 'remote:main-card',
+      canonicalSegmentKey: 'remote:main-tip',
+      continuationSegmentKeys: ['main', 'remote:main-tip'],
+    }
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'main',
+        response: {
+          cards: [mainCard],
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        },
+      }),
+    ).toEqual({ status: 'selected', card: mainCard })
+  })
 
   it('fails closed when the Card projection is incomplete', () => {
     expect(
@@ -213,7 +230,7 @@ describe('Session Card route resolution', () => {
     ).toEqual({ status: 'unavailable', reason: 'query' })
   })
 
-  it('keeps bootstrap routes available even while the Card query is disabled', () => {
+  it('keeps only new available while the Card query is disabled', () => {
     expect(
       resolveSessionCardRouteState({
         routeKey: 'new',
@@ -223,9 +240,15 @@ describe('Session Card route resolution', () => {
     expect(
       resolveSessionCardRouteState({
         routeKey: 'main',
+        queryStatus: 'pending',
+      }),
+    ).toBeNull()
+    expect(
+      resolveSessionCardRouteState({
+        routeKey: 'main',
         queryStatus: 'error',
       }),
-    ).toEqual({ status: 'bootstrap' })
+    ).toEqual({ status: 'unavailable', reason: 'query' })
   })
 
   it('waits for a pending Card query without selecting a raw session', () => {

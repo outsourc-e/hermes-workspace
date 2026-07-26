@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { createRoot } from 'react-dom/client'
+import { getByRole } from '@testing-library/dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { applySessionRouteResolution } from '../../routes/chat/-session-route-state'
@@ -26,6 +27,7 @@ const navigate = vi.fn()
 const queryContext = vi.hoisted(() => ({
   client: null as unknown as QueryClient,
   cardHistories: new Map<string, SessionCardHistoryResponse>(),
+  cardHistoryRefetches: new Map<string, ReturnType<typeof vi.fn>>(),
   chatMode: 'enhanced' as 'enhanced' | 'portable',
   connectionState: 'connected' as 'connected' | 'disconnected',
   realtimeInput: null as null | {
@@ -42,6 +44,11 @@ const queryContext = vi.hoisted(() => ({
   mobile: false,
   legacySessionsFailure: false,
   legacySessionsEnabled: undefined as boolean | undefined,
+  legacyHistoryInput: null as null | {
+    activeFriendlyId: string
+    activeSessionKey: string
+    forcedSessionKey?: string
+  },
   legacySessionsRefetch: vi.fn(),
 }))
 
@@ -78,7 +85,9 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
         isFetching: false,
         isLoading: false,
         isSuccess: true,
-        refetch: vi.fn().mockResolvedValue(undefined),
+        refetch:
+          queryContext.cardHistoryRefetches.get(historyCardId) ??
+          vi.fn().mockResolvedValue(undefined),
       }
     },
   }
@@ -315,6 +324,11 @@ vi.mock('./hooks/use-chat-history', () => ({
     activeSessionKey: string
     forcedSessionKey?: string
   }) => {
+    queryContext.legacyHistoryInput = {
+      activeFriendlyId,
+      activeSessionKey,
+      ...(forcedSessionKey === undefined ? {} : { forcedSessionKey }),
+    }
     const sessionKey = forcedSessionKey ?? activeSessionKey
     return {
       historyQuery: {
@@ -613,6 +627,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     resetPendingSend()
     navigate.mockReset()
     queryContext.cardHistories.clear()
+    queryContext.cardHistoryRefetches.clear()
     queryContext.chatMode = 'enhanced'
     queryContext.connectionState = 'connected'
     queryContext.realtimeInput = null
@@ -620,6 +635,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryContext.mobile = false
     queryContext.legacySessionsFailure = false
     queryContext.legacySessionsEnabled = undefined
+    queryContext.legacyHistoryInput = null
     queryContext.legacySessionsRefetch.mockReset()
     for (const sessionKey of [
       'new',
@@ -693,6 +709,8 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         },
       ],
     })
+    const retryChildHistory = vi.fn().mockResolvedValue(undefined)
+    queryContext.cardHistoryRefetches.set('remote:child', retryChildHistory)
 
     const container = document.createElement('div')
     document.body.appendChild(container)
@@ -723,7 +741,16 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         container.querySelector('[data-testid="chat-header-title"]')
           ?.textContent,
       ).toBe('Parent Card title')
+      expect(getByRole(container, 'status').textContent).toContain(
+        'Inspected child history is incomplete',
+      )
     })
+    React.act(() => {
+      getByRole(container, 'button', {
+        name: 'Retry inspected child history',
+      }).click()
+    })
+    expect(retryChildHistory).toHaveBeenCalledTimes(1)
 
     queryContext.cardHistories.delete('remote:child')
     render('remote:child')
@@ -743,6 +770,79 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       expect(transcript).toContain('parent transcript')
       expect(transcript).not.toContain('child transcript')
     })
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('discloses retryable incomplete parent Card history and refetches that Card in place', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard: SessionCard = {
+      cardId: 'remote:parent',
+      canonicalSource: 'remote',
+      title: 'Parent Card title',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'remote:parent-tip',
+      continuationSegmentKeys: ['remote:parent', 'remote:parent-tip'],
+      continuationCount: 2,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 2,
+      archived: false,
+      pinned: false,
+    }
+    queryContext.cardHistories.set('remote:parent', {
+      sessionKey: 'remote:parent-tip',
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:parent-tip',
+      messages: [userMessage('available-message', 'available transcript')],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: 'remote:missing-segment',
+          retryable: true,
+          error: 'temporarily unavailable',
+        },
+      ],
+    })
+    const retryParentHistory = vi.fn().mockResolvedValue(undefined)
+    queryContext.cardHistoryRefetches.set('remote:parent', retryParentHistory)
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId="remote:parent"
+            activeCard={activeCard}
+            sessionCards={[activeCard]}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('available transcript')
+      expect(getByRole(container, 'status').textContent).toContain(
+        'Conversation history is incomplete',
+      )
+      expect(container.textContent).not.toContain('remote:missing-segment')
+    })
+    React.act(() => {
+      getByRole(container, 'button', {
+        name: 'Retry parent conversation history',
+      }).click()
+    })
+    expect(retryParentHistory).toHaveBeenCalledTimes(1)
+    expect(container.textContent).toContain('available transcript')
 
     React.act(() => root.unmount())
     document.body.removeChild(container)
@@ -1355,7 +1455,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
-  it('keeps an active Card independent from legacy session-list failures and retries', async () => {
+  it('keeps an active Card independent from legacy session-list/history identity and retries', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -1403,6 +1503,10 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
 
     await waitForAssertion(() => {
       expect(queryContext.legacySessionsEnabled).toBe(false)
+      expect(queryContext.legacyHistoryInput).toEqual({
+        activeFriendlyId: 'new',
+        activeSessionKey: '',
+      })
       expect(container.textContent).toContain('Card transcript remains visible')
       expect(container.textContent).not.toContain(
         'Unauthorized legacy sessions',

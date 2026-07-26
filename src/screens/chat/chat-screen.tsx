@@ -638,6 +638,12 @@ export function ChatScreen({
   const { renameSession, renaming: renamingSessionTitle } = useRenameSession()
   const sseConnectionState = useChatStore((s) => s.connectionState)
 
+  // Card routes never feed their stable Card ID or canonical backend segment
+  // into the retired session hooks. Keep those hooks on the inert `new`
+  // bootstrap identity so React hook ordering stays stable without creating a
+  // second active-session/history path.
+  const legacyRouteFriendlyId = activeCard ? 'new' : activeFriendlyId
+  const legacyForcedSessionKey = activeCard ? undefined : forcedSessionKey
   const {
     sessionsQuery,
     sessions,
@@ -650,9 +656,9 @@ export function ChatScreen({
     sessionsFetching: _sessionsFetching,
     refetchSessions: _refetchSessions,
   } = useChatSessions({
-    activeFriendlyId,
-    isNewChat,
-    forcedSessionKey,
+    activeFriendlyId: legacyRouteFriendlyId,
+    isNewChat: isNewChat || Boolean(activeCard),
+    forcedSessionKey: legacyForcedSessionKey,
     enabled: !activeCard,
   })
   const activeSessionKey =
@@ -675,9 +681,9 @@ export function ChatScreen({
     activeCanonicalKey: legacyActiveCanonicalKey,
     sessionKeyForHistory: legacySessionKeyForHistory,
   } = useChatHistory({
-    activeFriendlyId: transportFriendlyId,
-    activeSessionKey,
-    forcedSessionKey,
+    activeFriendlyId: activeCard ? 'new' : transportFriendlyId,
+    activeSessionKey: activeCard ? '' : activeSessionKey,
+    forcedSessionKey: legacyForcedSessionKey,
     isNewChat: isNewChat || Boolean(activeCard),
     isRedirecting: legacyRedirecting,
     activeExists: activeCard ? true : activeExists,
@@ -776,6 +782,11 @@ export function ChatScreen({
   const displayedHistoryQuery = inspectedChildCard
     ? inspectedChildHistoryQuery
     : historyQuery
+  const displayedCardHistory = inspectedChildCard
+    ? inspectedChildHistoryQuery.data
+    : activeCard
+      ? cardHistoryQuery.data
+      : undefined
   const displayedHistoryError = inspectedChildCard
     ? (inspectedChildHistoryQuery.error?.message ?? null)
     : historyError
@@ -2962,6 +2973,30 @@ export function ChatScreen({
     (displayedHistoryQuery.isLoading && !displayedHistoryQuery.data) ||
     legacyRedirecting
   const historyEmpty = !historyLoading && finalDisplayMessages.length === 0
+  const incompleteHistoryNotice =
+    displayedCardHistory?.completeness === 'partial' ? (
+      <div className="mx-4 mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-200">
+        <p role="status">
+          {inspectedChildCard
+            ? 'Inspected child history is incomplete. Some messages may be unavailable.'
+            : 'Conversation history is incomplete. Some messages may be unavailable.'}
+        </p>
+        {displayedCardHistory.retryable ? (
+          <button
+            type="button"
+            className="shrink-0 rounded-md border border-amber-400 px-2.5 py-1 text-xs font-semibold hover:bg-amber-100 dark:border-amber-600 dark:hover:bg-amber-900/40"
+            aria-label={
+              inspectedChildCard
+                ? 'Retry inspected child history'
+                : 'Retry parent conversation history'
+            }
+            onClick={() => void displayedHistoryQuery.refetch()}
+          >
+            Retry history
+          </button>
+        ) : null}
+      </div>
+    ) : null
   const errorNotice = useMemo(() => {
     if (!showErrorNotice) return null
     if (!serverError) return null
@@ -3218,6 +3253,7 @@ export function ChatScreen({
           {errorNotice && (
             <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>
           )}
+          {incompleteHistoryNotice}
           {pendingApprovals.length > 0 && (
             <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/15">
               <div className="space-y-2">

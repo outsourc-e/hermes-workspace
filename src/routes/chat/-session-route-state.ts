@@ -100,7 +100,7 @@ export function resolveSessionCardProducerNavigation(
 }
 
 function isBootstrapRoute(routeKey: string): boolean {
-  return routeKey === 'new' || routeKey === 'main'
+  return routeKey === 'new'
 }
 
 /** Resolve route identity exclusively from the strictly validated Card list. */
@@ -127,6 +127,20 @@ export function resolveSessionCardRoute({
   const card = response.cards.find((candidate) => candidate.cardId === routeKey)
   if (card) return { status: 'selected', card }
 
+  // `main` is a former raw-session route, not a permanent bootstrap route.
+  // It may converge only through an identity that the complete Card projection
+  // itself owns; the browser never guesses a source or backend session.
+  if (routeKey === 'main') {
+    const target = resolveSessionCardProducerNavigation(response, [routeKey])
+    if (target && !target.inspectedChildCardId) {
+      const aliasedCard = response.cards.find(
+        (candidate) => candidate.cardId === target.cardId,
+      )
+      if (aliasedCard) return { status: 'selected', card: aliasedCard }
+    }
+    return { status: 'rejected', reason: 'missing' }
+  }
+
   const isContinuationRoute = response.cards.some((candidate) =>
     candidate.continuationSegmentKeys.includes(routeKey),
   )
@@ -139,7 +153,7 @@ export function resolveSessionCardRoute({
 
 /**
  * Convert query lifecycle state into a route state without ever falling back to
- * a raw backend session. New/main are the only explicit bootstrap exceptions.
+ * a raw backend session. `new` is the only explicit bootstrap exception.
  */
 export function resolveSessionCardRouteState({
   routeKey,
