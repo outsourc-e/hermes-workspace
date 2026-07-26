@@ -500,13 +500,16 @@ describe('SessionCardService collection and resolution', () => {
       metadataStore: metadataStore(),
     })
 
-    await expect(service.resolveCard('root')).resolves.toMatchObject({
+    const resolved = await service.resolveCard('root')
+    expect(resolved).toMatchObject({
       card: {
         cardId: 'remote:root',
         continuationSegmentKeys: ['remote:root', 'remote:hidden', 'remote:tip'],
       },
       aliases: ['remote:root', 'root'],
     })
+    expect(resolved.sourceBySegmentKey.get('remote:child')).toBe('remote')
+    expect(resolved.upstreamKeyBySegmentKey.get('remote:child')).toBe('child')
     await expect(service.resolveCard('hidden')).rejects.toBeInstanceOf(
       SessionCardNotFoundError,
     )

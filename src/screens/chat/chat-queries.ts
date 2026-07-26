@@ -3,6 +3,8 @@ import type { QueryClient } from '@tanstack/react-query'
 import type {
   ChatMessage,
   HistoryResponse,
+  SessionCard,
+  SessionCardChild,
   SessionListResponse,
   SessionMeta,
 } from './types'
@@ -58,6 +60,340 @@ export const chatQueryKeys = {
   },
 } as const
 
+export const sessionCardQueryKeys = {
+  list: function list(includeArchived = false) {
+    return ['chat', 'session-cards', 'list', includeArchived] as const
+  },
+  history: function history(
+    cardId: string,
+    canonicalSegmentKey: string,
+    cursor?: string,
+  ) {
+    return [
+      'chat',
+      'session-cards',
+      'history',
+      cardId,
+      canonicalSegmentKey,
+      cursor ?? '',
+    ] as const
+  },
+  metadata: function metadata(cardId: string) {
+    return ['chat', 'session-cards', 'metadata', cardId] as const
+  },
+  archive: function archive(cardId: string) {
+    return ['chat', 'session-cards', 'archive', cardId] as const
+  },
+  branch: function branch(cardId: string) {
+    return ['chat', 'session-cards', 'branch', cardId] as const
+  },
+} as const
+
+export type SessionCardSourceStatusWire = {
+  source: string
+  status: 'complete' | 'incomplete' | 'unavailable'
+  fetched: number
+  retryable: boolean
+  reason?:
+    | 'safe-cap'
+    | 'unsupported-pagination'
+    | 'stalled-pagination'
+    | 'unstable-pagination'
+  error?: string
+}
+
+export type SessionCardListWire = {
+  cards: Array<SessionCard>
+  completeness: 'complete' | 'incomplete'
+  retryable: boolean
+  sources: Array<SessionCardSourceStatusWire>
+}
+
+export type SessionCardHistoryWire = {
+  cardId: string
+  canonicalSegmentKey: string
+  messages: Array<{ segmentKey: string; message: Record<string, unknown> }>
+  completeness: 'complete' | 'partial'
+  retryable: boolean
+  missingSegments: Array<{
+    segmentKey: string
+    source?: string
+    retryable: true
+    error: string
+  }>
+  nextCursor?: string
+}
+
+export type SessionCardArchiveWire = {
+  ok: true
+  cardId: string
+  archived: true
+}
+
+export type SessionCardBranchWire = {
+  ok: true
+  cardId: string
+  canonicalSegmentKey: string
+  childSessionKey: string
+  supported: true
+}
+
+function isWireRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function nonblankWireString(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  return normalized || null
+}
+
+function wireEnum<const T extends string>(
+  value: unknown,
+  allowedValues: ReadonlyArray<T>,
+): T | null {
+  if (typeof value !== 'string') return null
+  return allowedValues.includes(value as T) ? (value as T) : null
+}
+
+function invalidSessionCardResponse(): never {
+  throw new Error('Invalid Session Card response')
+}
+
+function parseSessionCardChild(value: unknown): SessionCardChild {
+  if (!isWireRecord(value)) return invalidSessionCardResponse()
+  const cardId = nonblankWireString(value.cardId)
+  const sessionKey = nonblankWireString(value.sessionKey)
+  const title = nonblankWireString(value.title)
+  const relationshipKind = wireEnum(value.relationshipKind, ['branch', 'child'])
+  const status = wireEnum(value.status, [
+    'idle',
+    'running',
+    'complete',
+    'error',
+  ])
+  if (
+    !cardId ||
+    !sessionKey ||
+    !title ||
+    !relationshipKind ||
+    !status ||
+    typeof value.updatedAt !== 'number' ||
+    !Number.isFinite(value.updatedAt) ||
+    !Number.isSafeInteger(value.continuationCount) ||
+    Number(value.continuationCount) < 1
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return {
+    cardId,
+    sessionKey,
+    relationshipKind,
+    title,
+    status,
+    updatedAt: value.updatedAt,
+    continuationCount: Number(value.continuationCount),
+  }
+}
+
+function parseSessionCard(value: unknown): SessionCard {
+  if (!isWireRecord(value)) return invalidSessionCardResponse()
+  const cardId = nonblankWireString(value.cardId)
+  const title = nonblankWireString(value.title)
+  const canonicalSegmentKey = nonblankWireString(value.canonicalSegmentKey)
+  const continuationSegmentKeys = Array.isArray(value.continuationSegmentKeys)
+    ? value.continuationSegmentKeys.map(nonblankWireString)
+    : []
+  const titleSource = wireEnum(value.titleSource, ['default', 'auto', 'manual'])
+  const relationshipKind = wireEnum(value.relationshipKind, [
+    'root',
+    'branch',
+    'child',
+    'orphan',
+  ])
+  if (
+    !cardId ||
+    !title ||
+    !canonicalSegmentKey ||
+    !titleSource ||
+    !Array.isArray(value.continuationSegmentKeys) ||
+    continuationSegmentKeys.some((segmentKey) => segmentKey === null) ||
+    continuationSegmentKeys.length === 0 ||
+    new Set(continuationSegmentKeys).size !== continuationSegmentKeys.length ||
+    !Number.isSafeInteger(value.continuationCount) ||
+    Number(value.continuationCount) !== continuationSegmentKeys.length ||
+    canonicalSegmentKey !== continuationSegmentKeys.at(-1) ||
+    !relationshipKind ||
+    !Array.isArray(value.childNodes) ||
+    typeof value.updatedAt !== 'number' ||
+    !Number.isFinite(value.updatedAt) ||
+    typeof value.archived !== 'boolean'
+  ) {
+    return invalidSessionCardResponse()
+  }
+  const parentCardId =
+    value.parentCardId === undefined
+      ? undefined
+      : nonblankWireString(value.parentCardId)
+  if (parentCardId === null || parentCardId === cardId) {
+    return invalidSessionCardResponse()
+  }
+  const childNodes = value.childNodes.map(parseSessionCardChild)
+  if (
+    childNodes.some(
+      (child) =>
+        child.cardId === cardId || child.sessionKey === canonicalSegmentKey,
+    ) ||
+    new Set(childNodes.map((child) => child.cardId)).size !==
+      childNodes.length ||
+    new Set(childNodes.map((child) => child.sessionKey)).size !==
+      childNodes.length
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return {
+    cardId,
+    title,
+    titleSource,
+    canonicalSegmentKey,
+    continuationSegmentKeys: continuationSegmentKeys as Array<string>,
+    continuationCount: Number(value.continuationCount),
+    relationshipKind,
+    ...(parentCardId === undefined ? {} : { parentCardId }),
+    childNodes,
+    updatedAt: value.updatedAt,
+    archived: value.archived,
+  }
+}
+
+function hasRootCardRelationshipSemantics(card: SessionCard): boolean {
+  return (
+    card.relationshipKind !== 'branch' &&
+    card.relationshipKind !== 'child' &&
+    card.parentCardId === undefined
+  )
+}
+
+function hasUniqueSessionCardOwnership(cards: Array<SessionCard>): boolean {
+  const ownerByIdentity = new Map<string, object>()
+  const claimIdentity = (identity: string, owner: object): boolean => {
+    const existingOwner = ownerByIdentity.get(identity)
+    if (existingOwner !== undefined && existingOwner !== owner) return false
+    ownerByIdentity.set(identity, owner)
+    return true
+  }
+
+  for (const card of cards) {
+    const owner = {}
+    const ownAliases = [
+      card.cardId,
+      card.canonicalSegmentKey,
+      ...card.continuationSegmentKeys,
+    ]
+    if (ownAliases.some((alias) => !claimIdentity(alias, owner))) return false
+  }
+
+  for (const card of cards) {
+    for (const child of card.childNodes) {
+      const owner = {}
+      if (
+        !claimIdentity(child.cardId, owner) ||
+        !claimIdentity(child.sessionKey, owner)
+      ) {
+        return false
+      }
+    }
+  }
+
+  return true
+}
+
+function parseSourceStatus(value: unknown): SessionCardSourceStatusWire {
+  if (!isWireRecord(value)) return invalidSessionCardResponse()
+  const source = nonblankWireString(value.source)
+  const status = wireEnum(value.status, [
+    'complete',
+    'incomplete',
+    'unavailable',
+  ])
+  if (
+    !source ||
+    !status ||
+    !Number.isSafeInteger(value.fetched) ||
+    Number(value.fetched) < 0 ||
+    typeof value.retryable !== 'boolean'
+  ) {
+    return invalidSessionCardResponse()
+  }
+  const reason =
+    value.reason === undefined
+      ? undefined
+      : wireEnum(value.reason, [
+          'safe-cap',
+          'unsupported-pagination',
+          'stalled-pagination',
+          'unstable-pagination',
+        ])
+  if (reason === null) {
+    return invalidSessionCardResponse()
+  }
+  const error =
+    value.error === undefined ? undefined : nonblankWireString(value.error)
+  if (
+    error === null ||
+    (error !== undefined && error.length > 256) ||
+    (status === 'complete' &&
+      (value.retryable || value.reason !== undefined || error !== undefined)) ||
+    (status !== 'complete' && !value.retryable)
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return {
+    source,
+    status,
+    fetched: Number(value.fetched),
+    retryable: value.retryable,
+    ...(reason === undefined ? {} : { reason }),
+    ...(error === undefined ? {} : { error }),
+  }
+}
+
+function parseSessionCardList(value: unknown): SessionCardListWire {
+  if (
+    !isWireRecord(value) ||
+    !Array.isArray(value.cards) ||
+    (value.completeness !== 'complete' &&
+      value.completeness !== 'incomplete') ||
+    typeof value.retryable !== 'boolean' ||
+    !Array.isArray(value.sources)
+  ) {
+    return invalidSessionCardResponse()
+  }
+  const cards = value.cards.map(parseSessionCard)
+  const sources = value.sources.map(parseSourceStatus)
+  const hasIncompleteSource = sources.some(
+    (source) => source.status !== 'complete',
+  )
+  const sourceRetryable = sources.some((source) => source.retryable)
+  if (
+    cards.some((card) => !hasRootCardRelationshipSemantics(card)) ||
+    new Set(cards.map((card) => card.cardId)).size !== cards.length ||
+    !hasUniqueSessionCardOwnership(cards) ||
+    (value.completeness === 'complete' &&
+      (value.retryable || hasIncompleteSource)) ||
+    (value.completeness === 'incomplete' && !hasIncompleteSource) ||
+    value.retryable !== sourceRetryable
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return {
+    cards,
+    completeness: value.completeness,
+    retryable: value.retryable,
+    sources,
+  }
+}
+
 export async function fetchSessions(): Promise<Array<SessionMeta>> {
   const res = await fetch('/api/sessions')
   if (!res.ok) throw new Error(await readError(res))
@@ -78,6 +414,230 @@ export async function fetchHistory(payload: {
   })
   if (!res.ok) throw new Error(await readError(res))
   return (await res.json()) as HistoryResponse
+}
+
+export async function fetchSessionCards(
+  options: {
+    includeArchived?: boolean
+  } = {},
+): Promise<SessionCardListWire> {
+  const path = options.includeArchived
+    ? '/api/session-cards?includeArchived=true'
+    : '/api/session-cards'
+  const response = await fetch(path)
+  if (!response.ok) throw new Error(await readError(response))
+  return parseSessionCardList((await response.json()) as unknown)
+}
+
+function parseSessionCardHistory(value: unknown): SessionCardHistoryWire {
+  if (
+    !isWireRecord(value) ||
+    !nonblankWireString(value.cardId) ||
+    !nonblankWireString(value.canonicalSegmentKey) ||
+    !Array.isArray(value.messages) ||
+    (value.completeness !== 'complete' && value.completeness !== 'partial') ||
+    typeof value.retryable !== 'boolean' ||
+    !Array.isArray(value.missingSegments) ||
+    (value.nextCursor !== undefined && !nonblankWireString(value.nextCursor))
+  ) {
+    return invalidSessionCardResponse()
+  }
+
+  const messages = value.messages.map((entry) => {
+    if (
+      !isWireRecord(entry) ||
+      !nonblankWireString(entry.segmentKey) ||
+      !isWireRecord(entry.message)
+    ) {
+      return invalidSessionCardResponse()
+    }
+    return {
+      segmentKey: nonblankWireString(entry.segmentKey)!,
+      message: { ...entry.message },
+    }
+  })
+  const missingSegments = value.missingSegments.map((entry) => {
+    const error = isWireRecord(entry) ? nonblankWireString(entry.error) : null
+    if (
+      !isWireRecord(entry) ||
+      !nonblankWireString(entry.segmentKey) ||
+      entry.retryable !== true ||
+      !error ||
+      error.length > 256 ||
+      (entry.source !== undefined && !nonblankWireString(entry.source))
+    ) {
+      return invalidSessionCardResponse()
+    }
+    return {
+      segmentKey: nonblankWireString(entry.segmentKey)!,
+      ...(entry.source === undefined
+        ? {}
+        : { source: nonblankWireString(entry.source)! }),
+      retryable: true as const,
+      error,
+    }
+  })
+
+  if (
+    (value.completeness === 'complete' &&
+      (value.retryable || missingSegments.length > 0)) ||
+    (value.completeness === 'partial' &&
+      (!value.retryable || value.nextCursor !== undefined))
+  ) {
+    return invalidSessionCardResponse()
+  }
+
+  return {
+    cardId: nonblankWireString(value.cardId)!,
+    canonicalSegmentKey: nonblankWireString(value.canonicalSegmentKey)!,
+    messages,
+    completeness: value.completeness,
+    retryable: value.retryable,
+    missingSegments,
+    ...(value.nextCursor === undefined
+      ? {}
+      : { nextCursor: nonblankWireString(value.nextCursor)! }),
+  }
+}
+
+export async function fetchSessionCardHistory(payload: {
+  cardId: string
+  canonicalSegmentKey: string
+  cursor?: string
+  limit?: number
+  signal?: AbortSignal
+}): Promise<SessionCardHistoryWire> {
+  if (
+    !nonblankWireString(payload.cardId) ||
+    !nonblankWireString(payload.canonicalSegmentKey) ||
+    (payload.limit !== undefined &&
+      (!Number.isSafeInteger(payload.limit) ||
+        payload.limit < 1 ||
+        payload.limit > 500)) ||
+    (payload.cursor !== undefined &&
+      (!payload.cursor || payload.cursor.length > 4096))
+  ) {
+    throw new RangeError('Invalid Session Card history request')
+  }
+  const query = new URLSearchParams()
+  if (payload.limit !== undefined) query.set('limit', String(payload.limit))
+  if (payload.cursor) query.set('cursor', payload.cursor)
+  const suffix = query.size ? `?${query.toString()}` : ''
+  const response = await fetch(
+    `/api/session-cards/${encodeURIComponent(payload.cardId)}/history${suffix}`,
+    { signal: payload.signal },
+  )
+  if (!response.ok) throw new Error(await readError(response))
+  const history = parseSessionCardHistory((await response.json()) as unknown)
+  if (
+    history.cardId !== payload.cardId ||
+    history.canonicalSegmentKey !== payload.canonicalSegmentKey
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return history
+}
+
+export async function updateSessionCardMetadata(
+  cardId: string,
+  patch: { manualTitle?: string | null; autoTitle?: string | null },
+): Promise<{ card: SessionCard }> {
+  const response = await fetch(
+    `/api/session-cards/${encodeURIComponent(cardId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    },
+  )
+  if (!response.ok) throw new Error(await readError(response))
+  const value = (await response.json()) as unknown
+  if (!isWireRecord(value)) return invalidSessionCardResponse()
+  const card = parseSessionCard(value.card)
+  if (
+    card.cardId !== cardId ||
+    !hasRootCardRelationshipSemantics(card) ||
+    !hasUniqueSessionCardOwnership([card])
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return { card }
+}
+
+export async function archiveSessionCard(
+  cardId: string,
+): Promise<SessionCardArchiveWire> {
+  const response = await fetch(
+    `/api/session-cards/${encodeURIComponent(cardId)}/archive`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    },
+  )
+  if (!response.ok) throw new Error(await readError(response))
+  const value = (await response.json()) as unknown
+  if (
+    !isWireRecord(value) ||
+    value.ok !== true ||
+    value.archived !== true ||
+    value.cardId !== cardId
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return { ok: true, cardId, archived: true }
+}
+
+export async function branchSessionCard(
+  cardId: string,
+  expectedCanonicalSegmentKey: string,
+  options: { title?: string } = {},
+): Promise<SessionCardBranchWire> {
+  const expectedCanonicalParent = nonblankWireString(
+    expectedCanonicalSegmentKey,
+  )
+  if (
+    !expectedCanonicalParent ||
+    expectedCanonicalParent !== expectedCanonicalSegmentKey
+  ) {
+    throw new RangeError('Invalid Session Card branch request')
+  }
+  const response = await fetch(
+    `/api/session-cards/${encodeURIComponent(cardId)}/branch`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options),
+    },
+  )
+  if (!response.ok) throw new Error(await readError(response))
+  const value = (await response.json()) as unknown
+  const canonicalSegmentKey = isWireRecord(value)
+    ? nonblankWireString(value.canonicalSegmentKey)
+    : null
+  const childSessionKey = isWireRecord(value)
+    ? nonblankWireString(value.childSessionKey)
+    : null
+  if (
+    !isWireRecord(value) ||
+    value.ok !== true ||
+    value.supported !== true ||
+    value.cardId !== cardId ||
+    !canonicalSegmentKey ||
+    value.canonicalSegmentKey !== expectedCanonicalSegmentKey ||
+    !childSessionKey ||
+    childSessionKey === cardId ||
+    childSessionKey === canonicalSegmentKey
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return {
+    ok: true,
+    cardId,
+    canonicalSegmentKey,
+    childSessionKey,
+    supported: true,
+  }
 }
 
 export async function fetchStatus(): Promise<StatusResponse> {

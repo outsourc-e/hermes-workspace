@@ -143,7 +143,7 @@ describe('POST /api/sessions/$sessionKey/fork', () => {
         title: 'Alternate path',
         parent_session_id: 'parent',
       },
-      forkedFrom: 'parent',
+      forkedFrom: null,
     })
 
     const response = await handler({

@@ -25,6 +25,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+function validOptionalParentIdentity(
+  value: unknown,
+  expectedParent: string,
+): boolean {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === 'string' &&
+      value.trim().length > 0 &&
+      value === expectedParent)
+  )
+}
+
 function unavailableResponse(sessionKey: string): Response {
   return json(
     createCapabilityUnavailablePayload('sessionFork', {
@@ -110,13 +123,17 @@ export const Route = createFileRoute('/api/sessions/$sessionKey/fork')({
             sessionKey,
             title ? { title } : undefined,
           )
-          const returnedParentId =
-            typeof result.session.parent_session_id === 'string'
-              ? result.session.parent_session_id.trim()
-              : ''
+          const returnedParentId = result.session.parent_session_id
+          const verifiedParentId =
+            typeof result.forkedFrom === 'string'
+              ? result.forkedFrom
+              : typeof returnedParentId === 'string'
+                ? returnedParentId
+                : null
           if (
-            result.forkedFrom !== sessionKey ||
-            (returnedParentId && returnedParentId !== sessionKey)
+            !validOptionalParentIdentity(result.forkedFrom, sessionKey) ||
+            !validOptionalParentIdentity(returnedParentId, sessionKey) ||
+            verifiedParentId === null
           ) {
             throw new Error(
               'Hermes fork response did not identify the requested parent session.',
@@ -127,7 +144,7 @@ export const Route = createFileRoute('/api/sessions/$sessionKey/fork')({
             ...summary,
             lineage: {
               ...(summary.lineage ?? {}),
-              parentSessionId: result.forkedFrom,
+              parentSessionId: verifiedParentId,
               sessionSource: 'fork',
               relationshipKind: 'branch' as const,
             },
@@ -136,7 +153,7 @@ export const Route = createFileRoute('/api/sessions/$sessionKey/fork')({
             {
               ok: true,
               supported: true,
-              parentSessionKey: result.forkedFrom,
+              parentSessionKey: verifiedParentId,
               sessionKey: summary.key,
               entry,
             },

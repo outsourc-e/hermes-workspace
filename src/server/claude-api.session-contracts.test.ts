@@ -262,7 +262,7 @@ describe('forkSession', () => {
         parent_session_id: 'parent',
         title: 'Alternate path',
       },
-      forkedFrom: 'parent',
+      forkedFrom: null,
     })
     expect(fetchMock).toHaveBeenCalledWith(
       'http://gateway.test/api/sessions/parent/fork',
@@ -296,6 +296,89 @@ describe('forkSession', () => {
     await expect(forkSession('requested-parent')).rejects.toThrow(
       'did not identify the requested parent',
     )
+  })
+
+  it.each([
+    ['blank forked_from', { forked_from: '   ' }],
+    ['array forked_from', { forked_from: ['parent'] }],
+    ['object forked_from', { forked_from: { id: 'parent' } }],
+    ['numeric forked_from', { forked_from: 1 }],
+  ])('rejects %s alongside a valid parent_session_id', async (_name, patch) => {
+    const caps = capabilities({ sessionFork: true })
+    gatewayMocks.getCapabilities.mockReturnValue(caps)
+    gatewayMocks.ensureGatewayProbed.mockResolvedValue(caps)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            object: 'hermes.session',
+            session: { id: 'child', parent_session_id: 'parent' },
+            ...patch,
+          }),
+          { status: 201, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    )
+
+    await expect(forkSession('parent')).rejects.toThrow(
+      'did not identify the requested parent',
+    )
+  })
+
+  it.each([
+    ['blank parent_session_id', '   '],
+    ['array parent_session_id', ['parent']],
+    ['object parent_session_id', { id: 'parent' }],
+    ['numeric parent_session_id', 1],
+  ])(
+    'rejects %s alongside a valid forked_from',
+    async (_name, parentSessionId) => {
+      const caps = capabilities({ sessionFork: true })
+      gatewayMocks.getCapabilities.mockReturnValue(caps)
+      gatewayMocks.ensureGatewayProbed.mockResolvedValue(caps)
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              object: 'hermes.session',
+              forked_from: 'parent',
+              session: { id: 'child', parent_session_id: parentSessionId },
+            }),
+            { status: 201, headers: { 'content-type': 'application/json' } },
+          ),
+        ),
+      )
+
+      await expect(forkSession('parent')).rejects.toThrow(
+        'did not identify the requested parent',
+      )
+    },
+  )
+
+  it('preserves an explicit forked_from when parent_session_id is null', async () => {
+    const caps = capabilities({ sessionFork: true })
+    gatewayMocks.getCapabilities.mockReturnValue(caps)
+    gatewayMocks.ensureGatewayProbed.mockResolvedValue(caps)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            object: 'hermes.session',
+            forked_from: 'parent',
+            session: { id: 'child', parent_session_id: null },
+          }),
+          { status: 201, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    )
+
+    await expect(forkSession('parent')).resolves.toEqual({
+      session: { id: 'child', parent_session_id: null },
+      forkedFrom: 'parent',
+    })
   })
 
   it('does not mutate either transport when sessionFork is unavailable', async () => {

@@ -394,7 +394,7 @@ export type ForkSessionOptions = {
 
 export type ForkSessionResult = {
   session: ClaudeSession
-  forkedFrom: string
+  forkedFrom: string | null
 }
 
 export class SessionForkUnavailableError extends Error {
@@ -406,6 +406,23 @@ export class SessionForkUnavailableError extends Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function parseForkParentIdentity(
+  value: unknown,
+  expectedParent: string,
+): string | null {
+  if (value === undefined || value === null) return null
+  if (
+    typeof value !== 'string' ||
+    value.trim().length === 0 ||
+    value !== expectedParent
+  ) {
+    throw new Error(
+      'Hermes fork response did not identify the requested parent session.',
+    )
+  }
+  return value
 }
 
 /** Whole-session fork deliberately targets only the advertised gateway API. */
@@ -433,20 +450,12 @@ export async function forkSession(
     throw new Error('Hermes fork response identified the parent as its child.')
   }
 
-  const explicitParent =
-    typeof result.forked_from === 'string' && result.forked_from.trim()
-      ? result.forked_from.trim()
-      : undefined
-  const sessionParent =
-    typeof result.session.parent_session_id === 'string' &&
-    result.session.parent_session_id.trim()
-      ? result.session.parent_session_id.trim()
-      : undefined
-  if (
-    (!explicitParent && !sessionParent) ||
-    (explicitParent !== undefined && explicitParent !== sessionId) ||
-    (sessionParent !== undefined && sessionParent !== sessionId)
-  ) {
+  const explicitParent = parseForkParentIdentity(result.forked_from, sessionId)
+  const sessionParent = parseForkParentIdentity(
+    result.session.parent_session_id,
+    sessionId,
+  )
+  if (explicitParent === null && sessionParent === null) {
     throw new Error(
       'Hermes fork response did not identify the requested parent session.',
     )
@@ -454,7 +463,7 @@ export async function forkSession(
 
   return {
     session: result.session as ClaudeSession,
-    forkedFrom: sessionId,
+    forkedFrom: explicitParent,
   }
 }
 

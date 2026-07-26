@@ -874,6 +874,19 @@ export class SessionCardService {
       }
     }
 
+    // Relationship projection alone is not authoritative enough for mutations.
+    // Expose each direct child's fresh source-qualified upstream identity too.
+    for (const child of resolvedCard.childNodes) {
+      const source = fresh.collection.sourceBySessionKey.get(child.sessionKey)
+      const upstreamKey = fresh.collection.upstreamKeyBySessionKey.get(
+        child.sessionKey,
+      )
+      if (source) sourceBySegmentKey.set(child.sessionKey, source)
+      if (upstreamKey) {
+        upstreamKeyBySegmentKey.set(child.sessionKey, upstreamKey)
+      }
+    }
+
     return {
       card: resolvedCard,
       aliases: fresh.aliasesByCardId.get(card.cardId) ?? [card.cardId],

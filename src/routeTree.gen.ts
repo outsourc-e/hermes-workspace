@@ -66,6 +66,7 @@ import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
 import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
+import { Route as ApiSessionCardsRouteImport } from './routes/api/session-cards'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
@@ -115,6 +116,7 @@ import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/instal
 import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-search'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
 import { Route as ApiSessionsSearchRouteImport } from './routes/api/sessions/search'
+import { Route as ApiSessionCardsCardIdRouteImport } from './routes/api/session-cards.$cardId'
 import { Route as ApiRunsActiveRouteImport } from './routes/api/runs/active'
 import { Route as ApiProfilesUpdateRouteImport } from './routes/api/profiles/update'
 import { Route as ApiProfilesToggleSkillRouteImport } from './routes/api/profiles/toggle-skill'
@@ -158,6 +160,9 @@ import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/se
 import { Route as ApiSessionsSessionKeyLatestDescendantRouteImport } from './routes/api/sessions/$sessionKey.latest-descendant'
 import { Route as ApiSessionsSessionKeyForkRouteImport } from './routes/api/sessions/$sessionKey.fork'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
+import { Route as ApiSessionCardsCardIdHistoryRouteImport } from './routes/api/session-cards.$cardId.history'
+import { Route as ApiSessionCardsCardIdBranchRouteImport } from './routes/api/session-cards.$cardId.branch'
+import { Route as ApiSessionCardsCardIdArchiveRouteImport } from './routes/api/session-cards.$cardId.archive'
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
 import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
@@ -448,6 +453,11 @@ const ApiSessionHistoryRoute = ApiSessionHistoryRouteImport.update({
   path: '/api/session-history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionCardsRoute = ApiSessionCardsRouteImport.update({
+  id: '/api/session-cards',
+  path: '/api/session-cards',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
   id: '/api/send-stream',
   path: '/api/send-stream',
@@ -693,6 +703,11 @@ const ApiSessionsSearchRoute = ApiSessionsSearchRouteImport.update({
   path: '/search',
   getParentRoute: () => ApiSessionsRoute,
 } as any)
+const ApiSessionCardsCardIdRoute = ApiSessionCardsCardIdRouteImport.update({
+  id: '/$cardId',
+  path: '/$cardId',
+  getParentRoute: () => ApiSessionCardsRoute,
+} as any)
 const ApiRunsActiveRoute = ApiRunsActiveRouteImport.update({
   id: '/api/runs/active',
   path: '/api/runs/active',
@@ -914,6 +929,24 @@ const ApiSessionsSessionKeyActiveRunRoute =
     path: '/$sessionKey/active-run',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
+const ApiSessionCardsCardIdHistoryRoute =
+  ApiSessionCardsCardIdHistoryRouteImport.update({
+    id: '/history',
+    path: '/history',
+    getParentRoute: () => ApiSessionCardsCardIdRoute,
+  } as any)
+const ApiSessionCardsCardIdBranchRoute =
+  ApiSessionCardsCardIdBranchRouteImport.update({
+    id: '/branch',
+    path: '/branch',
+    getParentRoute: () => ApiSessionCardsCardIdRoute,
+  } as any)
+const ApiSessionCardsCardIdArchiveRoute =
+  ApiSessionCardsCardIdArchiveRouteImport.update({
+    id: '/archive',
+    path: '/archive',
+    getParentRoute: () => ApiSessionCardsCardIdRoute,
+  } as any)
 const ApiMcpHubSourcesIdRoute = ApiMcpHubSourcesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -989,6 +1022,7 @@ export interface FileRoutesByFullPath {
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
+  '/api/session-cards': typeof ApiSessionCardsRouteWithChildren
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
@@ -1066,6 +1100,7 @@ export interface FileRoutesByFullPath {
   '/api/profiles/toggle-skill': typeof ApiProfilesToggleSkillRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
   '/api/runs/active': typeof ApiRunsActiveRoute
+  '/api/session-cards/$cardId': typeof ApiSessionCardsCardIdRouteWithChildren
   '/api/sessions/search': typeof ApiSessionsSearchRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
@@ -1079,6 +1114,9 @@ export interface FileRoutesByFullPath {
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
+  '/api/session-cards/$cardId/archive': typeof ApiSessionCardsCardIdArchiveRoute
+  '/api/session-cards/$cardId/branch': typeof ApiSessionCardsCardIdBranchRoute
+  '/api/session-cards/$cardId/history': typeof ApiSessionCardsCardIdHistoryRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
   '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
@@ -1142,6 +1180,7 @@ export interface FileRoutesByTo {
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
+  '/api/session-cards': typeof ApiSessionCardsRouteWithChildren
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
@@ -1219,6 +1258,7 @@ export interface FileRoutesByTo {
   '/api/profiles/toggle-skill': typeof ApiProfilesToggleSkillRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
   '/api/runs/active': typeof ApiRunsActiveRoute
+  '/api/session-cards/$cardId': typeof ApiSessionCardsCardIdRouteWithChildren
   '/api/sessions/search': typeof ApiSessionsSearchRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
@@ -1232,6 +1272,9 @@ export interface FileRoutesByTo {
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
+  '/api/session-cards/$cardId/archive': typeof ApiSessionCardsCardIdArchiveRoute
+  '/api/session-cards/$cardId/branch': typeof ApiSessionCardsCardIdBranchRoute
+  '/api/session-cards/$cardId/history': typeof ApiSessionCardsCardIdHistoryRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
   '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
@@ -1297,6 +1340,7 @@ export interface FileRoutesById {
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
+  '/api/session-cards': typeof ApiSessionCardsRouteWithChildren
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
@@ -1374,6 +1418,7 @@ export interface FileRoutesById {
   '/api/profiles/toggle-skill': typeof ApiProfilesToggleSkillRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
   '/api/runs/active': typeof ApiRunsActiveRoute
+  '/api/session-cards/$cardId': typeof ApiSessionCardsCardIdRouteWithChildren
   '/api/sessions/search': typeof ApiSessionsSearchRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
@@ -1387,6 +1432,9 @@ export interface FileRoutesById {
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
+  '/api/session-cards/$cardId/archive': typeof ApiSessionCardsCardIdArchiveRoute
+  '/api/session-cards/$cardId/branch': typeof ApiSessionCardsCardIdBranchRoute
+  '/api/session-cards/$cardId/history': typeof ApiSessionCardsCardIdHistoryRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
   '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
@@ -1453,6 +1501,7 @@ export interface FileRouteTypes {
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
+    | '/api/session-cards'
     | '/api/session-history'
     | '/api/session-send'
     | '/api/session-status'
@@ -1530,6 +1579,7 @@ export interface FileRouteTypes {
     | '/api/profiles/toggle-skill'
     | '/api/profiles/update'
     | '/api/runs/active'
+    | '/api/session-cards/$cardId'
     | '/api/sessions/search'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
@@ -1543,6 +1593,9 @@ export interface FileRouteTypes {
     | '/api/update/workspace'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
+    | '/api/session-cards/$cardId/archive'
+    | '/api/session-cards/$cardId/branch'
+    | '/api/session-cards/$cardId/history'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/fork'
     | '/api/sessions/$sessionKey/latest-descendant'
@@ -1606,6 +1659,7 @@ export interface FileRouteTypes {
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
+    | '/api/session-cards'
     | '/api/session-history'
     | '/api/session-send'
     | '/api/session-status'
@@ -1683,6 +1737,7 @@ export interface FileRouteTypes {
     | '/api/profiles/toggle-skill'
     | '/api/profiles/update'
     | '/api/runs/active'
+    | '/api/session-cards/$cardId'
     | '/api/sessions/search'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
@@ -1696,6 +1751,9 @@ export interface FileRouteTypes {
     | '/api/update/workspace'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
+    | '/api/session-cards/$cardId/archive'
+    | '/api/session-cards/$cardId/branch'
+    | '/api/session-cards/$cardId/history'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/fork'
     | '/api/sessions/$sessionKey/latest-descendant'
@@ -1760,6 +1818,7 @@ export interface FileRouteTypes {
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
+    | '/api/session-cards'
     | '/api/session-history'
     | '/api/session-send'
     | '/api/session-status'
@@ -1837,6 +1896,7 @@ export interface FileRouteTypes {
     | '/api/profiles/toggle-skill'
     | '/api/profiles/update'
     | '/api/runs/active'
+    | '/api/session-cards/$cardId'
     | '/api/sessions/search'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
@@ -1850,6 +1910,9 @@ export interface FileRouteTypes {
     | '/api/update/workspace'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
+    | '/api/session-cards/$cardId/archive'
+    | '/api/session-cards/$cardId/branch'
+    | '/api/session-cards/$cardId/history'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/fork'
     | '/api/sessions/$sessionKey/latest-descendant'
@@ -1915,6 +1978,7 @@ export interface RootRouteChildren {
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
+  ApiSessionCardsRoute: typeof ApiSessionCardsRouteWithChildren
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
   ApiSessionSendRoute: typeof ApiSessionSendRoute
   ApiSessionStatusRoute: typeof ApiSessionStatusRoute
@@ -2382,6 +2446,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/session-cards': {
+      id: '/api/session-cards'
+      path: '/api/session-cards'
+      fullPath: '/api/session-cards'
+      preLoaderRoute: typeof ApiSessionCardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/send-stream': {
       id: '/api/send-stream'
       path: '/api/send-stream'
@@ -2725,6 +2796,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSearchRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/session-cards/$cardId': {
+      id: '/api/session-cards/$cardId'
+      path: '/$cardId'
+      fullPath: '/api/session-cards/$cardId'
+      preLoaderRoute: typeof ApiSessionCardsCardIdRouteImport
+      parentRoute: typeof ApiSessionCardsRoute
+    }
     '/api/runs/active': {
       id: '/api/runs/active'
       path: '/api/runs/active'
@@ -3026,6 +3104,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/session-cards/$cardId/history': {
+      id: '/api/session-cards/$cardId/history'
+      path: '/history'
+      fullPath: '/api/session-cards/$cardId/history'
+      preLoaderRoute: typeof ApiSessionCardsCardIdHistoryRouteImport
+      parentRoute: typeof ApiSessionCardsCardIdRoute
+    }
+    '/api/session-cards/$cardId/branch': {
+      id: '/api/session-cards/$cardId/branch'
+      path: '/branch'
+      fullPath: '/api/session-cards/$cardId/branch'
+      preLoaderRoute: typeof ApiSessionCardsCardIdBranchRouteImport
+      parentRoute: typeof ApiSessionCardsCardIdRoute
+    }
+    '/api/session-cards/$cardId/archive': {
+      id: '/api/session-cards/$cardId/archive'
+      path: '/archive'
+      fullPath: '/api/session-cards/$cardId/archive'
+      preLoaderRoute: typeof ApiSessionCardsCardIdArchiveRouteImport
+      parentRoute: typeof ApiSessionCardsCardIdRoute
+    }
     '/api/mcp/hub-sources/$id': {
       id: '/api/mcp/hub-sources/$id'
       path: '/$id'
@@ -3176,6 +3275,35 @@ const ApiMemoryRouteWithChildren = ApiMemoryRoute._addFileChildren(
   ApiMemoryRouteChildren,
 )
 
+interface ApiSessionCardsCardIdRouteChildren {
+  ApiSessionCardsCardIdArchiveRoute: typeof ApiSessionCardsCardIdArchiveRoute
+  ApiSessionCardsCardIdBranchRoute: typeof ApiSessionCardsCardIdBranchRoute
+  ApiSessionCardsCardIdHistoryRoute: typeof ApiSessionCardsCardIdHistoryRoute
+}
+
+const ApiSessionCardsCardIdRouteChildren: ApiSessionCardsCardIdRouteChildren = {
+  ApiSessionCardsCardIdArchiveRoute: ApiSessionCardsCardIdArchiveRoute,
+  ApiSessionCardsCardIdBranchRoute: ApiSessionCardsCardIdBranchRoute,
+  ApiSessionCardsCardIdHistoryRoute: ApiSessionCardsCardIdHistoryRoute,
+}
+
+const ApiSessionCardsCardIdRouteWithChildren =
+  ApiSessionCardsCardIdRoute._addFileChildren(
+    ApiSessionCardsCardIdRouteChildren,
+  )
+
+interface ApiSessionCardsRouteChildren {
+  ApiSessionCardsCardIdRoute: typeof ApiSessionCardsCardIdRouteWithChildren
+}
+
+const ApiSessionCardsRouteChildren: ApiSessionCardsRouteChildren = {
+  ApiSessionCardsCardIdRoute: ApiSessionCardsCardIdRouteWithChildren,
+}
+
+const ApiSessionCardsRouteWithChildren = ApiSessionCardsRoute._addFileChildren(
+  ApiSessionCardsRouteChildren,
+)
+
 interface ApiSessionsRouteChildren {
   ApiSessionsSearchRoute: typeof ApiSessionsSearchRoute
   ApiSessionsSendRoute: typeof ApiSessionsSendRoute
@@ -3299,6 +3427,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
+  ApiSessionCardsRoute: ApiSessionCardsRouteWithChildren,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,
   ApiSessionSendRoute: ApiSessionSendRoute,
   ApiSessionStatusRoute: ApiSessionStatusRoute,
