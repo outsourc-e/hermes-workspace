@@ -333,6 +333,125 @@ describe('ChatPanel Card routing', () => {
     expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
+  it('resolves main only through an authoritative Card alias and expands by cardId', () => {
+    mocks.workspaceState.chatPanelCardId = 'main'
+    const mainCard = card({
+      cardId: 'remote:main-card',
+      canonicalSegmentKey: 'main',
+      continuationSegmentKeys: ['remote:main-root', 'main'],
+    })
+    mocks.queryState = {
+      status: 'success',
+      data: wire([mainCard]),
+      isPending: false,
+      refetch: vi.fn(),
+    }
+
+    renderPanel()
+
+    expect(mocks.workspaceState.setChatPanelCardId).toHaveBeenCalledWith(
+      mainCard.cardId,
+    )
+    expect(mocks.chatScreenProps.at(-1)).toMatchObject({
+      activeFriendlyId: mainCard.cardId,
+      activeCard: mainCard,
+      isNewChat: false,
+    })
+    expect(mocks.chatScreenProps.at(-1)?.onSessionResolved).toBeUndefined()
+    expect(screen.queryByText('Main Chat')).toBeNull()
+
+    React.act(() =>
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Expand to full chat' }),
+      ),
+    )
+    expect(mocks.navigate).toHaveBeenCalledWith({
+      to: '/chat/$sessionKey',
+      params: { sessionKey: mainCard.cardId },
+    })
+    expect(mocks.navigate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ params: { sessionKey: 'main' } }),
+    )
+  })
+
+  it('fails closed when main has no Card in the complete projection', () => {
+    mocks.workspaceState.chatPanelCardId = 'main'
+    mocks.queryState = {
+      status: 'success',
+      data: wire([card()]),
+      isPending: false,
+      refetch: vi.fn(),
+    }
+
+    renderPanel()
+
+    expect(
+      screen.getByRole('heading', { name: 'Conversation unavailable' }),
+    ).toBeTruthy()
+    expect(
+      screen.getByText(/not present in the validated Session Card list/i),
+    ).toBeTruthy()
+    expect(screen.queryByTestId('chat-screen')).toBeNull()
+    expect(
+      screen
+        .getByRole('button', { name: 'Expand to full chat' })
+        .hasAttribute('disabled'),
+    ).toBe(true)
+    expect(mocks.workspaceState.setChatPanelCardId).not.toHaveBeenCalled()
+    expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    {
+      name: 'pending',
+      queryState: {
+        status: 'pending' as const,
+        data: undefined,
+        isPending: true,
+        refetch: vi.fn(),
+      },
+      expectedState: /resolving conversation/i,
+    },
+    {
+      name: 'failed',
+      queryState: {
+        status: 'error' as const,
+        data: undefined,
+        isPending: false,
+        refetch: vi.fn(),
+      },
+      expectedState: /validated Session Card list could not be loaded/i,
+    },
+    {
+      name: 'incomplete',
+      queryState: {
+        status: 'success' as const,
+        data: wire([card({ canonicalSegmentKey: 'main' })], 'incomplete'),
+        isPending: false,
+        refetch: vi.fn(),
+      },
+      expectedState: /validated Session Card projection is incomplete/i,
+    },
+  ])(
+    'keeps main non-interactive while Card resolution is $name',
+    ({ queryState, expectedState }) => {
+      mocks.workspaceState.chatPanelCardId = 'main'
+      mocks.queryState = queryState
+
+      renderPanel()
+
+      expect(screen.getByText(expectedState)).toBeTruthy()
+      expect(screen.queryByTestId('chat-screen')).toBeNull()
+      expect(
+        screen
+          .getByRole('button', { name: 'Expand to full chat' })
+          .hasAttribute('disabled'),
+      ).toBe(true)
+      expect(mocks.workspaceState.setChatPanelCardId).not.toHaveBeenCalled()
+      expect(mocks.navigate).not.toHaveBeenCalled()
+    },
+  )
+
   it.each([
     {
       name: 'pending',

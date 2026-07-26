@@ -1,9 +1,9 @@
 /**
  * ChatPanel — collapsible Card-native chat overlay for non-chat routes.
  *
- * Stable parent Card IDs own selection and full-chat routing. `new` and `main`
- * are the only bootstrap exceptions; every other selection must resolve through
- * the complete, validated Session Card projection.
+ * Stable parent Card IDs own selection and full-chat routing. `new` is the only
+ * bootstrap exception; every other selection must resolve through the complete,
+ * validated Session Card projection.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
@@ -59,6 +59,35 @@ function unavailableMessage(
   return 'This conversation is not present in the validated Session Card list.'
 }
 
+function resolveChatPanelCardRouteState({
+  routeKey,
+  queryStatus,
+  response,
+}: {
+  routeKey: string
+  queryStatus: 'pending' | 'error' | 'success'
+  response?: Parameters<typeof resolveSessionCardProducerNavigation>[0]
+}): ReturnType<typeof resolveSessionCardRouteState> {
+  if (routeKey !== 'main') {
+    return resolveSessionCardRouteState({ routeKey, queryStatus, response })
+  }
+  if (queryStatus === 'pending') return null
+  if (queryStatus === 'error' || !response) {
+    return { status: 'unavailable', reason: 'query' }
+  }
+  if (response.completeness !== 'complete') {
+    return { status: 'unavailable', reason: 'projection' }
+  }
+
+  const target = resolveSessionCardProducerNavigation(response, [routeKey])
+  const card = target
+    ? response.cards.find((candidate) => candidate.cardId === target.cardId)
+    : undefined
+  return card
+    ? { status: 'selected', card }
+    : { status: 'rejected', reason: 'missing' }
+}
+
 export function ChatPanel() {
   const isOpen = useWorkspaceStore((state) => state.chatPanelOpen)
   const selectedCardId = useWorkspaceStore((state) => state.chatPanelCardId)
@@ -79,7 +108,7 @@ export function ChatPanel() {
     staleTime: 5_000,
     refetchInterval: 5_000,
   })
-  const cardRouteResolution = resolveSessionCardRouteState({
+  const cardRouteResolution = resolveChatPanelCardRouteState({
     routeKey: selectedCardId,
     queryStatus: sessionCardsQuery.status,
     response: sessionCardsQuery.data,
@@ -93,21 +122,26 @@ export function ChatPanel() {
     sessionCardsQuery.data.completeness === 'complete'
       ? sessionCardsQuery.data.cards
       : undefined
-  const isExplicitBootstrap =
-    selectedCardId === 'new' || selectedCardId === 'main'
+  const isExplicitBootstrap = selectedCardId === 'new'
   const isNewChat = selectedCardId === 'new' && !bootstrapRecovery
   const activeFriendlyId =
     activeCard?.cardId ?? bootstrapRecovery?.friendlyId ?? selectedCardId
   const panelTitle =
     activeCard?.title ??
-    (selectedCardId === 'new'
-      ? 'New Chat'
-      : selectedCardId === 'main'
-        ? 'Main Chat'
-        : 'Conversation unavailable')
+    (selectedCardId === 'new' ? 'New Chat' : 'Conversation unavailable')
   const expandCardId =
     activeCard?.cardId ??
     (isExplicitBootstrap && !bootstrapRecovery ? selectedCardId : undefined)
+
+  useEffect(() => {
+    if (
+      selectedCardId === 'main' &&
+      activeCard &&
+      activeCard.cardId !== selectedCardId
+    ) {
+      setChatPanelCardId(activeCard.cardId)
+    }
+  }, [activeCard, selectedCardId, setChatPanelCardId])
 
   useEffect(() => {
     if (!bootstrapRecovery || sessionCardsQuery.status !== 'success') {
