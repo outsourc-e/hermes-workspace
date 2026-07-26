@@ -36,12 +36,14 @@ import {
   updateSessionCardMetadata,
 } from '../chat-queries'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
+import { isWholeCardBranchAvailable } from '../types'
 import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
 import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionCard, SessionMeta } from '../types'
+
 import { t } from '@/lib/i18n'
 import { SettingsDialog } from '@/components/settings-dialog'
 import {
@@ -68,6 +70,7 @@ import {
   MenuTrigger,
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
 type WorkspaceStats = Record<string, unknown>
 
@@ -697,6 +700,7 @@ type DesktopSidebarContentProps = {
   profileAvatarDataUrl: string | null
   handleOpenSettings: (section?: 'appearance' | 'claude') => void
   sessionCards: Array<SessionCard>
+  sessionForkAvailable: boolean
   onTogglePin: (card: SessionCard) => void
   onRename: (card: SessionCard) => void
   onArchive: (card: SessionCard) => void
@@ -724,6 +728,7 @@ function DesktopSidebarContent({
   profileAvatarDataUrl,
   handleOpenSettings,
   sessionCards,
+  sessionForkAvailable,
   onTogglePin,
   onRename,
   onArchive,
@@ -906,6 +911,7 @@ function DesktopSidebarContent({
               <div className="flex min-h-0 flex-1">
                 <SidebarSessions
                   sessionCards={sessionCards}
+                  sessionForkAvailable={sessionForkAvailable}
                   activeCardId={activeCardId}
                   inspectedChildCardId={inspectedChildCardId}
                   onSelect={onSelectSession}
@@ -964,6 +970,7 @@ function ChatSidebarComponent({
     retry: 1,
     refetchInterval: 5000,
   })
+  const sessionForkAvailable = useFeatureAvailable('sessionFork')
 
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
@@ -1108,6 +1115,7 @@ function ChatSidebarComponent({
   }
 
   function handleBranch(card: SessionCard) {
+    if (!isWholeCardBranchAvailable(card, sessionForkAvailable)) return
     cardActions.branch(card)
   }
 
@@ -1374,6 +1382,7 @@ function ChatSidebarComponent({
           profileAvatarDataUrl={profileAvatarDataUrl}
           handleOpenSettings={handleOpenSettings}
           sessionCards={sessionCardsQuery.data?.cards ?? []}
+          sessionForkAvailable={sessionForkAvailable}
           onTogglePin={handleTogglePin}
           onRename={handleOpenRename}
           onArchive={handleOpenArchive}
@@ -1568,6 +1577,7 @@ function ChatSidebarComponent({
                     <div className="flex-1 min-h-0">
                       <SidebarSessions
                         sessionCards={sessionCardsQuery.data?.cards ?? []}
+                        sessionForkAvailable={sessionForkAvailable}
                         activeCardId={activeFriendlyId}
                         inspectedChildCardId={inspectedChildCardId}
                         onSelect={onSelectSession}

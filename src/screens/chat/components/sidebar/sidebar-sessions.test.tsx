@@ -88,6 +88,7 @@ vi.mock('@/components/ui/menu', () => ({
 function card(overrides: Partial<SessionCard> = {}): SessionCard {
   return {
     cardId: 'card:root',
+    canonicalSource: 'remote',
     title: 'Authoritative card title',
     titleSource: 'manual',
     canonicalSegmentKey: 'remote:tip',
@@ -135,6 +136,7 @@ function renderSidebar(
     root.render(
       <SidebarSessions
         sessionCards={options.cards ?? [card()]}
+        sessionForkAvailable
         activeCardId={options.activeCardId ?? 'card:root'}
         inspectedChildCardId={options.inspectedChildCardId}
         onTogglePin={options.onTogglePin ?? vi.fn()}

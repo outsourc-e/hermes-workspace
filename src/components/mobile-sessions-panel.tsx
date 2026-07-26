@@ -11,8 +11,10 @@ import {
   PinIcon,
 } from '@hugeicons/core-free-icons'
 import type { SessionCard, SessionCardChild } from '@/screens/chat/types'
+import { isWholeCardBranchAvailable } from '@/screens/chat/types'
 
 import { cn } from '@/lib/utils'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
 type Props = {
   open: boolean
@@ -72,6 +74,7 @@ function MobileCardActions({
   card,
   open,
   pending,
+  canBranch,
   onToggle,
   onClose,
   onRenameCard,
@@ -82,6 +85,7 @@ function MobileCardActions({
   card: SessionCard
   open: boolean
   pending: boolean
+  canBranch: boolean
   onToggle: () => void
   onClose: () => void
   onRenameCard: Props['onRenameCard']
@@ -194,19 +198,25 @@ function MobileCardActions({
                 <HugeiconsIcon icon={PinIcon} size={15} strokeWidth={1.8} />
                 {card.pinned ? 'Unpin card' : 'Pin card'}
               </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  if (pending) return
-                  void onBranchCard(card.cardId)
-                  close()
-                }}
-                className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-primary-700 hover:bg-primary-100 disabled:opacity-50"
-              >
-                <HugeiconsIcon icon={GitForkIcon} size={15} strokeWidth={1.8} />
-                Branch conversation
-              </button>
+              {canBranch ? (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    if (pending) return
+                    void onBranchCard(card.cardId)
+                    close()
+                  }}
+                  className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-primary-700 hover:bg-primary-100 disabled:opacity-50"
+                >
+                  <HugeiconsIcon
+                    icon={GitForkIcon}
+                    size={15}
+                    strokeWidth={1.8}
+                  />
+                  Branch conversation
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={pending}
@@ -251,6 +261,7 @@ export function MobileSessionsPanel({
   onArchiveCard,
   pendingCardIds = new Set<string>(),
 }: Props) {
+  const sessionForkAvailable = useFeatureAvailable('sessionFork')
   const disclosurePrefix = useId().replaceAll(':', '')
   const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(
     () => new Set(),
@@ -524,6 +535,10 @@ export function MobileSessionsPanel({
                           card={card}
                           open={actionsOpen}
                           pending={pending}
+                          canBranch={isWholeCardBranchAvailable(
+                            card,
+                            sessionForkAvailable,
+                          )}
                           onToggle={() =>
                             setActionCardId(
                               actionsOpen ? undefined : card.cardId,

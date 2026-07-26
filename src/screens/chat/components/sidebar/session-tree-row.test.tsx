@@ -53,6 +53,7 @@ vi.mock('@/components/ui/menu', () => ({
 
 const rootCard: SessionCard = {
   cardId: 'card:root',
+  canonicalSource: 'remote',
   title: 'Root card',
   titleSource: 'manual',
   canonicalSegmentKey: 'remote:tip',
@@ -85,7 +86,21 @@ function row(
   }
 }
 
-function Harness() {
+function Harness({
+  card = rootCard,
+  sessionForkAvailable = true,
+  onTogglePin = vi.fn(),
+  onBranch = vi.fn(),
+  onRename = vi.fn(),
+  onArchive = vi.fn(),
+}: {
+  card?: SessionCard
+  sessionForkAvailable?: boolean
+  onTogglePin?: (card: SessionCard) => void
+  onBranch?: (card: SessionCard) => void
+  onRename?: (card: SessionCard) => void
+  onArchive?: (card: SessionCard) => void
+}) {
   const [expanded, setExpanded] = useState(false)
   const root = row('card:root', 'Root card', {
     isExpandable: true,
@@ -105,13 +120,14 @@ function Harness() {
       activeCardId="card:root"
       inspectedChildCardId="card:child"
       pinnedSessionKeys={new Set()}
-      cardsById={new Map([['card:root', rootCard]])}
+      cardsById={new Map([['card:root', card]])}
       pendingCardIds={new Set()}
+      sessionForkAvailable={sessionForkAvailable}
       onToggleExpanded={(_key, next) => setExpanded(next)}
-      onTogglePin={vi.fn()}
-      onBranch={vi.fn()}
-      onRename={vi.fn()}
-      onArchive={vi.fn()}
+      onTogglePin={onTogglePin}
+      onBranch={onBranch}
+      onRename={onRename}
+      onArchive={onArchive}
     />
   )
 }
@@ -120,11 +136,11 @@ const mountedRoots: Array<() => void> = []
 afterEach(() => {
   while (mountedRoots.length > 0) mountedRoots.pop()?.()
 })
-function render() {
+function render(options: React.ComponentProps<typeof Harness> = {}) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  React.act(() => root.render(<Harness />))
+  React.act(() => root.render(<Harness {...options} />))
   mountedRoots.push(() => {
     React.act(() => root.unmount())
     container.remove()
@@ -160,4 +176,68 @@ describe('SessionTreeRow Card routing', () => {
       screen.getByText('Root card').closest('a')?.getAttribute('aria-current'),
     ).toBe('page')
   })
+
+  it('offers branching and ordinary Card actions for a remote root when capability is available', () => {
+    const onTogglePin = vi.fn()
+    const onBranch = vi.fn()
+    const onRename = vi.fn()
+    const onArchive = vi.fn()
+    render({ onTogglePin, onBranch, onRename, onArchive })
+
+    React.act(() =>
+      fireEvent.click(
+        screen.getByRole('button', { name: /Expand related sessions/i }),
+      ),
+    )
+    expect(
+      screen.getAllByRole('button', { name: 'Branch conversation' }),
+    ).toHaveLength(1)
+
+    React.act(() =>
+      fireEvent.click(screen.getByRole('button', { name: 'Pin card' })),
+    )
+    React.act(() =>
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Branch conversation' }),
+      ),
+    )
+    React.act(() =>
+      fireEvent.click(screen.getByRole('button', { name: 'Rename' })),
+    )
+    React.act(() =>
+      fireEvent.click(screen.getByRole('button', { name: 'Archive' })),
+    )
+
+    for (const callback of [onTogglePin, onBranch, onRename, onArchive]) {
+      expect(callback).toHaveBeenCalledWith(rootCard)
+    }
+  })
+
+  it('omits branching when the fork capability is unavailable', () => {
+    render({ sessionForkAvailable: false })
+
+    expect(
+      screen.queryByRole('button', { name: 'Branch conversation' }),
+    ).toBeNull()
+    expect(screen.getByRole('button', { name: 'Pin card' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Archive' })).toBeTruthy()
+  })
+
+  it.each([
+    ['local', 'local' as const],
+    ['portable/unverified', undefined],
+  ])(
+    'omits branching for a %s root even when capability is available',
+    (_label, canonicalSource) => {
+      render({ card: { ...rootCard, canonicalSource } })
+
+      expect(
+        screen.queryByRole('button', { name: 'Branch conversation' }),
+      ).toBeNull()
+      expect(screen.getByRole('button', { name: 'Pin card' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Rename' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Archive' })).toBeTruthy()
+    },
+  )
 })

@@ -3,6 +3,7 @@
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useId } from 'react'
+import { isWholeCardBranchAvailable } from '../../types'
 import { SessionItem } from './session-item'
 import type {
   SessionCard,
@@ -34,6 +35,7 @@ type SessionTreeRowProps = {
   pinnedSessionKeys: ReadonlySet<string>
   cardsById: ReadonlyMap<string, SessionCard>
   pendingCardIds: ReadonlySet<string>
+  sessionForkAvailable: boolean
   onToggleExpanded: (cardId: string, expanded: boolean) => void
   onSelect?: () => void
   onTogglePin: (card: SessionCard) => void
@@ -76,6 +78,7 @@ function SessionTreeRow({
   pinnedSessionKeys,
   cardsById,
   pendingCardIds,
+  sessionForkAvailable,
   onToggleExpanded,
   onSelect,
   onTogglePin,
@@ -151,7 +154,10 @@ function SessionTreeRow({
             inspected={row.depth > 0 && row.key === inspectedChildCardId}
             onSelect={onSelect}
             onTogglePin={isRootCard ? () => onTogglePin(card) : undefined}
-            canBranch={isRootCard}
+            canBranch={
+              isRootCard &&
+              isWholeCardBranchAvailable(card, sessionForkAvailable)
+            }
             pending={isRootCard && pendingCardIds.has(card.cardId)}
             onBranch={isRootCard ? () => onBranch(card) : undefined}
             onRename={isRootCard ? () => onRename(card) : undefined}
@@ -178,6 +184,7 @@ function SessionTreeRow({
                     pinnedSessionKeys={pinnedSessionKeys}
                     cardsById={cardsById}
                     pendingCardIds={pendingCardIds}
+                    sessionForkAvailable={sessionForkAvailable}
                     onToggleExpanded={onToggleExpanded}
                     onSelect={onSelect}
                     onTogglePin={onTogglePin}

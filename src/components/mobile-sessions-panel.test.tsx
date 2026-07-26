@@ -3,20 +3,25 @@
 import React from 'react'
 import { fireEvent, screen } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MobileSessionsPanel } from './mobile-sessions-panel'
 import type { SessionCard } from '@/screens/chat/types'
 
 const reactActEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+const capabilityMocks = vi.hoisted(() => ({ sessionForkAvailable: true }))
 vi.mock('@hugeicons/react', () => ({
   HugeiconsIcon: () => <span aria-hidden="true" />,
+}))
+vi.mock('@/hooks/use-feature-available', () => ({
+  useFeatureAvailable: () => capabilityMocks.sessionForkAvailable,
 }))
 
 function card(): SessionCard {
   return {
     cardId: 'card:root',
+    canonicalSource: 'remote',
     title: 'Card title',
     titleSource: 'manual',
     canonicalSegmentKey: 'remote:tip',
@@ -41,6 +46,9 @@ function card(): SessionCard {
 }
 
 const mountedRoots: Array<() => void> = []
+beforeEach(() => {
+  capabilityMocks.sessionForkAvailable = true
+})
 afterEach(() => {
   while (mountedRoots.length > 0) mountedRoots.pop()?.()
 })
@@ -180,4 +188,45 @@ describe('MobileSessionsPanel Card routing', () => {
     )
     expect(onArchiveCard).toHaveBeenCalledWith('card:root')
   })
+
+  it('omits branching when the fork capability is unavailable while preserving ordinary actions', () => {
+    capabilityMocks.sessionForkAvailable = false
+    renderPanel()
+
+    React.act(() =>
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Card actions for Card title' }),
+      ),
+    )
+
+    expect(
+      screen.queryByRole('button', { name: 'Branch conversation' }),
+    ).toBeNull()
+    expect(screen.getByRole('button', { name: 'Pin card' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Archive card' })).toBeTruthy()
+  })
+
+  it.each([
+    ['local', 'local' as const],
+    ['portable/unverified', undefined],
+  ])(
+    'omits branching for a %s Card even when capability is available',
+    (_label, canonicalSource) => {
+      renderPanel({ cards: [{ ...card(), canonicalSource }] })
+
+      React.act(() =>
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Card actions for Card title' }),
+        ),
+      )
+
+      expect(
+        screen.queryByRole('button', { name: 'Branch conversation' }),
+      ).toBeNull()
+      expect(screen.getByRole('button', { name: 'Pin card' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Rename' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Archive card' })).toBeTruthy()
+    },
+  )
 })

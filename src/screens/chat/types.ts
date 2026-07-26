@@ -212,6 +212,17 @@ export type SessionCard = {
   pinned: boolean
 }
 
+/**
+ * Whole-Card branching requires both a positively advertised gateway
+ * capability and an authoritative remote canonical transport.
+ */
+export function isWholeCardBranchAvailable(
+  card: Pick<SessionCard, 'canonicalSource'>,
+  sessionForkAvailable: boolean,
+): boolean {
+  return sessionForkAvailable && card.canonicalSource === 'remote'
+}
+
 export type PathsPayload = {
   agentId: string
   stateDir: string

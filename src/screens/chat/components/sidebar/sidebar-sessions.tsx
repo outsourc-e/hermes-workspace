@@ -31,6 +31,7 @@ type SidebarSessionsProps = {
   onArchive: (card: SessionCard) => void
   onBranch: (card: SessionCard) => void
   pendingCardIds?: ReadonlySet<string>
+  sessionForkAvailable: boolean
   loading: boolean
   fetching: boolean
   error: string | null
@@ -60,6 +61,7 @@ export const SidebarSessions = memo(function SidebarSessions({
   onArchive,
   onBranch,
   pendingCardIds = new Set<string>(),
+  sessionForkAvailable,
   loading,
   fetching,
   error,
@@ -173,6 +175,7 @@ export const SidebarSessions = memo(function SidebarSessions({
         pinnedSessionKeys={pinnedCardIds}
         cardsById={cardsById}
         pendingCardIds={pendingCardIds}
+        sessionForkAvailable={sessionForkAvailable}
         onToggleExpanded={handleToggleExpanded}
         onSelect={onSelect}
         onTogglePin={onTogglePin}
@@ -280,6 +283,7 @@ function areSidebarSessionsEqual(
   if (prev.onArchive !== next.onArchive) return false
   if (prev.onBranch !== next.onBranch) return false
   if (prev.pendingCardIds !== next.pendingCardIds) return false
+  if (prev.sessionForkAvailable !== next.sessionForkAvailable) return false
   if (prev.loading !== next.loading) return false
   if (prev.fetching !== next.fetching) return false
   if (prev.error !== next.error) return false
