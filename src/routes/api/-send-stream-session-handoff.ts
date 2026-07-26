@@ -13,6 +13,7 @@ export type VerifiedStreamCard = {
   cardId: string
   canonicalSegmentKey: string
   continuationSegmentKeys: ReadonlyArray<string>
+  upstreamKeyBySegmentKey: ReadonlyMap<string, string>
   relationshipKind: 'root' | 'orphan' | 'branch' | 'child'
   parentCardId?: string
   collectionCompleteness: 'complete' | 'incomplete'
@@ -309,21 +310,36 @@ export function resolveAuthoritativeStreamHandoff(
   return { fromSessionKey, sessionKey }
 }
 
+function isExactNonblankIdentity(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.trim() === value
+}
+
 function isParentCard(card: VerifiedStreamCard): boolean {
   return (
     (card.relationshipKind === 'root' || card.relationshipKind === 'orphan') &&
     card.parentCardId === undefined &&
     card.collectionCompleteness === 'complete' &&
-    card.cardId.trim().length > 0 &&
-    card.canonicalSegmentKey.trim().length > 0 &&
+    isExactNonblankIdentity(card.cardId) &&
+    isExactNonblankIdentity(card.canonicalSegmentKey) &&
     card.continuationSegmentKeys.length > 0 &&
+    card.upstreamKeyBySegmentKey instanceof Map &&
     card.continuationSegmentKeys.every(
       (segmentKey) =>
-        typeof segmentKey === 'string' &&
-        segmentKey.trim().length > 0 &&
-        segmentKey.trim() === segmentKey,
+        isExactNonblankIdentity(segmentKey) &&
+        isExactNonblankIdentity(card.upstreamKeyBySegmentKey.get(segmentKey)),
     )
   )
+}
+
+function projectedSegmentKeyForUpstream(
+  card: VerifiedStreamCard,
+  upstreamKey: string,
+): string | null {
+  const matches = card.continuationSegmentKeys.filter(
+    (segmentKey) =>
+      card.upstreamKeyBySegmentKey.get(segmentKey) === upstreamKey,
+  )
+  return matches.length === 1 ? (matches[0] ?? null) : null
 }
 
 /**
@@ -332,25 +348,38 @@ function isParentCard(card: VerifiedStreamCard): boolean {
  * Stream event claims alone never confer card ownership.
  */
 export function resolveAuthoritativeCardStreamHandoff(
-  currentSegmentKey: string,
+  currentUpstreamKey: string,
   data: Record<string, unknown>,
   currentCard: VerifiedStreamCard | null,
   successorCard: VerifiedStreamCard | null,
 ): AuthoritativeCardStreamHandoff | null {
-  const fromSegmentKey = currentSegmentKey.trim()
-  const canonicalSegmentKey =
-    typeof data.session_id === 'string' ? data.session_id.trim() : ''
+  const successorUpstreamKey = data.session_id
   if (
-    !fromSegmentKey ||
-    !canonicalSegmentKey ||
-    canonicalSegmentKey === fromSegmentKey ||
-    SESSION_BOOTSTRAP_KEYS.has(canonicalSegmentKey) ||
+    !isExactNonblankIdentity(currentUpstreamKey) ||
+    !isExactNonblankIdentity(successorUpstreamKey) ||
+    successorUpstreamKey === currentUpstreamKey ||
+    SESSION_BOOTSTRAP_KEYS.has(successorUpstreamKey) ||
     hasNonParentStreamFacts(data) ||
     !currentCard ||
     !successorCard ||
     !isParentCard(currentCard) ||
     !isParentCard(successorCard) ||
-    currentCard.cardId !== successorCard.cardId ||
+    currentCard.cardId !== successorCard.cardId
+  ) {
+    return null
+  }
+
+  const fromSegmentKey = projectedSegmentKeyForUpstream(
+    currentCard,
+    currentUpstreamKey,
+  )
+  const canonicalSegmentKey = projectedSegmentKeyForUpstream(
+    successorCard,
+    successorUpstreamKey,
+  )
+  if (
+    !fromSegmentKey ||
+    !canonicalSegmentKey ||
     successorCard.canonicalSegmentKey !== canonicalSegmentKey ||
     !successorCard.continuationSegmentKeys.includes(fromSegmentKey) ||
     !successorCard.continuationSegmentKeys.includes(canonicalSegmentKey)
@@ -359,7 +388,7 @@ export function resolveAuthoritativeCardStreamHandoff(
   }
 
   return {
-    cardId: successorCard.cardId,
+    cardId: currentCard.cardId,
     fromSegmentKey,
     canonicalSegmentKey,
   }

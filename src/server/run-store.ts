@@ -30,6 +30,8 @@ export type PersistedRunState = {
   runId: string
   sessionKey: string
   friendlyId: string
+  cardId?: string
+  canonicalSegmentKey?: string
   status: 'accepted' | 'active' | 'handoff' | 'stalled' | 'complete' | 'error'
   createdAt: number
   updatedAt: number
@@ -97,12 +99,18 @@ export async function createPersistedRun(input: {
   runId: string
   sessionKey: string
   friendlyId?: string
+  cardId?: string
+  canonicalSegmentKey?: string
 }): Promise<PersistedRunState> {
   const now = Date.now()
   const run: PersistedRunState = {
     runId: input.runId,
     sessionKey: input.sessionKey,
     friendlyId: input.friendlyId || input.sessionKey,
+    ...(input.cardId?.trim() ? { cardId: input.cardId.trim() } : {}),
+    ...(input.canonicalSegmentKey?.trim()
+      ? { canonicalSegmentKey: input.canonicalSegmentKey.trim() }
+      : {}),
     status: 'accepted',
     createdAt: now,
     updatedAt: now,
@@ -133,6 +141,7 @@ export async function migratePersistedRun(
   toSessionKey: string,
   runId: string,
   friendlyId?: string,
+  cardIdentity?: { cardId: string; canonicalSegmentKey: string },
 ): Promise<PersistedRunState | null> {
   const normalizedFrom = fromSessionKey.trim()
   const normalizedTo = toSessionKey.trim()
@@ -152,6 +161,12 @@ export async function migratePersistedRun(
       ...current,
       sessionKey: normalizedTo,
       friendlyId: friendlyId?.trim() || current.friendlyId || normalizedTo,
+      ...(cardIdentity?.cardId.trim()
+        ? { cardId: cardIdentity.cardId.trim() }
+        : {}),
+      ...(cardIdentity?.canonicalSegmentKey.trim()
+        ? { canonicalSegmentKey: cardIdentity.canonicalSegmentKey.trim() }
+        : {}),
       updatedAt: Date.now(),
     }
     await writeRun(migrated)
@@ -426,6 +441,42 @@ export async function getActiveRunForSession(
       .filter((run) => now - run.updatedAt < STALE_RUN_THRESHOLD_MS)
       .sort((a, b) => b.updatedAt - a.updatedAt)
     return candidates[0] ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function getActiveRunForCard(
+  cardId: string,
+  canonicalSegmentKey: string,
+): Promise<PersistedRunState | null> {
+  const normalizedCardId = cardId.trim()
+  const normalizedCanonicalSegmentKey = canonicalSegmentKey.trim()
+  if (!normalizedCardId || !normalizedCanonicalSegmentKey) return null
+  try {
+    const entries = await readdir(RUNS_ROOT, { withFileTypes: true })
+    const runsBySession = await Promise.all(
+      entries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => readRunsInDir(path.join(RUNS_ROOT, entry.name))),
+    )
+    const now = Date.now()
+    return (
+      runsBySession
+        .flat()
+        .filter((run) => run.cardId === normalizedCardId)
+        .filter(
+          (run) => run.canonicalSegmentKey === normalizedCanonicalSegmentKey,
+        )
+        .filter((run) => !['complete', 'error'].includes(run.status))
+        .filter((run) => now - run.updatedAt < STALE_RUN_THRESHOLD_MS)
+        .sort(
+          (a, b) =>
+            b.updatedAt - a.updatedAt ||
+            b.createdAt - a.createdAt ||
+            a.runId.localeCompare(b.runId),
+        )[0] ?? null
+    )
   } catch {
     return null
   }

@@ -444,11 +444,33 @@ export const Route = createFileRoute('/api/send-stream')({
           typeof body.sessionKey === 'string' ? body.sessionKey.trim() : ''
         const requestedFriendlyId =
           typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
+        const hasRequestedCardId = Object.prototype.hasOwnProperty.call(
+          body,
+          'cardId',
+        )
+        const requestedCardId =
+          typeof body.cardId === 'string' ? body.cardId.trim() : ''
         const message = String(body.message ?? '')
         const thinking =
           typeof body.thinking === 'string' ? body.thinking : undefined
         const attachments = normalizeAttachments(body.attachments)
         const history = normalizePortableHistory(body.history)
+        if (
+          hasRequestedCardId &&
+          (typeof body.cardId !== 'string' ||
+            !requestedCardId ||
+            body.cardId !== requestedCardId)
+        ) {
+          return finishPreStreamResponse(
+            new Response(
+              JSON.stringify({ ok: false, error: 'invalid card id' }),
+              {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+        }
         if (!message.trim() && (!attachments || attachments.length === 0)) {
           return finishPreStreamResponse(
             new Response(
@@ -461,20 +483,65 @@ export const Route = createFileRoute('/api/send-stream')({
           )
         }
 
-        // Resolve session key
+        // Resolve the stable Card identifier to a fresh canonical projection, then
+        // translate that source-qualified segment key to the backend session key.
+        // Legacy callers without a cardId retain the existing alias resolver.
         let sessionKey: string
         let resolvedFriendlyId: string
+        let activeCardResolution: Awaited<
+          ReturnType<typeof sessionCardService.resolveCard>
+        > | null = null
+        let activeCardId: string | null = null
+        let activeCardCanonicalSegmentKey: string | null = null
+        let activeCardCanonicalSource: string | null = null
         try {
-          const resolved = await waitWithinStreamLifetime(
-            resolveSessionKey({
-              rawSessionKey,
-              friendlyId: requestedFriendlyId,
-              defaultKey: 'main',
-            }),
-          )
-          ensureStreamTransportAvailable()
-          sessionKey = resolved.sessionKey
-          resolvedFriendlyId = resolved.sessionKey
+          if (requestedCardId) {
+            const resolved = await waitWithinStreamLifetime(
+              sessionCardService.resolveCard(requestedCardId),
+            )
+            ensureStreamTransportAvailable()
+            const canonicalSegmentKey = resolved.card.canonicalSegmentKey
+            const canonicalSource =
+              resolved.sourceBySegmentKey.get(canonicalSegmentKey)?.trim() ?? ''
+            const upstreamKey =
+              resolved.upstreamKeyBySegmentKey
+                .get(canonicalSegmentKey)
+                ?.trim() ?? ''
+            const requestedSegmentBelongsToCard =
+              !rawSessionKey ||
+              resolved.card.continuationSegmentKeys.includes(rawSessionKey)
+            const isCompleteParentCard =
+              resolved.collection.completeness === 'complete' &&
+              (resolved.card.relationshipKind === 'root' ||
+                resolved.card.relationshipKind === 'orphan') &&
+              resolved.card.parentCardId === undefined
+            if (
+              resolved.card.cardId !== requestedCardId ||
+              !requestedSegmentBelongsToCard ||
+              !isCompleteParentCard ||
+              !canonicalSource ||
+              !upstreamKey
+            ) {
+              throw new Error('session not found')
+            }
+            activeCardResolution = resolved
+            activeCardId = requestedCardId
+            activeCardCanonicalSegmentKey = canonicalSegmentKey
+            activeCardCanonicalSource = canonicalSource
+            sessionKey = upstreamKey
+            resolvedFriendlyId = requestedCardId
+          } else {
+            const resolved = await waitWithinStreamLifetime(
+              resolveSessionKey({
+                rawSessionKey,
+                friendlyId: requestedFriendlyId,
+                defaultKey: 'main',
+              }),
+            )
+            ensureStreamTransportAvailable()
+            sessionKey = resolved.sessionKey
+            resolvedFriendlyId = resolved.sessionKey
+          }
         } catch (err) {
           if (err === streamTimeoutError) {
             return finishPreStreamResponse(streamTimeoutResponse())
@@ -502,8 +569,14 @@ export const Route = createFileRoute('/api/send-stream')({
           )
         }
 
-        // Check if the selected model is a local provider model — force portable + direct routing
-        let chatMode = getChatMode()
+        // A freshly resolved Card owns its transport: local segments are portable,
+        // while every remote segment stays on the gateway regardless of global mode
+        // or whether the requested model also appears in local discovery.
+        let chatMode = activeCardCanonicalSource
+          ? activeCardCanonicalSource === 'local'
+            ? 'portable'
+            : 'enhanced'
+          : getChatMode()
         let localBaseUrl: string | undefined
         const requestModel = typeof body.model === 'string' ? body.model : ''
         const bareModel = requestModel.includes('/')
@@ -516,16 +589,31 @@ export const Route = createFileRoute('/api/send-stream')({
           )
           if (localMatch) {
             const providerDef = getLocalProviderDef(localMatch.provider)
-            if (providerDef) {
+            if (
+              providerDef &&
+              (!activeCardCanonicalSource ||
+                activeCardCanonicalSource === 'local')
+            ) {
               chatMode = 'portable'
               localBaseUrl = providerDef.baseUrl
             }
           }
         }
-        if (chatMode === 'portable' && sessionKey === 'new') {
+        const portableBootstrapSessionKey =
+          chatMode === 'portable' &&
+          !activeCardId &&
+          SESSION_BOOTSTRAP_KEYS.has(sessionKey)
+            ? sessionKey
+            : null
+        if (portableBootstrapSessionKey === 'new') {
+          // This is an internal local-store/upstream identity only. It must not
+          // escape through routing, SSE, headers, or run persistence until a
+          // fresh complete local Card projection maps it authoritatively.
           sessionKey = crypto.randomUUID()
-          resolvedFriendlyId = sessionKey
         }
+        const publicSessionKey = portableBootstrapSessionKey ?? sessionKey
+        const publicFriendlyId =
+          activeCardId ?? portableBootstrapSessionKey ?? resolvedFriendlyId
 
         let workspaceScope: Awaited<
           ReturnType<typeof loadWorkspaceCatalog>
@@ -590,6 +678,7 @@ export const Route = createFileRoute('/api/send-stream')({
           runId: string | undefined,
           runSessionKey: string,
           friendlyId: string,
+          cardIdentity?: { cardId: string; canonicalSegmentKey: string },
         ) => {
           if (!runId || persistedRunReady) return
           persistedRunId = runId
@@ -598,6 +687,7 @@ export const Route = createFileRoute('/api/send-stream')({
             runId,
             sessionKey: runSessionKey,
             friendlyId,
+            ...cardIdentity,
           }).catch(() => null)
           runTextBuffer = createRunTextPersistenceBuffer(
             async (text, options) => {
@@ -613,6 +703,7 @@ export const Route = createFileRoute('/api/send-stream')({
           fromSessionKey: string,
           toSessionKey: string,
           friendlyId: string,
+          cardIdentity?: { cardId: string; canonicalSegmentKey: string },
         ) => {
           const runId = persistedRunId
           if (
@@ -635,12 +726,20 @@ export const Route = createFileRoute('/api/send-stream')({
               await waitWithinStreamLifetime(priorRunReady)
               if (streamTransportUnavailable()) return
 
-              const migration = migratePersistedRun(
-                fromSessionKey,
-                toSessionKey,
-                runId,
-                friendlyId,
-              )
+              const migration = cardIdentity
+                ? migratePersistedRun(
+                    fromSessionKey,
+                    toSessionKey,
+                    runId,
+                    friendlyId,
+                    cardIdentity,
+                  )
+                : migratePersistedRun(
+                    fromSessionKey,
+                    toSessionKey,
+                    runId,
+                    friendlyId,
+                  )
               // The underlying file operation is not cancellable. Observe a late
               // rejection, while the shared lifetime race prevents it from keeping
               // this route or a successor run alive after transport closure.
@@ -741,7 +840,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 // Use a dedicated hb_signal event (not 'thinking') so it does
                 // not pollute the activity card. The tiny comment is the
                 // actual keepalive byte for Cloudflare Tunnel/Access.
-                sendEvent('hb_signal', { sessionKey })
+                sendEvent('hb_signal', { sessionKey: publicSessionKey })
                 enqueueRaw(': keepalive\n\n')
               },
             })
@@ -788,7 +887,7 @@ export const Route = createFileRoute('/api/send-stream')({
               void terminalPersistence.catch(() => undefined)
               sendEvent('error', {
                 message: streamTimeoutError.message,
-                sessionKey,
+                sessionKey: publicSessionKey,
               })
               settleStreamLifetime(streamTimeoutError)
               closeStream()
@@ -797,23 +896,130 @@ export const Route = createFileRoute('/api/send-stream')({
             try {
               if (chatMode === 'portable') {
                 const runId = crypto.randomUUID()
-                const portableSessionKey = sessionKey
+                let portableSessionKey = sessionKey
 
-                // Ensure session exists (user message appended after building history)
+                // Ensure the internal local/upstream session exists before asking
+                // the fresh Card projection to prove its stable public identity.
                 ensureLocalSession(
                   portableSessionKey,
                   typeof body.model === 'string' ? body.model : undefined,
                 )
-                const portableFriendlyId =
-                  resolvedFriendlyId ||
-                  requestedFriendlyId ||
-                  rawSessionKey ||
-                  portableSessionKey
+
+                if (portableBootstrapSessionKey && !activeCardId) {
+                  try {
+                    const resolvedBootstrapCard =
+                      await waitWithinStreamLifetime(
+                        sessionCardService.resolveLocalCardByUpstreamSession(
+                          portableSessionKey,
+                        ),
+                      )
+                    ensureStreamTransportAvailable()
+                    const canonicalSegmentKey =
+                      resolvedBootstrapCard.card.canonicalSegmentKey
+                    const canonicalSource =
+                      resolvedBootstrapCard.sourceBySegmentKey
+                        .get(canonicalSegmentKey)
+                        ?.trim() ?? ''
+                    const canonicalUpstreamKey =
+                      resolvedBootstrapCard.upstreamKeyBySegmentKey
+                        .get(canonicalSegmentKey)
+                        ?.trim() ?? ''
+                    const mappedBootstrapSegments =
+                      resolvedBootstrapCard.card.continuationSegmentKeys.filter(
+                        (segmentKey) =>
+                          resolvedBootstrapCard.upstreamKeyBySegmentKey.get(
+                            segmentKey,
+                          ) === portableSessionKey,
+                      )
+                    const isCompleteLocalParentCard =
+                      resolvedBootstrapCard.collection.completeness ===
+                        'complete' &&
+                      resolvedBootstrapCard.card.canonicalSource === 'local' &&
+                      (resolvedBootstrapCard.card.relationshipKind === 'root' ||
+                        resolvedBootstrapCard.card.relationshipKind ===
+                          'orphan') &&
+                      resolvedBootstrapCard.card.parentCardId === undefined
+                    if (
+                      !isCompleteLocalParentCard ||
+                      canonicalSource !== 'local' ||
+                      !canonicalUpstreamKey ||
+                      mappedBootstrapSegments.length !== 1
+                    ) {
+                      throw new Error(
+                        'authoritative local bootstrap Card unavailable',
+                      )
+                    }
+
+                    activeCardResolution = resolvedBootstrapCard
+                    activeCardId = resolvedBootstrapCard.card.cardId
+                    activeCardCanonicalSegmentKey = canonicalSegmentKey
+                    activeCardCanonicalSource = canonicalSource
+                    portableSessionKey = canonicalUpstreamKey
+                    resolvedFriendlyId = resolvedBootstrapCard.card.cardId
+                  } catch (error) {
+                    if (
+                      error === streamTimeoutError ||
+                      error === streamAbortError ||
+                      streamTransportUnavailable()
+                    ) {
+                      throw error
+                    }
+                    // Projection may lag the synchronous local-store write. Keep
+                    // every public identity on the bootstrap key and skip durable
+                    // run persistence rather than exposing the internal UUID.
+                  }
+                }
+
+                const portableClientSessionKey =
+                  portableBootstrapSessionKey === 'new'
+                    ? (activeCardCanonicalSegmentKey ??
+                      portableBootstrapSessionKey)
+                    : portableSessionKey
+                const portableClientFriendlyId =
+                  portableBootstrapSessionKey === 'main'
+                    ? portableBootstrapSessionKey
+                    : (activeCardId ??
+                        portableBootstrapSessionKey ??
+                        resolvedFriendlyId) ||
+                      portableClientSessionKey
+                const portableRunSessionKey =
+                  portableBootstrapSessionKey === 'new'
+                    ? (activeCardCanonicalSegmentKey ?? null)
+                    : portableSessionKey
+                const portableRunFriendlyId =
+                  activeCardId ?? portableClientFriendlyId
                 let accumulated = ''
+
+                const bootstrapHandoff =
+                  portableBootstrapSessionKey === 'new' && activeCardId
+                    ? resolveAuthoritativeBootstrapHandoff(
+                        portableBootstrapSessionKey,
+                        portableClientSessionKey,
+                      )
+                    : null
+                if (bootstrapHandoff) {
+                  sendEvent('session_handoff', {
+                    ...bootstrapHandoff,
+                    friendlyId: portableClientFriendlyId,
+                    runId,
+                  })
+                }
 
                 activeRunId = runId
                 registerActiveSendRun(runId)
-                persistRunStarted(runId, portableSessionKey, portableFriendlyId)
+                if (portableRunSessionKey) {
+                  persistRunStarted(
+                    runId,
+                    portableRunSessionKey,
+                    portableRunFriendlyId,
+                    activeCardId && activeCardCanonicalSegmentKey
+                      ? {
+                          cardId: activeCardId,
+                          canonicalSegmentKey: activeCardCanonicalSegmentKey,
+                        }
+                      : undefined,
+                  )
+                }
                 unregisterTimer = setTimeout(() => {
                   if (activeRunId) {
                     unregisterActiveSendRun(activeRunId)
@@ -823,8 +1029,8 @@ export const Route = createFileRoute('/api/send-stream')({
 
                 sendEvent('started', {
                   runId,
-                  sessionKey: portableSessionKey,
-                  friendlyId: portableFriendlyId,
+                  sessionKey: portableClientSessionKey,
+                  friendlyId: portableClientFriendlyId,
                 })
                 lastActivity = 'Processing your message...'
 
@@ -918,7 +1124,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           sendEvent('chunk', {
                             text: accumulated,
                             fullReplace: true,
-                            sessionKey: portableSessionKey,
+                            sessionKey: portableClientSessionKey,
                             runId,
                           })
                           continue
@@ -945,7 +1151,7 @@ export const Route = createFileRoute('/api/send-stream')({
                             name: ev.name,
                             toolCallId: ev.callId,
                             args: argsForCard,
-                            sessionKey: portableSessionKey,
+                            sessionKey: portableClientSessionKey,
                             runId,
                           })
                           lastActivity = `Running: ${ev.name.replace(/_/g, ' ')}`
@@ -983,7 +1189,7 @@ export const Route = createFileRoute('/api/send-stream')({
                             toolCallId: ev.callId,
                             args: argsForCard,
                             result: ev.output,
-                            sessionKey: portableSessionKey,
+                            sessionKey: portableClientSessionKey,
                             runId,
                           })
                           lastActivity = `Completed: ${name.replace(/_/g, ' ')}`
@@ -1008,7 +1214,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         () => {
                           sendEvent('done', {
                             state: 'complete',
-                            sessionKey: portableSessionKey,
+                            sessionKey: portableClientSessionKey,
                             runId,
                             message: {
                               role: 'assistant',
@@ -1057,7 +1263,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       )
                       sendEvent('thinking', {
                         text: thinking,
-                        sessionKey: portableSessionKey,
+                        sessionKey: portableClientSessionKey,
                         runId,
                       })
                     } else if (chunk.type === 'tool') {
@@ -1092,7 +1298,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         name: chunk.name,
                         toolCallId,
                         preview: chunk.label,
-                        sessionKey: portableSessionKey,
+                        sessionKey: portableClientSessionKey,
                         runId,
                       })
                     } else {
@@ -1101,7 +1307,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       sendEvent('chunk', {
                         text: accumulated,
                         fullReplace: true,
-                        sessionKey: portableSessionKey,
+                        sessionKey: portableClientSessionKey,
                         runId,
                       })
                     }
@@ -1121,7 +1327,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     () => {
                       sendEvent('done', {
                         state: 'complete',
-                        sessionKey: portableSessionKey,
+                        sessionKey: portableClientSessionKey,
                         runId,
                         message: {
                           role: 'assistant',
@@ -1143,7 +1349,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       () => {
                         sendEvent('error', {
                           message: errorMessage,
-                          sessionKey: portableSessionKey,
+                          sessionKey: portableClientSessionKey,
                           runId,
                         })
                       },
@@ -1219,14 +1425,92 @@ export const Route = createFileRoute('/api/send-stream')({
 
               ensureStreamTransportAvailable()
 
-              const bootstrapHandoff = resolveAuthoritativeBootstrapHandoff(
-                requestedPreStreamSessionKey,
-                sessionKey,
-              )
+              const enhancedBootstrapSessionKey =
+                SESSION_BOOTSTRAP_KEYS.has(requestedPreStreamSessionKey) &&
+                requestedPreStreamSessionKey &&
+                sessionKey !== requestedPreStreamSessionKey
+                  ? requestedPreStreamSessionKey
+                  : null
+              let bootstrapHandoff: ReturnType<
+                typeof resolveAuthoritativeBootstrapHandoff
+              > = null
+              if (enhancedBootstrapSessionKey) {
+                try {
+                  const resolvedBootstrapCard = await waitWithinStreamLifetime(
+                    sessionCardService.resolveRemoteCardByUpstreamSession(
+                      sessionKey,
+                    ),
+                  )
+                  ensureStreamTransportAvailable()
+                  const canonicalSegmentKey =
+                    resolvedBootstrapCard.card.canonicalSegmentKey
+                  const canonicalSource =
+                    resolvedBootstrapCard.sourceBySegmentKey
+                      .get(canonicalSegmentKey)
+                      ?.trim() ?? ''
+                  const canonicalUpstreamKey =
+                    resolvedBootstrapCard.upstreamKeyBySegmentKey
+                      .get(canonicalSegmentKey)
+                      ?.trim() ?? ''
+                  const isCompleteParentCard =
+                    resolvedBootstrapCard.collection.completeness ===
+                      'complete' &&
+                    (resolvedBootstrapCard.card.relationshipKind === 'root' ||
+                      resolvedBootstrapCard.card.relationshipKind ===
+                        'orphan') &&
+                    resolvedBootstrapCard.card.parentCardId === undefined
+                  if (
+                    !isCompleteParentCard ||
+                    !canonicalSource ||
+                    canonicalSource === 'local' ||
+                    !canonicalUpstreamKey ||
+                    !resolvedBootstrapCard.card.continuationSegmentKeys.some(
+                      (segmentKey) =>
+                        resolvedBootstrapCard.upstreamKeyBySegmentKey.get(
+                          segmentKey,
+                        ) === sessionKey,
+                    )
+                  ) {
+                    throw new Error('authoritative bootstrap Card unavailable')
+                  }
+
+                  activeCardResolution = resolvedBootstrapCard
+                  activeCardId = resolvedBootstrapCard.card.cardId
+                  activeCardCanonicalSegmentKey = canonicalSegmentKey
+                  activeCardCanonicalSource = canonicalSource
+                  resolvedFriendlyId = resolvedBootstrapCard.card.cardId
+                  bootstrapHandoff = resolveAuthoritativeBootstrapHandoff(
+                    requestedPreStreamSessionKey,
+                    canonicalSegmentKey,
+                  )
+                } catch (error) {
+                  if (
+                    error === streamTimeoutError ||
+                    error === streamAbortError ||
+                    streamTransportUnavailable()
+                  ) {
+                    throw error
+                  }
+                  // Card projection can lag creation. Stay on the accepted
+                  // bootstrap route rather than exposing the raw backend key.
+                }
+              }
+              const getEnhancedClientSessionKey = () =>
+                activeCardCanonicalSegmentKey ??
+                enhancedBootstrapSessionKey ??
+                sessionKey
+              const getEnhancedClientFriendlyId = () =>
+                activeCardId ??
+                enhancedBootstrapSessionKey ??
+                resolvedFriendlyId
+              const getEnhancedRunSessionKey = () =>
+                enhancedBootstrapSessionKey
+                  ? activeCardCanonicalSegmentKey
+                  : getEnhancedClientSessionKey()
               if (bootstrapHandoff) {
                 sendEvent('session_handoff', {
                   ...bootstrapHandoff,
-                  friendlyId: bootstrapHandoff.sessionKey,
+                  friendlyId: getEnhancedClientFriendlyId(),
                   runId: activeRunId,
                 })
               }
@@ -1340,7 +1624,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     const syntheticEvents = collectSyntheticLiveToolEvents({
                       messages: msgs,
                       tracker: syntheticLiveToolTracker,
-                      sessionKey: polledSessionKey,
+                      sessionKey: getEnhancedClientSessionKey(),
                       runId: activeRunId ?? undefined,
                     })
                     if (syntheticEvents.length === 0) {
@@ -1409,21 +1693,25 @@ export const Route = createFileRoute('/api/send-stream')({
                         ] = mayVerifyContinuation
                           ? await waitWithinStreamLifetime(
                               Promise.all([
-                                getLatestDescendant(sessionKey),
-                                getSession(upstreamSessionKey)
-                                  .then((targetSession) =>
-                                    resolveAuthoritativeSessionSource(
-                                      upstreamSessionKey,
-                                      targetSession,
-                                    ),
-                                  )
-                                  .catch(() => null),
-                                sessionCardService
-                                  .resolveCard(sessionKey)
-                                  .catch(() => null),
-                                sessionCardService
-                                  .resolveCard(upstreamSessionKey)
-                                  .catch(() => null),
+                                activeCardId
+                                  ? Promise.resolve(null)
+                                  : getLatestDescendant(sessionKey),
+                                activeCardId
+                                  ? Promise.resolve(null)
+                                  : getSession(upstreamSessionKey)
+                                      .then((targetSession) =>
+                                        resolveAuthoritativeSessionSource(
+                                          upstreamSessionKey,
+                                          targetSession,
+                                        ),
+                                      )
+                                      .catch(() => null),
+                                Promise.resolve(activeCardResolution),
+                                activeCardId
+                                  ? sessionCardService
+                                      .resolveCard(activeCardId)
+                                      .catch(() => null)
+                                  : Promise.resolve(null),
                               ]),
                             )
                           : [null, null, null, null]
@@ -1440,6 +1728,8 @@ export const Route = createFileRoute('/api/send-stream')({
                                   resolved.card.canonicalSegmentKey,
                                 continuationSegmentKeys:
                                   resolved.card.continuationSegmentKeys,
+                                upstreamKeyBySegmentKey:
+                                  resolved.upstreamKeyBySegmentKey,
                                 relationshipKind:
                                   resolved.card.relationshipKind,
                                 ...(resolved.card.parentCardId
@@ -1458,7 +1748,7 @@ export const Route = createFileRoute('/api/send-stream')({
                             toVerifiedCard(currentCardResolution),
                             toVerifiedCard(successorCardResolution),
                           )
-                        const sessionHandoff = cardHandoff
+                        const sessionHandoff = activeCardId
                           ? null
                           : resolveAuthoritativeStreamHandoff(
                               sessionKey,
@@ -1467,26 +1757,54 @@ export const Route = createFileRoute('/api/send-stream')({
                               activeParentSource,
                               targetSessionSource,
                             )
-                        if (cardHandoff || sessionHandoff) {
-                          const fromSessionKey = cardHandoff
+                        if (
+                          enhancedBootstrapSessionKey &&
+                          sessionHandoff &&
+                          !cardHandoff
+                        ) {
+                          // A legacy continuation may still be needed to follow the
+                          // upstream run to completion, but it cannot establish a
+                          // public or durable identity for an unresolved bootstrap.
+                          sessionKey = sessionHandoff.sessionKey
+                          liveBaselineSessionKey = sessionHandoff.sessionKey
+                          liveBaselineCount = 0
+                          parentLifecycleEligible = true
+                        } else if (cardHandoff || sessionHandoff) {
+                          const fromRunSessionKey = cardHandoff
                             ? cardHandoff.fromSegmentKey
                             : sessionHandoff!.fromSessionKey
-                          const successorSessionKey = cardHandoff
+                          const successorRunSessionKey = cardHandoff
                             ? cardHandoff.canonicalSegmentKey
                             : sessionHandoff!.sessionKey
+                          const successorUpstreamSessionKey = cardHandoff
+                            ? upstreamSessionKey
+                            : sessionHandoff!.sessionKey
+                          const successorFriendlyId = cardHandoff
+                            ? cardHandoff.cardId
+                            : sessionHandoff!.sessionKey
                           await migrateActivePersistedRun(
-                            fromSessionKey,
-                            successorSessionKey,
-                            successorSessionKey,
+                            fromRunSessionKey,
+                            successorRunSessionKey,
+                            successorFriendlyId,
+                            cardHandoff
+                              ? {
+                                  cardId: cardHandoff.cardId,
+                                  canonicalSegmentKey:
+                                    cardHandoff.canonicalSegmentKey,
+                                }
+                              : undefined,
                           )
                           if (streamTransportUnavailable()) {
                             return
                           }
-                          sessionKey = successorSessionKey
-                          liveBaselineSessionKey = successorSessionKey
+                          sessionKey = successorUpstreamSessionKey
+                          liveBaselineSessionKey = successorUpstreamSessionKey
                           liveBaselineCount = 0
-                          resolvedFriendlyId = successorSessionKey
+                          resolvedFriendlyId = successorFriendlyId
                           if (cardHandoff) {
+                            activeCardResolution = successorCardResolution
+                            activeCardCanonicalSegmentKey =
+                              cardHandoff.canonicalSegmentKey
                             sendEvent('card_handoff', {
                               ...cardHandoff,
                               runId,
@@ -1494,7 +1812,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           } else {
                             sendEvent('session_handoff', {
                               ...sessionHandoff,
-                              friendlyId: successorSessionKey,
+                              friendlyId: successorFriendlyId,
                               runId,
                             })
                           }
@@ -1525,16 +1843,26 @@ export const Route = createFileRoute('/api/send-stream')({
                       // parent lifecycle/activity/persistence state.
                       if (!parentLifecycleEligible) return
                       streamEventProvenance.recordParentRun(upstreamRunId)
-                      const sessionKeyFromEvent = sessionKey
+                      const sessionKeyFromEvent = getEnhancedClientSessionKey()
 
                       if (runId && !activeRunId) {
                         activeRunId = runId
                         registerActiveSendRun(runId)
-                        persistRunStarted(
-                          runId,
-                          sessionKeyFromEvent,
-                          sessionKeyFromEvent,
-                        )
+                        const runSessionKey = getEnhancedRunSessionKey()
+                        if (runSessionKey) {
+                          persistRunStarted(
+                            runId,
+                            runSessionKey,
+                            getEnhancedClientFriendlyId(),
+                            activeCardId && activeCardCanonicalSegmentKey
+                              ? {
+                                  cardId: activeCardId,
+                                  canonicalSegmentKey:
+                                    activeCardCanonicalSegmentKey,
+                                }
+                              : undefined,
+                          )
+                        }
                         unregisterTimer = setTimeout(() => {
                           if (activeRunId) {
                             unregisterActiveSendRun(activeRunId)
@@ -1548,7 +1876,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         sendEvent('started', {
                           runId,
                           sessionKey: sessionKeyFromEvent,
-                          friendlyId: sessionKeyFromEvent,
+                          friendlyId: getEnhancedClientFriendlyId(),
                         })
                         lastActivity = 'Processing your message...'
                       }
@@ -1995,7 +2323,7 @@ export const Route = createFileRoute('/api/send-stream')({
                   () => {
                     sendEvent('error', {
                       message: errorMsg,
-                      sessionKey,
+                      sessionKey: publicSessionKey,
                     })
                   },
                 )
@@ -2025,8 +2353,8 @@ export const Route = createFileRoute('/api/send-stream')({
             Connection: 'keep-alive',
             'X-Accel-Buffering': 'no',
             ...buildResolvedSessionHeaders({
-              sessionKey,
-              friendlyId: resolvedFriendlyId,
+              sessionKey: publicSessionKey,
+              friendlyId: publicFriendlyId,
             }),
           },
         })

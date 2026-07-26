@@ -6,6 +6,7 @@ import type {
   AgentRegistryCardData,
   AgentRegistryStatus,
 } from '@/components/agent-view/agent-registry-card'
+import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
 import { AgentRegistryCard } from '@/components/agent-view/agent-registry-card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -15,6 +16,14 @@ import { fetchCronJobs } from '@/lib/cron-api'
 import { toggleAgentPause } from '@/lib/gateway-api'
 import { toast } from '@/components/ui/toast'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import {
+  fetchSessionCards,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
+import {
+  buildAgentSessionCardRoute,
+  resolveAgentSessionCardNavigation,
+} from '@/components/agent-view/agent-session-card-navigation'
 
 type AgentGatewayEntry = {
   id?: string
@@ -747,6 +756,13 @@ export function AgentsScreen({
     retry: false,
   })
 
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
+    retry: 1,
+    staleTime: 5_000,
+  })
+
   const cronJobsQuery = useQuery({
     queryKey: ['cron', 'jobs'],
     queryFn: fetchCronJobs,
@@ -757,7 +773,8 @@ export function AgentsScreen({
   const handlePullRefresh = useCallback(() => {
     void agentsQuery.refetch()
     void sessionsQuery.refetch()
-  }, [agentsQuery, sessionsQuery])
+    void sessionCardsQuery.refetch()
+  }, [agentsQuery, sessionCardsQuery, sessionsQuery])
 
   const {
     isPulling: agentHubPulling,
@@ -1084,26 +1101,44 @@ export function AgentsScreen({
     }
   }
 
-  async function handleChat(agent: AgentRegistryCardData) {
-    const existingFriendlyId =
-      readString(agent.friendlyId) ||
-      deriveFriendlyIdFromKey(readString(agent.sessionKey))
+  function openSessionCardChat(target: SessionCardProducerNavigation) {
+    void navigate(buildAgentSessionCardRoute(target))
+  }
 
-    if (existingFriendlyId) {
-      void navigate({
-        to: '/chat/$sessionKey',
-        params: { sessionKey: existingFriendlyId },
-      })
+  async function handleChat(agent: AgentRegistryCardData) {
+    const existingIdentity = {
+      sessionKey: readString(agent.sessionKey),
+      friendlyId: readString(agent.friendlyId),
+    }
+
+    if (existingIdentity.sessionKey || existingIdentity.friendlyId) {
+      const cachedTarget = resolveAgentSessionCardNavigation(
+        sessionCardsQuery.data,
+        existingIdentity,
+      )
+      if (cachedTarget) {
+        openSessionCardChat(cachedTarget)
+        return
+      }
+
+      const refreshedCards = await sessionCardsQuery.refetch()
+      const refreshedTarget = resolveAgentSessionCardNavigation(
+        refreshedCards.data,
+        existingIdentity,
+      )
+      if (refreshedTarget) openSessionCardChat(refreshedTarget)
       return
     }
 
     const spawned = await spawnSessionForAgent(agent)
     if (!spawned) return
 
-    void navigate({
-      to: '/chat/$sessionKey',
-      params: { sessionKey: spawned.friendlyId },
-    })
+    const refreshedCards = await sessionCardsQuery.refetch()
+    const target = resolveAgentSessionCardNavigation(
+      refreshedCards.data,
+      spawned,
+    )
+    if (target) openSessionCardChat(target)
   }
 
   async function handleSpawn(agent: AgentRegistryCardData) {
@@ -1431,8 +1466,14 @@ export function AgentsScreen({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {unmatchedSessions.map((session, index) => {
                       const sessionKey = readString(session.key)
-                      const sessionTarget =
-                        getSessionFriendlyId(session) || sessionKey
+                      const sessionNavigation =
+                        resolveAgentSessionCardNavigation(
+                          sessionCardsQuery.data,
+                          {
+                            key: sessionKey,
+                            friendlyId: readString(session.friendlyId),
+                          },
+                        )
                       const sessionModel = getSessionModelName(session)
 
                       return (
@@ -1471,13 +1512,16 @@ export function AgentsScreen({
                             <span>{formatRelativeTime(session.updatedAt)}</span>
                           </div>
 
-                          {sessionTarget ? (
-                            <a
-                              href={`/chat/${encodeURIComponent(sessionTarget)}`}
+                          {sessionNavigation ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openSessionCardChat(sessionNavigation)
+                              }
                               className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-primary-700 px-3 py-1.5 text-xs font-semibold text-accent-300 transition-colors hover:border-accent-500 hover:text-accent-300 sm:px-4 sm:py-2 sm:text-sm"
                             >
                               Open Chat
-                            </a>
+                            </button>
                           ) : null}
                         </div>
                       )
@@ -1979,7 +2023,13 @@ export function AgentsScreen({
                 {selectedHistoryAgent.matchedSessions
                   .slice(0, 8)
                   .map((session, index) => {
-                    const friendlyId = getSessionFriendlyId(session)
+                    const sessionNavigation = resolveAgentSessionCardNavigation(
+                      sessionCardsQuery.data,
+                      {
+                        key: readString(session.key),
+                        friendlyId: readString(session.friendlyId),
+                      },
+                    )
                     const sessionModel = getSessionModelName(session)
                     return (
                       <div
@@ -2001,15 +2051,12 @@ export function AgentsScreen({
                               ? `${readString(session.status) || 'unknown'} · ${formatModelName(sessionModel)}`
                               : readString(session.status) || 'unknown'}
                           </span>
-                          {friendlyId ? (
+                          {sessionNavigation ? (
                             <button
                               type="button"
                               onClick={() => {
                                 setHistoryAgentId(null)
-                                void navigate({
-                                  to: '/chat/$sessionKey',
-                                  params: { sessionKey: friendlyId },
-                                })
+                                openSessionCardChat(sessionNavigation)
                               }}
                               className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-accent-300 dark:hover:bg-accent-950/30 sm:px-4 sm:py-2 sm:text-sm"
                             >

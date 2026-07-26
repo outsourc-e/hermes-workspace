@@ -30,6 +30,14 @@ const ACTIVE_STATUSES: ReadonlySet<string> = new Set([
 
 const ACTIVE_RUN_CHECK_TIMEOUT_MS = 2000
 
+export function activeRunCheckUrl(sessionKey: string, cardId?: string): string {
+  const path = `/api/sessions/${encodeURIComponent(sessionKey)}/active-run`
+  const normalizedCardId = cardId?.trim()
+  return normalizedCardId
+    ? `${path}?cardId=${encodeURIComponent(normalizedCardId)}`
+    : path
+}
+
 /**
  * On mount, checks whether the server has an active run for this session.
  * If so, marks the session as waiting in the persistent Zustand store.
@@ -45,10 +53,12 @@ const ACTIVE_RUN_CHECK_TIMEOUT_MS = 2000
  */
 export function useActiveRunCheck({
   sessionKey,
+  cardId,
   enabled,
   onCheckComplete,
 }: {
   sessionKey: string
+  cardId?: string
   enabled: boolean
   onCheckComplete?: () => void
 }): void {
@@ -57,6 +67,12 @@ export function useActiveRunCheck({
   sessionKeyRef.current = sessionKey
   const onCompleteRef = useRef(onCheckComplete)
   onCompleteRef.current = onCheckComplete
+
+  // Reset before the check effect runs when a Card advances to a new canonical
+  // segment. The Card identity stays stable, but its recovery target changes.
+  useEffect(() => {
+    hasCheckedRef.current = false
+  }, [sessionKey, cardId])
 
   useEffect(() => {
     if (!enabled || !sessionKey || sessionKey === 'new') return
@@ -76,7 +92,11 @@ export function useActiveRunCheck({
     const timeoutId = window.setTimeout(() => {
       if (settled) return
       settle()
-      try { controller.abort() } catch { /* ignore */ }
+      try {
+        controller.abort()
+      } catch {
+        /* ignore */
+      }
       // Clear stale waiting state — the run is almost certainly dead
       const store = useChatStore.getState()
       if (store.isSessionWaiting(sessionKeyRef.current)) {
@@ -86,10 +106,9 @@ export function useActiveRunCheck({
 
     async function check() {
       try {
-        const response = await fetch(
-          `/api/sessions/${encodeURIComponent(sessionKey)}/active-run`,
-          { signal: controller.signal },
-        )
+        const response = await fetch(activeRunCheckUrl(sessionKey, cardId), {
+          signal: controller.signal,
+        })
         if (!response.ok) return finishCheck()
 
         const data = (await response.json()) as ActiveRunResponse
@@ -120,10 +139,5 @@ export function useActiveRunCheck({
       window.clearTimeout(timeoutId)
       controller.abort()
     }
-  }, [sessionKey, enabled])
-
-  // Reset check flag when session changes
-  useEffect(() => {
-    hasCheckedRef.current = false
-  }, [sessionKey])
+  }, [sessionKey, cardId, enabled])
 }

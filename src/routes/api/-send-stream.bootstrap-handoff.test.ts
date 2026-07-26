@@ -20,6 +20,14 @@ const mocks = vi.hoisted(() => ({
   upsertRunToolCall: vi.fn(),
   loadWorkspaceCatalog: vi.fn(),
   resolveSessionCard: vi.fn(),
+  resolveRemoteCardByUpstreamSession: vi.fn(),
+  resolveLocalCardByUpstreamSession: vi.fn(),
+  ensureLocalSession: vi.fn(),
+  buildResolvedSessionHeaders: vi.fn(() => ({})),
+  openaiChat: vi.fn(),
+  getDiscoveredModels: vi.fn(),
+  getLocalProviderDef: vi.fn(),
+  getChatMode: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -27,7 +35,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 vi.mock('../../lib/send-stream-session-headers', () => ({
-  buildResolvedSessionHeaders: () => ({}),
+  buildResolvedSessionHeaders: mocks.buildResolvedSessionHeaders,
 }))
 
 vi.mock('../../lib/workspace-message-scope', () => ({
@@ -69,27 +77,32 @@ vi.mock('../../server/run-store', async (importOriginal) => {
 })
 
 vi.mock('../../server/gateway-capabilities', () => ({
-  getChatMode: () => 'enhanced',
+  getChatMode: mocks.getChatMode,
 }))
 
 vi.mock('../../server/session-card-service', () => ({
-  sessionCardService: { resolveCard: mocks.resolveSessionCard },
+  sessionCardService: {
+    resolveCard: mocks.resolveSessionCard,
+    resolveRemoteCardByUpstreamSession:
+      mocks.resolveRemoteCardByUpstreamSession,
+    resolveLocalCardByUpstreamSession: mocks.resolveLocalCardByUpstreamSession,
+  },
 }))
 
 vi.mock('../../server/local-session-store', () => ({
   appendLocalMessage: vi.fn(),
-  ensureLocalSession: vi.fn(),
+  ensureLocalSession: mocks.ensureLocalSession,
   getLocalMessages: vi.fn(() => []),
   touchLocalSession: vi.fn(),
 }))
 
 vi.mock('../../server/local-provider-discovery', () => ({
-  getDiscoveredModels: () => [],
-  getLocalProviderDef: () => undefined,
+  getDiscoveredModels: mocks.getDiscoveredModels,
+  getLocalProviderDef: mocks.getLocalProviderDef,
 }))
 
 vi.mock('../../server/openai-compat-api', () => ({
-  openaiChat: vi.fn(),
+  openaiChat: mocks.openaiChat,
 }))
 
 vi.mock('../../server/responses-api', () => ({
@@ -188,7 +201,16 @@ describe('send-stream bootstrap session handoff', () => {
       }),
     )
     mocks.resolveSessionCard.mockRejectedValue(new Error('card unavailable'))
+    mocks.resolveRemoteCardByUpstreamSession.mockRejectedValue(
+      new Error('card unavailable'),
+    )
+    mocks.resolveLocalCardByUpstreamSession.mockRejectedValue(
+      new Error('card unavailable'),
+    )
     mocks.getMessages.mockResolvedValue([])
+    mocks.getChatMode.mockReturnValue('enhanced')
+    mocks.getDiscoveredModels.mockReturnValue([])
+    mocks.getLocalProviderDef.mockReturnValue(undefined)
     mocks.appendRunText.mockResolvedValue(null)
     mocks.createPersistedRun.mockResolvedValue(undefined)
     mocks.migratePersistedRun.mockImplementation(
@@ -226,6 +248,19 @@ describe('send-stream bootstrap session handoff', () => {
   it.each(['new', 'main'])(
     'emits the pre-stream %s-to-concrete handoff before ordinary stream events',
     async (bootstrapSessionKey) => {
+      mocks.resolveRemoteCardByUpstreamSession.mockResolvedValueOnce({
+        card: {
+          cardId: 'remote:created-card',
+          canonicalSegmentKey: 'remote:created-segment',
+          continuationSegmentKeys: ['remote:created-segment'],
+          relationshipKind: 'root',
+        },
+        sourceBySegmentKey: new Map([['remote:created-segment', 'remote']]),
+        upstreamKeyBySegmentKey: new Map([
+          ['remote:created-segment', 'created-session'],
+        ]),
+        collection: { completeness: 'complete' },
+      })
       const response = await handler({
         request: new Request('http://workspace.test/api/send-stream', {
           method: 'POST',
@@ -244,8 +279,8 @@ describe('send-stream bootstrap session handoff', () => {
         event: 'session_handoff',
         data: {
           fromSessionKey: bootstrapSessionKey,
-          sessionKey: 'created-session',
-          friendlyId: 'created-session',
+          sessionKey: 'remote:created-segment',
+          friendlyId: 'remote:created-card',
           runId: null,
         },
       })
@@ -256,7 +291,144 @@ describe('send-stream bootstrap session handoff', () => {
     },
   )
 
+  it.each(['new', 'main'])(
+    'keeps enhanced %s bootstrap identity fail-closed when the authoritative Card is not yet available',
+    async (bootstrapSessionKey) => {
+      const response = await handler({
+        request: new Request('http://workspace.test/api/send-stream', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            sessionKey: bootstrapSessionKey,
+            friendlyId: bootstrapSessionKey,
+            message: 'hello',
+          }),
+        }),
+      })
+
+      expect(response.status).toBe(200)
+      const events = parseEvents(await response.text())
+      expect(
+        events.filter(({ event }) => event === 'session_handoff'),
+      ).toHaveLength(0)
+      expect(events.some(({ event }) => event === 'started')).toBe(true)
+      expect(
+        events
+          .map(({ data }) => data?.sessionKey)
+          .filter((sessionKey) => sessionKey !== undefined),
+      ).toEqual([bootstrapSessionKey, bootstrapSessionKey])
+      expect(JSON.stringify(events)).not.toContain('created-session')
+      expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+      expect(mocks.appendRunText).not.toHaveBeenCalled()
+      expect(mocks.markRunStatus).not.toHaveBeenCalled()
+      expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+        sessionKey: bootstrapSessionKey,
+        friendlyId: bootstrapSessionKey,
+      })
+    },
+  )
+
+  it('keeps an invalid enhanced bootstrap projection out of SSE and run persistence', async () => {
+    mocks.resolveRemoteCardByUpstreamSession.mockResolvedValueOnce({
+      card: {
+        cardId: 'remote:created-card',
+        canonicalSegmentKey: 'remote:created-segment',
+        continuationSegmentKeys: ['remote:created-segment'],
+        relationshipKind: 'root',
+      },
+      sourceBySegmentKey: new Map([['remote:created-segment', 'remote']]),
+      upstreamKeyBySegmentKey: new Map([
+        ['remote:created-segment', 'created-session'],
+      ]),
+      collection: { completeness: 'incomplete' },
+    })
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(events.some(({ event }) => event === 'session_handoff')).toBe(false)
+    expect(
+      events
+        .map(({ data }) => data?.sessionKey)
+        .filter((sessionKey) => sessionKey !== undefined),
+    ).toEqual(['new', 'new'])
+    expect(JSON.stringify(events)).not.toContain('created-session')
+    expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+  })
+
+  it('keeps a verified backend continuation private while bootstrap projection remains unavailable', async () => {
+    confirmContinuation('created-session', 'successor-session')
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'private-run', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'assistant.delta',
+          data: {
+            run_id: 'private-run',
+            session_id: 'successor-session',
+            delta: 'continued privately',
+          },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'private-run', session_id: 'successor-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(events.some(({ event }) => event === 'session_handoff')).toBe(false)
+    expect(
+      events
+        .map(({ data }) => data?.sessionKey)
+        .filter((sessionKey) => sessionKey !== undefined),
+    ).toEqual(['new', 'new', 'new'])
+    expect(JSON.stringify(events)).not.toContain('created-session')
+    expect(JSON.stringify(events)).not.toContain('successor-session')
+    expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+    expect(mocks.migratePersistedRun).not.toHaveBeenCalled()
+    expect(mocks.appendRunText).not.toHaveBeenCalled()
+    expect(mocks.markRunStatus).not.toHaveBeenCalled()
+  })
+
   it('migrates a persisted run when an authoritative successor arrives after run start', async () => {
+    mocks.resolveSessionKey.mockResolvedValueOnce({
+      sessionKey: 'created-session',
+    })
     confirmContinuation('created-session', 'successor-session')
     mocks.streamChat.mockImplementationOnce(
       async (
@@ -1843,6 +2015,9 @@ describe('send-stream bootstrap session handoff', () => {
   })
 
   it('invalidates an origin poll and terminally backfills successor-only tool activity after handoff', async () => {
+    mocks.resolveSessionKey.mockResolvedValueOnce({
+      sessionKey: 'created-session',
+    })
     confirmContinuation('created-session', 'successor-session')
     let resolveOriginPoll:
       | ((messages: Array<Record<string, unknown>>) => void)
@@ -2974,6 +3149,9 @@ describe('send-stream bootstrap session handoff', () => {
   })
 
   it('keeps the handoff stream and persistence chain alive when run migration rejects', async () => {
+    mocks.resolveSessionKey.mockResolvedValueOnce({
+      sessionKey: 'created-session',
+    })
     confirmContinuation('created-session', 'successor-session')
     const durableRuns = new Map<
       string,
@@ -3121,33 +3299,349 @@ describe('send-stream bootstrap session handoff', () => {
     )
   })
 
-  it('emits card_handoff without a legacy navigation handoff for a verified continuation', async () => {
-    const card = (
-      canonicalSegmentKey: string,
-      continuationSegmentKeys: Array<string>,
-    ) => ({
+  it('sends a selected local Card with a bootstrap-shaped upstream key through portable transport', async () => {
+    mocks.resolveSessionCard.mockResolvedValue({
       card: {
-        cardId: 'parent-card',
-        canonicalSegmentKey,
-        continuationSegmentKeys,
+        cardId: 'local:parent-card',
+        canonicalSegmentKey: 'local:main',
+        continuationSegmentKeys: ['local:main'],
         relationshipKind: 'root',
       },
       collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['local:main', 'local']]),
+      upstreamKeyBySegmentKey: new Map([['local:main', 'main']]),
     })
-    mocks.resolveSessionCard.mockImplementation((sessionKey: string) => {
-      if (sessionKey === 'created-session') {
-        return Promise.resolve(card('created-session', ['created-session']))
-      }
-      if (sessionKey === 'successor-session') {
-        return Promise.resolve(
-          card('successor-session', ['created-session', 'successor-session']),
-        )
-      }
-      return Promise.reject(new Error('unknown card session'))
+    mocks.openaiChat.mockResolvedValueOnce([
+      { type: 'text', text: 'local response' },
+    ])
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'local:parent-card',
+          sessionKey: 'local:main',
+          friendlyId: 'local:parent-card',
+          message: 'hello locally',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const events = parseEvents(await response.text())
+    expect(mocks.openaiChat).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: 'hello locally' }),
+      ]),
+      expect.objectContaining({
+        stream: true,
+        sessionId: 'main',
+      }),
+    )
+    expect(events.filter(({ event }) => event === 'chunk')).toEqual([
+      {
+        event: 'chunk',
+        data: {
+          text: 'local response',
+          fullReplace: true,
+          sessionKey: 'main',
+          runId: expect.any(String),
+        },
+      },
+    ])
+    expect(mocks.resolveLocalCardByUpstreamSession).not.toHaveBeenCalled()
+    expect(mocks.streamChat).not.toHaveBeenCalled()
+    expect(mocks.getSession).not.toHaveBeenCalled()
+    expect(mocks.getMessages).not.toHaveBeenCalled()
+    expect(mocks.createPersistedRun).toHaveBeenCalledWith({
+      runId: expect.any(String),
+      sessionKey: 'main',
+      friendlyId: 'local:parent-card',
+      cardId: 'local:parent-card',
+      canonicalSegmentKey: 'local:main',
+    })
+  })
+
+  it('converges a portable new bootstrap through a fresh local parent Card before starting the run', async () => {
+    mocks.getChatMode.mockReturnValue('portable')
+    mocks.resolveLocalCardByUpstreamSession.mockImplementationOnce(
+      (upstreamSessionKey: string) =>
+        Promise.resolve({
+          card: {
+            cardId: 'local:created-card',
+            canonicalSegmentKey: 'local:created-segment',
+            canonicalSource: 'local',
+            continuationSegmentKeys: ['local:created-segment'],
+            relationshipKind: 'root',
+          },
+          collection: { completeness: 'complete' },
+          sourceBySegmentKey: new Map([['local:created-segment', 'local']]),
+          upstreamKeyBySegmentKey: new Map([
+            ['local:created-segment', upstreamSessionKey],
+          ]),
+        }),
+    )
+    mocks.openaiChat.mockResolvedValueOnce([
+      { type: 'text', text: 'portable response' },
+    ])
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'hello portably',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const events = parseEvents(await response.text())
+    const generatedUpstreamKey = mocks.ensureLocalSession.mock.calls[0]?.[0]
+    expect(generatedUpstreamKey).toEqual(expect.any(String))
+    expect(generatedUpstreamKey).not.toBe('new')
+    expect(mocks.resolveLocalCardByUpstreamSession).toHaveBeenCalledWith(
+      generatedUpstreamKey,
+    )
+    expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+      sessionKey: 'new',
+      friendlyId: 'new',
+    })
+    expect(events.slice(0, 2)).toEqual([
+      {
+        event: 'session_handoff',
+        data: {
+          fromSessionKey: 'new',
+          sessionKey: 'local:created-segment',
+          friendlyId: 'local:created-card',
+          runId: expect.any(String),
+        },
+      },
+      {
+        event: 'started',
+        data: {
+          runId: expect.any(String),
+          sessionKey: 'local:created-segment',
+          friendlyId: 'local:created-card',
+        },
+      },
+    ])
+    expect(mocks.createPersistedRun).toHaveBeenCalledWith({
+      runId: expect.any(String),
+      sessionKey: 'local:created-segment',
+      friendlyId: 'local:created-card',
+      cardId: 'local:created-card',
+      canonicalSegmentKey: 'local:created-segment',
+    })
+    expect(mocks.openaiChat).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ sessionId: generatedUpstreamKey }),
+    )
+    expect(JSON.stringify(events)).not.toContain(generatedUpstreamKey)
+  })
+
+  it('keeps portable new on bootstrap identity and skips raw run persistence when no authoritative local Card is available', async () => {
+    mocks.getChatMode.mockReturnValue('portable')
+    mocks.openaiChat.mockResolvedValueOnce([
+      { type: 'text', text: 'portable response' },
+    ])
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'hello portably',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    const generatedUpstreamKey = mocks.ensureLocalSession.mock.calls[0]?.[0]
+    expect(events.some(({ event }) => event === 'session_handoff')).toBe(false)
+    expect(
+      events
+        .map(({ data }) => data?.sessionKey)
+        .filter((sessionKey) => sessionKey !== undefined),
+    ).toEqual(['new', 'new', 'new'])
+    expect(JSON.stringify(events)).not.toContain(generatedUpstreamKey)
+    expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+    expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+      sessionKey: 'new',
+      friendlyId: 'new',
+    })
+  })
+
+  it.each([
+    [
+      'incomplete projection',
+      {
+        card: {
+          cardId: 'local:created-card',
+          canonicalSegmentKey: 'local:created-segment',
+          canonicalSource: 'local',
+          continuationSegmentKeys: ['local:created-segment'],
+          relationshipKind: 'root',
+        },
+        collection: { completeness: 'incomplete' },
+        sourceBySegmentKey: new Map([['local:created-segment', 'local']]),
+        upstreamKeyBySegmentKey: new Map([
+          ['local:created-segment', 'generated-upstream'],
+        ]),
+      },
+    ],
+    [
+      'child Card',
+      {
+        card: {
+          cardId: 'local:created-child',
+          canonicalSegmentKey: 'local:created-segment',
+          canonicalSource: 'local',
+          continuationSegmentKeys: ['local:created-segment'],
+          relationshipKind: 'child',
+          parentCardId: 'local:parent',
+        },
+        collection: { completeness: 'complete' },
+        sourceBySegmentKey: new Map([['local:created-segment', 'local']]),
+        upstreamKeyBySegmentKey: new Map([
+          ['local:created-segment', 'generated-upstream'],
+        ]),
+      },
+    ],
+    [
+      'non-local canonical source',
+      {
+        card: {
+          cardId: 'remote:created-card',
+          canonicalSegmentKey: 'remote:created-segment',
+          canonicalSource: 'remote',
+          continuationSegmentKeys: ['remote:created-segment'],
+          relationshipKind: 'root',
+        },
+        collection: { completeness: 'complete' },
+        sourceBySegmentKey: new Map([['remote:created-segment', 'remote']]),
+        upstreamKeyBySegmentKey: new Map([
+          ['remote:created-segment', 'generated-upstream'],
+        ]),
+      },
+    ],
+  ])('fails closed for a portable bootstrap %s', async (_label, candidate) => {
+    mocks.getChatMode.mockReturnValue('portable')
+    mocks.resolveLocalCardByUpstreamSession.mockImplementationOnce(
+      (upstreamSessionKey: string) =>
+        Promise.resolve({
+          ...candidate,
+          upstreamKeyBySegmentKey: new Map(
+            [...candidate.upstreamKeyBySegmentKey].map(
+              ([segmentKey, mappedUpstreamKey]) => [
+                segmentKey,
+                mappedUpstreamKey === 'generated-upstream'
+                  ? upstreamSessionKey
+                  : mappedUpstreamKey,
+              ],
+            ),
+          ),
+        }),
+    )
+    mocks.openaiChat.mockResolvedValueOnce([
+      { type: 'text', text: 'portable response' },
+    ])
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'hello portably',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    const generatedUpstreamKey = mocks.ensureLocalSession.mock.calls[0]?.[0]
+    expect(events.some(({ event }) => event === 'session_handoff')).toBe(false)
+    expect(JSON.stringify(events)).not.toContain(generatedUpstreamKey)
+    expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+  })
+
+  it('keeps portable main pinned while persisting its run by authoritative local Card identity', async () => {
+    mocks.getChatMode.mockReturnValue('portable')
+    mocks.resolveLocalCardByUpstreamSession.mockResolvedValueOnce({
+      card: {
+        cardId: 'local:main-card',
+        canonicalSegmentKey: 'local:main',
+        canonicalSource: 'local',
+        continuationSegmentKeys: ['local:main'],
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['local:main', 'local']]),
+      upstreamKeyBySegmentKey: new Map([['local:main', 'main']]),
+    })
+    mocks.openaiChat.mockResolvedValueOnce([
+      { type: 'text', text: 'portable response' },
+    ])
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'main',
+          friendlyId: 'main',
+          message: 'hello main',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(events.some(({ event }) => event === 'session_handoff')).toBe(false)
+    expect(events.find(({ event }) => event === 'started')).toEqual({
+      event: 'started',
+      data: {
+        runId: expect.any(String),
+        sessionKey: 'main',
+        friendlyId: 'main',
+      },
+    })
+    expect(mocks.createPersistedRun).toHaveBeenCalledWith({
+      runId: expect.any(String),
+      sessionKey: 'main',
+      friendlyId: 'local:main-card',
+      cardId: 'local:main-card',
+      canonicalSegmentKey: 'local:main',
+    })
+  })
+
+  it('keeps a remote Card on gateway transport when its requested model is locally discovered', async () => {
+    mocks.getChatMode.mockReturnValue('portable')
+    mocks.resolveSessionCard.mockResolvedValue({
+      card: {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey: 'remote:session',
+        continuationSegmentKeys: ['remote:session'],
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['remote:session', 'gateway']]),
+      upstreamKeyBySegmentKey: new Map([['remote:session', 'session']]),
+    })
+    mocks.getDiscoveredModels.mockReturnValue([
+      { id: 'local-model', provider: 'ollama' },
+    ])
+    mocks.getLocalProviderDef.mockReturnValue({
+      baseUrl: 'http://localhost:11434/v1',
     })
     mocks.streamChat.mockImplementationOnce(
       async (
-        _sessionKey: string,
+        sessionKey: string,
         _request: unknown,
         options: {
           onEvent: (payload: {
@@ -3156,6 +3650,86 @@ describe('send-stream bootstrap session handoff', () => {
           }) => Promise<void>
         },
       ) => {
+        expect(sessionKey).toBe('session')
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'remote-run', session_id: 'session' },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'remote-run', session_id: 'session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'remote:parent-card',
+          sessionKey: 'remote:session',
+          friendlyId: 'remote:parent-card',
+          model: 'local-model',
+          message: 'stay remote',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    await response.text()
+    expect(mocks.streamChat).toHaveBeenCalledTimes(1)
+    expect(mocks.openaiChat).not.toHaveBeenCalled()
+  })
+
+  it('translates projected Card keys for upstream send and same-Card handoff', async () => {
+    const card = (
+      canonicalSegmentKey: string,
+      continuationSegmentKeys: Array<string>,
+      upstreamEntries: Array<[string, string]>,
+    ) => ({
+      card: {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey,
+        continuationSegmentKeys,
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map(
+        upstreamEntries.map(([segmentKey]) => [segmentKey, 'gateway']),
+      ),
+      upstreamKeyBySegmentKey: new Map(upstreamEntries),
+    })
+    mocks.resolveSessionCard
+      .mockResolvedValueOnce(
+        card(
+          'remote:created-session',
+          ['remote:created-session'],
+          [['remote:created-session', 'created-session']],
+        ),
+      )
+      .mockResolvedValue(
+        card(
+          'remote:successor-session',
+          ['remote:created-session', 'remote:successor-session'],
+          [
+            ['remote:created-session', 'created-session'],
+            ['remote:successor-session', 'successor-session'],
+          ],
+        ),
+      )
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        expect(sessionKey).toBe('created-session')
         await options.onEvent({
           event: 'run.started',
           data: { run_id: 'card-run', session_id: 'created-session' },
@@ -3180,41 +3754,52 @@ describe('send-stream bootstrap session handoff', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          sessionKey: 'new',
-          friendlyId: 'new',
+          cardId: 'remote:parent-card',
+          sessionKey: 'remote:created-session',
+          friendlyId: 'remote:parent-card',
           message: 'hello',
         }),
       }),
     })
 
     const events = parseEvents(await response.text())
+    expect(mocks.resolveSessionKey).not.toHaveBeenCalled()
+    expect(mocks.resolveSessionCard).toHaveBeenNthCalledWith(
+      1,
+      'remote:parent-card',
+    )
+    expect(mocks.streamChat).toHaveBeenCalledTimes(1)
+    expect(mocks.openaiChat).not.toHaveBeenCalled()
     expect(events.filter(({ event }) => event === 'card_handoff')).toEqual([
       {
         event: 'card_handoff',
         data: {
-          cardId: 'parent-card',
-          fromSegmentKey: 'created-session',
-          canonicalSegmentKey: 'successor-session',
+          cardId: 'remote:parent-card',
+          fromSegmentKey: 'remote:created-session',
+          canonicalSegmentKey: 'remote:successor-session',
           runId: 'card-run',
         },
       },
     ])
-    expect(events.filter(({ event }) => event === 'session_handoff')).toEqual([
-      {
-        event: 'session_handoff',
-        data: {
-          fromSessionKey: 'new',
-          sessionKey: 'created-session',
-          friendlyId: 'created-session',
-          runId: null,
-        },
-      },
-    ])
+    expect(events.filter(({ event }) => event === 'session_handoff')).toEqual(
+      [],
+    )
+    expect(mocks.createPersistedRun).toHaveBeenCalledWith({
+      runId: 'card-run',
+      sessionKey: 'remote:created-session',
+      friendlyId: 'remote:parent-card',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:created-session',
+    })
     expect(mocks.migratePersistedRun).toHaveBeenCalledWith(
-      'created-session',
-      'successor-session',
+      'remote:created-session',
+      'remote:successor-session',
       'card-run',
-      'successor-session',
+      'remote:parent-card',
+      {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey: 'remote:successor-session',
+      },
     )
   })
 })

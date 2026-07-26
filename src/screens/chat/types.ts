@@ -180,6 +180,7 @@ export type SessionCardRelationshipKind = Exclude<
 >
 export type SessionCardTitleSource = 'default' | 'auto' | 'manual'
 export type SessionCardChildStatus = 'idle' | 'running' | 'complete' | 'error'
+export type SessionCardCanonicalSource = 'local' | 'remote'
 
 export type SessionCardChild = {
   cardId: string
@@ -193,6 +194,11 @@ export type SessionCardChild = {
 
 export type SessionCard = {
   cardId: string
+  /**
+   * Authoritative transport class for the canonical segment. The source-aware
+   * Card API always supplies it; pure projections omit it until server lookup.
+   */
+  canonicalSource?: SessionCardCanonicalSource
   title: string
   titleSource: SessionCardTitleSource
   canonicalSegmentKey: string

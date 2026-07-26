@@ -78,6 +78,22 @@ export const sessionCardQueryKeys = {
       cursor ?? '',
     ] as const
   },
+  childHistory: function childHistory(
+    parentCardId: string,
+    childCardId: string,
+    canonicalSegmentKey: string,
+    cursor?: string,
+  ) {
+    return [
+      'chat',
+      'session-cards',
+      'child-history',
+      parentCardId,
+      childCardId,
+      canonicalSegmentKey,
+      cursor ?? '',
+    ] as const
+  },
   metadata: function metadata(cardId: string) {
     return ['chat', 'session-cards', 'metadata', cardId] as const
   },
@@ -199,6 +215,7 @@ function parseSessionCardChild(value: unknown): SessionCardChild {
 function parseSessionCard(value: unknown): SessionCard {
   if (!isWireRecord(value)) return invalidSessionCardResponse()
   const cardId = nonblankWireString(value.cardId)
+  const canonicalSource = wireEnum(value.canonicalSource, ['local', 'remote'])
   const title = nonblankWireString(value.title)
   const canonicalSegmentKey = nonblankWireString(value.canonicalSegmentKey)
   const continuationSegmentKeys = Array.isArray(value.continuationSegmentKeys)
@@ -213,6 +230,7 @@ function parseSessionCard(value: unknown): SessionCard {
   ])
   if (
     !cardId ||
+    !canonicalSource ||
     !title ||
     !canonicalSegmentKey ||
     !titleSource ||
@@ -254,6 +272,7 @@ function parseSessionCard(value: unknown): SessionCard {
   }
   return {
     cardId,
+    canonicalSource,
     title,
     titleSource,
     canonicalSegmentKey,
@@ -505,6 +524,7 @@ function parseSessionCardHistory(value: unknown): SessionCardHistoryWire {
 export async function fetchSessionCardHistory(payload: {
   cardId: string
   canonicalSegmentKey: string
+  parentCardId?: string
   cursor?: string
   limit?: number
   signal?: AbortSignal
@@ -512,6 +532,9 @@ export async function fetchSessionCardHistory(payload: {
   if (
     !nonblankWireString(payload.cardId) ||
     !nonblankWireString(payload.canonicalSegmentKey) ||
+    (payload.parentCardId !== undefined &&
+      (!nonblankWireString(payload.parentCardId) ||
+        payload.parentCardId === payload.cardId)) ||
     (payload.limit !== undefined &&
       (!Number.isSafeInteger(payload.limit) ||
         payload.limit < 1 ||
@@ -522,6 +545,7 @@ export async function fetchSessionCardHistory(payload: {
     throw new RangeError('Invalid Session Card history request')
   }
   const query = new URLSearchParams()
+  if (payload.parentCardId) query.set('parentCardId', payload.parentCardId)
   if (payload.limit !== undefined) query.set('limit', String(payload.limit))
   if (payload.cursor) query.set('cursor', payload.cursor)
   const suffix = query.size ? `?${query.toString()}` : ''
@@ -561,6 +585,7 @@ function sessionCardMessage(
 export async function fetchCompleteSessionCardHistory(payload: {
   cardId: string
   canonicalSegmentKey: string
+  parentCardId?: string
   signal?: AbortSignal
 }): Promise<SessionCardHistoryResponse> {
   const messages: Array<ChatMessage> = []
@@ -572,6 +597,7 @@ export async function fetchCompleteSessionCardHistory(payload: {
     const page = await fetchSessionCardHistory({
       cardId: payload.cardId,
       canonicalSegmentKey: payload.canonicalSegmentKey,
+      parentCardId: payload.parentCardId,
       cursor,
       limit: 500,
       signal: payload.signal,

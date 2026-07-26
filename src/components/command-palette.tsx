@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowDown01Icon,
@@ -16,6 +17,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type React from 'react'
 import type { SessionMeta } from '@/screens/chat/types'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import {
   Command,
   CommandDialog,
@@ -35,6 +37,10 @@ import {
   CHAT_RUN_COMMAND_EVENT,
 } from '@/screens/chat/chat-events'
 import { cn } from '@/lib/utils'
+import {
+  fetchSessionCards,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
 
 type CommandPaletteProps = {
   pathname: string
@@ -61,14 +67,11 @@ const SCREEN_GROUP_ORDER = [
   'Slash Commands',
 ] as const
 
-function getSessionLabel(session: SessionMeta) {
-  return (
-    session.label ||
-    session.title ||
-    session.derivedTitle ||
-    session.friendlyId ||
-    session.key
-  )
+export function recentSessionCards(response: SessionCardListWire | undefined) {
+  if (!response || response.completeness !== 'complete') return []
+  return [...response.cards]
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .slice(0, 5)
 }
 
 function scoreCommandAction(action: CommandAction, query: string) {
@@ -102,8 +105,14 @@ function scoreCommandAction(action: CommandAction, query: string) {
   return 180 - gaps - Math.max(0, haystack.length - normalizedQuery.length)
 }
 
-export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
+export function CommandPalette({ pathname }: CommandPaletteProps) {
   const navigate = useNavigate()
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
+    retry: 1,
+    staleTime: 5_000,
+  })
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -234,23 +243,20 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
 
   const recentSessionActions = useMemo<Array<CommandAction>>(
     () =>
-      [...sessions]
-        .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
-        .slice(0, 5)
-        .map((session) => ({
-          id: `session-${session.key}`,
-          group: 'Recent Sessions',
-          label: getSessionLabel(session),
-          keywords: `${session.key} ${session.friendlyId} ${session.title ?? ''} ${session.derivedTitle ?? ''}`,
-          shortcut: 'Open',
-          icon: Chat01Icon,
-          onSelect: () =>
-            void navigate({
-              to: '/chat/$sessionKey',
-              params: { sessionKey: session.key },
-            }),
-        })),
-    [navigate, sessions],
+      recentSessionCards(sessionCardsQuery.data).map((card) => ({
+        id: `session-${card.cardId}`,
+        group: 'Recent Sessions',
+        label: card.title,
+        keywords: `${card.cardId} ${card.canonicalSegmentKey} ${card.continuationSegmentKeys.join(' ')}`,
+        shortcut: 'Open',
+        icon: Chat01Icon,
+        onSelect: () =>
+          void navigate({
+            to: '/chat/$sessionKey',
+            params: { sessionKey: card.cardId },
+          }),
+      })),
+    [navigate, sessionCardsQuery.data],
   )
 
   const slashCommandActions = useMemo<Array<CommandAction>>(

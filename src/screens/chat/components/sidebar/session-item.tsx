@@ -23,18 +23,19 @@ import {
 type SessionItemProps = {
   session: SessionMeta
   routeKey?: string
+  inspectChildCardId?: string
   active: boolean
   isPinned: boolean
   contextLabel?: string
   showActions?: boolean
   inspected?: boolean
   onSelect?: () => void
-  onTogglePin: (session: SessionMeta) => void
-  canFork: boolean
-  isForking: boolean
-  onFork: (session: SessionMeta) => void
-  onRename: (session: SessionMeta) => void
-  onDelete: (session: SessionMeta) => void
+  onTogglePin?: () => void
+  canBranch: boolean
+  pending: boolean
+  onBranch?: () => void
+  onRename?: () => void
+  onArchive?: () => void
 }
 
 const dayFormatter = new Intl.DateTimeFormat(undefined, {
@@ -107,6 +108,7 @@ function getFriendlyIdLabel(friendlyId: string): string {
 function SessionItemComponent({
   session,
   routeKey = session.friendlyId,
+  inspectChildCardId,
   active,
   isPinned,
   contextLabel,
@@ -114,11 +116,11 @@ function SessionItemComponent({
   inspected = false,
   onSelect,
   onTogglePin,
-  canFork,
-  isForking,
-  onFork,
+  canBranch,
+  pending,
+  onBranch,
   onRename,
-  onDelete,
+  onArchive,
 }: SessionItemProps) {
   const isGenerating = session.titleStatus === 'generating'
   const isError = session.titleStatus === 'error'
@@ -145,6 +147,7 @@ function SessionItemComponent({
     <Link
       to="/chat/$sessionKey"
       params={{ sessionKey: routeKey }}
+      search={inspectChildCardId ? { inspect: inspectChildCardId } : {}}
       aria-current={active ? 'page' : undefined}
       data-inspected={inspected ? 'true' : undefined}
       onClick={() => {
@@ -212,21 +215,21 @@ function SessionItemComponent({
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
-                onTogglePin(session)
+                onTogglePin?.()
               }}
               className="gap-2"
             >
               <HugeiconsIcon icon={PinIcon} size={20} strokeWidth={1.5} />{' '}
-              {isPinned ? 'Unpin session' : 'Pin session'}
+              {isPinned ? 'Unpin card' : 'Pin card'}
             </MenuItem>
-            {canFork ? (
+            {canBranch ? (
               <MenuItem
-                disabled={isForking}
-                aria-busy={isForking ? true : undefined}
+                disabled={pending}
+                aria-busy={pending ? true : undefined}
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
-                  if (!isForking) onFork(session)
+                  if (!pending) onBranch?.()
                 }}
                 className="gap-2"
               >
@@ -235,10 +238,11 @@ function SessionItemComponent({
               </MenuItem>
             ) : null}
             <MenuItem
+              disabled={pending}
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
-                onRename(session)
+                onRename?.()
               }}
               className="gap-2"
             >
@@ -246,15 +250,16 @@ function SessionItemComponent({
               Rename
             </MenuItem>
             <MenuItem
+              disabled={pending}
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
-                onDelete(session)
+                onArchive?.()
               }}
               className="text-red-700 gap-2 hover:bg-red-50 dark:hover:bg-red-900/30/80 data-highlighted:bg-red-50/80"
             >
               <HugeiconsIcon icon={Delete01Icon} size={20} strokeWidth={1.5} />{' '}
-              Delete
+              Archive
             </MenuItem>
           </MenuContent>
         </MenuRoot>
@@ -265,6 +270,7 @@ function SessionItemComponent({
 
 function areSessionItemsEqual(prev: SessionItemProps, next: SessionItemProps) {
   if (prev.routeKey !== next.routeKey) return false
+  if (prev.inspectChildCardId !== next.inspectChildCardId) return false
   if (prev.active !== next.active) return false
   if (prev.isPinned !== next.isPinned) return false
   if (prev.contextLabel !== next.contextLabel) return false
@@ -272,11 +278,11 @@ function areSessionItemsEqual(prev: SessionItemProps, next: SessionItemProps) {
   if (prev.inspected !== next.inspected) return false
   if (prev.onSelect !== next.onSelect) return false
   if (prev.onTogglePin !== next.onTogglePin) return false
-  if (prev.canFork !== next.canFork) return false
-  if (prev.isForking !== next.isForking) return false
-  if (prev.onFork !== next.onFork) return false
+  if (prev.canBranch !== next.canBranch) return false
+  if (prev.pending !== next.pending) return false
+  if (prev.onBranch !== next.onBranch) return false
   if (prev.onRename !== next.onRename) return false
-  if (prev.onDelete !== next.onDelete) return false
+  if (prev.onArchive !== next.onArchive) return false
   if (prev.session === next.session) return true
   return (
     prev.session.key === next.session.key &&

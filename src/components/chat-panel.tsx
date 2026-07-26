@@ -1,9 +1,11 @@
 /**
- * ChatPanel — collapsible right-panel chat overlay for non-chat routes.
- * Renders a full ChatScreen in a side panel so users can chat while
- * viewing dashboard, skills, other pages, etc.
+ * ChatPanel — collapsible Card-native chat overlay for non-chat routes.
+ *
+ * Stable parent Card IDs own selection and full-chat routing. `new` and `main`
+ * are the only bootstrap exceptions; every other selection must resolve through
+ * the complete, validated Session Card projection.
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -13,9 +15,17 @@ import {
   PencilEdit02Icon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import type { SessionMeta } from '@/screens/chat/types'
+import type { SessionRouteResolutionPayload } from '@/routes/chat/-session-route-state'
 import { ChatScreen } from '@/screens/chat/chat-screen'
-import { chatQueryKeys, moveHistoryMessages } from '@/screens/chat/chat-queries'
+import {
+  fetchSessionCards,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
+import {
+  applySessionRouteResolution,
+  resolveSessionCardProducerNavigation,
+  resolveSessionCardRouteState,
+} from '@/routes/chat/-session-route-state'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,109 +35,162 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 
+type BootstrapRecovery = {
+  friendlyId: string
+  sessionKey: string
+}
+
+function unavailableMessage(
+  resolution: ReturnType<typeof resolveSessionCardRouteState>,
+): string {
+  if (!resolution || resolution.status === 'selected') return ''
+  if (resolution.status === 'bootstrap') return ''
+  if (resolution.status === 'unavailable') {
+    return resolution.reason === 'query'
+      ? 'The validated Session Card list could not be loaded.'
+      : 'The validated Session Card projection is incomplete.'
+  }
+  if (resolution.reason === 'child') {
+    return 'Child and branch activity can only be inspected under its parent Card.'
+  }
+  if (resolution.reason === 'continuation') {
+    return 'Continuation segments cannot be opened directly. Select the parent Card.'
+  }
+  return 'This conversation is not present in the validated Session Card list.'
+}
+
 export function ChatPanel() {
-  const isOpen = useWorkspaceStore((s) => s.chatPanelOpen)
-  const sessionKey = useWorkspaceStore((s) => s.chatPanelSessionKey)
-  const setChatPanelOpen = useWorkspaceStore((s) => s.setChatPanelOpen)
-  const setChatPanelSessionKey = useWorkspaceStore(
-    (s) => s.setChatPanelSessionKey,
+  const isOpen = useWorkspaceStore((state) => state.chatPanelOpen)
+  const selectedCardId = useWorkspaceStore((state) => state.chatPanelCardId)
+  const setChatPanelOpen = useWorkspaceStore((state) => state.setChatPanelOpen)
+  const setChatPanelCardId = useWorkspaceStore(
+    (state) => state.setChatPanelCardId,
   )
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [bootstrapRecovery, setBootstrapRecovery] =
+    useState<BootstrapRecovery | null>(null)
+  const [showCardList, setShowCardList] = useState(false)
 
-  const [forcedSession, setForcedSession] = useState<{
-    friendlyId: string
-    sessionKey: string
-  } | null>(null)
-
-  const isNewChat = sessionKey === 'new'
-  const activeFriendlyId = sessionKey || 'main'
-  const forcedSessionKey =
-    forcedSession?.friendlyId === activeFriendlyId
-      ? forcedSession.sessionKey
-      : undefined
-
-  // Session list for the dropdown
-  const sessionsQuery = useQuery({
-    queryKey: chatQueryKeys.sessions,
-    queryFn: async () => {
-      const res = await fetch('/api/sessions')
-      if (!res.ok) return []
-      const data = await res.json()
-      return Array.isArray(data?.sessions)
-        ? data.sessions
-        : Array.isArray(data)
-          ? data
-          : []
-    },
-    staleTime: 10_000,
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
+    retry: 1,
+    staleTime: 5_000,
+    refetchInterval: 5_000,
   })
-  const sessions: Array<SessionMeta> = sessionsQuery.data ?? []
+  const cardRouteResolution = resolveSessionCardRouteState({
+    routeKey: selectedCardId,
+    queryStatus: sessionCardsQuery.status,
+    response: sessionCardsQuery.data,
+  })
+  const activeCard =
+    cardRouteResolution?.status === 'selected'
+      ? cardRouteResolution.card
+      : undefined
+  const authoritativeCards =
+    sessionCardsQuery.status === 'success' &&
+    sessionCardsQuery.data.completeness === 'complete'
+      ? sessionCardsQuery.data.cards
+      : undefined
+  const isExplicitBootstrap =
+    selectedCardId === 'new' || selectedCardId === 'main'
+  const isNewChat = selectedCardId === 'new' && !bootstrapRecovery
+  const activeFriendlyId =
+    activeCard?.cardId ?? bootstrapRecovery?.friendlyId ?? selectedCardId
+  const panelTitle =
+    activeCard?.title ??
+    (selectedCardId === 'new'
+      ? 'New Chat'
+      : selectedCardId === 'main'
+        ? 'Main Chat'
+        : 'Conversation unavailable')
+  const expandCardId =
+    activeCard?.cardId ??
+    (isExplicitBootstrap && !bootstrapRecovery ? selectedCardId : undefined)
 
-  // Current session title
-  const activeSession = sessions.find((s) => s.friendlyId === activeFriendlyId)
-  const panelTitle = activeSession
-    ? activeSession.label ||
-      activeSession.title ||
-      activeSession.derivedTitle ||
-      'Chat'
-    : activeFriendlyId === 'main'
-      ? 'Main Session'
-      : isNewChat
-        ? 'New Chat'
-        : 'Chat'
+  useEffect(() => {
+    if (!bootstrapRecovery || sessionCardsQuery.status !== 'success') {
+      return
+    }
+    const target = resolveSessionCardProducerNavigation(
+      sessionCardsQuery.data,
+      [bootstrapRecovery.sessionKey, bootstrapRecovery.friendlyId],
+    )
+    if (!target) return
+    setBootstrapRecovery(null)
+    setChatPanelCardId(target.cardId)
+  }, [
+    bootstrapRecovery,
+    sessionCardsQuery.data,
+    sessionCardsQuery.status,
+    setChatPanelCardId,
+  ])
 
   const handleSessionResolved = useCallback(
-    (payload: { friendlyId: string; sessionKey: string }) => {
-      moveHistoryMessages(
+    (payload: SessionRouteResolutionPayload) => {
+      const transition = applySessionRouteResolution({
         queryClient,
-        'new',
-        'new',
-        payload.friendlyId,
-        payload.sessionKey,
-      )
-      setForcedSession({
-        friendlyId: payload.friendlyId,
-        sessionKey: payload.sessionKey,
+        activeFriendlyId,
+        fallbackSessionKey: bootstrapRecovery?.sessionKey ?? activeFriendlyId,
+        payload,
       })
-      setChatPanelSessionKey(payload.friendlyId)
+      setBootstrapRecovery(transition.resolvedRoute)
+      void queryClient.invalidateQueries({
+        queryKey: sessionCardQueryKeys.list(false),
+      })
     },
-    [queryClient, setChatPanelSessionKey],
+    [activeFriendlyId, bootstrapRecovery?.sessionKey, queryClient],
   )
 
   const handleExpand = useCallback(() => {
+    if (!expandCardId) return
     setChatPanelOpen(false)
     navigate({
       to: '/chat/$sessionKey',
-      params: { sessionKey: activeFriendlyId },
+      params: { sessionKey: expandCardId },
     })
-  }, [activeFriendlyId, navigate, setChatPanelOpen])
+  }, [expandCardId, navigate, setChatPanelOpen])
 
   const handleClose = useCallback(() => {
+    setShowCardList(false)
     setChatPanelOpen(false)
   }, [setChatPanelOpen])
 
   const handleNewChat = useCallback(() => {
-    setForcedSession(null)
-    setChatPanelSessionKey('new')
-  }, [setChatPanelSessionKey])
+    setBootstrapRecovery(null)
+    setShowCardList(false)
+    setChatPanelCardId('new')
+  }, [setChatPanelCardId])
 
-  const handleSelectSession = useCallback(
-    (friendlyId: string) => {
-      setForcedSession(null)
-      setChatPanelSessionKey(friendlyId)
+  const handleSelectCard = useCallback(
+    (cardId: string) => {
+      setBootstrapRecovery(null)
+      setShowCardList(false)
+      setChatPanelCardId(cardId)
     },
-    [setChatPanelSessionKey],
+    [setChatPanelCardId],
   )
 
-  // Simple dropdown state
-  const [showSessionList, setShowSessionList] = useState(false)
+  const isPostBootstrapRecovery = bootstrapRecovery !== null
+  const isBootstrapRecoveryUnavailable =
+    isPostBootstrapRecovery &&
+    (sessionCardsQuery.status === 'error' ||
+      (sessionCardsQuery.status === 'success' &&
+        sessionCardsQuery.data.completeness !== 'complete'))
+  const bootstrapRecoveryMessage =
+    sessionCardsQuery.status === 'error'
+      ? 'The validated Session Card list could not be loaded.'
+      : 'The validated Session Card projection is incomplete.'
+  const canRenderChat =
+    cardRouteResolution?.status === 'selected' ||
+    (cardRouteResolution?.status === 'bootstrap' && !isPostBootstrapRecovery)
+  const resolutionMessage = unavailableMessage(cardRouteResolution)
 
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop for narrow screens */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -148,14 +211,15 @@ export function ChatPanel() {
               borderColor: 'var(--theme-border)',
             }}
           >
-            {/* Panel header */}
             <div className="flex items-center justify-between h-10 px-3 border-b border-primary-200 shrink-0">
               <div className="flex items-center gap-1.5 min-w-0">
                 <button
                   type="button"
-                  onClick={() => setShowSessionList((v) => !v)}
+                  onClick={() => setShowCardList((visible) => !visible)}
                   className="text-xs font-medium text-primary-700 hover:text-primary-900 truncate max-w-[200px] transition-colors"
                   title={panelTitle}
+                  aria-expanded={showCardList}
+                  aria-controls="chat-panel-card-list"
                 >
                   {panelTitle}
                 </button>
@@ -191,6 +255,7 @@ export function ChatPanel() {
                           variant="ghost"
                           className="text-primary-600 hover:text-primary-900"
                           aria-label="Expand to full chat"
+                          disabled={!expandCardId}
                         >
                           <HugeiconsIcon
                             icon={ArrowExpand01Icon}
@@ -219,10 +284,10 @@ export function ChatPanel() {
               </div>
             </div>
 
-            {/* Session switcher dropdown */}
             <AnimatePresence>
-              {showSessionList && (
+              {showCardList && (
                 <motion.div
+                  id="chat-panel-card-list"
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
@@ -230,40 +295,124 @@ export function ChatPanel() {
                   className="border-b border-primary-200 overflow-hidden"
                 >
                   <div className="max-h-48 overflow-y-auto py-1">
-                    {sessions.map((s) => (
-                      <button
-                        key={s.key}
-                        type="button"
-                        onClick={() => {
-                          handleSelectSession(s.friendlyId)
-                          setShowSessionList(false)
-                        }}
-                        className={`w-full text-left px-3 py-1.5 text-xs truncate transition-colors ${
-                          s.friendlyId === activeFriendlyId
-                            ? 'bg-accent-500/10 text-accent-600'
-                            : 'text-primary-700 hover:bg-primary-100'
-                        }`}
-                      >
-                        {s.label || s.title || s.derivedTitle || s.friendlyId}
-                      </button>
-                    ))}
+                    {sessionCardsQuery.isPending ? (
+                      <p className="px-3 py-2 text-xs text-primary-500">
+                        Loading conversations…
+                      </p>
+                    ) : !authoritativeCards ? (
+                      <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <p className="text-xs text-primary-500">
+                          Conversations unavailable.
+                        </p>
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-accent-600 hover:text-accent-700"
+                          onClick={() => void sessionCardsQuery.refetch()}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : authoritativeCards.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-primary-500">
+                        No conversations yet.
+                      </p>
+                    ) : (
+                      authoritativeCards.map((card) => (
+                        <button
+                          key={card.cardId}
+                          type="button"
+                          aria-label={`Open ${card.title}`}
+                          aria-current={
+                            card.cardId === activeCard?.cardId
+                              ? 'page'
+                              : undefined
+                          }
+                          onClick={() => handleSelectCard(card.cardId)}
+                          className={`w-full text-left px-3 py-1.5 text-xs truncate transition-colors ${
+                            card.cardId === activeCard?.cardId
+                              ? 'bg-accent-500/10 text-accent-600'
+                              : 'text-primary-700 hover:bg-primary-100'
+                          }`}
+                        >
+                          {card.title}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Chat content */}
             <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
-              <ChatScreen
-                key={activeFriendlyId}
-                activeFriendlyId={activeFriendlyId}
-                isNewChat={isNewChat}
-                forcedSessionKey={forcedSessionKey}
-                onSessionResolved={
-                  isNewChat ? handleSessionResolved : undefined
-                }
-                compact
-              />
+              {canRenderChat ? (
+                <ChatScreen
+                  activeFriendlyId={activeFriendlyId}
+                  activeCard={activeCard}
+                  sessionCards={authoritativeCards}
+                  isNewChat={isNewChat}
+                  forcedSessionKey={bootstrapRecovery?.sessionKey}
+                  onSessionResolved={
+                    isExplicitBootstrap || bootstrapRecovery
+                      ? handleSessionResolved
+                      : undefined
+                  }
+                  compact
+                  embedded
+                />
+              ) : isPostBootstrapRecovery && !isBootstrapRecoveryUnavailable ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-primary-700">
+                  <h2 className="text-base font-semibold">
+                    Resolving conversation
+                  </h2>
+                  <p className="text-sm text-primary-500">
+                    Waiting for the authoritative parent Card before enabling
+                    chat.
+                  </p>
+                  <button
+                    type="button"
+                    className="rounded-lg bg-accent-500 px-3 py-1.5 text-xs text-white"
+                    onClick={() => void sessionCardsQuery.refetch()}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : isPostBootstrapRecovery ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-primary-700">
+                  <h2 className="text-base font-semibold">
+                    Conversation unavailable
+                  </h2>
+                  <p className="text-sm text-primary-500">
+                    {bootstrapRecoveryMessage}
+                  </p>
+                  <button
+                    type="button"
+                    className="rounded-lg bg-accent-500 px-3 py-1.5 text-xs text-white"
+                    onClick={() => void sessionCardsQuery.refetch()}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : cardRouteResolution === null ? (
+                <div className="flex h-full items-center justify-center text-sm text-primary-400">
+                  Resolving conversation…
+                </div>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-primary-700">
+                  <h2 className="text-base font-semibold">
+                    Conversation unavailable
+                  </h2>
+                  <p className="text-sm text-primary-500">
+                    {resolutionMessage}
+                  </p>
+                  <button
+                    type="button"
+                    className="rounded-lg bg-accent-500 px-3 py-1.5 text-xs text-white"
+                    onClick={() => void sessionCardsQuery.refetch()}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         </>

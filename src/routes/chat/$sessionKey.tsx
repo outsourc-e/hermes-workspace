@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   applySessionRouteResolution,
   buildSessionReplaceNavigation,
-  resolveSessionCardRoute,
+  resolveSessionCardRouteState,
+  validatedInspectedChildCardId,
 } from './-session-route-state'
 import type { SessionRouteResolutionPayload } from './-session-route-state'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -12,7 +13,6 @@ import {
   fetchSessionCards,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
-import { isRecentSession } from '@/screens/chat/pending-send'
 
 const ChatScreen = lazy(async () => {
   const module = await import('../../screens/chat/chat-screen')
@@ -90,32 +90,20 @@ function ChatRoute() {
     retry: 1,
     refetchInterval: 5000,
   })
-  const resolvedCardRoute = shouldResolveCard
-    ? sessionCardsQuery.isSuccess
-      ? resolveSessionCardRoute({
-          routeKey: activeFriendlyId,
-          response: sessionCardsQuery.data,
-        })
-      : sessionCardsQuery.isError
-        ? ({ status: 'legacy-fallback' } as const)
-        : null
-    : ({ status: 'legacy-fallback' } as const)
-  const cardRouteResolution =
-    resolvedCardRoute?.status === 'rejected' &&
-    resolvedCardRoute.reason === 'missing' &&
-    isRecentSession(activeFriendlyId)
-      ? ({ status: 'legacy-fallback' } as const)
-      : resolvedCardRoute
+  const cardRouteResolution = resolveSessionCardRouteState({
+    routeKey: activeFriendlyId,
+    queryStatus: sessionCardsQuery.status,
+    response: sessionCardsQuery.data,
+  })
   const selectedCard =
     cardRouteResolution?.status === 'selected'
       ? cardRouteResolution.card
       : undefined
   const selectedCardId = selectedCard?.cardId
-  const inspectedChildCardId = selectedCard?.childNodes.some(
-    (child) => child.cardId === search.inspect,
+  const inspectedChildCardId = validatedInspectedChildCardId(
+    selectedCard,
+    search.inspect,
   )
-    ? search.inspect
-    : undefined
   const forcedSessionKey =
     forcedSession?.friendlyId === activeFriendlyId
       ? forcedSession.sessionKey
@@ -137,10 +125,7 @@ function ChatRoute() {
     try {
       localStorage.setItem('hermes-last-session-card', selectedCardId)
     } catch {}
-    if (activeFriendlyId !== selectedCardId) {
-      void navigate(buildSessionReplaceNavigation(selectedCardId))
-    }
-  }, [activeFriendlyId, navigate, selectedCardId])
+  }, [selectedCardId])
 
   // Clear history cache when navigating to new chat
   useEffect(() => {
@@ -189,27 +174,33 @@ function ChatRoute() {
     )
   }
 
-  if (cardRouteResolution.status === 'rejected') {
+  if (
+    cardRouteResolution.status === 'rejected' ||
+    cardRouteResolution.status === 'unavailable'
+  ) {
+    const unavailableMessage =
+      cardRouteResolution.status === 'unavailable'
+        ? cardRouteResolution.reason === 'query'
+          ? 'The validated Session Card list could not be loaded.'
+          : 'The validated Session Card projection is incomplete.'
+        : cardRouteResolution.reason === 'child'
+          ? 'Child and branch activity cannot replace the parent conversation.'
+          : cardRouteResolution.reason === 'continuation'
+            ? 'Continuation segments cannot be opened directly. Select the parent Session Card.'
+            : 'This conversation is not present in the validated Session Card list.'
+
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-primary-700">
         <h2 className="text-lg font-semibold">Conversation unavailable</h2>
         <p className="max-w-md text-sm text-primary-500">
-          {cardRouteResolution.reason === 'child'
-            ? 'Child and branch activity cannot replace the parent conversation.'
-            : 'This conversation is not present in the validated Session Card list.'}
+          {unavailableMessage}
         </p>
         <button
           type="button"
           className="rounded-lg bg-accent-500 px-4 py-2 text-sm text-white"
-          onClick={() =>
-            void navigate({
-              to: '/chat/$sessionKey',
-              params: { sessionKey: 'new' },
-              replace: true,
-            })
-          }
+          onClick={() => void sessionCardsQuery.refetch()}
         >
-          Start a new conversation
+          Retry
         </button>
       </div>
     )

@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import {
   Collapsible,
   CollapsiblePanel,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
+import {
+  fetchSessionCards,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
+import { resolveSessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
 
 type BackgroundRun = {
   runId: string
@@ -22,6 +29,16 @@ type BackgroundRun = {
   lifecycleEventCount: number
   lastLifecycleEvent: string | null
   errorMessage: string | null
+}
+
+export function resolveBackgroundRunCardNavigation(
+  response: SessionCardListWire | undefined,
+  run: Pick<BackgroundRun, 'sessionKey' | 'friendlyId'>,
+) {
+  return resolveSessionCardProducerNavigation(response, [
+    run.sessionKey,
+    run.friendlyId,
+  ])
 }
 
 const POLL_INTERVAL_MS = 10_000
@@ -46,6 +63,12 @@ function statusColor(run: BackgroundRun): string {
 
 export function BackgroundRunsSection() {
   const navigate = useNavigate()
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
+    retry: 1,
+    staleTime: 5_000,
+  })
   const [runs, setRuns] = useState<Array<BackgroundRun>>([])
   const [expanded, setExpanded] = useState(false)
   const [busyRunId, setBusyRunId] = useState<string | null>(null)
@@ -95,12 +118,20 @@ export function BackgroundRunsSection() {
 
   const handleOpen = useCallback(
     (run: BackgroundRun) => {
+      const target = resolveBackgroundRunCardNavigation(
+        sessionCardsQuery.data,
+        run,
+      )
+      if (!target) return
       void navigate({
         to: '/chat/$sessionKey',
-        params: { sessionKey: run.friendlyId || run.sessionKey },
+        params: { sessionKey: target.cardId },
+        search: target.inspectedChildCardId
+          ? { inspect: target.inspectedChildCardId }
+          : {},
       })
     },
-    [navigate],
+    [navigate, sessionCardsQuery.data],
   )
 
   if (runs.length === 0) return null
@@ -181,8 +212,14 @@ export function BackgroundRunsSection() {
                   <div className="mt-1 flex justify-end gap-1 pl-3">
                     <button
                       type="button"
+                      disabled={
+                        !resolveBackgroundRunCardNavigation(
+                          sessionCardsQuery.data,
+                          run,
+                        )
+                      }
                       onClick={() => handleOpen(run)}
-                      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-600 hover:bg-accent-100 hover:text-accent-800"
+                      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-600 hover:bg-accent-100 hover:text-accent-800 disabled:cursor-default disabled:opacity-50"
                     >
                       Open
                     </button>

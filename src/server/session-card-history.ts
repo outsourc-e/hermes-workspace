@@ -62,6 +62,8 @@ export type SessionCardHistoryResult = {
 
 export type SessionCardHistoryRequest = {
   cardId: string
+  /** Required when loading a child Card so ownership is revalidated server-side. */
+  parentCardId?: string
   cursor?: string
   limit?: number
 }
@@ -257,7 +259,12 @@ export class SessionCardHistoryService {
       : undefined
     let resolved: ResolvedSessionCard
     try {
-      resolved = await this.cardService.resolveCard(request.cardId)
+      resolved = request.parentCardId
+        ? await this.cardService.resolveChildCard(
+            request.parentCardId,
+            request.cardId,
+          )
+        : await this.cardService.resolveCard(request.cardId)
     } catch (error) {
       if (cursor) throw new SessionCardHistoryCursorError()
       throw error

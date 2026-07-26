@@ -476,14 +476,15 @@ describe('resolveAuthoritativeStreamHandoff', () => {
 
 describe('resolveAuthoritativeCardStreamHandoff', () => {
   const parentCard = {
-    cardId: 'parent-card',
-    canonicalSegmentKey: 'parent',
-    continuationSegmentKeys: ['parent'],
+    cardId: 'remote:parent-card',
+    canonicalSegmentKey: 'remote:parent',
+    continuationSegmentKeys: ['remote:parent'],
+    upstreamKeyBySegmentKey: new Map([['remote:parent', 'parent']]),
     relationshipKind: 'root' as const,
     collectionCompleteness: 'complete' as const,
   }
 
-  it('accepts a fresh same-card continuation tip', () => {
+  it('accepts a fresh same-card continuation tip through source-qualified mappings', () => {
     expect(
       resolveAuthoritativeCardStreamHandoff(
         'parent',
@@ -491,15 +492,87 @@ describe('resolveAuthoritativeCardStreamHandoff', () => {
         parentCard,
         {
           ...parentCard,
-          canonicalSegmentKey: 'continuation',
-          continuationSegmentKeys: ['parent', 'continuation'],
+          canonicalSegmentKey: 'remote:continuation',
+          continuationSegmentKeys: ['remote:parent', 'remote:continuation'],
+          upstreamKeyBySegmentKey: new Map([
+            ['remote:parent', 'parent'],
+            ['remote:continuation', 'continuation'],
+          ]),
         },
       ),
     ).toEqual({
-      cardId: 'parent-card',
-      fromSegmentKey: 'parent',
-      canonicalSegmentKey: 'continuation',
+      cardId: 'remote:parent-card',
+      fromSegmentKey: 'remote:parent',
+      canonicalSegmentKey: 'remote:continuation',
     })
+  })
+
+  it.each([
+    ['current upstream key', ' parent', { session_id: 'continuation' }],
+    ['successor upstream key', 'parent', { session_id: ' continuation ' }],
+  ])('rejects a whitespace-padded %s', (_label, currentUpstreamKey, data) => {
+    expect(
+      resolveAuthoritativeCardStreamHandoff(
+        currentUpstreamKey,
+        data,
+        parentCard,
+        {
+          ...parentCard,
+          canonicalSegmentKey: 'remote:continuation',
+          continuationSegmentKeys: ['remote:parent', 'remote:continuation'],
+          upstreamKeyBySegmentKey: new Map([
+            ['remote:parent', 'parent'],
+            ['remote:continuation', 'continuation'],
+          ]),
+        },
+      ),
+    ).toBeNull()
+  })
+
+  it.each([
+    ['cardId', { cardId: ' remote:parent-card ' }],
+    [
+      'canonicalSegmentKey',
+      {
+        canonicalSegmentKey: ' remote:continuation ',
+        continuationSegmentKeys: ['remote:parent', ' remote:continuation '],
+        upstreamKeyBySegmentKey: new Map([
+          ['remote:parent', 'parent'],
+          [' remote:continuation ', 'continuation'],
+        ]),
+      },
+    ],
+    [
+      'upstream map value',
+      {
+        upstreamKeyBySegmentKey: new Map([
+          ['remote:parent', 'parent'],
+          ['remote:continuation', ' continuation '],
+        ]),
+      },
+    ],
+  ])('rejects a Card with a whitespace-padded %s', (_label, overrides) => {
+    const successorCard = {
+      ...parentCard,
+      canonicalSegmentKey: 'remote:continuation',
+      continuationSegmentKeys: ['remote:parent', 'remote:continuation'],
+      upstreamKeyBySegmentKey: new Map([
+        ['remote:parent', 'parent'],
+        ['remote:continuation', 'continuation'],
+      ]),
+      ...overrides,
+    }
+    const currentCard =
+      'cardId' in overrides ? { ...parentCard, ...overrides } : parentCard
+
+    expect(
+      resolveAuthoritativeCardStreamHandoff(
+        'parent',
+        { session_id: 'continuation' },
+        currentCard,
+        successorCard,
+      ),
+    ).toBeNull()
   })
 
   it.each([
@@ -507,27 +580,39 @@ describe('resolveAuthoritativeCardStreamHandoff', () => {
       'child successor',
       {
         ...parentCard,
-        canonicalSegmentKey: 'child',
-        continuationSegmentKeys: ['parent', 'child'],
+        canonicalSegmentKey: 'remote:child',
+        continuationSegmentKeys: ['remote:parent', 'remote:child'],
+        upstreamKeyBySegmentKey: new Map([
+          ['remote:parent', 'parent'],
+          ['remote:child', 'child'],
+        ]),
         relationshipKind: 'child' as const,
-        parentCardId: 'parent-card',
+        parentCardId: 'remote:parent-card',
       },
     ],
     [
       'different parent card',
       {
         ...parentCard,
-        cardId: 'other-card',
-        canonicalSegmentKey: 'continuation',
-        continuationSegmentKeys: ['parent', 'continuation'],
+        cardId: 'remote:other-card',
+        canonicalSegmentKey: 'remote:continuation',
+        continuationSegmentKeys: ['remote:parent', 'remote:continuation'],
+        upstreamKeyBySegmentKey: new Map([
+          ['remote:parent', 'parent'],
+          ['remote:continuation', 'continuation'],
+        ]),
       },
     ],
     [
       'incomplete card projection',
       {
         ...parentCard,
-        canonicalSegmentKey: 'continuation',
-        continuationSegmentKeys: ['parent', 'continuation'],
+        canonicalSegmentKey: 'remote:continuation',
+        continuationSegmentKeys: ['remote:parent', 'remote:continuation'],
+        upstreamKeyBySegmentKey: new Map([
+          ['remote:parent', 'parent'],
+          ['remote:continuation', 'continuation'],
+        ]),
         collectionCompleteness: 'incomplete' as const,
       },
     ],
@@ -535,7 +620,12 @@ describe('resolveAuthoritativeCardStreamHandoff', () => {
     expect(
       resolveAuthoritativeCardStreamHandoff(
         'parent',
-        { session_id: successorCard.canonicalSegmentKey },
+        {
+          session_id:
+            successorCard.upstreamKeyBySegmentKey.get(
+              successorCard.canonicalSegmentKey,
+            ) ?? successorCard.canonicalSegmentKey,
+        },
         parentCard,
         successorCard,
       ),
@@ -550,8 +640,31 @@ describe('resolveAuthoritativeCardStreamHandoff', () => {
         parentCard,
         {
           ...parentCard,
-          canonicalSegmentKey: 'continuation',
-          continuationSegmentKeys: ['parent', 'continuation'],
+          canonicalSegmentKey: 'remote:continuation',
+          continuationSegmentKeys: ['remote:parent', 'remote:continuation'],
+          upstreamKeyBySegmentKey: new Map([
+            ['remote:parent', 'parent'],
+            ['remote:continuation', 'continuation'],
+          ]),
+        },
+      ),
+    ).toBeNull()
+  })
+
+  it('rejects a successor whose upstream identity is not mapped by the card', () => {
+    expect(
+      resolveAuthoritativeCardStreamHandoff(
+        'parent',
+        { session_id: 'unmapped-successor' },
+        parentCard,
+        {
+          ...parentCard,
+          canonicalSegmentKey: 'remote:continuation',
+          continuationSegmentKeys: ['remote:parent', 'remote:continuation'],
+          upstreamKeyBySegmentKey: new Map([
+            ['remote:parent', 'parent'],
+            ['remote:continuation', 'continuation'],
+          ]),
         },
       ),
     ).toBeNull()

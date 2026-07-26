@@ -3,39 +3,48 @@
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useId } from 'react'
-import { isSessionForkEligible } from '../../session-fork'
 import { SessionItem } from './session-item'
 import type {
+  SessionCard,
   SessionCardChildStatus,
-  SessionMeta,
-  SessionTreeRow as SessionTreeRowModel,
+  SessionCardRelationshipKind,
 } from '../../types'
 import { cn } from '@/lib/utils'
 
-type SessionTreeRowProps = {
-  row: SessionTreeRowModel
-  childrenByParent: ReadonlyMap<string, Array<SessionTreeRowModel>>
-  activeFriendlyId: string
-  activeSessionKey?: string
-  pinnedSessionKeys: ReadonlySet<string>
-  onToggleExpanded: (sessionKey: string, expanded: boolean) => void
-  onSelect?: () => void
-  onTogglePin: (session: SessionMeta) => void
-  sessionForkAvailable?: boolean
-  forkingSessionKey?: string | null
-  onFork?: (session: SessionMeta) => void
-  onRename: (session: SessionMeta) => void
-  onDelete: (session: SessionMeta) => void
-  ancestorKeys?: ReadonlySet<string>
-  rootCardId?: string
-  cardRouteMode?: boolean
-  childStatusByCardId?: ReadonlyMap<string, SessionCardChildStatus>
+type SessionCardTreeRow = {
+  key: string
+  title: string
+  updatedAt: number
+  relationshipKind: SessionCardRelationshipKind
+  status?: SessionCardChildStatus
+  depth: number
+  isExpandable: boolean
+  isExpanded: boolean
+  childCount: number
+  continuationCount: number
+  parentKey?: string
+  isOrphan: boolean
 }
 
-function getRelationshipLabel(
-  row: SessionTreeRowModel,
-  status?: SessionCardChildStatus,
-): string | undefined {
+type SessionTreeRowProps = {
+  row: SessionCardTreeRow
+  childrenByParent: ReadonlyMap<string, Array<SessionCardTreeRow>>
+  activeCardId: string
+  inspectedChildCardId?: string
+  pinnedSessionKeys: ReadonlySet<string>
+  cardsById: ReadonlyMap<string, SessionCard>
+  pendingCardIds: ReadonlySet<string>
+  onToggleExpanded: (cardId: string, expanded: boolean) => void
+  onSelect?: () => void
+  onTogglePin: (card: SessionCard) => void
+  onBranch: (card: SessionCard) => void
+  onRename: (card: SessionCard) => void
+  onArchive: (card: SessionCard) => void
+  ancestorKeys?: ReadonlySet<string>
+  rootCardId?: string
+}
+
+function getRelationshipLabel(row: SessionCardTreeRow): string | undefined {
   const identityLabel =
     row.relationshipKind === 'branch'
       ? 'Branch'
@@ -49,8 +58,8 @@ function getRelationshipLabel(
       row.continuationCount > 1
         ? `${identityLabel} · ${row.continuationCount} segments`
         : identityLabel
-    return status && status !== 'idle'
-      ? `${relationship} · ${status}`
+    return row.status && row.status !== 'idle'
+      ? `${relationship} · ${row.status}`
       : relationship
   }
   if (row.continuationCount > 1) {
@@ -58,41 +67,39 @@ function getRelationshipLabel(
   }
   return undefined
 }
+
 function SessionTreeRow({
   row,
   childrenByParent,
-  activeFriendlyId,
-  activeSessionKey,
+  activeCardId,
+  inspectedChildCardId,
   pinnedSessionKeys,
+  cardsById,
+  pendingCardIds,
   onToggleExpanded,
   onSelect,
   onTogglePin,
-  sessionForkAvailable = false,
-  forkingSessionKey,
-  onFork = () => {},
+  onBranch,
   onRename,
-  onDelete,
+  onArchive,
   ancestorKeys = new Set<string>(),
   rootCardId,
-  cardRouteMode = false,
-  childStatusByCardId = new Map(),
 }: SessionTreeRowProps) {
   const generatedId = useId().replaceAll(':', '')
   const childrenId = `session-tree-children-${generatedId}`
-  const relationshipLabel = getRelationshipLabel(
-    row,
-    childStatusByCardId.get(row.key),
-  )
+  const relationshipLabel = getRelationshipLabel(row)
   const childRows = childrenByParent.get(row.key) ?? []
   const nextAncestorKeys = new Set(ancestorKeys)
   nextAncestorKeys.add(row.key)
+  const card = cardsById.get(row.key)
+  const isRootCard = row.depth === 0 && card !== undefined
+  const parentRouteCardId = rootCardId ?? row.key
 
   return (
     <div
-      data-session-key={row.session.key}
-      data-session-depth={row.depth}
       data-card-id={row.depth === 0 ? row.key : undefined}
       data-card-child-id={row.depth > 0 ? row.key : undefined}
+      data-session-depth={row.depth}
     >
       <div
         className="relative flex min-w-0 items-center"
@@ -109,7 +116,7 @@ function SessionTreeRow({
               'mr-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded text-primary-500',
               'hover:bg-primary-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500',
             )}
-            aria-label={`${row.isExpanded ? 'Collapse' : 'Expand'} related sessions for ${row.session.friendlyId}`}
+            aria-label={`${row.isExpanded ? 'Collapse' : 'Expand'} related sessions for ${row.title}`}
             aria-expanded={row.isExpanded}
             aria-controls={childrenId}
             onClick={() => onToggleExpanded(row.key, !row.isExpanded)}
@@ -127,32 +134,28 @@ function SessionTreeRow({
         ) : null}
         <div className="min-w-0 flex-1">
           <SessionItem
-            session={row.session}
-            routeKey={
-              cardRouteMode ? (rootCardId ?? row.key) : row.session.friendlyId
-            }
-            active={
-              row.depth === 0
-                ? activeSessionKey
-                  ? row.key === activeSessionKey
-                  : row.session.friendlyId === activeFriendlyId
-                : false
-            }
+            session={{
+              key: row.key,
+              friendlyId: parentRouteCardId,
+              label: row.title,
+              updatedAt: row.updatedAt,
+              titleStatus: 'ready',
+              titleError: null,
+            }}
+            routeKey={parentRouteCardId}
+            inspectChildCardId={row.depth > 0 ? row.key : undefined}
+            active={row.depth === 0 && row.key === activeCardId}
             isPinned={row.depth === 0 && pinnedSessionKeys.has(row.key)}
             contextLabel={relationshipLabel}
             showActions={row.depth === 0}
-            inspected={
-              row.depth > 0 &&
-              (row.session.friendlyId === activeFriendlyId ||
-                row.session.key === activeFriendlyId)
-            }
+            inspected={row.depth > 0 && row.key === inspectedChildCardId}
             onSelect={onSelect}
-            onTogglePin={onTogglePin}
-            canFork={sessionForkAvailable && isSessionForkEligible(row.session)}
-            isForking={forkingSessionKey === row.session.backendKey}
-            onFork={onFork}
-            onRename={onRename}
-            onDelete={onDelete}
+            onTogglePin={isRootCard ? () => onTogglePin(card) : undefined}
+            canBranch={isRootCard}
+            pending={isRootCard && pendingCardIds.has(card.cardId)}
+            onBranch={isRootCard ? () => onBranch(card) : undefined}
+            onRename={isRootCard ? () => onRename(card) : undefined}
+            onArchive={isRootCard ? () => onArchive(card) : undefined}
           />
         </div>
       </div>
@@ -170,21 +173,19 @@ function SessionTreeRow({
                     key={childRow.key}
                     row={childRow}
                     childrenByParent={childrenByParent}
-                    activeFriendlyId={activeFriendlyId}
-                    activeSessionKey={activeSessionKey}
+                    activeCardId={activeCardId}
+                    inspectedChildCardId={inspectedChildCardId}
                     pinnedSessionKeys={pinnedSessionKeys}
+                    cardsById={cardsById}
+                    pendingCardIds={pendingCardIds}
                     onToggleExpanded={onToggleExpanded}
                     onSelect={onSelect}
                     onTogglePin={onTogglePin}
-                    sessionForkAvailable={sessionForkAvailable}
-                    forkingSessionKey={forkingSessionKey}
-                    onFork={onFork}
+                    onBranch={onBranch}
                     onRename={onRename}
-                    onDelete={onDelete}
+                    onArchive={onArchive}
                     ancestorKeys={nextAncestorKeys}
-                    rootCardId={rootCardId ?? row.key}
-                    cardRouteMode={cardRouteMode}
-                    childStatusByCardId={childStatusByCardId}
+                    rootCardId={parentRouteCardId}
                   />
                 ),
               )
@@ -196,4 +197,4 @@ function SessionTreeRow({
 }
 
 export { SessionTreeRow }
-export type { SessionTreeRowProps }
+export type { SessionCardTreeRow, SessionTreeRowProps }

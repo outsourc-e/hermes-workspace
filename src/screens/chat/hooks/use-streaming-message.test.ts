@@ -142,6 +142,52 @@ describe('stream card handoff authority', () => {
         currentSegmentKey: 'stale-segment',
       }),
     ).toBe(false)
+    expect(
+      shouldApplyCardHandoff({
+        handoff,
+        currentSegmentKey: 'parent-segment',
+      }),
+    ).toBe(false)
+  })
+
+  it.each([
+    ['cardId', ' parent-card '],
+    ['fromSegmentKey', ' parent-segment '],
+    ['canonicalSegmentKey', ' continuation-segment '],
+    ['runId', ' run-1 '],
+  ])('rejects whitespace-padded %s identities', (field, value) => {
+    expect(
+      resolveAuthoritativeCardHandoffEvent('card_handoff', {
+        cardId: 'parent-card',
+        fromSegmentKey: 'parent-segment',
+        canonicalSegmentKey: 'continuation-segment',
+        runId: 'run-1',
+        [field]: value,
+      }),
+    ).toBeNull()
+  })
+
+  it('requires an exact nonblank active Card identity', () => {
+    const handoff = resolveAuthoritativeCardHandoffEvent('card_handoff', {
+      cardId: 'parent-card',
+      fromSegmentKey: 'parent-segment',
+      canonicalSegmentKey: 'continuation-segment',
+    })!
+
+    expect(
+      shouldApplyCardHandoff({
+        handoff,
+        activeCardId: ' parent-card ',
+        currentSegmentKey: 'parent-segment',
+      }),
+    ).toBe(false)
+    expect(
+      shouldApplyCardHandoff({
+        handoff,
+        activeCardId: '',
+        currentSegmentKey: 'parent-segment',
+      }),
+    ).toBe(false)
   })
 
   it.each([

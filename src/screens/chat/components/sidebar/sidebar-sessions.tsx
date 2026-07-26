@@ -2,15 +2,10 @@
 
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { memo, useEffect, useMemo, useState } from 'react'
-import { projectSessionCards } from '../../session-cards'
+import { memo, useMemo, useState } from 'react'
 import { SessionTreeRow } from './session-tree-row'
-import type {
-  SessionCard,
-  SessionCardChildStatus,
-  SessionMeta,
-  SessionTreeRow as SessionTreeRowModel,
-} from '../../types'
+import type { SessionCardTreeRow } from './session-tree-row'
+import type { SessionCard, SessionCardChild } from '../../types'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -23,272 +18,133 @@ import {
   ScrollAreaViewport,
 } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
-import { usePinnedSessions } from '@/hooks/use-pinned-sessions'
 
 type SidebarSessionsProps = {
-  sessions: Array<SessionMeta>
-  /** Server-backed Cards take precedence. Legacy sessions remain a safe fallback. */
-  sessionCards?: Array<SessionCard>
-  activeFriendlyId: string
+  /** Authoritative, server-backed logical conversations. */
+  sessionCards: Array<SessionCard>
+  activeCardId: string
+  inspectedChildCardId?: string
   defaultOpen?: boolean
   onSelect?: () => void
-  onRename: (session: SessionMeta) => void
-  onDelete: (session: SessionMeta) => void
-  sessionForkAvailable?: boolean
-  forkingSessionKey?: string | null
-  onFork?: (session: SessionMeta) => void
+  onTogglePin: (card: SessionCard) => void
+  onRename: (card: SessionCard) => void
+  onArchive: (card: SessionCard) => void
+  onBranch: (card: SessionCard) => void
+  pendingCardIds?: ReadonlySet<string>
   loading: boolean
   fetching: boolean
   error: string | null
   onRetry: () => void
 }
 
-function sessionForKey(
-  sessions: Array<SessionMeta>,
-  key: string,
-): SessionMeta | undefined {
-  return sessions.find(
-    (session) =>
-      session.key === key ||
-      session.backendKey === key ||
-      session.friendlyId === key,
-  )
-}
-
-function legacySessionTitle(session: SessionMeta | undefined): string {
-  const candidates = [
-    session?.label,
-    session?.derivedTitle,
-    session?.title,
-    session?.friendlyId,
-  ]
-  for (const candidate of candidates) {
-    const title = candidate?.trim()
-    if (title) return title
-  }
-  return 'New conversation'
-}
-
-function cardSession(
-  sessions: Array<SessionMeta>,
-  sessionKey: string,
-  title: string,
-): SessionMeta {
-  const session = sessionForKey(sessions, sessionKey)
-  if (session && legacySessionTitle(session) === title) return session
-  return {
-    ...(session ?? { key: sessionKey, friendlyId: sessionKey }),
-    label: title,
-    title: undefined,
-    derivedTitle: undefined,
-    titleStatus: 'ready',
-    titleError: null,
-  }
-}
-
-function cardOwnsSessionKey(card: SessionCard, sessionKey: string): boolean {
-  return (
-    card.cardId === sessionKey ||
-    card.canonicalSegmentKey === sessionKey ||
-    card.continuationSegmentKeys.includes(sessionKey)
-  )
-}
-
-function findRootCardForSession(
-  roots: Array<SessionCard>,
-  cardsById: ReadonlyMap<string, SessionCard>,
-  sessionKey: string | undefined,
-): { rootCardId?: string; childCardId?: string } {
-  if (!sessionKey) return {}
-
-  const visit = (
-    rootCardId: string,
-    card: SessionCard,
-    visited: Set<string>,
-  ): { rootCardId: string; childCardId?: string } | undefined => {
-    if (visited.has(card.cardId)) return undefined
-    visited.add(card.cardId)
-    if (cardOwnsSessionKey(card, sessionKey)) {
-      return card.cardId === rootCardId
-        ? { rootCardId }
-        : { rootCardId, childCardId: card.cardId }
-    }
-    for (const child of card.childNodes) {
-      if (child.cardId === sessionKey || child.sessionKey === sessionKey) {
-        return { rootCardId, childCardId: child.cardId }
-      }
-      const childCard = cardsById.get(child.cardId)
-      if (childCard) {
-        const match = visit(rootCardId, childCard, visited)
-        if (match) return match
-      }
-    }
-    return undefined
-  }
-
-  for (const root of roots) {
-    const match = visit(root.cardId, root, new Set())
-    if (match) return match
-  }
-  return {}
+type CardRowNode = Pick<
+  SessionCard,
+  | 'cardId'
+  | 'title'
+  | 'updatedAt'
+  | 'relationshipKind'
+  | 'continuationCount'
+  | 'childNodes'
+> & {
+  status?: SessionCardChild['status']
 }
 
 export const SidebarSessions = memo(function SidebarSessions({
-  sessions,
   sessionCards,
-  activeFriendlyId,
+  activeCardId,
+  inspectedChildCardId,
   defaultOpen = true,
   onSelect,
+  onTogglePin,
   onRename,
-  onDelete,
-  sessionForkAvailable = false,
-  forkingSessionKey,
-  onFork = () => {},
+  onArchive,
+  onBranch,
+  pendingCardIds = new Set<string>(),
   loading,
   fetching,
   error,
   onRetry,
 }: SidebarSessionsProps) {
-  const { pinnedSessionKeys, togglePinnedSession, migratePinnedSession } =
-    usePinnedSessions()
   const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(
     () => new Set(),
   )
-  const [pinOverrides, setPinOverrides] = useState<
-    ReadonlyMap<string, boolean>
-  >(() => new Map())
+  const roots = sessionCards
+  const cardsById = useMemo(
+    () => new Map(sessionCards.map((card) => [card.cardId, card])),
+    [sessionCards],
+  )
 
-  const activeSessionKey = useMemo(
+  const pinnedCardIds = useMemo(
     () =>
-      sessions.find(
-        (session) =>
-          session.friendlyId === activeFriendlyId ||
-          session.key === activeFriendlyId ||
-          session.backendKey === activeFriendlyId,
-      )?.key ?? activeFriendlyId,
-    [activeFriendlyId, sessions],
+      new Set(roots.filter((card) => card.pinned).map((card) => card.cardId)),
+    [roots],
   )
-  const legacyProjection = useMemo(
-    () => projectSessionCards(sessions, { activeSessionKey }),
-    [activeSessionKey, sessions],
-  )
-  const roots = sessionCards ?? legacyProjection.roots
-  const cardsById = useMemo(() => {
-    const cards = sessionCards ?? legacyProjection.cards
-    return new Map(cards.map((card) => [card.cardId, card]))
-  }, [legacyProjection.cards, sessionCards])
-  const activeCard = useMemo(
-    () => findRootCardForSession(roots, cardsById, activeSessionKey),
-    [activeSessionKey, cardsById, roots],
-  )
-
-  const pinnedCardIds = useMemo(() => {
-    const result = new Set<string>()
-    for (const card of roots) {
-      const legacyPinned = pinnedSessionKeys.some(
-        (key) => key === card.cardId || cardOwnsSessionKey(card, key),
-      )
-      const overridden = pinOverrides.get(card.cardId)
-      if (overridden ?? (card.pinned || legacyPinned)) result.add(card.cardId)
-    }
-    return result
-  }, [pinOverrides, pinnedSessionKeys, roots])
-
-  useEffect(() => {
-    if (loading || fetching || error) return
-    for (const pinnedKey of pinnedSessionKeys) {
-      const owner = roots.find(
-        (card) =>
-          pinnedKey === card.cardId || cardOwnsSessionKey(card, pinnedKey),
-      )
-      if (owner && owner.cardId !== pinnedKey) {
-        migratePinnedSession(pinnedKey, owner.cardId)
-      }
-    }
-  }, [error, fetching, loading, migratePinnedSession, pinnedSessionKeys, roots])
 
   const cardRows = useMemo(() => {
-    const childrenByParent = new Map<string, Array<SessionTreeRowModel>>()
-    const childStatusByCardId = new Map<string, SessionCardChildStatus>()
-    const rowsByCardId = new Map<string, SessionTreeRowModel>()
+    const childrenByParent = new Map<string, Array<SessionCardTreeRow>>()
 
     const buildRow = (
-      card: SessionCard,
+      node: CardRowNode,
       depth: number,
+      ancestorCardIds: ReadonlySet<string>,
       parentKey?: string,
-      edgeTitle?: string,
-      edgeSessionKey?: string,
-    ): SessionTreeRowModel => {
-      const sessionKey = edgeSessionKey ?? card.canonicalSegmentKey
-      const sourceSession = sessionForKey(sessions, sessionKey)
-      const title =
-        edgeTitle ??
-        (sessionCards ? card.title : legacySessionTitle(sourceSession))
-      const childRows: Array<SessionTreeRowModel> = []
-      for (const child of card.childNodes) {
-        childStatusByCardId.set(child.cardId, child.status)
-        const fullChildCard = cardsById.get(child.cardId)
-        const childCard: SessionCard = fullChildCard ?? {
-          cardId: child.cardId,
-          title: child.title,
-          titleSource: 'default',
-          canonicalSegmentKey: child.sessionKey,
-          continuationSegmentKeys: [child.sessionKey],
-          continuationCount: child.continuationCount,
-          relationshipKind: child.relationshipKind,
-          parentCardId: card.cardId,
-          childNodes: [],
-          updatedAt: child.updatedAt,
-          archived: false,
-          pinned: false,
-        }
-        childRows.push(
+    ): { row: SessionCardTreeRow; containsInspectedChild: boolean } => {
+      const nextAncestorCardIds = new Set(ancestorCardIds)
+      nextAncestorCardIds.add(node.cardId)
+      const childResults = node.childNodes.flatMap((child) => {
+        if (nextAncestorCardIds.has(child.cardId)) return []
+        const nestedChildNodes = cardsById.get(child.cardId)?.childNodes ?? []
+        return [
           buildRow(
-            childCard,
+            {
+              cardId: child.cardId,
+              title: child.title,
+              updatedAt: child.updatedAt,
+              relationshipKind: child.relationshipKind,
+              continuationCount: child.continuationCount,
+              childNodes: nestedChildNodes,
+              status: child.status,
+            },
             depth + 1,
-            card.cardId,
-            sessionCards
-              ? child.title
-              : legacySessionTitle(sessionForKey(sessions, child.sessionKey)),
-            child.sessionKey,
+            nextAncestorCardIds,
+            node.cardId,
           ),
-        )
-      }
-      const hasInspectedDescendant =
-        activeCard.rootCardId ===
-          roots.find((root) => root.cardId === card.cardId)?.cardId &&
-        activeCard.childCardId !== undefined
+        ]
+      })
+      const childRows = childResults.map((result) => result.row)
+      const hasInspectedDescendant = childResults.some(
+        (result) => result.containsInspectedChild,
+      )
       const isExpanded =
         childRows.length > 0 &&
-        (!collapsedCardIds.has(card.cardId) || hasInspectedDescendant)
-      const row: SessionTreeRowModel = {
-        key: card.cardId,
-        session: cardSession(sessions, sessionKey, title),
-        relationshipKind: card.relationshipKind,
+        (!collapsedCardIds.has(node.cardId) || hasInspectedDescendant)
+      const row: SessionCardTreeRow = {
+        key: node.cardId,
+        title: node.title,
+        updatedAt: node.updatedAt,
+        relationshipKind: node.relationshipKind,
+        status: node.status,
         depth,
         isExpandable: childRows.length > 0,
         isExpanded,
         childCount: childRows.length,
-        continuationCount: card.continuationCount,
+        continuationCount: node.continuationCount,
         ...(parentKey ? { parentKey } : {}),
-        isOrphan: card.relationshipKind === 'orphan',
+        isOrphan: node.relationshipKind === 'orphan',
       }
-      rowsByCardId.set(card.cardId, row)
-      if (childRows.length > 0) childrenByParent.set(card.cardId, childRows)
-      return row
+      if (childRows.length > 0) childrenByParent.set(node.cardId, childRows)
+      return {
+        row,
+        containsInspectedChild:
+          node.cardId === inspectedChildCardId || hasInspectedDescendant,
+      }
     }
 
-    const rootRows = roots.map((card) => buildRow(card, 0))
-    return { rootRows, rowsByCardId, childrenByParent, childStatusByCardId }
-  }, [
-    activeCard.childCardId,
-    activeCard.rootCardId,
-    cardsById,
-    collapsedCardIds,
-    roots,
-    sessionCards,
-    sessions,
-  ])
+    const rootRows = roots.map(
+      (card) => buildRow(card, 0, new Set<string>()).row,
+    )
+    return { rootRows, childrenByParent }
+  }, [cardsById, collapsedCardIds, inspectedChildCardId, roots])
 
   const pinnedRows = cardRows.rootRows.filter((row) =>
     pinnedCardIds.has(row.key),
@@ -296,31 +152,6 @@ export const SidebarSessions = memo(function SidebarSessions({
   const unpinnedRows = cardRows.rootRows.filter(
     (row) => !pinnedCardIds.has(row.key),
   )
-
-  function handleTogglePin(session: SessionMeta) {
-    const card = roots.find(
-      (candidate) =>
-        candidate.canonicalSegmentKey === session.key ||
-        candidate.canonicalSegmentKey === session.backendKey ||
-        sessionForKey(sessions, candidate.canonicalSegmentKey)?.friendlyId ===
-          session.friendlyId,
-    )
-    if (!card) return
-    const nextPinned = !pinnedCardIds.has(card.cardId)
-    setPinOverrides((current) => {
-      const next = new Map(current)
-      next.set(card.cardId, nextPinned)
-      return next
-    })
-    const storedKeys = pinnedSessionKeys.filter(
-      (key) => key === card.cardId || cardOwnsSessionKey(card, key),
-    )
-    if (storedKeys.length > 0) {
-      for (const key of storedKeys) togglePinnedSession(key)
-    } else {
-      togglePinnedSession(card.cardId)
-    }
-  }
 
   function handleToggleExpanded(cardId: string, expanded: boolean) {
     setCollapsedCardIds((current) => {
@@ -331,25 +162,23 @@ export const SidebarSessions = memo(function SidebarSessions({
     })
   }
 
-  function renderRoots(rows: Array<SessionTreeRowModel>) {
+  function renderRoots(rows: Array<SessionCardTreeRow>) {
     return rows.map((row) => (
       <SessionTreeRow
         key={row.key}
         row={row}
         childrenByParent={cardRows.childrenByParent}
-        childStatusByCardId={cardRows.childStatusByCardId}
-        cardRouteMode={sessionCards !== undefined}
-        activeFriendlyId={activeFriendlyId}
-        activeSessionKey={activeCard.rootCardId}
+        activeCardId={activeCardId}
+        inspectedChildCardId={inspectedChildCardId}
         pinnedSessionKeys={pinnedCardIds}
+        cardsById={cardsById}
+        pendingCardIds={pendingCardIds}
         onToggleExpanded={handleToggleExpanded}
         onSelect={onSelect}
-        onTogglePin={handleTogglePin}
-        sessionForkAvailable={sessionForkAvailable}
-        forkingSessionKey={forkingSessionKey}
-        onFork={onFork}
+        onTogglePin={onTogglePin}
+        onBranch={onBranch}
         onRename={onRename}
-        onDelete={onDelete}
+        onArchive={onArchive}
       />
     ))
   }
@@ -421,7 +250,7 @@ export const SidebarSessions = memo(function SidebarSessions({
                     : 'No sessions yet. Start a conversation →'}
                 </div>
               )}
-              {fetching && !loading && !error && sessions.length > 0 ? (
+              {fetching && !loading && !error && sessionCards.length > 0 ? (
                 <div className="px-2 py-1 text-[11px] text-primary-400">
                   Updating…
                 </div>
@@ -442,67 +271,18 @@ function areSidebarSessionsEqual(
   next: SidebarSessionsProps,
 ) {
   if (prev.sessionCards !== next.sessionCards) return false
-  if (prev.activeFriendlyId !== next.activeFriendlyId) return false
+  if (prev.activeCardId !== next.activeCardId) return false
+  if (prev.inspectedChildCardId !== next.inspectedChildCardId) return false
   if (prev.defaultOpen !== next.defaultOpen) return false
   if (prev.onSelect !== next.onSelect) return false
   if (prev.onRename !== next.onRename) return false
-  if (prev.onDelete !== next.onDelete) return false
-  if (prev.sessionForkAvailable !== next.sessionForkAvailable) return false
-  if (prev.forkingSessionKey !== next.forkingSessionKey) return false
-  if (prev.onFork !== next.onFork) return false
+  if (prev.onTogglePin !== next.onTogglePin) return false
+  if (prev.onArchive !== next.onArchive) return false
+  if (prev.onBranch !== next.onBranch) return false
+  if (prev.pendingCardIds !== next.pendingCardIds) return false
   if (prev.loading !== next.loading) return false
   if (prev.fetching !== next.fetching) return false
   if (prev.error !== next.error) return false
   if (prev.onRetry !== next.onRetry) return false
-  if (prev.sessions === next.sessions) return true
-  if (prev.sessions.length !== next.sessions.length) return false
-  for (let i = 0; i < prev.sessions.length; i += 1) {
-    const prevSession = prev.sessions[i]
-    const nextSession = next.sessions[i]
-    if (!prevSession || !nextSession) return false
-    if (prevSession.key !== nextSession.key) return false
-    if (prevSession.backendKey !== nextSession.backendKey) return false
-    if (prevSession.friendlyId !== nextSession.friendlyId) return false
-    if (prevSession.label !== nextSession.label) return false
-    if (prevSession.title !== nextSession.title) return false
-    if (prevSession.derivedTitle !== nextSession.derivedTitle) return false
-    if (prevSession.updatedAt !== nextSession.updatedAt) return false
-    if (prevSession.titleStatus !== nextSession.titleStatus) return false
-    if (prevSession.titleSource !== nextSession.titleSource) return false
-    if (prevSession.titleError !== nextSession.titleError) return false
-    if (prevSession.lastMessage !== nextSession.lastMessage) return false
-    if (!areSessionLineagesEqual(prevSession, nextSession)) return false
-  }
   return true
 }
-
-function areSessionLineagesEqual(
-  prevSession: SessionMeta,
-  nextSession: SessionMeta,
-): boolean {
-  const prev = prevSession.lineage
-  const next = nextSession.lineage
-  if (prev === next) return true
-  if (!prev || !next) return false
-  return (
-    prev.parentSessionId === next.parentSessionId &&
-    prev.relationshipType === next.relationshipType &&
-    prev.relationshipKind === next.relationshipKind &&
-    prev.parentTitle === next.parentTitle &&
-    prev.parentSource === next.parentSource &&
-    prev.sessionSource === next.sessionSource &&
-    prev.lineageRootId === next.lineageRootId &&
-    prev.lineageTipId === next.lineageTipId &&
-    prev.compressionSegmentCount === next.compressionSegmentCount &&
-    prev.parentLineageRootId === next.parentLineageRootId &&
-    prev.parentLineageTipId === next.parentLineageTipId &&
-    prev.isCrossSurfaceChild === next.isCrossSurfaceChild &&
-    prev.isPreCompressionSnapshot === next.isPreCompressionSnapshot &&
-    prev.source === next.source &&
-    prev.endReason === next.endReason &&
-    prev.startedAt === next.startedAt &&
-    prev.endedAt === next.endedAt
-  )
-}
-
-export { areSessionLineagesEqual }

@@ -2,9 +2,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Folder01Icon } from '@hugeicons/core-free-icons'
-import { buildSessionTree } from '../session-lineage'
-import { projectSessionCards } from '../session-cards'
-import type { SessionCard, SessionMeta } from '../types'
+
+import type { SessionCard } from '../types'
 import { Button } from '@/components/ui/button'
 import {
   TooltipContent,
@@ -69,32 +68,6 @@ function formatMobileSessionTitle(rawTitle: string): string {
   return title
 }
 
-function getSessionTitle(session: SessionMeta): string {
-  const candidates = [
-    session.label,
-    session.derivedTitle,
-    session.title,
-    session.friendlyId,
-  ]
-  for (const candidate of candidates) {
-    const title = candidate?.trim()
-    if (title) return title
-  }
-  return 'Session'
-}
-
-function sessionForCardKey(
-  sessions: Array<SessionMeta>,
-  key: string,
-): SessionMeta | undefined {
-  return sessions.find(
-    (session) =>
-      session.key === key ||
-      session.backendKey === key ||
-      session.friendlyId === key,
-  )
-}
-
 function cardOwnsSessionKey(card: SessionCard, sessionKey: string): boolean {
   return (
     card.cardId === sessionKey ||
@@ -104,14 +77,14 @@ function cardOwnsSessionKey(card: SessionCard, sessionKey: string): boolean {
 }
 
 type ActiveLineageContextProps = {
-  parentSession?: SessionMeta
+  parentCard?: Pick<SessionCard, 'cardId' | 'title'>
   continuationCount: number
   onOpenParent?: () => void
   backToParent?: boolean
 }
 
 function ActiveLineageContext({
-  parentSession,
+  parentCard,
   continuationCount,
   onOpenParent,
   backToParent = false,
@@ -126,14 +99,15 @@ function ActiveLineageContext({
       </span>
     ) : null
 
-  if (!parentSession) return segmentStatus
+  if (!parentCard) return segmentStatus
 
-  const parentTitle = getSessionTitle(parentSession)
+  const parentTitle = parentCard.title
   return (
     <span className="flex min-w-0 items-center gap-1.5 text-[10px] text-primary-500">
       <Link
         to="/chat/$sessionKey"
-        params={{ sessionKey: parentSession.friendlyId }}
+        params={{ sessionKey: parentCard.cardId }}
+        search={{}}
         onClick={onOpenParent}
         aria-label={
           backToParent
@@ -160,8 +134,7 @@ type ChatHeaderProps = {
   renamingTitle?: boolean
   wrapperRef?: React.Ref<HTMLDivElement>
   onOpenSessions?: () => void
-  sessions?: Array<SessionMeta>
-  /** Server-backed Cards take precedence. Legacy sessions remain a safe fallback. */
+  /** Authoritative, server-backed logical conversations. */
   sessionCards?: Array<SessionCard>
   activeFriendlyId?: string
   inspectedChildCardId?: string
@@ -197,11 +170,10 @@ function ChatHeaderComponent({
   renamingTitle = false,
   wrapperRef,
   onOpenSessions,
-  sessions = [],
   sessionCards,
   activeFriendlyId = '',
   inspectedChildCardId,
-  onSelectSession,
+
   showFileExplorerButton = false,
   fileExplorerCollapsed = true,
   onToggleFileExplorer,
@@ -230,95 +202,24 @@ function ChatHeaderComponent({
     setSessionPopoverOpen(false)
     setSessionSearch('')
   }, [])
-  const activeSessionKey = useMemo(
-    () =>
-      sessions.find(
-        (session) =>
-          session.friendlyId === activeFriendlyId ||
-          session.key === activeFriendlyId,
-      )?.key ?? activeFriendlyId,
-    [activeFriendlyId, sessions],
-  )
-  const sessionTree = useMemo(
-    () => buildSessionTree(sessions, { activeSessionKey }),
-    [activeSessionKey, sessions],
-  )
-  const legacyCardProjection = useMemo(
-    () => projectSessionCards(sessions, { activeSessionKey }),
-    [activeSessionKey, sessions],
-  )
-  const activeTreeKey = activeSessionKey
-    ? (sessionTree.visibleKeyBySessionKey.get(activeSessionKey) ??
-      activeSessionKey)
-    : undefined
-  const activeTreeRow = activeTreeKey
-    ? sessionTree.indexByKey.get(activeTreeKey)
-    : undefined
-  const parentSession =
-    activeTreeRow?.parentKey &&
-    (activeTreeRow.relationshipKind === 'branch' ||
-      activeTreeRow.relationshipKind === 'child')
-      ? sessionTree.indexByKey.get(activeTreeRow.parentKey)?.session
-      : undefined
-  const continuationCount = activeTreeRow?.continuationCount ?? 1
-  const availableCards = sessionCards ?? legacyCardProjection.roots
+  const availableCards = sessionCards ?? []
   const cardContext = useMemo(() => {
-    if (!activeSessionKey) return undefined
-    for (const card of availableCards) {
-      const inspectedChild = card.childNodes.find(
-        (child) =>
-          child.cardId === inspectedChildCardId ||
-          (!inspectedChildCardId &&
-            (child.cardId === activeSessionKey ||
-              child.sessionKey === activeSessionKey)),
-      )
-      if (inspectedChild) return { card, inspectedChild }
-      if (cardOwnsSessionKey(card, activeSessionKey)) {
-        return { card, inspectedChild: undefined }
-      }
-    }
-    return undefined
-  }, [activeSessionKey, availableCards, inspectedChildCardId])
-  const legacyCardSession = cardContext
-    ? sessionForCardKey(sessions, cardContext.card.canonicalSegmentKey)
+    const card = availableCards.find(
+      (candidate) =>
+        candidate.cardId === activeFriendlyId ||
+        cardOwnsSessionKey(candidate, activeFriendlyId),
+    )
+    if (!card) return undefined
+    const inspectedChild = inspectedChildCardId
+      ? card.childNodes.find((child) => child.cardId === inspectedChildCardId)
+      : undefined
+    return { card, inspectedChild }
+  }, [activeFriendlyId, availableCards, inspectedChildCardId])
+  const displayedTitle = cardContext?.card.title ?? activeTitle
+  const displayedContinuationCount = cardContext?.card.continuationCount ?? 1
+  const displayedParentCard = cardContext?.inspectedChild
+    ? cardContext.card
     : undefined
-  const displayedTitle = cardContext
-    ? sessionCards
-      ? cardContext.card.title
-      : legacyCardSession
-        ? getSessionTitle(legacyCardSession)
-        : activeTitle
-    : activeTitle
-  const displayedContinuationCount =
-    cardContext?.card.continuationCount ?? continuationCount
-  const displayedParentSession = cardContext?.inspectedChild
-    ? (sessionForCardKey(sessions, cardContext.card.canonicalSegmentKey) ?? {
-        key: cardContext.card.canonicalSegmentKey,
-        friendlyId: cardContext.card.canonicalSegmentKey,
-      })
-    : parentSession
-  const switcherSessions = useMemo(() => {
-    return availableCards.map((card) => {
-      const session = sessionForCardKey(sessions, card.canonicalSegmentKey)
-      const cardTitle = sessionCards
-        ? card.title
-        : getSessionTitle(
-            session ?? {
-              key: card.canonicalSegmentKey,
-              friendlyId: card.canonicalSegmentKey,
-            },
-          )
-      return {
-        ...(session ?? {
-          key: card.canonicalSegmentKey,
-          friendlyId: card.canonicalSegmentKey,
-        }),
-        label: cardTitle,
-        title: undefined,
-        derivedTitle: undefined,
-      }
-    })
-  }, [availableCards, sessionCards, sessions])
 
   useEffect(() => {
     if (!sessionPopoverOpen) return
@@ -380,9 +281,7 @@ function ChatHeaderComponent({
     return () => window.clearTimeout(id)
   }, [isEditingTitle])
 
-  const canRenameTitle = Boolean(
-    onRenameTitle && !isMobile && !cardContext?.inspectedChild,
-  )
+  const canRenameTitle = Boolean(onRenameTitle && !isMobile)
 
   const startTitleEdit = useCallback(() => {
     if (!canRenameTitle || renamingTitle) return
@@ -481,7 +380,7 @@ function ChatHeaderComponent({
               </svg>
             </button>
             <ActiveLineageContext
-              parentSession={displayedParentSession}
+              parentCard={displayedParentCard}
               continuationCount={displayedContinuationCount}
               backToParent={Boolean(cardContext?.inspectedChild)}
             />
@@ -572,7 +471,7 @@ function ChatHeaderComponent({
                 </button>
               )}
               <ActiveLineageContext
-                parentSession={displayedParentSession}
+                parentCard={displayedParentCard}
                 continuationCount={displayedContinuationCount}
                 onOpenParent={closeSessionPopover}
                 backToParent={Boolean(cardContext?.inspectedChild)}
@@ -618,30 +517,26 @@ function ChatHeaderComponent({
                       opacity: 1,
                     }}
                   >
-                    {switcherSessions
-                      .filter((s) => {
+                    {availableCards
+                      .filter((card) => {
                         if (!sessionSearch.trim()) return true
                         const q = sessionSearch.toLowerCase()
                         return (
-                          getSessionTitle(s).toLowerCase().includes(q) ||
-                          s.friendlyId.toLowerCase().includes(q)
+                          card.title.toLowerCase().includes(q) ||
+                          card.cardId.toLowerCase().includes(q)
                         )
                       })
                       .slice(0, 20)
-                      .map((s) => {
-                        const label = getSessionTitle(s)
+                      .map((card) => {
                         const isActive =
-                          Boolean(activeFriendlyId) &&
-                          (s.friendlyId === activeFriendlyId ||
-                            s.key.endsWith(`:${activeFriendlyId}`))
+                          card.cardId === cardContext?.card.cardId
                         return (
-                          <button
-                            key={s.key || s.friendlyId}
-                            type="button"
-                            onClick={() => {
-                              closeSessionPopover()
-                              onSelectSession?.(s.key || s.friendlyId || '')
-                            }}
+                          <Link
+                            key={card.cardId}
+                            to="/chat/$sessionKey"
+                            params={{ sessionKey: card.cardId }}
+                            search={{}}
+                            onClick={closeSessionPopover}
                             className={cn(
                               'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors',
                               'border-b border-[var(--theme-border)] last:border-0 hover:bg-[var(--theme-card2)]',
@@ -652,15 +547,15 @@ function ChatHeaderComponent({
                               className="flex-1 min-w-0 truncate"
                               style={{ color: 'var(--theme-text)' }}
                             >
-                              {label}
+                              {card.title}
                             </span>
                             {isActive && (
                               <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />
                             )}
-                          </button>
+                          </Link>
                         )
                       })}
-                    {switcherSessions.length === 0 && (
+                    {availableCards.length === 0 && (
                       <p className="px-3 py-4 text-sm text-neutral-400">
                         No sessions
                       </p>

@@ -2,72 +2,74 @@
 
 ## Purpose
 
-Hermes Workspace supports a portable chat path through OpenAI-compatible `/v1/chat/completions`. In this mode, the browser route alone is not enough to preserve conversational context: Workspace must forward a stable server-side session identifier to the Hermes Agent gateway.
+Hermes Workspace routes chat by stable Session Card identity while backend storage may rotate through continuation segments. A Card route identifies the logical parent conversation; it does not expose or select an individual continuation segment.
 
-This same-ID gateway contract is distinct from Workspace lineage canonicalization, where backend compression can create a descendant with a new session ID. See [Session Lineage](./session-lineage.md) for the complete UI and degradation contract.
+For each send, stream handoff, and recovery operation, the server validates the Card against current lineage data and resolves its mutable canonical segment. Workspace also supports OpenAI-compatible `/v1/chat/completions`; its session headers carry that resolved backend segment and are transport details, not user-facing identity.
 
-## Routing Contract
+See [Session Lineage](./session-lineage.md) for Card projection, actions, history, and degradation behavior.
 
-There are two distinct header layers:
+## Identity and Routing Contract
 
-| Layer                             | Headers                                        | Purpose                                                                                             |
-| --------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Workspace UI route resolution     | `X-Hermes-Session-Key`, `X-Hermes-Friendly-Id` | Tells the browser which Workspace chat route/friendly ID is resolved for the visible conversation.  |
-| Hermes Agent gateway continuation | `X-Hermes-Session-Id`, `X-Claude-Session-Id`   | Tells the gateway which server-side Hermes session should receive the next chat completion request. |
+| Identity              | Scope                              | Contract                                                                                               |
+| --------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `cardId`              | Stable logical parent conversation | Owns the visible route, selection, title, pin state, actions, pending state, and parent-history query. |
+| `canonicalSegmentKey` | Mutable backend parent segment     | Receives the next parent send and live parent stream events after server-side validation.              |
+| `childSessionKey`     | Branch/delegate/child record       | May be used for explicit inspection, but cannot take over the parent Card route or canonical segment.  |
 
-Do not conflate these. A response can correctly resolve a Workspace route while the next gateway request still loses server-side context if `X-Hermes-Session-Id` is missing.
+A browser-supplied segment key, title, or parent ID is never sufficient to construct a Card relation or choose a send destination. A confirmed continuation may update `canonicalSegmentKey` while `cardId` and parent selection remain unchanged.
 
-## Two Continuity Mechanisms
+## Parent History and Continuity
 
-### Stable same-ID gateway continuation
+Workspace requests Card history from the server. The server assembles ordered, de-duplicated parent history across the Card's validated continuation segments and reports whether that component is complete. The browser does not concatenate segment transcripts.
 
-This is the portable OpenAI-compatible path. Workspace sends the same persistent session key on every gateway request, and Hermes Agent continues that server-side session under the same ID. It does not depend on lineage metadata or latest-descendant support.
+Branch, child, and delegate transcripts are excluded from parent history. They are loaded separately only when the user inspects that child, and returning from inspection restores the same selected parent Card.
 
-1. `src/routes/api/send-stream.ts` receives `sessionKey`, `friendlyId`, `message`, `history`, and optional `attachments` from the UI.
-2. It resolves a persistent Workspace `sessionKey`.
-3. It builds OpenAI-compatible messages, including multimodal image parts when attachments are present.
-4. It calls `openaiChat(..., { sessionId: portableSessionKey })`.
-5. `src/server/openai-compat-api.ts` forwards that session ID via `X-Hermes-Session-Id` and the legacy/back-compat `X-Claude-Session-Id` alias.
-6. Hermes Agent continues the supplied ID instead of deriving a fresh deterministic `api-*` session from request content.
+The inspection URL is `/chat/<parentCardId>?inspect=<childCardId>`. The route validates `childCardId` against the selected parent's projected direct children; the parent route, title, action ownership, canonical send target, and parent-history query do not change. The child-history request carries both child and parent Card IDs, and the server revalidates that relationship before assembling only the child's continuation component. Closing inspection removes the query state and reveals the already-separate parent history.
 
-### Compression-driven descendant canonicalization
+Malformed or stale inspection identity and missing, failed, or incomplete child history never trigger `/api/history` or another raw-session fallback. A valid partial child response may display only its available child messages; a missing or failed response stays empty/unavailable rather than showing parent messages as though they belonged to the child.
 
-A lineage-capable backend can store a compressed continuation under a new descendant ID. Workspace then asks `GET /api/sessions/:sessionKey/latest-descendant` for the canonical tip and changes routes only for a supported, explicitly changed, matching response.
+Pending sends, recovery state, and persisted runs retain both Card identity and the concrete canonical segment so a valid continuation rotation does not turn a storage key into a new user-facing conversation.
 
-If the capability is unavailable, the request fails, or the response is malformed, Workspace keeps the requested key so ordinary history navigation can proceed. This fallback does not recreate the same-ID gateway contract. Conversely, stable gateway headers do not cause Workspace to invent or merge descendant transcripts.
+## Gateway Session Headers
 
-The lineage tree can collapse confirmed continuation segments into one visible tip, but history still comes from the selected backend session. There is no client-side transcript concatenation.
+The OpenAI-compatible transport uses these server-to-gateway headers when a canonical segment is available:
 
-## Original Failure Mode
+| Header                | Purpose                                                                   |
+| --------------------- | ------------------------------------------------------------------------- |
+| `X-Hermes-Session-Id` | Identifies the validated backend segment that should receive the request. |
+| `X-Claude-Session-Id` | Compatibility alias for the same validated backend segment.               |
 
-The same-ID bug was coupling session-continuity headers to bearer-token presence:
+These headers are independent of bearer-token presence. Authentication, when required, is enforced separately. They do not authorize the browser to select a segment, prove a lineage relation, or permit a child session to become the parent target.
 
-```ts
-if (options.sessionId && bearer) {
-  headers['X-Hermes-Session-Id'] = options.sessionId
-  headers['X-Claude-Session-Id'] = options.sessionId
-}
-```
+For a backend that continues a conversation under one ID, the canonical segment can remain unchanged across requests. When backend-authoritative lineage confirms a parent continuation under a new ID, the server may rotate the canonical segment without changing the Card route.
 
-If a bearer token was unavailable or unused, Workspace still had a local session key, but the gateway never received it. The gateway then derived sessions such as `api-*` from request content, splitting related turns and attachment-only/image requests across separate API sessions.
+## Validated Stream Handoffs
 
-## Correct Same-ID Behavior
+An upstream session-ID change is accepted as a parent handoff only after the server confirms that the new record is a continuation within the same Card.
 
-Session routing is independent of whether a bearer token is configured. If the gateway requires authentication, it enforces that separately.
+- A confirmed same-Card continuation updates the canonical segment and retains the original `cardId`, parent selection, and active parent stream.
+- A branch, delegate, child, cross-source record, unknown relation, or malformed event leaves the parent Card and routing target unchanged.
+- Child activity is published beneath the parent Card and may be inspected; it is not a navigation event.
+- Stale or inconsistent Card events are rejected rather than rerouting traffic.
 
-```ts
-const bearer = getBearerToken()
-if (bearer) {
-  headers['Authorization'] = `Bearer ${bearer}`
-}
+## Card-Scoped Operations
 
-if (options.sessionId) {
-  headers['X-Hermes-Session-Id'] = options.sessionId
-  headers['X-Claude-Session-Id'] = options.sessionId
-}
-```
+Routing for user actions also starts from `cardId`:
 
-`src/server/openai-compat-api.test.ts` covers session headers with and without a bearer token. `src/server/chat-backends.ts` forwards `options.sessionId` into `openaiChat(...)` for streaming and non-streaming OpenAI-compatible calls.
+- title and pin changes update Card metadata;
+- branch resolves the current canonical parent segment and forks the whole Card;
+- archive changes Workspace metadata and hides the Card from the active list.
+
+Continuation segments and ordinary child nodes do not own these actions. Archive is not remote logical-Card deletion, and Workspace exposes no such deletion without an upstream atomic logical-conversation contract.
+
+## Conservative Degradation
+
+Malformed or incomplete Card data must not invent a relationship or destination.
+
+- If Card projection or canonical-segment validation is unavailable, preserve the selected Card and present a safe unavailable/retry state. Do not guess a segment, accept a child, or silently use a legacy per-segment route.
+- If only part of a confirmed continuation component can be retrieved, report history as incomplete. Do not fabricate a continuous transcript or merge a branch/delegate/child transcript.
+- A malformed stream handoff cannot change the route, Card selection, or parent send target.
+- An unavailable or inconsistent fork response leaves the parent Card unchanged.
 
 ## Credential-Free Manual Verification
 
@@ -89,9 +91,12 @@ Reuse the canonical gateway on `127.0.0.1:8642` and Dashboard on `127.0.0.1:9119
 
    Do not use `pnpm start:all`; it also starts another gateway.
 
-3. Use a disposable session and non-sensitive marker text:
-   - send two `/api/send-stream` turns with the same Workspace `sessionKey` and confirm both remain under that same backend ID rather than separate `api-*` sessions;
-   - send an image attachment with that same key and confirm it remains in the same session;
-   - separately open an existing compressed session, refresh, and confirm Workspace selects the reported descendant tip rather than treating the old and new IDs as two portable same-ID turns.
+3. With disposable, non-sensitive Card data, verify the same behavior on desktop and mobile:
+   - send parent turns before and after a validated continuation and confirm the Card route and selection stay stable while delivery resolves to the current canonical segment;
+   - refresh and confirm one continuous parent history spans the validated continuation segments;
+   - inspect a child and use `Back to parent conversation`; confirm neither inspection nor child activity replaces the parent Card or parent send target;
+   - rename, pin/unpin, create a whole-Card branch, and archive from the parent Card only;
+   - confirm the branch remains beneath the parent and the parent stays selected;
+   - confirm an archived Card leaves the active list without any remote logical-Card deletion claim or flow.
 
-A successful health or listener probe proves reachability only. Verify the actual chat path, and do not record credentials, transcript content, attachment data, or tool output.
+4. A health response proves reachability only. If no safe continuation/child fixture exists, leave that case unforced. Do not supply or record credentials, raw user transcript content, attachments, or tool output.

@@ -19,14 +19,25 @@ const MAX_CURSOR_LENGTH = 4096
 
 function parseHistoryQuery(
   request: Request,
-): { cursor?: string; limit?: number } | null {
+): { cursor?: string; limit?: number; parentCardId?: string } | null {
   const search = new URL(request.url).searchParams
-  if ([...search.keys()].some((key) => key !== 'cursor' && key !== 'limit')) {
+  if (
+    [...search.keys()].some(
+      (key) => key !== 'cursor' && key !== 'limit' && key !== 'parentCardId',
+    )
+  ) {
     return null
   }
   const cursorValues = search.getAll('cursor')
   const limitValues = search.getAll('limit')
-  if (cursorValues.length > 1 || limitValues.length > 1) return null
+  const parentCardIdValues = search.getAll('parentCardId')
+  if (
+    cursorValues.length > 1 ||
+    limitValues.length > 1 ||
+    parentCardIdValues.length > 1
+  ) {
+    return null
+  }
 
   const cursor = cursorValues[0]
   if (cursor !== undefined && (!cursor || cursor.length > MAX_CURSOR_LENGTH)) {
@@ -40,9 +51,16 @@ function parseHistoryQuery(
     limit = Number(rawLimit)
     if (!Number.isSafeInteger(limit) || limit > MAX_HISTORY_LIMIT) return null
   }
+  const rawParentCardId = parentCardIdValues[0]
+  const parentCardId =
+    rawParentCardId === undefined
+      ? undefined
+      : normalizedCardId(rawParentCardId)
+  if (parentCardId === null) return null
   return {
     ...(cursor === undefined ? {} : { cursor }),
     ...(limit === undefined ? {} : { limit }),
+    ...(parentCardId === undefined ? {} : { parentCardId }),
   }
 }
 
@@ -58,7 +76,10 @@ export const Route = createFileRoute('/api/session-cards/$cardId/history')({
         if (!cardId) return invalidRequest('Valid cardId required')
         const query = parseHistoryQuery(request)
         if (!query) {
-          return invalidRequest('Invalid Session Card history cursor or limit')
+          return invalidRequest('Invalid Session Card history query')
+        }
+        if (query.parentCardId === cardId) {
+          return invalidRequest('Child history requires a distinct parent Card')
         }
 
         try {

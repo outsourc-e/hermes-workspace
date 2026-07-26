@@ -25,21 +25,21 @@ import {
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Link, useRouterState } from '@tanstack/react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { CHAT_OPEN_SETTINGS_EVENT } from '../chat-events'
-import { fetchSessionCards, sessionCardQueryKeys } from '../chat-queries'
+import {
+  archiveSessionCard,
+  branchSessionCard,
+  fetchSessionCards,
+  sessionCardQueryKeys,
+  updateSessionCardMetadata,
+} from '../chat-queries'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
-import { useDeleteSession } from '../hooks/use-delete-session'
-import { useForkSession } from '../hooks/use-fork-session'
-import { useRenameSession } from '../hooks/use-rename-session'
 import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
-import {
-  SidebarSessions,
-  areSessionLineagesEqual,
-} from './sidebar/sidebar-sessions'
+import { SidebarSessions } from './sidebar/sidebar-sessions'
 import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionCard, SessionMeta } from '../types'
 import { t } from '@/lib/i18n'
@@ -68,9 +68,174 @@ import {
   MenuTrigger,
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
-import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
 type WorkspaceStats = Record<string, unknown>
+
+type DesktopCardAction = 'rename' | 'pin' | 'branch' | 'archive'
+
+type DesktopCardActionFailure = {
+  action: DesktopCardAction
+  actionLabel: string
+  cardId: string
+  cardTitle: string
+  message: string
+  retry: () => void
+}
+
+type DesktopSessionCardActionsOptions = {
+  activeCardId: string
+  onActiveSessionDelete?: () => void
+  invalidateCards: () => Promise<unknown> | unknown
+  navigateToCard: (cardId: string) => Promise<unknown> | unknown
+}
+
+function mutationErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message
+  return 'The Card service did not complete this action.'
+}
+
+export function useDesktopSessionCardActions({
+  activeCardId,
+  onActiveSessionDelete,
+  invalidateCards,
+  navigateToCard,
+}: DesktopSessionCardActionsOptions) {
+  const pendingCardIdsRef = useRef<Set<string>>(new Set())
+  const [pendingCardIds, setPendingCardIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const [failure, setFailure] = useState<DesktopCardActionFailure | null>(null)
+
+  function setCardPending(cardId: string, pending: boolean) {
+    const next = new Set(pendingCardIdsRef.current)
+    if (pending) next.add(cardId)
+    else next.delete(cardId)
+    pendingCardIdsRef.current = next
+    setPendingCardIds(next)
+  }
+
+  async function runCardAction(
+    card: SessionCard,
+    action: DesktopCardAction,
+    actionLabel: string,
+    mutation: () => Promise<unknown>,
+    onSuccess?: () => Promise<unknown> | unknown,
+  ): Promise<void> {
+    if (pendingCardIdsRef.current.has(card.cardId)) return
+    setFailure((current) => (current?.cardId === card.cardId ? null : current))
+    setCardPending(card.cardId, true)
+    try {
+      await mutation()
+      await onSuccess?.()
+      setFailure((current) =>
+        current?.cardId === card.cardId && current.action === action
+          ? null
+          : current,
+      )
+    } catch (error) {
+      setFailure({
+        action,
+        actionLabel,
+        cardId: card.cardId,
+        cardTitle: card.title,
+        message: mutationErrorMessage(error),
+        retry: () => {
+          void runCardAction(card, action, actionLabel, mutation, onSuccess)
+        },
+      })
+    } finally {
+      setCardPending(card.cardId, false)
+      try {
+        await invalidateCards()
+      } catch {
+        // The mutation outcome is already known. A later poll can reconcile the list.
+      }
+    }
+  }
+
+  return {
+    pendingCardIds,
+    failure,
+    dismissFailure: () => setFailure(null),
+    rename(card: SessionCard, newTitle: string) {
+      void runCardAction(card, 'rename', 'Rename', () =>
+        updateSessionCardMetadata(card.cardId, { manualTitle: newTitle }),
+      )
+    },
+    togglePin(card: SessionCard) {
+      void runCardAction(card, 'pin', card.pinned ? 'Unpin' : 'Pin', () =>
+        updateSessionCardMetadata(card.cardId, { pinned: !card.pinned }),
+      )
+    },
+    branch(card: SessionCard) {
+      void runCardAction(
+        card,
+        'branch',
+        'Branch',
+        () => branchSessionCard(card.cardId, card.canonicalSegmentKey),
+        () => navigateToCard(card.cardId),
+      )
+    },
+    archive(card: SessionCard) {
+      void runCardAction(
+        card,
+        'archive',
+        'Archive',
+        () => archiveSessionCard(card.cardId),
+        card.cardId === activeCardId ? onActiveSessionDelete : undefined,
+      )
+    },
+  }
+}
+
+export function DesktopCardActionFailureNotice({
+  failure,
+  pending,
+  onDismiss,
+}: {
+  failure: DesktopCardActionFailure
+  pending: boolean
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      role="alert"
+      className="mx-3 mt-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
+      data-card-action-error={failure.cardId}
+    >
+      <div className="font-medium">
+        {failure.actionLabel} unavailable for “{failure.cardTitle}”.
+      </div>
+      <details className="mt-1">
+        <summary className="cursor-pointer select-none text-[11px]">
+          Details
+        </summary>
+        <div className="mt-1 text-[11px] opacity-80">{failure.message}</div>
+      </details>
+      <div className="mt-2 flex gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          aria-label={`Retry ${failure.action} for ${failure.cardTitle}`}
+          onClick={failure.retry}
+        >
+          Retry
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={onDismiss}
+        >
+          Dismiss
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 function ThemeToggleMini() {
   const _theme = useSettingsStore((state) => state.settings.theme)
@@ -519,7 +684,8 @@ function usePersistedBool(key: string, defaultValue: boolean) {
 }
 
 type DesktopSidebarContentProps = {
-  activeFriendlyId: string
+  activeCardId: string
+  inspectedChildCardId?: string
   isVisuallyCollapsed: boolean
   transition: Record<string, unknown>
   searchItem: NavItemDef
@@ -530,21 +696,23 @@ type DesktopSidebarContentProps = {
   profileDisplayName: string
   profileAvatarDataUrl: string | null
   handleOpenSettings: (section?: 'appearance' | 'claude') => void
-  sessions: Array<SessionMeta>
-  sessionCards?: Array<SessionCard>
-  onRename: (session: SessionMeta) => void
-  onDelete: (session: SessionMeta) => void
-  sessionForkAvailable: boolean
-  forkingSessionKey: string | null
-  onFork: (session: SessionMeta) => void
-  sessionsLoading: boolean
-  sessionsFetching: boolean
-  sessionsError: string | null
-  onRetrySessions: () => void
+  sessionCards: Array<SessionCard>
+  onTogglePin: (card: SessionCard) => void
+  onRename: (card: SessionCard) => void
+  onArchive: (card: SessionCard) => void
+  onBranch: (card: SessionCard) => void
+  pendingCardIds: ReadonlySet<string>
+  cardActionFailure: DesktopCardActionFailure | null
+  onDismissCardActionFailure: () => void
+  loading: boolean
+  fetching: boolean
+  error: string | null
+  onRetry: () => void
 }
 
 function DesktopSidebarContent({
-  activeFriendlyId,
+  activeCardId,
+  inspectedChildCardId,
   isVisuallyCollapsed,
   transition,
   searchItem,
@@ -555,17 +723,18 @@ function DesktopSidebarContent({
   profileDisplayName,
   profileAvatarDataUrl,
   handleOpenSettings,
-  sessions,
   sessionCards,
+  onTogglePin,
   onRename,
-  onDelete,
-  sessionForkAvailable,
-  forkingSessionKey,
-  onFork,
-  sessionsLoading,
-  sessionsFetching,
-  sessionsError,
-  onRetrySessions,
+  onArchive,
+  onBranch,
+  pendingCardIds,
+  cardActionFailure,
+  onDismissCardActionFailure,
+  loading,
+  fetching,
+  error,
+  onRetry,
 }: DesktopSidebarContentProps) {
   return (
     <div className="flex h-full min-w-0 flex-1">
@@ -726,22 +895,31 @@ function DesktopSidebarContent({
             aria-label="Session history"
             className="flex min-w-0 flex-1 flex-col"
           >
-            <div className="flex min-h-0 flex-1">
-              <SidebarSessions
-                sessions={sessions}
-                sessionCards={sessionCards}
-                activeFriendlyId={activeFriendlyId}
-                onSelect={onSelectSession}
-                onRename={onRename}
-                onDelete={onDelete}
-                sessionForkAvailable={sessionForkAvailable}
-                forkingSessionKey={forkingSessionKey}
-                onFork={onFork}
-                loading={sessionsLoading}
-                fetching={sessionsFetching}
-                error={sessionsError}
-                onRetry={onRetrySessions}
-              />
+            <div className="flex min-h-0 flex-1 flex-col">
+              {cardActionFailure ? (
+                <DesktopCardActionFailureNotice
+                  failure={cardActionFailure}
+                  pending={pendingCardIds.has(cardActionFailure.cardId)}
+                  onDismiss={onDismissCardActionFailure}
+                />
+              ) : null}
+              <div className="flex min-h-0 flex-1">
+                <SidebarSessions
+                  sessionCards={sessionCards}
+                  activeCardId={activeCardId}
+                  inspectedChildCardId={inspectedChildCardId}
+                  onSelect={onSelectSession}
+                  onTogglePin={onTogglePin}
+                  onRename={onRename}
+                  onArchive={onArchive}
+                  onBranch={onBranch}
+                  pendingCardIds={pendingCardIds}
+                  loading={loading}
+                  fetching={fetching}
+                  error={error}
+                  onRetry={onRetry}
+                />
+              </div>
             </div>
           </motion.section>
         ) : null}
@@ -753,16 +931,11 @@ function DesktopSidebarContent({
 // ── Main component ──────────────────────────────────────────────────────
 
 function ChatSidebarComponent({
-  sessions,
   activeFriendlyId,
   isCollapsed,
   onToggleCollapse,
   onSelectSession,
   onActiveSessionDelete,
-  sessionsLoading,
-  sessionsFetching,
-  sessionsError,
-  onRetrySessions,
 }: ChatSidebarProps) {
   const { settingsOpen, settingsSection, setSettingsOpen, handleOpenSettings } =
     useSidebarSettings()
@@ -770,16 +943,19 @@ function ChatSidebarComponent({
   const profileAvatarDataUrl = useChatSettingsStore(
     selectChatProfileAvatarDataUrl,
   )
-  const { deleteSession } = useDeleteSession()
-  const { renameSession } = useRenameSession()
-  const sessionForkAvailable = useFeatureAvailable('sessionFork')
-  const { forkSession, forkingSessionKey } =
-    useForkSession(sessionForkAvailable)
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const openSearchModal = useSearchModal((state) => state.openModal)
   const isSearchModalOpen = useSearchModal((state) => state.isOpen)
   const pathname = useRouterState({
     select: function selectPathname(state) {
       return state.location.pathname
+    },
+  })
+  const inspectedChildCardId = useRouterState({
+    select: function selectInspectedChild(state) {
+      const search = state.location.search as Record<string, unknown>
+      return typeof search.inspect === 'string' ? search.inspect : undefined
     },
   })
   const sessionCardsQuery = useQuery({
@@ -871,13 +1047,11 @@ function ChatSidebarComponent({
   )
 
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
-  const [renameSessionKey, setRenameSessionKey] = useState<string | null>(null)
-  const [renameFriendlyId, setRenameFriendlyId] = useState<string | null>(null)
+  const [renameCard, setRenameCard] = useState<SessionCard | null>(null)
   const [renameSessionTitle, setRenameSessionTitle] = useState('')
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [deleteSessionKey, setDeleteSessionKey] = useState<string | null>(null)
-  const [deleteFriendlyId, setDeleteFriendlyId] = useState<string | null>(null)
+  const [archiveCard, setArchiveCard] = useState<SessionCard | null>(null)
   const [deleteSessionTitle, setDeleteSessionTitle] = useState('')
   const [providersOpen, setProvidersOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -886,47 +1060,55 @@ function ChatSidebarComponent({
   const sidebarRef = useRef<HTMLElement | null>(null)
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
 
-  function handleOpenRename(session: SessionMeta) {
-    setRenameSessionKey(session.key)
-    setRenameFriendlyId(session.friendlyId)
-    setRenameSessionTitle(
-      session.label || session.title || session.derivedTitle || '',
-    )
+  const cardActions = useDesktopSessionCardActions({
+    activeCardId: activeFriendlyId,
+    onActiveSessionDelete,
+    invalidateCards: () =>
+      queryClient.invalidateQueries({
+        queryKey: sessionCardQueryKeys.list(false),
+      }),
+    navigateToCard: (cardId) =>
+      navigate({
+        to: '/chat/$sessionKey',
+        params: { sessionKey: cardId },
+        search: {},
+      }),
+  })
+
+  function handleOpenRename(card: SessionCard) {
+    setRenameCard(card)
+    setRenameSessionTitle(card.title)
     setRenameDialogOpen(true)
   }
 
   function handleSaveRename(newTitle: string) {
-    if (renameSessionKey) {
-      void renameSession(renameSessionKey, renameFriendlyId, newTitle)
-    }
+    const card = renameCard
     setRenameDialogOpen(false)
-    setRenameSessionKey(null)
-    setRenameFriendlyId(null)
+    setRenameCard(null)
+    if (!card) return
+    cardActions.rename(card, newTitle)
   }
 
-  function handleOpenDelete(session: SessionMeta) {
-    setDeleteSessionKey(session.key)
-    setDeleteFriendlyId(session.friendlyId)
-    setDeleteSessionTitle(
-      session.label ||
-        session.title ||
-        session.derivedTitle ||
-        session.friendlyId,
-    )
+  function handleOpenArchive(card: SessionCard) {
+    setArchiveCard(card)
+    setDeleteSessionTitle(card.title)
     setDeleteDialogOpen(true)
   }
 
-  function handleConfirmDelete() {
-    if (deleteSessionKey && deleteFriendlyId) {
-      const isActive = deleteFriendlyId === activeFriendlyId
-      if (isActive && onActiveSessionDelete) {
-        onActiveSessionDelete()
-      }
-      void deleteSession(deleteSessionKey, deleteFriendlyId, isActive)
-    }
+  function handleConfirmArchive() {
+    const card = archiveCard
     setDeleteDialogOpen(false)
-    setDeleteSessionKey(null)
-    setDeleteFriendlyId(null)
+    setArchiveCard(null)
+    if (!card) return
+    cardActions.archive(card)
+  }
+
+  function handleTogglePin(card: SessionCard) {
+    cardActions.togglePin(card)
+  }
+
+  function handleBranch(card: SessionCard) {
+    cardActions.branch(card)
   }
 
   useEffect(() => {
@@ -1179,7 +1361,8 @@ function ChatSidebarComponent({
     >
       {!isMobile ? (
         <DesktopSidebarContent
-          activeFriendlyId={activeFriendlyId}
+          activeCardId={activeFriendlyId}
+          inspectedChildCardId={inspectedChildCardId}
           isVisuallyCollapsed={isVisuallyCollapsed}
           transition={transition}
           searchItem={searchItem}
@@ -1190,17 +1373,22 @@ function ChatSidebarComponent({
           profileDisplayName={profileDisplayName}
           profileAvatarDataUrl={profileAvatarDataUrl}
           handleOpenSettings={handleOpenSettings}
-          sessions={sessions}
-          sessionCards={sessionCardsQuery.data?.cards}
+          sessionCards={sessionCardsQuery.data?.cards ?? []}
+          onTogglePin={handleTogglePin}
           onRename={handleOpenRename}
-          onDelete={handleOpenDelete}
-          sessionForkAvailable={sessionForkAvailable}
-          forkingSessionKey={forkingSessionKey}
-          onFork={forkSession}
-          sessionsLoading={sessionsLoading}
-          sessionsFetching={sessionsFetching}
-          sessionsError={sessionsError}
-          onRetrySessions={onRetrySessions}
+          onArchive={handleOpenArchive}
+          onBranch={handleBranch}
+          pendingCardIds={cardActions.pendingCardIds}
+          cardActionFailure={cardActions.failure}
+          onDismissCardActionFailure={cardActions.dismissFailure}
+          loading={sessionCardsQuery.isLoading}
+          fetching={sessionCardsQuery.isFetching}
+          error={
+            sessionCardsQuery.error instanceof Error
+              ? sessionCardsQuery.error.message
+              : null
+          }
+          onRetry={() => void sessionCardsQuery.refetch()}
         />
       ) : (
         <>
@@ -1379,19 +1567,23 @@ function ChatSidebarComponent({
                   >
                     <div className="flex-1 min-h-0">
                       <SidebarSessions
-                        sessions={sessions}
-                        sessionCards={sessionCardsQuery.data?.cards}
-                        activeFriendlyId={activeFriendlyId}
+                        sessionCards={sessionCardsQuery.data?.cards ?? []}
+                        activeCardId={activeFriendlyId}
+                        inspectedChildCardId={inspectedChildCardId}
                         onSelect={onSelectSession}
+                        onTogglePin={handleTogglePin}
                         onRename={handleOpenRename}
-                        onDelete={handleOpenDelete}
-                        sessionForkAvailable={sessionForkAvailable}
-                        forkingSessionKey={forkingSessionKey}
-                        onFork={forkSession}
-                        loading={sessionsLoading}
-                        fetching={sessionsFetching}
-                        error={sessionsError}
-                        onRetry={onRetrySessions}
+                        onArchive={handleOpenArchive}
+                        onBranch={handleBranch}
+                        pendingCardIds={cardActions.pendingCardIds}
+                        loading={sessionCardsQuery.isLoading}
+                        fetching={sessionCardsQuery.isFetching}
+                        error={
+                          sessionCardsQuery.error instanceof Error
+                            ? sessionCardsQuery.error.message
+                            : null
+                        }
+                        onRetry={() => void sessionCardsQuery.refetch()}
                       />
                     </div>
                   </motion.div>
@@ -1499,8 +1691,7 @@ function ChatSidebarComponent({
         onOpenChange={(open) => {
           setRenameDialogOpen(open)
           if (!open) {
-            setRenameSessionKey(null)
-            setRenameFriendlyId(null)
+            setRenameCard(null)
             setRenameSessionTitle('')
           }
         }}
@@ -1508,8 +1699,7 @@ function ChatSidebarComponent({
         onSave={handleSaveRename}
         onCancel={() => {
           setRenameDialogOpen(false)
-          setRenameSessionKey(null)
-          setRenameFriendlyId(null)
+          setRenameCard(null)
           setRenameSessionTitle('')
         }}
       />
@@ -1518,36 +1708,12 @@ function ChatSidebarComponent({
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         sessionTitle={deleteSessionTitle}
-        onConfirm={handleConfirmDelete}
+        mode="archive"
+        onConfirm={handleConfirmArchive}
         onCancel={() => setDeleteDialogOpen(false)}
       />
     </motion.aside>
   )
-}
-
-function areSessionsEqual(
-  prevSessions: Array<SessionMeta>,
-  nextSessions: Array<SessionMeta>,
-): boolean {
-  if (prevSessions === nextSessions) return true
-  if (prevSessions.length !== nextSessions.length) return false
-  for (let i = 0; i < prevSessions.length; i += 1) {
-    const prev = prevSessions[i]
-    const next = nextSessions[i]
-    if (!prev || !next) return false
-    if (prev.key !== next.key) return false
-    if (prev.friendlyId !== next.friendlyId) return false
-    if (prev.label !== next.label) return false
-    if (prev.title !== next.title) return false
-    if (prev.derivedTitle !== next.derivedTitle) return false
-    if (prev.updatedAt !== next.updatedAt) return false
-    if (prev.titleStatus !== next.titleStatus) return false
-    if (prev.titleSource !== next.titleSource) return false
-    if (prev.titleError !== next.titleError) return false
-    if (prev.lastMessage !== next.lastMessage) return false
-    if (!areSessionLineagesEqual(prev, next)) return false
-  }
-  return true
 }
 
 function areSidebarPropsEqual(
@@ -1557,11 +1723,6 @@ function areSidebarPropsEqual(
   if (prevProps.activeFriendlyId !== nextProps.activeFriendlyId) return false
   if (prevProps.creatingSession !== nextProps.creatingSession) return false
   if (prevProps.isCollapsed !== nextProps.isCollapsed) return false
-  if (prevProps.sessionsLoading !== nextProps.sessionsLoading) return false
-  if (prevProps.sessionsFetching !== nextProps.sessionsFetching) return false
-  if (prevProps.sessionsError !== nextProps.sessionsError) return false
-  if (prevProps.onRetrySessions !== nextProps.onRetrySessions) return false
-  if (!areSessionsEqual(prevProps.sessions, nextProps.sessions)) return false
   return true
 }
 

@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { chatQueryKeys } from '../chat-queries'
+import {
+  chatQueryKeys,
+  sessionCardQueryKeys,
+  updateSessionCardMetadata,
+} from '../chat-queries'
 import {
   updateSessionTitleState,
   useSessionTitleInfo,
 } from '../session-title-store'
 import { textFromMessage } from '../utils'
-import type { ChatMessage, SessionMeta } from '../types'
+import type { ChatMessage, SessionCard, SessionMeta } from '../types'
 
 const MAX_TITLE_LENGTH = 50
 
@@ -51,6 +55,7 @@ type UseAutoSessionTitleInput = {
   friendlyId: string
   sessionKey: string | undefined
   activeSession?: SessionMeta
+  sessionCard?: SessionCard
   messages: Array<ChatMessage>
   messageCount?: number
   enabled: boolean
@@ -60,12 +65,14 @@ type UpdateTitlePayload = {
   friendlyId: string
   sessionKey: string
   title: string
+  cardId?: string
 }
 
 export function useAutoSessionTitle({
   friendlyId,
   sessionKey,
   activeSession,
+  sessionCard,
   messages,
   enabled,
 }: UseAutoSessionTitleInput) {
@@ -85,23 +92,33 @@ export function useAutoSessionTitle({
     if (!sessionKey || sessionKey === 'new') return false
     if (!proposedTitle) return false
     if (!hasAssistantResponse(messages)) return false
-    if (activeSession?.label && !isGenericTitle(activeSession.label))
-      return false
-    if (activeSession?.title && !isGenericTitle(activeSession.title))
-      return false
-    if (
-      activeSession?.derivedTitle &&
-      !isGenericTitle(activeSession.derivedTitle)
-    ) {
-      return false
-    }
-    if (titleInfo.source === 'manual' && titleInfo.title) return false
-    if (
-      titleInfo.status === 'ready' &&
-      titleInfo.title &&
-      !isGenericTitle(titleInfo.title)
-    ) {
-      return false
+    if (sessionCard) {
+      if (sessionCard.titleSource === 'manual') return false
+      if (
+        sessionCard.titleSource === 'auto' &&
+        !isGenericTitle(sessionCard.title)
+      ) {
+        return false
+      }
+    } else {
+      if (activeSession?.label && !isGenericTitle(activeSession.label))
+        return false
+      if (activeSession?.title && !isGenericTitle(activeSession.title))
+        return false
+      if (
+        activeSession?.derivedTitle &&
+        !isGenericTitle(activeSession.derivedTitle)
+      ) {
+        return false
+      }
+      if (titleInfo.source === 'manual' && titleInfo.title) return false
+      if (
+        titleInfo.status === 'ready' &&
+        titleInfo.title &&
+        !isGenericTitle(titleInfo.title)
+      ) {
+        return false
+      }
     }
     return titleInfo.status !== 'generating'
   }, [
@@ -112,6 +129,7 @@ export function useAutoSessionTitle({
     friendlyId,
     messages,
     proposedTitle,
+    sessionCard,
     sessionKey,
     titleInfo.source,
     titleInfo.status,
@@ -157,6 +175,12 @@ export function useAutoSessionTitle({
 
   const mutation = useMutation({
     mutationFn: async (payload: UpdateTitlePayload) => {
+      if (payload.cardId) {
+        await updateSessionCardMetadata(payload.cardId, {
+          autoTitle: payload.title,
+        })
+        return payload
+      }
       const res = await fetch('/api/sessions', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
@@ -173,6 +197,12 @@ export function useAutoSessionTitle({
       return payload
     },
     onSuccess: (payload) => {
+      if (payload.cardId) {
+        void queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.list(false),
+        })
+        return
+      }
       applyTitle(payload.friendlyId, payload.title, 'auto')
       void queryClient.invalidateQueries({ queryKey: chatQueryKeys.sessions })
     },
@@ -189,7 +219,7 @@ export function useAutoSessionTitle({
   useEffect(() => {
     if (!shouldGenerate) return
     if (isPending) return
-    const signature = `${sessionKey}:${proposedTitle}`
+    const signature = `${sessionCard?.cardId ?? sessionKey}:${proposedTitle}`
     if (lastAttemptRef.current[friendlyId] === signature) return
     lastAttemptRef.current[friendlyId] = signature
     updateSessionTitleState(friendlyId, { status: 'generating', error: null })
@@ -197,6 +227,15 @@ export function useAutoSessionTitle({
       friendlyId,
       sessionKey: sessionKey ?? friendlyId,
       title: proposedTitle,
+      ...(sessionCard ? { cardId: sessionCard.cardId } : {}),
     })
-  }, [friendlyId, isPending, mutate, proposedTitle, sessionKey, shouldGenerate])
+  }, [
+    friendlyId,
+    isPending,
+    mutate,
+    proposedTitle,
+    sessionCard,
+    sessionKey,
+    shouldGenerate,
+  ])
 }

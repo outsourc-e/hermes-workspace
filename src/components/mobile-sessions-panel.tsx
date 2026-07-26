@@ -4,52 +4,30 @@ import {
   Add01Icon,
   ArrowDown01Icon,
   Chat01Icon,
+  Delete01Icon,
+  GitForkIcon,
+  MoreHorizontalIcon,
+  Pen01Icon,
+  PinIcon,
 } from '@hugeicons/core-free-icons'
-import type {
-  SessionCard,
-  SessionCardChild,
-  SessionMeta,
-} from '@/screens/chat/types'
-import { projectSessionCards } from '@/screens/chat/session-cards'
+import type { SessionCard, SessionCardChild } from '@/screens/chat/types'
+
 import { cn } from '@/lib/utils'
 
 type Props = {
   open: boolean
   onClose: () => void
-  sessions: Array<SessionMeta>
-  /** Server-backed Cards take precedence. Legacy sessions remain a safe fallback. */
-  sessionCards?: Array<SessionCard>
+  /** Authoritative, server-backed logical conversations. */
+  sessionCards: Array<SessionCard>
   activeFriendlyId: string
-  onSelectSession: (key: string) => void
+  inspectedChildCardId?: string
+  onSelectSession: (cardId: string, inspectChildCardId?: string) => void
   onNewChat: () => void
-}
-
-function normalizeLabel(value: string | undefined): string {
-  if (typeof value !== 'string') return ''
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : ''
-}
-
-function getSessionTitle(session: SessionMeta | undefined): string {
-  const label = normalizeLabel(session?.label)
-  if (label) return label
-  const derivedTitle = normalizeLabel(session?.derivedTitle)
-  if (derivedTitle) return derivedTitle
-  const title = normalizeLabel(session?.title)
-  if (title) return title
-  return session ? `Session ${session.friendlyId.slice(0, 8)}` : 'Conversation'
-}
-
-function sessionForKey(
-  sessions: Array<SessionMeta>,
-  key: string,
-): SessionMeta | undefined {
-  return sessions.find(
-    (session) =>
-      session.key === key ||
-      session.backendKey === key ||
-      session.friendlyId === key,
-  )
+  onRenameCard: (cardId: string, nextTitle: string) => Promise<void> | void
+  onTogglePin: (cardId: string) => Promise<void> | void
+  onBranchCard: (cardId: string) => Promise<void> | void
+  onArchiveCard: (cardId: string) => Promise<void> | void
+  pendingCardIds?: ReadonlySet<string>
 }
 
 function cardOwnsSessionKey(card: SessionCard, sessionKey: string): boolean {
@@ -90,43 +68,199 @@ function formatUpdatedAt(updatedAt?: number): string {
   return dayFormatter.format(value)
 }
 
+function MobileCardActions({
+  card,
+  open,
+  pending,
+  onToggle,
+  onClose,
+  onRenameCard,
+  onTogglePin,
+  onBranchCard,
+  onArchiveCard,
+}: {
+  card: SessionCard
+  open: boolean
+  pending: boolean
+  onToggle: () => void
+  onClose: () => void
+  onRenameCard: Props['onRenameCard']
+  onTogglePin: Props['onTogglePin']
+  onBranchCard: Props['onBranchCard']
+  onArchiveCard: Props['onArchiveCard']
+}) {
+  const [mode, setMode] = useState<'actions' | 'rename' | 'archive'>('actions')
+  const [renameDraft, setRenameDraft] = useState(card.title)
+
+  const close = () => {
+    setMode('actions')
+    onClose()
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={`Card actions for ${card.title}`}
+        aria-expanded={open}
+        onClick={() => {
+          setMode('actions')
+          setRenameDraft(card.title)
+          onToggle()
+        }}
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-primary-500 hover:bg-primary-100"
+      >
+        <HugeiconsIcon icon={MoreHorizontalIcon} size={16} strokeWidth={1.8} />
+      </button>
+      {open ? (
+        <div
+          className="mb-1 ml-3 basis-full rounded-lg border border-primary-200 bg-primary-50 p-2"
+          data-card-actions={card.cardId}
+        >
+          {mode === 'rename' ? (
+            <form
+              className="space-y-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const nextTitle = renameDraft.trim()
+                if (!nextTitle || pending) return
+                void onRenameCard(card.cardId, nextTitle)
+                close()
+              }}
+            >
+              <input
+                value={renameDraft}
+                onChange={(event) => setRenameDraft(event.target.value)}
+                aria-label={`Rename ${card.title}`}
+                autoFocus
+                className="h-9 w-full rounded-md border border-primary-200 bg-surface px-2 text-sm text-ink outline-none focus:border-accent-400"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={close}
+                  className="rounded-md px-2 py-1 text-xs text-primary-600"
+                >
+                  Cancel rename
+                </button>
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-md bg-accent-500 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  Save rename
+                </button>
+              </div>
+            </form>
+          ) : mode === 'archive' ? (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-primary-600">
+                Archive this Card?
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={close}
+                  className="rounded-md px-2 py-1 text-xs text-primary-600"
+                >
+                  Cancel archive
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    if (pending) return
+                    void onArchiveCard(card.cardId)
+                    close()
+                  }}
+                  className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  Confirm archive
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  if (pending) return
+                  void onTogglePin(card.cardId)
+                  close()
+                }}
+                className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-primary-700 hover:bg-primary-100 disabled:opacity-50"
+              >
+                <HugeiconsIcon icon={PinIcon} size={15} strokeWidth={1.8} />
+                {card.pinned ? 'Unpin card' : 'Pin card'}
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  if (pending) return
+                  void onBranchCard(card.cardId)
+                  close()
+                }}
+                className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-primary-700 hover:bg-primary-100 disabled:opacity-50"
+              >
+                <HugeiconsIcon icon={GitForkIcon} size={15} strokeWidth={1.8} />
+                Branch conversation
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setMode('rename')}
+                className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-primary-700 hover:bg-primary-100 disabled:opacity-50"
+              >
+                <HugeiconsIcon icon={Pen01Icon} size={15} strokeWidth={1.8} />
+                Rename
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setMode('archive')}
+                className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                <HugeiconsIcon
+                  icon={Delete01Icon}
+                  size={15}
+                  strokeWidth={1.8}
+                />
+                Archive card
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </>
+  )
+}
+
 export function MobileSessionsPanel({
   open,
   onClose,
-  sessions,
   sessionCards,
   activeFriendlyId,
+  inspectedChildCardId,
   onSelectSession,
   onNewChat,
+  onRenameCard,
+  onTogglePin,
+  onBranchCard,
+  onArchiveCard,
+  pendingCardIds = new Set<string>(),
 }: Props) {
   const disclosurePrefix = useId().replaceAll(':', '')
   const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(
     () => new Set(),
   )
-  const activeSessionKey = useMemo(
-    () =>
-      sessions.find(
-        (session) =>
-          session.friendlyId === activeFriendlyId ||
-          session.key === activeFriendlyId ||
-          session.backendKey === activeFriendlyId,
-      )?.key ?? activeFriendlyId,
-    [activeFriendlyId, sessions],
-  )
-  const legacyProjection = useMemo(
-    () => projectSessionCards(sessions, { activeSessionKey }),
-    [activeSessionKey, sessions],
-  )
-  const roots = sessionCards ?? legacyProjection.roots
+  const [actionCardId, setActionCardId] = useState<string>()
+  const activeSessionKey = activeFriendlyId
+  const roots = sessionCards
   const cardsById = useMemo(
-    () =>
-      new Map(
-        (sessionCards ?? legacyProjection.cards).map((card) => [
-          card.cardId,
-          card,
-        ]),
-      ),
-    [legacyProjection.cards, sessionCards],
+    () => new Map(sessionCards.map((card) => [card.cardId, card])),
+    [sessionCards],
   )
   const activeCard = useMemo<{
     rootCardId?: string
@@ -141,9 +275,14 @@ export function MobileSessionsPanel({
       if (visited.has(card.cardId)) return undefined
       visited.add(card.cardId)
       if (cardOwnsSessionKey(card, activeSessionKey)) {
-        return card.cardId === rootCardId
-          ? { rootCardId }
-          : { rootCardId, childCardId: card.cardId }
+        if (card.cardId !== rootCardId) {
+          return { rootCardId, childCardId: card.cardId }
+        }
+        return card.childNodes.some(
+          (child) => child.cardId === inspectedChildCardId,
+        )
+          ? { rootCardId, childCardId: inspectedChildCardId }
+          : { rootCardId }
       }
       for (const child of card.childNodes) {
         if (
@@ -165,7 +304,7 @@ export function MobileSessionsPanel({
       if (match) return match
     }
     return {}
-  }, [activeSessionKey, cardsById, roots])
+  }, [activeSessionKey, cardsById, inspectedChildCardId, roots])
 
   useEffect(() => {
     if (!open) return
@@ -195,19 +334,22 @@ export function MobileSessionsPanel({
     })
   }
 
+  const closeCardActions = () => {
+    setActionCardId(undefined)
+  }
+
   const renderChild = (
     child: SessionCardChild,
+    rootCardId: string,
     depth: number,
     visited: ReadonlySet<string>,
   ): React.ReactNode => {
     if (visited.has(child.cardId)) return null
     const nextVisited = new Set(visited)
     nextVisited.add(child.cardId)
-    const session = sessionForKey(sessions, child.sessionKey)
-    const title = sessionCards ? child.title : getSessionTitle(session)
+    const title = child.title
     const fullCard = cardsById.get(child.cardId)
     const inspected = activeCard.childCardId === child.cardId
-    const routeKey = session?.friendlyId ?? child.sessionKey
     const grandchildren = fullCard?.childNodes ?? []
     const expanded = !collapsedCardIds.has(child.cardId)
     const childrenId = `${disclosurePrefix}-${child.cardId}-children`
@@ -221,7 +363,7 @@ export function MobileSessionsPanel({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => onSelectSession(routeKey)}
+            onClick={() => onSelectSession(rootCardId, child.cardId)}
             aria-label={`Inspect ${child.relationshipKind === 'branch' ? 'branch' : 'delegated session'} ${title}`}
             data-card-child-id={child.cardId}
             data-session-depth={depth}
@@ -263,7 +405,7 @@ export function MobileSessionsPanel({
           <div id={childrenId} hidden={!expanded} className="space-y-1 pt-1">
             {expanded
               ? grandchildren.map((grandchild) =>
-                  renderChild(grandchild, depth + 1, nextVisited),
+                  renderChild(grandchild, rootCardId, depth + 1, nextVisited),
                 )
               : null}
           </div>
@@ -313,13 +455,7 @@ export function MobileSessionsPanel({
             ) : (
               <div className="space-y-1">
                 {roots.map((card) => {
-                  const session = sessionForKey(
-                    sessions,
-                    card.canonicalSegmentKey,
-                  )
-                  const title = sessionCards
-                    ? card.title
-                    : getSessionTitle(session)
+                  const title = card.title
                   const timestamp = formatUpdatedAt(card.updatedAt)
                   const active = activeCard.rootCardId === card.cardId
                   const inspectedChild =
@@ -328,15 +464,16 @@ export function MobileSessionsPanel({
                     card.childNodes.length > 0 &&
                     (!collapsedCardIds.has(card.cardId) || inspectedChild)
                   const childrenId = `${disclosurePrefix}-${card.cardId}-children`
-                  const routeKey =
-                    session?.friendlyId ?? card.canonicalSegmentKey
+                  const actionsOpen = actionCardId === card.cardId
+                  const pending = pendingCardIds.has(card.cardId)
+
                   return (
                     <div key={card.cardId} data-card-container={card.cardId}>
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
                         <button
                           type="button"
                           aria-label={`Open card ${title}`}
-                          onClick={() => onSelectSession(routeKey)}
+                          onClick={() => onSelectSession(card.cardId)}
                           aria-current={active ? 'page' : undefined}
                           data-card-id={card.cardId}
                           data-session-key={card.canonicalSegmentKey}
@@ -362,7 +499,7 @@ export function MobileSessionsPanel({
                             </div>
                           ) : null}
                           <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-primary-500">
-                            <span className="truncate">{routeKey}</span>
+                            <span className="truncate">{card.cardId}</span>
                             {timestamp ? <span>{timestamp}</span> : null}
                           </div>
                         </button>
@@ -383,6 +520,21 @@ export function MobileSessionsPanel({
                             />
                           </button>
                         ) : null}
+                        <MobileCardActions
+                          card={card}
+                          open={actionsOpen}
+                          pending={pending}
+                          onToggle={() =>
+                            setActionCardId(
+                              actionsOpen ? undefined : card.cardId,
+                            )
+                          }
+                          onClose={closeCardActions}
+                          onRenameCard={onRenameCard}
+                          onTogglePin={onTogglePin}
+                          onBranchCard={onBranchCard}
+                          onArchiveCard={onArchiveCard}
+                        />
                       </div>
                       {card.childNodes.length > 0 ? (
                         <div
@@ -392,7 +544,12 @@ export function MobileSessionsPanel({
                         >
                           {expanded
                             ? card.childNodes.map((child) =>
-                                renderChild(child, 1, new Set([card.cardId])),
+                                renderChild(
+                                  child,
+                                  card.cardId,
+                                  1,
+                                  new Set([card.cardId]),
+                                ),
                               )
                             : null}
                         </div>

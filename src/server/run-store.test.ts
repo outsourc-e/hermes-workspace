@@ -228,6 +228,123 @@ describe('run-store persistence', () => {
     })
   })
 
+  it('retains card identity and advances its canonical segment during migration', async () => {
+    const {
+      createPersistedRun,
+      getActiveRunForCard,
+      getPersistedRun,
+      migratePersistedRun,
+    } = await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'card-run',
+      sessionKey: 'remote:parent',
+      friendlyId: 'remote:parent-card',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:parent',
+    })
+    await migratePersistedRun(
+      'remote:parent',
+      'remote:continuation',
+      'card-run',
+      'remote:parent-card',
+      {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey: 'remote:continuation',
+      },
+    )
+
+    expect(
+      await getPersistedRun('remote:continuation', 'card-run'),
+    ).toMatchObject({
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:continuation',
+      sessionKey: 'remote:continuation',
+    })
+    expect(
+      await getActiveRunForCard('remote:parent-card', 'remote:continuation'),
+    ).toMatchObject({
+      runId: 'card-run',
+      canonicalSegmentKey: 'remote:continuation',
+    })
+  })
+
+  it('returns the newest active run for the stable Card and current canonical segment', async () => {
+    vi.useFakeTimers()
+    const { createPersistedRun, getActiveRunForCard } =
+      await import('./run-store')
+
+    vi.setSystemTime(new Date('2026-07-26T12:00:00.000Z'))
+    await createPersistedRun({
+      runId: 'older-current-run',
+      sessionKey: 'tip-upstream-a',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:tip',
+    })
+    vi.setSystemTime(new Date('2026-07-26T12:00:03.000Z'))
+    await createPersistedRun({
+      runId: 'newest-stale-lineage-run',
+      sessionKey: 'old-tip-upstream',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:old-tip',
+    })
+    vi.setSystemTime(new Date('2026-07-26T12:00:02.000Z'))
+    await createPersistedRun({
+      runId: 'newest-current-run',
+      sessionKey: 'tip-upstream-b',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:tip',
+    })
+
+    await expect(
+      getActiveRunForCard('remote:parent-card', 'remote:tip'),
+    ).resolves.toMatchObject({
+      runId: 'newest-current-run',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:tip',
+    })
+  })
+
+  it('keeps a failed migration recoverable through the stable card id', async () => {
+    const { createPersistedRun, getActiveRunForCard, migratePersistedRun } =
+      await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'recoverable-card-run',
+      sessionKey: 'remote:parent',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:parent',
+    })
+    fsPromiseState.rejectedUnlinks = [
+      {
+        suffix: join('remote%3Aparent', 'recoverable-card-run.json'),
+        message: 'forced card migration failure',
+      },
+    ]
+
+    await expect(
+      migratePersistedRun(
+        'remote:parent',
+        'remote:continuation',
+        'recoverable-card-run',
+        'remote:parent-card',
+        {
+          cardId: 'remote:parent-card',
+          canonicalSegmentKey: 'remote:continuation',
+        },
+      ),
+    ).rejects.toThrow('forced card migration failure')
+    fsPromiseState.rejectedUnlinks = []
+
+    expect(
+      await getActiveRunForCard('remote:parent-card', 'remote:parent'),
+    ).toMatchObject({
+      runId: 'recoverable-card-run',
+      sessionKey: 'remote:parent',
+      canonicalSegmentKey: 'remote:parent',
+    })
+  })
+
   it('does not leave a successor recovery clone when source unlink fails', async () => {
     const {
       appendRunText,

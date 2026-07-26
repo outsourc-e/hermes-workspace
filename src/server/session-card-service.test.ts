@@ -555,6 +555,56 @@ describe('SessionCardService collection and resolution', () => {
     )
   })
 
+  it('resolves a child Card only through its validated direct parent', async () => {
+    const child = session(
+      'child',
+      {
+        parentSessionId: 'hidden',
+        relationshipType: 'child_session',
+        source: 'cli',
+      },
+      400,
+    )
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () =>
+          Promise.resolve(
+            page(
+              [...continuationSessions(), child, session('other-root')],
+              0,
+              5,
+            ),
+          ),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+    })
+
+    await expect(
+      service.resolveChildCard('remote:root', 'remote:child'),
+    ).resolves.toMatchObject({
+      card: {
+        cardId: 'remote:child',
+        parentCardId: 'remote:root',
+        canonicalSegmentKey: 'remote:child',
+        continuationSegmentKeys: ['remote:child'],
+      },
+      pinEligible: false,
+      aliases: ['remote:child'],
+    })
+
+    await expect(
+      service.resolveChildCard('remote:other-root', 'remote:child'),
+    ).rejects.toBeInstanceOf(SessionCardNotFoundError)
+    await expect(
+      service.resolveChildCard('remote:root', 'child'),
+    ).rejects.toBeInstanceOf(SessionCardNotFoundError)
+    await expect(
+      service.resolveChildCard('remote:root', 'remote:missing'),
+    ).rejects.toBeInstanceOf(SessionCardNotFoundError)
+  })
+
   it('accepts only an unambiguous server-validated cold continuation alias', async () => {
     const coldTip = session('tip', {
       parentSessionId: 'previous-tip',
@@ -619,6 +669,72 @@ describe('SessionCardService collection and resolution', () => {
     })
   })
 
+  it('resolves a raw remote bootstrap session only through its authoritative Card identity', async () => {
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () =>
+          Promise.resolve(
+            page([session('created-session', { source: 'cli' }, 20)], 0, 1),
+          ),
+      },
+      localSource: {
+        source: 'local',
+        listSessions: () => [
+          session('created-session', { source: 'local' }, 10),
+        ],
+      },
+      metadataStore: metadataStore(),
+    })
+
+    await expect(
+      service.resolveRemoteCardByUpstreamSession('created-session'),
+    ).resolves.toMatchObject({
+      card: {
+        cardId: 'remote:created-session',
+        canonicalSegmentKey: 'remote:created-session',
+      },
+      collection: { completeness: 'complete' },
+    })
+    await expect(
+      service.resolveRemoteCardByUpstreamSession('missing-session'),
+    ).rejects.toBeInstanceOf(SessionCardNotFoundError)
+  })
+
+  it('resolves a raw local bootstrap session only through one complete local parent Card', async () => {
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () =>
+          Promise.resolve(
+            page([session('created-session', { source: 'cli' }, 20)], 0, 1),
+          ),
+      },
+      localSource: {
+        source: 'local',
+        listSessions: () => [
+          session('created-session', { source: 'local' }, 10),
+        ],
+      },
+      metadataStore: metadataStore(),
+    })
+
+    await expect(
+      service.resolveLocalCardByUpstreamSession('created-session'),
+    ).resolves.toMatchObject({
+      card: {
+        cardId: 'local:created-session',
+        canonicalSegmentKey: 'local:created-session',
+        canonicalSource: 'local',
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+    })
+    await expect(
+      service.resolveLocalCardByUpstreamSession('missing-session'),
+    ).rejects.toBeInstanceOf(SessionCardNotFoundError)
+  })
+
   it('preserves same-key remote and local conversations as independent source-qualified cards', async () => {
     const service = new SessionCardService({
       remoteSource: {
@@ -636,6 +752,9 @@ describe('SessionCardService collection and resolution', () => {
     const listed = await service.listCards()
     expect(listed.cards).toHaveLength(2)
     expect(new Set(listed.cards.map((card) => card.cardId)).size).toBe(2)
+    expect(new Set(listed.cards.map((card) => card.canonicalSource))).toEqual(
+      new Set(['local', 'remote']),
+    )
     await expect(service.resolveCard('main')).rejects.toBeInstanceOf(
       SessionCardNotFoundError,
     )
@@ -647,13 +766,14 @@ describe('SessionCardService collection and resolution', () => {
       resolved
         .map((card) => [
           card.card.cardId,
+          card.card.canonicalSource,
           [...card.sourceBySegmentKey.values()][0],
           [...card.upstreamKeyBySegmentKey.values()][0],
         ])
-        .sort((left, right) => String(left[1]).localeCompare(String(right[1]))),
+        .sort((left, right) => String(left[2]).localeCompare(String(right[2]))),
     ).toEqual([
-      [expect.stringContaining('local'), 'local', 'main'],
-      [expect.stringContaining('remote'), 'remote', 'main'],
+      [expect.stringContaining('local'), 'local', 'local', 'main'],
+      [expect.stringContaining('remote'), 'remote', 'remote', 'main'],
     ])
   })
 

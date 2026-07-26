@@ -586,6 +586,9 @@ describe('GET /api/session-cards/$cardId/history', () => {
       'cursor=',
       `cursor=${'x'.repeat(4097)}`,
       'segmentKey=remote%3Atip',
+      'parentCardId=',
+      'parentCardId=remote%3Aroot&parentCardId=remote%3Aother',
+      'parentCardId=remote%3Aroot',
     ]) {
       const response = await historyHandler({
         request: getRequest(
@@ -596,6 +599,33 @@ describe('GET /api/session-cards/$cardId/history', () => {
       expect(response.status).toBe(400)
     }
     expect(mocks.getHistory).not.toHaveBeenCalled()
+  })
+
+  it('passes a distinct parent Card only for validated child-history resolution', async () => {
+    const childHistory = {
+      cardId: 'remote:child',
+      canonicalSegmentKey: 'remote:child-tip',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+    mocks.getHistory.mockResolvedValue(childHistory)
+
+    const response = await historyHandler({
+      request: getRequest(
+        '/api/session-cards/remote%3Achild/history?parentCardId=remote%3Aroot&limit=25',
+      ),
+      params: { cardId: 'remote:child' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.getHistory).toHaveBeenCalledWith({
+      cardId: 'remote:child',
+      parentCardId: 'remote:root',
+      limit: 25,
+    })
+    expect(await response.json()).toEqual(childHistory)
   })
 
   it('preserves partial status while recursively sanitizing missing-segment diagnostics', async () => {

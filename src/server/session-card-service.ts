@@ -67,6 +67,7 @@ export type SessionCardSourceStatus = {
 
 export type SessionCardCollection = {
   sessions: Array<SessionMeta>
+  originBySessionKey: ReadonlyMap<string, 'remote' | 'local'>
   sourceBySessionKey: ReadonlyMap<string, string>
   upstreamKeyBySessionKey: ReadonlyMap<string, string>
   sourceStatusBySessionKey: ReadonlyMap<string, SessionCardSourceStatus>
@@ -334,6 +335,7 @@ function projectSourceQualifiedSessions(
 ): Pick<
   SessionCardCollection,
   | 'sessions'
+  | 'originBySessionKey'
   | 'sourceBySessionKey'
   | 'upstreamKeyBySessionKey'
   | 'sourceStatusBySessionKey'
@@ -356,6 +358,7 @@ function projectSourceQualifiedSessions(
   }
 
   const sessions: Array<SessionMeta> = []
+  const originBySessionKey = new Map<string, CollectedSession['origin']>()
   const sourceBySessionKey = new Map<string, string>()
   const upstreamKeyBySessionKey = new Map<string, string>()
   const sourceStatusBySessionKey = new Map<string, SessionCardSourceStatus>()
@@ -400,6 +403,7 @@ function projectSourceQualifiedSessions(
       key: projectedKey,
       ...(lineage ? { lineage } : {}),
     })
+    originBySessionKey.set(projectedKey, entry.origin)
     sourceBySessionKey.set(projectedKey, entry.source)
     upstreamKeyBySessionKey.set(projectedKey, entry.session.key)
     const status = statusByOrigin.get(entry.origin)
@@ -408,6 +412,7 @@ function projectSourceQualifiedSessions(
 
   return {
     sessions,
+    originBySessionKey,
     sourceBySessionKey,
     upstreamKeyBySessionKey,
     sourceStatusBySessionKey,
@@ -493,6 +498,103 @@ function visibleRootCards(
         visibleCardIds.has(child.cardId),
       ),
     }))
+}
+
+function canonicalSourceForCard(
+  card: SessionCard,
+  collection: SessionCardCollection,
+): 'local' | 'remote' {
+  const canonicalSource = collection.originBySessionKey.get(
+    card.canonicalSegmentKey,
+  )
+  if (!canonicalSource) {
+    throw new Error(
+      `Canonical Session Card source is unavailable: ${card.cardId}`,
+    )
+  }
+  return canonicalSource
+}
+
+function attachCanonicalSources(
+  cards: Array<SessionCard>,
+  collection: SessionCardCollection,
+): Array<SessionCard> {
+  return cards.map((card) => ({
+    ...card,
+    canonicalSource: canonicalSourceForCard(card, collection),
+  }))
+}
+
+function resolveProjectedCard(
+  fresh: FreshProjection,
+  card: SessionCard,
+  aliases: Array<string>,
+  pinEligible: boolean,
+): ResolvedSessionCard {
+  const sourceBySegmentKey = new Map<string, string>()
+  const upstreamKeyBySegmentKey = new Map<string, string>()
+  const continuationSegmentKeys: Array<string> = []
+  const seenContinuationSegmentKeys = new Set<string>()
+  for (const loadedSegmentKey of card.continuationSegmentKeys) {
+    const knownMissing =
+      fresh.collection.knownMissingContinuationSegmentKeysBySessionKey.get(
+        loadedSegmentKey,
+      ) ?? []
+    for (const segmentKey of [...knownMissing, loadedSegmentKey]) {
+      if (seenContinuationSegmentKeys.has(segmentKey)) continue
+      seenContinuationSegmentKeys.add(segmentKey)
+      continuationSegmentKeys.push(segmentKey)
+    }
+  }
+  const resolvedCard: SessionCard = {
+    ...card,
+    canonicalSource: canonicalSourceForCard(card, fresh.collection),
+    continuationSegmentKeys,
+  }
+  const requiredSources: Array<SessionCardSourceStatus> = []
+  const seenRequiredSources = new Set<SessionCardSourceStatus>()
+  let componentComplete = true
+  for (const segmentKey of resolvedCard.continuationSegmentKeys) {
+    const source = fresh.collection.sourceBySessionKey.get(segmentKey)
+    const upstreamKey = fresh.collection.upstreamKeyBySessionKey.get(segmentKey)
+    const sourceStatus =
+      fresh.collection.sourceStatusBySessionKey.get(segmentKey)
+    if (source) sourceBySegmentKey.set(segmentKey, source)
+    if (upstreamKey) upstreamKeyBySegmentKey.set(segmentKey, upstreamKey)
+    if (!source || !upstreamKey || sourceStatus?.status !== 'complete') {
+      componentComplete = false
+    }
+    if (sourceStatus && !seenRequiredSources.has(sourceStatus)) {
+      seenRequiredSources.add(sourceStatus)
+      requiredSources.push(sourceStatus)
+    }
+  }
+
+  // Relationship projection alone is not authoritative enough for mutations.
+  // Expose each direct child's fresh source-qualified upstream identity too.
+  for (const child of resolvedCard.childNodes) {
+    const source = fresh.collection.sourceBySessionKey.get(child.sessionKey)
+    const upstreamKey = fresh.collection.upstreamKeyBySessionKey.get(
+      child.sessionKey,
+    )
+    if (source) sourceBySegmentKey.set(child.sessionKey, source)
+    if (upstreamKey) upstreamKeyBySegmentKey.set(child.sessionKey, upstreamKey)
+  }
+
+  return {
+    card: resolvedCard,
+    pinEligible,
+    aliases,
+    sourceBySegmentKey,
+    upstreamKeyBySegmentKey,
+    collection: {
+      completeness: componentComplete ? 'complete' : 'incomplete',
+      retryable:
+        !componentComplete ||
+        requiredSources.some((source) => source.retryable),
+      sources: requiredSources,
+    },
+  }
 }
 
 export class SessionCardService {
@@ -821,9 +923,9 @@ export class SessionCardService {
   ): Promise<SessionCardListResult> {
     const fresh = await this.freshProjection()
     return {
-      cards: visibleRootCards(
-        fresh.projection,
-        options.includeArchived === true,
+      cards: attachCanonicalSources(
+        visibleRootCards(fresh.projection, options.includeArchived === true),
+        fresh.collection,
       ),
       completeness: fresh.collection.completeness,
       retryable: fresh.collection.retryable,
@@ -849,72 +951,112 @@ export class SessionCardService {
     })
     if (!card) throw new SessionCardNotFoundError(requestedCardId)
 
-    const sourceBySegmentKey = new Map<string, string>()
-    const upstreamKeyBySegmentKey = new Map<string, string>()
-    const continuationSegmentKeys: Array<string> = []
-    const seenContinuationSegmentKeys = new Set<string>()
-    for (const loadedSegmentKey of card.continuationSegmentKeys) {
-      const knownMissing =
-        fresh.collection.knownMissingContinuationSegmentKeysBySessionKey.get(
-          loadedSegmentKey,
-        ) ?? []
-      for (const segmentKey of [...knownMissing, loadedSegmentKey]) {
-        if (seenContinuationSegmentKeys.has(segmentKey)) continue
-        seenContinuationSegmentKeys.add(segmentKey)
-        continuationSegmentKeys.push(segmentKey)
-      }
-    }
-    const resolvedCard: SessionCard = {
-      ...card,
-      continuationSegmentKeys,
-    }
-    const requiredSources: Array<SessionCardSourceStatus> = []
-    const seenRequiredSources = new Set<SessionCardSourceStatus>()
-    let componentComplete = true
-    for (const segmentKey of resolvedCard.continuationSegmentKeys) {
-      const source = fresh.collection.sourceBySessionKey.get(segmentKey)
-      const upstreamKey =
-        fresh.collection.upstreamKeyBySessionKey.get(segmentKey)
-      const sourceStatus =
-        fresh.collection.sourceStatusBySessionKey.get(segmentKey)
-      if (source) sourceBySegmentKey.set(segmentKey, source)
-      if (upstreamKey) upstreamKeyBySegmentKey.set(segmentKey, upstreamKey)
-      if (!source || !upstreamKey || sourceStatus?.status !== 'complete') {
-        componentComplete = false
-      }
-      if (sourceStatus && !seenRequiredSources.has(sourceStatus)) {
-        seenRequiredSources.add(sourceStatus)
-        requiredSources.push(sourceStatus)
-      }
+    return resolveProjectedCard(
+      fresh,
+      card,
+      fresh.aliasesByCardId.get(card.cardId) ?? [card.cardId],
+      fresh.projection.pinEligibleCardIds.has(card.cardId),
+    )
+  }
+
+  private async resolveCardByUpstreamSession(
+    origin: 'remote' | 'local',
+    requestedUpstreamSessionKey: string,
+  ): Promise<ResolvedSessionCard> {
+    const upstreamSessionKey = requestedUpstreamSessionKey.trim()
+    const fresh = await this.freshProjection()
+    const matches = visibleRootCards(fresh.projection, false)
+      .map((card) => ({
+        card,
+        segmentKeys: card.continuationSegmentKeys.filter(
+          (segmentKey) =>
+            fresh.collection.originBySessionKey.get(segmentKey) === origin &&
+            fresh.collection.upstreamKeyBySessionKey.get(segmentKey) ===
+              upstreamSessionKey,
+        ),
+      }))
+      .filter(({ segmentKeys }) => segmentKeys.length > 0)
+    if (
+      !upstreamSessionKey ||
+      matches.length !== 1 ||
+      matches[0]!.segmentKeys.length !== 1
+    ) {
+      throw new SessionCardNotFoundError(requestedUpstreamSessionKey)
     }
 
-    // Relationship projection alone is not authoritative enough for mutations.
-    // Expose each direct child's fresh source-qualified upstream identity too.
-    for (const child of resolvedCard.childNodes) {
-      const source = fresh.collection.sourceBySessionKey.get(child.sessionKey)
-      const upstreamKey = fresh.collection.upstreamKeyBySessionKey.get(
-        child.sessionKey,
-      )
-      if (source) sourceBySegmentKey.set(child.sessionKey, source)
-      if (upstreamKey) {
-        upstreamKeyBySegmentKey.set(child.sessionKey, upstreamKey)
-      }
+    const card = matches[0]!.card
+    const resolved = resolveProjectedCard(
+      fresh,
+      card,
+      fresh.aliasesByCardId.get(card.cardId) ?? [card.cardId],
+      fresh.projection.pinEligibleCardIds.has(card.cardId),
+    )
+    if (
+      resolved.collection.completeness !== 'complete' ||
+      resolved.card.canonicalSource !== origin
+    ) {
+      throw new SessionCardNotFoundError(requestedUpstreamSessionKey)
     }
+    return resolved
+  }
 
-    return {
-      card: resolvedCard,
-      pinEligible: fresh.projection.pinEligibleCardIds.has(card.cardId),
-      aliases: fresh.aliasesByCardId.get(card.cardId) ?? [card.cardId],
-      sourceBySegmentKey,
-      upstreamKeyBySegmentKey,
-      collection: {
-        completeness: componentComplete ? 'complete' : 'incomplete',
-        retryable:
-          !componentComplete ||
-          requiredSources.some((source) => source.retryable),
-        sources: requiredSources,
+  /**
+   * Resolves a backend session through a fresh remote Card projection. Raw
+   * upstream identity is accepted only at this server-side boundary; callers
+   * receive the authoritative Card ID and canonical projected segment.
+   */
+  async resolveRemoteCardByUpstreamSession(
+    requestedUpstreamSessionKey: string,
+  ): Promise<ResolvedSessionCard> {
+    return this.resolveCardByUpstreamSession(
+      'remote',
+      requestedUpstreamSessionKey,
+    )
+  }
+
+  /** Resolve an internal portable-session key through a fresh local Card. */
+  async resolveLocalCardByUpstreamSession(
+    requestedUpstreamSessionKey: string,
+  ): Promise<ResolvedSessionCard> {
+    return this.resolveCardByUpstreamSession(
+      'local',
+      requestedUpstreamSessionKey,
+    )
+  }
+
+  async resolveChildCard(
+    requestedParentCardId: string,
+    requestedChildCardId: string,
+  ): Promise<ResolvedSessionCard> {
+    const parentCardId = requestedParentCardId.trim()
+    const childCardId = requestedChildCardId.trim()
+    const fresh = await this.freshProjection()
+    const parent = visibleRootCards(fresh.projection, false).find(
+      (candidate) => {
+        const aliases = fresh.aliasesByCardId.get(candidate.cardId) ?? [
+          candidate.cardId,
+        ]
+        return aliases.includes(parentCardId)
       },
+    )
+    const directChild = parent?.childNodes.find(
+      (candidate) => candidate.cardId === childCardId,
+    )
+    const child = directChild
+      ? fresh.projection.indexByCardId.get(directChild.cardId)
+      : undefined
+    if (
+      !parent ||
+      !directChild ||
+      !child ||
+      child.parentCardId !== parent.cardId ||
+      (child.relationshipKind !== 'branch' &&
+        child.relationshipKind !== 'child')
+    ) {
+      throw new SessionCardNotFoundError(requestedChildCardId)
     }
+
+    return resolveProjectedCard(fresh, child, [child.cardId], false)
   }
 
   async updateCardMetadata(

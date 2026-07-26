@@ -13,6 +13,7 @@ import {
 
 const card = {
   cardId: 'remote:root',
+  canonicalSource: 'remote',
   title: 'Root',
   titleSource: 'manual',
   canonicalSegmentKey: 'remote:tip',
@@ -70,6 +71,21 @@ describe('Session Card query keys', () => {
       'branch',
       'remote:root',
     ])
+    expect(
+      sessionCardQueryKeys.childHistory(
+        'remote:root',
+        'remote:child',
+        'remote:child-tip',
+      ),
+    ).toEqual([
+      'chat',
+      'session-cards',
+      'child-history',
+      'remote:root',
+      'remote:child',
+      'remote:child-tip',
+      '',
+    ])
   })
 })
 
@@ -101,6 +117,29 @@ describe('Session Card fetchers', () => {
       'Invalid Session Card response',
     )
   })
+
+  it.each([undefined, null, '', 'gateway', 'portable', []])(
+    'rejects a missing or unverified canonical Card source: %j',
+    async (canonicalSource) => {
+      const candidate: Record<string, unknown> = { ...card, canonicalSource }
+      if (canonicalSource === undefined) delete candidate.canonicalSource
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          response({
+            cards: [candidate],
+            completeness: 'complete',
+            retryable: false,
+            sources: [],
+          }),
+        ),
+      )
+
+      await expect(fetchSessionCards()).rejects.toThrow(
+        'Invalid Session Card response',
+      )
+    },
+  )
 
   it.each([undefined, null, 0, 1, 'true', [], {}])(
     'rejects a non-primitive-boolean pinned value: %j',
@@ -424,6 +463,63 @@ describe('Session Card fetchers', () => {
       { signal: undefined },
     )
     expect(fetchMock.mock.calls.flat().join(' ')).not.toContain('/api/history')
+  })
+
+  it('loads child Card history with explicit parent ownership and no raw-session fallback', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response({
+        cardId: 'remote:child',
+        canonicalSegmentKey: 'remote:child-tip',
+        messages: [
+          {
+            segmentKey: 'remote:child-tip',
+            message: { id: 'child-message' },
+          },
+        ],
+        completeness: 'partial',
+        retryable: true,
+        missingSegments: [
+          {
+            segmentKey: 'remote:child-root',
+            retryable: true,
+            error: 'temporarily unavailable',
+          },
+        ],
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      fetchSessionCardHistory({
+        parentCardId: 'remote:root',
+        cardId: 'remote:child',
+        canonicalSegmentKey: 'remote:child-tip',
+        limit: 25,
+      }),
+    ).resolves.toMatchObject({
+      cardId: 'remote:child',
+      completeness: 'partial',
+      retryable: true,
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/session-cards/remote%3Achild/history?parentCardId=remote%3Aroot&limit=25',
+      { signal: undefined },
+    )
+    expect(fetchMock.mock.calls.flat().join(' ')).not.toContain('/api/history')
+  })
+
+  it('rejects malformed child history identity before any request', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      fetchSessionCardHistory({
+        parentCardId: 'remote:root',
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:child-tip',
+      }),
+    ).rejects.toThrow('Invalid Session Card history request')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('loads every Card history cursor page in parent order', async () => {

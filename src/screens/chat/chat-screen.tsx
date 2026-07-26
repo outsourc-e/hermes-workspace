@@ -11,12 +11,7 @@ import {
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
-import {
-  deriveFriendlyIdFromKey,
-  isMissingAuth,
-  readError,
-  textFromMessage,
-} from './utils'
+import { isMissingAuth, textFromMessage } from './utils'
 import {
   advanceStickyStreamingText,
   createOptimisticMessage,
@@ -29,6 +24,8 @@ import {
 import {
   appendHistoryMessage,
   appendSessionCardHistoryMessage,
+  archiveSessionCard,
+  branchSessionCard,
   chatQueryKeys,
   clearHistoryMessages,
   fetchCompleteSessionCardHistory,
@@ -39,6 +36,7 @@ import {
   updateHistoryMessageByClientId,
   updateHistoryMessageByClientIdEverywhere,
   updateSessionCardHistoryMessages,
+  updateSessionCardMetadata,
   updateSessionLastMessage,
 } from './chat-queries'
 import { ChatHeader } from './components/chat-header'
@@ -61,7 +59,10 @@ import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
 import { snapshotOptimisticUserMessages } from './hooks/optimistic-message-reinject'
 import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useStreamingMessage } from './hooks/use-streaming-message'
-import { useActiveRunCheck } from './hooks/use-active-run-check'
+import {
+  activeRunCheckUrl,
+  useActiveRunCheck,
+} from './hooks/use-active-run-check'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
@@ -88,12 +89,7 @@ import type {
   ThinkingLevel,
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
-import type {
-  ChatAttachment,
-  ChatMessage,
-  SessionCard,
-  SessionMeta,
-} from './types'
+import type { ChatAttachment, ChatMessage, SessionCard } from './types'
 import type { AgentActivity } from '@/stores/chat-activity-store'
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { playChatComplete } from '@/lib/sounds'
@@ -514,6 +510,9 @@ export function ChatScreen({
     activeCard && cardHandoff?.cardId === activeCard.cardId
       ? cardHandoff.canonicalSegmentKey
       : activeCard?.canonicalSegmentKey
+  const inspectedChildCard = activeCard?.childNodes.find(
+    (child) => child.cardId === inspectedChildCardId,
+  )
   useEffect(() => {
     if (
       activeCard &&
@@ -524,16 +523,42 @@ export function ChatScreen({
     }
   }, [activeCard, cardHandoff])
   const [sending, setSending] = useState(false)
-  const [_creatingSession, setCreatingSession] = useState(false)
+
   const [sessionsOpen, setSessionsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [renamingCardTitle, setRenamingCardTitle] = useState(false)
+  const [pendingCardIds, setPendingCardIds] = useState<Set<string>>(
+    () => new Set(),
+  )
   const [isRedirecting, setIsRedirecting] = useState(false)
   const { headerRef, composerRef, mainRef, pinGroupMinHeight, headerHeight } =
     useChatMeasurements()
   useTapDebug(mainRef, { label: 'chat-main' })
   const chatMode = useChatMode()
-  const isPortableMode = chatMode === 'portable'
-  const portableChatFriendlyId = isPortableMode ? 'main' : activeFriendlyId
+  const activeCardSource = activeCard?.canonicalSource
+  const hasVerifiedCardSource =
+    !activeCard || activeCardSource === 'local' || activeCardSource === 'remote'
+  const cardTransportReady =
+    hasVerifiedCardSource &&
+    (!activeCard || Boolean(activeCardCanonicalSegmentKey?.trim()))
+  // Existing Cards are routed by their server-verified canonical source. The
+  // global mode remains authoritative only for legacy and bootstrap routes.
+  const isPortableMode = activeCard
+    ? activeCardSource === 'local'
+    : chatMode === 'portable'
+  // Portable `main` remains a legacy existing-session transport only. Every
+  // New Chat starts from the server bootstrap sentinel so its verified Card
+  // handoff, rather than a client-side main alias, owns the route transition.
+  const isPortableMainSession = isPortableMode && !activeCard && !isNewChat
+  const transportFriendlyId = activeCard
+    ? activeCard.cardId
+    : isPortableMainSession
+      ? 'main'
+      : activeFriendlyId
+  const cardSourceError =
+    activeCard && !cardTransportReady
+      ? 'Session Card canonical source is missing or invalid.'
+      : null
   // --- Issue #43 fix: lift waitingForResponse into persistent Zustand store ---
   // The store survives component unmount, so navigating away mid-stream
   const [liveToolActivity, setLiveToolActivity] = useState<
@@ -624,15 +649,23 @@ export function ChatScreen({
     sessionsLoading: _sessionsLoading,
     sessionsFetching: _sessionsFetching,
     refetchSessions: _refetchSessions,
-  } = useChatSessions({ activeFriendlyId, isNewChat, forcedSessionKey })
+  } = useChatSessions({
+    activeFriendlyId,
+    isNewChat,
+    forcedSessionKey,
+    enabled: !activeCard,
+  })
   const activeSessionKey =
     activeCardCanonicalSegmentKey ?? legacyActiveSessionKey
   const activeTitle = activeCard?.title ?? legacyActiveTitle
-  const sessionSource = getChatSessionSourceState({
-    embedded,
-    sessionsStatus: sessionsQuery.status,
-    source: activeSession?.lineage?.source,
-  })
+  const legacyRedirecting = !activeCard && isRedirecting
+  const sessionSource = activeCard
+    ? (activeCardSource ?? 'unknown')
+    : getChatSessionSourceState({
+        embedded,
+        sessionsStatus: sessionsQuery.status,
+        source: activeSession?.lineage?.source,
+      })
   const {
     historyQuery: legacyHistoryQuery,
     historyMessages: legacyHistoryMessages,
@@ -642,16 +675,18 @@ export function ChatScreen({
     activeCanonicalKey: legacyActiveCanonicalKey,
     sessionKeyForHistory: legacySessionKeyForHistory,
   } = useChatHistory({
-    activeFriendlyId: portableChatFriendlyId,
+    activeFriendlyId: transportFriendlyId,
     activeSessionKey,
     forcedSessionKey,
     isNewChat: isNewChat || Boolean(activeCard),
-    isRedirecting,
-    activeExists,
-    sessionsReady: sessionsQuery.isSuccess,
+    isRedirecting: legacyRedirecting,
+    activeExists: activeCard ? true : activeExists,
+    sessionsReady: activeCard ? true : sessionsQuery.isSuccess,
     queryClient,
     historyRefetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
-    portableMode: isPortableMode,
+    // This legacy hook's portable mode specifically means the global `main`
+    // conversation. A local Card keeps its canonical Card identity.
+    portableMode: isPortableMainSession,
     sessionSource,
     onCanonicalSessionResolved: useCallback(
       ({
@@ -699,11 +734,36 @@ export function ChatScreen({
       return mergeSessionCardHistoryResponse(server, cached)
     },
     enabled:
+      cardTransportReady &&
       Boolean(activeCard) &&
       Boolean(activeCardCanonicalSegmentKey) &&
-      !isNewChat &&
-      !isRedirecting,
+      !isNewChat,
     refetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
+  })
+  const inspectedChildHistoryQuery = useQuery({
+    queryKey: sessionCardQueryKeys.childHistory(
+      activeCard?.cardId ?? '',
+      inspectedChildCard?.cardId ?? '',
+      inspectedChildCard?.sessionKey ?? '',
+    ),
+    queryFn: ({ signal }) => {
+      if (!activeCard || !inspectedChildCard) {
+        throw new Error('Inspected child Card is not validated')
+      }
+      return fetchCompleteSessionCardHistory({
+        parentCardId: activeCard.cardId,
+        cardId: inspectedChildCard.cardId,
+        canonicalSegmentKey: inspectedChildCard.sessionKey,
+        signal,
+      })
+    },
+    enabled:
+      cardTransportReady &&
+      Boolean(activeCard) &&
+      Boolean(inspectedChildCard) &&
+      !isNewChat,
+    retry: 1,
+    refetchOnWindowFocus: true,
   })
   const historyQuery = activeCard ? cardHistoryQuery : legacyHistoryQuery
   const historyMessages = activeCard
@@ -711,8 +771,14 @@ export function ChatScreen({
     : legacyHistoryMessages
   const messageCount = activeCard ? historyMessages.length : legacyMessageCount
   const historyError = activeCard
-    ? (cardHistoryQuery.error?.message ?? null)
+    ? (cardSourceError ?? cardHistoryQuery.error?.message ?? null)
     : legacyHistoryError
+  const displayedHistoryQuery = inspectedChildCard
+    ? inspectedChildHistoryQuery
+    : historyQuery
+  const displayedHistoryError = inspectedChildCard
+    ? (inspectedChildHistoryQuery.error?.message ?? null)
+    : historyError
   const resolvedSessionKey = activeCard
     ? activeCardCanonicalSegmentKey
     : legacyResolvedSessionKey
@@ -797,8 +863,12 @@ export function ChatScreen({
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
   useActiveRunCheck({
     sessionKey: resolvedSessionKey ?? '',
+    cardId: activeCard?.cardId,
     enabled:
-      !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
+      cardTransportReady &&
+      !isNewChat &&
+      Boolean(resolvedSessionKey) &&
+      historyQuery.isSuccess,
     onCheckComplete: useCallback(() => {
       setActiveRunCheckDone(true)
     }, []),
@@ -819,18 +889,22 @@ export function ChatScreen({
     streamingRunId,
     activeToolCalls,
   } = useRealtimeChatHistory({
-    sessionKey: isPortableMode
-      ? 'main'
+    sessionKey: activeCard
+      ? activeCardCanonicalSegmentKey || ''
       : isNewChat
         ? 'new'
-        : resolvedSessionKey ||
-          sessionKeyForHistory ||
-          activeCanonicalKey ||
-          'main',
-    friendlyId: portableChatFriendlyId,
+        : isPortableMainSession
+          ? 'main'
+          : resolvedSessionKey ||
+            sessionKeyForHistory ||
+            activeCanonicalKey ||
+            'main',
+    friendlyId: transportFriendlyId,
     historyMessages,
-    portableMode: isPortableMode,
+    // Do not let the legacy portable hook coerce a local Card to `main`.
+    portableMode: isPortableMainSession,
     enabled:
+      cardTransportReady &&
       // Always enable for new chats in portable mode (no sessions API to resolve).
       // In enhanced mode, wait for session resolution before subscribing.
       ((isPortableMode && isNewChat) ||
@@ -838,7 +912,7 @@ export function ChatScreen({
           Boolean(
             resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey,
           ))) &&
-      !isRedirecting,
+      !legacyRedirecting,
     onUserMessage: useCallback(() => {
       // External message arrived (e.g. from Telegram) — show thinking indicator
       setWaitingForResponse(true)
@@ -1055,12 +1129,17 @@ export function ChatScreen({
     // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
     // The refetch replaces the query cache with server data — if the server
     // hasn't processed the user's POST yet, the optimistic message vanishes.
-    const historySessionKey = isPortableMode
-      ? 'main'
-      : activeSessionKey || sessionKeyForHistory || resolvedSessionKey || 'main'
+    const historySessionKey = activeCard
+      ? activeCardCanonicalSegmentKey || ''
+      : isPortableMainSession
+        ? 'main'
+        : activeSessionKey ||
+          sessionKeyForHistory ||
+          resolvedSessionKey ||
+          'main'
     const reInjectOptimistic = snapshotOptimisticUserMessages(
       queryClient,
-      portableChatFriendlyId,
+      transportFriendlyId,
       historySessionKey,
     )
 
@@ -1093,15 +1172,16 @@ export function ChatScreen({
   // Issue #43 polling fallback: when waiting but SSE hasn't reconnected,
   // poll the active-run endpoint every 5s to detect completion.
   useEffect(() => {
-    if (!waitingForResponse || !resolvedSessionKey) return
+    if (!cardTransportReady || !waitingForResponse || !resolvedSessionKey)
+      return
     if (sseConnectionState === 'connected') return // SSE will deliver the event
     const interval = window.setInterval(async () => {
       try {
-        const res = await fetch(
-          `/api/sessions/${encodeURIComponent(resolvedSessionKey)}/active-run`,
+        const response = await fetch(
+          activeRunCheckUrl(resolvedSessionKey, activeCard?.cardId),
         )
-        if (!res.ok) return
-        const data = await res.json()
+        if (!response.ok) return
+        const data = await response.json()
         if (!data.ok) return
         // Run not yet registered (gateway lag during silent processing) → keep waiting
         if (!data.run) return
@@ -1115,16 +1195,27 @@ export function ChatScreen({
       }
     }, 5000)
     return () => window.clearInterval(interval)
-  }, [waitingForResponse, resolvedSessionKey, sseConnectionState, streamFinish])
+  }, [
+    activeCard?.cardId,
+    cardTransportReady,
+    waitingForResponse,
+    resolvedSessionKey,
+    sseConnectionState,
+    streamFinish,
+  ])
 
   useAutoSessionTitle({
     friendlyId: activeFriendlyId,
     sessionKey: resolvedSessionKey,
     activeSession,
+    sessionCard: activeCard,
     messages: historyMessages,
     messageCount,
     enabled:
-      !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
+      cardTransportReady &&
+      !isNewChat &&
+      Boolean(resolvedSessionKey) &&
+      historyQuery.isSuccess,
   })
 
   // Phase 4.1: Smart Model Suggestions
@@ -1288,11 +1379,7 @@ export function ChatScreen({
     activeCardId: activeCard?.cardId,
     onCardHandoff: useCallback(
       (handoff: AuthoritativeCardHandoff) => {
-        if (
-          !activeCard ||
-          handoff.cardId !== activeCard.cardId ||
-          handoff.fromSegmentKey !== activeCardCanonicalSegmentKey
-        ) {
+        if (!activeCard || handoff.cardId !== activeCard.cardId) {
           return
         }
         streamHandoffRouteRef.current = {
@@ -1321,7 +1408,7 @@ export function ChatScreen({
           queryKey: sessionCardQueryKeys.list(false),
         })
       },
-      [activeCard, activeCardCanonicalSegmentKey, queryClient],
+      [activeCard, queryClient],
     ),
     onSessionResolved: useCallback(
       ({
@@ -1356,6 +1443,14 @@ export function ChatScreen({
         }
         if (alreadyResolved) return
         streamHandoffRouteRef.current = { sessionKey, friendlyId }
+        if (reason === 'bootstrap') {
+          // The server only emits a bootstrap handoff after a fresh
+          // authoritative Card projection. Refresh the route's Card list as
+          // the stable Card ID replaces the `new` bootstrap segment.
+          void queryClient.invalidateQueries({
+            queryKey: sessionCardQueryKeys.list(false),
+          })
+        }
         onSessionResolved?.({
           fromSessionKey,
           sessionKey,
@@ -1369,6 +1464,7 @@ export function ChatScreen({
         activeSessionKey,
         forcedSessionKey,
         onSessionResolved,
+        queryClient,
         resolvedSessionKey,
       ],
     ),
@@ -1564,7 +1660,7 @@ export function ChatScreen({
 
   // Use realtime-merged messages for display (SSE + history)
   // Re-apply display filter to realtime messages
-  const finalDisplayMessages = useMemo(() => {
+  const parentDisplayMessages = useMemo(() => {
     const filtered = realtimeMessages.filter((msg) => {
       if (msg.role === 'user') {
         const text = stripQueuedWrapper(textFromMessage(msg))
@@ -1754,9 +1850,28 @@ export function ChatScreen({
     realtimeStreamingThinking,
   ])
 
+  const inspectedChildDisplayMessages = useMemo(() => {
+    const messages = inspectedChildHistoryQuery.data?.messages ?? []
+    return messages
+      .filter((message) => {
+        if (message.role === 'user') {
+          const text = stripQueuedWrapper(textFromMessage(message))
+          return !text.startsWith('A subagent task')
+        }
+        if (message.role !== 'assistant') return false
+        if (textFromMessage(message).trim().length > 0) return true
+        const content = Array.isArray(message.content) ? message.content : []
+        return content.some((part) => part.type === 'toolCall')
+      })
+      .map((message) => stripQueuedWrapperFromUserMessage(message))
+  }, [inspectedChildHistoryQuery.data?.messages])
+  const finalDisplayMessages = inspectedChildCard
+    ? inspectedChildDisplayMessages
+    : parentDisplayMessages
+
   const derivedStreamingInfo = useMemo(() => {
     if (activeIsRealtimeStreaming) {
-      const last = finalDisplayMessages.at(-1)
+      const last = parentDisplayMessages.at(-1)
       const id = isPortableMode
         ? localStreamingMessageId
         : last?.role === 'assistant'
@@ -1764,8 +1879,8 @@ export function ChatScreen({
           : null
       return { isStreaming: true, streamingMessageId: id }
     }
-    if (waitingForResponse && finalDisplayMessages.length > 0) {
-      const last = finalDisplayMessages.at(-1)
+    if (waitingForResponse && parentDisplayMessages.length > 0) {
+      const last = parentDisplayMessages.at(-1)
       if (last && last.role === 'assistant') {
         const isStreamingPlaceholder =
           (last as any).__streamingStatus === 'streaming'
@@ -1782,7 +1897,7 @@ export function ChatScreen({
     return { isStreaming: false, streamingMessageId: null as string | null }
   }, [
     waitingForResponse,
-    finalDisplayMessages,
+    parentDisplayMessages,
     activeIsRealtimeStreaming,
     isPortableMode,
     localStreamingMessageId,
@@ -1802,9 +1917,10 @@ export function ChatScreen({
       return
     }
     if (responseWaitSnapshotRef.current) return
-    responseWaitSnapshotRef.current =
-      createResponseWaitSnapshot(finalDisplayMessages)
-  }, [waitingForResponse, finalDisplayMessages])
+    responseWaitSnapshotRef.current = createResponseWaitSnapshot(
+      parentDisplayMessages,
+    )
+  }, [waitingForResponse, parentDisplayMessages])
 
   useEffect(() => {
     if (!waitingForResponse) {
@@ -1816,14 +1932,16 @@ export function ChatScreen({
     }
     const snapshot = responseWaitSnapshotRef.current
     if (!snapshot) return
-    if (shouldClearWaitingForAssistantMessage(finalDisplayMessages, snapshot)) {
+    if (
+      shouldClearWaitingForAssistantMessage(parentDisplayMessages, snapshot)
+    ) {
       if (clearTimerRef.current) return
       clearTimerRef.current = window.setTimeout(() => {
         clearTimerRef.current = null
         streamFinish()
       }, 50)
     }
-  }, [finalDisplayMessages, waitingForResponse, streamFinish])
+  }, [parentDisplayMessages, waitingForResponse, streamFinish])
 
   useEffect(() => {
     const wasStreaming = prevIsRealtimeStreamingRef.current
@@ -1908,18 +2026,20 @@ export function ChatScreen({
             }
           : null
       : null
-  const serverError = statusError?.message ?? sessionsError ?? historyError
+  const legacySessionsError = activeCard ? null : sessionsError
+  const serverError =
+    statusError?.message ?? legacySessionsError ?? displayedHistoryError
   const serverErrorStatus = statusError?.status
   const showErrorNotice = Boolean(serverError) && !isNewChat
   const handleRefetch = useCallback(() => {
     void statusQuery.refetch()
-    void sessionsQuery.refetch()
-    void historyQuery.refetch()
-  }, [statusQuery, sessionsQuery, historyQuery])
+    if (!activeCard) void sessionsQuery.refetch()
+    void displayedHistoryQuery.refetch()
+  }, [activeCard, statusQuery, sessionsQuery, displayedHistoryQuery])
 
   const handleRefreshHistory = useCallback(() => {
-    void historyQuery.refetch()
-  }, [historyQuery])
+    void displayedHistoryQuery.refetch()
+  }, [displayedHistoryQuery])
 
   useEffect(() => {
     const handleRefreshRequest = () => {
@@ -1991,6 +2111,9 @@ export function ChatScreen({
     !isNewChat &&
     !activeCard &&
     !forcedSessionKey &&
+    // `main` is an explicitly allowed bootstrap identity. It must remain in
+    // place until a server-verified Card handoff replaces it.
+    activeFriendlyId !== 'main' &&
     !isRecentSession(activeFriendlyId) &&
     sessionsQuery.isSuccess &&
     sessions.length > 0 &&
@@ -1999,7 +2122,7 @@ export function ChatScreen({
     !historyQuery.isSuccess
 
   useEffect(() => {
-    if (isRedirecting) {
+    if (legacyRedirecting) {
       if (error) setError(null)
       return
     }
@@ -2010,13 +2133,14 @@ export function ChatScreen({
     if (
       sessionsQuery.isSuccess &&
       !activeExists &&
-      !sessionsError &&
-      !historyError
+      !legacySessionsError &&
+      !displayedHistoryError
     ) {
       if (error) setError(null)
       return
     }
-    const messageText = sessionsError ?? historyError ?? statusError?.message
+    const messageText =
+      legacySessionsError ?? displayedHistoryError ?? statusError?.message
     if (!messageText) {
       if (error?.startsWith('Failed to load')) {
         setError(null)
@@ -2026,10 +2150,10 @@ export function ChatScreen({
     if (isMissingAuth(messageText) && !embedded) {
       navigate({ to: '/', replace: true })
     }
-    const message = sessionsError
-      ? `Failed to load sessions. ${sessionsError}`
-      : historyError
-        ? `Failed to load history. ${historyError}`
+    const message = legacySessionsError
+      ? `Failed to load sessions. ${legacySessionsError}`
+      : displayedHistoryError
+        ? `Failed to load history. ${displayedHistoryError}`
         : statusError
           ? `Hermes Agent unavailable. ${statusError.message}`
           : null
@@ -2038,26 +2162,33 @@ export function ChatScreen({
     activeExists,
     error,
     statusError,
-    historyError,
-    isRedirecting,
+    displayedHistoryError,
+    legacyRedirecting,
     navigate,
-    sessionsError,
+    legacySessionsError,
     sessionsQuery.isSuccess,
     shouldRedirectToNew,
   ])
 
   useEffect(() => {
     if (!isRedirecting) return
-    if (isNewChat) {
+    if (activeCard || isNewChat) {
       setIsRedirecting(false)
       return
     }
     if (!shouldRedirectToNew && sessionsQuery.isSuccess) {
       setIsRedirecting(false)
     }
-  }, [isNewChat, isRedirecting, sessionsQuery.isSuccess, shouldRedirectToNew])
+  }, [
+    activeCard,
+    isNewChat,
+    isRedirecting,
+    sessionsQuery.isSuccess,
+    shouldRedirectToNew,
+  ])
 
   useEffect(() => {
+    if (activeCard) return
     if (embedded) return
     if (isNewChat) return
     if (!sessionsQuery.isSuccess) return
@@ -2069,13 +2200,16 @@ export function ChatScreen({
       activeFriendlyId,
       sessionKeyForHistory || activeFriendlyId,
     )
-    const latestSession = sessions[0]?.friendlyId ?? 'new'
     navigate({
       to: '/chat/$sessionKey',
-      params: { sessionKey: latestSession },
+      // Nonbootstrap legacy identities cannot become a Card route by selecting
+      // an arbitrary raw session-list row. Restart only from the explicit
+      // bootstrap sentinel, which may later advance through a verified handoff.
+      params: { sessionKey: 'new' },
       replace: true,
     })
   }, [
+    activeCard,
     activeFriendlyId,
     historyQuery.isFetching,
     historyQuery.isSuccess,
@@ -2089,9 +2223,9 @@ export function ChatScreen({
     embedded,
   ])
 
-  const hideUi = shouldRedirectToNew || isRedirecting
+  const hideUi = shouldRedirectToNew || legacyRedirecting
   const isFocusMode = !compact && chatFocusMode
-  const showComposer = !isRedirecting
+  const showComposer = !legacyRedirecting
 
   const handleToggleFocusMode = useCallback(() => {
     if (compact) return
@@ -2280,7 +2414,9 @@ export function ChatScreen({
           size: attachment.size,
         }
       })
-      const history = buildPortableHistory(finalDisplayMessages)
+      // Child inspection changes only what is rendered. Sends always continue
+      // the parent Card with its independently maintained parent transcript.
+      const history = buildPortableHistory(parentDisplayMessages)
 
       try {
         streamStart()
@@ -2293,6 +2429,7 @@ export function ChatScreen({
       void startStreaming({
         sessionKey,
         friendlyId,
+        cardId: activeCard?.cardId,
         message: enrichedBody,
         history,
         attachments:
@@ -2312,7 +2449,7 @@ export function ChatScreen({
     [
       activeCard,
       activeCardCanonicalSegmentKey,
-      finalDisplayMessages,
+      parentDisplayMessages,
       clearCompletedStreaming,
       queryClient,
       setLocalActivity,
@@ -2324,12 +2461,14 @@ export function ChatScreen({
   )
 
   useLayoutEffect(() => {
-    if (isNewChat) return
+    if (isNewChat || !cardTransportReady) return
     const pending = consumePendingSend(
-      isPortableMode
-        ? 'main'
-        : forcedSessionKey || resolvedSessionKey || activeSessionKey,
-      portableChatFriendlyId,
+      activeCard
+        ? activeCardCanonicalSegmentKey || ''
+        : isPortableMode
+          ? 'main'
+          : forcedSessionKey || resolvedSessionKey || activeSessionKey,
+      transportFriendlyId,
     )
     if (!pending) return
     pendingStartRef.current = true
@@ -2374,11 +2513,14 @@ export function ChatScreen({
         : '',
     )
   }, [
+    activeCard,
+    activeCardCanonicalSegmentKey,
     activeSessionKey,
+    cardTransportReady,
     forcedSessionKey,
     isNewChat,
     isPortableMode,
-    portableChatFriendlyId,
+    transportFriendlyId,
     queryClient,
     resolvedSessionKey,
     sendMessage,
@@ -2386,6 +2528,7 @@ export function ChatScreen({
 
   const retryQueuedMessage = useCallback(
     function retryQueuedMessage(message: ChatMessage, mode: 'manual' | 'auto') {
+      if (!cardTransportReady) return false
       if (!isRetryableQueuedMessage(message)) return false
 
       const body = textFromMessage(message).trim()
@@ -2400,16 +2543,18 @@ export function ChatScreen({
         return false
       }
 
-      const sessionKeyForSend = isPortableMode
-        ? 'main'
-        : forcedSessionKey || resolvedSessionKey || activeSessionKey || 'main'
+      const sessionKeyForSend = activeCard
+        ? activeCardCanonicalSegmentKey || ''
+        : isPortableMode
+          ? 'main'
+          : forcedSessionKey || resolvedSessionKey || activeSessionKey || 'main'
       const sessionKeyForMessage = sessionKeyForHistory || sessionKeyForSend
       const existingClientId = getMessageClientId(message)
 
       if (existingClientId) {
         updateHistoryMessageByClientId(
           queryClient,
-          portableChatFriendlyId,
+          transportFriendlyId,
           sessionKeyForMessage,
           existingClientId,
           function markSending(currentMessage) {
@@ -2431,7 +2576,7 @@ export function ChatScreen({
 
       sendMessage(
         sessionKeyForSend,
-        portableChatFriendlyId,
+        transportFriendlyId,
         body,
         attachments,
         false,
@@ -2441,10 +2586,13 @@ export function ChatScreen({
       return true
     },
     [
+      activeCard,
+      activeCardCanonicalSegmentKey,
       activeSessionKey,
+      cardTransportReady,
       forcedSessionKey,
       isPortableMode,
-      portableChatFriendlyId,
+      transportFriendlyId,
       queryClient,
       resolvedSessionKey,
       sessionKeyForHistory,
@@ -2454,11 +2602,11 @@ export function ChatScreen({
 
   const flushRetryableMessages = useCallback(
     function flushRetryableMessages() {
-      for (const message of finalDisplayMessages) {
+      for (const message of parentDisplayMessages) {
         retryQueuedMessage(message, 'auto')
       }
     },
-    [finalDisplayMessages, retryQueuedMessage],
+    [parentDisplayMessages, retryQueuedMessage],
   )
 
   const handleRetryMessage = useCallback(
@@ -2504,91 +2652,6 @@ export function ChatScreen({
       window.removeEventListener('claude:health-restored', handleHealthRestored)
     }
   }, [flushRetryableMessages, handleRefetch])
-
-  const createSessionForMessage = useCallback(
-    async (preferredFriendlyId?: string) => {
-      setCreatingSession(true)
-      try {
-        const res = await fetch('/api/sessions', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(
-            preferredFriendlyId && preferredFriendlyId.trim().length > 0
-              ? { friendlyId: preferredFriendlyId }
-              : {},
-          ),
-        })
-        if (!res.ok) throw new Error(await readError(res))
-
-        const data = (await res.json()) as {
-          sessionKey?: string
-          friendlyId?: string
-        }
-
-        const sessionKey =
-          typeof data.sessionKey === 'string' ? data.sessionKey : ''
-        const friendlyId =
-          typeof data.friendlyId === 'string' &&
-          data.friendlyId.trim().length > 0
-            ? data.friendlyId.trim()
-            : (preferredFriendlyId?.trim() ?? '') ||
-              deriveFriendlyIdFromKey(sessionKey)
-
-        if (!sessionKey || !friendlyId) {
-          throw new Error('Invalid session response')
-        }
-
-        queryClient.invalidateQueries({ queryKey: chatQueryKeys.sessions })
-        return { sessionKey, friendlyId }
-      } finally {
-        setCreatingSession(false)
-      }
-    },
-    [queryClient],
-  )
-
-  const upsertSessionInCache = useCallback(
-    (friendlyId: string, lastMessage: ChatMessage) => {
-      if (!friendlyId) return
-      queryClient.setQueryData(
-        chatQueryKeys.sessions,
-        function upsert(existing: unknown) {
-          const sessions = Array.isArray(existing)
-            ? (existing as Array<SessionMeta>)
-            : []
-          const now = Date.now()
-          const existingIndex = sessions.findIndex((session) => {
-            return (
-              session.friendlyId === friendlyId || session.key === friendlyId
-            )
-          })
-
-          if (existingIndex === -1) {
-            return [
-              {
-                key: friendlyId,
-                friendlyId,
-                updatedAt: now,
-                lastMessage,
-                titleStatus: 'idle',
-              },
-              ...sessions,
-            ]
-          }
-
-          return sessions.map((session, index) => {
-            if (index !== existingIndex) return session
-            return {
-              ...session,
-              updatedAt: now,
-              lastMessage,
-            }
-          })
-        },
-      )
-    },
-    [queryClient],
-  )
 
   const scrollChatToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
@@ -2685,6 +2748,10 @@ export function ChatScreen({
     ) => {
       const trimmedBody = body.trim()
       if (trimmedBody.length === 0 && attachments.length === 0) return
+      if (!cardTransportReady) {
+        setError(cardSourceError)
+        return
+      }
       if (attachments.length === 0 && handleUiSlashCommand(trimmedBody)) return
 
       // Deduplicate sends with identical content within a 500ms window.
@@ -2716,29 +2783,20 @@ export function ChatScreen({
       )
 
       if (isNewChat) {
-        // In portable mode, use 'main' — no server-side sessions exist.
-        // In enhanced mode, create a UUID thread for the sessions API.
-        const threadId = isPortableMode ? 'main' : crypto.randomUUID()
+        // Every mode must stay on the accepted `new` bootstrap route. The
+        // send-stream server creates the backend session and may resolve it to
+        // a stable Card; only that authoritative handoff is allowed to replace
+        // the route. A client-generated UUID is a raw segment and is rejected
+        // by Card-only routing.
+        const threadId = 'new'
         const { optimisticMessage } = createOptimisticMessage(
           trimmedBody,
           attachmentPayload,
         )
         appendHistoryMessage(queryClient, threadId, threadId, optimisticMessage)
-        upsertSessionInCache(threadId, optimisticMessage)
         setPendingGeneration(true)
         setSending(true)
         setWaitingForResponse(true)
-
-        if (!isPortableMode) {
-          void createSessionForMessage(threadId).catch((err: unknown) => {
-            if (import.meta.env.DEV) {
-              console.warn('[chat] failed to register new thread', err)
-            }
-            void queryClient.invalidateQueries({
-              queryKey: chatQueryKeys.sessions,
-            })
-          })
-        }
 
         sendMessage(
           threadId,
@@ -2751,39 +2809,37 @@ export function ChatScreen({
             ? optimisticMessage.clientId
             : '',
         )
-        // In portable mode, navigate to /chat/main instead of UUID
-        if (!embedded) {
-          navigate({
-            to: '/chat/$sessionKey',
-            params: { sessionKey: threadId },
-            replace: true,
-          })
-        }
+        // Stay on new until onSessionResolved receives the server's
+        // authoritative Card ID and canonical segment key.
         return
       }
 
-      const sessionKeyForSend = isPortableMode
-        ? 'main'
-        : forcedSessionKey || resolvedSessionKey || activeSessionKey || 'main'
+      const sessionKeyForSend = activeCard
+        ? activeCardCanonicalSegmentKey || ''
+        : isPortableMode
+          ? 'main'
+          : forcedSessionKey || resolvedSessionKey || activeSessionKey || 'main'
       sendMessage(
         sessionKeyForSend,
-        isPortableMode ? 'main' : activeFriendlyId,
+        transportFriendlyId,
         trimmedBody,
         attachmentPayload,
         fastMode,
       )
     },
     [
+      activeCard,
+      activeCardCanonicalSegmentKey,
       activeFriendlyId,
       activeSessionKey,
-      createSessionForMessage,
+      cardSourceError,
+      cardTransportReady,
       forcedSessionKey,
       isNewChat,
-      navigate,
-      onSessionResolved,
+      isPortableMode,
       scrollChatToBottom,
       sendMessage,
-      upsertSessionInCache,
+      transportFriendlyId,
       queryClient,
       resolvedSessionKey,
       handleUiSlashCommand,
@@ -2903,7 +2959,8 @@ export function ChatScreen({
 
   const historyLoading =
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-    (historyQuery.isLoading && !historyQuery.data) || isRedirecting
+    (displayedHistoryQuery.isLoading && !displayedHistoryQuery.data) ||
+    legacyRedirecting
   const historyEmpty = !historyLoading && finalDisplayMessages.length === 0
   const errorNotice = useMemo(() => {
     if (!showErrorNotice) return null
@@ -2947,8 +3004,114 @@ export function ChatScreen({
     // agent view panel removed
   }, [])
 
+  const findSessionCard = useCallback(
+    (cardId: string) => {
+      if (activeCard?.cardId === cardId) return activeCard
+      return sessionCards?.find((card) => card.cardId === cardId)
+    },
+    [activeCard, sessionCards],
+  )
+
+  const runCardMutation = useCallback(
+    async (cardId: string, mutation: () => Promise<void>) => {
+      if (pendingCardIds.has(cardId)) return
+      setPendingCardIds((current) => new Set(current).add(cardId))
+      try {
+        await mutation()
+        await queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.list(false),
+        })
+      } catch (mutationError) {
+        const message =
+          mutationError instanceof Error
+            ? mutationError.message
+            : 'Card action failed'
+        toast(message, { type: 'error' })
+      } finally {
+        setPendingCardIds((current) => {
+          const next = new Set(current)
+          next.delete(cardId)
+          return next
+        })
+      }
+    },
+    [pendingCardIds, queryClient],
+  )
+
+  const handleRenameCard = useCallback(
+    async (cardId: string, nextTitle: string) => {
+      await runCardMutation(cardId, async () => {
+        await updateSessionCardMetadata(cardId, { manualTitle: nextTitle })
+      })
+    },
+    [runCardMutation],
+  )
+
+  const handleTogglePinCard = useCallback(
+    async (cardId: string) => {
+      const card = findSessionCard(cardId)
+      if (!card) return
+      await runCardMutation(cardId, async () => {
+        await updateSessionCardMetadata(cardId, { pinned: !card.pinned })
+      })
+    },
+    [findSessionCard, runCardMutation],
+  )
+
+  const handleBranchCard = useCallback(
+    async (cardId: string) => {
+      const card = findSessionCard(cardId)
+      if (!card) return
+      const canonicalSegmentKey =
+        activeCard?.cardId === cardId
+          ? (activeCardCanonicalSegmentKey ?? card.canonicalSegmentKey)
+          : card.canonicalSegmentKey
+      await runCardMutation(cardId, async () => {
+        await branchSessionCard(cardId, canonicalSegmentKey)
+      })
+    },
+    [
+      activeCard?.cardId,
+      activeCardCanonicalSegmentKey,
+      findSessionCard,
+      runCardMutation,
+    ],
+  )
+
+  const handleArchiveCard = useCallback(
+    async (cardId: string) => {
+      const isActiveCard = activeCard?.cardId === cardId
+      await runCardMutation(cardId, async () => {
+        await archiveSessionCard(cardId)
+        if (isActiveCard) {
+          setSessionsOpen(false)
+          await navigate({
+            to: '/chat/$sessionKey',
+            params: { sessionKey: 'main' },
+            replace: true,
+          })
+        }
+      })
+    },
+    [activeCard?.cardId, navigate, runCardMutation],
+  )
+
   const handleRenameActiveSessionTitle = useCallback(
     async (nextTitle: string) => {
+      if (activeCard) {
+        setRenamingCardTitle(true)
+        try {
+          await updateSessionCardMetadata(activeCard.cardId, {
+            manualTitle: nextTitle,
+          })
+          await queryClient.invalidateQueries({
+            queryKey: sessionCardQueryKeys.list(false),
+          })
+        } finally {
+          setRenamingCardTitle(false)
+        }
+        return
+      }
       const sessionKey =
         resolvedSessionKey || activeSession?.key || activeSessionKey || ''
       if (!sessionKey) return
@@ -2959,9 +3122,11 @@ export function ChatScreen({
       )
     },
     [
+      activeCard,
       activeSession?.friendlyId,
       activeSession?.key,
       activeSessionKey,
+      queryClient,
       renameSession,
       resolvedSessionKey,
     ],
@@ -3019,10 +3184,9 @@ export function ChatScreen({
             <ChatHeader
               activeTitle={activeTitle}
               onRenameTitle={handleRenameActiveSessionTitle}
-              renamingTitle={renamingSessionTitle}
+              renamingTitle={renamingSessionTitle || renamingCardTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
-              sessions={sessions}
               sessionCards={sessionCards}
               activeFriendlyId={activeFriendlyId}
               inspectedChildCardId={inspectedChildCardId}
@@ -3035,7 +3199,7 @@ export function ChatScreen({
               showFileExplorerButton={!isMobile && !isFocusMode}
               fileExplorerCollapsed={fileExplorerCollapsed}
               onToggleFileExplorer={handleToggleFileExplorer}
-              dataUpdatedAt={historyQuery.dataUpdatedAt}
+              dataUpdatedAt={displayedHistoryQuery.dataUpdatedAt}
               onRefresh={handleRefreshHistory}
               agentModel={currentModel}
               agentConnected={mobileHeaderStatus === 'connected'}
@@ -3116,7 +3280,9 @@ export function ChatScreen({
           {hideUi ? null : (
             <ChatMessageList
               messages={finalDisplayMessages}
-              onRetryMessage={handleRetryMessage}
+              onRetryMessage={
+                inspectedChildCard ? undefined : handleRetryMessage
+              }
               onRefresh={handleRefreshHistory}
               loading={historyLoading}
               empty={historyEmpty}
@@ -3130,8 +3296,10 @@ export function ChatScreen({
               }
               notice={null}
               noticePosition="end"
-              waitingForResponse={waitingForResponse}
-              sessionKey={activeCanonicalKey}
+              waitingForResponse={
+                inspectedChildCard ? false : waitingForResponse
+              }
+              sessionKey={inspectedChildCard?.sessionKey ?? activeCanonicalKey}
               pinToTop={false}
               pinGroupMinHeight={pinGroupMinHeight}
               headerHeight={headerHeight}
@@ -3139,25 +3307,37 @@ export function ChatScreen({
               bottomOffset={
                 isMobile ? mobileScrollBottomOffset : terminalPanelInset
               }
-              isStreaming={derivedStreamingInfo.isStreaming}
-              streamingMessageId={derivedStreamingInfo.streamingMessageId}
+              isStreaming={
+                inspectedChildCard ? false : derivedStreamingInfo.isStreaming
+              }
+              streamingMessageId={
+                inspectedChildCard
+                  ? null
+                  : derivedStreamingInfo.streamingMessageId
+              }
               streamingText={
-                stableActiveStreamingText ||
-                completedStreamingText.current ||
-                undefined
+                inspectedChildCard
+                  ? undefined
+                  : stableActiveStreamingText ||
+                    completedStreamingText.current ||
+                    undefined
               }
               streamingThinking={
-                realtimeStreamingThinking ||
-                completedStreamingThinking.current ||
-                undefined
+                inspectedChildCard
+                  ? undefined
+                  : realtimeStreamingThinking ||
+                    completedStreamingThinking.current ||
+                    undefined
               }
-              lifecycleEvents={realtimeLifecycleEvents}
+              lifecycleEvents={
+                inspectedChildCard ? [] : realtimeLifecycleEvents
+              }
               hideSystemMessages
-              activeToolCalls={activeToolCalls}
-              liveToolActivity={liveToolActivity}
-              researchCard={researchCard}
-              isCompacting={isCompacting}
-              sending={sending}
+              activeToolCalls={inspectedChildCard ? [] : activeToolCalls}
+              liveToolActivity={inspectedChildCard ? [] : liveToolActivity}
+              researchCard={inspectedChildCard ? undefined : researchCard}
+              isCompacting={inspectedChildCard ? false : isCompacting}
+              sending={inspectedChildCard ? false : sending}
             />
           )}
           {showComposer ? (
@@ -3165,7 +3345,7 @@ export function ChatScreen({
               onSubmit={send}
               onAbort={handleAbortStreaming}
               isLoading={sending || waitingForResponse}
-              disabled={sending || hideUi}
+              disabled={sending || hideUi || !cardTransportReady}
               sessionKey={
                 isNewChat
                   ? undefined
@@ -3202,13 +3382,15 @@ export function ChatScreen({
         <MobileSessionsPanel
           open={sessionsOpen}
           onClose={() => setSessionsOpen(false)}
-          sessions={sessions}
+          sessionCards={sessionCards ?? []}
           activeFriendlyId={activeFriendlyId}
-          onSelectSession={(friendlyId) => {
+          inspectedChildCardId={inspectedChildCardId}
+          onSelectSession={(cardId, inspectChildCardId) => {
             setSessionsOpen(false)
             void navigate({
               to: '/chat/$sessionKey',
-              params: { sessionKey: friendlyId },
+              params: { sessionKey: cardId },
+              search: inspectChildCardId ? { inspect: inspectChildCardId } : {},
             })
           }}
           onNewChat={() => {
@@ -3218,6 +3400,11 @@ export function ChatScreen({
               params: { sessionKey: 'new' },
             })
           }}
+          onRenameCard={handleRenameCard}
+          onTogglePin={handleTogglePinCard}
+          onBranchCard={handleBranchCard}
+          onArchiveCard={handleArchiveCard}
+          pendingCardIds={pendingCardIds}
         />
       )}
 

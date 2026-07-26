@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { applySessionRouteResolution } from '../../routes/chat/-session-route-state'
 import { useChatStore } from '../../stores/chat-store'
-import { chatQueryKeys } from './chat-queries'
+import { chatQueryKeys, sessionCardQueryKeys } from './chat-queries'
 import { ChatScreen } from './chat-screen'
 import {
   hasPendingGeneration,
@@ -19,11 +19,30 @@ import {
   resetPendingSend,
 } from './pending-send'
 import type { SessionRouteResolutionPayload } from '../../routes/chat/-session-route-state'
-import type { ChatMessage, HistoryResponse } from './types'
+import type { SessionCardHistoryResponse } from './chat-queries'
+import type { ChatMessage, HistoryResponse, SessionCard } from './types'
 
 const navigate = vi.fn()
 const queryContext = vi.hoisted(() => ({
   client: null as unknown as QueryClient,
+  cardHistories: new Map<string, SessionCardHistoryResponse>(),
+  chatMode: 'enhanced' as 'enhanced' | 'portable',
+  connectionState: 'connected' as 'connected' | 'disconnected',
+  realtimeInput: null as null | {
+    sessionKey: string
+    friendlyId: string
+    portableMode: boolean
+    enabled: boolean
+  },
+  activeRunInput: null as null | {
+    sessionKey: string
+    cardId?: string
+    enabled: boolean
+  },
+  mobile: false,
+  legacySessionsFailure: false,
+  legacySessionsEnabled: undefined as boolean | undefined,
+  legacySessionsRefetch: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-query', async (importOriginal) => {
@@ -33,20 +52,35 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
     QueryClientProvider: ({ children }: { children: React.ReactNode }) =>
       children,
     useQueryClient: () => queryContext.client,
-    useQuery: ({ queryKey }: { queryKey: Array<unknown> }) => ({
-      data:
-        queryKey[0] === 'models'
+    useQuery: ({ queryKey }: { queryKey: Array<unknown> }) => {
+      const historyCardId =
+        queryKey[0] === 'chat' &&
+        queryKey[1] === 'session-cards' &&
+        queryKey[2] === 'history'
+          ? String(queryKey[3] ?? '')
+          : queryKey[0] === 'chat' &&
+              queryKey[1] === 'session-cards' &&
+              queryKey[2] === 'child-history'
+            ? String(queryKey[4] ?? '')
+            : ''
+      const data = historyCardId
+        ? queryContext.cardHistories.get(historyCardId)
+        : queryKey[0] === 'models'
           ? { models: [] }
           : queryKey[0] === 'claude' && queryKey[1] === 'status'
             ? { ok: true, status: 200 }
-            : '',
-      error: null,
-      isError: false,
-      isFetching: false,
-      isLoading: false,
-      isSuccess: true,
-      refetch: vi.fn().mockResolvedValue(undefined),
-    }),
+            : ''
+      return {
+        data,
+        dataUpdatedAt: 0,
+        error: null,
+        isError: false,
+        isFetching: false,
+        isLoading: false,
+        isSuccess: true,
+        refetch: vi.fn().mockResolvedValue(undefined),
+      }
+    },
   }
 })
 
@@ -125,13 +159,21 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   return { ...actual, useNavigate: () => navigate }
 })
 
-vi.mock('./components/chat-header', () => ({ ChatHeader: () => null }))
+vi.mock('./components/chat-header', () => ({
+  ChatHeader: ({ activeTitle }: { activeTitle: string }) => (
+    <div data-testid="chat-header-title">{activeTitle}</div>
+  ),
+}))
 vi.mock('./components/chat-message-list', () => ({
-  ChatMessageList: () => null,
+  ChatMessageList: ({ messages }: { messages: Array<ChatMessage> }) => (
+    <div data-testid="chat-transcript">{JSON.stringify(messages)}</div>
+  ),
 }))
 vi.mock('./components/chat-empty-state', () => ({ ChatEmptyState: () => null }))
 vi.mock('./components/connection-status-message', () => ({
-  ConnectionStatusMessage: () => null,
+  ConnectionStatusMessage: ({ error }: { error: string }) => (
+    <div data-testid="connection-error">{error}</div>
+  ),
 }))
 vi.mock('./components/context-bar', () => ({ ContextBar: () => null }))
 vi.mock('@/components/file-explorer', () => ({
@@ -145,7 +187,35 @@ vi.mock('@/components/model-suggestion-toast', () => ({
   ModelSuggestionToast: () => null,
 }))
 vi.mock('@/components/mobile-sessions-panel', () => ({
-  MobileSessionsPanel: () => null,
+  MobileSessionsPanel: (props: {
+    onRenameCard?: (cardId: string, nextTitle: string) => void
+    onTogglePin?: (cardId: string) => void
+    onBranchCard?: (cardId: string) => void
+    onArchiveCard?: (cardId: string) => void
+  }) => (
+    <div>
+      <button
+        type="button"
+        data-testid="mobile-rename"
+        onClick={() => props.onRenameCard?.('remote:parent', 'Mobile title')}
+      />
+      <button
+        type="button"
+        data-testid="mobile-pin"
+        onClick={() => props.onTogglePin?.('remote:parent')}
+      />
+      <button
+        type="button"
+        data-testid="mobile-branch"
+        onClick={() => props.onBranchCard?.('remote:parent')}
+      />
+      <button
+        type="button"
+        data-testid="mobile-archive"
+        onClick={() => props.onArchiveCard?.('remote:parent')}
+      />
+    </div>
+  ),
 }))
 vi.mock('@/components/usage-meter/context-alert-modal', () => ({
   ContextAlertModal: () => null,
@@ -193,16 +263,19 @@ vi.mock('./hooks/use-chat-measurements', () => ({
   }),
 }))
 vi.mock('./hooks/use-chat-mobile', () => ({
-  useChatMobile: () => ({ isMobile: false }),
+  useChatMobile: () => ({ isMobile: queryContext.mobile }),
 }))
 vi.mock('./hooks/use-chat-sessions', () => ({
   useChatSessions: ({
     activeFriendlyId,
     forcedSessionKey,
+    enabled,
   }: {
     activeFriendlyId: string
     forcedSessionKey?: string
+    enabled?: boolean
   }) => {
+    queryContext.legacySessionsEnabled = enabled
     const sessionKey = forcedSessionKey ?? activeFriendlyId
     const activeSession = {
       key: sessionKey,
@@ -212,16 +285,20 @@ vi.mock('./hooks/use-chat-sessions', () => ({
     }
     return {
       sessionsQuery: {
-        status: 'success',
-        isSuccess: true,
-        refetch: vi.fn(),
+        status: queryContext.legacySessionsFailure ? 'error' : 'success',
+        isSuccess: !queryContext.legacySessionsFailure,
+        refetch: queryContext.legacySessionsRefetch,
       },
-      sessions: [activeSession],
-      activeSession,
-      activeExists: true,
+      sessions: queryContext.legacySessionsFailure ? [] : [activeSession],
+      activeSession: queryContext.legacySessionsFailure
+        ? undefined
+        : activeSession,
+      activeExists: !queryContext.legacySessionsFailure,
       activeSessionKey: sessionKey,
       activeTitle: activeFriendlyId,
-      sessionsError: null,
+      sessionsError: queryContext.legacySessionsFailure
+        ? 'Unauthorized legacy sessions'
+        : null,
       sessionsLoading: false,
       sessionsFetching: false,
       refetchSessions: vi.fn(),
@@ -259,25 +336,48 @@ vi.mock('./hooks/use-chat-history', () => ({
   },
 }))
 vi.mock('./hooks/use-realtime-chat-history', () => ({
-  useRealtimeChatHistory: () => ({
-    messages: [],
-    lastCompletedRunAt: 0,
-    connectionState: 'connected',
-    isRealtimeStreaming: false,
-    realtimeStreamingText: '',
-    realtimeStreamingThinking: '',
-    realtimeLifecycleEvents: [],
-    completedStreamingText: { current: '' },
-    completedStreamingThinking: { current: '' },
-    clearCompletedStreaming: vi.fn(),
-    streamingRunId: null,
-    activeToolCalls: [],
-  }),
+  useRealtimeChatHistory: (input: {
+    historyMessages: Array<ChatMessage>
+    sessionKey: string
+    friendlyId: string
+    portableMode: boolean
+    enabled: boolean
+  }) => {
+    queryContext.realtimeInput = input
+    return {
+      messages: input.historyMessages,
+      lastCompletedRunAt: 0,
+      connectionState: queryContext.connectionState,
+      isRealtimeStreaming: false,
+      realtimeStreamingText: '',
+      realtimeStreamingThinking: '',
+      realtimeLifecycleEvents: [],
+      completedStreamingText: { current: '' },
+      completedStreamingThinking: { current: '' },
+      clearCompletedStreaming: vi.fn(),
+      streamingRunId: null,
+      activeToolCalls: [],
+    }
+  },
 }))
 vi.mock('./hooks/use-smooth-streaming-text', () => ({
   useSmoothStreamingText: (text: string) => text,
 }))
-vi.mock('./hooks/use-active-run-check', () => ({ useActiveRunCheck: () => {} }))
+vi.mock('./hooks/use-active-run-check', () => ({
+  activeRunCheckUrl: (sessionKey: string, cardId?: string) => {
+    const path = `/api/sessions/${encodeURIComponent(sessionKey)}/active-run`
+    return cardId ? `${path}?cardId=${encodeURIComponent(cardId)}` : path
+  },
+  useActiveRunCheck: (input: {
+    sessionKey: string
+    cardId?: string
+    enabled: boolean
+    onCheckComplete?: () => void
+  }) => {
+    queryContext.activeRunInput = input
+    React.useEffect(() => input.onCheckComplete?.(), [input.onCheckComplete])
+  },
+}))
 vi.mock('./hooks/use-auto-session-title', () => ({
   useAutoSessionTitle: () => {},
 }))
@@ -301,7 +401,9 @@ vi.mock('@/hooks/use-model-suggestions', () => ({
 }))
 vi.mock('@/hooks/use-research-card', () => ({ useResearchCard: () => null }))
 vi.mock('@/hooks/use-tap-debug', () => ({ useTapDebug: () => {} }))
-vi.mock('@/hooks/use-chat-mode', () => ({ useChatMode: () => 'enhanced' }))
+vi.mock('@/hooks/use-chat-mode', () => ({
+  useChatMode: () => queryContext.chatMode,
+}))
 
 class StubEventSource {
   addEventListener() {}
@@ -380,6 +482,7 @@ function ChatRouteHarness({
       <ChatScreen
         activeFriendlyId={route.friendlyId}
         forcedSessionKey={route.sessionKey}
+        isNewChat={route.friendlyId === 'new'}
         onSessionResolved={handleSessionResolved}
         compact
       />
@@ -387,12 +490,21 @@ function ChatRouteHarness({
   )
 }
 
-type HandoffEvent = {
-  fromSessionKey: string
-  sessionKey: string
-  friendlyId: string
-  runId: string
-}
+type HandoffEvent =
+  | {
+      event?: 'session_handoff'
+      fromSessionKey: string
+      sessionKey: string
+      friendlyId: string
+      runId: string
+    }
+  | {
+      event: 'card_handoff'
+      cardId: string
+      fromSegmentKey: string
+      canonicalSegmentKey: string
+      runId: string
+    }
 
 function createReaderHarness(
   handoffs: Array<HandoffEvent> = [
@@ -407,6 +519,7 @@ function createReaderHarness(
   const encoder = new TextEncoder()
   let releaseFirstRead: (() => void) | undefined
   let requestSignal: AbortSignal | undefined
+  let requestBody: Record<string, unknown> | undefined
   let rejectCurrentRead: ((reason?: unknown) => void) | undefined
   let rejectFirstRead: ((reason?: unknown) => void) | undefined
   let rejectPendingRead: ((reason?: unknown) => void) | undefined
@@ -419,11 +532,14 @@ function createReaderHarness(
           done: false,
           value: encoder.encode(
             handoffs
-              .flatMap((handoff) => [
-                'event: session_handoff',
-                `data: ${JSON.stringify(handoff)}`,
-                '',
-              ])
+              .flatMap((handoff) => {
+                const { event = 'session_handoff', ...payload } = handoff
+                return [
+                  `event: ${event}`,
+                  `data: ${JSON.stringify(payload)}`,
+                  '',
+                ]
+              })
               .concat('')
               .join('\n'),
           ),
@@ -453,6 +569,10 @@ function createReaderHarness(
   vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
     if (String(input) === '/api/send-stream') {
       requestSignal = init?.signal ?? undefined
+      requestBody =
+        typeof init?.body === 'string'
+          ? (JSON.parse(init.body) as Record<string, unknown>)
+          : undefined
       requestSignal?.addEventListener(
         'abort',
         () => rejectCurrentRead?.(new DOMException('Aborted', 'AbortError')),
@@ -478,6 +598,7 @@ function createReaderHarness(
     reader,
     releaseHandoff: () => releaseFirstRead?.(),
     getRequestSignal: () => requestSignal,
+    getRequestBody: () => requestBody,
   }
 }
 
@@ -491,6 +612,15 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     window.sessionStorage.clear()
     resetPendingSend()
     navigate.mockReset()
+    queryContext.cardHistories.clear()
+    queryContext.chatMode = 'enhanced'
+    queryContext.connectionState = 'connected'
+    queryContext.realtimeInput = null
+    queryContext.activeRunInput = null
+    queryContext.mobile = false
+    queryContext.legacySessionsFailure = false
+    queryContext.legacySessionsEnabled = undefined
+    queryContext.legacySessionsRefetch.mockReset()
     for (const sessionKey of [
       'new',
       'backend-parent',
@@ -508,6 +638,415 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     resetPendingSend()
+  })
+
+  it('shows only validated child Card history and restores parent history under the same Card', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard: SessionCard = {
+      cardId: 'remote:parent',
+      canonicalSource: 'remote',
+      title: 'Parent Card title',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'remote:parent-tip',
+      continuationSegmentKeys: ['remote:parent', 'remote:parent-tip'],
+      continuationCount: 2,
+      relationshipKind: 'root',
+      childNodes: [
+        {
+          cardId: 'remote:child',
+          sessionKey: 'remote:child-tip',
+          relationshipKind: 'child',
+          title: 'Delegate',
+          status: 'complete',
+          updatedAt: 2,
+          continuationCount: 1,
+        },
+      ],
+      updatedAt: 2,
+      archived: false,
+      pinned: false,
+    }
+    queryContext.cardHistories.set('remote:parent', {
+      sessionKey: 'remote:parent-tip',
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:parent-tip',
+      messages: [userMessage('parent-message', 'parent transcript')],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    queryContext.cardHistories.set('remote:child', {
+      sessionKey: 'remote:child-tip',
+      cardId: 'remote:child',
+      canonicalSegmentKey: 'remote:child-tip',
+      messages: [userMessage('child-message', 'child transcript')],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: 'remote:child-root',
+          retryable: true,
+          error: 'temporarily unavailable',
+        },
+      ],
+    })
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const render = (inspectedChildCardId?: string) => {
+      React.act(() => {
+        root.render(
+          <QueryClientProvider client={queryClient}>
+            <ChatScreen
+              activeFriendlyId="remote:parent"
+              activeCard={activeCard}
+              inspectedChildCardId={inspectedChildCardId}
+              sessionCards={[activeCard]}
+            />
+          </QueryClientProvider>,
+        )
+      })
+    }
+
+    render('remote:child')
+    await waitForAssertion(() => {
+      const transcript =
+        container.querySelector('[data-testid="chat-transcript"]')
+          ?.textContent ?? ''
+      expect(transcript).toContain('child transcript')
+      expect(transcript).not.toContain('parent transcript')
+      expect(
+        container.querySelector('[data-testid="chat-header-title"]')
+          ?.textContent,
+      ).toBe('Parent Card title')
+    })
+
+    queryContext.cardHistories.delete('remote:child')
+    render('remote:child')
+    await waitForAssertion(() => {
+      const transcript =
+        container.querySelector('[data-testid="chat-transcript"]')
+          ?.textContent ?? ''
+      expect(transcript).not.toContain('parent transcript')
+      expect(transcript).not.toContain('child transcript')
+    })
+
+    render()
+    await waitForAssertion(() => {
+      const transcript =
+        container.querySelector('[data-testid="chat-transcript"]')
+          ?.textContent ?? ''
+      expect(transcript).toContain('parent transcript')
+      expect(transcript).not.toContain('child transcript')
+    })
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('sends with the parent Card identity and transcript while inspecting child history', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard: SessionCard = {
+      cardId: 'remote:parent',
+      canonicalSource: 'remote',
+      title: 'Parent Card title',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'remote:parent-tip',
+      continuationSegmentKeys: ['remote:parent', 'remote:parent-tip'],
+      continuationCount: 2,
+      relationshipKind: 'root',
+      childNodes: [
+        {
+          cardId: 'remote:child',
+          sessionKey: 'remote:child-tip',
+          relationshipKind: 'child',
+          title: 'Delegate',
+          status: 'complete',
+          updatedAt: 2,
+          continuationCount: 1,
+        },
+      ],
+      updatedAt: 2,
+      archived: false,
+      pinned: false,
+    }
+    queryContext.cardHistories.set('remote:parent', {
+      sessionKey: 'remote:parent-tip',
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:parent-tip',
+      messages: [userMessage('parent-message', 'parent transcript')],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    queryContext.cardHistories.set('remote:child', {
+      sessionKey: 'remote:child-tip',
+      cardId: 'remote:child',
+      canonicalSegmentKey: 'remote:child-tip',
+      messages: [userMessage('child-message', 'child transcript')],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const stream = createReaderHarness([])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId="remote:parent"
+            activeCard={activeCard}
+            inspectedChildCardId="remote:child"
+            sessionCards={[activeCard]}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    await waitForAssertion(() => {
+      expect(
+        container.querySelector('[data-testid="chat-transcript"]')?.textContent,
+      ).toContain('child transcript')
+    })
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+
+    await waitForAssertion(() => expect(stream.getRequestBody()).toBeDefined())
+    expect(stream.getRequestBody()).toMatchObject({
+      sessionKey: 'remote:parent-tip',
+      friendlyId: 'remote:parent',
+      cardId: 'remote:parent',
+      message: 'continue',
+      history: [{ role: 'user', content: 'parent transcript' }],
+    })
+    expect(JSON.stringify(stream.getRequestBody()?.history)).not.toContain(
+      'child transcript',
+    )
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('keeps a remote Card on canonical gateway transport when global chat mode is portable', async () => {
+    queryContext.chatMode = 'portable'
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard: SessionCard = {
+      cardId: 'opaque-card-id',
+      canonicalSource: 'remote',
+      title: 'Remote Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'opaque-canonical-segment',
+      continuationSegmentKeys: ['opaque-canonical-segment'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 1,
+      archived: false,
+      pinned: false,
+    }
+    queryContext.cardHistories.set(activeCard.cardId, {
+      sessionKey: activeCard.canonicalSegmentKey,
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: activeCard.canonicalSegmentKey,
+      messages: [userMessage('remote-history', 'remote Card history')],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const stream = createReaderHarness([])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCards={[activeCard]}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+
+    await waitForAssertion(() => expect(stream.getRequestBody()).toBeDefined())
+    expect(stream.getRequestBody()).toMatchObject({
+      sessionKey: 'opaque-canonical-segment',
+      friendlyId: 'opaque-card-id',
+      cardId: 'opaque-card-id',
+      history: [{ role: 'user', content: 'remote Card history' }],
+    })
+    expect(queryContext.realtimeInput).toMatchObject({
+      sessionKey: 'opaque-canonical-segment',
+      friendlyId: 'opaque-card-id',
+      portableMode: false,
+      enabled: true,
+    })
+    expect(queryContext.activeRunInput).toMatchObject({
+      sessionKey: 'opaque-canonical-segment',
+      cardId: 'opaque-card-id',
+      enabled: true,
+    })
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('keeps a local Card on canonical portable transport when global chat mode is enhanced', async () => {
+    queryContext.chatMode = 'enhanced'
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard: SessionCard = {
+      cardId: 'another-opaque-card-id',
+      canonicalSource: 'local',
+      title: 'Local Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'another-opaque-canonical-segment',
+      continuationSegmentKeys: ['another-opaque-canonical-segment'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 1,
+      archived: false,
+      pinned: false,
+    }
+    queryContext.cardHistories.set(activeCard.cardId, {
+      sessionKey: activeCard.canonicalSegmentKey,
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: activeCard.canonicalSegmentKey,
+      messages: [userMessage('local-history', 'local Card history')],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const stream = createReaderHarness([])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCards={[activeCard]}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+
+    await waitForAssertion(() => expect(stream.getRequestBody()).toBeDefined())
+    expect(stream.getRequestBody()).toMatchObject({
+      sessionKey: 'another-opaque-canonical-segment',
+      friendlyId: 'another-opaque-card-id',
+      cardId: 'another-opaque-card-id',
+      history: [{ role: 'user', content: 'local Card history' }],
+    })
+    expect(queryContext.realtimeInput).toMatchObject({
+      sessionKey: 'another-opaque-canonical-segment',
+      friendlyId: 'another-opaque-card-id',
+      portableMode: false,
+      enabled: true,
+    })
+    expect(queryContext.activeRunInput).toMatchObject({
+      sessionKey: 'another-opaque-canonical-segment',
+      cardId: 'another-opaque-card-id',
+      enabled: true,
+    })
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('fails closed when an active Card has no authoritative canonical source', async () => {
+    queryContext.chatMode = 'portable'
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard: SessionCard = {
+      cardId: 'unqualified-card',
+      title: 'Unverified Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'unqualified-segment',
+      continuationSegmentKeys: ['unqualified-segment'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 1,
+      archived: false,
+      pinned: false,
+    }
+    const stream = createReaderHarness([])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCards={[activeCard]}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+    await React.act(async () => Promise.resolve())
+
+    expect(stream.getRequestBody()).toBeUndefined()
+    expect(queryContext.realtimeInput).toMatchObject({ enabled: false })
+    expect(queryContext.activeRunInput).toMatchObject({ enabled: false })
+    expect(container.textContent).toContain(
+      'Session Card canonical source is missing or invalid.',
+    )
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
   })
 
   it('rerenders the real ChatScreen on an authoritative handoff without aborting its active reader', async () => {
@@ -625,6 +1164,259 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
+  it('accepts two consecutive same-Card canonical handoffs without changing the parent route', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard: SessionCard = {
+      cardId: 'remote:parent',
+      canonicalSource: 'remote',
+      title: 'Parent Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'backend-parent',
+      continuationSegmentKeys: ['backend-parent'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 1,
+      archived: false,
+      pinned: false,
+    }
+    queryContext.cardHistories.set('remote:parent', {
+      sessionKey: 'backend-parent',
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'backend-parent',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const stream = createReaderHarness([
+      {
+        event: 'card_handoff',
+        cardId: 'remote:parent',
+        fromSegmentKey: 'backend-parent',
+        canonicalSegmentKey: 'backend-a',
+        runId: 'run-card-chain',
+      },
+      {
+        event: 'card_handoff',
+        cardId: 'remote:parent',
+        fromSegmentKey: 'backend-a',
+        canonicalSegmentKey: 'backend-b',
+        runId: 'run-card-chain',
+      },
+    ])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId="remote:parent"
+            activeCard={activeCard}
+            sessionCards={[activeCard]}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+    const sourceKey = sessionCardQueryKeys.history(
+      'remote:parent',
+      'backend-parent',
+    )
+    await waitForAssertion(() =>
+      expect(
+        queryClient.getQueryData<SessionCardHistoryResponse>(sourceKey)
+          ?.messages,
+      ).toHaveLength(1),
+    )
+    stream.releaseHandoff()
+
+    const finalKey = sessionCardQueryKeys.history('remote:parent', 'backend-b')
+    await waitForAssertion(() =>
+      expect(
+        queryClient.getQueryData<SessionCardHistoryResponse>(finalKey)
+          ?.messages,
+      ).toHaveLength(1),
+    )
+    expect(
+      queryClient.getQueryData(
+        sessionCardQueryKeys.history('remote:parent', 'backend-a'),
+      ),
+    ).toBeUndefined()
+    expect(navigate).not.toHaveBeenCalled()
+    expect(stream.reader.cancel).not.toHaveBeenCalled()
+    expect(stream.getRequestSignal()?.aborted).toBe(false)
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('polls active-run recovery with the stable Card ID after canonical migration', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    queryContext.connectionState = 'disconnected'
+    useChatStore.getState().setConnectionState('disconnected')
+    const activeCard: SessionCard = {
+      cardId: 'remote:parent',
+      canonicalSource: 'remote',
+      title: 'Parent Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'remote:migrated-tip',
+      continuationSegmentKeys: ['remote:parent', 'remote:migrated-tip'],
+      continuationCount: 2,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 2,
+      archived: false,
+      pinned: false,
+    }
+    queryContext.cardHistories.set('remote:parent', {
+      sessionKey: 'remote:migrated-tip',
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:migrated-tip',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          ok: true,
+          run: {
+            runId: 'run-migrated',
+            status: 'active',
+            sessionKey: 'remote:migrated-tip',
+            startedAt: 1,
+          },
+        }),
+    } as Response)
+    vi.spyOn(window, 'setInterval').mockImplementation((handler, timeout) => {
+      if (timeout === 5000) {
+        void Promise.resolve().then(() => {
+          if (typeof handler === 'function') handler()
+        })
+      }
+      return 1 as unknown as NodeJS.Timeout
+    })
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId="remote:parent"
+            activeCard={activeCard}
+            sessionCards={[activeCard]}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+    React.act(() => {
+      useChatStore
+        .getState()
+        .setSessionWaiting('remote:migrated-tip', 'run-migrated')
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId="remote:parent"
+            activeCard={activeCard}
+            sessionCards={[activeCard]}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    await waitForAssertion(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        '/api/sessions/remote%3Amigrated-tip/active-run?cardId=remote%3Aparent',
+      )
+    })
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('keeps an active Card independent from legacy session-list failures and retries', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    queryContext.legacySessionsFailure = true
+    const activeCard: SessionCard = {
+      cardId: 'remote:parent',
+      canonicalSource: 'remote',
+      title: 'Card survives legacy failure',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'remote:tip',
+      continuationSegmentKeys: ['remote:tip'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 1,
+      archived: false,
+      pinned: false,
+    }
+    queryContext.cardHistories.set('remote:parent', {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [
+        userMessage('card-message', 'Card transcript remains visible'),
+      ],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId="remote:parent"
+            activeCard={activeCard}
+            sessionCards={[activeCard]}
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    await waitForAssertion(() => {
+      expect(queryContext.legacySessionsEnabled).toBe(false)
+      expect(container.textContent).toContain('Card transcript remains visible')
+      expect(container.textContent).not.toContain(
+        'Unauthorized legacy sessions',
+      )
+      expect(navigate).not.toHaveBeenCalledWith({ to: '/', replace: true })
+    })
+    React.act(() => window.dispatchEvent(new Event('claude:health-restored')))
+    expect(queryContext.legacySessionsRefetch).not.toHaveBeenCalled()
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
   it('normalizes bootstrap and immediate authoritative handoffs to the final successor in one reader batch', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -722,6 +1514,193 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     expect(useChatStore.getState().isSessionWaiting('new')).toBe(false)
     expect(useChatStore.getState().isSessionWaiting('backend-a')).toBe(false)
     expect(useChatStore.getState().isSessionWaiting('backend-b')).toBe(true)
+    expect(stream.reader.cancel).not.toHaveBeenCalled()
+    expect(stream.getRequestSignal()?.aborted).toBe(false)
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('keeps enhanced new-chat bootstrap on the allowed route until an authoritative Card handoff', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const sourceHistoryKey = chatQueryKeys.history('new', 'new')
+    const targetHistoryKey = chatQueryKeys.history(
+      'remote:created-card',
+      'remote:created-segment',
+    )
+    const stream = createReaderHarness([
+      {
+        fromSessionKey: 'new',
+        sessionKey: 'remote:created-segment',
+        friendlyId: 'remote:created-card',
+        runId: 'run-bootstrap-card',
+      },
+    ])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatRouteHarness
+            initialRoute={{ friendlyId: 'new', sessionKey: 'new' }}
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+
+    await waitForAssertion(() => {
+      expect(stream.getRequestBody()).toMatchObject({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'continue',
+      })
+      expect(
+        queryClient.getQueryData<HistoryResponse>(sourceHistoryKey)?.messages,
+      ).toHaveLength(1)
+    })
+    expect(
+      container
+        .querySelector('[data-testid="route-state"]')
+        ?.getAttribute('data-friendly-id'),
+    ).toBe('new')
+    expect(navigate).not.toHaveBeenCalled()
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(
+          ([input, init]) =>
+            String(input) === '/api/sessions' && init?.method === 'POST',
+        ),
+    ).toBe(false)
+
+    const optimisticMessage =
+      queryClient.getQueryData<HistoryResponse>(sourceHistoryKey)!.messages[0]!
+    stream.releaseHandoff()
+
+    await waitForAssertion(() => {
+      expect(
+        container
+          .querySelector('[data-testid="route-state"]')
+          ?.getAttribute('data-friendly-id'),
+      ).toBe('remote:created-card')
+      expect(
+        container
+          .querySelector('[data-testid="route-state"]')
+          ?.getAttribute('data-session-key'),
+      ).toBe('remote:created-segment')
+    })
+    expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
+    expect(
+      queryClient.getQueryData<HistoryResponse>(targetHistoryKey)?.messages,
+    ).toEqual([optimisticMessage])
+    expect(stream.reader.cancel).not.toHaveBeenCalled()
+    expect(stream.getRequestSignal()?.aborted).toBe(false)
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('routes portable new-chat bootstrap through new until an authoritative Card handoff', async () => {
+    queryContext.chatMode = 'portable'
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const sourceHistoryKey = chatQueryKeys.history('new', 'new')
+    const targetHistoryKey = chatQueryKeys.history(
+      'local:created-card',
+      'local:created-segment',
+    )
+    const stream = createReaderHarness([
+      {
+        fromSessionKey: 'new',
+        sessionKey: 'local:created-segment',
+        friendlyId: 'local:created-card',
+        runId: 'run-portable-bootstrap-card',
+      },
+    ])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatRouteHarness
+            initialRoute={{ friendlyId: 'new', sessionKey: 'new' }}
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+
+    await waitForAssertion(() => {
+      expect(stream.getRequestBody()).toMatchObject({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'continue',
+      })
+      expect(
+        queryClient.getQueryData<HistoryResponse>(sourceHistoryKey)?.messages,
+      ).toHaveLength(1)
+    })
+    expect(
+      container
+        .querySelector('[data-testid="route-state"]')
+        ?.getAttribute('data-friendly-id'),
+    ).toBe('new')
+    expect(navigate).not.toHaveBeenCalled()
+    expect(queryContext.realtimeInput).toMatchObject({
+      sessionKey: 'new',
+      friendlyId: 'new',
+      portableMode: false,
+      enabled: true,
+    })
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(
+          ([input, init]) =>
+            String(input) === '/api/sessions' && init?.method === 'POST',
+        ),
+    ).toBe(false)
+
+    const optimisticMessage =
+      queryClient.getQueryData<HistoryResponse>(sourceHistoryKey)!.messages[0]!
+    stream.releaseHandoff()
+
+    await waitForAssertion(() => {
+      expect(
+        container
+          .querySelector('[data-testid="route-state"]')
+          ?.getAttribute('data-friendly-id'),
+      ).toBe('local:created-card')
+      expect(
+        container
+          .querySelector('[data-testid="route-state"]')
+          ?.getAttribute('data-session-key'),
+      ).toBe('local:created-segment')
+    })
+    expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
+    expect(
+      queryClient.getQueryData<HistoryResponse>(targetHistoryKey)?.messages,
+    ).toEqual([optimisticMessage])
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)
 

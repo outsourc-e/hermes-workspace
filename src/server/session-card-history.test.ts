@@ -300,6 +300,57 @@ describe('SessionCardHistoryService', () => {
     )
   })
 
+  it('loads only a validated child Card component when its parent is supplied', async () => {
+    const rows = [
+      ...chain(),
+      session('delegate', {
+        parentSessionId: 'second',
+        source: 'cli',
+        relationshipType: 'child_session',
+      }),
+      session('other-root'),
+    ]
+    const messages = source({
+      first: [{ id: 'parent', content: 'parent content' }],
+      second: [],
+      third: [],
+      delegate: [{ id: 'child', content: 'child content' }],
+      'other-root': [],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => rows),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    await expect(
+      history.fetch({
+        parentCardId: 'remote:first',
+        cardId: 'remote:delegate',
+      }),
+    ).resolves.toMatchObject({
+      cardId: 'remote:delegate',
+      canonicalSegmentKey: 'remote:delegate',
+      messages: [
+        {
+          segmentKey: 'remote:delegate',
+          message: { id: 'child', content: 'child content' },
+        },
+      ],
+    })
+    expect(messages.getMessages.mock.calls.map(([key]) => key)).toEqual([
+      'delegate',
+    ])
+
+    await expect(
+      history.fetch({
+        parentCardId: 'remote:other-root',
+        cardId: 'remote:delegate',
+      }),
+    ).rejects.toThrow('Session Card not found')
+    expect(messages.getMessages).toHaveBeenCalledTimes(1)
+  })
+
   it('reports unavailable segments as partial and retryable without hiding the failure', async () => {
     const messages = source({
       first: [{ id: 'first-message', content: 'available' }],

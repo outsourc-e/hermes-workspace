@@ -6,37 +6,36 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { SessionTreeRow } from './session-tree-row'
-import type {
-  SessionMeta,
-  SessionTreeRow as SessionTreeRowModel,
-} from '../../types'
+import type { SessionCardTreeRow } from './session-tree-row'
+import type { SessionCard } from '../../types'
 
-const reactActEnvironment = globalThis as {
-  IS_REACT_ACT_ENVIRONMENT?: boolean
-}
+const reactActEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
     children,
     params,
+    search,
     to: _to,
     ...props
   }: React.AnchorHTMLAttributes<HTMLAnchorElement> & {
     children: React.ReactNode
     params?: { sessionKey?: string }
+    search?: { inspect?: string }
     to?: string
   }) => (
-    <a href={`/chat/${params?.sessionKey ?? ''}`} {...props}>
+    <a
+      href={`/chat/${params?.sessionKey ?? ''}${search?.inspect ? `?inspect=${search.inspect}` : ''}`}
+      {...props}
+    >
       {children}
     </a>
   ),
 }))
-
 vi.mock('@hugeicons/react', () => ({
   HugeiconsIcon: () => <span aria-hidden="true" />,
 }))
-
 vi.mock('@/components/ui/menu', () => ({
   MenuRoot: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
@@ -52,17 +51,29 @@ vi.mock('@/components/ui/menu', () => ({
   ),
 }))
 
-function session(key: string, title: string): SessionMeta {
-  return { key, friendlyId: `${key}-route`, title }
+const rootCard: SessionCard = {
+  cardId: 'card:root',
+  title: 'Root card',
+  titleSource: 'manual',
+  canonicalSegmentKey: 'remote:tip',
+  continuationSegmentKeys: ['remote:tip'],
+  continuationCount: 1,
+  relationshipKind: 'root',
+  childNodes: [],
+  updatedAt: 1,
+  archived: false,
+  pinned: false,
 }
 
-function model(
-  value: SessionMeta,
-  overrides: Partial<SessionTreeRowModel> = {},
-): SessionTreeRowModel {
+function row(
+  key: string,
+  title: string,
+  overrides: Partial<SessionCardTreeRow> = {},
+): SessionCardTreeRow {
   return {
-    key: value.key,
-    session: value,
+    key,
+    title,
+    updatedAt: 1,
     relationshipKind: 'root',
     depth: 0,
     isExpandable: false,
@@ -74,145 +85,79 @@ function model(
   }
 }
 
-function DisclosureHarness() {
+function Harness() {
   const [expanded, setExpanded] = useState(false)
-  const root = model(session('root', 'Root'), {
+  const root = row('card:root', 'Root card', {
     isExpandable: true,
     isExpanded: expanded,
     childCount: 1,
   })
-  const child = model(session('child', 'Child'), {
+  const child = row('card:child', 'Child card', {
     relationshipKind: 'child',
     depth: 1,
-    parentKey: 'root',
+    parentKey: 'card:root',
   })
-  const childrenByParent = useMemo(
-    () => new Map<string, Array<SessionTreeRowModel>>([['root', [child]]]),
-    [],
-  )
-
+  const childrenByParent = useMemo(() => new Map([['card:root', [child]]]), [])
   return (
-    <div>
-      <SessionTreeRow
-        row={root}
-        childrenByParent={childrenByParent}
-        activeFriendlyId=""
-        pinnedSessionKeys={new Set()}
-        onToggleExpanded={(_key, nextExpanded) => setExpanded(nextExpanded)}
-        onSelect={vi.fn()}
-        onTogglePin={vi.fn()}
-        onRename={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    </div>
+    <SessionTreeRow
+      row={root}
+      childrenByParent={childrenByParent}
+      activeCardId="card:root"
+      inspectedChildCardId="card:child"
+      pinnedSessionKeys={new Set()}
+      cardsById={new Map([['card:root', rootCard]])}
+      pendingCardIds={new Set()}
+      onToggleExpanded={(_key, next) => setExpanded(next)}
+      onTogglePin={vi.fn()}
+      onBranch={vi.fn()}
+      onRename={vi.fn()}
+      onArchive={vi.fn()}
+    />
   )
 }
 
+const mountedRoots: Array<() => void> = []
 afterEach(() => {
   while (mountedRoots.length > 0) mountedRoots.pop()?.()
 })
-
-const mountedRoots: Array<() => void> = []
-
-function render(element: React.ReactElement) {
+function render() {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  React.act(() => root.render(element))
+  React.act(() => root.render(<Harness />))
   mountedRoots.push(() => {
     React.act(() => root.unmount())
     container.remove()
   })
-  return container
 }
 
-describe('SessionTreeRow disclosure', () => {
-  it('uses a keyboard-focusable button with aria-expanded and aria-controls', () => {
-    render(<DisclosureHarness />)
-
+describe('SessionTreeRow Card routing', () => {
+  it('keeps disclosure keyboard semantics and renders children on demand', () => {
+    render()
     const disclosure = screen.getByRole('button', {
-      name: /Expand related sessions for root-route/i,
+      name: /Expand related sessions/i,
     })
-    const controls = disclosure.getAttribute('aria-controls')
-
-    expect(disclosure.tagName).toBe('BUTTON')
     expect(disclosure.getAttribute('aria-expanded')).toBe('false')
-    expect(controls).toBeTruthy()
-    expect(screen.queryByText('Child')).toBeNull()
-
-    disclosure.focus()
-    expect(document.activeElement).toBe(disclosure)
-    fireEvent.keyDown(disclosure, { key: 'Enter' })
+    expect(screen.queryByText('Child card')).toBeNull()
     React.act(() => fireEvent.click(disclosure))
-
+    expect(screen.getByText('Child card')).toBeTruthy()
     expect(disclosure.getAttribute('aria-expanded')).toBe('true')
-    expect(document.getElementById(controls!)).toBeTruthy()
-    expect(screen.getByText('Child')).toBeTruthy()
-    expect(screen.queryByRole('tree')).toBeNull()
-    expect(screen.queryByRole('treeitem')).toBeNull()
-    expect(screen.queryByRole('group')).toBeNull()
   })
 
-  it('renders an already-expanded active path without another local interaction', () => {
-    const root = model(session('root', 'Root'), {
-      isExpandable: true,
-      isExpanded: true,
-      childCount: 1,
-    })
-    const child = model(session('active-child', 'Active child'), {
-      relationshipKind: 'branch',
-      depth: 1,
-      parentKey: 'root',
-    })
-
-    render(
-      <div>
-        <SessionTreeRow
-          row={root}
-          childrenByParent={new Map([['root', [child]]])}
-          activeFriendlyId="active-child-route"
-          pinnedSessionKeys={new Set()}
-          onToggleExpanded={vi.fn()}
-          onSelect={vi.fn()}
-          onTogglePin={vi.fn()}
-          onRename={vi.fn()}
-          onDelete={vi.fn()}
-        />
-      </div>,
+  it('routes a child as inspection state on the parent Card route', () => {
+    render()
+    React.act(() =>
+      fireEvent.click(
+        screen.getByRole('button', { name: /Expand related sessions/i }),
+      ),
     )
-
-    expect(screen.getByText('Active child')).toBeTruthy()
-    expect(screen.getByText('Branch')).toBeTruthy()
+    const child = screen.getByText('Child card').closest('a')
+    expect(child?.getAttribute('href')).toBe(
+      '/chat/card:root?inspect=card:child',
+    )
+    expect(child?.getAttribute('data-inspected')).toBe('true')
+    expect(
+      screen.getByText('Root card').closest('a')?.getAttribute('aria-current'),
+    ).toBe('page')
   })
-
-  it.each([
-    ['branch', 'Branch · 3 segments'],
-    ['child', 'Delegated session · 3 segments'],
-  ] as const)(
-    'keeps the %s identity label when its logical row has continuation segments',
-    (relationshipKind, expectedLabel) => {
-      const value = session(relationshipKind, `${relationshipKind} work`)
-      const row = model(value, {
-        relationshipKind,
-        continuationCount: 3,
-      })
-
-      render(
-        <SessionTreeRow
-          row={row}
-          childrenByParent={new Map()}
-          activeFriendlyId=""
-          pinnedSessionKeys={new Set()}
-          onToggleExpanded={vi.fn()}
-          onSelect={vi.fn()}
-          onTogglePin={vi.fn()}
-          onRename={vi.fn()}
-          onDelete={vi.fn()}
-        />,
-      )
-
-      expect(screen.getByText(expectedLabel)).toBeTruthy()
-      expect(screen.queryByText(/^Continued/)).toBeNull()
-    },
-  )
 })

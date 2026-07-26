@@ -95,6 +95,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       fromSessionKey: 'new',
       fallbackSessionKey: 'new',
       targetFriendlyId: 'canonical-child',
+      cardId: 'remote:parent-card',
       reason: 'bootstrap' as const,
       portableMode: false,
       sessionSource: 'remote' as const,
@@ -105,6 +106,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       fromSessionKey: 'main',
       fallbackSessionKey: 'main',
       targetFriendlyId: 'canonical-main',
+      cardId: 'remote:parent-card',
       reason: 'bootstrap' as const,
       portableMode: false,
       sessionSource: 'unknown' as const,
@@ -115,6 +117,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       fromSessionKey: 'backend-parent',
       fallbackSessionKey: 'wrong-friendly-source',
       targetFriendlyId: 'child-friendly',
+      cardId: 'remote:parent-card',
       reason: 'stream-handoff' as const,
       portableMode: false,
       sessionSource: 'remote' as const,
@@ -126,6 +129,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       fromSessionKey,
       fallbackSessionKey,
       targetFriendlyId,
+      cardId,
       reason,
       portableMode,
       sessionSource,
@@ -193,8 +197,13 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
         cancel: vi.fn().mockResolvedValue(undefined),
       }
       let requestSignal: AbortSignal | undefined
+      let requestPayload: Record<string, unknown> | undefined
       vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
         requestSignal = init?.signal ?? undefined
+        requestPayload = JSON.parse(String(init?.body)) as Record<
+          string,
+          unknown
+        >
         return Promise.resolve({
           ok: true,
           body: { getReader: () => reader },
@@ -249,6 +258,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
         await controller!.startStreaming({
           sessionKey: fromSessionKey,
           friendlyId: activeFriendlyId,
+          cardId,
           message: 'continue',
           idempotencyKey: 'client-1',
         })
@@ -293,6 +303,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       })
       expect(reader.cancel).not.toHaveBeenCalled()
       expect(requestSignal?.aborted).toBe(false)
+      expect(requestPayload?.cardId).toBe(cardId)
       expect(onAbort).not.toHaveBeenCalled()
 
       React.act(() => root.unmount())

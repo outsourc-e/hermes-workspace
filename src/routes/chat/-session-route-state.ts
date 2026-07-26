@@ -32,13 +32,76 @@ export function buildSessionReplaceNavigation(friendlyId: string) {
 }
 
 export type SessionCardRouteResolution =
+  | { status: 'selected'; card: SessionCard }
+  | { status: 'bootstrap' }
   | {
-      status: 'selected'
-      card: SessionCard
-      navigation?: ReturnType<typeof buildSessionReplaceNavigation>
+      status: 'rejected'
+      reason: 'child' | 'continuation' | 'missing'
     }
-  | { status: 'rejected'; reason: 'child' | 'missing' }
-  | { status: 'legacy-fallback' }
+  | { status: 'unavailable'; reason: 'query' | 'projection' }
+
+/** Child transcript inspection is valid only inside its selected parent Card. */
+export function validatedInspectedChildCardId(
+  selectedCard: SessionCard | undefined,
+  requestedChildCardId: string | undefined,
+): string | undefined {
+  if (!selectedCard || !requestedChildCardId) return undefined
+  return selectedCard.childNodes.find(
+    (child) => child.cardId === requestedChildCardId,
+  )?.cardId
+}
+
+export type SessionCardProducerNavigation = {
+  cardId: string
+  inspectedChildCardId?: string
+}
+
+/**
+ * Translate legacy producer identities through the complete, validated Card
+ * projection. Missing or partial projections intentionally produce no route.
+ */
+export function resolveSessionCardProducerNavigation(
+  response: SessionCardListWire | undefined,
+  requestedIdentities: ReadonlyArray<string | null | undefined>,
+): SessionCardProducerNavigation | undefined {
+  if (!response || response.completeness !== 'complete') return undefined
+  const identities = requestedIdentities
+    .map((identity) => identity?.trim() ?? '')
+    .filter(
+      (identity, index, values) =>
+        Boolean(identity) && values.indexOf(identity) === index,
+    )
+  if (identities.length === 0) return undefined
+
+  // Preserve producer precedence (for example, sessionKey before a display
+  // friendlyId) rather than allowing Card list ordering to pick a route.
+  for (const identity of identities) {
+    for (const card of response.cards) {
+      if (
+        identity === card.cardId ||
+        identity === card.canonicalSegmentKey ||
+        card.continuationSegmentKeys.includes(identity)
+      ) {
+        return { cardId: card.cardId }
+      }
+      const child = card.childNodes.find(
+        (candidate) =>
+          identity === candidate.cardId || identity === candidate.sessionKey,
+      )
+      if (child) {
+        return {
+          cardId: card.cardId,
+          inspectedChildCardId: child.cardId,
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+function isBootstrapRoute(routeKey: string): boolean {
+  return routeKey === 'new' || routeKey === 'main'
+}
 
 /** Resolve route identity exclusively from the strictly validated Card list. */
 export function resolveSessionCardRoute({
@@ -48,46 +111,51 @@ export function resolveSessionCardRoute({
   routeKey: string
   response: SessionCardListWire
 }): SessionCardRouteResolution {
-  const normalizedRouteKey = routeKey.trim()
-  if (
-    !normalizedRouteKey ||
-    normalizedRouteKey === 'new' ||
-    normalizedRouteKey === 'main'
-  ) {
-    return { status: 'legacy-fallback' }
+  if (isBootstrapRoute(routeKey)) return { status: 'bootstrap' }
+
+  if (response.completeness !== 'complete') {
+    return { status: 'unavailable', reason: 'projection' }
   }
 
   const isChildRoute = response.cards.some((card) =>
     card.childNodes.some(
-      (child) =>
-        child.cardId === normalizedRouteKey ||
-        child.sessionKey === normalizedRouteKey,
+      (child) => child.cardId === routeKey || child.sessionKey === routeKey,
     ),
   )
   if (isChildRoute) return { status: 'rejected', reason: 'child' }
 
-  const card =
-    response.cards.find(
-      (candidate) => candidate.cardId === normalizedRouteKey,
-    ) ??
-    response.cards.find((candidate) =>
-      candidate.continuationSegmentKeys.includes(normalizedRouteKey),
-    )
-  if (card) {
-    return {
-      status: 'selected',
-      card,
-      ...(normalizedRouteKey === card.cardId
-        ? {}
-        : { navigation: buildSessionReplaceNavigation(card.cardId) }),
-    }
+  const card = response.cards.find((candidate) => candidate.cardId === routeKey)
+  if (card) return { status: 'selected', card }
+
+  const isContinuationRoute = response.cards.some((candidate) =>
+    candidate.continuationSegmentKeys.includes(routeKey),
+  )
+  if (isContinuationRoute) {
+    return { status: 'rejected', reason: 'continuation' }
   }
 
-  // A valid but incomplete list cannot prove that an unknown legacy key is
-  // unrelated. Preserve the legacy path until a complete response can decide.
-  return response.completeness === 'complete'
-    ? { status: 'rejected', reason: 'missing' }
-    : { status: 'legacy-fallback' }
+  return { status: 'rejected', reason: 'missing' }
+}
+
+/**
+ * Convert query lifecycle state into a route state without ever falling back to
+ * a raw backend session. New/main are the only explicit bootstrap exceptions.
+ */
+export function resolveSessionCardRouteState({
+  routeKey,
+  queryStatus,
+  response,
+}: {
+  routeKey: string
+  queryStatus: 'pending' | 'error' | 'success'
+  response?: SessionCardListWire
+}): SessionCardRouteResolution | null {
+  if (isBootstrapRoute(routeKey)) return { status: 'bootstrap' }
+  if (queryStatus === 'pending') return null
+  if (queryStatus === 'error' || !response) {
+    return { status: 'unavailable', reason: 'query' }
+  }
+  return resolveSessionCardRoute({ routeKey, response })
 }
 
 export function applySessionRouteResolution({

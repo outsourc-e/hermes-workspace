@@ -5,6 +5,10 @@ import { pushActivity } from '@/components/inspector/activity-store'
 
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
 
+function isExactNonblankIdentity(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.trim() === value
+}
+
 /**
  * Determine whether authoritative stream session data should trigger a route
  * handoff. Portable `main` remains pinned, but remote concrete sessions may
@@ -82,28 +86,24 @@ export function resolveAuthoritativeCardHandoffEvent(
     return null
   }
   const payload = data as Record<string, unknown>
-  const cardId = typeof payload.cardId === 'string' ? payload.cardId.trim() : ''
-  const fromSegmentKey =
-    typeof payload.fromSegmentKey === 'string'
-      ? payload.fromSegmentKey.trim()
-      : ''
-  const canonicalSegmentKey =
-    typeof payload.canonicalSegmentKey === 'string'
-      ? payload.canonicalSegmentKey.trim()
-      : ''
+  const { cardId, fromSegmentKey, canonicalSegmentKey } = payload
   if (
-    !cardId ||
-    !fromSegmentKey ||
-    !canonicalSegmentKey ||
+    !isExactNonblankIdentity(cardId) ||
+    !isExactNonblankIdentity(fromSegmentKey) ||
+    !isExactNonblankIdentity(canonicalSegmentKey) ||
     SESSION_BOOTSTRAP_KEYS.has(canonicalSegmentKey) ||
     fromSegmentKey === canonicalSegmentKey
   ) {
     return null
   }
-  const runId =
-    typeof payload.runId === 'string' && payload.runId.trim()
-      ? payload.runId.trim()
-      : null
+  if (
+    payload.runId !== undefined &&
+    payload.runId !== null &&
+    !isExactNonblankIdentity(payload.runId)
+  ) {
+    return null
+  }
+  const runId = typeof payload.runId === 'string' ? payload.runId : null
   return { cardId, fromSegmentKey, canonicalSegmentKey, runId }
 }
 
@@ -121,7 +121,9 @@ export function shouldApplyCardHandoff({
   currentSegmentKey: string
 }): boolean {
   return (
-    (!activeCardId || handoff.cardId === activeCardId) &&
+    isExactNonblankIdentity(activeCardId) &&
+    handoff.cardId === activeCardId &&
+    isExactNonblankIdentity(currentSegmentKey) &&
     handoff.fromSegmentKey === currentSegmentKey
   )
 }
@@ -947,6 +949,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     async (params: {
       sessionKey: string
       friendlyId: string
+      cardId?: string
       message: string
       history?: Array<PortableHistoryMessage>
       thinking?: string
@@ -1016,6 +1019,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           body: JSON.stringify({
             sessionKey: params.sessionKey,
             friendlyId: params.friendlyId,
+            cardId: params.cardId,
             message: params.message,
             history: params.history,
             thinking: params.thinking,
