@@ -6,6 +6,7 @@ import {
   internalFailure,
   invalidRequest,
   isSessionCardNotFound,
+  isSessionCardPinNotEligible,
   normalizedCardId,
   notFoundResponse,
   parseMetadataUpdate,
@@ -30,7 +31,7 @@ export const Route = createFileRoute('/api/session-cards/$cardId')({
         const patch = parseMetadataUpdate(body)
         if (!patch) {
           return invalidRequest(
-            'Provide only manualTitle or autoTitle as a valid string or null',
+            'Provide only manualTitle or autoTitle as a valid string or null, and pinned as a boolean',
           )
         }
 
@@ -46,6 +47,9 @@ export const Route = createFileRoute('/api/session-cards/$cardId')({
           return json({ card: fresh.card })
         } catch (error) {
           if (isSessionCardNotFound(error)) return notFoundResponse()
+          if (isSessionCardPinNotEligible(error)) {
+            return invalidRequest('Only root Session Cards can be pinned')
+          }
           return internalFailure('Unable to update Session Card metadata')
         }
       },

@@ -15,6 +15,7 @@ export type SessionCardMetadata = {
   manualTitle?: string
   autoTitle?: string
   archived?: boolean
+  pinned?: boolean
 }
 
 export type SessionCardProjectionOptions = {
@@ -29,6 +30,7 @@ export type SessionCardProjection = {
   cards: Array<SessionCard>
   indexByCardId: ReadonlyMap<string, SessionCard>
   cardIdBySessionKey: ReadonlyMap<string, string>
+  pinEligibleCardIds: ReadonlySet<string>
   activeCardId?: string
 }
 
@@ -126,6 +128,17 @@ function cardRelationshipKind(
     : row.relationshipKind
 }
 
+function hasChildRelationshipProvenance(session: SessionMeta): boolean {
+  const lineage = session.lineage
+  return (
+    lineage?.sessionSource?.trim().toLowerCase() === 'fork' ||
+    lineage?.relationshipType === 'child_session' ||
+    lineage?.isCrossSurfaceChild === true ||
+    lineage?.relationshipKind === 'branch' ||
+    lineage?.relationshipKind === 'child'
+  )
+}
+
 function normalizedTitle(value: string | undefined): string | undefined {
   const title = value?.trim()
   return title || undefined
@@ -145,6 +158,7 @@ function cardTitle(metadata: SessionCardMetadata | undefined): {
 }
 
 function compareCards(left: SessionCard, right: SessionCard): number {
+  if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
   const activityDifference = right.updatedAt - left.updatedAt
   if (activityDifference !== 0) return activityDifference
   return left.cardId.localeCompare(right.cardId)
@@ -173,6 +187,7 @@ export function projectSessionCards(
     maxDepth: options.maxDepth,
   })
   const uniqueSessions = deduplicateSessions(sessions)
+  const rowsByKey = new Map(tree.rows.map((row) => [row.key, row]))
   const membersByVisibleKey = new Map<string, Array<SessionMeta>>()
 
   for (const session of uniqueSessions) {
@@ -209,6 +224,7 @@ export function projectSessionCards(
         0,
       ),
       archived: metadata?.archived === true,
+      pinned: false,
     })
   }
 
@@ -239,6 +255,19 @@ export function projectSessionCards(
     })
   }
 
+  const pinEligibleCardIds = new Set<string>()
+  for (const [visibleKey, card] of cardsByVisibleKey) {
+    const row = rowsByKey.get(visibleKey)
+    const pinEligible =
+      card.parentCardId === undefined &&
+      !card.archived &&
+      row !== undefined &&
+      !hasChildRelationshipProvenance(row.session)
+    if (pinEligible) pinEligibleCardIds.add(card.cardId)
+    card.pinned =
+      pinEligible && options.cardMetadata?.get(card.cardId)?.pinned === true
+  }
+
   const cards = [...cardsByVisibleKey.values()].sort(compareCards)
   for (const card of cards) card.childNodes.sort(compareChildNodes)
 
@@ -265,6 +294,7 @@ export function projectSessionCards(
     cards,
     indexByCardId,
     cardIdBySessionKey,
+    pinEligibleCardIds,
     ...(activeCardId ? { activeCardId } : {}),
   }
 }

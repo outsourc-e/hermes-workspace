@@ -203,6 +203,7 @@ export type SessionCard = {
   childNodes: Array<SessionCardChild>
   updatedAt: number
   archived: boolean
+  pinned: boolean
 }
 
 export type PathsPayload = {

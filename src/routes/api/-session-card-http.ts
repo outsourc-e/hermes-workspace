@@ -1,10 +1,13 @@
 import { json } from '@tanstack/react-start'
-import { SessionCardNotFoundError } from '../../server/session-card-service'
+import {
+  SessionCardNotFoundError,
+  SessionCardPinNotEligibleError,
+} from '../../server/session-card-service'
 import { SESSION_CARD_TITLE_MAX_LENGTH } from '../../server/session-card-store'
 import type { SessionCardMetadataUpdate } from '../../server/session-card-store'
 
 const SESSION_CARD_ID_MAX_LENGTH = 256
-const TITLE_FIELDS = new Set(['manualTitle', 'autoTitle'])
+const METADATA_FIELDS = new Set(['manualTitle', 'autoTitle', 'pinned'])
 const MEDIA_TYPE_TOKEN = "[!#$%&'*+.^_`|~0-9A-Za-z-]+"
 const HTTP_OWS = '[ \\t]*'
 const MEDIA_TYPE_VALUE = `(?:${MEDIA_TYPE_TOKEN}|"(?:[ !#-\\[\\]-~]|\\\\[ -~])*")`
@@ -114,13 +117,21 @@ export function parseMetadataUpdate(
   body: Record<string, unknown>,
 ): SessionCardMetadataUpdate | null {
   const fields = Object.keys(body)
-  if (fields.length === 0 || fields.some((field) => !TITLE_FIELDS.has(field))) {
+  if (
+    fields.length === 0 ||
+    fields.some((field) => !METADATA_FIELDS.has(field))
+  ) {
     return null
   }
 
   const patch: SessionCardMetadataUpdate = {}
   for (const field of fields) {
     const value = body[field]
+    if (field === 'pinned') {
+      if (typeof value !== 'boolean') return null
+      patch.pinned = value
+      continue
+    }
     if (value !== null && typeof value !== 'string') return null
     if (
       typeof value === 'string' &&
@@ -152,4 +163,10 @@ export function isSessionCardNotFound(
   error: unknown,
 ): error is SessionCardNotFoundError {
   return error instanceof SessionCardNotFoundError
+}
+
+export function isSessionCardPinNotEligible(
+  error: unknown,
+): error is SessionCardPinNotEligibleError {
+  return error instanceof SessionCardPinNotEligibleError
 }

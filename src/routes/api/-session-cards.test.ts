@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SessionCardHistoryCursorError as CardHistoryCursorError } from '../../server/session-card-history'
-import { SessionCardNotFoundError as CardNotFoundError } from '../../server/session-card-service'
+import {
+  SessionCardNotFoundError as CardNotFoundError,
+  SessionCardPinNotEligibleError as CardPinNotEligibleError,
+} from '../../server/session-card-service'
 import { requireSessionCardJsonContentType } from './-session-card-http'
 import { Route as ListRoute } from './session-cards'
 import { Route as MetadataRoute } from './session-cards.$cardId'
@@ -30,6 +33,7 @@ vi.mock('../../server/auth-middleware', () => ({
 
 vi.mock('../../server/session-card-service', () => ({
   SessionCardNotFoundError: class SessionCardNotFoundError extends Error {},
+  SessionCardPinNotEligibleError: class SessionCardPinNotEligibleError extends Error {},
   sessionCardService: {
     listCards: mocks.listCards,
     resolveCard: mocks.resolveCard,
@@ -111,6 +115,7 @@ function resolvedCard() {
       childNodes: [],
       updatedAt: 123,
       archived: false,
+      pinned: false,
     },
     aliases: ['remote:root'],
     sourceBySegmentKey: new Map([
@@ -417,6 +422,10 @@ describe('PATCH /api/session-cards/$cardId', () => {
       {},
       { manualTitle: 1 },
       { autoTitle: false },
+      { pinned: null },
+      { pinned: 1 },
+      { pinned: 'true' },
+      { pinned: [] },
       { manualTitle: 'ok', parentSessionId: 'spoofed' },
     ]) {
       const response = await metadataHandler({
@@ -472,6 +481,51 @@ describe('PATCH /api/session-cards/$cardId', () => {
       expect(response.status).toBe(404)
     }
     expect(mocks.updateCardMetadata).not.toHaveBeenCalled()
+  })
+
+  it('accepts an exact boolean pin and returns the resolved Card pin state', async () => {
+    const fresh = resolvedCard()
+    fresh.card.pinned = true
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedCard())
+      .mockResolvedValueOnce(fresh)
+
+    const response = await metadataHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot',
+        'PATCH',
+        JSON.stringify({ pinned: true }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.updateCardMetadata).toHaveBeenCalledWith('remote:root', {
+      pinned: true,
+    })
+    expect(await response.json()).toEqual({ card: fresh.card })
+  })
+
+  it('rejects a pin rejected by the authoritative Card service', async () => {
+    mocks.resolveCard.mockResolvedValueOnce(resolvedCard())
+    mocks.updateCardMetadata.mockRejectedValueOnce(
+      new CardPinNotEligibleError('remote:orphan-child'),
+    )
+
+    const response = await metadataHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aorphan-child',
+        'PATCH',
+        JSON.stringify({ pinned: true }),
+      ),
+      params: { cardId: 'remote:orphan-child' },
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Only root Session Cards can be pinned',
+    })
   })
 })
 

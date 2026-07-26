@@ -300,6 +300,109 @@ describe('Session Card metadata persistence', () => {
     expect(reloaded.readSessionCardMetadata('card-1')).toEqual(archived)
   })
 
+  it('persists primitive pin state across reload and clears it when archived', async () => {
+    const pinned = updateSessionCardMetadata('card-1', { pinned: true })
+    expect(pinned).toMatchObject({ cardId: 'card-1', pinned: true })
+
+    vi.resetModules()
+    const reloaded = await import('./session-card-store')
+    expect(reloaded.readSessionCardMetadata('card-1')).toMatchObject({
+      cardId: 'card-1',
+      pinned: true,
+    })
+
+    const archived = reloaded.archiveSessionCardMetadata('card-1')
+    expect(archived.archivedAt).toBeDefined()
+    expect(archived.pinned).toBeUndefined()
+    expect(
+      JSON.parse(readFileSync(sessionCardStorePath(), 'utf8')).cards['card-1'],
+    ).not.toHaveProperty('pinned')
+
+    const afterStalePinUpdate = reloaded.updateSessionCardMetadata('card-1', {
+      pinned: true,
+    })
+    expect(afterStalePinUpdate).toMatchObject({
+      cardId: 'card-1',
+      archivedAt: expect.any(Number),
+    })
+    expect(afterStalePinUpdate).not.toHaveProperty('pinned')
+  })
+
+  it('fails closed for an archived persisted record that still contains a pin', () => {
+    writeFileSync(
+      sessionCardStorePath(),
+      JSON.stringify({
+        version: 1,
+        cards: {
+          archived: {
+            cardId: 'archived',
+            pinned: true,
+            updatedAt: 2,
+            archivedAt: 2,
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    expect(readSessionCardMetadata('archived')).toEqual({
+      cardId: 'archived',
+      updatedAt: 2,
+      archivedAt: 2,
+    })
+  })
+
+  it('rejects non-boolean pin updates and safely drops malformed persisted pin fields', () => {
+    for (const pinned of [undefined, null, 0, 1, 'true', [], {}]) {
+      expect(() =>
+        updateSessionCardMetadata('card-1', { pinned } as never),
+      ).toThrow(/pinned|boolean/i)
+    }
+    expect(existsSync(sessionCardStorePath())).toBe(false)
+
+    writeFileSync(
+      sessionCardStorePath(),
+      JSON.stringify({
+        version: 1,
+        cards: {
+          validAbsent: {
+            cardId: 'validAbsent',
+            manualTitle: 'Legacy-safe metadata',
+            updatedAt: 1,
+          },
+          validFalse: {
+            cardId: 'validFalse',
+            pinned: false,
+            updatedAt: 2,
+          },
+          malformed: {
+            cardId: 'malformed',
+            pinned: 'false',
+            updatedAt: 3,
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    expect(readSessionCardMetadata('validAbsent')).toMatchObject({
+      cardId: 'validAbsent',
+    })
+    expect(readSessionCardMetadata('validFalse')).toMatchObject({
+      cardId: 'validFalse',
+      pinned: false,
+    })
+    expect(readSessionCardMetadata('malformed')).toBeNull()
+
+    expect(
+      updateSessionCardMetadata('malformed', { pinned: true }),
+    ).toMatchObject({ cardId: 'malformed', pinned: true })
+    expect(readSessionCardMetadata('malformed')).toMatchObject({
+      cardId: 'malformed',
+      pinned: true,
+    })
+  })
+
   it('never imports legacy browser title, pin, or pending-send state', () => {
     writeFileSync(
       join(stateDir, 'claude.sessionTitles.v1'),

@@ -19,6 +19,7 @@ const card = {
   childNodes: [],
   updatedAt: 123,
   archived: false,
+  pinned: false,
 }
 
 function response(body: unknown, status = 200): Response {
@@ -97,6 +98,29 @@ describe('Session Card fetchers', () => {
       'Invalid Session Card response',
     )
   })
+
+  it.each([undefined, null, 0, 1, 'true', [], {}])(
+    'rejects a non-primitive-boolean pinned value: %j',
+    async (pinned) => {
+      const candidate: Record<string, unknown> = { ...card, pinned }
+      if (pinned === undefined) delete candidate.pinned
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          response({
+            cards: [candidate],
+            completeness: 'complete',
+            retryable: false,
+            sources: [],
+          }),
+        ),
+      )
+
+      await expect(fetchSessionCards()).rejects.toThrow(
+        'Invalid Session Card response',
+      )
+    },
+  )
 
   it.each([
     ['branch root', { cards: [{ ...card, relationshipKind: 'branch' }] }],
@@ -529,6 +553,32 @@ describe('Session Card fetchers', () => {
     )
     expect(fetchMock.mock.calls.flat().join(' ')).not.toContain('/api/sessions')
     expect(fetchMock.mock.calls.flat().join(' ')).not.toContain('/api/history')
+  })
+
+  it('sends a primitive pin update and requires pinned in the mutation response', async () => {
+    const withoutPinned: Record<string, unknown> = { ...card }
+    delete withoutPinned.pinned
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response({ card: { ...card, pinned: true } }))
+      .mockResolvedValueOnce(response({ card: withoutPinned }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      updateSessionCardMetadata('remote:root', { pinned: true }),
+    ).resolves.toEqual({ card: { ...card, pinned: true } })
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/session-cards/remote%3Aroot',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinned: true }),
+      },
+    )
+    await expect(
+      updateSessionCardMetadata('remote:root', { pinned: false }),
+    ).rejects.toThrow('Invalid Session Card response')
   })
 
   it.each([

@@ -88,6 +88,7 @@ export type SessionCardListResult = {
 
 export type ResolvedSessionCard = {
   card: SessionCard
+  pinEligible: boolean
   aliases: Array<string>
   sourceBySegmentKey: ReadonlyMap<string, string>
   upstreamKeyBySegmentKey: ReadonlyMap<string, string>
@@ -101,6 +102,13 @@ export class SessionCardNotFoundError extends Error {
   constructor(cardId: string) {
     super(`Session Card not found: ${cardId}`)
     this.name = 'SessionCardNotFoundError'
+  }
+}
+
+export class SessionCardPinNotEligibleError extends Error {
+  constructor(cardId: string) {
+    super(`Session Card cannot be pinned: ${cardId}`)
+    this.name = 'SessionCardPinNotEligibleError'
   }
 }
 
@@ -411,7 +419,12 @@ function metadataProjectionMap(
   metadata: Array<PersistedSessionCard>,
 ): ReadonlyMap<
   string,
-  { manualTitle?: string; autoTitle?: string; archived?: boolean }
+  {
+    manualTitle?: string
+    autoTitle?: string
+    archived?: boolean
+    pinned?: boolean
+  }
 > {
   return new Map(
     metadata.map((card) => [
@@ -420,6 +433,7 @@ function metadataProjectionMap(
         ...(card.manualTitle ? { manualTitle: card.manualTitle } : {}),
         ...(card.autoTitle ? { autoTitle: card.autoTitle } : {}),
         ...(card.archivedAt === undefined ? {} : { archived: true }),
+        ...(card.pinned === undefined ? {} : { pinned: card.pinned }),
       },
     ]),
   )
@@ -889,6 +903,7 @@ export class SessionCardService {
 
     return {
       card: resolvedCard,
+      pinEligible: fresh.projection.pinEligibleCardIds.has(card.cardId),
       aliases: fresh.aliasesByCardId.get(card.cardId) ?? [card.cardId],
       sourceBySegmentKey,
       upstreamKeyBySegmentKey,
@@ -907,6 +922,9 @@ export class SessionCardService {
     patch: SessionCardMetadataUpdate,
   ): Promise<PersistedSessionCard> {
     const resolved = await this.resolveCard(cardId)
+    if (patch.pinned === true && !resolved.pinEligible) {
+      throw new SessionCardPinNotEligibleError(resolved.card.cardId)
+    }
     return this.metadataStore.update(resolved.card.cardId, patch)
   }
 

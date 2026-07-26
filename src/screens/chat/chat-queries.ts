@@ -227,7 +227,8 @@ function parseSessionCard(value: unknown): SessionCard {
     !Array.isArray(value.childNodes) ||
     typeof value.updatedAt !== 'number' ||
     !Number.isFinite(value.updatedAt) ||
-    typeof value.archived !== 'boolean'
+    typeof value.archived !== 'boolean' ||
+    typeof value.pinned !== 'boolean'
   ) {
     return invalidSessionCardResponse()
   }
@@ -263,6 +264,7 @@ function parseSessionCard(value: unknown): SessionCard {
     childNodes,
     updatedAt: value.updatedAt,
     archived: value.archived,
+    pinned: value.pinned,
   }
 }
 
@@ -540,7 +542,11 @@ export async function fetchSessionCardHistory(payload: {
 
 export async function updateSessionCardMetadata(
   cardId: string,
-  patch: { manualTitle?: string | null; autoTitle?: string | null },
+  patch: {
+    manualTitle?: string | null
+    autoTitle?: string | null
+    pinned?: boolean
+  },
 ): Promise<{ card: SessionCard }> {
   const response = await fetch(
     `/api/session-cards/${encodeURIComponent(cardId)}`,

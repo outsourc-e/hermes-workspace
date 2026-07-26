@@ -21,22 +21,26 @@ export const SESSION_CARD_STORE_MAX_BYTES = 1024 * 1024
 const SESSION_CARD_STORE_VERSION = 1 as const
 const SESSION_CARD_STORE_FILE = 'session-cards.v1.json'
 const SESSION_CARD_ID_MAX_LENGTH = 256
-const SESSION_CARD_RECORD_MAX_BYTES = 1024
+// v1 remains backward compatible; reserve a bounded 16-byte JSON budget for
+// an optional `pinned: false` field without changing the overall store cap.
+const SESSION_CARD_RECORD_MAX_BYTES = 1040
 const SESSION_CARD_RECORD_MAX_COUNT = 2000
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 const RECORD_FIELDS = new Set([
   'cardId',
   'manualTitle',
   'autoTitle',
+  'pinned',
   'updatedAt',
   'archivedAt',
 ])
-const PATCH_FIELDS = new Set(['manualTitle', 'autoTitle'])
+const PATCH_FIELDS = new Set(['manualTitle', 'autoTitle', 'pinned'])
 
 export type PersistedSessionCard = {
   cardId: string
   manualTitle?: string
   autoTitle?: string
+  pinned?: boolean
   updatedAt: number
   archivedAt?: number
 }
@@ -49,6 +53,7 @@ export type PersistedSessionCardStore = {
 export type SessionCardMetadataUpdate = {
   manualTitle?: string | null
   autoTitle?: string | null
+  pinned?: boolean
 }
 
 export type SessionCardTitleSource = 'default' | 'auto' | 'manual'
@@ -143,10 +148,17 @@ function validatePersistedCard(
     if ('autoTitle' in value) {
       card.autoTitle = normalizeTitle(value.autoTitle)
     }
+    if ('pinned' in value) {
+      if (typeof value.pinned !== 'boolean') return null
+      card.pinned = value.pinned
+    }
     if ('archivedAt' in value) {
       if (!isTimestamp(value.archivedAt)) return null
       card.archivedAt = value.archivedAt
     }
+    // Pins only apply to visible Cards. Retain archive/title metadata from an
+    // older or externally-corrupted record, but fail closed on its pin state.
+    if (card.archivedAt !== undefined) delete card.pinned
     return card
   } catch {
     return null
@@ -273,7 +285,9 @@ function normalizeUpdate(
     throw new Error(`Unsupported Session Card metadata field: ${unsupported}`)
   }
   if (fields.length === 0) {
-    throw new Error('Session Card metadata update must contain a title field')
+    throw new Error(
+      'Session Card metadata update must contain a metadata field',
+    )
   }
 
   const normalized: SessionCardMetadataUpdate = {}
@@ -284,6 +298,12 @@ function normalizeUpdate(
   if ('autoTitle' in patch) {
     normalized.autoTitle =
       patch.autoTitle === null ? null : normalizeTitle(patch.autoTitle)
+  }
+  if ('pinned' in patch) {
+    if (typeof patch.pinned !== 'boolean') {
+      throw new Error('Session Card pinned state must be a boolean')
+    }
+    normalized.pinned = patch.pinned
   }
   return normalized
 }
@@ -343,6 +363,8 @@ export function updateSessionCardMetadata(
     if (normalizedPatch.autoTitle === null) delete next.autoTitle
     else next.autoTitle = normalizedPatch.autoTitle
   }
+  if (next.archivedAt !== undefined) delete next.pinned
+  else if ('pinned' in normalizedPatch) next.pinned = normalizedPatch.pinned
 
   store.cards[normalizedCardId] = next
   writeStore(store)
@@ -361,6 +383,7 @@ export function archiveSessionCardMetadata(
     updatedAt: now,
     archivedAt: now,
   }
+  delete next.pinned
   store.cards[normalizedCardId] = next
   writeStore(store)
   return next

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   SessionCardNotFoundError,
+  SessionCardPinNotEligibleError,
   SessionCardService,
 } from './session-card-service'
 import type {
@@ -68,19 +69,25 @@ function metadataStore(): SessionCardMetadataStore & {
       cardId: string
       manualTitle?: string
       autoTitle?: string
+      pinned?: boolean
       updatedAt: number
       archivedAt?: number
     }
   >()
   const archive = vi.fn((cardId: string) => {
     const value = { ...cards.get(cardId), cardId, updatedAt: 2, archivedAt: 2 }
+    delete value.pinned
     cards.set(cardId, value)
     return value
   })
   const update = vi.fn(
     (
       cardId: string,
-      patch: { manualTitle?: string | null; autoTitle?: string | null },
+      patch: {
+        manualTitle?: string | null
+        autoTitle?: string | null
+        pinned?: boolean
+      },
     ) => {
       const value = { ...cards.get(cardId), cardId, updatedAt: 1 }
       if (patch.manualTitle === null) delete value.manualTitle
@@ -88,6 +95,7 @@ function metadataStore(): SessionCardMetadataStore & {
         value.manualTitle = patch.manualTitle
       if (patch.autoTitle === null) delete value.autoTitle
       else if (patch.autoTitle !== undefined) value.autoTitle = patch.autoTitle
+      if (patch.pinned !== undefined) value.pinned = patch.pinned
       cards.set(cardId, value)
       return value
     },
@@ -480,6 +488,32 @@ describe('SessionCardService collection and resolution', () => {
     ])
   })
 
+  it('projects and deterministically sorts pinned root metadata before activity order', async () => {
+    const store = metadataStore()
+    store.update('remote:older', { pinned: true })
+    const rows = [
+      session('newer', undefined, 200),
+      session('older', undefined, 100),
+    ]
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page(rows, 0, rows.length)),
+      },
+      localSource: null,
+      metadataStore: store,
+    })
+
+    const result = await service.listCards()
+
+    expect(
+      result.cards.map(({ cardId, pinned }) => ({ cardId, pinned })),
+    ).toEqual([
+      { cardId: 'remote:older', pinned: true },
+      { cardId: 'remote:newer', pinned: false },
+    ])
+  })
+
   it('resolves only a fresh root card ID and rejects hidden, child, and arbitrary IDs', async () => {
     const child = session(
       'child',
@@ -760,5 +794,86 @@ describe('SessionCardService collection and resolution', () => {
     expect(store.archive).toHaveBeenCalledWith('remote:root')
     expect(deleteSession).not.toHaveBeenCalled()
     await expect(service.listCards()).resolves.toMatchObject({ cards: [] })
+  })
+
+  it('resolves a root alias before pinning and never invokes an upstream mutation', async () => {
+    const updateSession = vi.fn()
+    const store = metadataStore()
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page([session('root')], 0, 1)),
+        updateSession,
+      },
+      localSource: null,
+      metadataStore: store,
+    })
+
+    await expect(
+      service.updateCardMetadata('root', { pinned: true }),
+    ).resolves.toMatchObject({ cardId: 'remote:root', pinned: true })
+    expect(store.update).toHaveBeenCalledWith('remote:root', { pinned: true })
+    expect(updateSession).not.toHaveBeenCalled()
+    await expect(
+      service.updateCardMetadata('remote:missing', { pinned: true }),
+    ).rejects.toBeInstanceOf(SessionCardNotFoundError)
+    expect(store.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects pinning an orphan with child relationship provenance', async () => {
+    const store = metadataStore()
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () =>
+          Promise.resolve(
+            page(
+              [
+                session('orphan-child', {
+                  parentSessionId: 'not-loaded',
+                  relationshipType: 'child_session',
+                }),
+              ],
+              0,
+              1,
+            ),
+          ),
+      },
+      localSource: null,
+      metadataStore: store,
+    })
+
+    await expect(
+      service.updateCardMetadata('orphan-child', { pinned: true }),
+    ).rejects.toBeInstanceOf(SessionCardPinNotEligibleError)
+    expect(store.update).not.toHaveBeenCalled()
+    await expect(
+      service.updateCardMetadata('orphan-child', { pinned: false }),
+    ).resolves.toMatchObject({ cardId: 'remote:orphan-child', pinned: false })
+  })
+
+  it('clears durable pin metadata atomically when archiving', async () => {
+    const store = metadataStore()
+    store.update('remote:root', { pinned: true })
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page([session('root')], 0, 1)),
+      },
+      localSource: null,
+      metadataStore: store,
+    })
+
+    await service.archiveCard('remote:root')
+    const listed = await service.listCards({ includeArchived: true })
+
+    expect(listed.cards).toEqual([
+      expect.objectContaining({
+        cardId: 'remote:root',
+        archived: true,
+        pinned: false,
+      }),
+    ])
+    expect(store.list()[0]).not.toHaveProperty('pinned')
   })
 })

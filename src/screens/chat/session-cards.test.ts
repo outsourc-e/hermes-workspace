@@ -77,6 +77,7 @@ describe('projectSessionCards', () => {
       titleSource: 'default',
       updatedAt: 300,
       archived: false,
+      pinned: false,
     })
     expect(projection.cards[0]?.parentCardId).toBeUndefined()
     expect(projection.cardIdBySessionKey.get('root')).toBe('root')
@@ -243,5 +244,78 @@ describe('projectSessionCards', () => {
       title: 'Stable logical title',
       titleSource: 'manual',
     })
+  })
+
+  it('orders pinned roots first while refusing pin metadata on children', () => {
+    const parent = session('parent', undefined, 10)
+    const child = session(
+      'child',
+      { parentSessionId: 'parent', relationshipType: 'child_session' },
+      300,
+    )
+    const newest = session('newest', undefined, 200)
+    const pinnedOlder = session('pinned-older', undefined, 100)
+    const metadata = new Map([
+      ['pinned-older', { pinned: true }],
+      ['child', { pinned: true }],
+    ])
+
+    const projection = projectSessionCards(
+      [parent, child, newest, pinnedOlder],
+      { cardMetadata: metadata },
+    )
+
+    expect(projection.roots.map((card) => card.cardId)).toEqual([
+      'pinned-older',
+      'newest',
+      'parent',
+    ])
+    expect(projection.indexByCardId.get('pinned-older')?.pinned).toBe(true)
+    expect(projection.indexByCardId.get('newest')?.pinned).toBe(false)
+    expect(projection.indexByCardId.get('child')?.pinned).toBe(false)
+
+    const continuationMetadata = new Map([['second', { pinned: true }]])
+    const continuation = projectSessionCards(continuationChain(), {
+      cardMetadata: continuationMetadata,
+    })
+    expect(continuation.roots[0]).toMatchObject({
+      cardId: 'root',
+      pinned: false,
+    })
+  })
+
+  it('fails closed for persisted pins on orphaned child, fork, and cross-surface rows', () => {
+    const rows = [
+      session('root', undefined, 100),
+      session(
+        'orphan-child',
+        { parentSessionId: 'missing', relationshipType: 'child_session' },
+        300,
+      ),
+      session('orphan-fork', { sessionSource: 'fork' }, 200),
+      session('orphan-cross-surface', { isCrossSurfaceChild: true }, 150),
+    ]
+    const projection = projectSessionCards(rows, {
+      cardMetadata: new Map([
+        ['orphan-child', { pinned: true }],
+        ['orphan-fork', { pinned: true }],
+        ['orphan-cross-surface', { pinned: true }],
+        ['root', { pinned: true }],
+      ]),
+    })
+
+    expect(projection.roots.map((card) => card.cardId)).toEqual([
+      'root',
+      'orphan-child',
+      'orphan-fork',
+      'orphan-cross-surface',
+    ])
+    expect(projection.roots.map((card) => card.pinned)).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ])
+    expect([...projection.pinEligibleCardIds]).toEqual(['root'])
   })
 })
