@@ -28,13 +28,17 @@ import {
 } from '@/hooks/use-chat-settings'
 import { useSettingsStore } from '@/hooks/use-settings'
 import { AgentIdentityAvatar } from '@/components/avatars'
+import {
+  buildChatCardNavigation,
+  useWorkspaceStore,
+} from '@/stores/workspace-store'
 
 export const MOBILE_HAMBURGER_NAV_ITEMS = [
   {
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
-    to: '/chat/main',
+    to: '/chat/new',
     match: (p: string) => p.startsWith('/chat') || p === '/new' || p === '/',
   },
   {
@@ -160,6 +164,7 @@ export function MobileHamburgerMenu() {
   }, [open])
 
   const navigate = useNavigate()
+  const activeChatCardId = useWorkspaceStore((state) => state.activeChatCardId)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const agentDisplayName = useChatSettingsStore(selectAgentDisplayName)
@@ -172,9 +177,13 @@ export function MobileHamburgerMenu() {
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
-  function handleNav(to: string) {
+  function handleNav(to: string, cardAwareChat = false) {
     hapticTap()
-    void navigate({ to })
+    if (cardAwareChat) {
+      void navigate(buildChatCardNavigation(activeChatCardId))
+    } else {
+      void navigate({ to })
+    }
     setOpen(false)
   }
 
@@ -258,7 +267,7 @@ export function MobileHamburgerMenu() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => handleNav(item.to)}
+                onClick={() => handleNav(item.to, item.id === 'chat')}
                 className={cn(
                   'flex items-center gap-3 px-3 py-3 rounded-xl text-left w-full',
                   'transition-all duration-150 active:scale-[0.98]',

@@ -64,8 +64,9 @@ function CardActionsHarness({
   navigateToCard,
   onActiveSessionDelete,
 }: HarnessProps) {
+  const [selectedCardId, setSelectedCardId] = React.useState(activeCard.cardId)
   const actions = useDesktopSessionCardActions({
-    activeCardId: activeCard.cardId,
+    activeCardId: selectedCardId,
     invalidateCards,
     navigateToCard,
     onActiveSessionDelete,
@@ -87,6 +88,9 @@ function CardActionsHarness({
       </button>
       <button type="button" onClick={() => actions.archive(activeCard)}>
         Archive action
+      </button>
+      <button type="button" onClick={() => setSelectedCardId('card:newer')}>
+        Select newer Card
       </button>
       <output data-testid="pending">
         {actions.pendingCardIds.has(activeCard.cardId) ? 'pending' : 'idle'}
@@ -235,5 +239,64 @@ describe('active Card archive ordering', () => {
     ])
     expect(screen.getByTestId('pending').textContent).toBe('idle')
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('does not leave a newer Card selected while an earlier archive completes', async () => {
+    let resolveArchive: (() => void) | undefined
+    cardQueryMocks.archiveSessionCard.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveArchive = resolve
+        }),
+    )
+    const props = renderHarness()
+
+    await invoke('Archive action')
+    await invoke('Select newer Card')
+    await React.act(async () => {
+      resolveArchive?.()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(props.onActiveSessionDelete).not.toHaveBeenCalled()
+    expect(props.invalidateCards).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('pending').textContent).toBe('idle')
+  })
+})
+
+describe('Card branch selection ordering', () => {
+  it('keeps the existing post-success navigation while the branched Card is still selected', async () => {
+    cardQueryMocks.branchSessionCard.mockResolvedValue(undefined)
+    const props = renderHarness()
+
+    await invoke('Branch action')
+
+    expect(props.navigateToCard).toHaveBeenCalledWith(activeCard.cardId)
+    expect(props.invalidateCards).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('pending').textContent).toBe('idle')
+  })
+
+  it('does not navigate over a newer Card selected while an earlier branch completes', async () => {
+    let resolveBranch: (() => void) | undefined
+    cardQueryMocks.branchSessionCard.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveBranch = resolve
+        }),
+    )
+    const props = renderHarness()
+
+    await invoke('Branch action')
+    await invoke('Select newer Card')
+    await React.act(async () => {
+      resolveBranch?.()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(props.navigateToCard).not.toHaveBeenCalled()
+    expect(props.invalidateCards).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('pending').textContent).toBe('idle')
   })
 })

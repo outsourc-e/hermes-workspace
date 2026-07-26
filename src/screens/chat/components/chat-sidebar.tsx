@@ -104,6 +104,12 @@ export function useDesktopSessionCardActions({
   navigateToCard,
 }: DesktopSessionCardActionsOptions) {
   const pendingCardIdsRef = useRef<Set<string>>(new Set())
+  const activeCardIdRef = useRef(activeCardId)
+  const navigateToCardRef = useRef(navigateToCard)
+  const onActiveSessionDeleteRef = useRef(onActiveSessionDelete)
+  activeCardIdRef.current = activeCardId
+  navigateToCardRef.current = navigateToCard
+  onActiveSessionDeleteRef.current = onActiveSessionDelete
   const [pendingCardIds, setPendingCardIds] = useState<Set<string>>(
     () => new Set(),
   )
@@ -176,7 +182,10 @@ export function useDesktopSessionCardActions({
         'branch',
         'Branch',
         () => branchSessionCard(card.cardId, card.canonicalSegmentKey),
-        () => navigateToCard(card.cardId),
+        () => {
+          if (activeCardIdRef.current !== card.cardId) return
+          return navigateToCardRef.current(card.cardId)
+        },
       )
     },
     archive(card: SessionCard) {
@@ -185,7 +194,10 @@ export function useDesktopSessionCardActions({
         'archive',
         'Archive',
         () => archiveSessionCard(card.cardId),
-        card.cardId === activeCardId ? onActiveSessionDelete : undefined,
+        () => {
+          if (activeCardIdRef.current !== card.cardId) return
+          return onActiveSessionDeleteRef.current?.()
+        },
       )
     },
   }

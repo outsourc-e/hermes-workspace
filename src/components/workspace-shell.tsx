@@ -27,7 +27,12 @@ import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
-import { useWorkspaceStore } from '@/stores/workspace-store'
+import {
+  CHAT_BOOTSTRAP_CARD_ID,
+  buildChatCardNavigation,
+  normalizeActiveChatCardId,
+  useWorkspaceStore,
+} from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
@@ -59,6 +64,17 @@ const TerminalWorkspace = lazy(() =>
 
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
   'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
+
+export function resolveShellActiveChatCardId(pathname: string): string | null {
+  if (pathname === '/new') return CHAT_BOOTSTRAP_CARD_ID
+  const match = pathname.match(/^\/chat\/([^/?#]+)$/)
+  if (!match?.[1]) return null
+  try {
+    return normalizeActiveChatCardId(decodeURIComponent(match[1]))
+  } catch {
+    return normalizeActiveChatCardId(match[1])
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -95,6 +111,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
+  const activeChatCardId = useWorkspaceStore((s) => s.activeChatCardId)
+  const setActiveChatCardId = useWorkspaceStore((s) => s.setActiveChatCardId)
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
 
   // ChatGPT-style: track visual viewport height for keyboard-aware layout
@@ -204,9 +222,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     return null
   })()
 
-  const chatMatch = pathname.match(/^\/chat\/(.+)$/)
-  const activeFriendlyId = chatMatch?.[1] ?? 'main'
-  const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const routeChatCardId = resolveShellActiveChatCardId(pathname)
+  const activeFriendlyId = routeChatCardId ?? activeChatCardId
+  const isOnChatRoute = routeChatCardId !== null
   const isOnTerminalRoute = pathname.startsWith('/terminal')
   const shellSearch = readShellSearch(search)
   const isEmbeddedSurface =
@@ -219,6 +237,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     !isChromeFreeSurface && !isMobile && !isOnChatRoute && !sidebarCollapsed
 
   const isNewChat = activeFriendlyId === 'new'
+
+  useEffect(() => {
+    if (routeChatCardId !== null) setActiveChatCardId(routeChatCardId)
+  }, [routeChatCardId, setActiveChatCardId])
 
   // Sessions state — shared semantic source for sidebar and chat header
   const {
@@ -249,7 +271,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, [setSidebarCollapsed])
 
   const handleActiveSessionDelete = useCallback(() => {
-    navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })
+    navigate({
+      ...buildChatCardNavigation(CHAT_BOOTSTRAP_CARD_ID),
+      replace: true,
+    })
   }, [navigate])
 
   useEffect(() => {

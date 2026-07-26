@@ -24,6 +24,10 @@ import type { TouchEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { useSettings } from '@/hooks/use-settings'
+import {
+  buildChatCardNavigation,
+  useWorkspaceStore,
+} from '@/stores/workspace-store'
 
 /** Height constant for consistent bottom insets on mobile routes with tab bar */
 export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 80px)'
@@ -56,7 +60,7 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
-    to: '/chat/main',
+    to: '/chat/new',
     match: (p) => p.startsWith('/chat') || p === '/new',
   },
 
@@ -128,6 +132,7 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
 
 export function MobileTabBar() {
   const navigate = useNavigate()
+  const activeChatCardId = useWorkspaceStore((state) => state.activeChatCardId)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const navRef = useRef<HTMLElement>(null)
 
@@ -190,10 +195,14 @@ export function MobileTabBar() {
       ) {
         hapticTap()
         const nextTab = MOBILE_NAV_TABS[nextIdx]
-        if (nextTab) void navigate({ to: nextTab.to })
+        if (nextTab?.id === 'chat') {
+          void navigate(buildChatCardNavigation(activeChatCardId))
+        } else if (nextTab) {
+          void navigate({ to: nextTab.to })
+        }
       }
     },
-    [navigate, pathname],
+    [activeChatCardId, navigate, pathname],
   )
 
   // Measure pill for --tabbar-h (~80px total = pill + bottom offset)
@@ -288,7 +297,11 @@ export function MobileTabBar() {
                   // Don't fire navigate if this was a drag swipe
                   if (!isDragging) {
                     hapticTap()
-                    void navigate({ to: tab.to })
+                    if (tab.id === 'chat') {
+                      void navigate(buildChatCardNavigation(activeChatCardId))
+                    } else {
+                      void navigate({ to: tab.to })
+                    }
                   }
                 }}
                 aria-current={isActive ? 'page' : undefined}

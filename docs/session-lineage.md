@@ -25,6 +25,7 @@ Workspace does not infer a continuation from `parentSessionId`, a declared root/
 A `cardId` is the stable user-facing identity of a logical parent conversation. A `canonicalSegmentKey` is the mutable backend session key that currently receives parent sends and live parent events.
 
 - Chat routes select the stable Card ID, not an individual storage segment.
+- User-facing navigation returns to the last stable Card ID. `new` is the only controlled bootstrap destination; `main` is not a permanent route alias or fallback destination.
 - The server resolves the Card from a fresh validated projection and determines its current canonical segment for sending and recovery. A client-provided segment key or parent ID is not relationship authority.
 - A confirmed parent continuation may rotate the canonical segment without changing the selected Card, its route, title, pin state, or actions.
 - A branch, delegate, child, cross-source record, or malformed event cannot become the parent Card's canonical segment.
@@ -47,6 +48,8 @@ User actions belong to the parent Session Card, never to a hidden continuation s
 - **Title and pin:** update Card metadata keyed by `cardId`; a continuation or child has no separate title or pin action.
 - **Branch:** fork the whole parent conversation from the server-resolved canonical segment. The result appears beneath the parent and cannot replace its selection.
 - **Archive:** hide/archive the Card through Workspace metadata. Archival does not delete backend segments.
+
+Branch and archive completion respect newer user intent. If a mutation starts for Card A and the user selects Card B before it completes, the late completion reconciles the Card list but does not navigate away from B. Archiving the still-selected Card moves to the controlled `new` bootstrap only after the archive succeeds.
 
 Workspace exposes no remote logical-Card deletion because there is no upstream atomic logical-conversation deletion contract.
 

@@ -24,6 +24,11 @@ import type { SessionCardHistoryResponse } from './chat-queries'
 import type { ChatMessage, HistoryResponse, SessionCard } from './types'
 
 const navigate = vi.fn()
+const cardMutationMocks = vi.hoisted(() => ({
+  archiveSessionCard: vi.fn(),
+  branchSessionCard: vi.fn(),
+  updateSessionCardMetadata: vi.fn(),
+}))
 const queryContext = vi.hoisted(() => ({
   client: null as unknown as QueryClient,
   cardHistories: new Map<string, SessionCardHistoryResponse>(),
@@ -50,6 +55,13 @@ const queryContext = vi.hoisted(() => ({
     forcedSessionKey?: string
   },
   legacySessionsRefetch: vi.fn(),
+}))
+
+vi.mock('./chat-queries', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  archiveSessionCard: cardMutationMocks.archiveSessionCard,
+  branchSessionCard: cardMutationMocks.branchSessionCard,
+  updateSessionCardMetadata: cardMutationMocks.updateSessionCardMetadata,
 }))
 
 vi.mock('@tanstack/react-query', async (importOriginal) => {
@@ -626,6 +638,13 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     window.sessionStorage.clear()
     resetPendingSend()
     navigate.mockReset()
+    cardMutationMocks.archiveSessionCard
+      .mockReset()
+      .mockResolvedValue(undefined)
+    cardMutationMocks.branchSessionCard.mockReset().mockResolvedValue(undefined)
+    cardMutationMocks.updateSessionCardMetadata
+      .mockReset()
+      .mockResolvedValue(undefined)
     queryContext.cardHistories.clear()
     queryContext.cardHistoryRefetches.clear()
     queryContext.chatMode = 'enhanced'
@@ -654,6 +673,86 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     resetPendingSend()
+  })
+
+  it('does not navigate over a newer Card when an earlier mobile archive completes', async () => {
+    queryContext.mobile = true
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const invalidate = vi
+      .spyOn(queryClient, 'invalidateQueries')
+      .mockResolvedValue(undefined)
+    let resolveArchive: (() => void) | undefined
+    cardMutationMocks.archiveSessionCard.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveArchive = resolve
+        }),
+    )
+    const parentCard: SessionCard = {
+      cardId: 'remote:parent',
+      canonicalSource: 'remote',
+      title: 'Parent Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'remote:parent-tip',
+      continuationSegmentKeys: ['remote:parent-tip'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 2,
+      archived: false,
+      pinned: false,
+    }
+    const newerCard: SessionCard = {
+      ...parentCard,
+      cardId: 'remote:newer',
+      title: 'Newer Card',
+      canonicalSegmentKey: 'remote:newer-tip',
+      continuationSegmentKeys: ['remote:newer-tip'],
+      updatedAt: 3,
+    }
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const render = (activeCard: SessionCard) => {
+      React.act(() => {
+        root.render(
+          <QueryClientProvider client={queryClient}>
+            <ChatScreen
+              activeFriendlyId={activeCard.cardId}
+              activeCard={activeCard}
+              sessionCards={[parentCard, newerCard]}
+            />
+          </QueryClientProvider>,
+        )
+      })
+    }
+
+    render(parentCard)
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="mobile-archive"]')!
+        .click()
+    })
+    expect(cardMutationMocks.archiveSessionCard).toHaveBeenCalledWith(
+      parentCard.cardId,
+    )
+
+    render(newerCard)
+    await React.act(async () => {
+      resolveArchive?.()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await waitForAssertion(() => expect(invalidate).toHaveBeenCalledTimes(1))
+
+    expect(navigate).not.toHaveBeenCalled()
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
   })
 
   it('shows only validated child Card history and restores parent history under the same Card', async () => {

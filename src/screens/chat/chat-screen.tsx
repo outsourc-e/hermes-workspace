@@ -105,7 +105,11 @@ import { hapticTap } from '@/lib/haptics'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
-import { useWorkspaceStore } from '@/stores/workspace-store'
+import {
+  CHAT_BOOTSTRAP_CARD_ID,
+  buildChatCardNavigation,
+  useWorkspaceStore,
+} from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
@@ -525,6 +529,8 @@ export function ChatScreen({
   const [sending, setSending] = useState(false)
 
   const [sessionsOpen, setSessionsOpen] = useState(false)
+  const activeCardIdRef = useRef(activeCard?.cardId)
+  activeCardIdRef.current = activeCard?.cardId
   const [error, setError] = useState<string | null>(null)
   const [renamingCardTitle, setRenamingCardTitle] = useState(false)
   const [pendingCardIds, setPendingCardIds] = useState<Set<string>>(
@@ -3115,20 +3121,18 @@ export function ChatScreen({
 
   const handleArchiveCard = useCallback(
     async (cardId: string) => {
-      const isActiveCard = activeCard?.cardId === cardId
       await runCardMutation(cardId, async () => {
         await archiveSessionCard(cardId)
-        if (isActiveCard) {
+        if (activeCardIdRef.current === cardId) {
           setSessionsOpen(false)
           await navigate({
-            to: '/chat/$sessionKey',
-            params: { sessionKey: 'main' },
+            ...buildChatCardNavigation(CHAT_BOOTSTRAP_CARD_ID),
             replace: true,
           })
         }
       })
     },
-    [activeCard?.cardId, navigate, runCardMutation],
+    [navigate, runCardMutation],
   )
 
   const handleRenameActiveSessionTitle = useCallback(
