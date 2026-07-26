@@ -22,7 +22,10 @@ export type SessionCardProjectionOptions = {
   activeSessionKey?: string
   maxDepth?: number
   cardMetadata?: ReadonlyMap<string, SessionCardMetadata>
-  childStatusBySessionKey?: ReadonlyMap<string, SessionCardChildStatus>
+  childActivityByParentCardId?: ReadonlyMap<
+    string,
+    ReadonlyMap<string, { status: SessionCardChildStatus; updatedAt: number }>
+  >
 }
 
 export type SessionCardProjection = {
@@ -242,15 +245,16 @@ export function projectSessionCards(
       continue
     }
 
+    const childActivity = options.childActivityByParentCardId
+      ?.get(parentCard.cardId)
+      ?.get(card.cardId)
     parentCard.childNodes.push({
       cardId: card.cardId,
       sessionKey: card.canonicalSegmentKey,
       relationshipKind: card.relationshipKind,
       title: card.title,
-      status:
-        options.childStatusBySessionKey?.get(card.canonicalSegmentKey) ??
-        'idle',
-      updatedAt: card.updatedAt,
+      status: childActivity?.status ?? 'idle',
+      updatedAt: Math.max(card.updatedAt, childActivity?.updatedAt ?? 0),
       continuationCount: card.continuationCount,
     })
   }

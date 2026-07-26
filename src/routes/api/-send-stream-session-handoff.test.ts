@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   STREAM_PROVENANCE_ID_LIMIT,
+  childLifecycleStatusForEvent,
   createStreamEventProvenanceTracker,
   hasNonParentStreamFacts,
   resolveActiveParentSource,
@@ -10,6 +11,26 @@ import {
   resolveAuthoritativeSessionSource,
   resolveAuthoritativeStreamHandoff,
 } from './-send-stream-session-handoff'
+
+describe('childLifecycleStatusForEvent', () => {
+  it.each([
+    'run.started',
+    'message.started',
+    'assistant.delta',
+    'tool.running',
+  ])('maps %s activity to running', (event) =>
+    expect(childLifecycleStatusForEvent(event)).toBe('running'),
+  )
+
+  it.each(['run.completed', 'run.succeeded'])('maps %s to complete', (event) =>
+    expect(childLifecycleStatusForEvent(event)).toBe('complete'),
+  )
+
+  it.each(['error', 'run.failed', 'run.error', 'run.cancelled'])(
+    'maps %s to error',
+    (event) => expect(childLifecycleStatusForEvent(event)).toBe('error'),
+  )
+})
 
 describe('createStreamEventProvenanceTracker', () => {
   it('keeps a shared run quarantined after explicit parent ownership', () => {

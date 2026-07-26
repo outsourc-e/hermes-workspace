@@ -55,6 +55,7 @@ import {
   finalizeRunTerminalStream,
 } from './-send-stream-terminal'
 import {
+  childLifecycleStatusForEvent,
   createStreamEventProvenanceTracker,
   hasNonParentStreamFacts,
   resolveAuthoritativeBootstrapHandoff,
@@ -1659,6 +1660,46 @@ export const Route = createFileRoute('/api/send-stream')({
                       const upstreamRunId = readString(data.run_id)
                       const runId = upstreamRunId || activeRunId || undefined
                       const upstreamSessionKey = readString(data.session_id)
+                      const rawChildSessionKey =
+                        typeof data.session_id === 'string'
+                          ? data.session_id
+                          : ''
+                      const rawChildRunId =
+                        typeof data.run_id === 'string' ? data.run_id : ''
+                      if (
+                        activeCardId &&
+                        rawChildSessionKey.length > 0 &&
+                        rawChildSessionKey.trim() === rawChildSessionKey &&
+                        rawChildSessionKey !== sessionKey &&
+                        rawChildRunId.length > 0 &&
+                        rawChildRunId.trim() === rawChildRunId
+                      ) {
+                        const childObservation = await waitWithinStreamLifetime(
+                          sessionCardService
+                            .observeChildLifecycle({
+                              parentCardId: activeCardId,
+                              childUpstreamSessionKey: rawChildSessionKey,
+                              runId: rawChildRunId,
+                              status: childLifecycleStatusForEvent(event),
+                            })
+                            .catch(() => null),
+                        )
+                        if (streamTransportUnavailable()) return
+                        if (childObservation) {
+                          streamEventProvenance.quarantine({
+                            sessionKey: rawChildSessionKey,
+                            runId: rawChildRunId,
+                            sourceIsExplicitlyNonParent: true,
+                          })
+                          const childActivity = {
+                            ...childObservation,
+                            activity: event,
+                          }
+                          sendEvent('card_child_activity', childActivity)
+                          publishChatEvent('card_child_activity', childActivity)
+                          return
+                        }
+                      }
                       const hasExplicitNonParentFacts = hasNonParentStreamFacts(
                         data,
                         activeParentSource,

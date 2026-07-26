@@ -28,6 +28,8 @@ const mocks = vi.hoisted(() => ({
   getDiscoveredModels: vi.fn(),
   getLocalProviderDef: vi.fn(),
   getChatMode: vi.fn(),
+  observeChildLifecycle: vi.fn(),
+  publishChatEvent: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -55,7 +57,7 @@ vi.mock('../../server/rate-limit', () => ({
 }))
 
 vi.mock('../../server/chat-event-bus', () => ({
-  publishChatEvent: vi.fn(),
+  publishChatEvent: mocks.publishChatEvent,
 }))
 
 vi.mock('../../server/send-run-tracker', () => ({
@@ -86,6 +88,7 @@ vi.mock('../../server/session-card-service', () => ({
     resolveRemoteCardByUpstreamSession:
       mocks.resolveRemoteCardByUpstreamSession,
     resolveLocalCardByUpstreamSession: mocks.resolveLocalCardByUpstreamSession,
+    observeChildLifecycle: mocks.observeChildLifecycle,
   },
 }))
 
@@ -207,6 +210,7 @@ describe('send-stream bootstrap session handoff', () => {
     mocks.resolveLocalCardByUpstreamSession.mockRejectedValue(
       new Error('card unavailable'),
     )
+    mocks.observeChildLifecycle.mockResolvedValue(null)
     mocks.getMessages.mockResolvedValue([])
     mocks.getChatMode.mockReturnValue('enhanced')
     mocks.getDiscoveredModels.mockReturnValue([])
@@ -567,6 +571,134 @@ describe('send-stream bootstrap session handoff', () => {
       'complete',
       undefined,
     )
+  })
+
+  it('publishes validated child lifecycle while preserving the parent Card stream', async () => {
+    mocks.resolveSessionCard.mockResolvedValue({
+      card: {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey: 'remote:parent',
+        continuationSegmentKeys: ['remote:parent'],
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['remote:parent', 'gateway']]),
+      upstreamKeyBySegmentKey: new Map([['remote:parent', 'parent-session']]),
+    })
+    let observedAt = 100
+    mocks.observeChildLifecycle.mockImplementation(
+      (input: {
+        parentCardId: string
+        childUpstreamSessionKey: string
+        runId: string
+        status: 'running' | 'complete' | 'error'
+      }) =>
+        Promise.resolve({
+          cardId: input.parentCardId,
+          childCardId: 'remote:child-card',
+          childSessionKey: 'remote:child-session',
+          runId: input.runId,
+          status: input.status,
+          updatedAt: observedAt++,
+        }),
+    )
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        expect(sessionKey).toBe('parent-session')
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'parent-run', session_id: 'parent-session' },
+        })
+        for (const payload of [
+          {
+            event: 'message.started',
+            data: { run_id: 'child-success', session_id: 'child-session' },
+          },
+          {
+            event: 'run.completed',
+            data: { run_id: 'child-success', session_id: 'child-session' },
+          },
+          {
+            event: 'run.started',
+            data: { run_id: 'child-error', session_id: 'child-session' },
+          },
+          {
+            event: 'error',
+            data: { run_id: 'child-error', session_id: 'child-session' },
+          },
+        ]) {
+          await options.onEvent(payload)
+        }
+        await options.onEvent({
+          event: 'assistant.delta',
+          data: {
+            run_id: 'parent-run',
+            session_id: 'parent-session',
+            delta: 'parent remains canonical',
+          },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'parent-run', session_id: 'parent-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'remote:parent-card',
+          sessionKey: 'remote:parent',
+          friendlyId: 'remote:parent-card',
+          message: 'delegate safely',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(
+      events
+        .filter(({ event }) => event === 'card_child_activity')
+        .map(({ data }) => ({ status: data.status, activity: data.activity })),
+    ).toEqual([
+      { status: 'running', activity: 'message.started' },
+      { status: 'complete', activity: 'run.completed' },
+      { status: 'running', activity: 'run.started' },
+      { status: 'error', activity: 'error' },
+    ])
+    expect(mocks.publishChatEvent).toHaveBeenCalledTimes(4)
+    expect(events.some(({ event }) => event === 'card_handoff')).toBe(false)
+    expect(events.some(({ event }) => event === 'session_handoff')).toBe(false)
+    expect(events.filter(({ event }) => event === 'chunk')).toEqual([
+      {
+        event: 'chunk',
+        data: {
+          text: 'parent remains canonical',
+          sessionKey: 'remote:parent',
+          runId: 'parent-run',
+        },
+      },
+    ])
+    expect(events.at(-1)).toEqual({
+      event: 'done',
+      data: {
+        state: 'complete',
+        sessionKey: 'remote:parent',
+        runId: 'parent-run',
+      },
+    })
+    expect(mocks.migratePersistedRun).not.toHaveBeenCalled()
   })
 
   it('keeps rejected child output entirely out of the parent stream', async () => {

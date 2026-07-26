@@ -605,6 +605,173 @@ describe('SessionCardService collection and resolution', () => {
     ).rejects.toBeInstanceOf(SessionCardNotFoundError)
   })
 
+  it('persists validated child lifecycle observations through fresh list projections', async () => {
+    const rows = [
+      session('parent', { source: 'cli' }, 10),
+      session(
+        'child',
+        {
+          parentSessionId: 'parent',
+          relationshipType: 'child_session',
+          source: 'cli',
+          startedAt: 20,
+        },
+        20,
+      ),
+    ]
+    let now = 100
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page(rows, 0, rows.length)),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+      now: () => now,
+    })
+
+    await expect(
+      service.observeChildLifecycle({
+        parentCardId: 'remote:parent',
+        childUpstreamSessionKey: 'child',
+        runId: 'child-run-1',
+        status: 'running',
+      }),
+    ).resolves.toMatchObject({
+      cardId: 'remote:parent',
+      childCardId: 'remote:child',
+      childSessionKey: 'remote:child',
+      runId: 'child-run-1',
+      status: 'running',
+      updatedAt: 100,
+    })
+    await expect(service.listCards()).resolves.toMatchObject({
+      cards: [
+        {
+          cardId: 'remote:parent',
+          childNodes: [
+            expect.objectContaining({
+              cardId: 'remote:child',
+              status: 'running',
+              updatedAt: 100,
+            }),
+          ],
+        },
+      ],
+    })
+
+    now = 200
+    await service.observeChildLifecycle({
+      parentCardId: 'remote:parent',
+      childUpstreamSessionKey: 'child',
+      runId: 'child-run-1',
+      status: 'complete',
+    })
+    expect((await service.listCards()).cards[0]?.childNodes[0]?.status).toBe(
+      'complete',
+    )
+
+    now = 300
+    await service.observeChildLifecycle({
+      parentCardId: 'remote:parent',
+      childUpstreamSessionKey: 'child',
+      runId: 'child-run-2',
+      status: 'running',
+    })
+    now = 400
+    await service.observeChildLifecycle({
+      parentCardId: 'remote:parent',
+      childUpstreamSessionKey: 'child',
+      runId: 'child-run-2',
+      status: 'error',
+    })
+    expect((await service.listCards()).cards[0]?.childNodes[0]?.status).toBe(
+      'error',
+    )
+  })
+
+  it('fails closed and clears stale child activity when the validated relationship changes', async () => {
+    let rows = [
+      session('parent', { source: 'cli' }, 10),
+      session(
+        'child',
+        {
+          parentSessionId: 'parent',
+          relationshipType: 'child_session',
+          source: 'cli',
+          startedAt: 20,
+        },
+        20,
+      ),
+      session('other-parent', { source: 'cli' }, 5),
+    ]
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page(rows, 0, rows.length)),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+    })
+
+    await expect(
+      service.observeChildLifecycle({
+        parentCardId: 'remote:other-parent',
+        childUpstreamSessionKey: 'child',
+        runId: 'wrong-parent-run',
+        status: 'running',
+      }),
+    ).resolves.toBeNull()
+    await service.observeChildLifecycle({
+      parentCardId: 'remote:parent',
+      childUpstreamSessionKey: 'child',
+      runId: 'valid-run',
+      status: 'running',
+    })
+
+    rows = [
+      session('parent', { source: 'cli' }, 10),
+      session(
+        'child',
+        {
+          parentSessionId: 'parent',
+          relationshipType: 'child_session',
+          source: 'cli',
+          startedAt: 30,
+        },
+        30,
+      ),
+      session('other-parent', { source: 'cli' }, 5),
+    ]
+    expect((await service.listCards()).cards[0]?.childNodes[0]?.status).toBe(
+      'idle',
+    )
+
+    rows = [
+      session('parent', { source: 'cli' }, 10),
+      session(
+        'child',
+        {
+          parentSessionId: 'other-parent',
+          relationshipType: 'child_session',
+          source: 'cli',
+          startedAt: 30,
+        },
+        30,
+      ),
+      session('other-parent', { source: 'cli' }, 5),
+    ]
+
+    const listed = await service.listCards()
+    expect(
+      listed.cards.find((card) => card.cardId === 'remote:parent'),
+    ).toMatchObject({ childNodes: [] })
+    expect(
+      listed.cards.find((card) => card.cardId === 'remote:other-parent')
+        ?.childNodes[0]?.status,
+    ).toBe('idle')
+  })
+
   it('accepts only an unambiguous server-validated cold continuation alias', async () => {
     const coldTip = session('tip', {
       parentSessionId: 'previous-tip',

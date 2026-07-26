@@ -161,6 +161,45 @@ describe('projectSessionCards', () => {
     ])
   })
 
+  it('projects child lifecycle activity only through its validated parent Card', () => {
+    const parent = session('parent', undefined, 10)
+    const child = session(
+      'child',
+      { parentSessionId: 'parent', relationshipType: 'child_session' },
+      20,
+    )
+
+    const projection = projectSessionCards([parent, child], {
+      childActivityByParentCardId: new Map<
+        string,
+        Map<
+          string,
+          {
+            status: 'idle' | 'running' | 'complete' | 'error'
+            updatedAt: number
+          }
+        >
+      >([
+        [
+          'parent',
+          new Map([['child', { status: 'running' as const, updatedAt: 100 }]]),
+        ],
+        [
+          'unrelated-parent',
+          new Map([['child', { status: 'error' as const, updatedAt: 200 }]]),
+        ],
+      ]),
+    })
+
+    expect(projection.indexByCardId.get('parent')?.childNodes).toEqual([
+      expect.objectContaining({
+        cardId: 'child',
+        status: 'running',
+        updatedAt: 100,
+      }),
+    ])
+  })
+
   it('promotes invalid, cyclic, and missing relationships to safe orphan cards', () => {
     const missing = session(
       'missing',

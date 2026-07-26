@@ -12,7 +12,11 @@ import type {
   PersistedSessionCard,
   SessionCardMetadataUpdate,
 } from './session-card-store'
-import type { SessionCard, SessionMeta } from '../screens/chat/types'
+import type {
+  SessionCard,
+  SessionCardChildStatus,
+  SessionMeta,
+} from '../screens/chat/types'
 
 export const DEFAULT_SESSION_CARD_PAGE_SIZE = 100
 export const DEFAULT_SESSION_CARD_SAFE_CAP = 2000
@@ -119,6 +123,27 @@ type SessionCardServiceOptions = {
   metadataStore?: SessionCardMetadataStore
   pageSize?: number
   maxSessions?: number
+  now?: () => number
+}
+
+export type SessionCardChildLifecycleInput = {
+  parentCardId: string
+  childUpstreamSessionKey: string
+  runId: string
+  status: Exclude<SessionCardChildStatus, 'idle'>
+}
+
+export type SessionCardChildLifecycleObservation = {
+  cardId: string
+  childCardId: string
+  childSessionKey: string
+  runId: string
+  status: Exclude<SessionCardChildStatus, 'idle'>
+  updatedAt: number
+}
+
+type StoredChildLifecycle = SessionCardChildLifecycleObservation & {
+  binding: string
 }
 
 type FreshProjection = {
@@ -138,6 +163,9 @@ const CONTINUATION_RELATIONSHIP_TYPES = new Set([
   'compression_continuation',
 ])
 const LOCAL_LINEAGE_SOURCES = new Set(['local', 'portable'])
+const MAX_CHILD_LIFECYCLE_ENTRIES = 512
+const RUNNING_CHILD_LIFECYCLE_TTL_MS = 30 * 60 * 1000
+const TERMINAL_CHILD_LIFECYCLE_TTL_MS = 24 * 60 * 60 * 1000
 const LINEAGE_ID_FIELDS = [
   'parentSessionId',
   'lineageRootId',
@@ -148,6 +176,77 @@ const LINEAGE_ID_FIELDS = [
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function isExactIdentity(value: string): boolean {
+  return value.length > 0 && value.trim() === value
+}
+
+function childLifecycleKey(parentCardId: string, childCardId: string): string {
+  return JSON.stringify([parentCardId, childCardId])
+}
+
+function childLifecycleTtl(status: StoredChildLifecycle['status']): number {
+  return status === 'running'
+    ? RUNNING_CHILD_LIFECYCLE_TTL_MS
+    : TERMINAL_CHILD_LIFECYCLE_TTL_MS
+}
+
+function childRelationshipBinding(
+  parent: SessionCard,
+  child: SessionCard,
+  collection: SessionCardCollection,
+): string | null {
+  const anchorSegmentKey = child.continuationSegmentKeys[0]
+  if (
+    child.parentCardId !== parent.cardId ||
+    (child.relationshipKind !== 'branch' &&
+      child.relationshipKind !== 'child') ||
+    !anchorSegmentKey
+  ) {
+    return null
+  }
+
+  const parentOrigin = collection.originBySessionKey.get(
+    parent.canonicalSegmentKey,
+  )
+  const childOrigin = collection.originBySessionKey.get(anchorSegmentKey)
+  const upstreamAnchorKey =
+    collection.upstreamKeyBySessionKey.get(anchorSegmentKey)
+  const parentSourceStatus = collection.sourceStatusBySessionKey.get(
+    parent.canonicalSegmentKey,
+  )
+  const childSourceStatus =
+    collection.sourceStatusBySessionKey.get(anchorSegmentKey)
+  const anchorSession = collection.sessions.find(
+    (session) => session.key === anchorSegmentKey,
+  )
+  if (
+    !parentOrigin ||
+    parentOrigin !== childOrigin ||
+    !upstreamAnchorKey ||
+    parentSourceStatus?.status !== 'complete' ||
+    childSourceStatus?.status !== 'complete' ||
+    !anchorSession
+  ) {
+    return null
+  }
+
+  const lineage = anchorSession.lineage
+  return JSON.stringify([
+    parent.cardId,
+    child.cardId,
+    parentOrigin,
+    upstreamAnchorKey,
+    anchorSegmentKey,
+    lineage?.parentSessionId ?? null,
+    lineage?.relationshipType ?? null,
+    lineage?.relationshipKind ?? null,
+    lineage?.sessionSource ?? null,
+    lineage?.isCrossSurfaceChild ?? null,
+    lineage?.lineageRootId ?? null,
+    lineage?.startedAt ?? null,
+  ])
 }
 
 function normalizePositiveInteger(
@@ -604,6 +703,11 @@ export class SessionCardService {
   private readonly pageSize: number
   private readonly maxSessions: number
   private readonly allowLegacyRootAliases: boolean
+  private readonly now: () => number
+  private readonly childLifecycleByBinding = new Map<
+    string,
+    StoredChildLifecycle
+  >()
 
   constructor(options: SessionCardServiceOptions = {}) {
     this.remoteSource =
@@ -623,6 +727,7 @@ export class SessionCardService {
       options.maxSessions,
       DEFAULT_SESSION_CARD_SAFE_CAP,
     )
+    this.now = options.now ?? Date.now
     this.allowLegacyRootAliases =
       Number(this.remoteSource !== null) + Number(this.localSource !== null) ===
       1
@@ -901,11 +1006,67 @@ export class SessionCardService {
     }
   }
 
+  private validatedChildActivity(
+    projection: SessionCardProjection,
+    collection: SessionCardCollection,
+  ): ReadonlyMap<
+    string,
+    ReadonlyMap<string, { status: SessionCardChildStatus; updatedAt: number }>
+  > {
+    const now = this.now()
+    const activityByParentCardId = new Map<
+      string,
+      Map<string, { status: SessionCardChildStatus; updatedAt: number }>
+    >()
+
+    for (const [key, stored] of this.childLifecycleByBinding) {
+      const parent = projection.roots.find(
+        (candidate) => candidate.cardId === stored.cardId,
+      )
+      const child = projection.indexByCardId.get(stored.childCardId)
+      const remainsDirectChild = parent?.childNodes.some(
+        (candidate) => candidate.cardId === stored.childCardId,
+      )
+      if (!parent || !child || !remainsDirectChild) {
+        this.childLifecycleByBinding.delete(key)
+        continue
+      }
+      const binding = childRelationshipBinding(parent, child, collection)
+      const expired = now - stored.updatedAt > childLifecycleTtl(stored.status)
+      if (!binding || binding !== stored.binding || expired) {
+        this.childLifecycleByBinding.delete(key)
+        continue
+      }
+
+      const childActivity =
+        activityByParentCardId.get(parent.cardId) ??
+        new Map<string, { status: SessionCardChildStatus; updatedAt: number }>()
+      childActivity.set(child.cardId, {
+        status: stored.status,
+        updatedAt: stored.updatedAt,
+      })
+      activityByParentCardId.set(parent.cardId, childActivity)
+    }
+
+    return activityByParentCardId
+  }
+
   private async freshProjection(): Promise<FreshProjection> {
     const collection = await this.collectSessions()
-    const projection = projectSessionCards(collection.sessions, {
-      cardMetadata: metadataProjectionMap(this.metadataStore.list()),
+    const cardMetadata = metadataProjectionMap(this.metadataStore.list())
+    const baseProjection = projectSessionCards(collection.sessions, {
+      cardMetadata,
     })
+    const childActivityByParentCardId = this.validatedChildActivity(
+      baseProjection,
+      collection,
+    )
+    const projection = childActivityByParentCardId.size
+      ? projectSessionCards(collection.sessions, {
+          cardMetadata,
+          childActivityByParentCardId,
+        })
+      : baseProjection
     return {
       projection,
       collection,
@@ -931,6 +1092,69 @@ export class SessionCardService {
       retryable: fresh.collection.retryable,
       sources: fresh.collection.sources,
     }
+  }
+
+  async observeChildLifecycle(
+    input: SessionCardChildLifecycleInput,
+  ): Promise<SessionCardChildLifecycleObservation | null> {
+    if (
+      !isExactIdentity(input.parentCardId) ||
+      !isExactIdentity(input.childUpstreamSessionKey) ||
+      !isExactIdentity(input.runId)
+    ) {
+      return null
+    }
+
+    const fresh = await this.freshProjection()
+    const parent = fresh.projection.roots.find(
+      (candidate) =>
+        candidate.cardId === input.parentCardId && !candidate.archived,
+    )
+    if (!parent) return null
+
+    const matches: Array<{ child: SessionCard; binding: string }> = []
+    for (const childNode of parent.childNodes) {
+      const child = fresh.projection.indexByCardId.get(childNode.cardId)
+      if (!child) continue
+      const matchingSegments = child.continuationSegmentKeys.filter(
+        (segmentKey) =>
+          fresh.collection.upstreamKeyBySessionKey.get(segmentKey) ===
+          input.childUpstreamSessionKey,
+      )
+      if (matchingSegments.length !== 1) continue
+      const binding = childRelationshipBinding(parent, child, fresh.collection)
+      if (binding) matches.push({ child, binding })
+    }
+    if (matches.length !== 1) return null
+
+    const { child, binding } = matches[0]!
+    const key = childLifecycleKey(parent.cardId, child.cardId)
+    const existing = this.childLifecycleByBinding.get(key)
+    if (
+      existing?.binding === binding &&
+      existing.runId === input.runId &&
+      existing.status !== 'running' &&
+      input.status === 'running'
+    ) {
+      return null
+    }
+
+    const observation: SessionCardChildLifecycleObservation = {
+      cardId: parent.cardId,
+      childCardId: child.cardId,
+      childSessionKey: child.canonicalSegmentKey,
+      runId: input.runId,
+      status: input.status,
+      updatedAt: this.now(),
+    }
+    this.childLifecycleByBinding.delete(key)
+    while (this.childLifecycleByBinding.size >= MAX_CHILD_LIFECYCLE_ENTRIES) {
+      const oldestKey = this.childLifecycleByBinding.keys().next().value
+      if (typeof oldestKey !== 'string') break
+      this.childLifecycleByBinding.delete(oldestKey)
+    }
+    this.childLifecycleByBinding.set(key, { ...observation, binding })
+    return observation
   }
 
   async resolveCard(
