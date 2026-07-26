@@ -49,6 +49,8 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'gemini-2.5-flash': 1_000_000,
   'gemini-2.5-pro': 1_000_000,
   'kimi-k2.6': 256_000,
+  'MiniMax-M3': 1_000_000,
+  'MiniMax-M2.7': 204_800,
 }
 
 const CHARS_PER_TOKEN = 3.5

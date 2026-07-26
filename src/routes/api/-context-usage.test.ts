@@ -37,6 +37,25 @@ afterEach(() => {
 })
 
 describe('context usage estimation', () => {
+  it('uses the model-specific fallback context window for MiniMax-M2.7', async () => {
+    vi.mocked(getLocalSession).mockReturnValue({
+      id: 'local-minimax',
+      model: 'MiniMax-M2.7',
+    } as any)
+    vi.mocked(getLocalMessages).mockReturnValue([{ content: 'hello' }] as any)
+
+    const fetchMock = vi.fn(async () => new Response('not found', { status: 404 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const snapshot = await readContextUsage('local-minimax')
+
+    expect(snapshot).toMatchObject({
+      ok: true,
+      model: 'MiniMax-M2.7',
+      maxTokens: 204_800,
+    })
+  })
+
   it('prefers live gateway runtime snapshots when the vanilla runtime endpoint is available', async () => {
     const fetchMock = vi.fn(async () =>
       new Response(
