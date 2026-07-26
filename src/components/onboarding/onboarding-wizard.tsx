@@ -13,6 +13,7 @@ import { ONBOARDING_STEPS } from './onboarding-steps'
 import { useOnboardingStore } from '@/hooks/use-onboarding'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { AgentIdentityAvatar } from '@/components/avatars'
 
 export function OnboardingWizard() {
   const navigate = useNavigate()
@@ -144,11 +145,7 @@ export function OnboardingWizard() {
                       )}
                     >
                       {step.id === 'welcome' ? (
-                        <img
-                          src="/claude-avatar.webp"
-                          alt="Hermes Agent"
-                          className="size-16 rounded-2xl"
-                        />
+                        <AgentIdentityAvatar className="size-16 rounded-2xl" />
                       ) : (
                         <HugeiconsIcon
                           icon={step.icon}

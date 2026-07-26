@@ -13,6 +13,7 @@ export type LoaderStyle =
   | 'lobster'
   | 'logo'
 export const DEFAULT_CHAT_DISPLAY_NAME = 'User'
+export const DEFAULT_AGENT_DISPLAY_NAME = 'Hermes Agent'
 
 export type EnterBehavior = 'send' | 'newline'
 export type ChatWidth = 'comfortable' | 'wide' | 'full'
@@ -24,6 +25,8 @@ export type ChatSettings = {
   loaderStyle: LoaderStyle
   displayName: string
   avatarDataUrl: string | null
+  agentDisplayName: string
+  agentAvatarDataUrl: string | null
   /**
    * Controls how Enter behaves in the chat composer.
    *  - 'send'    — Enter sends, Shift+Enter / Cmd+Enter inserts a newline (default)
@@ -68,6 +71,8 @@ function defaultChatSettings(): ChatSettings {
     loaderStyle: 'dots',
     displayName: DEFAULT_CHAT_DISPLAY_NAME,
     avatarDataUrl: null,
+    agentDisplayName: DEFAULT_AGENT_DISPLAY_NAME,
+    agentAvatarDataUrl: null,
     enterBehavior: 'send',
     chatWidth: 'comfortable',
     sidebarHoverExpand: false,
@@ -126,6 +131,11 @@ export function getChatProfileDisplayName(displayName: string): string {
   return trimmed.length > 0 ? trimmed : DEFAULT_CHAT_DISPLAY_NAME
 }
 
+export function getAgentDisplayName(displayName: string): string {
+  const trimmed = displayName.trim()
+  return trimmed.length > 0 ? trimmed : DEFAULT_AGENT_DISPLAY_NAME
+}
+
 export function selectChatProfileDisplayName(state: ChatSettingsState): string {
   return getChatProfileDisplayName(state.settings.displayName)
 }
@@ -134,6 +144,16 @@ export function selectChatProfileAvatarDataUrl(
   state: ChatSettingsState,
 ): string | null {
   return state.settings.avatarDataUrl
+}
+
+export function selectAgentDisplayName(state: ChatSettingsState): string {
+  return getAgentDisplayName(state.settings.agentDisplayName)
+}
+
+export function selectAgentAvatarDataUrl(
+  state: ChatSettingsState,
+): string | null {
+  return state.settings.agentAvatarDataUrl
 }
 
 export function selectEnterBehavior(state: ChatSettingsState): EnterBehavior {

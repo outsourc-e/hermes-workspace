@@ -36,10 +36,11 @@ import {
 } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
+  getAgentDisplayName,
   getChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import { UserAvatar } from '@/components/avatars'
+import { AgentIdentityAvatar, UserAvatar } from '@/components/avatars'
 import { Input } from '@/components/ui/input'
 import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
@@ -2185,6 +2186,11 @@ class SettingsErrorBoundary extends Component<
 function AgentBehaviorContent() {
   const [config, setConfig] = useState<Record<string, unknown>>({})
   const [msg, setMsg] = useState<string | null>(null)
+  const { settings: chatSettings, updateSettings: updateChatSettings } =
+    useChatSettingsStore()
+  const [identityError, setIdentityError] = useState<string | null>(null)
+  const [processingAvatar, setProcessingAvatar] = useState(false)
+  const agentName = getAgentDisplayName(chatSettings.agentDisplayName)
 
   useEffect(() => {
     fetch('/api/hermes-config')
@@ -2211,6 +2217,55 @@ function AgentBehaviorContent() {
     }
   }
 
+  async function handleAgentAvatarUpload(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setIdentityError('Unsupported file type.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setIdentityError('Image too large (max 10MB).')
+      return
+    }
+
+    setIdentityError(null)
+    setProcessingAvatar(true)
+    try {
+      const url = URL.createObjectURL(file)
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const loadedImage = new Image()
+        loadedImage.onload = () => resolve(loadedImage)
+        loadedImage.onerror = () => reject(new Error('Failed'))
+        loadedImage.src = url
+      })
+      const scale = Math.min(1, 128 / Math.max(image.width, image.height))
+      const width = Math.round(image.width * scale)
+      const height = Math.round(image.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('Canvas unavailable')
+      context.imageSmoothingQuality = 'high'
+      context.drawImage(image, 0, 0, width, height)
+      URL.revokeObjectURL(url)
+      updateChatSettings({
+        agentAvatarDataUrl: canvas.toDataURL(
+          file.type === 'image/png' ? 'image/png' : 'image/jpeg',
+          0.82,
+        ),
+      })
+    } catch {
+      setIdentityError('Failed to process image.')
+    } finally {
+      setProcessingAvatar(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <SectionHeader
@@ -2229,6 +2284,59 @@ function AgentBehaviorContent() {
           {msg}
         </div>
       )}
+      <div className={SETTINGS_CARD_CLASS}>
+        <div className="mb-3 flex items-center gap-3">
+          <AgentIdentityAvatar size={44} className="rounded-xl object-cover" />
+          <div>
+            <p className="text-sm font-medium text-primary-900 dark:text-neutral-100">
+              {agentName}
+            </p>
+            <p className="text-xs text-primary-500 dark:text-neutral-400">
+              Used throughout this workspace
+            </p>
+          </div>
+        </div>
+        <Row label="Agent name" description="Shown with the agent icon">
+          <Input
+            value={chatSettings.agentDisplayName}
+            onChange={(event) =>
+              updateChatSettings({ agentDisplayName: event.target.value })
+            }
+            placeholder="Hermes Agent"
+            className="h-8 w-full max-w-xs rounded-lg border-primary-200 text-sm"
+            maxLength={50}
+            aria-label="Agent name"
+          />
+        </Row>
+        <Row label="Agent icon" description="PNG, JPEG, or WebP up to 10MB">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="block">
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleAgentAvatarUpload}
+                disabled={processingAvatar}
+                aria-label="Upload agent icon"
+                className="block max-w-[13rem] cursor-pointer text-xs text-primary-700 dark:text-neutral-300 file:mr-2 file:cursor-pointer file:rounded-lg file:border file:border-primary-200 file:bg-primary-100 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-primary-900 file:transition-colors hover:file:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => updateChatSettings({ agentAvatarDataUrl: null })}
+              disabled={!chatSettings.agentAvatarDataUrl || processingAvatar}
+              className="h-8 rounded-lg border-primary-200 px-3"
+            >
+              Reset
+            </Button>
+          </div>
+          {identityError && (
+            <p className="text-xs text-red-600" role="alert">
+              {identityError}
+            </p>
+          )}
+        </Row>
+      </div>
       <div className={SETTINGS_CARD_CLASS}>
         <Row
           label="Max turns"

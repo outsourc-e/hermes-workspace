@@ -50,6 +50,7 @@ import { getUnavailableReason } from '@/lib/feature-gates'
 import { cn } from '@/lib/utils'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
+import { AgentIdentityAvatar } from '@/components/avatars'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
 // `IconSvgObject` isn't exported from @hugeicons/react; reuse the
@@ -898,8 +899,7 @@ export function DashboardScreen() {
                 '0 0 0 4px color-mix(in srgb, var(--theme-accent) 6%, transparent)',
             }}
           >
-            <img
-              src="/claude-avatar.webp"
+            <AgentIdentityAvatar
               alt="Hermes Workspace logo"
               className="size-8 rounded-md"
               style={{ background: 'transparent' }}

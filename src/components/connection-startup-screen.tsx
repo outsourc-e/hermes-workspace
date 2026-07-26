@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AuthStatus } from '@/lib/claude-auth'
 import { writeTextToClipboard } from '@/lib/clipboard'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
+import { AgentIdentityAvatar } from '@/components/avatars'
 
 const POLL_INTERVAL_MS = 2_000
 const FAILURE_REVEAL_MS = 5_000
@@ -219,11 +220,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
       }}
     >
       <div className="flex w-full max-w-lg flex-col items-center text-center">
-        <img
-          src="/claude-avatar.webp"
-          alt="Hermes Agent"
-          className="mb-5 h-20 w-20 rounded-2xl object-cover shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
-        />
+        <AgentIdentityAvatar className="mb-5 h-20 w-20 rounded-2xl object-cover shadow-[0_12px_40px_rgba(0,0,0,0.45)]" />
 
         <h1 className="text-[2rem] font-semibold tracking-tight text-white">
           Hermes Workspace

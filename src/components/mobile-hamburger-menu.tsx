@@ -22,10 +22,12 @@ import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
 import {
+  selectAgentDisplayName,
   selectChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { useSettingsStore } from '@/hooks/use-settings'
+import { AgentIdentityAvatar } from '@/components/avatars'
 
 export const MOBILE_HAMBURGER_NAV_ITEMS = [
   {
@@ -160,6 +162,7 @@ export function MobileHamburgerMenu() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
+  const agentDisplayName = useChatSettingsStore(selectAgentDisplayName)
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
   )
@@ -220,17 +223,13 @@ export function MobileHamburgerMenu() {
           style={{ borderBottom: '1px solid var(--color-border, #e5e7eb)' }}
         >
           <div className="flex items-center gap-2.5">
-            <img
-              src="/claude-avatar.webp"
-              alt="Hermes Agent"
-              className="size-8 rounded-xl shrink-0"
-            />
+            <AgentIdentityAvatar className="size-8 rounded-xl shrink-0" />
             <div className="flex flex-col leading-tight">
               <span
                 className="font-bold text-[15px] tracking-tight"
                 style={{ color: 'var(--color-ink, #111)' }}
               >
-                Hermes Agent
+                {agentDisplayName}
               </span>
               <span
                 className="text-[11px]"

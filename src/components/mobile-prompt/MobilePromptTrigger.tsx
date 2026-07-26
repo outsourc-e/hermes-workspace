@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import { MobileSetupModal } from './MobileSetupModal'
+import { AgentIdentityAvatar } from '@/components/avatars'
 
 export function MobilePromptTrigger() {
   const [showPrompt, setShowPrompt] = useState(false)
@@ -100,11 +101,7 @@ export function MobilePromptTrigger() {
             <div className="px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <img
-                    src="/claude-avatar.webp"
-                    alt="Hermes Agent"
-                    className="size-8 rounded-lg"
-                  />
+                  <AgentIdentityAvatar className="size-8 rounded-lg" />
                   <span className="text-xs text-primary-600">+</span>
                   <div className="flex size-8 items-center justify-center rounded-lg bg-[#232b3b]">
                     <svg viewBox="0 0 100 100" className="size-5">

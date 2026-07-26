@@ -481,11 +481,23 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             } catch(e){}
 
             var isDark = !['claude-nous-light','claude-official-light','claude-classic-light','claude-slate-light'].includes(theme);
+            var agentName = 'Hermes Agent';
+            var agentAvatar = '/claude-avatar.webp';
+            try {
+              var persistedChatSettings = JSON.parse(localStorage.getItem('chat-settings') || '{}');
+              var persistedIdentity = persistedChatSettings && persistedChatSettings.state && persistedChatSettings.state.settings;
+              if (persistedIdentity && typeof persistedIdentity.agentDisplayName === 'string' && persistedIdentity.agentDisplayName.trim()) {
+                agentName = persistedIdentity.agentDisplayName.trim();
+              }
+              if (persistedIdentity && typeof persistedIdentity.agentAvatarDataUrl === 'string' && new RegExp('^data:image/(png|jpeg|webp);base64,').test(persistedIdentity.agentAvatarDataUrl)) {
+                agentAvatar = persistedIdentity.agentAvatarDataUrl;
+              }
+            } catch(e) {}
             var quips = ["Consulting the oracle...","Loading ancient knowledge...","Warming up the messenger...","Calibrating tool chain...","Summoning your agent...","Preparing the workspace...","Bridging realms...","Initializing agent runtime..."];
             var quip = quips[Math.floor(Math.random() * quips.length)];
 
             d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease;';
-            d.innerHTML = '<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
+            d.innerHTML = '<img src="'+agentAvatar+'" alt="'+agentName.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')+'" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
               + '<img src="'+(isDark ? '/claude-banner.png' : '/claude-banner-light.png')+'" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
               + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+'">Workspace</div>'
               + '<div style="margin-top:28px;width:140px;height:3px;background:'+(isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')+';border-radius:3px;overflow:hidden;position:relative"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';
