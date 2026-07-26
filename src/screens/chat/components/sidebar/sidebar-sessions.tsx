@@ -1,11 +1,13 @@
 'use client'
 
-import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { memo, useEffect, useMemo, useState } from 'react'
-import { buildSessionTree } from '../../session-lineage'
+import { projectSessionCards } from '../../session-cards'
 import { SessionTreeRow } from './session-tree-row'
 import type {
+  SessionCard,
+  SessionCardChildStatus,
   SessionMeta,
   SessionTreeRow as SessionTreeRowModel,
 } from '../../types'
@@ -25,6 +27,8 @@ import { usePinnedSessions } from '@/hooks/use-pinned-sessions'
 
 type SidebarSessionsProps = {
   sessions: Array<SessionMeta>
+  /** Server-backed Cards take precedence. Legacy sessions remain a safe fallback. */
+  sessionCards?: Array<SessionCard>
   activeFriendlyId: string
   defaultOpen?: boolean
   onSelect?: () => void
@@ -39,8 +43,99 @@ type SidebarSessionsProps = {
   onRetry: () => void
 }
 
+function sessionForKey(
+  sessions: Array<SessionMeta>,
+  key: string,
+): SessionMeta | undefined {
+  return sessions.find(
+    (session) =>
+      session.key === key ||
+      session.backendKey === key ||
+      session.friendlyId === key,
+  )
+}
+
+function legacySessionTitle(session: SessionMeta | undefined): string {
+  const candidates = [
+    session?.label,
+    session?.derivedTitle,
+    session?.title,
+    session?.friendlyId,
+  ]
+  for (const candidate of candidates) {
+    const title = candidate?.trim()
+    if (title) return title
+  }
+  return 'New conversation'
+}
+
+function cardSession(
+  sessions: Array<SessionMeta>,
+  sessionKey: string,
+  title: string,
+): SessionMeta {
+  const session = sessionForKey(sessions, sessionKey)
+  if (session && legacySessionTitle(session) === title) return session
+  return {
+    ...(session ?? { key: sessionKey, friendlyId: sessionKey }),
+    label: title,
+    title: undefined,
+    derivedTitle: undefined,
+    titleStatus: 'ready',
+    titleError: null,
+  }
+}
+
+function cardOwnsSessionKey(card: SessionCard, sessionKey: string): boolean {
+  return (
+    card.cardId === sessionKey ||
+    card.canonicalSegmentKey === sessionKey ||
+    card.continuationSegmentKeys.includes(sessionKey)
+  )
+}
+
+function findRootCardForSession(
+  roots: Array<SessionCard>,
+  cardsById: ReadonlyMap<string, SessionCard>,
+  sessionKey: string | undefined,
+): { rootCardId?: string; childCardId?: string } {
+  if (!sessionKey) return {}
+
+  const visit = (
+    rootCardId: string,
+    card: SessionCard,
+    visited: Set<string>,
+  ): { rootCardId: string; childCardId?: string } | undefined => {
+    if (visited.has(card.cardId)) return undefined
+    visited.add(card.cardId)
+    if (cardOwnsSessionKey(card, sessionKey)) {
+      return card.cardId === rootCardId
+        ? { rootCardId }
+        : { rootCardId, childCardId: card.cardId }
+    }
+    for (const child of card.childNodes) {
+      if (child.cardId === sessionKey || child.sessionKey === sessionKey) {
+        return { rootCardId, childCardId: child.cardId }
+      }
+      const childCard = cardsById.get(child.cardId)
+      if (childCard) {
+        const match = visit(rootCardId, childCard, visited)
+        if (match) return match
+      }
+    }
+    return undefined
+  }
+
+  for (const root of roots) {
+    const match = visit(root.cardId, root, new Set())
+    if (match) return match
+  }
+  return {}
+}
+
 export const SidebarSessions = memo(function SidebarSessions({
   sessions,
+  sessionCards,
   activeFriendlyId,
   defaultOpen = true,
   onSelect,
@@ -56,168 +151,197 @@ export const SidebarSessions = memo(function SidebarSessions({
 }: SidebarSessionsProps) {
   const { pinnedSessionKeys, togglePinnedSession, migratePinnedSession } =
     usePinnedSessions()
+  const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const [pinOverrides, setPinOverrides] = useState<
+    ReadonlyMap<string, boolean>
+  >(() => new Map())
 
-  const [collapsedLogicalRootKeys, setCollapsedLogicalRootKeys] = useState<
-    Set<string>
-  >(() => new Set())
   const activeSessionKey = useMemo(
     () =>
       sessions.find(
         (session) =>
           session.friendlyId === activeFriendlyId ||
-          session.key === activeFriendlyId,
-      )?.key,
+          session.key === activeFriendlyId ||
+          session.backendKey === activeFriendlyId,
+      )?.key ?? activeFriendlyId,
     [activeFriendlyId, sessions],
   )
-  const projectionTree = useMemo(
-    () => buildSessionTree(sessions, { activeSessionKey }),
+  const legacyProjection = useMemo(
+    () => projectSessionCards(sessions, { activeSessionKey }),
     [activeSessionKey, sessions],
   )
-  const expandedSessionKeys = useMemo(
-    () =>
-      sessions
-        .filter(
-          (session) =>
-            !collapsedLogicalRootKeys.has(
-              projectionTree.logicalRootKeyBySessionKey.get(session.key) ??
-                session.key,
-            ),
-        )
-        .map((session) => session.key),
-    [collapsedLogicalRootKeys, projectionTree, sessions],
+  const roots = sessionCards ?? legacyProjection.roots
+  const cardsById = useMemo(() => {
+    const cards = sessionCards ?? legacyProjection.cards
+    return new Map(cards.map((card) => [card.cardId, card]))
+  }, [legacyProjection.cards, sessionCards])
+  const activeCard = useMemo(
+    () => findRootCardForSession(roots, cardsById, activeSessionKey),
+    [activeSessionKey, cardsById, roots],
   )
-  const tree = useMemo(
-    () =>
-      buildSessionTree(sessions, {
-        activeSessionKey,
-        expandedSessionKeys,
-      }),
-    [activeSessionKey, expandedSessionKeys, sessions],
-  )
-  const childrenByParent = useMemo(() => {
-    const children = new Map<string, Array<SessionTreeRowModel>>()
-    for (const row of tree.rows) {
-      if (!row.parentKey) continue
-      const siblings = children.get(row.parentKey) ?? []
-      siblings.push(row)
-      children.set(row.parentKey, siblings)
+
+  const pinnedCardIds = useMemo(() => {
+    const result = new Set<string>()
+    for (const card of roots) {
+      const legacyPinned = pinnedSessionKeys.some(
+        (key) => key === card.cardId || cardOwnsSessionKey(card, key),
+      )
+      const overridden = pinOverrides.get(card.cardId)
+      if (overridden ?? (card.pinned || legacyPinned)) result.add(card.cardId)
     }
-    return children
-  }, [tree.rows])
-  const activeTreeKey = activeSessionKey
-    ? (tree.visibleKeyBySessionKey.get(activeSessionKey) ?? activeSessionKey)
-    : undefined
-  const logicalPinnedKeys = useMemo(() => {
-    const keys = new Set<string>()
-    for (const pinnedKey of pinnedSessionKeys) {
-      keys.add(tree.visibleKeyBySessionKey.get(pinnedKey) ?? pinnedKey)
-    }
-    return keys
-  }, [pinnedSessionKeys, tree.visibleKeyBySessionKey])
+    return result
+  }, [pinOverrides, pinnedSessionKeys, roots])
+
   useEffect(() => {
     if (loading || fetching || error) return
     for (const pinnedKey of pinnedSessionKeys) {
-      const visibleKey = tree.visibleKeyBySessionKey.get(pinnedKey)
-      if (visibleKey && visibleKey !== pinnedKey) {
-        migratePinnedSession(pinnedKey, visibleKey)
+      const owner = roots.find(
+        (card) =>
+          pinnedKey === card.cardId || cardOwnsSessionKey(card, pinnedKey),
+      )
+      if (owner && owner.cardId !== pinnedKey) {
+        migratePinnedSession(pinnedKey, owner.cardId)
       }
     }
-  }, [
-    error,
-    fetching,
-    loading,
-    migratePinnedSession,
-    pinnedSessionKeys,
-    tree.visibleKeyBySessionKey,
-  ])
-  const pinnedRows = useMemo(
-    () =>
-      tree.rows
-        .filter((row) => logicalPinnedKeys.has(row.key))
-        .map((row) => ({
-          ...row,
-          depth: 0,
-          isExpandable: false,
-          isExpanded: false,
-          childCount: 0,
-          parentKey: undefined,
-        })),
-    [logicalPinnedKeys, tree.rows],
-  )
-  const unpinnedProjection = useMemo(() => {
-    const roots: Array<SessionTreeRowModel> = []
-    const children = new Map<string, Array<SessionTreeRowModel>>()
+  }, [error, fetching, loading, migratePinnedSession, pinnedSessionKeys, roots])
 
-    function appendRows(
-      rows: Array<SessionTreeRowModel>,
+  const cardRows = useMemo(() => {
+    const childrenByParent = new Map<string, Array<SessionTreeRowModel>>()
+    const childStatusByCardId = new Map<string, SessionCardChildStatus>()
+    const rowsByCardId = new Map<string, SessionTreeRowModel>()
+
+    const buildRow = (
+      card: SessionCard,
       depth: number,
       parentKey?: string,
-    ): Array<SessionTreeRowModel> {
-      const projectedRows: Array<SessionTreeRowModel> = []
-      for (const row of rows) {
-        const childRows = childrenByParent.get(row.key) ?? []
-        if (logicalPinnedKeys.has(row.key)) {
-          projectedRows.push(...appendRows(childRows, depth, parentKey))
-          continue
+      edgeTitle?: string,
+      edgeSessionKey?: string,
+    ): SessionTreeRowModel => {
+      const sessionKey = edgeSessionKey ?? card.canonicalSegmentKey
+      const sourceSession = sessionForKey(sessions, sessionKey)
+      const title =
+        edgeTitle ??
+        (sessionCards ? card.title : legacySessionTitle(sourceSession))
+      const childRows: Array<SessionTreeRowModel> = []
+      for (const child of card.childNodes) {
+        childStatusByCardId.set(child.cardId, child.status)
+        const fullChildCard = cardsById.get(child.cardId)
+        const childCard: SessionCard = fullChildCard ?? {
+          cardId: child.cardId,
+          title: child.title,
+          titleSource: 'default',
+          canonicalSegmentKey: child.sessionKey,
+          continuationSegmentKeys: [child.sessionKey],
+          continuationCount: child.continuationCount,
+          relationshipKind: child.relationshipKind,
+          parentCardId: card.cardId,
+          childNodes: [],
+          updatedAt: child.updatedAt,
+          archived: false,
+          pinned: false,
         }
-
-        const projectedChildren = appendRows(childRows, depth + 1, row.key)
-        const projectedRow: SessionTreeRowModel = {
-          ...row,
-          depth,
-          isExpandable: projectedChildren.length > 0,
-          isExpanded: projectedChildren.length > 0 && row.isExpanded,
-          childCount: projectedChildren.length,
-          ...(parentKey ? { parentKey } : { parentKey: undefined }),
-        }
-        projectedRows.push(projectedRow)
-        if (projectedChildren.length > 0) {
-          children.set(projectedRow.key, projectedChildren)
-        }
+        childRows.push(
+          buildRow(
+            childCard,
+            depth + 1,
+            card.cardId,
+            sessionCards
+              ? child.title
+              : legacySessionTitle(sessionForKey(sessions, child.sessionKey)),
+            child.sessionKey,
+          ),
+        )
       }
-      return projectedRows
+      const hasInspectedDescendant =
+        activeCard.rootCardId ===
+          roots.find((root) => root.cardId === card.cardId)?.cardId &&
+        activeCard.childCardId !== undefined
+      const isExpanded =
+        childRows.length > 0 &&
+        (!collapsedCardIds.has(card.cardId) || hasInspectedDescendant)
+      const row: SessionTreeRowModel = {
+        key: card.cardId,
+        session: cardSession(sessions, sessionKey, title),
+        relationshipKind: card.relationshipKind,
+        depth,
+        isExpandable: childRows.length > 0,
+        isExpanded,
+        childCount: childRows.length,
+        continuationCount: card.continuationCount,
+        ...(parentKey ? { parentKey } : {}),
+        isOrphan: card.relationshipKind === 'orphan',
+      }
+      rowsByCardId.set(card.cardId, row)
+      if (childRows.length > 0) childrenByParent.set(card.cardId, childRows)
+      return row
     }
 
-    roots.push(...appendRows(tree.roots, 0))
-    return { roots, children }
-  }, [childrenByParent, logicalPinnedKeys, tree.roots])
+    const rootRows = roots.map((card) => buildRow(card, 0))
+    return { rootRows, rowsByCardId, childrenByParent, childStatusByCardId }
+  }, [
+    activeCard.childCardId,
+    activeCard.rootCardId,
+    cardsById,
+    collapsedCardIds,
+    roots,
+    sessionCards,
+    sessions,
+  ])
+
+  const pinnedRows = cardRows.rootRows.filter((row) =>
+    pinnedCardIds.has(row.key),
+  )
+  const unpinnedRows = cardRows.rootRows.filter(
+    (row) => !pinnedCardIds.has(row.key),
+  )
 
   function handleTogglePin(session: SessionMeta) {
+    const card = roots.find(
+      (candidate) =>
+        candidate.canonicalSegmentKey === session.key ||
+        candidate.canonicalSegmentKey === session.backendKey ||
+        sessionForKey(sessions, candidate.canonicalSegmentKey)?.friendlyId ===
+          session.friendlyId,
+    )
+    if (!card) return
+    const nextPinned = !pinnedCardIds.has(card.cardId)
+    setPinOverrides((current) => {
+      const next = new Map(current)
+      next.set(card.cardId, nextPinned)
+      return next
+    })
     const storedKeys = pinnedSessionKeys.filter(
-      (pinnedKey) =>
-        (tree.visibleKeyBySessionKey.get(pinnedKey) ?? pinnedKey) ===
-        session.key,
+      (key) => key === card.cardId || cardOwnsSessionKey(card, key),
     )
     if (storedKeys.length > 0) {
       for (const key of storedKeys) togglePinnedSession(key)
-      return
+    } else {
+      togglePinnedSession(card.cardId)
     }
-    togglePinnedSession(session.key)
   }
 
-  function handleToggleExpanded(sessionKey: string, expanded: boolean) {
-    const logicalRootKey =
-      tree.logicalRootKeyBySessionKey.get(sessionKey) ?? sessionKey
-    setCollapsedLogicalRootKeys((current) => {
+  function handleToggleExpanded(cardId: string, expanded: boolean) {
+    setCollapsedCardIds((current) => {
       const next = new Set(current)
-      if (expanded) next.delete(logicalRootKey)
-      else next.add(logicalRootKey)
+      if (expanded) next.delete(cardId)
+      else next.add(cardId)
       return next
     })
   }
 
-  function renderRoots(
-    roots: Array<SessionTreeRowModel>,
-    rowChildren: ReadonlyMap<string, Array<SessionTreeRowModel>>,
-  ) {
-    return roots.map((row) => (
+  function renderRoots(rows: Array<SessionTreeRowModel>) {
+    return rows.map((row) => (
       <SessionTreeRow
         key={row.key}
         row={row}
-        childrenByParent={rowChildren}
+        childrenByParent={cardRows.childrenByParent}
+        childStatusByCardId={cardRows.childStatusByCardId}
+        cardRouteMode={sessionCards !== undefined}
         activeFriendlyId={activeFriendlyId}
-        activeSessionKey={activeTreeKey}
-        pinnedSessionKeys={logicalPinnedKeys}
+        activeSessionKey={activeCard.rootCardId}
+        pinnedSessionKeys={pinnedCardIds}
         onToggleExpanded={handleToggleExpanded}
         onSelect={onSelect}
         onTogglePin={handleTogglePin}
@@ -247,13 +371,12 @@ export const SidebarSessions = memo(function SidebarSessions({
         </span>
       </CollapsibleTrigger>
 
-      {/* Pinned sessions — always visible (outside collapsible panel) */}
       {pinnedRows.length > 0 ? (
         <section
           aria-label="Pinned sessions"
           className="flex shrink-0 flex-col gap-px pl-3 pr-2 pt-1"
         >
-          {renderRoots(pinnedRows, new Map())}
+          {renderRoots(pinnedRows)}
         </section>
       ) : null}
 
@@ -282,16 +405,13 @@ export const SidebarSessions = memo(function SidebarSessions({
                     Retry
                   </Button>
                 </div>
-              ) : unpinnedProjection.roots.length > 0 ? (
+              ) : unpinnedRows.length > 0 ? (
                 <>
                   {pinnedRows.length > 0 ? (
                     <div className="my-1 border-t border-primary-200/80" />
                   ) : null}
                   <section aria-label="Sessions">
-                    {renderRoots(
-                      unpinnedProjection.roots,
-                      unpinnedProjection.children,
-                    )}
+                    {renderRoots(unpinnedRows)}
                   </section>
                 </>
               ) : (
@@ -321,6 +441,7 @@ function areSidebarSessionsEqual(
   prev: SidebarSessionsProps,
   next: SidebarSessionsProps,
 ) {
+  if (prev.sessionCards !== next.sessionCards) return false
   if (prev.activeFriendlyId !== next.activeFriendlyId) return false
   if (prev.defaultOpen !== next.defaultOpen) return false
   if (prev.onSelect !== next.onSelect) return false

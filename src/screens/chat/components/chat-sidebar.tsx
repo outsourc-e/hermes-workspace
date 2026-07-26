@@ -25,8 +25,10 @@ import {
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { CHAT_OPEN_SETTINGS_EVENT } from '../chat-events'
+import { fetchSessionCards, sessionCardQueryKeys } from '../chat-queries'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
 import { useForkSession } from '../hooks/use-fork-session'
@@ -39,7 +41,7 @@ import {
   areSessionLineagesEqual,
 } from './sidebar/sidebar-sessions'
 import type { ChatOpenSettingsDetail } from '../chat-events'
-import type { SessionMeta } from '../types'
+import type { SessionCard, SessionMeta } from '../types'
 import { t } from '@/lib/i18n'
 import { SettingsDialog } from '@/components/settings-dialog'
 import {
@@ -529,6 +531,7 @@ type DesktopSidebarContentProps = {
   profileAvatarDataUrl: string | null
   handleOpenSettings: (section?: 'appearance' | 'claude') => void
   sessions: Array<SessionMeta>
+  sessionCards?: Array<SessionCard>
   onRename: (session: SessionMeta) => void
   onDelete: (session: SessionMeta) => void
   sessionForkAvailable: boolean
@@ -553,6 +556,7 @@ function DesktopSidebarContent({
   profileAvatarDataUrl,
   handleOpenSettings,
   sessions,
+  sessionCards,
   onRename,
   onDelete,
   sessionForkAvailable,
@@ -725,6 +729,7 @@ function DesktopSidebarContent({
             <div className="flex min-h-0 flex-1">
               <SidebarSessions
                 sessions={sessions}
+                sessionCards={sessionCards}
                 activeFriendlyId={activeFriendlyId}
                 onSelect={onSelectSession}
                 onRename={onRename}
@@ -776,6 +781,12 @@ function ChatSidebarComponent({
     select: function selectPathname(state) {
       return state.location.pathname
     },
+  })
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
+    retry: 1,
+    refetchInterval: 5000,
   })
 
   useEffect(() => {
@@ -1180,6 +1191,7 @@ function ChatSidebarComponent({
           profileAvatarDataUrl={profileAvatarDataUrl}
           handleOpenSettings={handleOpenSettings}
           sessions={sessions}
+          sessionCards={sessionCardsQuery.data?.cards}
           onRename={handleOpenRename}
           onDelete={handleOpenDelete}
           sessionForkAvailable={sessionForkAvailable}
@@ -1368,6 +1380,7 @@ function ChatSidebarComponent({
                     <div className="flex-1 min-h-0">
                       <SidebarSessions
                         sessions={sessions}
+                        sessionCards={sessionCardsQuery.data?.cards}
                         activeFriendlyId={activeFriendlyId}
                         onSelect={onSelectSession}
                         onRename={handleOpenRename}

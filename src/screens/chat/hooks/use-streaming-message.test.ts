@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   resolveAuthoritativeCardHandoffEvent,
   resolveAuthoritativeSessionHandoffEvent,
+  shouldApplyCardHandoff,
   shouldResolveStreamSession,
 } from './use-streaming-message'
 
@@ -111,6 +112,36 @@ describe('stream card handoff authority', () => {
       canonicalSegmentKey: 'continuation-segment',
       runId: 'run-1',
     })
+  })
+
+  it('advances only the selected Card from its current canonical segment', () => {
+    const handoff = resolveAuthoritativeCardHandoffEvent('card_handoff', {
+      cardId: 'parent-card',
+      fromSegmentKey: 'parent-segment',
+      canonicalSegmentKey: 'continuation-segment',
+    })!
+
+    expect(
+      shouldApplyCardHandoff({
+        handoff,
+        activeCardId: 'parent-card',
+        currentSegmentKey: 'parent-segment',
+      }),
+    ).toBe(true)
+    expect(
+      shouldApplyCardHandoff({
+        handoff,
+        activeCardId: 'another-card',
+        currentSegmentKey: 'parent-segment',
+      }),
+    ).toBe(false)
+    expect(
+      shouldApplyCardHandoff({
+        handoff,
+        activeCardId: 'parent-card',
+        currentSegmentKey: 'stale-segment',
+      }),
+    ).toBe(false)
   })
 
   it.each([

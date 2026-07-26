@@ -107,6 +107,25 @@ export function resolveAuthoritativeCardHandoffEvent(
   return { cardId, fromSegmentKey, canonicalSegmentKey, runId }
 }
 
+export type AuthoritativeCardHandoff = NonNullable<
+  ReturnType<typeof resolveAuthoritativeCardHandoffEvent>
+>
+
+export function shouldApplyCardHandoff({
+  handoff,
+  activeCardId,
+  currentSegmentKey,
+}: {
+  handoff: AuthoritativeCardHandoff
+  activeCardId?: string
+  currentSegmentKey: string
+}): boolean {
+  return (
+    (!activeCardId || handoff.cardId === activeCardId) &&
+    handoff.fromSegmentKey === currentSegmentKey
+  )
+}
+
 type StreamingState = {
   isStreaming: boolean
   streamingMessageId: string | null
@@ -164,6 +183,8 @@ type UseStreamingMessageOptions = {
     friendlyId: string
     reason: 'bootstrap' | 'stream-handoff'
   }) => void
+  activeCardId?: string
+  onCardHandoff?: (payload: AuthoritativeCardHandoff) => void
   acceptedTimeoutMs?: number
   handoffTimeoutMs?: number
 }
@@ -180,6 +201,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     onMessageAccepted,
     onAbort,
     onSessionResolved,
+    activeCardId,
+    onCardHandoff,
     acceptedTimeoutMs,
     handoffTimeoutMs,
   } = options
@@ -605,7 +628,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const handoff = resolveAuthoritativeCardHandoffEvent(event, data)
           if (
             !handoff ||
-            handoff.fromSegmentKey !== activeSessionKeyRef.current
+            !shouldApplyCardHandoff({
+              handoff,
+              activeCardId,
+              currentSegmentKey: activeSessionKeyRef.current,
+            })
           ) {
             break
           }
@@ -615,9 +642,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           }
           handoffSession(handoff.fromSegmentKey, handoff.canonicalSegmentKey)
           activeSessionKeyRef.current = handoff.canonicalSegmentKey
+          onCardHandoff?.(handoff)
           break
         }
         case 'session_handoff': {
+          if (activeCardId) break
           const handoff = resolveAuthoritativeSessionHandoffEvent(event, data)
           if (!handoff) break
           if (handoff.runId) {
@@ -897,9 +926,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
     },
     [
+      activeCardId,
       applySessionHandoff,
       finishStream,
+      handoffSession,
       markFailed,
+      onCardHandoff,
       onStarted,
       onThinking,
       onTool,

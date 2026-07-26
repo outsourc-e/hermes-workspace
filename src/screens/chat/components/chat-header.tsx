@@ -3,7 +3,8 @@ import { Link } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Folder01Icon } from '@hugeicons/core-free-icons'
 import { buildSessionTree } from '../session-lineage'
-import type { SessionMeta } from '../types'
+import { projectSessionCards } from '../session-cards'
+import type { SessionCard, SessionMeta } from '../types'
 import { Button } from '@/components/ui/button'
 import {
   TooltipContent,
@@ -82,16 +83,38 @@ function getSessionTitle(session: SessionMeta): string {
   return 'Session'
 }
 
+function sessionForCardKey(
+  sessions: Array<SessionMeta>,
+  key: string,
+): SessionMeta | undefined {
+  return sessions.find(
+    (session) =>
+      session.key === key ||
+      session.backendKey === key ||
+      session.friendlyId === key,
+  )
+}
+
+function cardOwnsSessionKey(card: SessionCard, sessionKey: string): boolean {
+  return (
+    card.cardId === sessionKey ||
+    card.canonicalSegmentKey === sessionKey ||
+    card.continuationSegmentKeys.includes(sessionKey)
+  )
+}
+
 type ActiveLineageContextProps = {
   parentSession?: SessionMeta
   continuationCount: number
   onOpenParent?: () => void
+  backToParent?: boolean
 }
 
 function ActiveLineageContext({
   parentSession,
   continuationCount,
   onOpenParent,
+  backToParent = false,
 }: ActiveLineageContextProps) {
   const segmentStatus =
     continuationCount > 1 ? (
@@ -112,11 +135,17 @@ function ActiveLineageContext({
         to="/chat/$sessionKey"
         params={{ sessionKey: parentSession.friendlyId }}
         onClick={onOpenParent}
-        aria-label={`Open parent session ${parentTitle}`}
+        aria-label={
+          backToParent
+            ? 'Back to parent conversation'
+            : `Open parent session ${parentTitle}`
+        }
         className="min-w-0 truncate rounded-sm underline decoration-primary-300 underline-offset-2 hover:text-accent-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
         title={`Parent: ${parentTitle}`}
       >
-        Parent: {parentTitle}
+        {backToParent
+          ? 'Back to parent conversation'
+          : `Parent: ${parentTitle}`}
       </Link>
       {segmentStatus}
     </span>
@@ -132,7 +161,10 @@ type ChatHeaderProps = {
   wrapperRef?: React.Ref<HTMLDivElement>
   onOpenSessions?: () => void
   sessions?: Array<SessionMeta>
+  /** Server-backed Cards take precedence. Legacy sessions remain a safe fallback. */
+  sessionCards?: Array<SessionCard>
   activeFriendlyId?: string
+  inspectedChildCardId?: string
   onSelectSession?: (key: string) => void
   showFileExplorerButton?: boolean
   fileExplorerCollapsed?: boolean
@@ -166,7 +198,9 @@ function ChatHeaderComponent({
   wrapperRef,
   onOpenSessions,
   sessions = [],
+  sessionCards,
   activeFriendlyId = '',
+  inspectedChildCardId,
   onSelectSession,
   showFileExplorerButton = false,
   fileExplorerCollapsed = true,
@@ -202,11 +236,15 @@ function ChatHeaderComponent({
         (session) =>
           session.friendlyId === activeFriendlyId ||
           session.key === activeFriendlyId,
-      )?.key,
+      )?.key ?? activeFriendlyId,
     [activeFriendlyId, sessions],
   )
   const sessionTree = useMemo(
     () => buildSessionTree(sessions, { activeSessionKey }),
+    [activeSessionKey, sessions],
+  )
+  const legacyCardProjection = useMemo(
+    () => projectSessionCards(sessions, { activeSessionKey }),
     [activeSessionKey, sessions],
   )
   const activeTreeKey = activeSessionKey
@@ -223,6 +261,64 @@ function ChatHeaderComponent({
       ? sessionTree.indexByKey.get(activeTreeRow.parentKey)?.session
       : undefined
   const continuationCount = activeTreeRow?.continuationCount ?? 1
+  const availableCards = sessionCards ?? legacyCardProjection.roots
+  const cardContext = useMemo(() => {
+    if (!activeSessionKey) return undefined
+    for (const card of availableCards) {
+      const inspectedChild = card.childNodes.find(
+        (child) =>
+          child.cardId === inspectedChildCardId ||
+          (!inspectedChildCardId &&
+            (child.cardId === activeSessionKey ||
+              child.sessionKey === activeSessionKey)),
+      )
+      if (inspectedChild) return { card, inspectedChild }
+      if (cardOwnsSessionKey(card, activeSessionKey)) {
+        return { card, inspectedChild: undefined }
+      }
+    }
+    return undefined
+  }, [activeSessionKey, availableCards, inspectedChildCardId])
+  const legacyCardSession = cardContext
+    ? sessionForCardKey(sessions, cardContext.card.canonicalSegmentKey)
+    : undefined
+  const displayedTitle = cardContext
+    ? sessionCards
+      ? cardContext.card.title
+      : legacyCardSession
+        ? getSessionTitle(legacyCardSession)
+        : activeTitle
+    : activeTitle
+  const displayedContinuationCount =
+    cardContext?.card.continuationCount ?? continuationCount
+  const displayedParentSession = cardContext?.inspectedChild
+    ? (sessionForCardKey(sessions, cardContext.card.canonicalSegmentKey) ?? {
+        key: cardContext.card.canonicalSegmentKey,
+        friendlyId: cardContext.card.canonicalSegmentKey,
+      })
+    : parentSession
+  const switcherSessions = useMemo(() => {
+    return availableCards.map((card) => {
+      const session = sessionForCardKey(sessions, card.canonicalSegmentKey)
+      const cardTitle = sessionCards
+        ? card.title
+        : getSessionTitle(
+            session ?? {
+              key: card.canonicalSegmentKey,
+              friendlyId: card.canonicalSegmentKey,
+            },
+          )
+      return {
+        ...(session ?? {
+          key: card.canonicalSegmentKey,
+          friendlyId: card.canonicalSegmentKey,
+        }),
+        label: cardTitle,
+        title: undefined,
+        derivedTitle: undefined,
+      }
+    })
+  }, [availableCards, sessionCards, sessions])
 
   useEffect(() => {
     if (!sessionPopoverOpen) return
@@ -233,7 +329,7 @@ function ChatHeaderComponent({
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [closeSessionPopover, sessionPopoverOpen])
-  const [titleDraft, setTitleDraft] = useState(activeTitle)
+  const [titleDraft, setTitleDraft] = useState(displayedTitle)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const isSavingTitleRef = useRef(false)
 
@@ -246,7 +342,7 @@ function ChatHeaderComponent({
   }, [])
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
-  const mobileTitle = formatMobileSessionTitle(activeTitle)
+  const mobileTitle = formatMobileSessionTitle(displayedTitle)
   void _agentModel
   void agentConnected
   void statusMode
@@ -272,8 +368,8 @@ function ChatHeaderComponent({
 
   useEffect(() => {
     if (isEditingTitle) return
-    setTitleDraft(activeTitle)
-  }, [activeTitle, isEditingTitle])
+    setTitleDraft(displayedTitle)
+  }, [displayedTitle, isEditingTitle])
 
   useEffect(() => {
     if (!isEditingTitle) return
@@ -284,18 +380,20 @@ function ChatHeaderComponent({
     return () => window.clearTimeout(id)
   }, [isEditingTitle])
 
-  const canRenameTitle = Boolean(onRenameTitle && !isMobile)
+  const canRenameTitle = Boolean(
+    onRenameTitle && !isMobile && !cardContext?.inspectedChild,
+  )
 
   const startTitleEdit = useCallback(() => {
     if (!canRenameTitle || renamingTitle) return
-    setTitleDraft(activeTitle)
+    setTitleDraft(displayedTitle)
     setIsEditingTitle(true)
-  }, [activeTitle, canRenameTitle, renamingTitle])
+  }, [canRenameTitle, displayedTitle, renamingTitle])
 
   const cancelTitleEdit = useCallback(() => {
-    setTitleDraft(activeTitle)
+    setTitleDraft(displayedTitle)
     setIsEditingTitle(false)
-  }, [activeTitle])
+  }, [displayedTitle])
 
   const saveTitleEdit = useCallback(async () => {
     if (!onRenameTitle || isSavingTitleRef.current) return
@@ -306,7 +404,7 @@ function ChatHeaderComponent({
       return
     }
 
-    if (trimmed === activeTitle.trim()) {
+    if (trimmed === displayedTitle.trim()) {
       setIsEditingTitle(false)
       return
     }
@@ -318,7 +416,7 @@ function ChatHeaderComponent({
     } finally {
       isSavingTitleRef.current = false
     }
-  }, [activeTitle, cancelTitleEdit, onRenameTitle, titleDraft])
+  }, [cancelTitleEdit, displayedTitle, onRenameTitle, titleDraft])
 
   if (isMobile) {
     return (
@@ -383,8 +481,9 @@ function ChatHeaderComponent({
               </svg>
             </button>
             <ActiveLineageContext
-              parentSession={parentSession}
-              continuationCount={continuationCount}
+              parentSession={displayedParentSession}
+              continuationCount={displayedContinuationCount}
+              backToParent={Boolean(cardContext?.inspectedChild)}
             />
           </div>
 
@@ -460,7 +559,7 @@ function ChatHeaderComponent({
                 className="min-w-0 truncate text-sm font-medium text-balance hover:text-accent-600 transition-colors rounded-sm text-left"
                 title="Click to switch session"
               >
-                {activeTitle}
+                {displayedTitle}
               </button>
               {canRenameTitle && !renamingTitle && (
                 <button
@@ -473,9 +572,10 @@ function ChatHeaderComponent({
                 </button>
               )}
               <ActiveLineageContext
-                parentSession={parentSession}
-                continuationCount={continuationCount}
+                parentSession={displayedParentSession}
+                continuationCount={displayedContinuationCount}
                 onOpenParent={closeSessionPopover}
+                backToParent={Boolean(cardContext?.inspectedChild)}
               />
               {sessionPopoverOpen && (
                 <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 overflow-hidden rounded-xl border border-[var(--theme-border)] shadow-2xl">
@@ -518,25 +618,18 @@ function ChatHeaderComponent({
                       opacity: 1,
                     }}
                   >
-                    {sessions
+                    {switcherSessions
                       .filter((s) => {
                         if (!sessionSearch.trim()) return true
                         const q = sessionSearch.toLowerCase()
                         return (
-                          (s.label || s.derivedTitle || s.title || '')
-                            .toLowerCase()
-                            .includes(q) ||
+                          getSessionTitle(s).toLowerCase().includes(q) ||
                           s.friendlyId.toLowerCase().includes(q)
                         )
                       })
                       .slice(0, 20)
                       .map((s) => {
-                        const label =
-                          s.label ||
-                          s.derivedTitle ||
-                          s.title ||
-                          s.friendlyId.slice(0, 8) ||
-                          'Session'
+                        const label = getSessionTitle(s)
                         const isActive =
                           Boolean(activeFriendlyId) &&
                           (s.friendlyId === activeFriendlyId ||
@@ -567,7 +660,7 @@ function ChatHeaderComponent({
                           </button>
                         )
                       })}
-                    {sessions.length === 0 && (
+                    {switcherSessions.length === 0 && (
                       <p className="px-3 py-4 text-sm text-neutral-400">
                         No sessions
                       </p>

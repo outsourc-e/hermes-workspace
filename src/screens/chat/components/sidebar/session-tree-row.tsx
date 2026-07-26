@@ -6,6 +6,7 @@ import { useId } from 'react'
 import { isSessionForkEligible } from '../../session-fork'
 import { SessionItem } from './session-item'
 import type {
+  SessionCardChildStatus,
   SessionMeta,
   SessionTreeRow as SessionTreeRowModel,
 } from '../../types'
@@ -26,9 +27,15 @@ type SessionTreeRowProps = {
   onRename: (session: SessionMeta) => void
   onDelete: (session: SessionMeta) => void
   ancestorKeys?: ReadonlySet<string>
+  rootCardId?: string
+  cardRouteMode?: boolean
+  childStatusByCardId?: ReadonlyMap<string, SessionCardChildStatus>
 }
 
-function getRelationshipLabel(row: SessionTreeRowModel): string | undefined {
+function getRelationshipLabel(
+  row: SessionTreeRowModel,
+  status?: SessionCardChildStatus,
+): string | undefined {
   const identityLabel =
     row.relationshipKind === 'branch'
       ? 'Branch'
@@ -38,9 +45,13 @@ function getRelationshipLabel(row: SessionTreeRowModel): string | undefined {
           ? 'Original session unavailable'
           : undefined
   if (identityLabel) {
-    return row.continuationCount > 1
-      ? `${identityLabel} · ${row.continuationCount} segments`
-      : identityLabel
+    const relationship =
+      row.continuationCount > 1
+        ? `${identityLabel} · ${row.continuationCount} segments`
+        : identityLabel
+    return status && status !== 'idle'
+      ? `${relationship} · ${status}`
+      : relationship
   }
   if (row.continuationCount > 1) {
     return `Continued · ${row.continuationCount} segments`
@@ -62,16 +73,27 @@ function SessionTreeRow({
   onRename,
   onDelete,
   ancestorKeys = new Set<string>(),
+  rootCardId,
+  cardRouteMode = false,
+  childStatusByCardId = new Map(),
 }: SessionTreeRowProps) {
   const generatedId = useId().replaceAll(':', '')
   const childrenId = `session-tree-children-${generatedId}`
-  const relationshipLabel = getRelationshipLabel(row)
+  const relationshipLabel = getRelationshipLabel(
+    row,
+    childStatusByCardId.get(row.key),
+  )
   const childRows = childrenByParent.get(row.key) ?? []
   const nextAncestorKeys = new Set(ancestorKeys)
   nextAncestorKeys.add(row.key)
 
   return (
-    <div data-session-key={row.key} data-session-depth={row.depth}>
+    <div
+      data-session-key={row.session.key}
+      data-session-depth={row.depth}
+      data-card-id={row.depth === 0 ? row.key : undefined}
+      data-card-child-id={row.depth > 0 ? row.key : undefined}
+    >
       <div
         className="relative flex min-w-0 items-center"
         style={
@@ -106,13 +128,24 @@ function SessionTreeRow({
         <div className="min-w-0 flex-1">
           <SessionItem
             session={row.session}
-            active={
-              activeSessionKey
-                ? row.key === activeSessionKey
-                : row.session.friendlyId === activeFriendlyId
+            routeKey={
+              cardRouteMode ? (rootCardId ?? row.key) : row.session.friendlyId
             }
-            isPinned={pinnedSessionKeys.has(row.key)}
+            active={
+              row.depth === 0
+                ? activeSessionKey
+                  ? row.key === activeSessionKey
+                  : row.session.friendlyId === activeFriendlyId
+                : false
+            }
+            isPinned={row.depth === 0 && pinnedSessionKeys.has(row.key)}
             contextLabel={relationshipLabel}
+            showActions={row.depth === 0}
+            inspected={
+              row.depth > 0 &&
+              (row.session.friendlyId === activeFriendlyId ||
+                row.session.key === activeFriendlyId)
+            }
             onSelect={onSelect}
             onTogglePin={onTogglePin}
             canFork={sessionForkAvailable && isSessionForkEligible(row.session)}
@@ -149,6 +182,9 @@ function SessionTreeRow({
                     onRename={onRename}
                     onDelete={onDelete}
                     ancestorKeys={nextAncestorKeys}
+                    rootCardId={rootCardId ?? row.key}
+                    cardRouteMode={cardRouteMode}
+                    childStatusByCardId={childStatusByCardId}
                   />
                 ),
               )

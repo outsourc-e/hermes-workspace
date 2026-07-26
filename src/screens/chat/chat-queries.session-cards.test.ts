@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { QueryClient } from '@tanstack/react-query'
 import {
   archiveSessionCard,
   branchSessionCard,
+  fetchCompleteSessionCardHistory,
   fetchSessionCardHistory,
   fetchSessionCards,
+  moveSessionCardHistoryMessages,
   sessionCardQueryKeys,
   updateSessionCardMetadata,
 } from './chat-queries'
@@ -421,6 +424,113 @@ describe('Session Card fetchers', () => {
       { signal: undefined },
     )
     expect(fetchMock.mock.calls.flat().join(' ')).not.toContain('/api/history')
+  })
+
+  it('loads every Card history cursor page in parent order', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response({
+          cardId: 'remote:root',
+          canonicalSegmentKey: 'remote:tip',
+          messages: [
+            {
+              segmentKey: 'remote:root',
+              message: { id: 'm1', role: 'user', content: [] },
+            },
+          ],
+          completeness: 'complete',
+          retryable: false,
+          missingSegments: [],
+          nextCursor: 'page-2',
+        }),
+      )
+      .mockResolvedValueOnce(
+        response({
+          cardId: 'remote:root',
+          canonicalSegmentKey: 'remote:tip',
+          messages: [
+            {
+              segmentKey: 'remote:tip',
+              message: { id: 'm2', role: 'assistant', content: [] },
+            },
+          ],
+          completeness: 'complete',
+          retryable: false,
+          missingSegments: [],
+        }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      fetchCompleteSessionCardHistory({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:tip',
+      }),
+    ).resolves.toMatchObject({
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [
+        { id: 'm1', __segmentKey: 'remote:root' },
+        { id: 'm2', __segmentKey: 'remote:tip' },
+      ],
+      completeness: 'complete',
+      retryable: false,
+    })
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/session-cards/remote%3Aroot/history?limit=500',
+      { signal: undefined },
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/session-cards/remote%3Aroot/history?limit=500&cursor=page-2',
+      { signal: undefined },
+    )
+  })
+
+  it('moves Card history cache across canonical handoff without changing Card identity', () => {
+    const queryClient = new QueryClient()
+    const sourceKey = sessionCardQueryKeys.history('remote:root', 'remote:tip')
+    const targetKey = sessionCardQueryKeys.history('remote:root', 'remote:next')
+    queryClient.setQueryData(sourceKey, {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [{ id: 'optimistic', role: 'user', content: [] }],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    queryClient.setQueryData(targetKey, {
+      sessionKey: 'remote:next',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:next',
+      messages: [
+        { id: 'optimistic', role: 'user', content: [] },
+        { id: 'server', role: 'assistant', content: [] },
+      ],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+
+    moveSessionCardHistoryMessages(
+      queryClient,
+      'remote:root',
+      'remote:tip',
+      'remote:next',
+    )
+
+    expect(queryClient.getQueryData(sourceKey)).toBeUndefined()
+    expect(queryClient.getQueryData(targetKey)).toMatchObject({
+      sessionKey: 'remote:next',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:next',
+      messages: [{ id: 'optimistic' }, { id: 'server' }],
+    })
+    queryClient.clear()
   })
 
   it.each([

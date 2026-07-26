@@ -1,14 +1,24 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, Chat01Icon } from '@hugeicons/core-free-icons'
-import type { SessionMeta, SessionTreeRow } from '@/screens/chat/types'
-import { buildSessionTree } from '@/screens/chat/session-lineage'
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  Chat01Icon,
+} from '@hugeicons/core-free-icons'
+import type {
+  SessionCard,
+  SessionCardChild,
+  SessionMeta,
+} from '@/screens/chat/types'
+import { projectSessionCards } from '@/screens/chat/session-cards'
 import { cn } from '@/lib/utils'
 
 type Props = {
   open: boolean
   onClose: () => void
   sessions: Array<SessionMeta>
+  /** Server-backed Cards take precedence. Legacy sessions remain a safe fallback. */
+  sessionCards?: Array<SessionCard>
   activeFriendlyId: string
   onSelectSession: (key: string) => void
   onNewChat: () => void
@@ -20,34 +30,44 @@ function normalizeLabel(value: string | undefined): string {
   return trimmed.length > 0 ? trimmed : ''
 }
 
-function getSessionTitle(session: SessionMeta): string {
-  const label = normalizeLabel(session.label)
+function getSessionTitle(session: SessionMeta | undefined): string {
+  const label = normalizeLabel(session?.label)
   if (label) return label
-  const derivedTitle = normalizeLabel(session.derivedTitle)
+  const derivedTitle = normalizeLabel(session?.derivedTitle)
   if (derivedTitle) return derivedTitle
-  const title = normalizeLabel(session.title)
+  const title = normalizeLabel(session?.title)
   if (title) return title
-  return `Session ${session.friendlyId.slice(0, 8)}`
+  return session ? `Session ${session.friendlyId.slice(0, 8)}` : 'Conversation'
 }
 
-function getRelationshipLabel(row: SessionTreeRow): string | undefined {
-  const identityLabel =
-    row.relationshipKind === 'branch'
-      ? 'Branch'
-      : row.relationshipKind === 'child'
-        ? 'Delegated session'
-        : row.isOrphan
-          ? 'Original session unavailable'
-          : undefined
-  if (identityLabel) {
-    return row.continuationCount > 1
-      ? `${identityLabel} · ${row.continuationCount} segments`
-      : identityLabel
-  }
-  if (row.continuationCount > 1) {
-    return `Continued · ${row.continuationCount} segments`
-  }
-  return undefined
+function sessionForKey(
+  sessions: Array<SessionMeta>,
+  key: string,
+): SessionMeta | undefined {
+  return sessions.find(
+    (session) =>
+      session.key === key ||
+      session.backendKey === key ||
+      session.friendlyId === key,
+  )
+}
+
+function cardOwnsSessionKey(card: SessionCard, sessionKey: string): boolean {
+  return (
+    card.cardId === sessionKey ||
+    card.canonicalSegmentKey === sessionKey ||
+    card.continuationSegmentKeys.includes(sessionKey)
+  )
+}
+
+function relationshipLabel(child: SessionCardChild): string {
+  const kind =
+    child.relationshipKind === 'branch' ? 'Branch' : 'Delegated session'
+  const segments =
+    child.continuationCount > 1 ? ` · ${child.continuationCount} segments` : ''
+  return child.status === 'idle'
+    ? `${kind}${segments}`
+    : `${kind}${segments} · ${child.status}`
 }
 
 const dayFormatter = new Intl.DateTimeFormat(undefined, {
@@ -74,33 +94,83 @@ export function MobileSessionsPanel({
   open,
   onClose,
   sessions,
+  sessionCards,
   activeFriendlyId,
   onSelectSession,
   onNewChat,
 }: Props) {
+  const disclosurePrefix = useId().replaceAll(':', '')
+  const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(
+    () => new Set(),
+  )
   const activeSessionKey = useMemo(
     () =>
       sessions.find(
         (session) =>
           session.friendlyId === activeFriendlyId ||
-          session.key === activeFriendlyId,
-      )?.key,
+          session.key === activeFriendlyId ||
+          session.backendKey === activeFriendlyId,
+      )?.key ?? activeFriendlyId,
     [activeFriendlyId, sessions],
   )
-  const tree = useMemo(
-    () => buildSessionTree(sessions, { activeSessionKey }),
+  const legacyProjection = useMemo(
+    () => projectSessionCards(sessions, { activeSessionKey }),
     [activeSessionKey, sessions],
   )
-  const activeTreeKey = activeSessionKey
-    ? (tree.visibleKeyBySessionKey.get(activeSessionKey) ?? activeSessionKey)
-    : undefined
+  const roots = sessionCards ?? legacyProjection.roots
+  const cardsById = useMemo(
+    () =>
+      new Map(
+        (sessionCards ?? legacyProjection.cards).map((card) => [
+          card.cardId,
+          card,
+        ]),
+      ),
+    [legacyProjection.cards, sessionCards],
+  )
+  const activeCard = useMemo<{
+    rootCardId?: string
+    childCardId?: string
+  }>(() => {
+    if (!activeSessionKey) return {}
+    const visit = (
+      rootCardId: string,
+      card: SessionCard,
+      visited: Set<string>,
+    ): { rootCardId: string; childCardId?: string } | undefined => {
+      if (visited.has(card.cardId)) return undefined
+      visited.add(card.cardId)
+      if (cardOwnsSessionKey(card, activeSessionKey)) {
+        return card.cardId === rootCardId
+          ? { rootCardId }
+          : { rootCardId, childCardId: card.cardId }
+      }
+      for (const child of card.childNodes) {
+        if (
+          child.cardId === activeSessionKey ||
+          child.sessionKey === activeSessionKey
+        ) {
+          return { rootCardId, childCardId: child.cardId }
+        }
+        const fullChild = cardsById.get(child.cardId)
+        if (fullChild) {
+          const match = visit(rootCardId, fullChild, visited)
+          if (match) return match
+        }
+      }
+      return undefined
+    }
+    for (const root of roots) {
+      const match = visit(root.cardId, root, new Set())
+      if (match) return match
+    }
+    return {}
+  }, [activeSessionKey, cardsById, roots])
 
   useEffect(() => {
     if (!open) return
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onClose()
-      }
+      if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
@@ -115,6 +185,92 @@ export function MobileSessionsPanel({
   }, [open])
 
   if (!open) return null
+
+  const toggleCard = (cardId: string, expanded: boolean) => {
+    setCollapsedCardIds((current) => {
+      const next = new Set(current)
+      if (expanded) next.delete(cardId)
+      else next.add(cardId)
+      return next
+    })
+  }
+
+  const renderChild = (
+    child: SessionCardChild,
+    depth: number,
+    visited: ReadonlySet<string>,
+  ): React.ReactNode => {
+    if (visited.has(child.cardId)) return null
+    const nextVisited = new Set(visited)
+    nextVisited.add(child.cardId)
+    const session = sessionForKey(sessions, child.sessionKey)
+    const title = sessionCards ? child.title : getSessionTitle(session)
+    const fullCard = cardsById.get(child.cardId)
+    const inspected = activeCard.childCardId === child.cardId
+    const routeKey = session?.friendlyId ?? child.sessionKey
+    const grandchildren = fullCard?.childNodes ?? []
+    const expanded = !collapsedCardIds.has(child.cardId)
+    const childrenId = `${disclosurePrefix}-${child.cardId}-children`
+
+    return (
+      <div
+        key={child.cardId}
+        data-card-child-id={child.cardId}
+        data-session-depth={depth}
+      >
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onSelectSession(routeKey)}
+            aria-label={`Inspect ${child.relationshipKind === 'branch' ? 'branch' : 'delegated session'} ${title}`}
+            data-card-child-id={child.cardId}
+            data-session-depth={depth}
+            data-inspected={inspected ? 'true' : undefined}
+            className={cn(
+              'min-w-0 flex-1 rounded-lg border px-3 py-2 text-left transition-colors',
+              inspected
+                ? 'border-accent-300 bg-accent-50'
+                : 'border-transparent bg-primary-50 hover:border-primary-200',
+            )}
+            style={{
+              paddingInlineStart: `${12 + Math.min(depth, 8) * 16}px`,
+            }}
+          >
+            <div className="truncate text-sm font-medium text-ink">{title}</div>
+            <div className="mt-0.5 truncate text-[11px] font-medium text-primary-600">
+              {relationshipLabel(child)}
+            </div>
+          </button>
+          {grandchildren.length > 0 ? (
+            <button
+              type="button"
+              aria-label={`${expanded ? 'Collapse' : 'Expand'} child activity for ${title}`}
+              aria-expanded={expanded}
+              aria-controls={childrenId}
+              onClick={() => toggleCard(child.cardId, !expanded)}
+              className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-primary-500 hover:bg-primary-100"
+            >
+              <HugeiconsIcon
+                icon={ArrowDown01Icon}
+                size={14}
+                strokeWidth={1.8}
+                className={cn(!expanded && '-rotate-90')}
+              />
+            </button>
+          ) : null}
+        </div>
+        {grandchildren.length > 0 ? (
+          <div id={childrenId} hidden={!expanded} className="space-y-1 pt-1">
+            {expanded
+              ? grandchildren.map((grandchild) =>
+                  renderChild(grandchild, depth + 1, nextVisited),
+                )
+              : null}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-[97] no-swipe md:hidden">
@@ -146,7 +302,7 @@ export function MobileSessionsPanel({
           </div>
 
           <div className="flex-1 overflow-y-auto p-2">
-            {sessions.length === 0 ? (
+            {roots.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-primary-500">
                 <HugeiconsIcon icon={Chat01Icon} size={24} strokeWidth={1.6} />
                 <p className="text-sm">No sessions yet.</p>
@@ -156,48 +312,92 @@ export function MobileSessionsPanel({
               </div>
             ) : (
               <div className="space-y-1">
-                {tree.rows.map((row) => {
-                  const { session } = row
-                  const active = activeTreeKey
-                    ? row.key === activeTreeKey
-                    : session.friendlyId === activeFriendlyId
-                  const timestamp = formatUpdatedAt(session.updatedAt)
-                  const relationshipLabel = getRelationshipLabel(row)
+                {roots.map((card) => {
+                  const session = sessionForKey(
+                    sessions,
+                    card.canonicalSegmentKey,
+                  )
+                  const title = sessionCards
+                    ? card.title
+                    : getSessionTitle(session)
+                  const timestamp = formatUpdatedAt(card.updatedAt)
+                  const active = activeCard.rootCardId === card.cardId
+                  const inspectedChild =
+                    active && activeCard.childCardId !== undefined
+                  const expanded =
+                    card.childNodes.length > 0 &&
+                    (!collapsedCardIds.has(card.cardId) || inspectedChild)
+                  const childrenId = `${disclosurePrefix}-${card.cardId}-children`
+                  const routeKey =
+                    session?.friendlyId ?? card.canonicalSegmentKey
                   return (
-                    <button
-                      key={row.key}
-                      type="button"
-                      onClick={() => onSelectSession(session.friendlyId)}
-                      aria-current={active ? 'page' : undefined}
-                      data-session-key={row.key}
-                      data-session-depth={row.depth}
-                      className={cn(
-                        'w-full rounded-lg border px-3 py-2 text-left transition-colors',
-                        active
-                          ? 'border-accent-300 bg-accent-50'
-                          : 'border-transparent bg-primary-50 hover:border-primary-200',
-                      )}
-                      style={
-                        row.depth > 0
-                          ? {
-                              paddingInlineStart: `${12 + Math.min(row.depth, 8) * 16}px`,
-                            }
-                          : undefined
-                      }
-                    >
-                      <div className="truncate text-sm font-medium text-ink">
-                        {getSessionTitle(session)}
+                    <div key={card.cardId} data-card-container={card.cardId}>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label={`Open card ${title}`}
+                          onClick={() => onSelectSession(routeKey)}
+                          aria-current={active ? 'page' : undefined}
+                          data-card-id={card.cardId}
+                          data-session-key={card.canonicalSegmentKey}
+                          data-session-depth={0}
+                          className={cn(
+                            'min-w-0 flex-1 rounded-lg border px-3 py-2 text-left transition-colors',
+                            active
+                              ? 'border-accent-300 bg-accent-50'
+                              : 'border-transparent bg-primary-50 hover:border-primary-200',
+                          )}
+                        >
+                          <div className="truncate text-sm font-medium text-ink">
+                            {title}
+                          </div>
+                          {card.continuationCount > 1 ? (
+                            <div className="mt-0.5 truncate text-[11px] font-medium text-primary-600">
+                              Continued · {card.continuationCount} segments
+                            </div>
+                          ) : null}
+                          {card.relationshipKind === 'orphan' ? (
+                            <div className="mt-0.5 truncate text-[11px] font-medium text-primary-600">
+                              Original session unavailable
+                            </div>
+                          ) : null}
+                          <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-primary-500">
+                            <span className="truncate">{routeKey}</span>
+                            {timestamp ? <span>{timestamp}</span> : null}
+                          </div>
+                        </button>
+                        {card.childNodes.length > 0 ? (
+                          <button
+                            type="button"
+                            aria-label={`${expanded ? 'Collapse' : 'Expand'} child activity for ${title}`}
+                            aria-expanded={expanded}
+                            aria-controls={childrenId}
+                            onClick={() => toggleCard(card.cardId, !expanded)}
+                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-primary-500 hover:bg-primary-100"
+                          >
+                            <HugeiconsIcon
+                              icon={ArrowDown01Icon}
+                              size={14}
+                              strokeWidth={1.8}
+                              className={cn(!expanded && '-rotate-90')}
+                            />
+                          </button>
+                        ) : null}
                       </div>
-                      {relationshipLabel ? (
-                        <div className="mt-0.5 truncate text-[11px] font-medium text-primary-600">
-                          {relationshipLabel}
+                      {card.childNodes.length > 0 ? (
+                        <div
+                          id={childrenId}
+                          hidden={!expanded}
+                          className="space-y-1 pt-1"
+                        >
+                          {expanded
+                            ? card.childNodes.map((child) =>
+                                renderChild(child, 1, new Set([card.cardId])),
+                              )
+                            : null}
                         </div>
                       ) : null}
-                      <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-primary-500">
-                        <span className="truncate">{session.friendlyId}</span>
-                        {timestamp ? <span>{timestamp}</span> : null}
-                      </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>

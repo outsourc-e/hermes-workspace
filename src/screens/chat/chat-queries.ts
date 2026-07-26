@@ -540,6 +540,177 @@ export async function fetchSessionCardHistory(payload: {
   return history
 }
 
+export type SessionCardHistoryResponse = HistoryResponse & {
+  cardId: string
+  canonicalSegmentKey: string
+  completeness: 'complete' | 'partial'
+  retryable: boolean
+  missingSegments: SessionCardHistoryWire['missingSegments']
+}
+
+function sessionCardMessage(
+  entry: SessionCardHistoryWire['messages'][number],
+): ChatMessage {
+  return {
+    ...entry.message,
+    __segmentKey: entry.segmentKey,
+  } as ChatMessage
+}
+
+/** Load every stable cursor page so the parent pane never drops older segments. */
+export async function fetchCompleteSessionCardHistory(payload: {
+  cardId: string
+  canonicalSegmentKey: string
+  signal?: AbortSignal
+}): Promise<SessionCardHistoryResponse> {
+  const messages: Array<ChatMessage> = []
+  const seenCursors = new Set<string>()
+  let cursor: string | undefined
+  let finalPage: SessionCardHistoryWire
+
+  do {
+    const page = await fetchSessionCardHistory({
+      cardId: payload.cardId,
+      canonicalSegmentKey: payload.canonicalSegmentKey,
+      cursor,
+      limit: 500,
+      signal: payload.signal,
+    })
+    messages.push(...page.messages.map(sessionCardMessage))
+    finalPage = page
+    cursor = page.nextCursor
+    if (cursor) {
+      if (seenCursors.has(cursor)) {
+        throw new Error('Invalid Session Card history cursor sequence')
+      }
+      seenCursors.add(cursor)
+    }
+  } while (cursor)
+
+  return {
+    sessionKey: finalPage.canonicalSegmentKey,
+    cardId: finalPage.cardId,
+    canonicalSegmentKey: finalPage.canonicalSegmentKey,
+    messages,
+    completeness: finalPage.completeness,
+    retryable: finalPage.retryable,
+    missingSegments: finalPage.missingSegments,
+  }
+}
+
+function messageCacheIdentity(message: ChatMessage): string {
+  const raw = message as Record<string, unknown>
+  for (const key of [
+    'stableId',
+    'id',
+    'messageId',
+    'clientId',
+    'client_id',
+    '__optimisticId',
+  ]) {
+    const value = nonblankWireString(raw[key])
+    if (value) return `${message.role ?? ''}:${key}:${value}`
+  }
+  return `${message.role ?? ''}:content:${JSON.stringify(message.content ?? [])}`
+}
+
+function mergeCardHistoryMessages(
+  primary: Array<ChatMessage>,
+  secondary: Array<ChatMessage>,
+): Array<ChatMessage> {
+  const messages = [...primary]
+  const seen = new Set(primary.map(messageCacheIdentity))
+  for (const message of secondary) {
+    const identity = messageCacheIdentity(message)
+    if (seen.has(identity)) continue
+    seen.add(identity)
+    messages.push(message)
+  }
+  return messages
+}
+
+export function mergeSessionCardHistoryResponse(
+  server: SessionCardHistoryResponse,
+  cached: SessionCardHistoryResponse | undefined,
+): SessionCardHistoryResponse {
+  if (!cached) return server
+  const optimistic = cached.messages.filter((message) => {
+    const raw = message as Record<string, unknown>
+    return (
+      nonblankWireString(raw.__optimisticId) !== null ||
+      raw.status === 'sending' ||
+      raw.status === 'queued'
+    )
+  })
+  return {
+    ...server,
+    messages: mergeCardHistoryMessages(server.messages, optimistic),
+  }
+}
+
+export function updateSessionCardHistoryMessages(
+  queryClient: QueryClient,
+  cardId: string,
+  canonicalSegmentKey: string,
+  updater: (messages: Array<ChatMessage>) => Array<ChatMessage>,
+) {
+  const queryKey = sessionCardQueryKeys.history(cardId, canonicalSegmentKey)
+  queryClient.setQueryData(queryKey, function update(data: unknown) {
+    const current = data as SessionCardHistoryResponse | undefined
+    return {
+      sessionKey: canonicalSegmentKey,
+      cardId,
+      canonicalSegmentKey,
+      completeness: current?.completeness ?? 'complete',
+      retryable: current?.retryable ?? false,
+      missingSegments: current?.missingSegments ?? [],
+      messages: updater(
+        Array.isArray(current?.messages) ? current.messages : [],
+      ),
+    } satisfies SessionCardHistoryResponse
+  })
+}
+
+export function appendSessionCardHistoryMessage(
+  queryClient: QueryClient,
+  cardId: string,
+  canonicalSegmentKey: string,
+  message: ChatMessage,
+) {
+  updateSessionCardHistoryMessages(
+    queryClient,
+    cardId,
+    canonicalSegmentKey,
+    (messages) => mergeCardHistoryMessages(messages, [message]),
+  )
+}
+
+export function moveSessionCardHistoryMessages(
+  queryClient: QueryClient,
+  cardId: string,
+  fromCanonicalSegmentKey: string,
+  toCanonicalSegmentKey: string,
+) {
+  if (fromCanonicalSegmentKey === toCanonicalSegmentKey) return
+  const fromKey = sessionCardQueryKeys.history(cardId, fromCanonicalSegmentKey)
+  const toKey = sessionCardQueryKeys.history(cardId, toCanonicalSegmentKey)
+  const fromData = queryClient.getQueryData<SessionCardHistoryResponse>(fromKey)
+  if (!fromData) return
+  const toData = queryClient.getQueryData<SessionCardHistoryResponse>(toKey)
+  queryClient.setQueryData(toKey, {
+    ...fromData,
+    ...toData,
+    sessionKey: toCanonicalSegmentKey,
+    cardId,
+    canonicalSegmentKey: toCanonicalSegmentKey,
+    messages: mergeCardHistoryMessages(
+      fromData.messages,
+      toData?.messages ?? [],
+    ),
+  } satisfies SessionCardHistoryResponse)
+  queryClient.removeQueries({ queryKey: fromKey, exact: true })
+}
+
 export async function updateSessionCardMetadata(
   cardId: string,
   patch: {
@@ -970,9 +1141,14 @@ export function updateHistoryMessageByClientIdEverywhere(
   const normalizedClientId = normalizeId(clientId)
   if (!normalizedClientId) return
   const optimisticId = `opt-${normalizedClientId}`
-  const historyQueries = queryClient.getQueriesData<HistoryResponse>({
-    queryKey: ['chat', 'history'],
-  })
+  const historyQueries = [
+    ...queryClient.getQueriesData<HistoryResponse>({
+      queryKey: ['chat', 'history'],
+    }),
+    ...queryClient.getQueriesData<HistoryResponse>({
+      queryKey: ['chat', 'session-cards', 'history'],
+    }),
+  ]
 
   for (const [queryKey, data] of historyQueries) {
     const current = data
@@ -987,11 +1163,7 @@ export function updateHistoryMessageByClientIdEverywhere(
       }
       return updater(message)
     })
-    queryClient.setQueryData(queryKey, {
-      sessionKey: current?.sessionKey ?? '',
-      sessionId: current?.sessionId,
-      messages: nextMessages,
-    })
+    queryClient.setQueryData(queryKey, { ...current, messages: nextMessages })
   }
 }
 

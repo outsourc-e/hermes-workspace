@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SidebarSessions } from './sidebar-sessions'
-import type { SessionLineage, SessionMeta } from '../../types'
+import type { SessionCard, SessionLineage, SessionMeta } from '../../types'
 import type * as PinnedSessions from '@/hooks/use-pinned-sessions'
 import { usePinnedSessionsStore } from '@/hooks/use-pinned-sessions'
 
@@ -161,6 +161,7 @@ function session(
 function renderSidebar(
   sessions: Array<SessionMeta>,
   options: {
+    sessionCards?: Array<SessionCard>
     activeFriendlyId?: string
     onRename?: (session: SessionMeta) => void
     onDelete?: (session: SessionMeta) => void
@@ -185,6 +186,7 @@ function renderSidebar(
       root.render(
         <SidebarSessions
           sessions={currentSessions}
+          sessionCards={options.sessionCards}
           activeFriendlyId={currentActiveFriendlyId}
           onRename={options.onRename ?? vi.fn()}
           onDelete={options.onDelete ?? vi.fn()}
@@ -248,6 +250,127 @@ afterEach(() => {
 })
 
 describe('SidebarSessions lineage projection', () => {
+  it('renders one parent Card with nested inspectable children and no continuation or child menus', () => {
+    const hidden = session('root', 'Hidden snapshot', {
+      source: 'cli',
+      endReason: 'compression',
+      endedAt: 100,
+      lineageRootId: 'root',
+      lineageTipId: 'tip',
+    })
+    const tip = session('tip', 'Legacy tip title', {
+      parentSessionId: 'root',
+      source: 'cli',
+      startedAt: 100,
+      lineageRootId: 'root',
+      lineageTipId: 'tip',
+      compressionSegmentCount: 2,
+    })
+    const child = session('delegate', 'Legacy delegate title', {
+      parentSessionId: 'tip',
+      relationshipType: 'child_session',
+    })
+    const card: SessionCard = {
+      cardId: 'root',
+      title: 'Project planning',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'tip',
+      continuationSegmentKeys: ['root', 'tip'],
+      continuationCount: 2,
+      relationshipKind: 'root',
+      childNodes: [
+        {
+          cardId: 'delegate',
+          sessionKey: 'delegate',
+          relationshipKind: 'child',
+          title: 'Research delegate',
+          status: 'running',
+          updatedAt: 30,
+          continuationCount: 1,
+        },
+      ],
+      updatedAt: 40,
+      archived: false,
+      pinned: false,
+    }
+
+    renderSidebar([hidden, tip, child], {
+      sessionCards: [card],
+      activeFriendlyId: child.friendlyId,
+    })
+
+    const parentCard = screen
+      .getByText('Project planning')
+      .closest<HTMLElement>('[data-card-id="root"]')
+    const childNode = screen
+      .getByText('Research delegate')
+      .closest<HTMLElement>('[data-card-child-id="delegate"]')
+    expect(parentCard).toBeTruthy()
+    expect(childNode).toBeTruthy()
+    expect(screen.queryByText('Hidden snapshot')).toBeNull()
+    expect(screen.queryByText('Legacy tip title')).toBeNull()
+    expect(screen.getByText('Continued · 2 segments')).toBeTruthy()
+    expect(
+      within(parentCard!).getAllByRole('button', { name: 'Card options' }),
+    ).toHaveLength(1)
+    expect(
+      within(childNode!).queryByRole('button', { name: 'Card options' }),
+    ).toBeNull()
+    expect(within(childNode!).getByText(/running/i)).toBeTruthy()
+    expect(within(childNode!).getByRole('link').getAttribute('href')).toBe(
+      '/chat/root',
+    )
+    expect(
+      within(parentCard!)
+        .getByRole('link', { name: /Project planning/i })
+        .getAttribute('aria-current'),
+    ).toBe('page')
+  })
+
+  it('renders a pinned Card as a whole Card without independently pinning its child', () => {
+    const parent = session('parent', 'Legacy parent')
+    const child = session('child', 'Legacy child', {
+      parentSessionId: 'parent',
+      relationshipType: 'child_session',
+    })
+    const card: SessionCard = {
+      cardId: 'parent',
+      title: 'Pinned project',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'parent',
+      continuationSegmentKeys: ['parent'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [
+        {
+          cardId: 'child',
+          sessionKey: 'child',
+          relationshipKind: 'child',
+          title: 'Nested delegate',
+          status: 'complete',
+          updatedAt: 10,
+          continuationCount: 1,
+        },
+      ],
+      updatedAt: 20,
+      archived: false,
+      pinned: true,
+    }
+
+    renderSidebar([parent, child], { sessionCards: [card] })
+
+    const pinned = screen.getByRole('region', { name: 'Pinned sessions' })
+    expect(within(pinned).getByText('Pinned project')).toBeTruthy()
+    const childNode = within(pinned)
+      .getByText('Nested delegate')
+      .closest<HTMLElement>('[data-card-child-id="child"]')
+    expect(childNode).toBeTruthy()
+    expect(
+      within(childNode!).queryByText(/Pin session|Unpin session/),
+    ).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Sessions' })).toBeNull()
+  })
+
   it('shows whole-conversation branching only for supported eligible remote sessions', () => {
     const onFork = vi.fn()
     const remote = session('remote-parent', 'Remote parent')
@@ -350,7 +473,7 @@ describe('SidebarSessions lineage projection', () => {
     expect(screen.queryByRole('treeitem')).toBeNull()
   })
 
-  it('keeps a pinned continuation as one logical row and unpins its migrated tip key', () => {
+  it('keeps a pinned continuation under its stable Card ID', () => {
     pinnedState.keys = ['root']
     const root = session('root', 'Hidden pinned snapshot', {
       source: 'cli',
@@ -377,10 +500,10 @@ describe('SidebarSessions lineage projection', () => {
     React.act(() =>
       fireEvent.click(within(pinnedSessions).getByText('Unpin session')),
     )
-    expect(pinnedState.toggle).toHaveBeenCalledWith('tip')
+    expect(pinnedState.toggle).toHaveBeenCalledWith('root')
   })
 
-  it('persists a cold hidden continuation pin under the only loaded visible tip', async () => {
+  it('keeps a cold hidden continuation pin under the stable Card ID', async () => {
     pinnedState.keys = ['root']
     const tip = session('tip', 'Pinned conversation', {
       parentSessionId: 'root',
@@ -390,9 +513,8 @@ describe('SidebarSessions lineage projection', () => {
 
     renderSidebar([tip])
 
-    await waitFor(() =>
-      expect(pinnedState.migrate).toHaveBeenCalledWith('root', 'tip'),
-    )
+    await React.act(async () => Promise.resolve())
+    expect(pinnedState.migrate).not.toHaveBeenCalled()
 
     const pinnedSessions = screen.getByRole('region', {
       name: 'Pinned sessions',
@@ -403,7 +525,7 @@ describe('SidebarSessions lineage projection', () => {
     )
   })
 
-  it('migrates a persisted pin through a second cold continuation generation', async () => {
+  it('keeps a persisted Card pin through a second cold continuation generation', async () => {
     pinnedState.useActual = true
     usePinnedSessionsStore.getState().pinSession('root')
     const root = session('root', 'Original snapshot', {
@@ -427,7 +549,7 @@ describe('SidebarSessions lineage projection', () => {
     const firstMount = renderSidebar([root, firstTip])
     await waitFor(() =>
       expect(usePinnedSessionsStore.getState().pinnedSessionKeys).toEqual([
-        'tip-1',
+        'root',
       ]),
     )
     firstMount.unmount()
@@ -447,12 +569,12 @@ describe('SidebarSessions lineage projection', () => {
 
     await waitFor(() =>
       expect(usePinnedSessionsStore.getState().pinnedSessionKeys).toEqual([
-        'tip-2',
+        'root',
       ]),
     )
     expect(
       JSON.parse(localStorage.getItem('pinned-sessions') ?? '{}'),
-    ).toMatchObject({ state: { pinnedSessionKeys: ['tip-2'] } })
+    ).toMatchObject({ state: { pinnedSessionKeys: ['root'] } })
     expect(
       within(screen.getByRole('region', { name: 'Pinned sessions' })).getByText(
         'Second continuation',
@@ -479,7 +601,7 @@ describe('SidebarSessions lineage projection', () => {
     expect(pinnedState.migrate).not.toHaveBeenCalled()
   })
 
-  it('moves a newly pinned nested child into a discrete pinned row without moving its root or siblings', () => {
+  it('keeps nested children within the parent Card and gives them no pin action', () => {
     const parent = session('parent', 'Parent')
     const child = session('child', 'Pinned child', {
       parentSessionId: 'parent',
@@ -496,19 +618,14 @@ describe('SidebarSessions lineage projection', () => {
       .closest<HTMLElement>('[data-session-key="child"]')
     expect(childRow).toBeTruthy()
 
-    React.act(() => fireEvent.click(within(childRow!).getByText('Pin session')))
-
-    const pinnedSessions = screen.getByRole('region', {
-      name: 'Pinned sessions',
-    })
     const normalSessions = screen.getByRole('region', { name: 'Sessions' })
-    expect(within(pinnedSessions).getAllByRole('link')).toHaveLength(1)
-    expect(within(pinnedSessions).getByText('Pinned child')).toBeTruthy()
-    expect(within(pinnedSessions).queryByText('Parent')).toBeNull()
-    expect(within(pinnedSessions).queryByText('Unpinned sibling')).toBeNull()
+    expect(
+      within(childRow!).queryByText(/Pin session|Unpin session/),
+    ).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Pinned sessions' })).toBeNull()
     expect(within(normalSessions).getByText('Parent')).toBeTruthy()
     expect(within(normalSessions).getByText('Unpinned sibling')).toBeTruthy()
-    expect(within(normalSessions).queryByText('Pinned child')).toBeNull()
+    expect(within(normalSessions).getByText('Pinned child')).toBeTruthy()
   })
 
   it('renders branches and delegated children beneath their parent and links each child to its own route', () => {
@@ -676,7 +793,7 @@ describe('SidebarSessions lineage projection', () => {
     ).toBe('page')
   })
 
-  it('preserves pin, rename, and delete actions for the actual child session', () => {
+  it('does not expose pin, rename, or delete actions on child inspection rows', () => {
     const onRename = vi.fn()
     const onDelete = vi.fn()
     const parent = session('parent', 'Parent')
@@ -690,16 +807,12 @@ describe('SidebarSessions lineage projection', () => {
     const childRow = screen
       .getByText('Child')
       .closest<HTMLElement>('[data-session-key="child"]')!
-    React.act(() => fireEvent.click(within(childRow).getByText('Pin session')))
-    const pinnedChildRow = screen
-      .getByRole('region', { name: 'Pinned sessions' })
-      .querySelector<HTMLElement>('[data-session-key="child"]')!
-    fireEvent.click(within(pinnedChildRow).getByText('Rename'))
-    fireEvent.click(within(pinnedChildRow).getByText('Delete'))
-
-    expect(pinnedState.toggle).toHaveBeenCalledWith('child')
-    expect(onRename).toHaveBeenCalledWith(child)
-    expect(onDelete).toHaveBeenCalledWith(child)
+    expect(within(childRow).queryByText(/Pin session|Unpin session/)).toBeNull()
+    expect(within(childRow).queryByText('Rename')).toBeNull()
+    expect(within(childRow).queryByText('Delete')).toBeNull()
+    expect(pinnedState.toggle).not.toHaveBeenCalled()
+    expect(onRename).not.toHaveBeenCalled()
+    expect(onDelete).not.toHaveBeenCalled()
   })
 
   it('retains the existing flat-list appearance and routes when no hierarchy exists', () => {

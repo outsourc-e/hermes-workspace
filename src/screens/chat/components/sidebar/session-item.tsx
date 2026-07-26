@@ -22,9 +22,12 @@ import {
 
 type SessionItemProps = {
   session: SessionMeta
+  routeKey?: string
   active: boolean
   isPinned: boolean
   contextLabel?: string
+  showActions?: boolean
+  inspected?: boolean
   onSelect?: () => void
   onTogglePin: (session: SessionMeta) => void
   canFork: boolean
@@ -103,9 +106,12 @@ function getFriendlyIdLabel(friendlyId: string): string {
 
 function SessionItemComponent({
   session,
+  routeKey = session.friendlyId,
   active,
   isPinned,
   contextLabel,
+  showActions = true,
+  inspected = false,
   onSelect,
   onTogglePin,
   canFork,
@@ -138,8 +144,9 @@ function SessionItemComponent({
   return (
     <Link
       to="/chat/$sessionKey"
-      params={{ sessionKey: session.friendlyId }}
+      params={{ sessionKey: routeKey }}
       aria-current={active ? 'page' : undefined}
+      data-inspected={inspected ? 'true' : undefined}
       onClick={() => {
         try {
           localStorage.setItem('claude-last-session', session.friendlyId)
@@ -179,85 +186,90 @@ function SessionItemComponent({
           {subtitle}
         </div>
       </div>
-      <MenuRoot>
-        <MenuTrigger
-          type="button"
-          onClick={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
-          className={cn(
-            'ml-2 inline-flex size-7 items-center justify-center rounded-md text-primary-700',
-            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary-200 dark:hover:bg-primary-800',
-            'aria-expanded:opacity-100 aria-expanded:bg-primary-200',
-          )}
-          aria-label="Session options"
-        >
-          <HugeiconsIcon
-            icon={MoreHorizontalIcon}
-            size={20}
-            strokeWidth={1.5}
-          />
-        </MenuTrigger>
-        <MenuContent side="bottom" align="end">
-          <MenuItem
+      {showActions ? (
+        <MenuRoot>
+          <MenuTrigger
+            type="button"
             onClick={(event) => {
               event.preventDefault()
               event.stopPropagation()
-              onTogglePin(session)
             }}
-            className="gap-2"
+            className={cn(
+              'ml-2 inline-flex size-7 items-center justify-center rounded-md text-primary-700',
+              'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary-200 dark:hover:bg-primary-800',
+              'aria-expanded:opacity-100 aria-expanded:bg-primary-200',
+            )}
+            aria-label="Card options"
           >
-            <HugeiconsIcon icon={PinIcon} size={20} strokeWidth={1.5} />{' '}
-            {isPinned ? 'Unpin session' : 'Pin session'}
-          </MenuItem>
-          {canFork ? (
+            <HugeiconsIcon
+              icon={MoreHorizontalIcon}
+              size={20}
+              strokeWidth={1.5}
+            />
+          </MenuTrigger>
+          <MenuContent side="bottom" align="end">
             <MenuItem
-              disabled={isForking}
-              aria-busy={isForking ? true : undefined}
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
-                if (!isForking) onFork(session)
+                onTogglePin(session)
               }}
               className="gap-2"
             >
-              <HugeiconsIcon icon={GitForkIcon} size={20} strokeWidth={1.5} />{' '}
-              Branch conversation
+              <HugeiconsIcon icon={PinIcon} size={20} strokeWidth={1.5} />{' '}
+              {isPinned ? 'Unpin session' : 'Pin session'}
             </MenuItem>
-          ) : null}
-          <MenuItem
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              onRename(session)
-            }}
-            className="gap-2"
-          >
-            <HugeiconsIcon icon={Pen01Icon} size={20} strokeWidth={1.5} />{' '}
-            Rename
-          </MenuItem>
-          <MenuItem
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              onDelete(session)
-            }}
-            className="text-red-700 gap-2 hover:bg-red-50 dark:hover:bg-red-900/30/80 data-highlighted:bg-red-50/80"
-          >
-            <HugeiconsIcon icon={Delete01Icon} size={20} strokeWidth={1.5} />{' '}
-            Delete
-          </MenuItem>
-        </MenuContent>
-      </MenuRoot>
+            {canFork ? (
+              <MenuItem
+                disabled={isForking}
+                aria-busy={isForking ? true : undefined}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  if (!isForking) onFork(session)
+                }}
+                className="gap-2"
+              >
+                <HugeiconsIcon icon={GitForkIcon} size={20} strokeWidth={1.5} />{' '}
+                Branch conversation
+              </MenuItem>
+            ) : null}
+            <MenuItem
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onRename(session)
+              }}
+              className="gap-2"
+            >
+              <HugeiconsIcon icon={Pen01Icon} size={20} strokeWidth={1.5} />{' '}
+              Rename
+            </MenuItem>
+            <MenuItem
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onDelete(session)
+              }}
+              className="text-red-700 gap-2 hover:bg-red-50 dark:hover:bg-red-900/30/80 data-highlighted:bg-red-50/80"
+            >
+              <HugeiconsIcon icon={Delete01Icon} size={20} strokeWidth={1.5} />{' '}
+              Delete
+            </MenuItem>
+          </MenuContent>
+        </MenuRoot>
+      ) : null}
     </Link>
   )
 }
 
 function areSessionItemsEqual(prev: SessionItemProps, next: SessionItemProps) {
+  if (prev.routeKey !== next.routeKey) return false
   if (prev.active !== next.active) return false
   if (prev.isPinned !== next.isPinned) return false
   if (prev.contextLabel !== next.contextLabel) return false
+  if (prev.showActions !== next.showActions) return false
+  if (prev.inspected !== next.inspected) return false
   if (prev.onSelect !== next.onSelect) return false
   if (prev.onTogglePin !== next.onTogglePin) return false
   if (prev.canFork !== next.canFork) return false

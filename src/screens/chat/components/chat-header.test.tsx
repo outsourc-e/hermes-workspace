@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ChatHeader } from './chat-header'
-import type { SessionLineage, SessionMeta } from '../types'
+import type { SessionCard, SessionLineage, SessionMeta } from '../types'
 
 const reactActEnvironment = globalThis as {
   IS_REACT_ACT_ENVIRONMENT?: boolean
@@ -101,6 +101,57 @@ afterEach(() => {
 })
 
 describe('ChatHeader active lineage context', () => {
+  it('shows the parent Card title and a back-to-parent control while inspecting a child', () => {
+    const parent = session('parent', 'Legacy parent')
+    const child = session('child', 'Legacy child')
+    const card: SessionCard = {
+      cardId: 'parent',
+      title: 'Project planning',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'parent',
+      continuationSegmentKeys: ['parent'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [
+        {
+          cardId: 'child',
+          sessionKey: 'child',
+          relationshipKind: 'child',
+          title: 'Research delegate',
+          status: 'running',
+          updatedAt: 10,
+          continuationCount: 1,
+        },
+      ],
+      updatedAt: 20,
+      archived: false,
+      pinned: false,
+    }
+    const onSelectSession = vi.fn()
+
+    renderHeader(
+      <ChatHeader
+        activeTitle="Legacy child"
+        sessions={[parent, child]}
+        sessionCards={[card]}
+        activeFriendlyId={child.friendlyId}
+        onSelectSession={onSelectSession}
+        onOpenSessions={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByRole('button', { name: 'Switch session' }).textContent,
+    ).toContain('Project planning')
+    const back = screen.getByRole('link', {
+      name: 'Back to parent conversation',
+    })
+    expect(back.getAttribute('href')).toBe('/chat/parent-route')
+    fireEvent.click(back)
+    expect(navigateToSession).toHaveBeenCalledWith(parent.friendlyId)
+    expect(onSelectSession).not.toHaveBeenCalled()
+  })
+
   it.each([
     ['branch', { parentSessionId: 'parent', sessionSource: 'fork' }],
     [
@@ -127,8 +178,9 @@ describe('ChatHeader active lineage context', () => {
       )
 
       const titleButton = screen.getByRole('button', { name: 'Switch session' })
+      expect(titleButton.textContent).toContain('Parent conversation')
       const parentLink = screen.getByRole('link', {
-        name: 'Open parent session Parent conversation',
+        name: 'Back to parent conversation',
       })
       expect(titleButton.parentElement).toContain(parentLink)
       expect(parentLink.getAttribute('href')).toBe('/chat/parent-route')
@@ -184,7 +236,9 @@ describe('ChatHeader active lineage context', () => {
     )
 
     React.act(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Active work' }))
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Parent conversation' }),
+      )
     })
     const searchInput = screen.getByPlaceholderText('Search sessions...')
     React.act(() => {
@@ -194,9 +248,7 @@ describe('ChatHeader active lineage context', () => {
 
     React.act(() => {
       fireEvent.click(
-        screen.getByRole('link', {
-          name: 'Open parent session Parent conversation',
-        }),
+        screen.getByRole('link', { name: 'Back to parent conversation' }),
       )
     })
 
@@ -205,7 +257,9 @@ describe('ChatHeader active lineage context', () => {
     expect(screen.queryByPlaceholderText('Search sessions...')).toBeNull()
 
     React.act(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Active work' }))
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Parent conversation' }),
+      )
     })
     expect(
       screen.getByPlaceholderText<HTMLInputElement>('Search sessions...').value,

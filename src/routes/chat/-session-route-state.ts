@@ -3,6 +3,8 @@ import {
   reconcileSessionDraft,
 } from '../../screens/chat/chat-queries'
 import { handoffPendingSend } from '../../screens/chat/pending-send'
+import type { SessionCardListWire } from '../../screens/chat/chat-queries'
+import type { SessionCard } from '../../screens/chat/types'
 import type { QueryClient } from '@tanstack/react-query'
 
 export type SessionRouteResolutionPayload =
@@ -27,6 +29,65 @@ export function buildSessionReplaceNavigation(friendlyId: string) {
     state: true as const,
     replace: true as const,
   }
+}
+
+export type SessionCardRouteResolution =
+  | {
+      status: 'selected'
+      card: SessionCard
+      navigation?: ReturnType<typeof buildSessionReplaceNavigation>
+    }
+  | { status: 'rejected'; reason: 'child' | 'missing' }
+  | { status: 'legacy-fallback' }
+
+/** Resolve route identity exclusively from the strictly validated Card list. */
+export function resolveSessionCardRoute({
+  routeKey,
+  response,
+}: {
+  routeKey: string
+  response: SessionCardListWire
+}): SessionCardRouteResolution {
+  const normalizedRouteKey = routeKey.trim()
+  if (
+    !normalizedRouteKey ||
+    normalizedRouteKey === 'new' ||
+    normalizedRouteKey === 'main'
+  ) {
+    return { status: 'legacy-fallback' }
+  }
+
+  const isChildRoute = response.cards.some((card) =>
+    card.childNodes.some(
+      (child) =>
+        child.cardId === normalizedRouteKey ||
+        child.sessionKey === normalizedRouteKey,
+    ),
+  )
+  if (isChildRoute) return { status: 'rejected', reason: 'child' }
+
+  const card =
+    response.cards.find(
+      (candidate) => candidate.cardId === normalizedRouteKey,
+    ) ??
+    response.cards.find((candidate) =>
+      candidate.continuationSegmentKeys.includes(normalizedRouteKey),
+    )
+  if (card) {
+    return {
+      status: 'selected',
+      card,
+      ...(normalizedRouteKey === card.cardId
+        ? {}
+        : { navigation: buildSessionReplaceNavigation(card.cardId) }),
+    }
+  }
+
+  // A valid but incomplete list cannot prove that an unknown legacy key is
+  // unrelated. Preserve the legacy path until a complete response can decide.
+  return response.completeness === 'complete'
+    ? { status: 'rejected', reason: 'missing' }
+    : { status: 'legacy-fallback' }
 }
 
 export function applySessionRouteResolution({

@@ -28,11 +28,17 @@ import {
 } from './chat-screen-utils'
 import {
   appendHistoryMessage,
+  appendSessionCardHistoryMessage,
   chatQueryKeys,
   clearHistoryMessages,
+  fetchCompleteSessionCardHistory,
   fetchStatus,
+  mergeSessionCardHistoryResponse,
+  moveSessionCardHistoryMessages,
+  sessionCardQueryKeys,
   updateHistoryMessageByClientId,
   updateHistoryMessageByClientIdEverywhere,
+  updateSessionCardHistoryMessages,
   updateSessionLastMessage,
 } from './chat-queries'
 import { ChatHeader } from './components/chat-header'
@@ -68,6 +74,8 @@ import {
   CHAT_RUN_COMMAND_EVENT,
   CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
+import type { AuthoritativeCardHandoff } from './hooks/use-streaming-message'
+import type { SessionCardHistoryResponse } from './chat-queries'
 import type {
   ChatRunCommandDetail,
   ChatSubmitSelectionDetail,
@@ -80,7 +88,12 @@ import type {
   ThinkingLevel,
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
-import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
+import type {
+  ChatAttachment,
+  ChatMessage,
+  SessionCard,
+  SessionMeta,
+} from './types'
 import type { AgentActivity } from '@/stores/chat-activity-store'
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { playChatComplete } from '@/lib/sounds'
@@ -121,6 +134,9 @@ export function setLocalModelOverride(model: string) {
 
 type ChatScreenProps = {
   activeFriendlyId: string
+  activeCard?: SessionCard
+  inspectedChildCardId?: string
+  sessionCards?: Array<SessionCard>
   isNewChat?: boolean
   onSessionResolved?: (
     payload:
@@ -477,6 +493,9 @@ function stripQueuedWrapperFromUserMessage(message: ChatMessage): ChatMessage {
 
 export function ChatScreen({
   activeFriendlyId,
+  activeCard,
+  inspectedChildCardId,
+  sessionCards,
   isNewChat = false,
   onSessionResolved,
   forcedSessionKey,
@@ -487,6 +506,23 @@ export function ChatScreen({
   const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
   const setChatFocusMode = useWorkspaceStore((s) => s.setChatFocusMode)
   const queryClient = useQueryClient()
+  const [cardHandoff, setCardHandoff] = useState<{
+    cardId: string
+    canonicalSegmentKey: string
+  } | null>(null)
+  const activeCardCanonicalSegmentKey =
+    activeCard && cardHandoff?.cardId === activeCard.cardId
+      ? cardHandoff.canonicalSegmentKey
+      : activeCard?.canonicalSegmentKey
+  useEffect(() => {
+    if (
+      activeCard &&
+      cardHandoff?.cardId === activeCard.cardId &&
+      cardHandoff.canonicalSegmentKey === activeCard.canonicalSegmentKey
+    ) {
+      setCardHandoff(null)
+    }
+  }, [activeCard, cardHandoff])
   const [sending, setSending] = useState(false)
   const [_creatingSession, setCreatingSession] = useState(false)
   const [sessionsOpen, setSessionsOpen] = useState(false)
@@ -582,31 +618,34 @@ export function ChatScreen({
     sessions,
     activeSession,
     activeExists,
-    activeSessionKey,
-    activeTitle,
+    activeSessionKey: legacyActiveSessionKey,
+    activeTitle: legacyActiveTitle,
     sessionsError,
     sessionsLoading: _sessionsLoading,
     sessionsFetching: _sessionsFetching,
     refetchSessions: _refetchSessions,
   } = useChatSessions({ activeFriendlyId, isNewChat, forcedSessionKey })
+  const activeSessionKey =
+    activeCardCanonicalSegmentKey ?? legacyActiveSessionKey
+  const activeTitle = activeCard?.title ?? legacyActiveTitle
   const sessionSource = getChatSessionSourceState({
     embedded,
     sessionsStatus: sessionsQuery.status,
     source: activeSession?.lineage?.source,
   })
   const {
-    historyQuery,
-    historyMessages,
-    messageCount,
-    historyError,
-    resolvedSessionKey,
-    activeCanonicalKey,
-    sessionKeyForHistory,
+    historyQuery: legacyHistoryQuery,
+    historyMessages: legacyHistoryMessages,
+    messageCount: legacyMessageCount,
+    historyError: legacyHistoryError,
+    resolvedSessionKey: legacyResolvedSessionKey,
+    activeCanonicalKey: legacyActiveCanonicalKey,
+    sessionKeyForHistory: legacySessionKeyForHistory,
   } = useChatHistory({
     activeFriendlyId: portableChatFriendlyId,
     activeSessionKey,
     forcedSessionKey,
-    isNewChat,
+    isNewChat: isNewChat || Boolean(activeCard),
     isRedirecting,
     activeExists,
     sessionsReady: sessionsQuery.isSuccess,
@@ -636,6 +675,53 @@ export function ChatScreen({
       [activeFriendlyId, activeSessionKey, forcedSessionKey, onSessionResolved],
     ),
   })
+
+  const cardHistoryQuery = useQuery({
+    queryKey: sessionCardQueryKeys.history(
+      activeCard?.cardId ?? '',
+      activeCardCanonicalSegmentKey ?? '',
+    ),
+    queryFn: async ({ signal }) => {
+      if (!activeCard || !activeCardCanonicalSegmentKey) {
+        throw new Error('Session Card route is not resolved')
+      }
+      const queryKey = sessionCardQueryKeys.history(
+        activeCard.cardId,
+        activeCardCanonicalSegmentKey,
+      )
+      const cached =
+        queryClient.getQueryData<SessionCardHistoryResponse>(queryKey)
+      const server = await fetchCompleteSessionCardHistory({
+        cardId: activeCard.cardId,
+        canonicalSegmentKey: activeCardCanonicalSegmentKey,
+        signal,
+      })
+      return mergeSessionCardHistoryResponse(server, cached)
+    },
+    enabled:
+      Boolean(activeCard) &&
+      Boolean(activeCardCanonicalSegmentKey) &&
+      !isNewChat &&
+      !isRedirecting,
+    refetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
+  })
+  const historyQuery = activeCard ? cardHistoryQuery : legacyHistoryQuery
+  const historyMessages = activeCard
+    ? (cardHistoryQuery.data?.messages ?? [])
+    : legacyHistoryMessages
+  const messageCount = activeCard ? historyMessages.length : legacyMessageCount
+  const historyError = activeCard
+    ? (cardHistoryQuery.error?.message ?? null)
+    : legacyHistoryError
+  const resolvedSessionKey = activeCard
+    ? activeCardCanonicalSegmentKey
+    : legacyResolvedSessionKey
+  const activeCanonicalKey = activeCard
+    ? activeCardCanonicalSegmentKey
+    : legacyActiveCanonicalKey
+  const sessionKeyForHistory = activeCard
+    ? activeCardCanonicalSegmentKey
+    : legacySessionKeyForHistory
 
   // --- Waiting state management (Issue #43 + #449) ---
   // resolvedSessionKey is now available (defined above from useChatHistory).
@@ -710,7 +796,7 @@ export function ChatScreen({
   // On remount, check if the server still has an active run for this session.
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
   useActiveRunCheck({
-    sessionKey: resolvedSessionKey,
+    sessionKey: resolvedSessionKey ?? '',
     enabled:
       !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
     onCheckComplete: useCallback(() => {
@@ -1199,6 +1285,44 @@ export function ChatScreen({
       portableMode: isPortableMode,
       sessionSource,
     }),
+    activeCardId: activeCard?.cardId,
+    onCardHandoff: useCallback(
+      (handoff: AuthoritativeCardHandoff) => {
+        if (
+          !activeCard ||
+          handoff.cardId !== activeCard.cardId ||
+          handoff.fromSegmentKey !== activeCardCanonicalSegmentKey
+        ) {
+          return
+        }
+        streamHandoffRouteRef.current = {
+          sessionKey: handoff.canonicalSegmentKey,
+          friendlyId: activeCard.cardId,
+        }
+        const activeSend = activeSendRef.current
+        if (activeSend) {
+          activeSendRef.current = {
+            ...activeSend,
+            sessionKey: handoff.canonicalSegmentKey,
+            friendlyId: activeCard.cardId,
+          }
+        }
+        moveSessionCardHistoryMessages(
+          queryClient,
+          activeCard.cardId,
+          handoff.fromSegmentKey,
+          handoff.canonicalSegmentKey,
+        )
+        setCardHandoff({
+          cardId: activeCard.cardId,
+          canonicalSegmentKey: handoff.canonicalSegmentKey,
+        })
+        void queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.list(false),
+        })
+      },
+      [activeCard, activeCardCanonicalSegmentKey, queryClient],
+    ),
     onSessionResolved: useCallback(
       ({
         fromSessionKey,
@@ -1865,6 +1989,7 @@ export function ChatScreen({
 
   const shouldRedirectToNew =
     !isNewChat &&
+    !activeCard &&
     !forcedSessionKey &&
     !isRecentSession(activeFriendlyId) &&
     sessionsQuery.isSuccess &&
@@ -1939,7 +2064,11 @@ export function ChatScreen({
     if (sessions.length === 0) return
     if (!shouldRedirectToNew) return
     resetPendingSend()
-    clearHistoryMessages(queryClient, activeFriendlyId, sessionKeyForHistory)
+    clearHistoryMessages(
+      queryClient,
+      activeFriendlyId,
+      sessionKeyForHistory || activeFriendlyId,
+    )
     const latestSession = sessions[0]?.friendlyId ?? 'new'
     navigate({
       to: '/chat/$sessionKey',
@@ -2072,12 +2201,21 @@ export function ChatScreen({
           normalizedAttachments,
         )
         optimisticClientId = clientId
-        appendHistoryMessage(
-          queryClient,
-          friendlyId,
-          sessionKey,
-          optimisticMessage,
-        )
+        if (activeCard && activeCardCanonicalSegmentKey) {
+          appendSessionCardHistoryMessage(
+            queryClient,
+            activeCard.cardId,
+            activeCardCanonicalSegmentKey,
+            optimisticMessage,
+          )
+        } else {
+          appendHistoryMessage(
+            queryClient,
+            friendlyId,
+            sessionKey,
+            optimisticMessage,
+          )
+        }
         updateSessionLastMessage(
           queryClient,
           sessionKey,
@@ -2172,6 +2310,8 @@ export function ChatScreen({
       })
     },
     [
+      activeCard,
+      activeCardCanonicalSegmentKey,
       finalDisplayMessages,
       clearCompletedStreaming,
       queryClient,
@@ -2480,7 +2620,16 @@ export function ChatScreen({
           resolvedSessionKey ||
           activeSessionKey ||
           activeFriendlyId
-        clearHistoryMessages(queryClient, activeFriendlyId, sessionKey)
+        if (activeCard && activeCardCanonicalSegmentKey) {
+          updateSessionCardHistoryMessages(
+            queryClient,
+            activeCard.cardId,
+            activeCardCanonicalSegmentKey,
+            () => [],
+          )
+        } else {
+          clearHistoryMessages(queryClient, activeFriendlyId, sessionKey)
+        }
         toast('Chat cleared', { type: 'success' })
         return true
       }
@@ -2515,6 +2664,8 @@ export function ChatScreen({
       return false
     },
     [
+      activeCard,
+      activeCardCanonicalSegmentKey,
       activeFriendlyId,
       activeSessionKey,
       finalDisplayMessages,
@@ -2872,7 +3023,9 @@ export function ChatScreen({
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
               sessions={sessions}
+              sessionCards={sessionCards}
               activeFriendlyId={activeFriendlyId}
+              inspectedChildCardId={inspectedChildCardId}
               onSelectSession={(key) =>
                 void navigate({
                   to: '/chat/$sessionKey',
@@ -3024,7 +3177,6 @@ export function ChatScreen({
               wrapperRef={composerRef}
               composerRef={composerHandleRef}
               embedded={embedded}
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
               focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
               thinkingLevel={thinkingLevel}
               onThinkingLevelChange={handleThinkingLevelChange}
