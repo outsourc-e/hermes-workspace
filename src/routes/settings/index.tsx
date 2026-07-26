@@ -36,10 +36,11 @@ import { LOCALE_LABELS, getLocale, setLocale } from '@/lib/i18n'
 import { THEMES, getTheme, isDarkTheme, setTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
+  getAgentDisplayName,
   getChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import { UserAvatar } from '@/components/avatars'
+import { AgentIdentityAvatar, UserAvatar } from '@/components/avatars'
 import { Input } from '@/components/ui/input'
 import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
@@ -821,6 +822,132 @@ function _ProfileSection() {
           {profileError && (
             <p className="text-xs text-red-600" role="alert">
               {profileError}
+            </p>
+          )}
+        </div>
+      </SettingsRow>
+    </SettingsSection>
+  )
+}
+
+function AgentIdentitySection() {
+  const { settings: chatSettings, updateSettings: updateChatSettings } =
+    useChatSettingsStore()
+  const [identityError, setIdentityError] = useState<string | null>(null)
+  const [processingAvatar, setProcessingAvatar] = useState(false)
+  const agentName = getAgentDisplayName(chatSettings.agentDisplayName)
+
+  async function handleAgentAvatarUpload(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setIdentityError('Unsupported file type.')
+      return
+    }
+    if (file.size > PROFILE_IMAGE_MAX_FILE_SIZE) {
+      setIdentityError('Image too large (max 10MB).')
+      return
+    }
+
+    setIdentityError(null)
+    setProcessingAvatar(true)
+    try {
+      const url = URL.createObjectURL(file)
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const loadedImage = new Image()
+        loadedImage.onload = () => resolve(loadedImage)
+        loadedImage.onerror = () => reject(new Error('Failed'))
+        loadedImage.src = url
+      })
+      const scale = Math.min(
+        1,
+        PROFILE_IMAGE_MAX_DIMENSION / Math.max(image.width, image.height),
+      )
+      const width = Math.round(image.width * scale)
+      const height = Math.round(image.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('Canvas unavailable')
+      context.imageSmoothingQuality = 'high'
+      context.drawImage(image, 0, 0, width, height)
+      URL.revokeObjectURL(url)
+      updateChatSettings({
+        agentAvatarDataUrl: canvas.toDataURL(
+          file.type === 'image/png' ? 'image/png' : 'image/jpeg',
+          0.82,
+        ),
+      })
+    } catch {
+      setIdentityError('Failed to process image.')
+    } finally {
+      setProcessingAvatar(false)
+    }
+  }
+
+  return (
+    <SettingsSection
+      title="Agent identity"
+      description="Customize the agent name and icon used throughout this workspace."
+      icon={Settings02Icon}
+    >
+      <div className="flex items-center gap-4">
+        <AgentIdentityAvatar
+          size={56}
+          className="rounded-xl object-cover"
+          alt={agentName}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-primary-900">{agentName}</p>
+          <p className="text-xs text-primary-500">
+            Used throughout this workspace.
+          </p>
+        </div>
+      </div>
+      <SettingsRow label="Agent name" description="Shown with the agent icon.">
+        <Input
+          value={chatSettings.agentDisplayName}
+          onChange={(event) =>
+            updateChatSettings({ agentDisplayName: event.target.value })
+          }
+          placeholder="Hermes Agent"
+          className="h-9 w-full md:max-w-xs"
+          maxLength={50}
+          aria-label="Agent name"
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Agent icon"
+        description="PNG, JPEG, or WebP up to 10MB."
+      >
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="block">
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleAgentAvatarUpload}
+                disabled={processingAvatar}
+                aria-label="Upload agent icon"
+                className="block w-full cursor-pointer text-xs text-primary-700 dark:text-gray-300 md:max-w-xs file:mr-2 file:cursor-pointer file:rounded-md file:border file:border-primary-200 dark:file:border-gray-600 file:bg-primary-100 dark:file:bg-gray-700 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-primary-900 dark:file:text-gray-100 file:transition-colors hover:file:bg-primary-200 dark:hover:file:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => updateChatSettings({ agentAvatarDataUrl: null })}
+              disabled={!chatSettings.agentAvatarDataUrl || processingAvatar}
+            >
+              Reset
+            </Button>
+          </div>
+          {identityError && (
+            <p className="text-xs text-red-600" role="alert">
+              {identityError}
             </p>
           )}
         </div>
@@ -2466,60 +2593,63 @@ function ClaudeConfigSection({
   )
 
   const renderAgentBehavior = () => (
-    <SettingsSection
-      title="Agent Behavior"
-      description="Control agent execution limits and tool access."
-      icon={Settings02Icon}
-    >
-      <SettingsRow
-        label="Max turns"
-        description="Maximum agent turns per request (1-100)."
+    <>
+      <AgentIdentitySection />
+      <SettingsSection
+        title="Agent Behavior"
+        description="Control agent execution limits and tool access."
+        icon={Settings02Icon}
       >
-        <Input
-          type="number"
-          min={1}
-          max={100}
-          value={readNumber(agentConfig.max_turns, 50)}
-          onChange={(e) =>
-            saveNumberField('agent', 'max_turns', e.target.value, 50)
-          }
-          className="md:w-28"
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Gateway timeout"
-        description="Seconds before gateway times out a request."
-      >
-        <Input
-          type="number"
-          min={10}
-          max={600}
-          value={readNumber(agentConfig.gateway_timeout, 120)}
-          onChange={(e) =>
-            saveNumberField('agent', 'gateway_timeout', e.target.value, 120)
-          }
-          className="md:w-28"
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Tool use enforcement"
-        description="Whether the agent must use tools when available."
-      >
-        <select
-          value={(agentConfig.tool_use_enforcement as string) || 'auto'}
-          onChange={(e) =>
-            void saveConfig({
-              config: { agent: { tool_use_enforcement: e.target.value } },
-            })
-          }
-          className={selectClassName}
+        <SettingsRow
+          label="Max turns"
+          description="Maximum agent turns per request (1-100)."
         >
-          <option value="auto">auto</option>
-          <option value="required">required</option>
-          <option value="none">none</option>
-        </select>
-      </SettingsRow>
-    </SettingsSection>
+          <Input
+            type="number"
+            min={1}
+            max={100}
+            value={readNumber(agentConfig.max_turns, 50)}
+            onChange={(e) =>
+              saveNumberField('agent', 'max_turns', e.target.value, 50)
+            }
+            className="md:w-28"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Gateway timeout"
+          description="Seconds before gateway times out a request."
+        >
+          <Input
+            type="number"
+            min={10}
+            max={600}
+            value={readNumber(agentConfig.gateway_timeout, 120)}
+            onChange={(e) =>
+              saveNumberField('agent', 'gateway_timeout', e.target.value, 120)
+            }
+            className="md:w-28"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Tool use enforcement"
+          description="Whether the agent must use tools when available."
+        >
+          <select
+            value={(agentConfig.tool_use_enforcement as string) || 'auto'}
+            onChange={(e) =>
+              void saveConfig({
+                config: { agent: { tool_use_enforcement: e.target.value } },
+              })
+            }
+            className={selectClassName}
+          >
+            <option value="auto">auto</option>
+            <option value="required">required</option>
+            <option value="none">none</option>
+          </select>
+        </SettingsRow>
+      </SettingsSection>
+    </>
   )
 
   const renderSmartRouting = () => (
