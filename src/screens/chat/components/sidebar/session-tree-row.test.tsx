@@ -103,9 +103,11 @@ function Harness({
 }) {
   const [expanded, setExpanded] = useState(false)
   const root = row('card:root', 'Root card', {
+    relationshipKind: card.relationshipKind,
     isExpandable: true,
     isExpanded: expanded,
     childCount: 1,
+    isOrphan: card.relationshipKind === 'orphan',
   })
   const child = row('card:child', 'Child card', {
     relationshipKind: 'child',
@@ -211,6 +213,19 @@ describe('SessionTreeRow Card routing', () => {
     for (const callback of [onTogglePin, onBranch, onRename, onArchive]) {
       expect(callback).toHaveBeenCalledWith(rootCard)
     }
+  })
+
+  it('keeps a top-level orphan inspectable but hides every root-only action', () => {
+    render({ card: { ...rootCard, relationshipKind: 'orphan' } })
+
+    expect(screen.getByText('Original session unavailable')).toBeTruthy()
+    expect(screen.getByText('Root card').closest('a')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Pin card' })).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Branch conversation' }),
+    ).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull()
   })
 
   it('omits branching when the fork capability is unavailable', () => {

@@ -334,6 +334,18 @@ export function MobileSessionsPanel({
     }
   }, [open])
 
+  useEffect(() => {
+    if (
+      actionCardId &&
+      !sessionCards.some(
+        (card) =>
+          card.cardId === actionCardId && card.relationshipKind === 'root',
+      )
+    ) {
+      setActionCardId(undefined)
+    }
+  }, [actionCardId, sessionCards])
+
   if (!open) return null
 
   const toggleCard = (cardId: string, expanded: boolean) => {
@@ -477,6 +489,7 @@ export function MobileSessionsPanel({
                   const childrenId = `${disclosurePrefix}-${card.cardId}-children`
                   const actionsOpen = actionCardId === card.cardId
                   const pending = pendingCardIds.has(card.cardId)
+                  const isActionableCard = card.relationshipKind === 'root'
 
                   return (
                     <div key={card.cardId} data-card-container={card.cardId}>
@@ -531,25 +544,27 @@ export function MobileSessionsPanel({
                             />
                           </button>
                         ) : null}
-                        <MobileCardActions
-                          card={card}
-                          open={actionsOpen}
-                          pending={pending}
-                          canBranch={isWholeCardBranchAvailable(
-                            card,
-                            sessionForkAvailable,
-                          )}
-                          onToggle={() =>
-                            setActionCardId(
-                              actionsOpen ? undefined : card.cardId,
-                            )
-                          }
-                          onClose={closeCardActions}
-                          onRenameCard={onRenameCard}
-                          onTogglePin={onTogglePin}
-                          onBranchCard={onBranchCard}
-                          onArchiveCard={onArchiveCard}
-                        />
+                        {isActionableCard ? (
+                          <MobileCardActions
+                            card={card}
+                            open={actionsOpen}
+                            pending={pending}
+                            canBranch={isWholeCardBranchAvailable(
+                              card,
+                              sessionForkAvailable,
+                            )}
+                            onToggle={() =>
+                              setActionCardId(
+                                actionsOpen ? undefined : card.cardId,
+                              )
+                            }
+                            onClose={closeCardActions}
+                            onRenameCard={onRenameCard}
+                            onTogglePin={onTogglePin}
+                            onBranchCard={onBranchCard}
+                            onArchiveCard={onArchiveCard}
+                          />
+                        ) : null}
                       </div>
                       {card.childNodes.length > 0 ? (
                         <div

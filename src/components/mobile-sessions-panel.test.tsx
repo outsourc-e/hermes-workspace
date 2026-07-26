@@ -67,12 +67,12 @@ function renderPanel(
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  React.act(() => {
+  const renderCards = (cards: Array<SessionCard>) => {
     root.render(
       <MobileSessionsPanel
         open
         onClose={vi.fn()}
-        sessionCards={options.cards ?? [card()]}
+        sessionCards={cards}
         activeFriendlyId="card:root"
         inspectedChildCardId={options.inspectedChildCardId}
         onSelectSession={onSelectSession}
@@ -83,12 +83,20 @@ function renderPanel(
         onArchiveCard={options.onArchiveCard ?? vi.fn()}
       />,
     )
+  }
+  React.act(() => {
+    renderCards(options.cards ?? [card()])
   })
   mountedRoots.push(() => {
     React.act(() => root.unmount())
     container.remove()
   })
-  return onSelectSession
+  return {
+    onSelectSession,
+    rerenderCards: (cards: Array<SessionCard>) => {
+      React.act(() => renderCards(cards))
+    },
+  }
 }
 
 describe('MobileSessionsPanel Card routing', () => {
@@ -100,7 +108,9 @@ describe('MobileSessionsPanel Card routing', () => {
   })
 
   it('selects the parent by cardId and child activity as inspect state', () => {
-    const onSelectSession = renderPanel({ inspectedChildCardId: 'card:child' })
+    const { onSelectSession } = renderPanel({
+      inspectedChildCardId: 'card:child',
+    })
     const parent = screen.getByRole('button', { name: 'Open card Card title' })
     const child = screen.getByRole('button', {
       name: /Inspect delegated session Child activity/i,
@@ -187,6 +197,44 @@ describe('MobileSessionsPanel Card routing', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Confirm archive' })),
     )
     expect(onArchiveCard).toHaveBeenCalledWith('card:root')
+  })
+
+  it('keeps a top-level orphan selectable but never exposes root-only actions', () => {
+    const orphan = { ...card(), relationshipKind: 'orphan' as const }
+    const { onSelectSession } = renderPanel({ cards: [orphan] })
+
+    expect(screen.getByText('Original session unavailable')).toBeTruthy()
+    const openCard = screen.getByRole('button', {
+      name: 'Open card Card title',
+    })
+    React.act(() => fireEvent.click(openCard))
+    expect(onSelectSession).toHaveBeenCalledWith('card:root')
+    expect(
+      screen.queryByRole('button', { name: 'Card actions for Card title' }),
+    ).toBeNull()
+  })
+
+  it('closes a stale action selection when a refreshed Card becomes non-root', () => {
+    const { rerenderCards } = renderPanel()
+    React.act(() =>
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Card actions for Card title' }),
+      ),
+    )
+    expect(
+      document.querySelector('[data-card-actions="card:root"]'),
+    ).toBeTruthy()
+
+    rerenderCards([{ ...card(), relationshipKind: 'orphan' }])
+    expect(
+      screen.queryByRole('button', { name: 'Card actions for Card title' }),
+    ).toBeNull()
+
+    rerenderCards([card()])
+    expect(
+      screen.getByRole('button', { name: 'Card actions for Card title' }),
+    ).toBeTruthy()
+    expect(document.querySelector('[data-card-actions="card:root"]')).toBeNull()
   })
 
   it('omits branching when the fork capability is unavailable while preserving ordinary actions', () => {

@@ -88,6 +88,10 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
           return branchFailure()
         }
 
+        if (resolved.card.relationshipKind !== 'root') {
+          return invalidRequest('Only root Session Cards can be branched')
+        }
+
         const canonicalSegmentKey = resolved.card.canonicalSegmentKey
         const canonicalSource =
           resolved.sourceBySegmentKey.get(canonicalSegmentKey)

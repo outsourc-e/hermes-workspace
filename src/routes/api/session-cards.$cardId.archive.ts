@@ -33,6 +33,9 @@ export const Route = createFileRoute('/api/session-cards/$cardId/archive')({
           const current = await sessionCardService.resolveCard(cardId, {
             includeArchived: true,
           })
+          if (current.card.relationshipKind !== 'root') {
+            return invalidRequest('Only root Session Cards can be archived')
+          }
           await sessionCardService.archiveCard(current.card.cardId)
           return json({
             ok: true,

@@ -293,10 +293,13 @@ function parseSessionCard(value: unknown): SessionCard {
 }
 
 function hasRootCardRelationshipSemantics(card: SessionCard): boolean {
+  return card.relationshipKind === 'root' && card.parentCardId === undefined
+}
+
+function hasTopLevelCardRelationshipSemantics(card: SessionCard): boolean {
   return (
-    card.relationshipKind !== 'branch' &&
-    card.relationshipKind !== 'child' &&
-    card.parentCardId === undefined
+    hasRootCardRelationshipSemantics(card) ||
+    (card.relationshipKind === 'orphan' && card.parentCardId === undefined)
   )
 }
 
@@ -426,7 +429,7 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
   )
   const sourceRetryable = sources.some((source) => source.retryable)
   if (
-    cards.some((card) => !hasRootCardRelationshipSemantics(card)) ||
+    cards.some((card) => !hasTopLevelCardRelationshipSemantics(card)) ||
     new Set(cards.map((card) => card.cardId)).size !== cards.length ||
     !hasUniqueSessionCardOwnership(cards) ||
     (cardResolutions !== undefined &&

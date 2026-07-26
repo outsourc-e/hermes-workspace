@@ -195,6 +195,25 @@ describe('Session Card fetchers', () => {
     },
   )
 
+  it('preserves a top-level orphan relationship instead of promoting it to root', async () => {
+    const orphan = { ...card, relationshipKind: 'orphan' }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          cards: [orphan],
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        }),
+      ),
+    )
+
+    await expect(fetchSessionCards()).resolves.toMatchObject({
+      cards: [{ cardId: 'remote:root', relationshipKind: 'orphan' }],
+    })
+  })
+
   it.each([undefined, null, '', 'gateway', 'portable', []])(
     'rejects a missing or unverified canonical Card source: %j',
     async (canonicalSource) => {

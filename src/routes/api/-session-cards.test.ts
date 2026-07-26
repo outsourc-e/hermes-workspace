@@ -130,6 +130,12 @@ function resolvedCard() {
   }
 }
 
+function resolvedOrphanCard() {
+  const resolved = resolvedCard()
+  resolved.card.relationshipKind = 'orphan'
+  return resolved
+}
+
 function resolvedCardWithBranch(
   options: {
     parentSource?: string
@@ -483,6 +489,26 @@ describe('PATCH /api/session-cards/$cardId', () => {
     expect(mocks.updateCardMetadata).not.toHaveBeenCalled()
   })
 
+  it('rejects a resolved orphan before any rename or pin mutation', async () => {
+    mocks.resolveCard.mockResolvedValueOnce(resolvedOrphanCard())
+
+    const response = await metadataHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aorphan',
+        'PATCH',
+        JSON.stringify({ manualTitle: 'Unsafe rename' }),
+      ),
+      params: { cardId: 'remote:orphan' },
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Only root Session Cards can be updated',
+    })
+    expect(mocks.updateCardMetadata).not.toHaveBeenCalled()
+  })
+
   it('accepts an exact boolean pin and returns the resolved Card pin state', async () => {
     const fresh = resolvedCard()
     fresh.card.pinned = true
@@ -573,6 +599,26 @@ describe('POST /api/session-cards/$cardId/archive', () => {
     })
 
     expect(response.status).toBe(404)
+    expect(mocks.archiveCard).not.toHaveBeenCalled()
+  })
+
+  it('rejects a resolved orphan before archive mutation', async () => {
+    mocks.resolveCard.mockResolvedValueOnce(resolvedOrphanCard())
+
+    const response = await archiveHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aorphan/archive',
+        'POST',
+        '{}',
+      ),
+      params: { cardId: 'remote:orphan' },
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Only root Session Cards can be archived',
+    })
     expect(mocks.archiveCard).not.toHaveBeenCalled()
   })
 })
@@ -775,6 +821,27 @@ describe('POST /api/session-cards/$cardId/branch', () => {
       supported: false,
       capability: 'sessionFork',
     })
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+  })
+
+  it('rejects a resolved orphan before capability probing or forking', async () => {
+    mocks.resolveCard.mockResolvedValueOnce(resolvedOrphanCard())
+
+    const response = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aorphan/branch',
+        'POST',
+        '{}',
+      ),
+      params: { cardId: 'remote:orphan' },
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Only root Session Cards can be branched',
+    })
+    expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
     expect(mocks.forkSession).not.toHaveBeenCalled()
   })
 

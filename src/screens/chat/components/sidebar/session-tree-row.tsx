@@ -95,7 +95,8 @@ function SessionTreeRow({
   const nextAncestorKeys = new Set(ancestorKeys)
   nextAncestorKeys.add(row.key)
   const card = cardsById.get(row.key)
-  const isRootCard = row.depth === 0 && card !== undefined
+  const isActionableCard =
+    row.relationshipKind === 'root' && card?.relationshipKind === 'root'
   const parentRouteCardId = rootCardId ?? row.key
 
   return (
@@ -148,20 +149,20 @@ function SessionTreeRow({
             routeKey={parentRouteCardId}
             inspectChildCardId={row.depth > 0 ? row.key : undefined}
             active={row.depth === 0 && row.key === activeCardId}
-            isPinned={row.depth === 0 && pinnedSessionKeys.has(row.key)}
+            isPinned={isActionableCard && pinnedSessionKeys.has(row.key)}
             contextLabel={relationshipLabel}
-            showActions={row.depth === 0}
+            showActions={isActionableCard}
             inspected={row.depth > 0 && row.key === inspectedChildCardId}
             onSelect={onSelect}
-            onTogglePin={isRootCard ? () => onTogglePin(card) : undefined}
+            onTogglePin={isActionableCard ? () => onTogglePin(card) : undefined}
             canBranch={
-              isRootCard &&
+              isActionableCard &&
               isWholeCardBranchAvailable(card, sessionForkAvailable)
             }
-            pending={isRootCard && pendingCardIds.has(card.cardId)}
-            onBranch={isRootCard ? () => onBranch(card) : undefined}
-            onRename={isRootCard ? () => onRename(card) : undefined}
-            onArchive={isRootCard ? () => onArchive(card) : undefined}
+            pending={isActionableCard && pendingCardIds.has(card.cardId)}
+            onBranch={isActionableCard ? () => onBranch(card) : undefined}
+            onRename={isActionableCard ? () => onRename(card) : undefined}
+            onArchive={isActionableCard ? () => onArchive(card) : undefined}
           />
         </div>
       </div>
