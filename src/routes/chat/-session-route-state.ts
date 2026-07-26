@@ -57,14 +57,14 @@ export type SessionCardProducerNavigation = {
 }
 
 /**
- * Translate legacy producer identities through the complete, validated Card
- * projection. Missing or partial projections intentionally produce no route.
+ * Translate legacy producer identities through a validated, source-complete
+ * Card projection. Missing or partial owning projections produce no route.
  */
 export function resolveSessionCardProducerNavigation(
   response: SessionCardListWire | undefined,
   requestedIdentities: ReadonlyArray<string | null | undefined>,
 ): SessionCardProducerNavigation | undefined {
-  if (!response || response.completeness !== 'complete') return undefined
+  if (!response) return undefined
   const identities = requestedIdentities
     .map((identity) => identity?.trim() ?? '')
     .filter(
@@ -82,17 +82,21 @@ export function resolveSessionCardProducerNavigation(
         identity === card.canonicalSegmentKey ||
         card.continuationSegmentKeys.includes(identity)
       ) {
-        return { cardId: card.cardId }
+        return isCardProjectionComplete(response, card.cardId)
+          ? { cardId: card.cardId }
+          : undefined
       }
       const child = card.childNodes.find(
         (candidate) =>
           identity === candidate.cardId || identity === candidate.sessionKey,
       )
       if (child) {
-        return {
-          cardId: card.cardId,
-          inspectedChildCardId: child.cardId,
-        }
+        return isCardProjectionComplete(response, card.cardId)
+          ? {
+              cardId: card.cardId,
+              inspectedChildCardId: child.cardId,
+            }
+          : undefined
       }
     }
   }
@@ -101,6 +105,27 @@ export function resolveSessionCardProducerNavigation(
 
 function isBootstrapRoute(routeKey: string): boolean {
   return routeKey === 'new'
+}
+
+function isCardProjectionComplete(
+  response: SessionCardListWire,
+  cardId: string,
+): boolean {
+  if (response.cardResolutions === undefined) {
+    return response.completeness === 'complete'
+  }
+  const card = response.cards.find((candidate) => candidate.cardId === cardId)
+  if (card?.canonicalSource !== 'local' && card?.canonicalSource !== 'remote') {
+    return false
+  }
+  const matches = response.cardResolutions.filter(
+    (resolution) => resolution.cardId === cardId,
+  )
+  return (
+    matches.length === 1 &&
+    matches[0]!.completeness === 'complete' &&
+    matches[0]!.retryable === false
+  )
 }
 
 /** Resolve route identity exclusively from the strictly validated Card list. */
@@ -113,10 +138,6 @@ export function resolveSessionCardRoute({
 }): SessionCardRouteResolution {
   if (isBootstrapRoute(routeKey)) return { status: 'bootstrap' }
 
-  if (response.completeness !== 'complete') {
-    return { status: 'unavailable', reason: 'projection' }
-  }
-
   const isChildRoute = response.cards.some((card) =>
     card.childNodes.some(
       (child) => child.cardId === routeKey || child.sessionKey === routeKey,
@@ -124,8 +145,17 @@ export function resolveSessionCardRoute({
   )
   if (isChildRoute) return { status: 'rejected', reason: 'child' }
 
-  const card = response.cards.find((candidate) => candidate.cardId === routeKey)
-  if (card) return { status: 'selected', card }
+  const cards = response.cards.filter(
+    (candidate) => candidate.cardId === routeKey,
+  )
+  if (cards.length === 1) {
+    return isCardProjectionComplete(response, cards[0]!.cardId)
+      ? { status: 'selected', card: cards[0]! }
+      : { status: 'unavailable', reason: 'projection' }
+  }
+  if (cards.length > 1) {
+    return { status: 'unavailable', reason: 'projection' }
+  }
 
   // `main` is a former raw-session route, not a permanent bootstrap route.
   // It may converge only through an identity that the complete Card projection
@@ -138,7 +168,9 @@ export function resolveSessionCardRoute({
       )
       if (aliasedCard) return { status: 'selected', card: aliasedCard }
     }
-    return { status: 'rejected', reason: 'missing' }
+    return response.completeness === 'complete'
+      ? { status: 'rejected', reason: 'missing' }
+      : { status: 'unavailable', reason: 'projection' }
   }
 
   const isContinuationRoute = response.cards.some((candidate) =>
@@ -148,7 +180,9 @@ export function resolveSessionCardRoute({
     return { status: 'rejected', reason: 'continuation' }
   }
 
-  return { status: 'rejected', reason: 'missing' }
+  return response.completeness === 'complete'
+    ? { status: 'rejected', reason: 'missing' }
+    : { status: 'unavailable', reason: 'projection' }
 }
 
 /**

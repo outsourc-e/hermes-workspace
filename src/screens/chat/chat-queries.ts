@@ -120,6 +120,11 @@ export type SessionCardSourceStatusWire = {
 
 export type SessionCardListWire = {
   cards: Array<SessionCard>
+  cardResolutions?: Array<{
+    cardId: string
+    completeness: 'complete' | 'incomplete'
+    retryable: boolean
+  }>
   completeness: 'complete' | 'incomplete'
   retryable: boolean
   sources: Array<SessionCardSourceStatusWire>
@@ -379,6 +384,24 @@ function parseSourceStatus(value: unknown): SessionCardSourceStatusWire {
   }
 }
 
+function parseCardResolution(
+  value: unknown,
+): NonNullable<SessionCardListWire['cardResolutions']>[number] {
+  if (!isWireRecord(value)) return invalidSessionCardResponse()
+  const cardId = nonblankWireString(value.cardId)
+  const completeness = wireEnum(value.completeness, ['complete', 'incomplete'])
+  if (
+    !cardId ||
+    !completeness ||
+    typeof value.retryable !== 'boolean' ||
+    (completeness === 'complete' && value.retryable) ||
+    (completeness === 'incomplete' && !value.retryable)
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return { cardId, completeness, retryable: value.retryable }
+}
+
 function parseSessionCardList(value: unknown): SessionCardListWire {
   if (
     !isWireRecord(value) ||
@@ -392,6 +415,12 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
   }
   const cards = value.cards.map(parseSessionCard)
   const sources = value.sources.map(parseSourceStatus)
+  const cardResolutions =
+    value.cardResolutions === undefined
+      ? undefined
+      : Array.isArray(value.cardResolutions)
+        ? value.cardResolutions.map(parseCardResolution)
+        : invalidSessionCardResponse()
   const hasIncompleteSource = sources.some(
     (source) => source.status !== 'complete',
   )
@@ -400,6 +429,13 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
     cards.some((card) => !hasRootCardRelationshipSemantics(card)) ||
     new Set(cards.map((card) => card.cardId)).size !== cards.length ||
     !hasUniqueSessionCardOwnership(cards) ||
+    (cardResolutions !== undefined &&
+      (cardResolutions.length !== cards.length ||
+        new Set(cardResolutions.map(({ cardId }) => cardId)).size !==
+          cardResolutions.length ||
+        cardResolutions.some(
+          ({ cardId }) => !cards.some((card) => card.cardId === cardId),
+        ))) ||
     (value.completeness === 'complete' &&
       (value.retryable || hasIncompleteSource)) ||
     (value.completeness === 'incomplete' && !hasIncompleteSource) ||
@@ -409,6 +445,7 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
   }
   return {
     cards,
+    ...(cardResolutions === undefined ? {} : { cardResolutions }),
     completeness: value.completeness,
     retryable: value.retryable,
     sources,

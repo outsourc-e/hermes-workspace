@@ -86,6 +86,11 @@ export type SessionCardCollection = {
 
 export type SessionCardListResult = {
   cards: Array<SessionCard>
+  cardResolutions: Array<{
+    cardId: string
+    completeness: 'complete' | 'incomplete'
+    retryable: boolean
+  }>
   completeness: 'complete' | 'incomplete'
   retryable: boolean
   sources: Array<SessionCardSourceStatus>
@@ -1083,11 +1088,25 @@ export class SessionCardService {
     options: { includeArchived?: boolean } = {},
   ): Promise<SessionCardListResult> {
     const fresh = await this.freshProjection()
+    const cards = visibleRootCards(
+      fresh.projection,
+      options.includeArchived === true,
+    )
     return {
-      cards: attachCanonicalSources(
-        visibleRootCards(fresh.projection, options.includeArchived === true),
-        fresh.collection,
-      ),
+      cards: attachCanonicalSources(cards, fresh.collection),
+      cardResolutions: cards.map((card) => {
+        const resolved = resolveProjectedCard(
+          fresh,
+          card,
+          fresh.aliasesByCardId.get(card.cardId) ?? [card.cardId],
+          fresh.projection.pinEligibleCardIds.has(card.cardId),
+        )
+        return {
+          cardId: card.cardId,
+          completeness: resolved.collection.completeness,
+          retryable: resolved.collection.retryable,
+        }
+      }),
       completeness: fresh.collection.completeness,
       retryable: fresh.collection.retryable,
       sources: fresh.collection.sources,

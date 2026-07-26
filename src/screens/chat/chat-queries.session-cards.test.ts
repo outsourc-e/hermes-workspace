@@ -91,9 +91,17 @@ describe('Session Card query keys', () => {
 
 describe('Session Card fetchers', () => {
   it('lists Cards through only /api/session-cards and validates the wire payload', async () => {
+    const cardResolutions = [
+      {
+        cardId: 'remote:root',
+        completeness: 'complete',
+        retryable: false,
+      },
+    ] as const
     const fetchMock = vi.fn().mockResolvedValue(
       response({
         cards: [card],
+        cardResolutions,
         completeness: 'complete',
         retryable: false,
         sources: [],
@@ -103,6 +111,7 @@ describe('Session Card fetchers', () => {
 
     await expect(fetchSessionCards()).resolves.toEqual({
       cards: [card],
+      cardResolutions,
       completeness: 'complete',
       retryable: false,
       sources: [],
@@ -117,6 +126,74 @@ describe('Session Card fetchers', () => {
       'Invalid Session Card response',
     )
   })
+
+  it.each([
+    [
+      'unknown Card ID',
+      [
+        {
+          cardId: 'remote:other',
+          completeness: 'complete',
+          retryable: false,
+        },
+      ],
+    ],
+    [
+      'duplicate Card ID',
+      [
+        {
+          cardId: 'remote:root',
+          completeness: 'complete',
+          retryable: false,
+        },
+        {
+          cardId: 'remote:root',
+          completeness: 'complete',
+          retryable: false,
+        },
+      ],
+    ],
+    [
+      'contradictory complete status',
+      [
+        {
+          cardId: 'remote:root',
+          completeness: 'complete',
+          retryable: true,
+        },
+      ],
+    ],
+    [
+      'contradictory incomplete status',
+      [
+        {
+          cardId: 'remote:root',
+          completeness: 'incomplete',
+          retryable: false,
+        },
+      ],
+    ],
+  ])(
+    'rejects unsafe per-Card resolution metadata: %s',
+    async (_name, cardResolutions) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          response({
+            cards: [card],
+            cardResolutions,
+            completeness: 'complete',
+            retryable: false,
+            sources: [],
+          }),
+        ),
+      )
+
+      await expect(fetchSessionCards()).rejects.toThrow(
+        'Invalid Session Card response',
+      )
+    },
+  )
 
   it.each([undefined, null, '', 'gateway', 'portable', []])(
     'rejects a missing or unverified canonical Card source: %j',

@@ -792,6 +792,17 @@ describe('SessionCardService collection and resolution', () => {
       metadataStore: metadataStore(),
     })
 
+    await expect(service.listCards()).resolves.toMatchObject({
+      completeness: 'complete',
+      retryable: false,
+      cardResolutions: [
+        {
+          cardId: 'remote:root',
+          completeness: 'incomplete',
+          retryable: true,
+        },
+      ],
+    })
     await expect(
       service.resolveCard('remote:previous-tip'),
     ).resolves.toMatchObject({
@@ -1047,6 +1058,13 @@ describe('SessionCardService collection and resolution', () => {
     await expect(service.listCards()).resolves.toMatchObject({
       completeness: 'incomplete',
       retryable: true,
+      cardResolutions: [
+        {
+          cardId: 'local:local-card',
+          completeness: 'complete',
+          retryable: false,
+        },
+      ],
     })
     await expect(
       service.resolveCard('local:local-card'),

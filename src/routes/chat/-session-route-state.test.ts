@@ -32,6 +32,16 @@ const rootCard = {
   pinned: false,
 }
 
+const localCard = {
+  ...rootCard,
+  cardId: 'local:root',
+  canonicalSource: 'local' as const,
+  canonicalSegmentKey: 'local:root',
+  continuationSegmentKeys: ['local:root'],
+  continuationCount: 1,
+  childNodes: [],
+}
+
 describe('chat canonical replace navigation', () => {
   it('preserves search, hash, and route state', () => {
     expect(buildSessionReplaceNavigation('canonical-friendly')).toEqual({
@@ -214,6 +224,94 @@ describe('Session Card route resolution', () => {
               fetched: 0,
               retryable: true,
               error: 'temporarily unavailable',
+            },
+          ],
+        },
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'projection' })
+  })
+
+  it('keeps a source-complete local Card navigable when remote collection fails', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'local:root',
+        response: {
+          cards: [localCard],
+          cardResolutions: [
+            {
+              cardId: 'local:root',
+              completeness: 'complete',
+              retryable: false,
+            },
+          ],
+          completeness: 'incomplete',
+          retryable: true,
+          sources: [
+            {
+              source: 'gateway',
+              status: 'unavailable',
+              fetched: 0,
+              retryable: true,
+              error: 'temporarily unavailable',
+            },
+            {
+              source: 'local',
+              status: 'complete',
+              fetched: 1,
+              retryable: false,
+            },
+          ],
+        },
+      }),
+    ).toEqual({ status: 'selected', card: localCard })
+  })
+
+  it('keeps a Card unavailable when its own continuation projection is incomplete', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'remote:root',
+        response: {
+          cards: [{ ...rootCard, canonicalSource: 'remote' }],
+          cardResolutions: [
+            {
+              cardId: 'remote:root',
+              completeness: 'incomplete',
+              retryable: true,
+            },
+          ],
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        },
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'projection' })
+  })
+
+  it('fails closed for missing or ambiguous per-Card resolution metadata', () => {
+    const response = {
+      cards: [localCard],
+      completeness: 'incomplete' as const,
+      retryable: true,
+      sources: [],
+    }
+    expect(
+      resolveSessionCardRoute({ routeKey: 'local:root', response }),
+    ).toEqual({ status: 'unavailable', reason: 'projection' })
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'local:root',
+        response: {
+          ...response,
+          cardResolutions: [
+            {
+              cardId: 'local:root',
+              completeness: 'complete',
+              retryable: false,
+            },
+            {
+              cardId: 'local:root',
+              completeness: 'complete',
+              retryable: false,
             },
           ],
         },
