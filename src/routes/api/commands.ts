@@ -1,14 +1,16 @@
 /**
- * Server-side proxy for /v1/commands on the gateway.
+ * Server-side proxy for the TUI gateway's authoritative command catalog.
  *
- * The gateway exposes a list of slash commands at /v1/commands.
- * This route proxies that call server-side (with gateway auth) so the
- * browser never needs to reach the gateway port directly.
+ * The API server does not expose `/v1/commands`. `commands.catalog` is the
+ * registry-backed JSON-RPC method shared by the TUI and dashboard, including
+ * profile-specific quick commands and installed skill commands. This route
+ * keeps dashboard credentials on the server; the browser only receives the
+ * normalized command metadata.
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { gatewayFetch } from '../../server/gateway-capabilities'
+import { getTuiCommandCatalog } from '../../server/tui-command-catalog'
 
 export const Route = createFileRoute('/api/commands')({
   server: {
@@ -19,20 +21,15 @@ export const Route = createFileRoute('/api/commands')({
         }
 
         try {
-          const res = await gatewayFetch('/v1/commands')
-
-          if (!res.ok) {
-            return json(
-              { error: `Gateway responded with status ${res.status}` },
-              { status: res.status },
-            )
-          }
-
-          const body = await res.json()
-          return Response.json(body)
-        } catch {
+          return json({ commands: await getTuiCommandCatalog() })
+        } catch (error) {
           return json(
-            { error: 'Gateway is unreachable' },
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Hermes command catalog is unavailable',
+            },
             { status: 500 },
           )
         }

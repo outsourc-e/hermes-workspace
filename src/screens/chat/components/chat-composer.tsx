@@ -37,7 +37,6 @@ import type {
 import {
   DEFAULT_SLASH_COMMANDS,
   SlashCommandMenu,
-  mergeSlashCommands,
 } from '@/components/slash-command-menu'
 import {
   PromptInput,
@@ -214,42 +213,6 @@ type ClaudeAvailableModelsResponse = {
   provider: string
   models: Array<{ id: string; description: string }>
   providers: Array<ClaudeProviderOption>
-}
-
-type InstalledSkillSummary = {
-  id: string
-  name: string
-  description: string
-  installed: boolean
-  enabled: boolean
-}
-
-async function fetchInstalledSkills(): Promise<Array<InstalledSkillSummary>> {
-  const response = await fetch('/api/skills?tab=installed&limit=120')
-  if (!response.ok) {
-    throw new Error(`Skills request failed (${response.status})`)
-  }
-
-  const payload = (await response.json()) as {
-    skills?: Array<Record<string, unknown>>
-    ok?: boolean
-  }
-  const skills = Array.isArray(payload.skills) ? payload.skills : []
-
-  return skills
-    .map((entry) => {
-      const id =
-        readModelText(entry.id) ||
-        readModelText(entry.slug) ||
-        readModelText(entry.name)
-      if (!id) return null
-      const name = readModelText(entry.name) || id
-      const description = readModelText(entry.description)
-      const installed = entry.installed !== false
-      const enabled = entry.enabled !== false
-      return { id, name, description, installed, enabled }
-    })
-    .filter((entry): entry is InstalledSkillSummary => entry !== null)
 }
 
 async function fetchModels(): Promise<{
@@ -763,6 +726,18 @@ async function readResponseError(response: Response): Promise<string> {
   }
 }
 
+async function fetchSlashCommands(): Promise<Array<SlashCommandDefinition>> {
+  const response = await fetch('/api/commands')
+  if (!response.ok) {
+    throw new Error(await readResponseError(response))
+  }
+
+  const payload = (await response.json()) as {
+    commands?: Array<SlashCommandDefinition>
+  }
+  return Array.isArray(payload.commands) ? payload.commands : []
+}
+
 async function fetchCurrentModelFromStatus(
   sessionKey?: string,
 ): Promise<string> {
@@ -1049,11 +1024,13 @@ function ChatComposerComponent({
     retry: false,
     staleTime: 15_000,
   })
-  const installedSkillsQuery = useQuery({
-    queryKey: ['chat', 'composer', 'installed-skills'],
-    queryFn: fetchInstalledSkills,
+  const slashCommandsQuery = useQuery({
+    queryKey: ['chat', 'composer', 'slash-commands'],
+    queryFn: fetchSlashCommands,
     retry: false,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
   })
   const workspaceContextQuery = useQuery({
     queryKey: ['workspace', 'composer-context'],
@@ -1070,6 +1047,9 @@ function ChatComposerComponent({
         queryClient.invalidateQueries({ queryKey: ['claude', 'models'] }),
         queryClient.invalidateQueries({
           queryKey: ['claude', 'session-status-model'],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['chat', 'composer', 'slash-commands'],
         }),
       ])
       setIsProfileMenuOpen(false)
@@ -1716,40 +1696,9 @@ function ChatComposerComponent({
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
     : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
-  const [serverCommands, setServerCommands] = useState<
-    Array<SlashCommandDefinition>
-  >([])
-
-  useEffect(() => {
-    fetch('/api/commands')
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
-      .then(
-        (data: {
-          commands?: Array<{ command: string; description: string }>
-        }) => {
-          setServerCommands(data.commands ?? [])
-        },
-      )
-      .catch(() => {
-        // fall back to DEFAULT_SLASH_COMMANDS only
-      })
-  }, [])
-
   const slashCommands = useMemo(
-    () =>
-      mergeSlashCommands(
-        mergeSlashCommands(DEFAULT_SLASH_COMMANDS, serverCommands),
-        (installedSkillsQuery.data ?? [])
-          .filter((skill) => skill.installed && skill.enabled)
-          .map((skill) => ({
-            command: `/${skill.id}`,
-            description: skill.description || `Run ${skill.name}`,
-          })),
-      ),
-    [serverCommands, installedSkillsQuery.data],
+    () => slashCommandsQuery.data ?? DEFAULT_SLASH_COMMANDS,
+    [slashCommandsQuery.data],
   )
   const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
   const isSlashMenuOpen =
