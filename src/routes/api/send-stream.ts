@@ -19,6 +19,7 @@ import {
   upsertRunToolCall,
 } from '../../server/run-store'
 import { getChatMode } from '../../server/gateway-capabilities'
+import { sessionCardService } from '../../server/session-card-service'
 import {
   appendLocalMessage,
   ensureLocalSession,
@@ -57,6 +58,7 @@ import {
   createStreamEventProvenanceTracker,
   hasNonParentStreamFacts,
   resolveAuthoritativeBootstrapHandoff,
+  resolveAuthoritativeCardStreamHandoff,
   resolveAuthoritativeSessionSource,
   resolveAuthoritativeStreamHandoff,
 } from './-send-stream-session-handoff'
@@ -1399,49 +1401,103 @@ export const Route = createFileRoute('/api/send-stream')({
                           !streamEventProvenance.isExplicitlyRejectedSession(
                             upstreamSessionKey,
                           )
-                        const [continuationVerification, targetSessionSource] =
-                          mayVerifyContinuation
-                            ? await waitWithinStreamLifetime(
-                                Promise.all([
-                                  getLatestDescendant(sessionKey),
-                                  getSession(upstreamSessionKey)
-                                    .then((targetSession) =>
-                                      resolveAuthoritativeSessionSource(
-                                        upstreamSessionKey,
-                                        targetSession,
-                                      ),
-                                    )
-                                    .catch(() => null),
-                                ]),
-                              )
-                            : [null, null]
+                        const [
+                          continuationVerification,
+                          targetSessionSource,
+                          currentCardResolution,
+                          successorCardResolution,
+                        ] = mayVerifyContinuation
+                          ? await waitWithinStreamLifetime(
+                              Promise.all([
+                                getLatestDescendant(sessionKey),
+                                getSession(upstreamSessionKey)
+                                  .then((targetSession) =>
+                                    resolveAuthoritativeSessionSource(
+                                      upstreamSessionKey,
+                                      targetSession,
+                                    ),
+                                  )
+                                  .catch(() => null),
+                                sessionCardService
+                                  .resolveCard(sessionKey)
+                                  .catch(() => null),
+                                sessionCardService
+                                  .resolveCard(upstreamSessionKey)
+                                  .catch(() => null),
+                              ]),
+                            )
+                          : [null, null, null, null]
                         if (streamTransportUnavailable()) return
-                        const sessionHandoff =
-                          resolveAuthoritativeStreamHandoff(
+                        const toVerifiedCard = (
+                          resolved: Awaited<
+                            ReturnType<typeof sessionCardService.resolveCard>
+                          > | null,
+                        ) =>
+                          resolved
+                            ? {
+                                cardId: resolved.card.cardId,
+                                canonicalSegmentKey:
+                                  resolved.card.canonicalSegmentKey,
+                                continuationSegmentKeys:
+                                  resolved.card.continuationSegmentKeys,
+                                relationshipKind:
+                                  resolved.card.relationshipKind,
+                                ...(resolved.card.parentCardId
+                                  ? {
+                                      parentCardId: resolved.card.parentCardId,
+                                    }
+                                  : {}),
+                                collectionCompleteness:
+                                  resolved.collection.completeness,
+                              }
+                            : null
+                        const cardHandoff =
+                          resolveAuthoritativeCardStreamHandoff(
                             sessionKey,
                             data,
-                            continuationVerification,
-                            activeParentSource,
-                            targetSessionSource,
+                            toVerifiedCard(currentCardResolution),
+                            toVerifiedCard(successorCardResolution),
                           )
-                        if (sessionHandoff) {
+                        const sessionHandoff = cardHandoff
+                          ? null
+                          : resolveAuthoritativeStreamHandoff(
+                              sessionKey,
+                              data,
+                              continuationVerification,
+                              activeParentSource,
+                              targetSessionSource,
+                            )
+                        if (cardHandoff || sessionHandoff) {
+                          const fromSessionKey = cardHandoff
+                            ? cardHandoff.fromSegmentKey
+                            : sessionHandoff!.fromSessionKey
+                          const successorSessionKey = cardHandoff
+                            ? cardHandoff.canonicalSegmentKey
+                            : sessionHandoff!.sessionKey
                           await migrateActivePersistedRun(
-                            sessionHandoff.fromSessionKey,
-                            sessionHandoff.sessionKey,
-                            sessionHandoff.sessionKey,
+                            fromSessionKey,
+                            successorSessionKey,
+                            successorSessionKey,
                           )
                           if (streamTransportUnavailable()) {
                             return
                           }
-                          sessionKey = sessionHandoff.sessionKey
-                          liveBaselineSessionKey = sessionHandoff.sessionKey
+                          sessionKey = successorSessionKey
+                          liveBaselineSessionKey = successorSessionKey
                           liveBaselineCount = 0
-                          resolvedFriendlyId = sessionHandoff.sessionKey
-                          sendEvent('session_handoff', {
-                            ...sessionHandoff,
-                            friendlyId: sessionHandoff.sessionKey,
-                            runId,
-                          })
+                          resolvedFriendlyId = successorSessionKey
+                          if (cardHandoff) {
+                            sendEvent('card_handoff', {
+                              ...cardHandoff,
+                              runId,
+                            })
+                          } else {
+                            sendEvent('session_handoff', {
+                              ...sessionHandoff,
+                              friendlyId: successorSessionKey,
+                              runId,
+                            })
+                          }
                           parentLifecycleEligible = true
                         } else {
                           streamEventProvenance.quarantine({

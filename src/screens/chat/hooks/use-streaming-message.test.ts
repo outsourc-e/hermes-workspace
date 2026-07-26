@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  resolveAuthoritativeCardHandoffEvent,
   resolveAuthoritativeSessionHandoffEvent,
   shouldResolveStreamSession,
 } from './use-streaming-message'
@@ -92,5 +93,47 @@ describe('stream session handoff authority', () => {
     ['session_handoff', null],
   ])('ignores non-authoritative or malformed %s payloads', (event, data) => {
     expect(resolveAuthoritativeSessionHandoffEvent(event, data)).toBeNull()
+  })
+})
+
+describe('stream card handoff authority', () => {
+  it('accepts a complete server-authoritative card handoff event', () => {
+    expect(
+      resolveAuthoritativeCardHandoffEvent('card_handoff', {
+        cardId: 'parent-card',
+        fromSegmentKey: 'parent-segment',
+        canonicalSegmentKey: 'continuation-segment',
+        runId: 'run-1',
+      }),
+    ).toEqual({
+      cardId: 'parent-card',
+      fromSegmentKey: 'parent-segment',
+      canonicalSegmentKey: 'continuation-segment',
+      runId: 'run-1',
+    })
+  })
+
+  it.each([
+    ['session_handoff', {}],
+    ['card_handoff', {}],
+    ['card_handoff', { cardId: 'card', fromSegmentKey: 'parent' }],
+    [
+      'card_handoff',
+      {
+        cardId: 'card',
+        fromSegmentKey: 'parent',
+        canonicalSegmentKey: 'parent',
+      },
+    ],
+    [
+      'card_handoff',
+      {
+        cardId: 'card',
+        fromSegmentKey: 'parent',
+        canonicalSegmentKey: 'main',
+      },
+    ],
+  ])('rejects stale or malformed %s payloads', (event, data) => {
+    expect(resolveAuthoritativeCardHandoffEvent(event, data)).toBeNull()
   })
 })

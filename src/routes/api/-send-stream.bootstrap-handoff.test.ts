@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   setRunThinking: vi.fn(),
   upsertRunToolCall: vi.fn(),
   loadWorkspaceCatalog: vi.fn(),
+  resolveSessionCard: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -69,6 +70,10 @@ vi.mock('../../server/run-store', async (importOriginal) => {
 
 vi.mock('../../server/gateway-capabilities', () => ({
   getChatMode: () => 'enhanced',
+}))
+
+vi.mock('../../server/session-card-service', () => ({
+  sessionCardService: { resolveCard: mocks.resolveSessionCard },
 }))
 
 vi.mock('../../server/local-session-store', () => ({
@@ -182,6 +187,7 @@ describe('send-stream bootstrap session handoff', () => {
         supported: false,
       }),
     )
+    mocks.resolveSessionCard.mockRejectedValue(new Error('card unavailable'))
     mocks.getMessages.mockResolvedValue([])
     mocks.appendRunText.mockResolvedValue(null)
     mocks.createPersistedRun.mockResolvedValue(undefined)
@@ -3112,6 +3118,103 @@ describe('send-stream bootstrap session handoff', () => {
     )
     expect(mocks.appendRunText.mock.invocationCallOrder[1]).toBeLessThan(
       mocks.markRunStatus.mock.invocationCallOrder[0]!,
+    )
+  })
+
+  it('emits card_handoff without a legacy navigation handoff for a verified continuation', async () => {
+    const card = (
+      canonicalSegmentKey: string,
+      continuationSegmentKeys: Array<string>,
+    ) => ({
+      card: {
+        cardId: 'parent-card',
+        canonicalSegmentKey,
+        continuationSegmentKeys,
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+    })
+    mocks.resolveSessionCard.mockImplementation((sessionKey: string) => {
+      if (sessionKey === 'created-session') {
+        return Promise.resolve(card('created-session', ['created-session']))
+      }
+      if (sessionKey === 'successor-session') {
+        return Promise.resolve(
+          card('successor-session', ['created-session', 'successor-session']),
+        )
+      }
+      return Promise.reject(new Error('unknown card session'))
+    })
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'card-run', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'assistant.delta',
+          data: {
+            run_id: 'card-run',
+            session_id: 'successor-session',
+            delta: 'continued response',
+          },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'card-run', session_id: 'successor-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(events.filter(({ event }) => event === 'card_handoff')).toEqual([
+      {
+        event: 'card_handoff',
+        data: {
+          cardId: 'parent-card',
+          fromSegmentKey: 'created-session',
+          canonicalSegmentKey: 'successor-session',
+          runId: 'card-run',
+        },
+      },
+    ])
+    expect(events.filter(({ event }) => event === 'session_handoff')).toEqual([
+      {
+        event: 'session_handoff',
+        data: {
+          fromSessionKey: 'new',
+          sessionKey: 'created-session',
+          friendlyId: 'created-session',
+          runId: null,
+        },
+      },
+    ])
+    expect(mocks.migratePersistedRun).toHaveBeenCalledWith(
+      'created-session',
+      'successor-session',
+      'card-run',
+      'successor-session',
     )
   })
 })

@@ -3,6 +3,21 @@ export type AuthoritativeStreamHandoff = {
   sessionKey: string
 }
 
+export type AuthoritativeCardStreamHandoff = {
+  cardId: string
+  fromSegmentKey: string
+  canonicalSegmentKey: string
+}
+
+export type VerifiedStreamCard = {
+  cardId: string
+  canonicalSegmentKey: string
+  continuationSegmentKeys: ReadonlyArray<string>
+  relationshipKind: 'root' | 'orphan' | 'branch' | 'child'
+  parentCardId?: string
+  collectionCompleteness: 'complete' | 'incomplete'
+}
+
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
 
 export function resolveAuthoritativeBootstrapHandoff(
@@ -292,4 +307,60 @@ export function resolveAuthoritativeStreamHandoff(
     return null
   }
   return { fromSessionKey, sessionKey }
+}
+
+function isParentCard(card: VerifiedStreamCard): boolean {
+  return (
+    (card.relationshipKind === 'root' || card.relationshipKind === 'orphan') &&
+    card.parentCardId === undefined &&
+    card.collectionCompleteness === 'complete' &&
+    card.cardId.trim().length > 0 &&
+    card.canonicalSegmentKey.trim().length > 0 &&
+    card.continuationSegmentKeys.length > 0 &&
+    card.continuationSegmentKeys.every(
+      (segmentKey) =>
+        typeof segmentKey === 'string' &&
+        segmentKey.trim().length > 0 &&
+        segmentKey.trim() === segmentKey,
+    )
+  )
+}
+
+/**
+ * A parent card can rotate its concrete segment only after fresh card
+ * projection confirms both segments belong to the same complete parent card.
+ * Stream event claims alone never confer card ownership.
+ */
+export function resolveAuthoritativeCardStreamHandoff(
+  currentSegmentKey: string,
+  data: Record<string, unknown>,
+  currentCard: VerifiedStreamCard | null,
+  successorCard: VerifiedStreamCard | null,
+): AuthoritativeCardStreamHandoff | null {
+  const fromSegmentKey = currentSegmentKey.trim()
+  const canonicalSegmentKey =
+    typeof data.session_id === 'string' ? data.session_id.trim() : ''
+  if (
+    !fromSegmentKey ||
+    !canonicalSegmentKey ||
+    canonicalSegmentKey === fromSegmentKey ||
+    SESSION_BOOTSTRAP_KEYS.has(canonicalSegmentKey) ||
+    hasNonParentStreamFacts(data) ||
+    !currentCard ||
+    !successorCard ||
+    !isParentCard(currentCard) ||
+    !isParentCard(successorCard) ||
+    currentCard.cardId !== successorCard.cardId ||
+    successorCard.canonicalSegmentKey !== canonicalSegmentKey ||
+    !successorCard.continuationSegmentKeys.includes(fromSegmentKey) ||
+    !successorCard.continuationSegmentKeys.includes(canonicalSegmentKey)
+  ) {
+    return null
+  }
+
+  return {
+    cardId: successorCard.cardId,
+    fromSegmentKey,
+    canonicalSegmentKey,
+  }
 }

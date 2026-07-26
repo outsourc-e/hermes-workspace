@@ -6,6 +6,7 @@ import {
   hasNonParentStreamFacts,
   resolveActiveParentSource,
   resolveAuthoritativeBootstrapHandoff,
+  resolveAuthoritativeCardStreamHandoff,
   resolveAuthoritativeSessionSource,
   resolveAuthoritativeStreamHandoff,
 } from './-send-stream-session-handoff'
@@ -471,4 +472,88 @@ describe('resolveAuthoritativeStreamHandoff', () => {
       ).toBeNull()
     },
   )
+})
+
+describe('resolveAuthoritativeCardStreamHandoff', () => {
+  const parentCard = {
+    cardId: 'parent-card',
+    canonicalSegmentKey: 'parent',
+    continuationSegmentKeys: ['parent'],
+    relationshipKind: 'root' as const,
+    collectionCompleteness: 'complete' as const,
+  }
+
+  it('accepts a fresh same-card continuation tip', () => {
+    expect(
+      resolveAuthoritativeCardStreamHandoff(
+        'parent',
+        { session_id: 'continuation' },
+        parentCard,
+        {
+          ...parentCard,
+          canonicalSegmentKey: 'continuation',
+          continuationSegmentKeys: ['parent', 'continuation'],
+        },
+      ),
+    ).toEqual({
+      cardId: 'parent-card',
+      fromSegmentKey: 'parent',
+      canonicalSegmentKey: 'continuation',
+    })
+  })
+
+  it.each([
+    [
+      'child successor',
+      {
+        ...parentCard,
+        canonicalSegmentKey: 'child',
+        continuationSegmentKeys: ['parent', 'child'],
+        relationshipKind: 'child' as const,
+        parentCardId: 'parent-card',
+      },
+    ],
+    [
+      'different parent card',
+      {
+        ...parentCard,
+        cardId: 'other-card',
+        canonicalSegmentKey: 'continuation',
+        continuationSegmentKeys: ['parent', 'continuation'],
+      },
+    ],
+    [
+      'incomplete card projection',
+      {
+        ...parentCard,
+        canonicalSegmentKey: 'continuation',
+        continuationSegmentKeys: ['parent', 'continuation'],
+        collectionCompleteness: 'incomplete' as const,
+      },
+    ],
+  ])('rejects a %s', (_label, successorCard) => {
+    expect(
+      resolveAuthoritativeCardStreamHandoff(
+        'parent',
+        { session_id: successorCard.canonicalSegmentKey },
+        parentCard,
+        successorCard,
+      ),
+    ).toBeNull()
+  })
+
+  it('rejects explicit child provenance despite matching card data', () => {
+    expect(
+      resolveAuthoritativeCardStreamHandoff(
+        'parent',
+        { session_id: 'continuation', relationship_type: 'child_session' },
+        parentCard,
+        {
+          ...parentCard,
+          canonicalSegmentKey: 'continuation',
+          continuationSegmentKeys: ['parent', 'continuation'],
+        },
+      ),
+    ).toBeNull()
+  })
 })

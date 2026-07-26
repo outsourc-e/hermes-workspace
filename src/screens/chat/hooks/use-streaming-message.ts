@@ -69,6 +69,44 @@ export function resolveAuthoritativeSessionHandoffEvent(
   return { fromSessionKey, sessionKey, friendlyId, runId }
 }
 
+export function resolveAuthoritativeCardHandoffEvent(
+  event: string,
+  data: unknown,
+): {
+  cardId: string
+  fromSegmentKey: string
+  canonicalSegmentKey: string
+  runId: string | null
+} | null {
+  if (event !== 'card_handoff' || !data || typeof data !== 'object') {
+    return null
+  }
+  const payload = data as Record<string, unknown>
+  const cardId = typeof payload.cardId === 'string' ? payload.cardId.trim() : ''
+  const fromSegmentKey =
+    typeof payload.fromSegmentKey === 'string'
+      ? payload.fromSegmentKey.trim()
+      : ''
+  const canonicalSegmentKey =
+    typeof payload.canonicalSegmentKey === 'string'
+      ? payload.canonicalSegmentKey.trim()
+      : ''
+  if (
+    !cardId ||
+    !fromSegmentKey ||
+    !canonicalSegmentKey ||
+    SESSION_BOOTSTRAP_KEYS.has(canonicalSegmentKey) ||
+    fromSegmentKey === canonicalSegmentKey
+  ) {
+    return null
+  }
+  const runId =
+    typeof payload.runId === 'string' && payload.runId.trim()
+      ? payload.runId.trim()
+      : null
+  return { cardId, fromSegmentKey, canonicalSegmentKey, runId }
+}
+
 type StreamingState = {
   isStreaming: boolean
   streamingMessageId: string | null
@@ -561,6 +599,22 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             transport: 'send-stream',
           })
           onStarted?.({ runId: runId ?? null })
+          break
+        }
+        case 'card_handoff': {
+          const handoff = resolveAuthoritativeCardHandoffEvent(event, data)
+          if (
+            !handoff ||
+            handoff.fromSegmentKey !== activeSessionKeyRef.current
+          ) {
+            break
+          }
+          if (handoff.runId) {
+            activeRunIdRef.current = handoff.runId
+            registerSendStreamRun(handoff.runId)
+          }
+          handoffSession(handoff.fromSegmentKey, handoff.canonicalSegmentKey)
+          activeSessionKeyRef.current = handoff.canonicalSegmentKey
           break
         }
         case 'session_handoff': {
