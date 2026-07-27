@@ -10,10 +10,12 @@ import {
   sessionCardQueryKeys,
   updateSessionCardMetadata,
 } from './chat-queries'
+import { isWholeCardBranchAvailable } from './types'
 
 const card = {
   cardId: 'remote:root',
   canonicalSource: 'remote',
+  canonicalTransport: 'gateway',
   title: 'Root',
   titleSource: 'manual',
   canonicalSegmentKey: 'remote:tip',
@@ -109,13 +111,15 @@ describe('Session Card fetchers', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(fetchSessionCards()).resolves.toEqual({
+    const result = await fetchSessionCards()
+    expect(result).toEqual({
       cards: [card],
       cardResolutions,
       completeness: 'complete',
       retryable: false,
       sources: [],
     })
+    expect(isWholeCardBranchAvailable(result.cards[0]!, true)).toBe(true)
     expect(fetchMock).toHaveBeenCalledWith('/api/session-cards')
     expect(fetchMock.mock.calls.flat().join(' ')).not.toContain('/api/sessions')
 
@@ -219,6 +223,91 @@ describe('Session Card fetchers', () => {
     async (canonicalSource) => {
       const candidate: Record<string, unknown> = { ...card, canonicalSource }
       if (canonicalSource === undefined) delete candidate.canonicalSource
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          response({
+            cards: [candidate],
+            completeness: 'complete',
+            retryable: false,
+            sources: [],
+          }),
+        ),
+      )
+
+      await expect(fetchSessionCards()).rejects.toThrow(
+        'Invalid Session Card response',
+      )
+    },
+  )
+
+  it.each([
+    ['dashboard', 'dashboard'],
+    ['missing', undefined],
+  ] as const)(
+    'keeps branching disabled for a %s canonical transport',
+    async (_name: string, canonicalTransport: 'dashboard' | undefined) => {
+      const candidate: Record<string, unknown> = {
+        ...card,
+        canonicalTransport,
+      }
+      if (canonicalTransport === undefined) delete candidate.canonicalTransport
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          response({
+            cards: [candidate],
+            completeness: 'complete',
+            retryable: false,
+            sources: [],
+          }),
+        ),
+      )
+
+      const result = await fetchSessionCards()
+      expect(isWholeCardBranchAvailable(result.cards[0]!, true)).toBe(false)
+      expect(result.cards[0]).toEqual(candidate)
+    },
+  )
+
+  it.each([null, '', 'local', 'Gateway', 'gateway ', [], {}])(
+    'rejects a malformed or unsupported canonical transport: %j',
+    async (canonicalTransport: unknown) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          response({
+            cards: [{ ...card, canonicalTransport }],
+            completeness: 'complete',
+            retryable: false,
+            sources: [],
+          }),
+        ),
+      )
+
+      await expect(fetchSessionCards()).rejects.toThrow(
+        'Invalid Session Card response',
+      )
+    },
+  )
+
+  it.each([
+    {
+      name: 'local canonical source claiming gateway transport',
+      candidate: { ...card, canonicalSource: 'local' },
+    },
+    {
+      name: 'local-qualified identity claiming a remote gateway source',
+      candidate: {
+        ...card,
+        cardId: 'local:root',
+        canonicalSegmentKey: 'local:tip',
+        continuationSegmentKeys: ['local:root', 'local:tip'],
+      },
+    },
+  ])(
+    'rejects a spoofed transport binding: $name',
+    async ({ candidate }: { candidate: Record<string, unknown> }) => {
       vi.stubGlobal(
         'fetch',
         vi.fn().mockResolvedValue(

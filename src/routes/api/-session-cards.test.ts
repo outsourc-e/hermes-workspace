@@ -108,6 +108,8 @@ function resolvedCard() {
   return {
     card: {
       cardId: 'remote:root',
+      canonicalSource: 'remote',
+      canonicalTransport: 'gateway',
       title: 'Root',
       titleSource: 'manual',
       canonicalSegmentKey: 'remote:tip',

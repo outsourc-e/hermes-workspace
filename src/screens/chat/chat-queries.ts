@@ -267,12 +267,20 @@ function parseSessionCardChild(value: unknown): ParsedSessionCardChild {
 
 function parseSessionCard(value: unknown): SessionCardWire {
   if (!isWireRecord(value)) return invalidSessionCardResponse()
-  const cardId = nonblankWireString(value.cardId)
+  const cardIdentity = sourceQualifiedWireIdentity(value.cardId)
   const canonicalSource = wireEnum(value.canonicalSource, ['local', 'remote'])
+  const canonicalTransport =
+    value.canonicalTransport === undefined
+      ? undefined
+      : wireEnum(value.canonicalTransport, ['dashboard', 'gateway'])
   const title = nonblankWireString(value.title)
-  const canonicalSegmentKey = nonblankWireString(value.canonicalSegmentKey)
-  const continuationSegmentKeys = Array.isArray(value.continuationSegmentKeys)
-    ? value.continuationSegmentKeys.map(nonblankWireString)
+  const canonicalSegmentIdentity = sourceQualifiedWireIdentity(
+    value.canonicalSegmentKey,
+  )
+  const continuationSegmentIdentities = Array.isArray(
+    value.continuationSegmentKeys,
+  )
+    ? value.continuationSegmentKeys.map(sourceQualifiedWireIdentity)
     : []
   const titleSource = wireEnum(value.titleSource, ['default', 'auto', 'manual'])
   const relationshipKind = wireEnum(value.relationshipKind, [
@@ -282,18 +290,27 @@ function parseSessionCard(value: unknown): SessionCardWire {
     'orphan',
   ])
   if (
-    !cardId ||
+    !cardIdentity ||
     !canonicalSource ||
+    canonicalTransport === null ||
+    (canonicalTransport !== undefined && canonicalSource !== 'remote') ||
+    cardIdentity.source !== canonicalSource ||
     !title ||
-    !canonicalSegmentKey ||
+    !canonicalSegmentIdentity ||
+    canonicalSegmentIdentity.source !== canonicalSource ||
     !titleSource ||
     !Array.isArray(value.continuationSegmentKeys) ||
-    continuationSegmentKeys.some((segmentKey) => segmentKey === null) ||
-    continuationSegmentKeys.length === 0 ||
-    new Set(continuationSegmentKeys).size !== continuationSegmentKeys.length ||
+    continuationSegmentIdentities.some((identity) => identity === null) ||
+    continuationSegmentIdentities.some(
+      (identity) => identity?.source !== canonicalSource,
+    ) ||
+    continuationSegmentIdentities.length === 0 ||
+    new Set(continuationSegmentIdentities.map((identity) => identity?.identity))
+      .size !== continuationSegmentIdentities.length ||
     !Number.isSafeInteger(value.continuationCount) ||
-    Number(value.continuationCount) !== continuationSegmentKeys.length ||
-    canonicalSegmentKey !== continuationSegmentKeys.at(-1) ||
+    Number(value.continuationCount) !== continuationSegmentIdentities.length ||
+    canonicalSegmentIdentity.identity !==
+      continuationSegmentIdentities.at(-1)?.identity ||
     !relationshipKind ||
     !Array.isArray(value.childNodes) ||
     typeof value.updatedAt !== 'number' ||
@@ -303,18 +320,23 @@ function parseSessionCard(value: unknown): SessionCardWire {
   ) {
     return invalidSessionCardResponse()
   }
-  const parentCardId =
+  const parentIdentity =
     value.parentCardId === undefined
       ? undefined
-      : nonblankWireString(value.parentCardId)
-  if (parentCardId === null || parentCardId === cardId) {
+      : sourceQualifiedWireIdentity(value.parentCardId)
+  if (
+    parentIdentity === null ||
+    parentIdentity?.identity === cardIdentity.identity ||
+    (parentIdentity !== undefined && parentIdentity.source !== canonicalSource)
+  ) {
     return invalidSessionCardResponse()
   }
   const childNodes = value.childNodes.map(parseSessionCardChild)
   if (
     childNodes.some(
       (child) =>
-        child.cardId === cardId || child.sessionKey === canonicalSegmentKey,
+        child.cardId === cardIdentity.identity ||
+        child.sessionKey === canonicalSegmentIdentity.identity,
     ) ||
     new Set(childNodes.map((child) => child.cardId)).size !==
       childNodes.length ||
@@ -323,16 +345,22 @@ function parseSessionCard(value: unknown): SessionCardWire {
   ) {
     return invalidSessionCardResponse()
   }
+  const continuationSegmentKeys = continuationSegmentIdentities.map(
+    (identity) => identity?.identity ?? invalidSessionCardResponse(),
+  )
   return {
-    cardId,
+    cardId: cardIdentity.identity,
     canonicalSource,
+    ...(canonicalTransport === undefined ? {} : { canonicalTransport }),
     title,
     titleSource,
-    canonicalSegmentKey,
-    continuationSegmentKeys: continuationSegmentKeys as Array<string>,
+    canonicalSegmentKey: canonicalSegmentIdentity.identity,
+    continuationSegmentKeys,
     continuationCount: Number(value.continuationCount),
     relationshipKind,
-    ...(parentCardId === undefined ? {} : { parentCardId }),
+    ...(parentIdentity === undefined
+      ? {}
+      : { parentCardId: parentIdentity.identity }),
     childNodes,
     updatedAt: value.updatedAt,
     archived: value.archived,

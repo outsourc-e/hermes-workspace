@@ -168,6 +168,80 @@ describe('SessionCardService collection and resolution', () => {
     ])
   })
 
+  it.each(['gateway', 'dashboard'] as const)(
+    'projects the canonical %s transport from the adapter-owned canonical segment',
+    async (transport) => {
+      const spoofedSession = {
+        ...session('owned-root'),
+        canonicalTransport: transport === 'gateway' ? 'dashboard' : 'gateway',
+      } as SessionMeta
+      const service = new SessionCardService({
+        remoteSource: {
+          source: 'hermes',
+          listPage: () =>
+            Promise.resolve({
+              ...page([spoofedSession], 0, 1),
+              source: transport,
+            }),
+        },
+        localSource: null,
+        metadataStore: metadataStore(),
+      })
+
+      await expect(service.listCards()).resolves.toMatchObject({
+        cards: [
+          {
+            cardId: 'remote:owned-root',
+            canonicalSource: 'remote',
+            canonicalTransport: transport,
+          },
+        ],
+      })
+      await expect(
+        service.resolveCard('remote:owned-root'),
+      ).resolves.toMatchObject({
+        card: {
+          cardId: 'remote:owned-root',
+          canonicalSource: 'remote',
+          canonicalTransport: transport,
+        },
+      })
+    },
+  )
+
+  it.each([
+    {
+      name: 'local adapter',
+      remoteSource: null,
+      localSource: {
+        source: 'local',
+        listSessions: () => [session('local-root', { source: 'local' })],
+      },
+      cardId: 'local:local-root',
+    },
+    {
+      name: 'unsupported remote adapter source',
+      remoteSource: {
+        source: 'unverified',
+        listPage: () => Promise.resolve(page([session('remote-root')], 0, 1)),
+      },
+      localSource: null,
+      cardId: 'remote:remote-root',
+    },
+  ])('omits canonical transport for $name', async (options) => {
+    const service = new SessionCardService({
+      remoteSource: options.remoteSource,
+      localSource: options.localSource,
+      metadataStore: metadataStore(),
+    })
+
+    const listed = await service.listCards()
+    const resolved = await service.resolveCard(options.cardId)
+
+    expect(listed.cards[0]).not.toHaveProperty('canonicalTransport')
+    expect(resolved.card).not.toHaveProperty('canonicalTransport')
+  })
+
   it('keeps a one-page collection complete without requiring a snapshot', async () => {
     const service = new SessionCardService({
       remoteSource: {

@@ -257,14 +257,20 @@ describe('SessionTreeRow Card routing', () => {
     },
   )
 
-  it('omits branching for a dashboard-backed remote root even when the gateway advertises fork', () => {
-    render({ card: { ...rootCard, canonicalTransport: 'dashboard' } })
+  it.each([
+    ['dashboard-backed', 'dashboard'],
+    ['transport-missing', undefined],
+  ] as const)(
+    'omits branching for a %s remote root even when the gateway advertises fork',
+    (_name: string, canonicalTransport: 'dashboard' | undefined) => {
+      render({ card: { ...rootCard, canonicalTransport } })
 
-    expect(
-      screen.queryByRole('button', { name: 'Branch conversation' }),
-    ).toBeNull()
-    expect(screen.getByRole('button', { name: 'Pin card' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Rename' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Archive' })).toBeTruthy()
-  })
+      expect(
+        screen.queryByRole('button', { name: 'Branch conversation' }),
+      ).toBeNull()
+      expect(screen.getByRole('button', { name: 'Pin card' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Rename' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Archive' })).toBeTruthy()
+    },
+  )
 })

@@ -181,7 +181,7 @@ export type SessionCardRelationshipKind = Exclude<
 export type SessionCardTitleSource = 'default' | 'auto' | 'manual'
 export type SessionCardChildStatus = 'idle' | 'running' | 'complete' | 'error'
 export type SessionCardCanonicalSource = 'local' | 'remote'
-export type SessionCardCanonicalTransport = 'local' | 'dashboard' | 'gateway'
+export type SessionCardCanonicalTransport = 'dashboard' | 'gateway'
 
 export type SessionCardChild = {
   cardId: string

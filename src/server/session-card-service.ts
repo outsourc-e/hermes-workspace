@@ -14,6 +14,7 @@ import type {
 } from './session-card-store'
 import type {
   SessionCard,
+  SessionCardCanonicalTransport,
   SessionCardChildStatus,
   SessionMeta,
 } from '../screens/chat/types'
@@ -626,14 +627,29 @@ function canonicalSourceForCard(
   return canonicalSource
 }
 
+function canonicalTransportForCard(
+  card: SessionCard,
+  collection: SessionCardCollection,
+): SessionCardCanonicalTransport | undefined {
+  if (canonicalSourceForCard(card, collection) !== 'remote') return undefined
+  const transport = collection.sourceBySessionKey.get(card.canonicalSegmentKey)
+  return transport === 'gateway' || transport === 'dashboard'
+    ? transport
+    : undefined
+}
+
 function attachCanonicalSources(
   cards: Array<SessionCard>,
   collection: SessionCardCollection,
 ): Array<SessionCard> {
-  return cards.map((card) => ({
-    ...card,
-    canonicalSource: canonicalSourceForCard(card, collection),
-  }))
+  return cards.map((card) => {
+    const canonicalTransport = canonicalTransportForCard(card, collection)
+    return {
+      ...card,
+      canonicalSource: canonicalSourceForCard(card, collection),
+      ...(canonicalTransport === undefined ? {} : { canonicalTransport }),
+    }
+  })
 }
 
 function resolveProjectedCard(
@@ -657,9 +673,11 @@ function resolveProjectedCard(
       continuationSegmentKeys.push(segmentKey)
     }
   }
+  const canonicalTransport = canonicalTransportForCard(card, fresh.collection)
   const resolvedCard: SessionCard = {
     ...card,
     canonicalSource: canonicalSourceForCard(card, fresh.collection),
+    ...(canonicalTransport === undefined ? {} : { canonicalTransport }),
     continuationSegmentKeys,
   }
   const requiredSources: Array<SessionCardSourceStatus> = []
