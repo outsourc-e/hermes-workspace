@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { applySessionRouteResolution } from '../../routes/chat/-session-route-state'
 import { useChatStore } from '../../stores/chat-store'
+import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
 import { chatQueryKeys, sessionCardQueryKeys } from './chat-queries'
 import { ChatScreen } from './chat-screen'
 import {
@@ -36,6 +37,10 @@ const queryContext = vi.hoisted(() => ({
   client: null as unknown as QueryClient,
   cardHistories: new Map<string, SessionCardHistoryResponse>(),
   cardHistoryRefetches: new Map<string, ReturnType<typeof vi.fn>>(),
+  cardHistoryInput: null as null | {
+    cardId: string
+    canonicalSegmentKey: string
+  },
   chatMode: 'enhanced' as 'enhanced' | 'portable',
   connectionState: 'connected' as 'connected' | 'disconnected',
   realtimeInput: null as null | {
@@ -94,16 +99,23 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
       children,
     useQueryClient: () => queryContext.client,
     useQuery: ({ queryKey }: { queryKey: Array<unknown> }) => {
-      const historyCardId =
+      const isCardHistory =
         queryKey[0] === 'chat' &&
         queryKey[1] === 'session-cards' &&
         queryKey[2] === 'history'
-          ? String(queryKey[3] ?? '')
-          : queryKey[0] === 'chat' &&
-              queryKey[1] === 'session-cards' &&
-              queryKey[2] === 'child-history'
-            ? String(queryKey[4] ?? '')
-            : ''
+      if (isCardHistory) {
+        queryContext.cardHistoryInput = {
+          cardId: String(queryKey[3] ?? ''),
+          canonicalSegmentKey: String(queryKey[4] ?? ''),
+        }
+      }
+      const historyCardId = isCardHistory
+        ? String(queryKey[3] ?? '')
+        : queryKey[0] === 'chat' &&
+            queryKey[1] === 'session-cards' &&
+            queryKey[2] === 'child-history'
+          ? String(queryKey[4] ?? '')
+          : ''
       const data = historyCardId
         ? queryContext.cardHistories.get(historyCardId)
         : queryKey[0] === 'models'
@@ -512,6 +524,35 @@ function userMessage(id: string, text: string): ChatMessage {
   }
 }
 
+function createRootCard({
+  cardId,
+  canonicalSegmentKey,
+  canonicalSource = 'remote',
+  continuationSegmentKeys = [canonicalSegmentKey],
+  updatedAt = 1,
+}: {
+  cardId: string
+  canonicalSegmentKey: string
+  canonicalSource?: 'local' | 'remote'
+  continuationSegmentKeys?: Array<string>
+  updatedAt?: number
+}): SessionCard {
+  return {
+    cardId,
+    canonicalSource,
+    title: cardId,
+    titleSource: 'manual',
+    canonicalSegmentKey,
+    continuationSegmentKeys,
+    continuationCount: continuationSegmentKeys.length,
+    relationshipKind: 'root',
+    childNodes: [],
+    updatedAt,
+    archived: false,
+    pinned: false,
+  }
+}
+
 type RouteState = { friendlyId: string; sessionKey: string }
 
 function ChatRouteHarness({
@@ -697,6 +738,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       .mockResolvedValue(undefined)
     queryContext.cardHistories.clear()
     queryContext.cardHistoryRefetches.clear()
+    queryContext.cardHistoryInput = null
     queryContext.chatMode = 'enhanced'
     queryContext.connectionState = 'connected'
     queryContext.realtimeInput = null
@@ -1593,6 +1635,303 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     expect(stream.reader.read).toHaveBeenCalledTimes(2)
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('uses an immediate Card handoff until a projection containing it advances to a newer canonical segment', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const initialCard = createRootCard({
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:a',
+    })
+    queryContext.cardHistories.set(initialCard.cardId, {
+      sessionKey: 'remote:a',
+      cardId: initialCard.cardId,
+      canonicalSegmentKey: 'remote:a',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const stream = createReaderHarness([
+      {
+        event: 'card_handoff',
+        cardId: initialCard.cardId,
+        fromSegmentKey: 'remote:a',
+        canonicalSegmentKey: 'remote:b',
+        runId: 'run-card-advance',
+      },
+    ])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const render = (activeCard: SessionCard) => {
+      React.act(() => {
+        root.render(
+          <QueryClientProvider client={queryClient}>
+            <ChatScreen
+              activeFriendlyId={activeCard.cardId}
+              activeCard={activeCard}
+              sessionCardList={cardList([activeCard])}
+              compact
+            />
+          </QueryClientProvider>,
+        )
+      })
+    }
+
+    render(initialCard)
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+    await waitForAssertion(() =>
+      expect(stream.getRequestBody()).toMatchObject({
+        sessionKey: 'remote:a',
+        cardId: initialCard.cardId,
+      }),
+    )
+    stream.releaseHandoff()
+
+    await waitForAssertion(() => {
+      expect(queryContext.cardHistoryInput).toEqual({
+        cardId: initialCard.cardId,
+        canonicalSegmentKey: 'remote:b',
+      })
+      expect(queryContext.realtimeInput).toMatchObject({
+        sessionKey: 'remote:b',
+        friendlyId: initialCard.cardId,
+        enabled: true,
+      })
+      expect(queryContext.activeRunInput).toMatchObject({
+        sessionKey: 'remote:b',
+        cardId: initialCard.cardId,
+        enabled: true,
+      })
+    })
+
+    const advancedCard = createRootCard({
+      cardId: initialCard.cardId,
+      canonicalSegmentKey: 'remote:c',
+      continuationSegmentKeys: ['remote:a', 'remote:b', 'remote:c'],
+      updatedAt: 3,
+    })
+    queryContext.cardHistories.set(advancedCard.cardId, {
+      sessionKey: 'remote:c',
+      cardId: advancedCard.cardId,
+      canonicalSegmentKey: 'remote:c',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    render(advancedCard)
+
+    await waitForAssertion(() => {
+      expect(queryContext.cardHistoryInput).toEqual({
+        cardId: advancedCard.cardId,
+        canonicalSegmentKey: 'remote:c',
+      })
+      expect(queryContext.realtimeInput).toMatchObject({
+        sessionKey: 'remote:c',
+        friendlyId: advancedCard.cardId,
+        enabled: true,
+      })
+      expect(queryContext.activeRunInput).toMatchObject({
+        sessionKey: 'remote:c',
+        cardId: advancedCard.cardId,
+        enabled: true,
+      })
+    })
+
+    React.act(() => {
+      window.dispatchEvent(
+        new CustomEvent(CHAT_SUBMIT_SELECTION_EVENT, {
+          detail: { text: 'send after projection advance' },
+        }),
+      )
+    })
+    await waitForAssertion(() =>
+      expect(stream.getRequestBody()).toMatchObject({
+        sessionKey: 'remote:c',
+        friendlyId: advancedCard.cardId,
+        cardId: advancedCard.cardId,
+        message: 'send after projection advance',
+      }),
+    )
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('clears a Card handoff when switching to a source-qualified sibling Card', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const remoteCard = createRootCard({
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:a',
+    })
+    const localCard = createRootCard({
+      cardId: 'local:parent',
+      canonicalSegmentKey: 'local:tip',
+      canonicalSource: 'local',
+    })
+    for (const card of [remoteCard, localCard]) {
+      queryContext.cardHistories.set(card.cardId, {
+        sessionKey: card.canonicalSegmentKey,
+        cardId: card.cardId,
+        canonicalSegmentKey: card.canonicalSegmentKey,
+        messages: [],
+        completeness: 'complete',
+        retryable: false,
+        missingSegments: [],
+      })
+    }
+    const stream = createReaderHarness([
+      {
+        event: 'card_handoff',
+        cardId: remoteCard.cardId,
+        fromSegmentKey: 'remote:a',
+        canonicalSegmentKey: 'remote:b',
+        runId: 'run-before-switch',
+      },
+    ])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const render = (activeCard: SessionCard) => {
+      React.act(() => {
+        root.render(
+          <QueryClientProvider client={queryClient}>
+            <ChatScreen
+              activeFriendlyId={activeCard.cardId}
+              activeCard={activeCard}
+              sessionCardList={cardList([remoteCard, localCard])}
+              compact
+            />
+          </QueryClientProvider>,
+        )
+      })
+    }
+
+    render(remoteCard)
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+    await waitForAssertion(() => expect(stream.getRequestBody()).toBeDefined())
+    stream.releaseHandoff()
+    await waitForAssertion(() =>
+      expect(queryContext.realtimeInput).toMatchObject({
+        sessionKey: 'remote:b',
+        friendlyId: remoteCard.cardId,
+      }),
+    )
+
+    render(localCard)
+    await waitForAssertion(() =>
+      expect(queryContext.realtimeInput).toMatchObject({
+        sessionKey: 'local:tip',
+        friendlyId: localCard.cardId,
+      }),
+    )
+    render(remoteCard)
+    await waitForAssertion(() => {
+      expect(queryContext.cardHistoryInput).toEqual({
+        cardId: remoteCard.cardId,
+        canonicalSegmentKey: 'remote:a',
+      })
+      expect(queryContext.realtimeInput).toMatchObject({
+        sessionKey: 'remote:a',
+        friendlyId: remoteCard.cardId,
+      })
+      expect(queryContext.activeRunInput).toMatchObject({
+        sessionKey: 'remote:a',
+        cardId: remoteCard.cardId,
+      })
+    })
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('rejects a Card handoff carrying the same unqualified ID from another source', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard = createRootCard({
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:a',
+    })
+    queryContext.cardHistories.set(activeCard.cardId, {
+      sessionKey: 'remote:a',
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: 'remote:a',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const stream = createReaderHarness([
+      {
+        event: 'card_handoff',
+        cardId: 'local:parent',
+        fromSegmentKey: 'remote:a',
+        canonicalSegmentKey: 'remote:b',
+        runId: 'run-wrong-source',
+      },
+    ])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCardList={cardList([activeCard])}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+    await waitForAssertion(() => expect(stream.getRequestBody()).toBeDefined())
+    stream.releaseHandoff()
+    await waitForAssertion(() =>
+      expect(stream.reader.read).toHaveBeenCalledTimes(2),
+    )
+
+    expect(queryContext.cardHistoryInput).toEqual({
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: 'remote:a',
+    })
+    expect(queryContext.realtimeInput).toMatchObject({
+      sessionKey: 'remote:a',
+      friendlyId: activeCard.cardId,
+    })
+    expect(queryContext.activeRunInput).toMatchObject({
+      sessionKey: 'remote:a',
+      cardId: activeCard.cardId,
+    })
 
     React.act(() => root.unmount())
     document.body.removeChild(container)

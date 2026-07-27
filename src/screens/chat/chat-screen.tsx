@@ -518,8 +518,20 @@ export function ChatScreen({
     cardId: string
     canonicalSegmentKey: string
   } | null>(null)
+  const activeCardContainsHandoff = Boolean(
+    activeCard &&
+    cardHandoff?.cardId === activeCard.cardId &&
+    activeCard.continuationSegmentKeys.includes(
+      cardHandoff.canonicalSegmentKey,
+    ),
+  )
+  // A just-accepted handoff bridges the interval before the Card projection
+  // refreshes. Once that projection contains the handed-off segment, its
+  // canonical tip is newer authority and may already have advanced again.
   const activeCardCanonicalSegmentKey =
-    activeCard && cardHandoff?.cardId === activeCard.cardId
+    activeCard &&
+    cardHandoff?.cardId === activeCard.cardId &&
+    !activeCardContainsHandoff
       ? cardHandoff.canonicalSegmentKey
       : activeCard?.canonicalSegmentKey
   const inspectedChildCard = activeCard?.childNodes.find(
@@ -527,13 +539,14 @@ export function ChatScreen({
   )
   useEffect(() => {
     if (
-      activeCard &&
-      cardHandoff?.cardId === activeCard.cardId &&
-      cardHandoff.canonicalSegmentKey === activeCard.canonicalSegmentKey
+      cardHandoff &&
+      (!activeCard ||
+        cardHandoff.cardId !== activeCard.cardId ||
+        activeCardContainsHandoff)
     ) {
       setCardHandoff(null)
     }
-  }, [activeCard, cardHandoff])
+  }, [activeCard, activeCardContainsHandoff, cardHandoff])
   const [sending, setSending] = useState(false)
 
   const [sessionsOpen, setSessionsOpen] = useState(false)
