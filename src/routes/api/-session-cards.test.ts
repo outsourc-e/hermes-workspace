@@ -1120,6 +1120,59 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(mocks.completeBranchReplay).not.toHaveBeenCalled()
   })
 
+  it.each([
+    [
+      'a lost or thrown upstream response',
+      () => mocks.forkSession.mockRejectedValueOnce(new Error('response lost')),
+    ],
+    [
+      'a malformed upstream fork outcome',
+      () =>
+        mocks.forkSession.mockResolvedValueOnce({
+          session: { id: '', parent_session_id: 'tip-upstream' },
+          forkedFrom: 'tip-upstream',
+        }),
+    ],
+  ] as const)(
+    'durably marks %s ambiguous after the effect boundary and never repeats it',
+    async (_name, arrangeFork) => {
+      arrangeFork()
+      const body = JSON.stringify({
+        expectedCanonicalSegmentKey: 'remote:tip',
+        idempotencyKey: `post-effect-${_name.replace(/\W+/gu, '-')}`,
+      })
+      const invoke = () =>
+        branchHandler({
+          request: jsonRequest(
+            '/api/session-cards/remote%3Aroot/branch',
+            'POST',
+            body,
+          ),
+          params: { cardId: 'remote:root' },
+        })
+
+      const first = await invoke()
+      expect(first.status).toBe(503)
+      expect(await first.json()).toMatchObject({
+        ok: false,
+        retryable: true,
+        error: expect.stringMatching(/outcome is unknown/i),
+      })
+      expect(mocks.completeBranchReplay).toHaveBeenCalledWith(
+        'remote:root',
+        expect.stringMatching(/^[a-f0-9]{64}$/),
+        expect.stringMatching(/^[a-f0-9]{64}$/),
+        expect.stringMatching(/^[a-f0-9]{32}$/),
+        { kind: 'ambiguous' },
+      )
+
+      const replay = await invoke()
+      expect(replay.status).toBe(503)
+      expect(await replay.json()).toMatchObject({ retryable: true })
+      expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+    },
+  )
+
   it('reconciles projection-confirmed ambiguity and replays it without another fork', async () => {
     mocks.reserveBranchReplay.mockImplementationOnce(
       (_cardId: string, requestKeyHash: string, fingerprint: string) => {
@@ -1873,7 +1926,7 @@ describe('POST /api/session-cards/$cardId/branch', () => {
       name: 'self-child authoritative identity',
       fresh: resolvedCardWithBranch({ childUpstreamKey: 'tip-upstream' }),
     },
-  ])('fails closed after fork for $name', async ({ fresh }) => {
+  ])('retains an ambiguous effect after fork for $name', async ({ fresh }) => {
     mocks.forkSession.mockResolvedValue({
       session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
       forkedFrom: 'tip-upstream',
@@ -1891,8 +1944,15 @@ describe('POST /api/session-cards/$cardId/branch', () => {
       params: { cardId: 'remote:root' },
     })
 
-    expect(response.status).toBe(502)
-    expect(await response.json()).toMatchObject({ ok: false })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ ok: false, retryable: true })
+    expect(mocks.completeBranchReplay).toHaveBeenLastCalledWith(
+      'remote:root',
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      { kind: 'ambiguous' },
+    )
   })
 
   it.each([
@@ -1951,7 +2011,7 @@ describe('POST /api/session-cards/$cardId/branch', () => {
         forkedFrom: 'tip-upstream',
       },
     },
-  ])('returns 502 for $name', async ({ fork }) => {
+  ])('returns durable ambiguity for $name', async ({ fork }) => {
     mocks.forkSession.mockResolvedValue(fork)
 
     const response = await branchHandler({
@@ -1963,11 +2023,12 @@ describe('POST /api/session-cards/$cardId/branch', () => {
       params: { cardId: 'remote:root' },
     })
 
-    expect(response.status).toBe(502)
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ retryable: true })
     expect(mocks.listCards).not.toHaveBeenCalled()
   })
 
-  it('returns 502 rather than fabricating a child when the fresh Card relation is spoofed', async () => {
+  it('retains ambiguity rather than fabricating a child when the fresh Card relation is spoofed', async () => {
     mocks.forkSession.mockResolvedValue({
       session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
       forkedFrom: 'tip-upstream',
@@ -1992,7 +2053,7 @@ describe('POST /api/session-cards/$cardId/branch', () => {
       params: { cardId: 'remote:root' },
     })
 
-    expect(response.status).toBe(502)
-    expect(await response.json()).toMatchObject({ ok: false })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ ok: false, retryable: true })
   })
 })

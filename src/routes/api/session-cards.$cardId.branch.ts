@@ -163,10 +163,14 @@ function outcomeFromReplay(
         }
       }
     } catch {
-      // Persist only a stable failure marker when an internal response is malformed.
+      // A malformed response after dispatch cannot prove that the opaque fork
+      // did not happen. Fall through to the durable ambiguity fence.
     }
   }
-  return { kind: replay.status === 503 ? 'unavailable' : 'failed' }
+  // This classifier is called only after beginSideEffect reserved the durable
+  // effect intent. Any response without a verified child identity may follow a
+  // provider-accepted request, so it must never age into an automatic re-fork.
+  return { kind: 'ambiguous' }
 }
 
 function durableReplayResponse(
@@ -747,13 +751,17 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
           let replay = await captureReplay(response)
           if (operationState.reservationId) {
             try {
+              const outcome = outcomeFromReplay(replay)
               completeSessionCardBranchReplay(
                 cardId,
                 requestKeyHash,
                 fingerprint,
                 operationState.reservationId,
-                outcomeFromReplay(replay),
+                outcome,
               )
+              if (outcome.kind === 'ambiguous') {
+                replay = await captureReplay(replayAmbiguousUnavailable())
+              }
             } catch {
               replay = await captureReplay(branchFailure())
             }

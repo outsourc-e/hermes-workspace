@@ -596,7 +596,10 @@ type SessionCardStoreLock = {
 
 type SessionCardStoreLockMetadata = {
   token: string
+  pid: number
+  processIdentity?: string
   createdAt: number
+  leaseUntil?: number
   fence?: number
 }
 
@@ -626,13 +629,28 @@ function readLockMetadata(path: string): SessionCardStoreLockMetadata | null {
       !isRecord(parsed) ||
       typeof parsed.token !== 'string' ||
       !LOCK_TOKEN_PATTERN.test(parsed.token) ||
+      !Number.isSafeInteger(parsed.pid) ||
+      Number(parsed.pid) <= 0 ||
+      Number(parsed.pid) > 2_147_483_647 ||
+      ('processIdentity' in parsed &&
+        (typeof parsed.processIdentity !== 'string' ||
+          parsed.processIdentity.length === 0 ||
+          parsed.processIdentity.length > 256)) ||
+      ('leaseUntil' in parsed && !isTimestamp(parsed.leaseUntil)) ||
       !isTimestamp(parsed.createdAt)
     ) {
       return null
     }
     const metadata: SessionCardStoreLockMetadata = {
       token: parsed.token,
+      pid: Number(parsed.pid),
       createdAt: parsed.createdAt,
+    }
+    if ('processIdentity' in parsed) {
+      metadata.processIdentity = parsed.processIdentity as string
+    }
+    if ('leaseUntil' in parsed) {
+      metadata.leaseUntil = parsed.leaseUntil as number
     }
     if ('fence' in parsed) {
       if (!Number.isSafeInteger(parsed.fence) || Number(parsed.fence) < 1) {
@@ -645,6 +663,57 @@ function readLockMetadata(path: string): SessionCardStoreLockMetadata | null {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw error
     return null
   }
+}
+
+function processIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH'
+  }
+}
+
+function getProcessIdentity(pid: number): string | null {
+  if (process.platform !== 'linux') return null
+  try {
+    const raw = readFileSync(`/proc/${pid}/stat`, 'utf8')
+    const closingParenthesis = raw.lastIndexOf(') ')
+    if (closingParenthesis < 0) return null
+    const fieldsAfterCommand = raw
+      .slice(closingParenthesis + 2)
+      .trim()
+      .split(/\s+/u)
+    const startTime = fieldsAfterCommand[19]
+    return startTime && /^\d+$/u.test(startTime) ? `linux:${startTime}` : null
+  } catch {
+    return null
+  }
+}
+
+function lockOwnerIsRecoverable(
+  owner: SessionCardStoreLockMetadata | null,
+  lockModifiedAt: number,
+  now: number,
+): boolean {
+  if (!owner) {
+    return now - lockModifiedAt >= SESSION_CARD_STORE_LOCK_STALE_MS
+  }
+  if (!processIsAlive(owner.pid)) return true
+
+  if (owner.processIdentity) {
+    const currentIdentity = getProcessIdentity(owner.pid)
+    // A matching PID + process-start identity is authoritative liveness. Never
+    // evict that owner merely because wall-clock timestamps or its lease aged.
+    if (currentIdentity === owner.processIdentity) return false
+    if (currentIdentity !== null) return true
+  }
+
+  const leaseUntil =
+    owner.leaseUntil ??
+    Math.max(owner.createdAt, Math.floor(lockModifiedAt)) +
+      SESSION_CARD_STORE_LOCK_STALE_MS
+  return now > leaseUntil
 }
 
 function createFenceMarker(prefix: string, fence: number): void {
@@ -680,12 +749,7 @@ function recoverStaleLock(lockPath: string, now: number): boolean {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
     throw error
   }
-  const persistedAgeSource = metadata?.createdAt ?? Math.floor(observed.mtimeMs)
-  const ageSource =
-    persistedAgeSource > now + SESSION_CARD_STORE_LOCK_STALE_MS
-      ? now - SESSION_CARD_STORE_LOCK_STALE_MS
-      : persistedAgeSource
-  if (now - ageSource < SESSION_CARD_STORE_LOCK_STALE_MS) return false
+  if (!lockOwnerIsRecoverable(metadata, observed.mtimeMs, now)) return false
 
   const claimPath = `${lockPath}.claim.${process.pid}.${randomBytes(8).toString('hex')}`
   try {
@@ -738,13 +802,17 @@ function acquireSessionCardStoreLock(): SessionCardStoreLock {
       if (!Number.isSafeInteger(fence)) {
         throw new Error('Session Card metadata fence is exhausted')
       }
+      const createdAt = Date.now()
+      const processIdentity = getProcessIdentity(process.pid)
       descriptor = openSync(lockPath, 'wx', 0o600)
       writeFileSync(
         descriptor,
         `${JSON.stringify({
           token,
           pid: process.pid,
-          createdAt: Date.now(),
+          ...(processIdentity ? { processIdentity } : {}),
+          createdAt,
+          leaseUntil: createdAt + SESSION_CARD_STORE_LOCK_STALE_MS,
           fence,
         })}\n`,
         'utf8',

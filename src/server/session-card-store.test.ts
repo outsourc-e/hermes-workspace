@@ -15,6 +15,7 @@ import {
 import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import process from 'node:process'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -388,6 +389,74 @@ describe('Session Card metadata persistence', () => {
     })
   })
 
+  it('retains an immediate post-effect ambiguity past its exact TTL until safe reconciliation', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
+    const requestKeyHash = '5'.repeat(64)
+    const fingerprint = '6'.repeat(64)
+    const reservation = reserveSessionCardBranchReplay(
+      'card-post-effect-ambiguity',
+      requestKeyHash,
+      fingerprint,
+    )
+    if (reservation.status !== 'reserved') {
+      throw new Error('Expected post-effect reservation')
+    }
+
+    const ambiguous = completeSessionCardBranchReplay(
+      'card-post-effect-ambiguity',
+      requestKeyHash,
+      fingerprint,
+      reservation.reservationId,
+      { kind: 'ambiguous' },
+    )
+    expect(ambiguous).toMatchObject({
+      completedAt: Date.now(),
+      expiresAt: Date.now() + SESSION_CARD_BRANCH_COMPLETED_TTL_MS,
+      outcome: { kind: 'ambiguous' },
+    })
+
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_COMPLETED_TTL_MS)
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-post-effect-ambiguity',
+        requestKeyHash,
+        fingerprint,
+      ),
+    ).toMatchObject({
+      status: 'completed',
+      replay: { outcome: { kind: 'ambiguous' } },
+    })
+    vi.advanceTimersByTime(1)
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-post-effect-ambiguity',
+        requestKeyHash,
+        '7'.repeat(64),
+      ),
+    ).toEqual({ status: 'conflict' })
+
+    expect(
+      reconcileSessionCardBranchReplay(
+        'card-post-effect-ambiguity',
+        requestKeyHash,
+        fingerprint,
+        {
+          kind: 'operator-no-effect',
+          actorFingerprint: '8'.repeat(64),
+          assertedAt: Date.now(),
+        },
+      ),
+    ).toEqual({ status: 'removed' })
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-post-effect-ambiguity',
+        requestKeyHash,
+        fingerprint,
+      ),
+    ).toMatchObject({ status: 'reserved' })
+  })
+
   it('evicts expired completed outcomes so capacity eventually admits new keys', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
@@ -686,6 +755,86 @@ describe('Session Card metadata persistence', () => {
     expect(existsSync(sessionCardStoreLockPath())).toBe(false)
   })
 
+  it.runIf(process.platform === 'linux')(
+    'never evicts a confirmed matching live owner solely because its timestamps are stale',
+    () => {
+      const processStat = readFileSync(`/proc/${process.pid}/stat`, 'utf8')
+      const processIdentity = `linux:${
+        processStat.slice(processStat.lastIndexOf(') ') + 2).split(' ')[19]
+      }`
+      mkdirSync(stateDir, { recursive: true })
+      const owner = {
+        token: '9'.repeat(32),
+        pid: process.pid,
+        processIdentity,
+        createdAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+        leaseUntil: Date.now() - 1,
+      }
+      writeFileSync(sessionCardStoreLockPath(), `${JSON.stringify(owner)}\n`, {
+        encoding: 'utf8',
+        mode: 0o600,
+      })
+
+      expect(() =>
+        updateSessionCardMetadata('card-live-owner-lock', {
+          autoTitle: 'Must not commit',
+        }),
+      ).toThrow(/busy/i)
+      expect(
+        JSON.parse(readFileSync(sessionCardStoreLockPath(), 'utf8')),
+      ).toEqual(owner)
+      expect(readSessionCardMetadata('card-live-owner-lock')).toBeNull()
+      unlinkSync(sessionCardStoreLockPath())
+    },
+    5_000,
+  )
+
+  it.runIf(process.platform === 'linux')(
+    'reclaims a live PID lock only when its process-start identity mismatches',
+    () => {
+      mkdirSync(stateDir, { recursive: true })
+      writeFileSync(
+        sessionCardStoreLockPath(),
+        `${JSON.stringify({
+          token: 'a'.repeat(32),
+          pid: process.pid,
+          processIdentity: 'linux:impossible-reused-process',
+          createdAt: Date.now(),
+          leaseUntil: Date.now() + SESSION_CARD_BRANCH_PENDING_TTL_MS,
+        })}\n`,
+        { encoding: 'utf8', mode: 0o600 },
+      )
+
+      expect(
+        updateSessionCardMetadata('card-reused-pid-lock', {
+          autoTitle: 'Reclaimed safely',
+        }),
+      ).toMatchObject({ autoTitle: 'Reclaimed safely' })
+      expect(existsSync(sessionCardStoreLockPath())).toBe(false)
+    },
+  )
+
+  it('reclaims an expired legacy lease when a live PID has no process identity', () => {
+    mkdirSync(stateDir, { recursive: true })
+    writeFileSync(
+      sessionCardStoreLockPath(),
+      `${JSON.stringify({
+        token: 'b'.repeat(32),
+        pid: process.pid,
+        createdAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+        leaseUntil: Date.now() - 1,
+      })}\n`,
+      { encoding: 'utf8', mode: 0o600 },
+    )
+
+    expect(
+      updateSessionCardMetadata('card-expired-legacy-lock', {
+        autoTitle: 'Recovered from legacy lease',
+      }),
+    ).toMatchObject({ autoTitle: 'Recovered from legacy lease' })
+    expect(existsSync(sessionCardStoreLockPath())).toBe(false)
+  })
+
   it('does not release a successor lock after ownership changes', async () => {
     const actualFs = await vi.importActual<ActualFs>('node:fs')
     const successor = {
@@ -742,6 +891,8 @@ describe('Session Card metadata persistence', () => {
         `${JSON.stringify({
           ...staleLock,
           createdAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+          processIdentity: 'linux:impossible-reused-process',
+          leaseUntil: Date.now() - 1,
         })}\n`,
         'utf8',
       )
