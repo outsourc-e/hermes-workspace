@@ -9,6 +9,14 @@ import { AgentStreamPanel } from './agent-stream-panel'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import type { SessionCard } from '@/screens/chat/types'
 
+type SessionCardWithChildAliases = SessionCard & {
+  childNodes: Array<
+    SessionCard['childNodes'][number] & {
+      continuationSegmentKeys: Array<string>
+    }
+  >
+}
+
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   queryOptions: [] as Array<{
@@ -53,7 +61,9 @@ reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const mountedRoots: Array<() => void> = []
 
-function parentCard(overrides: Partial<SessionCard> = {}): SessionCard {
+function parentCard(
+  overrides: Partial<SessionCardWithChildAliases> = {},
+): SessionCardWithChildAliases {
   return {
     cardId: 'remote:parent-card',
     canonicalSource: 'remote',
@@ -66,7 +76,12 @@ function parentCard(overrides: Partial<SessionCard> = {}): SessionCard {
     childNodes: [
       {
         cardId: 'remote:child-card',
-        sessionKey: 'raw:child-session',
+        sessionKey: 'remote:child-tip',
+        continuationSegmentKeys: [
+          'remote:child-card',
+          'remote:child-middle',
+          'remote:child-tip',
+        ],
         relationshipKind: 'child',
         title: 'Delegated research',
         status: 'running',
@@ -148,13 +163,13 @@ describe('AgentStreamPanel Card-only activity', () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response(body))
     vi.stubGlobal('fetch', fetchMock)
 
-    renderPanel('raw:child-session')
+    renderPanel('remote:child-tip')
 
     expect(screen.getByText('Delegated research')).toBeTruthy()
     expect(screen.getByText('Child Card activity')).toBeTruthy()
     expect(screen.getByText('Running')).toBeTruthy()
     expect(screen.getByText('3 segments')).toBeTruthy()
-    expect(document.body.textContent).not.toContain('raw:child-session')
+    expect(document.body.textContent).not.toContain('remote:child-tip')
     expect(fetchMock).not.toHaveBeenCalled()
     expect(mocks.queryOptions).toHaveLength(1)
     expect(mocks.queryOptions[0]?.queryKey).toEqual([

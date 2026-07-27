@@ -7,7 +7,17 @@ import {
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import type { SessionCard } from '@/screens/chat/types'
 
-function card(overrides: Partial<SessionCard> = {}): SessionCard {
+type SessionCardWithChildAliases = SessionCard & {
+  childNodes: Array<
+    SessionCard['childNodes'][number] & {
+      continuationSegmentKeys: Array<string>
+    }
+  >
+}
+
+function card(
+  overrides: Partial<SessionCardWithChildAliases> = {},
+): SessionCardWithChildAliases {
   return {
     cardId: 'remote:parent-card',
     canonicalSource: 'remote',
@@ -21,11 +31,12 @@ function card(overrides: Partial<SessionCard> = {}): SessionCard {
       {
         cardId: 'remote:child-card',
         sessionKey: 'remote:child-tip',
+        continuationSegmentKeys: ['remote:child-card', 'remote:child-tip'],
         relationshipKind: 'child',
         title: 'Child activity',
         status: 'complete',
         updatedAt: 2,
-        continuationCount: 1,
+        continuationCount: 2,
       },
     ],
     updatedAt: 3,
