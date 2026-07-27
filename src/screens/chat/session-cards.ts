@@ -226,7 +226,7 @@ export function projectSessionCards(
     const members = orderContinuationMembers(
       membersByVisibleKey.get(row.key) ?? [row.session],
     )
-    const title = cardTitle(metadata, row.session)
+    const title = cardTitle(metadata, members[0] ?? row.session)
 
     cardsByVisibleKey.set(row.key, {
       cardId,

@@ -650,6 +650,7 @@ function createReaderHarness(
 ) {
   const encoder = new TextEncoder()
   let releaseFirstRead: (() => void) | undefined
+  let releaseTerminalRead: (() => void) | undefined
   let requestSignal: AbortSignal | undefined
   let requestBody: Record<string, unknown> | undefined
   let rejectCurrentRead: ((reason?: unknown) => void) | undefined
@@ -679,6 +680,23 @@ function createReaderHarness(
       }
     },
   )
+  const terminalRead = new Promise<ReadableStreamReadResult<Uint8Array>>(
+    (resolve) => {
+      releaseTerminalRead = () => {
+        resolve({
+          done: false,
+          value: encoder.encode(
+            [
+              'event: done',
+              'data: {"state":"complete","sessionKey":"backend-b","runId":"run-chain"}',
+              '',
+              '',
+            ].join('\n'),
+          ),
+        })
+      }
+    },
+  )
   const pendingRead = new Promise<ReadableStreamReadResult<Uint8Array>>(
     (_resolve, reject) => {
       rejectPendingRead = reject
@@ -690,6 +708,9 @@ function createReaderHarness(
       .mockImplementationOnce(() => {
         rejectCurrentRead = rejectFirstRead
         return firstRead
+      })
+      .mockImplementationOnce(() => {
+        return terminalRead
       })
       .mockImplementation(() => {
         rejectCurrentRead = rejectPendingRead
@@ -729,6 +750,7 @@ function createReaderHarness(
   return {
     reader,
     releaseHandoff: () => releaseFirstRead?.(),
+    releaseTerminal: () => releaseTerminalRead?.(),
     getRequestSignal: () => requestSignal,
     getRequestBody: () => requestBody,
   }
@@ -2315,7 +2337,14 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)
 
+    // The real Card route can unmount ChatScreen while it resolves the newly
+    // created Card. The accepted reader must still clear the handoff target
+    // when its terminal event arrives.
     React.act(() => root.unmount())
+    stream.releaseTerminal()
+    await waitForAssertion(() => {
+      expect(useChatStore.getState().isSessionWaiting('backend-b')).toBe(false)
+    })
     document.body.removeChild(container)
     queryClient.clear()
   })

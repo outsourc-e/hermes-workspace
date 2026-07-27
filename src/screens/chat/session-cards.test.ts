@@ -73,7 +73,7 @@ describe('projectSessionCards', () => {
       continuationCount: 3,
       relationshipKind: 'root',
       childNodes: [],
-      title: 'legacy title for third',
+      title: 'legacy title for root',
       titleSource: 'auto',
       updatedAt: 300,
       archived: false,

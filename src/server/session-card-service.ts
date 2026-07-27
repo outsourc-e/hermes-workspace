@@ -317,6 +317,7 @@ function defaultLocalSource(): SessionCardLocalSource {
         backendKey: session.id,
         friendlyId: session.id,
         updatedAt: session.updatedAt,
+        title: session.title ?? undefined,
         lineage: { source: 'local' },
       })),
   }
