@@ -157,6 +157,7 @@ export type SessionCardChildLifecycleObservation = {
 
 type StoredChildLifecycle = SessionCardChildLifecycleObservation & {
   binding: string
+  supersededRunIds: Array<string>
 }
 
 type FreshProjection = {
@@ -1307,14 +1308,27 @@ export class SessionCardService {
     const { child, binding } = matches[0]!
     const key = childLifecycleKey(parent.cardId, child.cardId)
     const existing = this.childLifecycleByBinding.get(key)
-    if (
-      existing?.binding === binding &&
-      existing.runId === input.runId &&
-      existing.status !== 'running' &&
-      input.status === 'running'
+    const current = existing?.binding === binding ? existing : null
+    if (current?.supersededRunIds.includes(input.runId)) return null
+    if (input.status === 'running') {
+      if (current?.runId === input.runId && current.status !== 'running') {
+        return null
+      }
+    } else if (
+      !current ||
+      current.runId !== input.runId ||
+      current.status !== 'running'
     ) {
       return null
     }
+    const supersededRunIds = current
+      ? [
+          ...current.supersededRunIds,
+          ...(input.status === 'running' && current.runId !== input.runId
+            ? [current.runId]
+            : []),
+        ].slice(-32)
+      : []
 
     const observation: SessionCardChildLifecycleObservation = {
       cardId: parent.cardId,
@@ -1330,7 +1344,11 @@ export class SessionCardService {
       if (typeof oldestKey !== 'string') break
       this.childLifecycleByBinding.delete(oldestKey)
     }
-    this.childLifecycleByBinding.set(key, { ...observation, binding })
+    this.childLifecycleByBinding.set(key, {
+      ...observation,
+      binding,
+      supersededRunIds,
+    })
     return observation
   }
 

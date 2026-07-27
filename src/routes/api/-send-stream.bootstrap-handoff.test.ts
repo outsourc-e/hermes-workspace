@@ -511,6 +511,73 @@ describe('send-stream bootstrap session handoff', () => {
     )
   })
 
+  it('falls back to an exclusive durable record identity on provider run collisions', async () => {
+    mocks.createPersistedRun
+      .mockRejectedValueOnce(
+        Object.assign(new Error('collision'), { code: 'EEXIST' }),
+      )
+      .mockResolvedValueOnce({ status: 'accepted' })
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'provider-collision', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'assistant.delta',
+          data: { run_id: 'provider-collision', delta: 'owned output' },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'provider-collision', session_id: 'created-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'created-session',
+          friendlyId: 'created-session',
+          message: 'hello',
+        }),
+      }),
+    })
+    await response.text()
+
+    expect(mocks.createPersistedRun).toHaveBeenCalledTimes(2)
+    const fallback = mocks.createPersistedRun.mock.calls[1]?.[0] as {
+      runId: string
+      providerRunId: string
+    }
+    expect(fallback).toMatchObject({ providerRunId: 'provider-collision' })
+    expect(fallback.runId).toMatch(/^persisted-[a-f0-9-]{36}$/)
+    expect(fallback.runId).not.toBe('provider-collision')
+    expect(mocks.appendRunText).toHaveBeenCalledWith(
+      'created-session',
+      fallback.runId,
+      'owned output',
+      { replace: false },
+    )
+    expect(mocks.markRunStatus).toHaveBeenCalledWith(
+      'created-session',
+      fallback.runId,
+      'complete',
+      undefined,
+    )
+  })
+
   it('preserves ordinary identifier-less events for an unconflicted parent run', async () => {
     mocks.streamChat.mockImplementationOnce(
       async (
@@ -714,6 +781,128 @@ describe('send-stream bootstrap session handoff', () => {
       },
     })
     expect(mocks.migratePersistedRun).not.toHaveBeenCalled()
+  })
+
+  it('omits late superseded child terminals from SSE and public Card activity', async () => {
+    mocks.resolveSessionCard.mockResolvedValue({
+      card: {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey: 'remote:parent',
+        continuationSegmentKeys: ['remote:parent'],
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['remote:parent', 'gateway']]),
+      upstreamKeyBySegmentKey: new Map([['remote:parent', 'parent-session']]),
+    })
+    let currentChildRun: string | null = null
+    let terminal = false
+    const supersededRuns = new Set<string>()
+    mocks.observeChildLifecycle.mockImplementation(
+      (input: {
+        parentCardId: string
+        childUpstreamSessionKey: string
+        runId: string
+        status: 'running' | 'complete' | 'error'
+      }) => {
+        if (supersededRuns.has(input.runId)) return Promise.resolve(null)
+        if (input.status === 'running') {
+          if (currentChildRun === input.runId && terminal)
+            return Promise.resolve(null)
+          if (currentChildRun && currentChildRun !== input.runId) {
+            supersededRuns.add(currentChildRun)
+          }
+          currentChildRun = input.runId
+          terminal = false
+        } else {
+          if (currentChildRun !== input.runId || terminal)
+            return Promise.resolve(null)
+          terminal = true
+        }
+        return Promise.resolve({
+          cardId: input.parentCardId,
+          childCardId: 'remote:child-card',
+          childSessionKey: 'remote:child-session',
+          runId: input.runId,
+          status: input.status,
+          updatedAt: 100,
+        })
+      },
+    )
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'parent-run', session_id: 'parent-session' },
+        })
+        for (const payload of [
+          {
+            event: 'run.started',
+            data: { run_id: 'child-a', session_id: 'child-session' },
+          },
+          {
+            event: 'run.started',
+            data: { run_id: 'child-b', session_id: 'child-session' },
+          },
+          {
+            event: 'run.completed',
+            data: { run_id: 'child-a', session_id: 'child-session' },
+          },
+          {
+            event: 'run.completed',
+            data: { run_id: 'child-b', session_id: 'child-session' },
+          },
+          {
+            event: 'message.started',
+            data: { run_id: 'child-a', session_id: 'child-session' },
+          },
+          {
+            event: 'message.started',
+            data: { run_id: 'child-b', session_id: 'child-session' },
+          },
+        ]) {
+          await options.onEvent(payload)
+        }
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'parent-run', session_id: 'parent-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'remote:parent-card',
+          sessionKey: 'remote:parent',
+          friendlyId: 'remote:parent-card',
+          message: 'delegate with replacement',
+        }),
+      }),
+    })
+    const activities = parseEvents(await response.text())
+      .filter(({ event }) => event === 'card_child_activity')
+      .map(({ data }) => ({ runId: data.runId, status: data.status }))
+
+    expect(activities).toEqual([
+      { runId: 'child-a', status: 'running' },
+      { runId: 'child-b', status: 'running' },
+      { runId: 'child-b', status: 'complete' },
+    ])
+    expect(mocks.publishChatEvent.mock.calls.map((call) => call[1])).toEqual(
+      activities.map((activity) => expect.objectContaining(activity)),
+    )
   })
 
   it('keeps rejected child output entirely out of the parent stream', async () => {

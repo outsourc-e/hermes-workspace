@@ -1,8 +1,11 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { fork } from 'node:child_process'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ChildProcess } from 'node:child_process'
 import type * as FsPromises from 'node:fs/promises'
 
 const fsPromiseState = vi.hoisted(() => ({
@@ -41,6 +44,60 @@ function createDeferred<T = void>() {
     reject = rejectPromise
   })
   return { promise, resolve, reject }
+}
+
+function waitForWorkerMessage<T>(worker: ChildProcess): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const onMessage = (message: unknown) => {
+      cleanup()
+      resolve(message as T)
+    }
+    const onExit = (code: number | null) => {
+      cleanup()
+      reject(new Error(`run-store worker exited before replying (${code})`))
+    }
+    const cleanup = () => {
+      worker.off('message', onMessage)
+      worker.off('exit', onExit)
+    }
+    worker.once('message', onMessage)
+    worker.once('exit', onExit)
+  })
+}
+
+async function startRunStoreWorker(): Promise<ChildProcess> {
+  const worker = fork(
+    fileURLToPath(
+      new URL(
+        './test-fixtures/run-store-concurrency-worker.ts',
+        import.meta.url,
+      ),
+    ),
+    [],
+    {
+      env: { ...process.env, HERMES_HOME: tempHome! },
+      execArgv: ['--import', 'tsx'],
+      stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
+    },
+  )
+  await waitForWorkerMessage<{ ready: true }>(worker)
+  return worker
+}
+
+async function runWorkerCommand<T>(
+  worker: ChildProcess,
+  command: Record<string, unknown>,
+): Promise<T> {
+  const response = waitForWorkerMessage<T>(worker)
+  worker.send(command)
+  return response
+}
+
+async function stopRunStoreWorker(worker: ChildProcess): Promise<void> {
+  if (!worker.connected) return
+  const stopped = waitForWorkerMessage<{ stopped: true }>(worker)
+  worker.send({ action: 'stop' })
+  await stopped
 }
 
 beforeEach(() => {
@@ -194,6 +251,211 @@ describe('run text persistence buffer', () => {
 })
 
 describe('run-store persistence', () => {
+  it('creates run records exclusively instead of replacing a colliding owner', async () => {
+    const { createPersistedRun, getPersistedRun } = await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'provider-collision',
+      sessionKey: 'shared-session',
+      friendlyId: 'first-owner',
+    })
+    await expect(
+      createPersistedRun({
+        runId: 'provider-collision',
+        sessionKey: 'shared-session',
+        friendlyId: 'second-owner',
+      }),
+    ).rejects.toMatchObject({ code: 'EEXIST' })
+
+    await expect(
+      getPersistedRun('shared-session', 'provider-collision'),
+    ).resolves.toMatchObject({ friendlyId: 'first-owner' })
+  })
+
+  it('serializes creation and read-modify-write updates across independent processes', async () => {
+    const workers = await Promise.all([
+      startRunStoreWorker(),
+      startRunStoreWorker(),
+    ])
+    try {
+      const createResults = await Promise.all(
+        workers.map((worker, index) =>
+          runWorkerCommand<{ ok: boolean; code?: string }>(worker, {
+            action: 'create',
+            runId: 'cross-process-run',
+            sessionKey: 'cross-process-session',
+            friendlyId: `owner-${index}`,
+          }),
+        ),
+      )
+      expect(createResults.filter((result) => result.ok)).toHaveLength(1)
+      expect(
+        createResults.filter((result) => result.code === 'EEXIST'),
+      ).toHaveLength(1)
+
+      await Promise.all(
+        workers.map((worker, index) =>
+          runWorkerCommand(worker, {
+            action: 'events',
+            runId: 'cross-process-run',
+            sessionKey: 'cross-process-session',
+            prefix: `worker-${index}`,
+            count: 20,
+          }),
+        ),
+      )
+
+      const { getPersistedRun } = await import('./run-store')
+      const stored = await getPersistedRun(
+        'cross-process-session',
+        'cross-process-run',
+      )
+      expect(stored?.lifecycleEvents).toHaveLength(40)
+      expect(
+        new Set(stored?.lifecycleEvents.map((event) => event.text)),
+      ).toEqual(
+        new Set(
+          workers.flatMap((_, workerIndex) =>
+            Array.from(
+              { length: 20 },
+              (_unused, eventIndex) => `worker-${workerIndex}-${eventIndex}`,
+            ),
+          ),
+        ),
+      )
+    } finally {
+      await Promise.all(workers.map(stopRunStoreWorker))
+    }
+  })
+
+  it('recovers a lock whose owning process is no longer alive', async () => {
+    const { appendRunText, createPersistedRun, getPersistedRun } =
+      await import('./run-store')
+    await createPersistedRun({ runId: 'dead-lock', sessionKey: 'session-a' })
+    writeFileSync(
+      join(tempHome!, 'webui-mvp', 'runs', 'session-a', 'dead-lock.json.lock'),
+      `${JSON.stringify({
+        token: '00000000-0000-4000-8000-000000000000',
+        pid: 2_147_483_647,
+      })}\n`,
+    )
+
+    await appendRunText('session-a', 'dead-lock', 'recovered')
+
+    await expect(
+      getPersistedRun('session-a', 'dead-lock'),
+    ).resolves.toMatchObject({ status: 'active', assistantText: 'recovered' })
+  })
+
+  it('keeps terminal statuses absorbing across independent process writers', async () => {
+    const { createPersistedRun, getPersistedRun } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'terminal-race',
+      sessionKey: 'terminal-session',
+    })
+    const workers = await Promise.all([
+      startRunStoreWorker(),
+      startRunStoreWorker(),
+    ])
+    try {
+      const results = await Promise.all([
+        runWorkerCommand<{ ok: boolean; message?: string }>(workers[0], {
+          action: 'status',
+          runId: 'terminal-race',
+          sessionKey: 'terminal-session',
+          status: 'complete',
+        }),
+        runWorkerCommand<{ ok: boolean; message?: string }>(workers[1], {
+          action: 'append-many',
+          runId: 'terminal-race',
+          sessionKey: 'terminal-session',
+          count: 20,
+        }),
+      ])
+      expect(results).toEqual([{ ok: true }, { ok: true }])
+
+      await expect(
+        getPersistedRun('terminal-session', 'terminal-race'),
+      ).resolves.toMatchObject({ status: 'complete' })
+    } finally {
+      await Promise.all(workers.map(stopRunStoreWorker))
+    }
+  })
+
+  it('bounds tool count and fields while allowing retained tools to terminalize', async () => {
+    const {
+      MAX_PERSISTED_RUN_TOOL_CALLS,
+      PERSISTED_TOOL_ARGS_MAX_BYTES,
+      PERSISTED_TOOL_RESULT_MAX_BYTES,
+      createPersistedRun,
+      getPersistedRun,
+      upsertRunToolCall,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'bounded-tools',
+      sessionKey: 'session-a',
+    })
+
+    for (let index = 0; index < MAX_PERSISTED_RUN_TOOL_CALLS; index += 1) {
+      await upsertRunToolCall('session-a', 'bounded-tools', {
+        id: `tool-${index}`,
+        name: 'read_file',
+        phase: 'calling',
+        args: { payload: 'a'.repeat(PERSISTED_TOOL_ARGS_MAX_BYTES * 2) },
+      })
+    }
+    await upsertRunToolCall('session-a', 'bounded-tools', {
+      id: 'rejected-over-cap',
+      name: 'unknown',
+      phase: 'calling',
+    })
+    await upsertRunToolCall('session-a', 'bounded-tools', {
+      id: 'tool-0',
+      name: 'read_file',
+      phase: 'complete',
+      result: 'r'.repeat(PERSISTED_TOOL_RESULT_MAX_BYTES * 2),
+    })
+
+    const stored = await getPersistedRun('session-a', 'bounded-tools')
+    expect(stored?.toolCalls).toHaveLength(MAX_PERSISTED_RUN_TOOL_CALLS)
+    expect(stored?.toolCalls.some(({ id }) => id === 'rejected-over-cap')).toBe(
+      false,
+    )
+    expect(stored?.toolCalls[0]).toMatchObject({
+      id: 'tool-0',
+      phase: 'complete',
+    })
+    expect(
+      Buffer.byteLength(JSON.stringify(stored?.toolCalls[0]?.args), 'utf8'),
+    ).toBeLessThanOrEqual(PERSISTED_TOOL_ARGS_MAX_BYTES)
+    expect(
+      Buffer.byteLength(stored?.toolCalls[0]?.result ?? '', 'utf8'),
+    ).toBeLessThanOrEqual(PERSISTED_TOOL_RESULT_MAX_BYTES)
+  })
+
+  it('sanitizes persisted tool failures without copying raw provider errors', async () => {
+    const { createPersistedRun, getPersistedRun, upsertRunToolCall } =
+      await import('./run-store')
+    await createPersistedRun({ runId: 'tool-error', sessionKey: 'session-a' })
+
+    await upsertRunToolCall('session-a', 'tool-error', {
+      id: 'failed-tool',
+      name: 'shell',
+      phase: 'error',
+      result: 'secret-token=do-not-persist',
+    })
+
+    const stored = await getPersistedRun('session-a', 'tool-error')
+    expect(JSON.stringify(stored)).not.toContain('secret-token=do-not-persist')
+    expect(stored).toMatchObject({
+      status: 'error',
+      errorMessage: 'A tool call failed.',
+      toolCalls: [
+        expect.objectContaining({ phase: 'error', result: 'Tool failed.' }),
+      ],
+    })
+  })
+
   it('rejects unsafe run ids without writing outside the session directory', async () => {
     const { createPersistedRun, getPersistedRun } = await import('./run-store')
     const escapedPath = join(tempHome!, 'webui-mvp', 'escaped-run.json')

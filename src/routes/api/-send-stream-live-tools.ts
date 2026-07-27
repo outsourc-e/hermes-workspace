@@ -1,4 +1,4 @@
-type SyntheticLiveToolTracker = {
+export type SyntheticLiveToolTracker = {
   emittedPhaseByToolCallId: Map<string, 'calling' | 'complete' | 'error'>
 }
 
@@ -19,8 +19,44 @@ type SyntheticLiveToolEvent = {
   runId?: string
 }
 
-function readString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
+export const SYNTHETIC_LIVE_TOOL_ID_LIMIT = 128
+export const SYNTHETIC_LIVE_TOOL_ID_MAX_BYTES = 256
+export const SYNTHETIC_LIVE_TOOL_NAME_MAX_BYTES = 128
+export const SYNTHETIC_LIVE_TOOL_ARGS_MAX_BYTES = 16 * 1024
+export const SYNTHETIC_LIVE_TOOL_RESULT_MAX_BYTES = 16 * 1024
+
+function truncateUtf8(value: string, maxBytes: number): string {
+  if (Buffer.byteLength(value, 'utf8') <= maxBytes) return value
+  let result = ''
+  let bytes = 0
+  for (const character of value) {
+    const characterBytes = Buffer.byteLength(character, 'utf8')
+    if (bytes + characterBytes > maxBytes) break
+    result += character
+    bytes += characterBytes
+  }
+  return result
+}
+
+function containsControlCharacter(value: string): boolean {
+  for (const character of value) {
+    const code = character.charCodeAt(0)
+    if (code <= 31 || code === 127) return true
+  }
+  return false
+}
+
+function readBoundedIdentifier(value: unknown, maxBytes: number): string {
+  if (typeof value !== 'string' || !value || value.trim() !== value) return ''
+  if (containsControlCharacter(value)) return ''
+  return Buffer.byteLength(value, 'utf8') <= maxBytes ? value : ''
+}
+
+function readBoundedName(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed || containsControlCharacter(trimmed)) return ''
+  return truncateUtf8(trimmed, SYNTHETIC_LIVE_TOOL_NAME_MAX_BYTES)
 }
 
 function readRecord(value: unknown): Record<string, unknown> | undefined {
@@ -29,21 +65,37 @@ function readRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined
 }
 
-function parseJsonIfPossible(value: unknown): unknown {
-  if (typeof value !== 'string') return value
+function parseBoundedJsonIfPossible(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    try {
+      const serialized = JSON.stringify(value)
+      if (
+        Buffer.byteLength(serialized, 'utf8') <=
+        SYNTHETIC_LIVE_TOOL_ARGS_MAX_BYTES
+      ) {
+        return value
+      }
+    } catch {
+      // Fall through to the bounded omission marker.
+    }
+    return { omitted: 'Tool arguments could not be persisted safely.' }
+  }
   const trimmed = value.trim()
   if (!trimmed) return value
+  if (Buffer.byteLength(trimmed, 'utf8') > SYNTHETIC_LIVE_TOOL_ARGS_MAX_BYTES) {
+    return { omitted: 'Tool arguments exceeded the persistence limit.' }
+  }
   if (
     (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
     (trimmed.startsWith('[') && trimmed.endsWith(']'))
   ) {
     try {
-      return JSON.parse(trimmed)
+      return JSON.parse(trimmed) as unknown
     } catch {
-      return value
+      return truncateUtf8(value, SYNTHETIC_LIVE_TOOL_ARGS_MAX_BYTES)
     }
   }
-  return value
+  return truncateUtf8(value, SYNTHETIC_LIVE_TOOL_ARGS_MAX_BYTES)
 }
 
 function extractToolResultText(message: Record<string, unknown>): string {
@@ -72,45 +124,66 @@ export function collectSyntheticLiveToolEvents({
   sessionKey,
   runId,
 }: CollectSyntheticLiveToolEventsParams): Array<SyntheticLiveToolEvent> {
-  const resultByCallId = new Map<string, { text: string; isError: boolean }>()
-  const runToolCalls: Array<Record<string, unknown>> = []
+  const runToolCalls = new Map<string, Record<string, unknown>>()
 
   for (const message of messages) {
-    if (message.role === 'tool' || message.role === 'tool_result') {
-      const callId =
-        readString(message.tool_call_id) || readString(message.toolCallId)
-      if (!callId) continue
-      resultByCallId.set(callId, {
-        text: extractToolResultText(message),
-        isError: Boolean(message.is_error) || Boolean(message.isError),
-      })
-      continue
-    }
-
-    if (message.role === 'assistant') {
-      const toolCalls = (message.tool_calls ?? message.toolCalls) as
-        | Array<Record<string, unknown>>
-        | undefined
-      if (Array.isArray(toolCalls) && toolCalls.length > 0) {
-        runToolCalls.push(...toolCalls)
+    if (message.role !== 'assistant') continue
+    const toolCalls = (message.tool_calls ?? message.toolCalls) as
+      | Array<Record<string, unknown>>
+      | undefined
+    if (!Array.isArray(toolCalls)) continue
+    for (const toolCall of toolCalls) {
+      const toolCallId =
+        readBoundedIdentifier(toolCall.id, SYNTHETIC_LIVE_TOOL_ID_MAX_BYTES) ||
+        readBoundedIdentifier(
+          toolCall.tool_call_id,
+          SYNTHETIC_LIVE_TOOL_ID_MAX_BYTES,
+        )
+      if (!toolCallId) continue
+      const retained =
+        runToolCalls.has(toolCallId) ||
+        tracker.emittedPhaseByToolCallId.has(toolCallId)
+      if (!retained && runToolCalls.size >= SYNTHETIC_LIVE_TOOL_ID_LIMIT) {
+        continue
       }
+      runToolCalls.set(toolCallId, toolCall)
     }
   }
 
+  const resultByCallId = new Map<string, { text: string; isError: boolean }>()
+  for (const message of messages) {
+    if (message.role !== 'tool' && message.role !== 'tool_result') continue
+    const callId =
+      readBoundedIdentifier(
+        message.tool_call_id,
+        SYNTHETIC_LIVE_TOOL_ID_MAX_BYTES,
+      ) ||
+      readBoundedIdentifier(
+        message.toolCallId,
+        SYNTHETIC_LIVE_TOOL_ID_MAX_BYTES,
+      )
+    if (!callId || !runToolCalls.has(callId)) continue
+    const isError = Boolean(message.is_error) || Boolean(message.isError)
+    resultByCallId.set(callId, {
+      text: isError
+        ? 'Tool failed.'
+        : truncateUtf8(
+            extractToolResultText(message),
+            SYNTHETIC_LIVE_TOOL_RESULT_MAX_BYTES,
+          ),
+      isError,
+    })
+  }
+
   const events: Array<SyntheticLiveToolEvent> = []
-
-  for (const toolCall of runToolCalls) {
+  for (const [toolCallId, toolCall] of runToolCalls) {
     const toolFunction = readRecord(toolCall.function)
-    const toolCallId =
-      readString(toolCall.id) || readString(toolCall.tool_call_id) || ''
-    if (!toolCallId) continue
-
     const name =
-      readString(toolCall.tool_name) ||
-      readString(toolCall.name) ||
-      readString(toolFunction?.name) ||
+      readBoundedName(toolCall.tool_name) ||
+      readBoundedName(toolCall.name) ||
+      readBoundedName(toolFunction?.name) ||
       'tool'
-    const args = parseJsonIfPossible(
+    const args = parseBoundedJsonIfPossible(
       toolFunction?.arguments ?? toolCall.arguments,
     )
     const resultEntry = resultByCallId.get(toolCallId)
@@ -125,6 +198,12 @@ export function collectSyntheticLiveToolEvents({
     if (
       previousPhase &&
       (previousPhase === 'complete' || previousPhase === 'error')
+    ) {
+      continue
+    }
+    if (
+      previousPhase === undefined &&
+      tracker.emittedPhaseByToolCallId.size >= SYNTHETIC_LIVE_TOOL_ID_LIMIT
     ) {
       continue
     }

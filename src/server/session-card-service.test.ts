@@ -781,6 +781,73 @@ describe('SessionCardService collection and resolution', () => {
     )
   })
 
+  it('rejects superseded terminals and terminal-to-running regressions for one child binding', async () => {
+    const rows = [
+      session('parent', { source: 'cli' }, 10),
+      session(
+        'child',
+        {
+          parentSessionId: 'parent',
+          relationshipType: 'child_session',
+          source: 'cli',
+          startedAt: 20,
+        },
+        20,
+      ),
+    ]
+    let now = 100
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page(rows, 0, rows.length)),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+      now: () => now++,
+    })
+    const observe = (runId: string, status: 'running' | 'complete' | 'error') =>
+      service.observeChildLifecycle({
+        parentCardId: 'remote:parent',
+        childUpstreamSessionKey: 'child',
+        runId,
+        status,
+      })
+
+    await expect(observe('run-a', 'running')).resolves.toMatchObject({
+      runId: 'run-a',
+      status: 'running',
+    })
+    await expect(observe('run-b', 'running')).resolves.toMatchObject({
+      runId: 'run-b',
+      status: 'running',
+    })
+    await expect(observe('run-a', 'complete')).resolves.toBeNull()
+    await expect(observe('run-a', 'error')).resolves.toBeNull()
+    await expect(observe('run-a', 'running')).resolves.toBeNull()
+    await expect(service.listCards()).resolves.toMatchObject({
+      cards: [
+        {
+          childNodes: [
+            expect.objectContaining({
+              cardId: 'remote:child',
+              status: 'running',
+            }),
+          ],
+        },
+      ],
+    })
+
+    await expect(observe('run-b', 'complete')).resolves.toMatchObject({
+      runId: 'run-b',
+      status: 'complete',
+    })
+    await expect(observe('run-b', 'running')).resolves.toBeNull()
+    expect((await service.listCards()).cards[0]?.childNodes[0]).toMatchObject({
+      cardId: 'remote:child',
+      status: 'complete',
+    })
+  })
+
   it('fails closed and clears stale child activity when the validated relationship changes', async () => {
     let rows = [
       session('parent', { source: 'cli' }, 10),

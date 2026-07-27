@@ -724,11 +724,10 @@ export const Route = createFileRoute('/api/send-stream')({
             await runTextBuffer?.seal()
           },
           persist: async (status, errorMessage) => {
-            const runId = persistedRunId
-            if (!runId) return
             await (persistedRunReady ?? Promise.resolve())
+            const runId = persistedRunId
             const runSessionKey = activeRunSessionKey
-            if (!runSessionKey) return
+            if (!runId || !runSessionKey) return
             await markRunStatus(runSessionKey, runId, status, errorMessage)
           },
         })
@@ -768,13 +767,30 @@ export const Route = createFileRoute('/api/send-stream')({
             sessionKey: runSessionKey,
             friendlyId,
             ...cardIdentity,
-          }).catch(() => null)
+          }).catch(async (error: unknown) => {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') return null
+            const durableRunId = `persisted-${crypto.randomUUID()}`
+            persistedRunId = durableRunId
+            return createPersistedRun({
+              runId: durableRunId,
+              providerRunId: runId,
+              sessionKey: runSessionKey,
+              friendlyId,
+              ...cardIdentity,
+            })
+          })
           runTextBuffer = createRunTextPersistenceBuffer(
             async (text, options) => {
               await (persistedRunReady ?? Promise.resolve())
               const targetRunSessionKey = activeRunSessionKey
-              if (!targetRunSessionKey) return null
-              return appendRunText(targetRunSessionKey, runId, text, options)
+              const targetRunId = persistedRunId
+              if (!targetRunSessionKey || !targetRunId) return null
+              return appendRunText(
+                targetRunSessionKey,
+                targetRunId,
+                text,
+                options,
+              )
             },
           )
         }
@@ -785,9 +801,7 @@ export const Route = createFileRoute('/api/send-stream')({
           friendlyId: string,
           cardIdentity?: { cardId: string; canonicalSegmentKey: string },
         ) => {
-          const runId = persistedRunId
           if (
-            !runId ||
             !persistedRunReady ||
             fromSessionKey === toSessionKey ||
             streamTransportUnavailable()
@@ -805,6 +819,8 @@ export const Route = createFileRoute('/api/send-stream')({
             const migrationReady = (async () => {
               await waitWithinStreamLifetime(priorRunReady)
               if (streamTransportUnavailable()) return
+              const runId = persistedRunId
+              if (!runId) return
 
               const migration = cardIdentity
                 ? migratePersistedRun(
@@ -862,11 +878,14 @@ export const Route = createFileRoute('/api/send-stream')({
           if (terminalRunTransition.isSealed() && !allowAfterTerminalClaim) {
             return Promise.resolve()
           }
-          if (!activeRunId || !activeRunSessionKey) return Promise.resolve()
-          const runId = activeRunId
-          const runSessionKey = activeRunSessionKey
+          if (!persistedRunId || !activeRunSessionKey) return Promise.resolve()
           const nextReady = (persistedRunReady ?? Promise.resolve())
-            .then(() => write(runSessionKey, runId))
+            .then(() => {
+              const runId = persistedRunId
+              const runSessionKey = activeRunSessionKey
+              if (!runId || !runSessionKey) return null
+              return write(runSessionKey, runId)
+            })
             .then(() => null)
             .catch(() => null)
           persistedRunReady = nextReady
