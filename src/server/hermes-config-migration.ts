@@ -1,4 +1,10 @@
-export type HermesProviderKind = 'oauth' | 'api_key' | 'local' | 'custom'
+export type HermesProviderKind =
+  | 'oauth'
+  | 'api_key'
+  | 'local'
+  | 'custom'
+  | 'external'
+  | 'sdk'
 
 export type HermesAuthSource =
   | 'env'
@@ -85,14 +91,41 @@ export type NormalizeHermesConfigInput = {
 
 export const HERMES_PROVIDER_CATALOG: Array<ProviderDef> = [
   { id: 'nous', name: 'Nous Portal', kind: 'oauth', envKeys: [], models: [] },
-  { id: 'openai-codex', name: 'OpenAI Codex', kind: 'oauth', envKeys: [], models: [] },
-  { id: 'anthropic', name: 'Anthropic', kind: 'api_key', envKeys: ['ANTHROPIC_API_KEY'], models: [] },
   { id: 'openrouter', name: 'OpenRouter', kind: 'api_key', envKeys: ['OPENROUTER_API_KEY'], models: [] },
-  { id: 'zai', name: 'Z.AI / GLM', kind: 'api_key', envKeys: ['GLM_API_KEY'], models: [] },
-  { id: 'kimi-coding', name: 'Kimi', kind: 'api_key', envKeys: ['KIMI_API_KEY'], models: [] },
-  { id: 'minimax', name: 'MiniMax', kind: 'api_key', envKeys: ['MINIMAX_API_KEY'], models: [] },
-  { id: 'minimax-cn', name: 'MiniMax (China)', kind: 'api_key', envKeys: ['MINIMAX_CN_API_KEY'], models: [] },
+  { id: 'novita', name: 'NovitaAI', kind: 'api_key', envKeys: ['NOVITA_API_KEY'], models: [] },
+  { id: 'lmstudio', name: 'LM Studio', kind: 'local', envKeys: ['LM_API_KEY'], models: [] },
+  { id: 'anthropic', name: 'Anthropic', kind: 'api_key', envKeys: ['ANTHROPIC_API_KEY', 'ANTHROPIC_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'], models: [] },
+  { id: 'openai-codex', name: 'OpenAI Codex', kind: 'oauth', envKeys: [], models: [] },
+  { id: 'openai-api', name: 'OpenAI API', kind: 'api_key', envKeys: ['OPENAI_API_KEY'], models: [] },
+  { id: 'alibaba', name: 'Qwen Cloud / DashScope', kind: 'api_key', envKeys: ['DASHSCOPE_API_KEY'], models: [] },
+  { id: 'alibaba-coding-plan', name: 'Alibaba Cloud (Coding Plan)', kind: 'api_key', envKeys: ['ALIBABA_CODING_PLAN_API_KEY', 'DASHSCOPE_API_KEY'], models: [] },
+  { id: 'xai-oauth', name: 'xAI Grok OAuth', kind: 'oauth', envKeys: [], models: [] },
   { id: 'xiaomi', name: 'Xiaomi MiMo', kind: 'api_key', envKeys: ['XIAOMI_API_KEY'], models: [] },
+  { id: 'tencent-tokenhub', name: 'Tencent TokenHub', kind: 'api_key', envKeys: ['TOKENHUB_API_KEY'], models: [] },
+  { id: 'nvidia', name: 'NVIDIA NIM', kind: 'api_key', envKeys: ['NVIDIA_API_KEY'], models: [] },
+  { id: 'copilot', name: 'GitHub Copilot', kind: 'api_key', envKeys: ['COPILOT_GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'], models: [] },
+  { id: 'copilot-acp', name: 'GitHub Copilot ACP', kind: 'external', envKeys: [], models: [] },
+  { id: 'huggingface', name: 'Hugging Face', kind: 'api_key', envKeys: ['HF_TOKEN'], models: [] },
+  { id: 'gemini', name: 'Google AI Studio', kind: 'api_key', envKeys: ['GOOGLE_API_KEY', 'GEMINI_API_KEY'], models: [] },
+  { id: 'google-gemini-cli', name: 'Google Gemini (OAuth)', kind: 'oauth', envKeys: [], models: [] },
+  { id: 'deepseek', name: 'DeepSeek', kind: 'api_key', envKeys: ['DEEPSEEK_API_KEY'], models: [] },
+  { id: 'xai', name: 'xAI', kind: 'api_key', envKeys: ['XAI_API_KEY'], models: [] },
+  { id: 'zai', name: 'Z.AI / GLM', kind: 'api_key', envKeys: ['GLM_API_KEY', 'ZAI_API_KEY', 'Z_AI_API_KEY'], models: [] },
+  { id: 'kimi-coding', name: 'Kimi / Moonshot', kind: 'api_key', envKeys: ['KIMI_API_KEY', 'KIMI_CODING_API_KEY'], models: [] },
+  { id: 'kimi-coding-cn', name: 'Kimi / Moonshot (China)', kind: 'api_key', envKeys: ['KIMI_CN_API_KEY'], models: [] },
+  { id: 'stepfun', name: 'StepFun Step Plan', kind: 'api_key', envKeys: ['STEPFUN_API_KEY'], models: [] },
+  { id: 'minimax', name: 'MiniMax', kind: 'api_key', envKeys: ['MINIMAX_API_KEY'], models: [] },
+  { id: 'minimax-oauth', name: 'MiniMax (OAuth)', kind: 'oauth', envKeys: [], models: [] },
+  { id: 'minimax-cn', name: 'MiniMax (China)', kind: 'api_key', envKeys: ['MINIMAX_CN_API_KEY'], models: [] },
+  { id: 'ollama-cloud', name: 'Ollama Cloud', kind: 'api_key', envKeys: ['OLLAMA_API_KEY'], models: [] },
+  { id: 'arcee', name: 'Arcee AI', kind: 'api_key', envKeys: ['ARCEEAI_API_KEY'], models: [] },
+  { id: 'gmi', name: 'GMI Cloud', kind: 'api_key', envKeys: ['GMI_API_KEY'], models: [] },
+  { id: 'kilocode', name: 'Kilo Code', kind: 'api_key', envKeys: ['KILOCODE_API_KEY'], models: [] },
+  { id: 'opencode-zen', name: 'OpenCode Zen', kind: 'api_key', envKeys: ['OPENCODE_ZEN_API_KEY'], models: [] },
+  { id: 'opencode-go', name: 'OpenCode Go', kind: 'api_key', envKeys: ['OPENCODE_GO_API_KEY'], models: [] },
+  { id: 'bedrock', name: 'AWS Bedrock', kind: 'sdk', envKeys: [], models: [] },
+  { id: 'azure-foundry', name: 'Azure Foundry', kind: 'api_key', envKeys: ['AZURE_FOUNDRY_API_KEY'], models: [] },
+  { id: 'qwen-oauth', name: 'Qwen OAuth', kind: 'oauth', envKeys: [], models: [] },
   { id: 'ollama', name: 'Ollama', kind: 'local', envKeys: [], models: [] },
   { id: 'atomic-chat', name: 'Atomic Chat', kind: 'local', envKeys: [], models: [] },
   { id: 'custom', name: 'Custom', kind: 'custom', envKeys: ['CUSTOM_API_KEY'], models: [] },

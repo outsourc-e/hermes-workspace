@@ -2,9 +2,9 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
   ssr: false,
-  beforeLoad: function redirectToChat() {
+  beforeLoad: function redirectToMissionControl() {
     throw redirect({
-      to: '/chat' as string,
+      to: '/mission-control' as string,
       replace: true,
     })
   },

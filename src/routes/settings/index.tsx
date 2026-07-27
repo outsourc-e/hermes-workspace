@@ -1040,9 +1040,11 @@ function _LoaderStyleSection() {
 type ClaudeProvider = {
   id: string
   name: string
-  authType: string
+  kind: 'oauth' | 'api_key' | 'local' | 'custom' | 'external' | 'sdk'
   envKeys: Array<string>
   configured: boolean
+  authenticated: boolean
+  available: boolean
   maskedKeys: Record<string, string>
 }
 
@@ -1062,7 +1064,97 @@ const CLAUDE_API =
 type AvailableModelsResponse = {
   provider: string
   models: Array<{ id: string; description: string }>
-  providers: Array<{ id: string; label: string; authenticated: boolean }>
+  providers?: Array<{ id: string; label: string; authenticated: boolean }>
+}
+
+type ProviderPickerOption = { id: string; label: string; authenticated: boolean }
+
+const LOCAL_PROVIDER_IDS = new Set(['ollama', 'atomic-chat', 'lmstudio'])
+const CONFIGURED_ENDPOINT_PROVIDER_KINDS = new Set(['custom', 'local'])
+
+function providerDisplayLabel(provider: ClaudeProvider): string {
+  const authHint = provider.authenticated || provider.configured ? ' ✓' : ''
+  return `${provider.name}${authHint}`
+}
+
+function customProviderTitle(entry: Record<string, unknown>): string {
+  const normalized = normalizeCustomProviderEntry(entry)
+  return normalized.title || normalized.name || normalized.base_url || 'Custom provider'
+}
+
+function buildProviderOptions(
+  providers: Array<ClaudeProvider>,
+  customProviders: Array<Record<string, unknown>>,
+  existing: Array<ProviderPickerOption> = [],
+): Array<ProviderPickerOption> {
+  const options: Array<ProviderPickerOption> = []
+  const seen = new Set<string>()
+  const push = (option: ProviderPickerOption) => {
+    const id = option.id.trim()
+    if (!id || seen.has(id)) return
+    seen.add(id)
+    options.push({ ...option, id })
+  }
+
+  for (const provider of providers) {
+    push({
+      id: provider.id,
+      label: providerDisplayLabel(provider),
+      authenticated: provider.authenticated || provider.configured,
+    })
+  }
+  for (const row of customProviders) {
+    const normalized = normalizeCustomProviderEntry(row)
+    if (!normalized.name) continue
+    push({
+      id: normalized.name,
+      label: `${customProviderTitle(row)} (${normalized.name})`,
+      authenticated: Boolean(normalized.api_key || normalized.base_url),
+    })
+  }
+  for (const option of existing) push(option)
+
+  return options
+}
+
+function customProviderRowForId(
+  providerId: string,
+  customProviders: Array<Record<string, unknown>>,
+): ReturnType<typeof normalizeCustomProviderEntry> | null {
+  const wanted = providerId.trim().toLowerCase()
+  if (!wanted) return null
+  for (const row of customProviders) {
+    const normalized = normalizeCustomProviderEntry(row)
+    if (normalized.name.toLowerCase() === wanted) return normalized
+  }
+  return null
+}
+
+function providerUsesBaseUrl(
+  providerId: string,
+  providers: Array<ClaudeProvider>,
+  customProviders: Array<Record<string, unknown>>,
+): boolean {
+  const id = providerId.trim()
+  if (!id) return false
+  if (customProviderRowForId(id, customProviders)?.base_url) return true
+  if (LOCAL_PROVIDER_IDS.has(id)) return true
+  const catalogEntry = providers.find((p) => p.id === id)
+  if (!catalogEntry) return true
+  return CONFIGURED_ENDPOINT_PROVIDER_KINDS.has(catalogEntry.kind)
+}
+
+function baseUrlForProviderSelection(
+  providerId: string,
+  currentProvider: string,
+  currentBaseUrl: string,
+  providers: Array<ClaudeProvider>,
+  customProviders: Array<Record<string, unknown>>,
+): string {
+  const customRow = customProviderRowForId(providerId, customProviders)
+  if (customRow?.base_url) return customRow.base_url
+  if (!providerUsesBaseUrl(providerId, providers, customProviders)) return ''
+  return providerId.trim() === currentProvider.trim() ? currentBaseUrl.trim() : ''
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -1264,7 +1356,7 @@ function ClaudeConfigSection({
   const [showFallbackRow, setShowFallbackRow] = useState(false)
 
   const [availableProviders, setAvailableProviders] = useState<
-    Array<{ id: string; label: string; authenticated: boolean }>
+    Array<ProviderPickerOption>
   >([])
   const [availableModels, setAvailableModels] = useState<
     Array<{ id: string; description: string }>
@@ -1273,9 +1365,22 @@ function ClaudeConfigSection({
 
   const syncInputsFromData = useCallback((configData: ClaudeConfigData) => {
     const cfg = configData.config
+    const activeProvider = configData.activeProvider || ''
+    const configCustomProviders = Array.isArray(cfg.custom_providers)
+      ? (cfg.custom_providers as Array<Record<string, unknown>>)
+      : []
+    const configuredBaseUrl = typeof cfg.base_url === 'string' ? cfg.base_url : ''
     setModelInput(configData.activeModel || '')
-    setProviderInput(configData.activeProvider || '')
-    setBaseUrlInput((cfg.base_url as string) || '')
+    setProviderInput(activeProvider)
+    setBaseUrlInput(
+      baseUrlForProviderSelection(
+        activeProvider,
+        activeProvider,
+        configuredBaseUrl,
+        configData.providers,
+        configCustomProviders,
+      ),
+    )
     const fb = readFallbackInputsFromConfig(cfg)
     setFallbackProviderInput(fb.provider)
     setFallbackModelInput(fb.model)
@@ -1290,6 +1395,12 @@ function ClaudeConfigSection({
     const configData = (await res.json()) as ClaudeConfigData
     setData(configData)
     syncInputsFromData(configData)
+    const configCustomProviders = Array.isArray(configData.config.custom_providers)
+      ? (configData.config.custom_providers as Array<Record<string, unknown>>)
+      : []
+    setAvailableProviders((prev) =>
+      buildProviderOptions(configData.providers, configCustomProviders, prev),
+    )
     return configData
   }, [syncInputsFromData])
 
@@ -1306,7 +1417,12 @@ function ClaudeConfigSection({
       if (res.ok) {
         const result = (await res.json()) as AvailableModelsResponse
         setAvailableModels(result.models)
-        if (result.providers.length > 0) setAvailableProviders(result.providers)
+        const upstreamProviders = result.providers ?? []
+        if (upstreamProviders.length > 0) {
+          setAvailableProviders((prev) =>
+            buildProviderOptions([], [], [...prev, ...upstreamProviders]),
+          )
+        }
       }
     } catch {
       // ignore
@@ -1575,6 +1691,15 @@ function ClaudeConfigSection({
                   const newProvider = e.target.value
                   setProviderInput(newProvider)
                   setModelInput('')
+                  setBaseUrlInput(
+                    baseUrlForProviderSelection(
+                      newProvider,
+                      data.activeProvider,
+                      primaryConfigBaseUrl,
+                      data.providers,
+                      customProviders,
+                    ),
+                  )
                   void fetchModelsForProvider(newProvider)
                 }}
                 className={selectClassName}
@@ -1582,7 +1707,7 @@ function ClaudeConfigSection({
                 {availableProviders.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.label}
-                    {p.authenticated ? ' ✓' : ''}
+                    {p.authenticated && !p.label.includes('✓') ? ' ✓' : ''}
                   </option>
                 ))}
               </select>
@@ -1721,10 +1846,15 @@ function ClaudeConfigSection({
                 fallbackProviderInput.trim() ||
                 fallbackModelInput.trim() ||
                 fallbackBaseUrlInput.trim()
+              const primaryBaseUrl = baseUrlInput.trim()
               const configUpdate: Record<string, unknown> = {
                 model: modelInput.trim(),
                 provider: providerInput.trim(),
-                base_url: baseUrlInput.trim() || null,
+                base_url:
+                  providerUsesBaseUrl(providerInput.trim(), data.providers, customProviders) &&
+                  primaryBaseUrl
+                    ? primaryBaseUrl
+                    : null,
               }
               if (hasFallback) {
                 configUpdate.fallback_model = {
@@ -2243,7 +2373,7 @@ function ClaudeConfigSection({
                       style={{ color: 'var(--theme-muted)' }}
                     >
                       {customApiKeyConfigured
-                        ? customProviderCatalogEntry.maskedKeys['CUSTOM_API_KEY'] || 'Set'
+                        ? (customProviderCatalogEntry?.maskedKeys ?? {})['CUSTOM_API_KEY'] || 'Set'
                         : 'Not set'}
                     </span>
                     <Button

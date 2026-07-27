@@ -6,6 +6,7 @@ import type {
   SessionTitleStatus,
   ToolCallContent,
 } from './types'
+import { stripProjectContextDirective } from '../../lib/project-context'
 import { stripWorkspaceDirective } from '../../lib/workspace-message-scope'
 
 export function deriveFriendlyIdFromKey(key: string | undefined): string {
@@ -53,7 +54,7 @@ function stripChannelPrefix(text: string): string {
  * and [Telegram/Signal/etc ...] headers, leaving just the user's text.
  */
 function cleanUserText(raw: string): string {
-  let text = stripWorkspaceDirective(raw)
+  let text = stripProjectContextDirective(stripWorkspaceDirective(raw))
 
   // Remove "Conversation info (untrusted metadata):" headers + JSON block
   // Format: "Conversation info (untrusted metadata):\n```json\n{...}\n```\n\n"
@@ -289,5 +290,13 @@ export const missingAuthMessage =
   'Hermes Agent connection failed. Make sure Hermes Agent is running and HERMES_API_URL is set correctly.'
 
 export function isMissingAuth(message: string): boolean {
-  return message.includes(missingAuthMessage)
+  const normalized = message.trim().toLowerCase()
+  return (
+    message.includes(missingAuthMessage) ||
+    normalized === 'unauthorized' ||
+    normalized.includes('"error":"unauthorized"') ||
+    normalized.includes('"error": "unauthorized"') ||
+    normalized.includes('401 unauthorized') ||
+    normalized.includes('stream request failed (401)')
+  )
 }

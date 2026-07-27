@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { buildResolvedSessionHeaders } from '../../lib/send-stream-session-headers'
 import { buildWorkspaceScopedTextMessage } from '../../lib/workspace-message-scope'
+import { buildProjectScopedTextMessage } from '../../lib/project-context'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
@@ -311,6 +312,8 @@ export const Route = createFileRoute('/api/send-stream')({
           typeof body.thinking === 'string' ? body.thinking : undefined
         const attachments = normalizeAttachments(body.attachments)
         const history = normalizePortableHistory(body.history)
+        const projectId =
+          typeof body.projectId === 'string' ? body.projectId.trim() : ''
         if (!message.trim() && (!attachments || attachments.length === 0)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'message required' }),
@@ -371,9 +374,20 @@ export const Route = createFileRoute('/api/send-stream')({
         }
 
         const workspaceScope = await loadWorkspaceCatalog().catch(() => null)
-        const scopedMessage = buildWorkspaceScopedTextMessage(
+        const workspaceScopedMessage = buildWorkspaceScopedTextMessage(
           getChatMessage(message, attachments),
           workspaceScope,
+        )
+        const scopedMessage = buildProjectScopedTextMessage(
+          workspaceScopedMessage,
+          projectId
+            ? {
+                id: projectId,
+                name: '',
+                goal: '',
+                instructions: '',
+              }
+            : null,
         )
 
         // Create streaming response using the SHARED server connection

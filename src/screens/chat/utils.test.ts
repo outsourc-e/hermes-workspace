@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { normalizeSessions, textFromMessage } from './utils'
+import { normalizeSessions, textFromMessage, isMissingAuth, missingAuthMessage } from './utils'
 import type { ChatMessage, SessionSummary } from './types'
 
 describe('chat utils workspace directive cleanup', () => {
@@ -16,6 +16,20 @@ describe('chat utils workspace directive cleanup', () => {
     }
 
     expect(textFromMessage(message)).toBe('Run the tests')
+  })
+
+  it('hides project_context directives from user-visible message text', () => {
+    const message: ChatMessage = {
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: '<project_context active="true" id="seo" name="SEO" goal="Launch" instructions="Stay focused" />\n\nWhat should we do next?',
+        },
+      ],
+    }
+
+    expect(textFromMessage(message)).toBe('What should we do next?')
   })
 
   it('strips workspace_context directives from session previews and derived titles', () => {
@@ -37,5 +51,17 @@ describe('chat utils workspace directive cleanup', () => {
     expect(sessions[0]?.preview).toBe('Review the open PRs')
     expect(sessions[0]?.derivedTitle).toBe('Review the open PRs')
     expect(sessions[1]?.derivedTitle).toBe('Fix Docker publish')
+  })
+})
+
+describe('chat auth error detection', () => {
+  it('detects legacy gateway auth failure text', () => {
+    expect(isMissingAuth(missingAuthMessage)).toBe(true)
+  })
+
+  it('detects expired workspace session responses', () => {
+    expect(isMissingAuth('Unauthorized')).toBe(true)
+    expect(isMissingAuth('{"ok":false,"error":"Unauthorized"}')).toBe(true)
+    expect(isMissingAuth('401 Unauthorized')).toBe(true)
   })
 })

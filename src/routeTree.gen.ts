@@ -20,7 +20,10 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReserveRouteImport } from './routes/reserve'
 import { Route as ProfilesRouteImport } from './routes/profiles'
 import { Route as PlaygroundRouteImport } from './routes/playground'
+import { Route as OutreachRouteImport } from './routes/outreach'
 import { Route as OperationsRouteImport } from './routes/operations'
+import { Route as NotionRouteImport } from './routes/notion'
+import { Route as MissionControlRouteImport } from './routes/mission-control'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as JobsRouteImport } from './routes/jobs'
@@ -30,6 +33,7 @@ import { Route as EchoStudioRouteImport } from './routes/echo-studio'
 import { Route as EarlyAccessRouteImport } from './routes/early-access'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
+import { Route as ApprovalQueueRouteImport } from './routes/approval-queue'
 import { Route as AgoraRouteImport } from './routes/agora'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
@@ -75,6 +79,7 @@ import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-hist
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
+import { Route as ApiProjectsRouteImport } from './routes/api/projects'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
 import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-npc'
@@ -135,7 +140,14 @@ import { Route as ApiProfilesCreateRouteImport } from './routes/api/profiles/cre
 import { Route as ApiProfilesActivateRouteImport } from './routes/api/profiles/activate'
 import { Route as ApiOauthPollTokenRouteImport } from './routes/api/oauth.poll-token'
 import { Route as ApiOauthDeviceCodeRouteImport } from './routes/api/oauth.device-code'
+import { Route as ApiNotionSourcesRouteImport } from './routes/api/notion/sources'
+import { Route as ApiNotionQueryRouteImport } from './routes/api/notion/query'
+import { Route as ApiNotionOutreachRouteImport } from './routes/api/notion/outreach'
+import { Route as ApiNotionCrmRouteImport } from './routes/api/notion/crm'
+import { Route as ApiNotionApprovalsRouteImport } from './routes/api/notion/approvals'
 import { Route as ApiModelInfoRouteImport } from './routes/api/model/info'
+import { Route as ApiMissionControlSystemRouteImport } from './routes/api/mission-control/system'
+import { Route as ApiMissionControlSummaryRouteImport } from './routes/api/mission-control/summary'
 import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
 import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
 import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
@@ -225,9 +237,24 @@ const PlaygroundRoute = PlaygroundRouteImport.update({
   path: '/playground',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OutreachRoute = OutreachRouteImport.update({
+  id: '/outreach',
+  path: '/outreach',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OperationsRoute = OperationsRouteImport.update({
   id: '/operations',
   path: '/operations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotionRoute = NotionRouteImport.update({
+  id: '/notion',
+  path: '/notion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MissionControlRoute = MissionControlRouteImport.update({
+  id: '/mission-control',
+  path: '/mission-control',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MemoryRoute = MemoryRouteImport.update({
@@ -273,6 +300,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const ConductorRoute = ConductorRouteImport.update({
   id: '/conductor',
   path: '/conductor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApprovalQueueRoute = ApprovalQueueRouteImport.update({
+  id: '/approval-queue',
+  path: '/approval-queue',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgoraRoute = AgoraRouteImport.update({
@@ -499,6 +531,11 @@ const ApiSendRoute = ApiSendRouteImport.update({
 const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
   id: '/api/provider-usage',
   path: '/api/provider-usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsRoute = ApiProjectsRouteImport.update({
+  id: '/api/projects',
+  path: '/api/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
@@ -801,11 +838,47 @@ const ApiOauthDeviceCodeRoute = ApiOauthDeviceCodeRouteImport.update({
   path: '/api/oauth/device-code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiNotionSourcesRoute = ApiNotionSourcesRouteImport.update({
+  id: '/api/notion/sources',
+  path: '/api/notion/sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNotionQueryRoute = ApiNotionQueryRouteImport.update({
+  id: '/api/notion/query',
+  path: '/api/notion/query',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNotionOutreachRoute = ApiNotionOutreachRouteImport.update({
+  id: '/api/notion/outreach',
+  path: '/api/notion/outreach',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNotionCrmRoute = ApiNotionCrmRouteImport.update({
+  id: '/api/notion/crm',
+  path: '/api/notion/crm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNotionApprovalsRoute = ApiNotionApprovalsRouteImport.update({
+  id: '/api/notion/approvals',
+  path: '/api/notion/approvals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiModelInfoRoute = ApiModelInfoRouteImport.update({
   id: '/api/model/info',
   path: '/api/model/info',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMissionControlSystemRoute = ApiMissionControlSystemRouteImport.update({
+  id: '/api/mission-control/system',
+  path: '/api/mission-control/system',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMissionControlSummaryRoute =
+  ApiMissionControlSummaryRouteImport.update({
+    id: '/api/mission-control/summary',
+    path: '/api/mission-control/summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMemoryWriteRoute = ApiMemoryWriteRouteImport.update({
   id: '/write',
   path: '/write',
@@ -983,6 +1056,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/agora': typeof AgoraRoute
+  '/approval-queue': typeof ApprovalQueueRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/early-access': typeof EarlyAccessRoute
@@ -992,7 +1066,10 @@ export interface FileRoutesByFullPath {
   '/jobs': typeof JobsRoute
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
+  '/mission-control': typeof MissionControlRoute
+  '/notion': typeof NotionRoute
   '/operations': typeof OperationsRoute
+  '/outreach': typeof OutreachRoute
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
   '/reserve': typeof ReserveRouteWithChildren
@@ -1041,6 +1118,7 @@ export interface FileRoutesByFullPath {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/projects': typeof ApiProjectsRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1110,7 +1188,14 @@ export interface FileRoutesByFullPath {
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
+  '/api/mission-control/summary': typeof ApiMissionControlSummaryRoute
+  '/api/mission-control/system': typeof ApiMissionControlSystemRoute
   '/api/model/info': typeof ApiModelInfoRoute
+  '/api/notion/approvals': typeof ApiNotionApprovalsRoute
+  '/api/notion/crm': typeof ApiNotionCrmRoute
+  '/api/notion/outreach': typeof ApiNotionOutreachRoute
+  '/api/notion/query': typeof ApiNotionQueryRoute
+  '/api/notion/sources': typeof ApiNotionSourcesRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
@@ -1145,6 +1230,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/agora': typeof AgoraRoute
+  '/approval-queue': typeof ApprovalQueueRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/early-access': typeof EarlyAccessRoute
@@ -1154,7 +1240,10 @@ export interface FileRoutesByTo {
   '/jobs': typeof JobsRoute
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
+  '/mission-control': typeof MissionControlRoute
+  '/notion': typeof NotionRoute
   '/operations': typeof OperationsRoute
+  '/outreach': typeof OutreachRoute
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
   '/reserve': typeof ReserveRouteWithChildren
@@ -1202,6 +1291,7 @@ export interface FileRoutesByTo {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/projects': typeof ApiProjectsRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1271,7 +1361,14 @@ export interface FileRoutesByTo {
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
+  '/api/mission-control/summary': typeof ApiMissionControlSummaryRoute
+  '/api/mission-control/system': typeof ApiMissionControlSystemRoute
   '/api/model/info': typeof ApiModelInfoRoute
+  '/api/notion/approvals': typeof ApiNotionApprovalsRoute
+  '/api/notion/crm': typeof ApiNotionCrmRoute
+  '/api/notion/outreach': typeof ApiNotionOutreachRoute
+  '/api/notion/query': typeof ApiNotionQueryRoute
+  '/api/notion/sources': typeof ApiNotionSourcesRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
@@ -1307,6 +1404,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/agora': typeof AgoraRoute
+  '/approval-queue': typeof ApprovalQueueRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/early-access': typeof EarlyAccessRoute
@@ -1316,7 +1414,10 @@ export interface FileRoutesById {
   '/jobs': typeof JobsRoute
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
+  '/mission-control': typeof MissionControlRoute
+  '/notion': typeof NotionRoute
   '/operations': typeof OperationsRoute
+  '/outreach': typeof OutreachRoute
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
   '/reserve': typeof ReserveRouteWithChildren
@@ -1365,6 +1466,7 @@ export interface FileRoutesById {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/projects': typeof ApiProjectsRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1434,7 +1536,14 @@ export interface FileRoutesById {
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/memory/write': typeof ApiMemoryWriteRoute
+  '/api/mission-control/summary': typeof ApiMissionControlSummaryRoute
+  '/api/mission-control/system': typeof ApiMissionControlSystemRoute
   '/api/model/info': typeof ApiModelInfoRoute
+  '/api/notion/approvals': typeof ApiNotionApprovalsRoute
+  '/api/notion/crm': typeof ApiNotionCrmRoute
+  '/api/notion/outreach': typeof ApiNotionOutreachRoute
+  '/api/notion/query': typeof ApiNotionQueryRoute
+  '/api/notion/sources': typeof ApiNotionSourcesRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
@@ -1471,6 +1580,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/agora'
+    | '/approval-queue'
     | '/conductor'
     | '/dashboard'
     | '/early-access'
@@ -1480,7 +1590,10 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/mcp'
     | '/memory'
+    | '/mission-control'
+    | '/notion'
     | '/operations'
+    | '/outreach'
     | '/playground'
     | '/profiles'
     | '/reserve'
@@ -1529,6 +1642,7 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/projects'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1598,7 +1712,14 @@ export interface FileRouteTypes {
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
+    | '/api/mission-control/summary'
+    | '/api/mission-control/system'
     | '/api/model/info'
+    | '/api/notion/approvals'
+    | '/api/notion/crm'
+    | '/api/notion/outreach'
+    | '/api/notion/query'
+    | '/api/notion/sources'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/profiles/activate'
@@ -1633,6 +1754,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/agora'
+    | '/approval-queue'
     | '/conductor'
     | '/dashboard'
     | '/early-access'
@@ -1642,7 +1764,10 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/mcp'
     | '/memory'
+    | '/mission-control'
+    | '/notion'
     | '/operations'
+    | '/outreach'
     | '/playground'
     | '/profiles'
     | '/reserve'
@@ -1690,6 +1815,7 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/projects'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1759,7 +1885,14 @@ export interface FileRouteTypes {
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
+    | '/api/mission-control/summary'
+    | '/api/mission-control/system'
     | '/api/model/info'
+    | '/api/notion/approvals'
+    | '/api/notion/crm'
+    | '/api/notion/outreach'
+    | '/api/notion/query'
+    | '/api/notion/sources'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/profiles/activate'
@@ -1794,6 +1927,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/agora'
+    | '/approval-queue'
     | '/conductor'
     | '/dashboard'
     | '/early-access'
@@ -1803,7 +1937,10 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/mcp'
     | '/memory'
+    | '/mission-control'
+    | '/notion'
     | '/operations'
+    | '/outreach'
     | '/playground'
     | '/profiles'
     | '/reserve'
@@ -1852,6 +1989,7 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/projects'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1921,7 +2059,14 @@ export interface FileRouteTypes {
     | '/api/memory/read'
     | '/api/memory/search'
     | '/api/memory/write'
+    | '/api/mission-control/summary'
+    | '/api/mission-control/system'
     | '/api/model/info'
+    | '/api/notion/approvals'
+    | '/api/notion/crm'
+    | '/api/notion/outreach'
+    | '/api/notion/query'
+    | '/api/notion/sources'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/profiles/activate'
@@ -1957,6 +2102,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   AgoraRoute: typeof AgoraRoute
+  ApprovalQueueRoute: typeof ApprovalQueueRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
   EarlyAccessRoute: typeof EarlyAccessRoute
@@ -1966,7 +2112,10 @@ export interface RootRouteChildren {
   JobsRoute: typeof JobsRoute
   McpRoute: typeof McpRoute
   MemoryRoute: typeof MemoryRoute
+  MissionControlRoute: typeof MissionControlRoute
+  NotionRoute: typeof NotionRoute
   OperationsRoute: typeof OperationsRoute
+  OutreachRoute: typeof OutreachRoute
   PlaygroundRoute: typeof PlaygroundRoute
   ProfilesRoute: typeof ProfilesRoute
   ReserveRoute: typeof ReserveRouteWithChildren
@@ -2015,6 +2164,7 @@ export interface RootRouteChildren {
   ApiPlaygroundNpcRoute: typeof ApiPlaygroundNpcRoute
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
+  ApiProjectsRoute: typeof ApiProjectsRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
@@ -2066,7 +2216,14 @@ export interface RootRouteChildren {
   ApiKnowledgeReadRoute: typeof ApiKnowledgeReadRoute
   ApiKnowledgeSearchRoute: typeof ApiKnowledgeSearchRoute
   ApiKnowledgeSyncRoute: typeof ApiKnowledgeSyncRoute
+  ApiMissionControlSummaryRoute: typeof ApiMissionControlSummaryRoute
+  ApiMissionControlSystemRoute: typeof ApiMissionControlSystemRoute
   ApiModelInfoRoute: typeof ApiModelInfoRoute
+  ApiNotionApprovalsRoute: typeof ApiNotionApprovalsRoute
+  ApiNotionCrmRoute: typeof ApiNotionCrmRoute
+  ApiNotionOutreachRoute: typeof ApiNotionOutreachRoute
+  ApiNotionQueryRoute: typeof ApiNotionQueryRoute
+  ApiNotionSourcesRoute: typeof ApiNotionSourcesRoute
   ApiOauthDeviceCodeRoute: typeof ApiOauthDeviceCodeRoute
   ApiOauthPollTokenRoute: typeof ApiOauthPollTokenRoute
   ApiProfilesActivateRoute: typeof ApiProfilesActivateRoute
@@ -2164,11 +2321,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlaygroundRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/outreach': {
+      id: '/outreach'
+      path: '/outreach'
+      fullPath: '/outreach'
+      preLoaderRoute: typeof OutreachRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/operations': {
       id: '/operations'
       path: '/operations'
       fullPath: '/operations'
       preLoaderRoute: typeof OperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notion': {
+      id: '/notion'
+      path: '/notion'
+      fullPath: '/notion'
+      preLoaderRoute: typeof NotionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mission-control': {
+      id: '/mission-control'
+      path: '/mission-control'
+      fullPath: '/mission-control'
+      preLoaderRoute: typeof MissionControlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/memory': {
@@ -2232,6 +2410,13 @@ declare module '@tanstack/react-router' {
       path: '/conductor'
       fullPath: '/conductor'
       preLoaderRoute: typeof ConductorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/approval-queue': {
+      id: '/approval-queue'
+      path: '/approval-queue'
+      fullPath: '/approval-queue'
+      preLoaderRoute: typeof ApprovalQueueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agora': {
@@ -2547,6 +2732,13 @@ declare module '@tanstack/react-router' {
       path: '/api/provider-usage'
       fullPath: '/api/provider-usage'
       preLoaderRoute: typeof ApiProviderUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects': {
+      id: '/api/projects'
+      path: '/api/projects'
+      fullPath: '/api/projects'
+      preLoaderRoute: typeof ApiProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/preview-file': {
@@ -2969,11 +3161,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOauthDeviceCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/notion/sources': {
+      id: '/api/notion/sources'
+      path: '/api/notion/sources'
+      fullPath: '/api/notion/sources'
+      preLoaderRoute: typeof ApiNotionSourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/notion/query': {
+      id: '/api/notion/query'
+      path: '/api/notion/query'
+      fullPath: '/api/notion/query'
+      preLoaderRoute: typeof ApiNotionQueryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/notion/outreach': {
+      id: '/api/notion/outreach'
+      path: '/api/notion/outreach'
+      fullPath: '/api/notion/outreach'
+      preLoaderRoute: typeof ApiNotionOutreachRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/notion/crm': {
+      id: '/api/notion/crm'
+      path: '/api/notion/crm'
+      fullPath: '/api/notion/crm'
+      preLoaderRoute: typeof ApiNotionCrmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/notion/approvals': {
+      id: '/api/notion/approvals'
+      path: '/api/notion/approvals'
+      fullPath: '/api/notion/approvals'
+      preLoaderRoute: typeof ApiNotionApprovalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/model/info': {
       id: '/api/model/info'
       path: '/api/model/info'
       fullPath: '/api/model/info'
       preLoaderRoute: typeof ApiModelInfoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mission-control/system': {
+      id: '/api/mission-control/system'
+      path: '/api/mission-control/system'
+      fullPath: '/api/mission-control/system'
+      preLoaderRoute: typeof ApiMissionControlSystemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mission-control/summary': {
+      id: '/api/mission-control/summary'
+      path: '/api/mission-control/summary'
+      fullPath: '/api/mission-control/summary'
+      preLoaderRoute: typeof ApiMissionControlSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/memory/write': {
@@ -3426,6 +3667,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AgoraRoute: AgoraRoute,
+  ApprovalQueueRoute: ApprovalQueueRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
   EarlyAccessRoute: EarlyAccessRoute,
@@ -3435,7 +3677,10 @@ const rootRouteChildren: RootRouteChildren = {
   JobsRoute: JobsRoute,
   McpRoute: McpRoute,
   MemoryRoute: MemoryRoute,
+  MissionControlRoute: MissionControlRoute,
+  NotionRoute: NotionRoute,
   OperationsRoute: OperationsRoute,
+  OutreachRoute: OutreachRoute,
   PlaygroundRoute: PlaygroundRoute,
   ProfilesRoute: ProfilesRoute,
   ReserveRoute: ReserveRouteWithChildren,
@@ -3484,6 +3729,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPlaygroundNpcRoute: ApiPlaygroundNpcRoute,
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
+  ApiProjectsRoute: ApiProjectsRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
@@ -3535,7 +3781,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiKnowledgeReadRoute: ApiKnowledgeReadRoute,
   ApiKnowledgeSearchRoute: ApiKnowledgeSearchRoute,
   ApiKnowledgeSyncRoute: ApiKnowledgeSyncRoute,
+  ApiMissionControlSummaryRoute: ApiMissionControlSummaryRoute,
+  ApiMissionControlSystemRoute: ApiMissionControlSystemRoute,
   ApiModelInfoRoute: ApiModelInfoRoute,
+  ApiNotionApprovalsRoute: ApiNotionApprovalsRoute,
+  ApiNotionCrmRoute: ApiNotionCrmRoute,
+  ApiNotionOutreachRoute: ApiNotionOutreachRoute,
+  ApiNotionQueryRoute: ApiNotionQueryRoute,
+  ApiNotionSourcesRoute: ApiNotionSourcesRoute,
   ApiOauthDeviceCodeRoute: ApiOauthDeviceCodeRoute,
   ApiOauthPollTokenRoute: ApiOauthPollTokenRoute,
   ApiProfilesActivateRoute: ApiProfilesActivateRoute,
