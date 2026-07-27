@@ -203,8 +203,22 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 })
 
 vi.mock('./components/chat-header', () => ({
-  ChatHeader: ({ activeTitle }: { activeTitle: string }) => (
-    <div data-testid="chat-header-title">{activeTitle}</div>
+  ChatHeader: ({
+    activeTitle,
+    onRenameTitle,
+  }: {
+    activeTitle: string
+    onRenameTitle?: (nextTitle: string) => Promise<void> | void
+  }) => (
+    <div>
+      <div data-testid="chat-header-title">{activeTitle}</div>
+      <button
+        type="button"
+        data-testid="chat-header-rename"
+        disabled={!onRenameTitle}
+        onClick={() => void onRenameTitle?.('Renamed from header')}
+      />
+    </div>
   ),
 }))
 vi.mock('./components/chat-message-list', () => ({
@@ -710,6 +724,134 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     resetPendingSend()
+  })
+
+  it('exposes the header metadata callback only for root Cards and never PATCHes an orphan', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined)
+    const rootCard: SessionCard = {
+      cardId: 'remote:parent',
+      canonicalSource: 'remote',
+      title: 'Parent Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'remote:parent-tip',
+      continuationSegmentKeys: ['remote:parent-tip'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 2,
+      archived: false,
+      pinned: false,
+    }
+    const orphanCard: SessionCard = {
+      ...rootCard,
+      relationshipKind: 'orphan',
+    }
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const reactRoot = createRoot(container)
+    const render = (activeCard: SessionCard) => {
+      React.act(() => {
+        reactRoot.render(
+          <QueryClientProvider client={queryClient}>
+            <ChatScreen
+              activeFriendlyId={activeCard.cardId}
+              activeCard={activeCard}
+              sessionCards={[activeCard]}
+            />
+          </QueryClientProvider>,
+        )
+      })
+    }
+
+    render(rootCard)
+    const rename = container.querySelector<HTMLButtonElement>(
+      '[data-testid="chat-header-rename"]',
+    )!
+    expect(rename.disabled).toBe(false)
+    await React.act(async () => {
+      rename.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(cardMutationMocks.updateSessionCardMetadata).toHaveBeenCalledWith(
+      rootCard.cardId,
+      { manualTitle: 'Renamed from header' },
+    )
+
+    render(orphanCard)
+    const orphanRename = container.querySelector<HTMLButtonElement>(
+      '[data-testid="chat-header-rename"]',
+    )!
+    expect(orphanRename.disabled).toBe(true)
+    React.act(() => orphanRename.click())
+    expect(cardMutationMocks.updateSessionCardMetadata).toHaveBeenCalledTimes(1)
+
+    React.act(() => reactRoot.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('fails closed when stale mobile callbacks target a non-root Card', async () => {
+    queryContext.mobile = true
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const orphanCard: SessionCard = {
+      cardId: 'remote:orphan',
+      canonicalSource: 'remote',
+      title: 'Orphan Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'remote:orphan-tip',
+      continuationSegmentKeys: ['remote:orphan-tip'],
+      continuationCount: 1,
+      relationshipKind: 'orphan',
+      childNodes: [],
+      updatedAt: 2,
+      archived: false,
+      pinned: false,
+    }
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const reactRoot = createRoot(container)
+    React.act(() => {
+      reactRoot.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={orphanCard.cardId}
+            activeCard={orphanCard}
+            sessionCards={[orphanCard]}
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    await React.act(async () => {
+      for (const testId of [
+        'mobile-rename',
+        'mobile-pin',
+        'mobile-branch',
+        'mobile-archive',
+      ]) {
+        container
+          .querySelector<HTMLElement>(`[data-testid="${testId}"]`)!
+          .click()
+      }
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(cardMutationMocks.updateSessionCardMetadata).not.toHaveBeenCalled()
+    expect(cardMutationMocks.branchSessionCard).not.toHaveBeenCalled()
+    expect(cardMutationMocks.archiveSessionCard).not.toHaveBeenCalled()
+
+    React.act(() => reactRoot.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
   })
 
   it('does not navigate over a newer Card when an earlier mobile archive completes', async () => {

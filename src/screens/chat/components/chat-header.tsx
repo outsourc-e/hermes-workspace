@@ -281,7 +281,11 @@ function ChatHeaderComponent({
     return () => window.clearTimeout(id)
   }, [isEditingTitle])
 
-  const canRenameTitle = Boolean(onRenameTitle && !isMobile)
+  const canRenameTitle = Boolean(
+    onRenameTitle &&
+    !isMobile &&
+    (!cardContext || cardContext.card.relationshipKind === 'root'),
+  )
 
   const startTitleEdit = useCallback(() => {
     if (!canRenameTitle || renamingTitle) return
@@ -295,7 +299,7 @@ function ChatHeaderComponent({
   }, [displayedTitle])
 
   const saveTitleEdit = useCallback(async () => {
-    if (!onRenameTitle || isSavingTitleRef.current) return
+    if (!canRenameTitle || !onRenameTitle || isSavingTitleRef.current) return
 
     const trimmed = titleDraft.trim()
     if (!trimmed) {
@@ -315,7 +319,13 @@ function ChatHeaderComponent({
     } finally {
       isSavingTitleRef.current = false
     }
-  }, [cancelTitleEdit, displayedTitle, onRenameTitle, titleDraft])
+  }, [
+    cancelTitleEdit,
+    canRenameTitle,
+    displayedTitle,
+    onRenameTitle,
+    titleDraft,
+  ])
 
   if (isMobile) {
     return (
@@ -424,7 +434,7 @@ function ChatHeaderComponent({
           </TooltipProvider>
         ) : null}
         <div className="group min-w-0 flex-1">
-          {isEditingTitle ? (
+          {isEditingTitle && canRenameTitle ? (
             <input
               ref={titleInputRef}
               value={titleDraft}

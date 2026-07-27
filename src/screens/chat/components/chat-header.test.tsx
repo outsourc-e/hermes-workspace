@@ -98,8 +98,13 @@ afterEach(() => {
   while (mountedRoots.length > 0) mountedRoots.pop()?.()
 })
 function renderHeader(
-  options: { cards?: Array<SessionCard>; inspected?: string } = {},
+  options: {
+    cards?: Array<SessionCard>
+    inspected?: string
+    onRenameTitle?: (nextTitle: string) => Promise<void> | void
+  } = {},
 ) {
+  const onRenameTitle = options.onRenameTitle ?? vi.fn()
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -107,7 +112,7 @@ function renderHeader(
     root.render(
       <ChatHeader
         activeTitle="Legacy active title"
-        onRenameTitle={vi.fn()}
+        onRenameTitle={onRenameTitle}
         sessionCards={options.cards ?? [card()]}
         activeFriendlyId="card:root"
         inspectedChildCardId={options.inspected}
@@ -119,6 +124,7 @@ function renderHeader(
     React.act(() => root.unmount())
     container.remove()
   })
+  return { onRenameTitle }
 }
 
 describe('ChatHeader Card-only routing', () => {
@@ -140,6 +146,40 @@ describe('ChatHeader Card-only routing', () => {
     mockViewport(false)
     renderHeader({ inspected: 'card:child' })
     expect(screen.getByTitle('Rename session')).toBeTruthy()
+  })
+
+  it('renames a root Card from the desktop title affordance', async () => {
+    mockViewport(false)
+    const patchMetadata = vi.fn().mockResolvedValue(undefined)
+    renderHeader({ onRenameTitle: patchMetadata })
+
+    React.act(() => fireEvent.click(screen.getByTitle('Rename session')))
+    const input = screen.getByRole<HTMLInputElement>('textbox', {
+      name: 'Session name',
+    })
+    React.act(() =>
+      fireEvent.change(input, { target: { value: 'Renamed root Card' } }),
+    )
+    await React.act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await Promise.resolve()
+    })
+
+    expect(patchMetadata).toHaveBeenCalledWith('Renamed root Card')
+  })
+
+  it('does not expose or invoke the rename action for an orphan Card', () => {
+    mockViewport(false)
+    const patchMetadata = vi.fn()
+    renderHeader({
+      cards: [{ ...card(), relationshipKind: 'orphan' }],
+      onRenameTitle: patchMetadata,
+    })
+
+    expect(screen.getByText('Card project')).toBeTruthy()
+    expect(screen.queryByTitle('Rename session')).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Session name' })).toBeNull()
+    expect(patchMetadata).not.toHaveBeenCalled()
   })
 
   it('uses native Card links in the desktop switcher and resets transient search state', () => {

@@ -3086,17 +3086,19 @@ export function ChatScreen({
 
   const handleRenameCard = useCallback(
     async (cardId: string, nextTitle: string) => {
+      const card = findSessionCard(cardId)
+      if (card?.relationshipKind !== 'root') return
       await runCardMutation(cardId, async () => {
         await updateSessionCardMetadata(cardId, { manualTitle: nextTitle })
       })
     },
-    [runCardMutation],
+    [findSessionCard, runCardMutation],
   )
 
   const handleTogglePinCard = useCallback(
     async (cardId: string) => {
       const card = findSessionCard(cardId)
-      if (!card) return
+      if (card?.relationshipKind !== 'root') return
       await runCardMutation(cardId, async () => {
         await updateSessionCardMetadata(cardId, { pinned: !card.pinned })
       })
@@ -3107,7 +3109,7 @@ export function ChatScreen({
   const handleBranchCard = useCallback(
     async (cardId: string) => {
       const card = findSessionCard(cardId)
-      if (!card) return
+      if (card?.relationshipKind !== 'root') return
       const canonicalSegmentKey =
         activeCard?.cardId === cardId
           ? (activeCardCanonicalSegmentKey ?? card.canonicalSegmentKey)
@@ -3127,6 +3129,8 @@ export function ChatScreen({
 
   const handleArchiveCard = useCallback(
     async (cardId: string) => {
+      const card = findSessionCard(cardId)
+      if (card?.relationshipKind !== 'root') return
       await runCardMutation(cardId, async () => {
         await archiveSessionCard(cardId)
         if (activeCardIdRef.current === cardId) {
@@ -3138,12 +3142,13 @@ export function ChatScreen({
         }
       })
     },
-    [navigate, runCardMutation],
+    [findSessionCard, navigate, runCardMutation],
   )
 
   const handleRenameActiveSessionTitle = useCallback(
     async (nextTitle: string) => {
       if (activeCard) {
+        if (activeCard.relationshipKind !== 'root') return
         setRenamingCardTitle(true)
         try {
           await updateSessionCardMetadata(activeCard.cardId, {
@@ -3228,7 +3233,11 @@ export function ChatScreen({
           {!compact && (
             <ChatHeader
               activeTitle={activeTitle}
-              onRenameTitle={handleRenameActiveSessionTitle}
+              onRenameTitle={
+                !activeCard || activeCard.relationshipKind === 'root'
+                  ? handleRenameActiveSessionTitle
+                  : undefined
+              }
               renamingTitle={renamingSessionTitle || renamingCardTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
