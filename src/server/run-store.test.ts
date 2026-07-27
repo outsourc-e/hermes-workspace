@@ -19,6 +19,7 @@ import type * as FsPromises from 'node:fs/promises'
 
 const fsPromiseState = vi.hoisted(() => ({
   rejectedUnlinks: [] as Array<{ suffix: string; message: string }>,
+  afterRunTempWrite: null as null | ((filePath: string) => void),
 }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -37,6 +38,13 @@ vi.mock('node:fs/promises', async (importOriginal) => {
         )
       }
       return actual.unlink(filePath)
+    },
+    writeFile: async (...args: Parameters<typeof actual.writeFile>) => {
+      const result = await actual.writeFile(...args)
+      const filePath = String(args[0])
+      if (filePath.endsWith('.tmp'))
+        fsPromiseState.afterRunTempWrite?.(filePath)
+      return result
     },
   }
 })
@@ -146,12 +154,14 @@ async function stopRunStoreWorker(worker: ChildProcess): Promise<void> {
 beforeEach(() => {
   vi.resetModules()
   fsPromiseState.rejectedUnlinks = []
+  fsPromiseState.afterRunTempWrite = null
   tempHome = mkdtempSync(join(tmpdir(), 'hermes-run-store-'))
   process.env.HERMES_HOME = tempHome
 })
 
 afterEach(() => {
   vi.useRealTimers()
+  fsPromiseState.afterRunTempWrite = null
   if (tempHome) rmSync(tempHome, { recursive: true, force: true })
   tempHome = null
   if (originalHermesHome === undefined) delete process.env.HERMES_HOME
@@ -868,9 +878,48 @@ describe('run-store persistence', () => {
     ).resolves.toBeNull()
   })
 
-  it('fails Card recovery closed instead of dropping valid runs past the retained-result limit', async () => {
-    const { MAX_PERSISTED_RUN_RESULTS, getActiveRunForCard } =
-      await import('./run-store')
+  it('keeps active recovery available after more than the retained-result limit of terminal history', async () => {
+    const {
+      MAX_PERSISTED_RUN_RESULTS,
+      getActiveRunForCard,
+      listAllActiveRuns,
+    } = await import('./run-store')
+    for (let index = 0; index <= MAX_PERSISTED_RUN_RESULTS; index += 1) {
+      writePersistedRunFixture(
+        'remote:terminal-history',
+        `historical-result-${String(index).padStart(4, '0')}`,
+        { status: index % 2 === 0 ? 'complete' : 'error' },
+      )
+    }
+    writePersistedRunFixture(
+      'remote:terminal-history',
+      'zz-card-active-result',
+      {
+        friendlyId: 'bounded-card',
+        cardId: 'bounded-card',
+        canonicalSegmentKey: 'remote:terminal-history',
+      },
+    )
+    writePersistedRunFixture(
+      'remote:terminal-history',
+      'zz-other-active-result',
+    )
+
+    await expect(
+      getActiveRunForCard('bounded-card', 'remote:terminal-history'),
+    ).resolves.toMatchObject({ runId: 'zz-card-active-result' })
+    await expect(listAllActiveRuns()).resolves.toEqual([
+      expect.objectContaining({ runId: 'zz-card-active-result' }),
+      expect.objectContaining({ runId: 'zz-other-active-result' }),
+    ])
+  })
+
+  it('fails recovery closed for genuine active volume past the retained-result limit', async () => {
+    const {
+      MAX_PERSISTED_RUN_RESULTS,
+      getActiveRunForCard,
+      listAllActiveRuns,
+    } = await import('./run-store')
     writePersistedRunFixture(
       'remote:bounded-results',
       'bounded-result-target',
@@ -890,6 +939,7 @@ describe('run-store persistence', () => {
     await expect(
       getActiveRunForCard('bounded-card', 'remote:bounded-results'),
     ).resolves.toBeNull()
+    await expect(listAllActiveRuns()).resolves.toEqual([])
   })
 
   it('reclaims a lock whose live PID belongs to a different process identity', async () => {
@@ -921,9 +971,8 @@ describe('run-store persistence', () => {
     ).resolves.toMatchObject({ assistantText: 'reclaimed' })
   })
 
-  it('reclaims an expired lease when a legacy PID cannot prove ownership', async () => {
-    const { appendRunText, createPersistedRun, getPersistedRun } =
-      await import('./run-store')
+  it('does not evict a demonstrably live owner when identity lookup is unavailable and its lease expires', async () => {
+    const { appendRunText, createPersistedRun } = await import('./run-store')
     await createPersistedRun({
       runId: 'expired-lease-lock',
       sessionKey: 'session-a',
@@ -943,10 +992,91 @@ describe('run-store persistence', () => {
       })}\n`,
     )
 
-    await appendRunText('session-a', 'expired-lease-lock', 'reclaimed')
+    const lockPath = join(
+      tempHome!,
+      'webui-mvp',
+      'runs',
+      'session-a',
+      'expired-lease-lock.json.lock',
+    )
+    let settled = false
+    const blockedUpdate = appendRunText(
+      'session-a',
+      'expired-lease-lock',
+      'write after release',
+    ).finally(() => {
+      settled = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(settled).toBe(false)
+    expect(existsSync(lockPath)).toBe(true)
+    unlinkSync(lockPath)
+    await expect(blockedUpdate).resolves.toMatchObject({
+      assistantText: 'write after release',
+    })
+  }, 5_000)
+
+  it('resolves Windows process creation identity through the platform seam', async () => {
+    const { resolveProcessIdentity } = await import('./run-store')
+    const linuxStatLookup = vi.fn<() => Promise<string>>()
+    const windowsCreationLookup = vi.fn(() =>
+      Promise.resolve('134127360000000000'),
+    )
+
     await expect(
-      getPersistedRun('session-a', 'expired-lease-lock'),
-    ).resolves.toMatchObject({ assistantText: 'reclaimed' })
+      resolveProcessIdentity(
+        42,
+        'win32',
+        linuxStatLookup,
+        windowsCreationLookup,
+      ),
+    ).resolves.toBe('windows:134127360000000000')
+    expect(linuxStatLookup).not.toHaveBeenCalled()
+    expect(windowsCreationLookup).toHaveBeenCalledWith(42)
+  })
+
+  it('fences a stale writer before rename so it cannot overwrite its successor', async () => {
+    const { appendRunText, createPersistedRun, getPersistedRun } =
+      await import('./run-store')
+    await createPersistedRun({
+      runId: 'stale-publication',
+      sessionKey: 'session-a',
+    })
+    const targetPath = join(
+      tempHome!,
+      'webui-mvp',
+      'runs',
+      'session-a',
+      'stale-publication.json',
+    )
+    const lockPath = `${targetPath}.lock`
+    fsPromiseState.afterRunTempWrite = () => {
+      fsPromiseState.afterRunTempWrite = null
+      const successor = JSON.parse(readFileSync(targetPath, 'utf8')) as Record<
+        string,
+        unknown
+      >
+      successor.assistantText = 'successor publication'
+      successor.status = 'active'
+      successor.updatedAt = Date.now()
+      successor.lastEventAt = Date.now()
+      writeFileSync(targetPath, `${JSON.stringify(successor, null, 2)}\n`)
+      writeFileSync(
+        lockPath,
+        `${JSON.stringify({
+          token: '11111111-1111-4111-8111-111111111111',
+          pid: process.pid,
+          leaseUntil: Date.now() + 60_000,
+        })}\n`,
+      )
+    }
+
+    await expect(
+      appendRunText('session-a', 'stale-publication', 'stale publication'),
+    ).rejects.toThrow('lock ownership changed')
+    await expect(
+      getPersistedRun('session-a', 'stale-publication'),
+    ).resolves.toMatchObject({ assistantText: 'successor publication' })
   })
 
   it('does not evict a confirmed live lock owner when its lease timestamp is stale', async () => {

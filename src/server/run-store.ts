@@ -9,6 +9,7 @@ import {
   unlink,
   writeFile,
 } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
 import path from 'node:path'
 
 import { getHermesRoot } from './claude-paths'
@@ -608,6 +609,7 @@ function runLockPath(identity: RunLockIdentity): string {
 }
 
 type AcquiredRunLock = { path: string; token: string }
+type RunPublicationFence = () => Promise<void>
 
 type RunLockOwner = {
   token: string
@@ -657,8 +659,9 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
-async function getProcessIdentity(pid: number): Promise<string | null> {
-  if (process.platform !== 'linux') return null
+type ProcessCreationLookup = (pid: number) => Promise<string | null>
+
+async function readLinuxProcessStartTime(pid: number): Promise<string | null> {
   try {
     const raw = await readFile(`/proc/${pid}/stat`, 'utf8')
     const closingParenthesis = raw.lastIndexOf(') ')
@@ -668,15 +671,70 @@ async function getProcessIdentity(pid: number): Promise<string | null> {
       .trim()
       .split(/\s+/u)
     const startTime = fieldsAfterCommand[19]
-    return startTime && /^\d+$/u.test(startTime) ? `linux:${startTime}` : null
+    return startTime && /^\d+$/u.test(startTime) ? startTime : null
   } catch {
     return null
   }
 }
 
+async function readWindowsProcessCreationTime(
+  pid: number,
+): Promise<string | null> {
+  const command = [
+    "$ErrorActionPreference = 'Stop'",
+    `$processInfo = Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId = ${pid}'`,
+    'if ($null -ne $processInfo) { [Console]::Out.Write($processInfo.CreationDate.ToUniversalTime().Ticks) }',
+  ].join('; ')
+  return new Promise((resolve) => {
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', command],
+      {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 2_000,
+        maxBuffer: 1024,
+      },
+      (error, stdout) => {
+        if (error) {
+          resolve(null)
+          return
+        }
+        const creationTime = stdout.trim()
+        resolve(/^\d+$/u.test(creationTime) ? creationTime : null)
+      },
+    )
+  })
+}
+
+/** Platform seam for process-creation identity. Windows uses CIM rather than
+ * lease age so a reused PID can be distinguished without evicting a paused,
+ * demonstrably live owner. Unsupported or failed lookups safely return null. */
+export async function resolveProcessIdentity(
+  pid: number,
+  platform: NodeJS.Platform,
+  linuxStartTimeLookup: ProcessCreationLookup = readLinuxProcessStartTime,
+  windowsCreationTimeLookup: ProcessCreationLookup = readWindowsProcessCreationTime,
+): Promise<string | null> {
+  const lookup =
+    platform === 'linux'
+      ? linuxStartTimeLookup
+      : platform === 'win32'
+        ? windowsCreationTimeLookup
+        : null
+  if (!lookup) return null
+  const creationIdentity = await lookup(pid)
+  return creationIdentity && /^\d+$/u.test(creationIdentity)
+    ? `${platform === 'win32' ? 'windows' : 'linux'}:${creationIdentity}`
+    : null
+}
+
+async function getProcessIdentity(pid: number): Promise<string | null> {
+  return resolveProcessIdentity(pid, process.platform)
+}
+
 async function lockOwnerIsRecoverable(
   owner: RunLockOwner | null,
-  lockModifiedAt: number,
 ): Promise<boolean> {
   if (!owner) return true
   if (!processIsAlive(owner.pid)) return true
@@ -687,8 +745,10 @@ async function lockOwnerIsRecoverable(
     if (currentIdentity !== null) return true
   }
 
-  const leaseUntil = owner.leaseUntil ?? lockModifiedAt + RUN_LOCK_LEASE_MS
-  return Date.now() > leaseUntil
+  // A lease cannot fence a paused writer. If the PID is confirmed live but its
+  // creation identity is unavailable, waiting for process death is the only
+  // safe cross-platform fallback.
+  return false
 }
 
 async function recoverDeadRunLock(lockPath: string): Promise<boolean> {
@@ -707,7 +767,7 @@ async function recoverDeadRunLock(lockPath: string): Promise<boolean> {
         if ((error as NodeJS.ErrnoException).code !== 'EFBIG') throw error
       }
     }
-    if (!(await lockOwnerIsRecoverable(owner, observed.mtimeMs))) return false
+    if (!(await lockOwnerIsRecoverable(owner))) return false
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
     throw error
@@ -801,9 +861,23 @@ async function releaseRunLock(lock: AcquiredRunLock): Promise<void> {
   }
 }
 
+async function assertRunLockOwned(lock: AcquiredRunLock): Promise<void> {
+  let owner: RunLockOwner | null = null
+  try {
+    owner = parseRunLockOwner(await readBoundedUtf8File(lock.path, 1024))
+  } catch (error) {
+    throw new Error('Persisted run update lock ownership changed', {
+      cause: error,
+    })
+  }
+  if (owner?.token !== lock.token) {
+    throw new Error('Persisted run update lock ownership changed')
+  }
+}
+
 async function withRunLocks<T>(
   identities: Array<RunLockIdentity>,
-  work: () => Promise<T>,
+  work: (assertLocksOwned: RunPublicationFence) => Promise<T>,
 ): Promise<T> {
   const unique = new Map(
     identities.map((identity) => [runLockPath(identity), identity] as const),
@@ -816,7 +890,9 @@ async function withRunLocks<T>(
     for (const [, identity] of ordered) {
       acquired.push(await acquireRunLock(identity))
     }
-    return await work()
+    return await work(async () => {
+      for (const lock of acquired) await assertRunLockOwned(lock)
+    })
   } finally {
     for (const lock of acquired.reverse()) await releaseRunLock(lock)
   }
@@ -841,7 +917,10 @@ function assertSameRunOwner(
   }
 }
 
-async function writeRun(run: PersistedRunState): Promise<void> {
+async function writeRun(
+  run: PersistedRunState,
+  assertPublicationAllowed?: RunPublicationFence,
+): Promise<void> {
   assertSafeRunId(run.runId)
   const normalized = normalizePersistedRun(run)
   if (!normalized) throw new Error('Persisted run state is invalid')
@@ -857,6 +936,7 @@ async function writeRun(run: PersistedRunState): Promise<void> {
       flag: 'wx',
       mode: 0o600,
     })
+    await assertPublicationAllowed?.()
     await rename(tempPath, targetPath)
   } finally {
     await unlink(tempPath).catch((error: NodeJS.ErrnoException) => {
@@ -865,7 +945,10 @@ async function writeRun(run: PersistedRunState): Promise<void> {
   }
 }
 
-async function writeRunExclusive(run: PersistedRunState): Promise<void> {
+async function writeRunExclusive(
+  run: PersistedRunState,
+  assertPublicationAllowed?: RunPublicationFence,
+): Promise<void> {
   assertSafeRunId(run.runId)
   const normalized = normalizePersistedRun(run)
   if (!normalized) throw new Error('Persisted run state is invalid')
@@ -884,6 +967,7 @@ async function writeRunExclusive(run: PersistedRunState): Promise<void> {
     // A hard link publishes the fully-written temp inode only when the target
     // does not exist. Unlike rename(), this cannot replace another owner that
     // won a destination race after our preflight check.
+    await assertPublicationAllowed?.()
     await link(tempPath, targetPath)
   } finally {
     await unlink(tempPath).catch((error: NodeJS.ErrnoException) => {
@@ -1021,7 +1105,7 @@ export async function migratePersistedRun(
         { sessionKey: normalizedFrom, runId: normalizedRunId },
         { sessionKey: normalizedTo, runId: normalizedRunId },
       ],
-      async () => {
+      async (assertLocksOwned) => {
         const current = await getPersistedRun(normalizedFrom, normalizedRunId)
         const destination = await getPersistedRun(normalizedTo, normalizedRunId)
         if (!current) {
@@ -1075,7 +1159,7 @@ export async function migratePersistedRun(
           updatedAt: Date.now(),
         }
         try {
-          await writeRunExclusive(migrated)
+          await writeRunExclusive(migrated, assertLocksOwned)
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
             throw new Error(
@@ -1097,14 +1181,17 @@ export async function migratePersistedRun(
             if ((rollbackError as NodeJS.ErrnoException).code !== 'ENOENT') {
               const now = Date.now()
               try {
-                await writeRun({
-                  ...migrated,
-                  status: 'error',
-                  updatedAt: now,
-                  lastEventAt: now,
-                  errorMessage:
-                    'Run migration failed; recover from the original session.',
-                })
+                await writeRun(
+                  {
+                    ...migrated,
+                    status: 'error',
+                    updatedAt: now,
+                    lastEventAt: now,
+                    errorMessage:
+                      'Run migration failed; recover from the original session.',
+                  },
+                  assertLocksOwned,
+                )
               } catch (terminalizationError) {
                 throw new AggregateError(
                   [error, rollbackError, terminalizationError],
@@ -1132,7 +1219,7 @@ export async function updatePersistedRun(
 ): Promise<PersistedRunState | null> {
   if (!isSafeRunId(runId)) return null
   return enqueueRunUpdate(sessionKey, runId, async () =>
-    withRunLocks([{ sessionKey, runId }], async () => {
+    withRunLocks([{ sessionKey, runId }], async (assertLocksOwned) => {
       const current = await getPersistedRun(sessionKey, runId)
       if (!current) return null
       if (TERMINAL_RUN_STATUSES.has(current.status)) return current
@@ -1140,7 +1227,7 @@ export async function updatePersistedRun(
       assertSameRunOwner(current, next)
       const stored = normalizePersistedRun({ ...next, updatedAt: Date.now() })
       if (!stored) throw new Error('Persisted run update is invalid')
-      await writeRun(stored)
+      await writeRun(stored, assertLocksOwned)
       return stored
     }),
   )
@@ -1429,6 +1516,10 @@ async function readRunsInDir(
         sessionKey: expectedSessionKey,
       })
       if (!run) continue
+      // Completed/error records remain bounded by the directory, file, and byte
+      // budgets above, but do not consume the active-recovery result budget.
+      // Otherwise ordinary terminal history eventually disables every Card.
+      if (run.status === 'complete' || run.status === 'error') continue
       budget.results += 1
       if (budget.results > MAX_PERSISTED_RUN_RESULTS) {
         budget.exceeded = true
