@@ -88,10 +88,32 @@ function jsonRequest(
   body: string,
   contentType = 'application/json',
 ): Request {
+  let requestBody = body
+  if (path.endsWith('/branch')) {
+    try {
+      const parsed = JSON.parse(body) as unknown
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        requestBody = branchRequestBody(parsed as Record<string, unknown>)
+      }
+    } catch {
+      // Preserve malformed JSON verbatim for strict parser tests.
+    }
+  }
   return new Request(`http://workspace.test${path}`, {
     method,
     headers: { 'content-type': contentType },
-    body,
+    body: requestBody,
+  })
+}
+
+let branchIntentSequence = 0
+
+function branchRequestBody(patch: Record<string, unknown> = {}): string {
+  branchIntentSequence += 1
+  return JSON.stringify({
+    expectedCanonicalSegmentKey: 'remote:tip',
+    idempotencyKey: `branch-route-test-${branchIntentSequence}`,
+    ...patch,
   })
 }
 
@@ -156,9 +178,19 @@ function resolvedCardWithBranch(
     parentUpstreamKey?: string
     childSource?: string
     childUpstreamKey?: string
+    canonicalSource?: string
+    canonicalTransport?: string
   } = {},
 ) {
   const resolved = resolvedCard()
+  if (options.canonicalSource !== undefined) {
+    Object.assign(resolved.card, { canonicalSource: options.canonicalSource })
+  }
+  if (options.canonicalTransport !== undefined) {
+    Object.assign(resolved.card, {
+      canonicalTransport: options.canonicalTransport,
+    })
+  }
   const childKey = 'remote:child-upstream'
   const card = resolved.card as unknown as {
     canonicalSegmentKey: string
@@ -849,7 +881,7 @@ describe('POST /api/session-cards/$cardId/branch', () => {
         request: jsonRequest(
           '/api/session-cards/remote%3Aroot/branch',
           'POST',
-          JSON.stringify(body),
+          branchRequestBody(body),
         ),
         params: { cardId: 'remote:root' },
       })
@@ -858,6 +890,253 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(mocks.resolveCard).not.toHaveBeenCalled()
     expect(mocks.forkSession).not.toHaveBeenCalled()
   })
+
+  it('rejects a stale canonical precondition with no upstream fork and no raw identity disclosure', async () => {
+    const fresh = resolvedCard()
+    fresh.card.canonicalSegmentKey = 'remote:fresh-tip'
+    fresh.card.continuationSegmentKeys.push('remote:fresh-tip')
+    fresh.sourceBySegmentKey.set('remote:fresh-tip', 'gateway')
+    fresh.upstreamKeyBySegmentKey.set('remote:fresh-tip', 'fresh-tip-upstream')
+    mocks.resolveCard.mockResolvedValueOnce(fresh)
+
+    const response = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        branchRequestBody(),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(409)
+    const payload = await response.json()
+    expect(payload).toMatchObject({ ok: false })
+    expect(JSON.stringify(payload)).not.toContain('remote:tip')
+    expect(JSON.stringify(payload)).not.toContain('remote:fresh-tip')
+    expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+  })
+
+  it('coalesces concurrent same-key same-intent requests into one fork and one replayed response', async () => {
+    mocks.forkSession.mockResolvedValue({
+      session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
+      forkedFrom: 'tip-upstream',
+    })
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedCard())
+      .mockResolvedValueOnce(resolvedCardWithBranch())
+    const body = JSON.stringify({
+      expectedCanonicalSegmentKey: 'remote:tip',
+      idempotencyKey: 'same-branch-intent',
+      title: 'Alternate path',
+    })
+    const invoke = () =>
+      branchHandler({
+        request: jsonRequest(
+          '/api/session-cards/remote%3Aroot/branch',
+          'POST',
+          body,
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+    const [first, replay] = await Promise.all([invoke(), invoke()])
+
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(201)
+    const firstPayload = await first.json()
+    expect(await replay.json()).toEqual(firstPayload)
+    const laterReplay = await invoke()
+    expect(laterReplay.status).toBe(201)
+    expect(await laterReplay.json()).toEqual(firstPayload)
+    expect(mocks.resolveCard).toHaveBeenCalledTimes(2)
+    expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('conflicts instead of replaying a key across a different expected parent or title', async () => {
+    mocks.forkSession.mockResolvedValue({
+      session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
+      forkedFrom: 'tip-upstream',
+    })
+    const idempotencyKey = 'bound-branch-intent'
+    const invoke = (expectedCanonicalSegmentKey: string, title: string) =>
+      branchHandler({
+        request: jsonRequest(
+          '/api/session-cards/remote%3Aroot/branch',
+          'POST',
+          JSON.stringify({
+            expectedCanonicalSegmentKey,
+            idempotencyKey,
+            title,
+          }),
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+    const first = await invoke('remote:tip', 'First title')
+    const differentParent = await invoke('remote:other-tip', 'First title')
+    const differentTitle = await invoke('remote:tip', 'Different title')
+
+    expect(first.status).toBe(202)
+    expect(differentParent.status).toBe(409)
+    expect(differentTitle.status).toBe(409)
+    expect(mocks.resolveCard).toHaveBeenCalledTimes(2)
+    expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('scopes the same idempotency key to its Card instead of replaying another Card result', async () => {
+    const other = resolvedCard()
+    other.card.cardId = 'remote:other'
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedCard())
+      .mockResolvedValueOnce(resolvedCard())
+      .mockResolvedValueOnce(other)
+      .mockResolvedValueOnce(other)
+    mocks.forkSession
+      .mockResolvedValueOnce({
+        session: { id: 'child-one', parent_session_id: 'tip-upstream' },
+        forkedFrom: 'tip-upstream',
+      })
+      .mockResolvedValueOnce({
+        session: { id: 'child-two', parent_session_id: 'tip-upstream' },
+        forkedFrom: 'tip-upstream',
+      })
+    const invoke = (cardId: string) =>
+      branchHandler({
+        request: jsonRequest(
+          `/api/session-cards/${encodeURIComponent(cardId)}/branch`,
+          'POST',
+          JSON.stringify({
+            expectedCanonicalSegmentKey: 'remote:tip',
+            idempotencyKey: 'card-scoped-intent',
+          }),
+        ),
+        params: { cardId },
+      })
+
+    const first = await invoke('remote:root')
+    const second = await invoke('remote:other')
+
+    expect(await first.json()).toMatchObject({
+      cardId: 'remote:root',
+      childSessionKey: 'remote:child-one',
+    })
+    expect(await second.json()).toMatchObject({
+      cardId: 'remote:other',
+      childSessionKey: 'remote:child-two',
+    })
+    expect(mocks.forkSession).toHaveBeenCalledTimes(2)
+  })
+
+  it('authenticates before replaying a completed branch intent', async () => {
+    mocks.forkSession.mockResolvedValue({
+      session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
+      forkedFrom: 'tip-upstream',
+    })
+    const body = JSON.stringify({
+      expectedCanonicalSegmentKey: 'remote:tip',
+      idempotencyKey: 'authenticated-replay-intent',
+    })
+    const invoke = () =>
+      branchHandler({
+        request: jsonRequest(
+          '/api/session-cards/remote%3Aroot/branch',
+          'POST',
+          body,
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+    expect((await invoke()).status).toBe(202)
+    mocks.isAuthenticated.mockReturnValue(false)
+    const unauthorized = await invoke()
+
+    expect(unauthorized.status).toBe(401)
+    expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows a distinct idempotency key to create a new valid branch intent', async () => {
+    mocks.forkSession
+      .mockResolvedValueOnce({
+        session: { id: 'child-one', parent_session_id: 'tip-upstream' },
+        forkedFrom: 'tip-upstream',
+      })
+      .mockResolvedValueOnce({
+        session: { id: 'child-two', parent_session_id: 'tip-upstream' },
+        forkedFrom: 'tip-upstream',
+      })
+
+    const invoke = (idempotencyKey: string) =>
+      branchHandler({
+        request: jsonRequest(
+          '/api/session-cards/remote%3Aroot/branch',
+          'POST',
+          JSON.stringify({
+            expectedCanonicalSegmentKey: 'remote:tip',
+            idempotencyKey,
+          }),
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+    const first = await invoke('branch-intent-one')
+    const second = await invoke('branch-intent-two')
+
+    expect(first.status).toBe(202)
+    expect(second.status).toBe(202)
+    expect(await first.json()).toMatchObject({
+      childSessionKey: 'remote:child-one',
+    })
+    expect(await second.json()).toMatchObject({
+      childSessionKey: 'remote:child-two',
+    })
+    expect(mocks.forkSession).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    [{ idempotencyKey: 'missing-expected' }],
+    [{ expectedCanonicalSegmentKey: 'remote:tip' }],
+  ])('requires both precondition and idempotency fields', async (body) => {
+    const response = await branchHandler({
+      request: new Request(
+        'http://workspace.test/api/session-cards/remote%3Aroot/branch',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(400)
+    expect(mocks.resolveCard).not.toHaveBeenCalled()
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['malformed', 'not valid because spaces'],
+    ['oversized', 'a'.repeat(129)],
+  ])(
+    'rejects a %s idempotency key before Card resolution',
+    async (_name, idempotencyKey) => {
+      const response = await branchHandler({
+        request: jsonRequest(
+          '/api/session-cards/remote%3Aroot/branch',
+          'POST',
+          JSON.stringify({
+            expectedCanonicalSegmentKey: 'remote:tip',
+            idempotencyKey,
+          }),
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+      expect(response.status).toBe(400)
+      expect(mocks.resolveCard).not.toHaveBeenCalled()
+      expect(mocks.forkSession).not.toHaveBeenCalled()
+    },
+  )
 
   it('forks only the server-resolved canonical upstream parent and verifies the fresh child relation', async () => {
     mocks.forkSession.mockResolvedValue({
@@ -1023,10 +1302,10 @@ describe('POST /api/session-cards/$cardId/branch', () => {
       params: { cardId: 'remote:root' },
     })
 
-    expect(response.status).toBe(503)
+    expect(response.status).toBe(409)
     expect(await response.json()).toEqual({
       ok: false,
-      error: 'Session Card inventory is temporarily unavailable',
+      error: 'Session Card changed or is not ready to branch',
       retryable: true,
     })
     expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
@@ -1048,6 +1327,30 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     })
 
     expect(response.status).toBe(503)
+    expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+  })
+
+  it('rejects a mismatched canonical source or transport discriminator before forking', async () => {
+    for (const patch of [
+      { canonicalSource: 'local', canonicalTransport: 'gateway' },
+      { canonicalSource: 'remote', canonicalTransport: 'dashboard' },
+    ]) {
+      const mismatched = resolvedCard()
+      Object.assign(mismatched.card, patch)
+      mocks.resolveCard.mockResolvedValueOnce(mismatched)
+
+      const response = await branchHandler({
+        request: jsonRequest(
+          '/api/session-cards/remote%3Aroot/branch',
+          'POST',
+          '{}',
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+      expect(response.status).toBe(503)
+    }
     expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
     expect(mocks.forkSession).not.toHaveBeenCalled()
   })
@@ -1076,6 +1379,14 @@ describe('POST /api/session-cards/$cardId/branch', () => {
   )
 
   it.each([
+    {
+      name: 'canonical transport switch',
+      fresh: resolvedCardWithBranch({ canonicalTransport: 'dashboard' }),
+    },
+    {
+      name: 'canonical source switch',
+      fresh: resolvedCardWithBranch({ canonicalSource: 'local' }),
+    },
     {
       name: 'parent source switch',
       fresh: resolvedCardWithBranch({ parentSource: 'dashboard' }),

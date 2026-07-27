@@ -3107,8 +3107,9 @@ export function ChatScreen({
         activeCard?.cardId === cardId
           ? (activeCardCanonicalSegmentKey ?? card.canonicalSegmentKey)
           : card.canonicalSegmentKey
+      const idempotencyKey = crypto.randomUUID()
       await runCardMutation(cardId, async () => {
-        await branchSessionCard(cardId, canonicalSegmentKey)
+        await branchSessionCard(cardId, canonicalSegmentKey, { idempotencyKey })
       })
     },
     [

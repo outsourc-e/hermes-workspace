@@ -1043,6 +1043,7 @@ describe('Session Card fetchers', () => {
     await updateSessionCardMetadata('remote:root', { manualTitle: 'Renamed' })
     await archiveSessionCard('remote:root')
     await branchSessionCard('remote:root', 'remote:tip', {
+      idempotencyKey: 'branch-client-test',
       title: 'Alternate path',
     })
 
@@ -1070,7 +1071,11 @@ describe('Session Card fetchers', () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Alternate path' }),
+        body: JSON.stringify({
+          expectedCanonicalSegmentKey: 'remote:tip',
+          idempotencyKey: 'branch-client-test',
+          title: 'Alternate path',
+        }),
       },
     )
     expect(fetchMock.mock.calls.flat().join(' ')).not.toContain('/api/sessions')
@@ -1125,7 +1130,9 @@ describe('Session Card fetchers', () => {
     )
 
     await expect(
-      branchSessionCard('remote:root', 'remote:tip'),
+      branchSessionCard('remote:root', 'remote:tip', {
+        idempotencyKey: 'branch-response-test',
+      }),
     ).rejects.toThrow('Invalid Session Card response')
   })
 
@@ -1281,7 +1288,9 @@ describe('Session Card fetchers', () => {
     )
 
     await expect(
-      branchSessionCard('remote:root', 'remote:tip'),
+      branchSessionCard('remote:root', 'remote:tip', {
+        idempotencyKey: 'branch-response-test',
+      }),
     ).rejects.toThrow('Invalid Session Card response')
   })
 
@@ -1289,10 +1298,59 @@ describe('Session Card fetchers', () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(branchSessionCard('remote:root', '   ')).rejects.toThrow(
-      'Invalid Session Card branch request',
-    )
+    await expect(
+      branchSessionCard('remote:root', '   ', {
+        idempotencyKey: 'branch-invalid-parent-test',
+      }),
+    ).rejects.toThrow('Invalid Session Card branch request')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['malformed', 'not valid because spaces'],
+    ['oversized', 'a'.repeat(129)],
+  ] as const)(
+    'rejects a %s branch idempotency key without fetching',
+    async (_name, idempotencyKey) => {
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(
+        branchSessionCard('remote:root', 'remote:tip', { idempotencyKey }),
+      ).rejects.toThrow('Invalid Session Card branch request')
+      expect(fetchMock).not.toHaveBeenCalled()
+    },
+  )
+
+  it('uses the same caller-owned key when the same branch intent is retried', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        response(
+          {
+            ok: true,
+            cardId: 'remote:root',
+            canonicalSegmentKey: 'remote:tip',
+            childSessionKey: 'remote:child',
+            supported: true,
+          },
+          201,
+        ),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const intent = { idempotencyKey: 'same-client-intent' }
+
+    await branchSessionCard('remote:root', 'remote:tip', intent)
+    await branchSessionCard('remote:root', 'remote:tip', intent)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const firstBody = (fetchMock.mock.calls[0]?.[1] as RequestInit).body
+    const secondBody = (fetchMock.mock.calls[1]?.[1] as RequestInit).body
+    expect(secondBody).toBe(firstBody)
+    expect(JSON.parse(String(firstBody))).toEqual({
+      expectedCanonicalSegmentKey: 'remote:tip',
+      idempotencyKey: 'same-client-intent',
+    })
   })
 
   it('rejects a branch child equal to the canonical parent even when the Card ID differs', async () => {
@@ -1313,7 +1371,9 @@ describe('Session Card fetchers', () => {
     )
 
     await expect(
-      branchSessionCard('remote:root', 'remote:tip'),
+      branchSessionCard('remote:root', 'remote:tip', {
+        idempotencyKey: 'branch-response-test',
+      }),
     ).rejects.toThrow('Invalid Session Card response')
   })
 })

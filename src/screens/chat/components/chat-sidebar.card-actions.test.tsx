@@ -195,6 +195,24 @@ describe('desktop Session Card mutation failures', () => {
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.getByTestId('pending').textContent).toBe('idle')
   })
+
+  it('reuses the same branch intent key when retrying a dropped response', async () => {
+    cardQueryMocks.branchSessionCard
+      .mockRejectedValueOnce(new Error('Branch response lost'))
+      .mockResolvedValueOnce(undefined)
+    renderHarness()
+
+    await invoke('Branch action')
+    await invoke('Retry branch for Active Card')
+
+    expect(cardQueryMocks.branchSessionCard).toHaveBeenCalledTimes(2)
+    const firstOptions = cardQueryMocks.branchSessionCard.mock.calls[0]?.[2]
+    const retryOptions = cardQueryMocks.branchSessionCard.mock.calls[1]?.[2]
+    expect(firstOptions).toEqual({
+      idempotencyKey: expect.stringMatching(/^[A-Za-z0-9._:-]{1,128}$/),
+    })
+    expect(retryOptions).toEqual(firstOptions)
+  })
 })
 
 describe('active Card archive ordering', () => {

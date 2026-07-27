@@ -912,14 +912,16 @@ export async function archiveSessionCard(
 export async function branchSessionCard(
   cardId: string,
   expectedCanonicalSegmentKey: string,
-  options: { title?: string } = {},
+  options: { idempotencyKey: string; title?: string },
 ): Promise<SessionCardBranchWire> {
   const expectedCanonicalParent = nonblankWireString(
     expectedCanonicalSegmentKey,
   )
   if (
     !expectedCanonicalParent ||
-    expectedCanonicalParent !== expectedCanonicalSegmentKey
+    expectedCanonicalParent !== expectedCanonicalSegmentKey ||
+    typeof options.idempotencyKey !== 'string' ||
+    !/^[A-Za-z0-9._:-]{1,128}$/.test(options.idempotencyKey)
   ) {
     throw new RangeError('Invalid Session Card branch request')
   }
@@ -928,7 +930,11 @@ export async function branchSessionCard(
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(options),
+      body: JSON.stringify({
+        expectedCanonicalSegmentKey,
+        idempotencyKey: options.idempotencyKey,
+        ...(options.title === undefined ? {} : { title: options.title }),
+      }),
     },
   )
   if (!response.ok) throw new Error(await readError(response))

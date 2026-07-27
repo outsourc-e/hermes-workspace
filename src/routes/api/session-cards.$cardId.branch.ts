@@ -18,6 +18,79 @@ import {
 } from './-session-card-http'
 
 const MAX_BRANCH_TITLE_LENGTH = 500
+const MAX_CANONICAL_SEGMENT_KEY_LENGTH = 2_048
+const MAX_IDEMPOTENCY_KEY_LENGTH = 128
+const MAX_BRANCH_REPLAYS = 256
+const BRANCH_REPLAY_TTL_MS = 10 * 60 * 1_000
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]+$/
+
+type BranchReplay = {
+  status: number
+  statusText: string
+  headers: Array<[string, string]>
+  body: string
+}
+
+type BranchReplayEntry = {
+  fingerprint: string
+  promise: Promise<BranchReplay>
+  expiresAt: number
+  settled: boolean
+}
+
+const branchReplayEntries = new Map<string, BranchReplayEntry>()
+
+function branchConflict(): Response {
+  return json(
+    {
+      ok: false,
+      error: 'Session Card changed or is not ready to branch',
+      retryable: true,
+    },
+    { status: 409 },
+  )
+}
+
+function idempotencyConflict(): Response {
+  return json(
+    { ok: false, error: 'Branch request conflicts with an earlier intent' },
+    { status: 409 },
+  )
+}
+
+function replayCapacityUnavailable(): Response {
+  return json(
+    {
+      ok: false,
+      error: 'Branch request tracking is temporarily unavailable',
+      retryable: true,
+    },
+    { status: 503 },
+  )
+}
+
+async function captureReplay(response: Response): Promise<BranchReplay> {
+  return {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Array.from(response.headers.entries()),
+    body: await response.text(),
+  }
+}
+
+function replayResponse(replay: BranchReplay): Response {
+  return new Response(replay.body, {
+    status: replay.status,
+    statusText: replay.statusText,
+    headers: replay.headers,
+  })
+}
+
+function pruneBranchReplays(now: number): void {
+  for (const [key, entry] of branchReplayEntries) {
+    if (entry.settled && entry.expiresAt <= now) branchReplayEntries.delete(key)
+  }
+}
 
 function unavailableResponse(cardId: string): Response {
   return json(
@@ -56,17 +129,6 @@ function projectionPendingResponse(
   )
 }
 
-function projectionUnavailable(): Response {
-  return json(
-    {
-      ok: false,
-      error: 'Session Card inventory is temporarily unavailable',
-      retryable: true,
-    },
-    { status: 503 },
-  )
-}
-
 function remoteProjectedKey(upstreamKey: string): string {
   return `remote:${encodeURIComponent(upstreamKey)}`
 }
@@ -84,6 +146,169 @@ function validOptionalParentIdentity(
   )
 }
 
+async function executeBranch(
+  cardId: string,
+  expectedCanonicalSegmentKey: string,
+  title: string,
+  markSideEffectStarted: () => void,
+): Promise<Response> {
+  let resolved
+  try {
+    resolved = await sessionCardService.resolveCard(cardId)
+  } catch (error) {
+    if (isSessionCardNotFound(error)) return notFoundResponse()
+    return branchFailure()
+  }
+
+  if (resolved.collection.completeness !== 'complete') {
+    return branchConflict()
+  }
+  if (resolved.card.relationshipKind !== 'root') {
+    return invalidRequest('Only root Session Cards can be branched')
+  }
+
+  const canonicalSegmentKey = resolved.card.canonicalSegmentKey
+  if (canonicalSegmentKey !== expectedCanonicalSegmentKey) {
+    return branchConflict()
+  }
+  const canonicalSource = resolved.sourceBySegmentKey.get(canonicalSegmentKey)
+  const authoritativeUpstreamKey =
+    resolved.upstreamKeyBySegmentKey.get(canonicalSegmentKey)
+  if (
+    resolved.card.canonicalSource !== 'remote' ||
+    resolved.card.canonicalTransport !== 'gateway' ||
+    canonicalSource !== 'gateway'
+  ) {
+    return unavailableResponse(resolved.card.cardId)
+  }
+  if (!authoritativeUpstreamKey) return branchFailure()
+
+  let supported = false
+  try {
+    supported = (await ensureGatewayProbed()).sessionFork
+  } catch {
+    // A failed capability probe is indistinguishable from unavailable.
+  }
+  if (!supported) return unavailableResponse(resolved.card.cardId)
+
+  try {
+    markSideEffectStarted()
+    const result = await forkSession(
+      authoritativeUpstreamKey,
+      title ? { title } : undefined,
+    )
+    const childUpstreamKey = result.session.id.trim()
+    const returnedParent = result.session.parent_session_id
+    if (
+      !childUpstreamKey ||
+      childUpstreamKey === authoritativeUpstreamKey ||
+      !validOptionalParentIdentity(
+        result.forkedFrom,
+        authoritativeUpstreamKey,
+      ) ||
+      !validOptionalParentIdentity(returnedParent, authoritativeUpstreamKey) ||
+      (result.forkedFrom == null && returnedParent == null)
+    ) {
+      return branchFailure()
+    }
+
+    const expectedChildKey = remoteProjectedKey(childUpstreamKey)
+    let fresh
+    try {
+      fresh = await sessionCardService.resolveCard(resolved.card.cardId, {
+        includeArchived: true,
+      })
+    } catch {
+      return projectionPendingResponse(
+        resolved.card.cardId,
+        canonicalSegmentKey,
+        expectedChildKey,
+      )
+    }
+    if (fresh.card.cardId !== resolved.card.cardId) return branchFailure()
+    if (fresh.collection.completeness !== 'complete') {
+      return projectionPendingResponse(
+        resolved.card.cardId,
+        canonicalSegmentKey,
+        expectedChildKey,
+      )
+    }
+
+    const freshCanonicalKey = fresh.card.canonicalSegmentKey
+    const malformedProjectedBranch = fresh.card.childNodes.some(
+      (candidate) =>
+        candidate.relationshipKind === 'branch' &&
+        (!fresh.sourceBySegmentKey.has(candidate.sessionKey) ||
+          !fresh.upstreamKeyBySegmentKey.has(candidate.sessionKey)),
+    )
+    if (malformedProjectedBranch) return branchFailure()
+    const child = fresh.card.childNodes.find(
+      (candidate) =>
+        candidate.relationshipKind === 'branch' &&
+        candidate.cardId === expectedChildKey &&
+        candidate.sessionKey === expectedChildKey,
+    )
+    if (!child) {
+      return projectionPendingResponse(
+        resolved.card.cardId,
+        canonicalSegmentKey,
+        expectedChildKey,
+      )
+    }
+
+    const freshParentSource = fresh.sourceBySegmentKey.get(canonicalSegmentKey)
+    const freshParentUpstreamKey =
+      fresh.upstreamKeyBySegmentKey.get(canonicalSegmentKey)
+    const freshCanonicalSource = fresh.sourceBySegmentKey.get(freshCanonicalKey)
+    const freshCanonicalUpstreamKey =
+      fresh.upstreamKeyBySegmentKey.get(freshCanonicalKey)
+    const freshChildSource = fresh.sourceBySegmentKey.get(child.sessionKey)
+    const freshChildUpstreamKey = fresh.upstreamKeyBySegmentKey.get(
+      child.sessionKey,
+    )
+    if (
+      freshParentSource === undefined ||
+      freshParentUpstreamKey === undefined ||
+      freshCanonicalSource === undefined ||
+      freshCanonicalUpstreamKey === undefined
+    ) {
+      return projectionPendingResponse(
+        resolved.card.cardId,
+        canonicalSegmentKey,
+        expectedChildKey,
+      )
+    }
+    if (
+      fresh.card.canonicalSource !== 'remote' ||
+      fresh.card.canonicalTransport !== 'gateway' ||
+      freshParentSource !== 'gateway' ||
+      freshCanonicalSource !== 'gateway' ||
+      freshChildSource !== 'gateway' ||
+      freshParentUpstreamKey !== authoritativeUpstreamKey ||
+      freshChildUpstreamKey !== childUpstreamKey ||
+      freshChildUpstreamKey === freshParentUpstreamKey
+    ) {
+      return branchFailure()
+    }
+
+    return json(
+      {
+        ok: true,
+        cardId: resolved.card.cardId,
+        canonicalSegmentKey,
+        childSessionKey: child.sessionKey,
+        supported: true,
+      },
+      { status: 201 },
+    )
+  } catch (error) {
+    if (error instanceof SessionForkUnavailableError) {
+      return unavailableResponse(resolved.card.cardId)
+    }
+    return branchFailure()
+  }
+}
+
 export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
   server: {
     handlers: {
@@ -98,8 +323,35 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
         if (!cardId) return invalidRequest('Valid cardId required')
         const body = await readJsonObject(request)
         if (!body) return invalidRequest('Request body must be a JSON object')
-        if (Object.keys(body).some((key) => key !== 'title')) {
-          return invalidRequest('Only an optional title may be provided')
+        if (
+          Object.keys(body).some(
+            (key) =>
+              key !== 'expectedCanonicalSegmentKey' &&
+              key !== 'idempotencyKey' &&
+              key !== 'title',
+          )
+        ) {
+          return invalidRequest(
+            'Only expectedCanonicalSegmentKey, idempotencyKey, and an optional title may be provided',
+          )
+        }
+        if (
+          typeof body.expectedCanonicalSegmentKey !== 'string' ||
+          body.expectedCanonicalSegmentKey.length === 0 ||
+          body.expectedCanonicalSegmentKey.length >
+            MAX_CANONICAL_SEGMENT_KEY_LENGTH ||
+          body.expectedCanonicalSegmentKey.trim() !==
+            body.expectedCanonicalSegmentKey
+        ) {
+          return invalidRequest('Valid expected canonical segment required')
+        }
+        if (
+          typeof body.idempotencyKey !== 'string' ||
+          body.idempotencyKey.length === 0 ||
+          body.idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH ||
+          !IDEMPOTENCY_KEY_PATTERN.test(body.idempotencyKey)
+        ) {
+          return invalidRequest('Valid branch idempotency key required')
         }
         if (body.title !== undefined && typeof body.title !== 'string') {
           return invalidRequest('title must be a string')
@@ -109,158 +361,51 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
           return invalidRequest('title must be 500 characters or fewer')
         }
 
-        let resolved
+        const expectedCanonicalSegmentKey = body.expectedCanonicalSegmentKey
+        const idempotencyKey = body.idempotencyKey
+        const scopeKey = `${cardId}\n${idempotencyKey}`
+        const fingerprint = JSON.stringify([expectedCanonicalSegmentKey, title])
+        const now = Date.now()
+        pruneBranchReplays(now)
+        const existing = branchReplayEntries.get(scopeKey)
+        if (existing) {
+          if (existing.fingerprint !== fingerprint) return idempotencyConflict()
+          return replayResponse(await existing.promise)
+        }
+        if (branchReplayEntries.size >= MAX_BRANCH_REPLAYS) {
+          return replayCapacityUnavailable()
+        }
+
+        const operationState = { sideEffectStarted: false }
+        const operation = Promise.resolve().then(async () =>
+          captureReplay(
+            await executeBranch(
+              cardId,
+              expectedCanonicalSegmentKey,
+              title,
+              () => {
+                operationState.sideEffectStarted = true
+              },
+            ),
+          ),
+        )
+        const entry: BranchReplayEntry = {
+          fingerprint,
+          promise: operation,
+          expiresAt: Number.POSITIVE_INFINITY,
+          settled: false,
+        }
+        branchReplayEntries.set(scopeKey, entry)
+
         try {
-          resolved = await sessionCardService.resolveCard(cardId)
-        } catch (error) {
-          if (isSessionCardNotFound(error)) return notFoundResponse()
-          return branchFailure()
-        }
-
-        if (resolved.collection.completeness !== 'complete') {
-          return projectionUnavailable()
-        }
-        if (resolved.card.relationshipKind !== 'root') {
-          return invalidRequest('Only root Session Cards can be branched')
-        }
-
-        const canonicalSegmentKey = resolved.card.canonicalSegmentKey
-        const canonicalSource =
-          resolved.sourceBySegmentKey.get(canonicalSegmentKey)
-        const authoritativeUpstreamKey =
-          resolved.upstreamKeyBySegmentKey.get(canonicalSegmentKey)
-        if (canonicalSource !== 'gateway') {
-          return unavailableResponse(resolved.card.cardId)
-        }
-        if (!authoritativeUpstreamKey) return branchFailure()
-
-        let supported = false
-        try {
-          supported = (await ensureGatewayProbed()).sessionFork
-        } catch {
-          // A failed capability probe is indistinguishable from unavailable.
-        }
-        if (!supported) return unavailableResponse(resolved.card.cardId)
-
-        try {
-          const result = await forkSession(
-            authoritativeUpstreamKey,
-            title ? { title } : undefined,
-          )
-          const childUpstreamKey = result.session.id.trim()
-          const returnedParent = result.session.parent_session_id
-          if (
-            !childUpstreamKey ||
-            childUpstreamKey === authoritativeUpstreamKey ||
-            !validOptionalParentIdentity(
-              result.forkedFrom,
-              authoritativeUpstreamKey,
-            ) ||
-            !validOptionalParentIdentity(
-              returnedParent,
-              authoritativeUpstreamKey,
-            ) ||
-            (result.forkedFrom == null && returnedParent == null)
-          ) {
-            return branchFailure()
+          return replayResponse(await operation)
+        } finally {
+          entry.settled = true
+          if (operationState.sideEffectStarted) {
+            entry.expiresAt = Date.now() + BRANCH_REPLAY_TTL_MS
+          } else if (branchReplayEntries.get(scopeKey) === entry) {
+            branchReplayEntries.delete(scopeKey)
           }
-
-          const expectedChildKey = remoteProjectedKey(childUpstreamKey)
-          let fresh
-          try {
-            fresh = await sessionCardService.resolveCard(resolved.card.cardId, {
-              includeArchived: true,
-            })
-          } catch {
-            return projectionPendingResponse(
-              resolved.card.cardId,
-              canonicalSegmentKey,
-              expectedChildKey,
-            )
-          }
-          if (fresh.card.cardId !== resolved.card.cardId) return branchFailure()
-          if (fresh.collection.completeness !== 'complete') {
-            return projectionPendingResponse(
-              resolved.card.cardId,
-              canonicalSegmentKey,
-              expectedChildKey,
-            )
-          }
-
-          const freshCanonicalKey = fresh.card.canonicalSegmentKey
-          const malformedProjectedBranch = fresh.card.childNodes.some(
-            (candidate) =>
-              candidate.relationshipKind === 'branch' &&
-              (!fresh.sourceBySegmentKey.has(candidate.sessionKey) ||
-                !fresh.upstreamKeyBySegmentKey.has(candidate.sessionKey)),
-          )
-          if (malformedProjectedBranch) return branchFailure()
-          const child = fresh.card.childNodes.find(
-            (candidate) =>
-              candidate.relationshipKind === 'branch' &&
-              candidate.cardId === expectedChildKey &&
-              candidate.sessionKey === expectedChildKey,
-          )
-          if (!child) {
-            return projectionPendingResponse(
-              resolved.card.cardId,
-              canonicalSegmentKey,
-              expectedChildKey,
-            )
-          }
-
-          const freshParentSource =
-            fresh.sourceBySegmentKey.get(canonicalSegmentKey)
-          const freshParentUpstreamKey =
-            fresh.upstreamKeyBySegmentKey.get(canonicalSegmentKey)
-          const freshCanonicalSource =
-            fresh.sourceBySegmentKey.get(freshCanonicalKey)
-          const freshCanonicalUpstreamKey =
-            fresh.upstreamKeyBySegmentKey.get(freshCanonicalKey)
-          const freshChildSource = fresh.sourceBySegmentKey.get(
-            child.sessionKey,
-          )
-          const freshChildUpstreamKey = fresh.upstreamKeyBySegmentKey.get(
-            child.sessionKey,
-          )
-          if (
-            freshParentSource === undefined ||
-            freshParentUpstreamKey === undefined ||
-            freshCanonicalSource === undefined ||
-            freshCanonicalUpstreamKey === undefined
-          ) {
-            return projectionPendingResponse(
-              resolved.card.cardId,
-              canonicalSegmentKey,
-              expectedChildKey,
-            )
-          }
-          if (
-            freshParentSource !== 'gateway' ||
-            freshCanonicalSource !== 'gateway' ||
-            freshChildSource !== 'gateway' ||
-            freshParentUpstreamKey !== authoritativeUpstreamKey ||
-            freshChildUpstreamKey !== childUpstreamKey ||
-            freshChildUpstreamKey === freshParentUpstreamKey
-          ) {
-            return branchFailure()
-          }
-
-          return json(
-            {
-              ok: true,
-              cardId: resolved.card.cardId,
-              canonicalSegmentKey,
-              childSessionKey: child.sessionKey,
-              supported: true,
-            },
-            { status: 201 },
-          )
-        } catch (error) {
-          if (error instanceof SessionForkUnavailableError) {
-            return unavailableResponse(resolved.card.cardId)
-          }
-          return branchFailure()
         }
       },
     },

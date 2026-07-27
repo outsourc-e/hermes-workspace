@@ -178,11 +178,15 @@ export function useDesktopSessionCardActions({
       )
     },
     branch(card: SessionCard) {
+      const idempotencyKey = crypto.randomUUID()
       void runCardAction(
         card,
         'branch',
         'Branch',
-        () => branchSessionCard(card.cardId, card.canonicalSegmentKey),
+        () =>
+          branchSessionCard(card.cardId, card.canonicalSegmentKey, {
+            idempotencyKey,
+          }),
         () => {
           if (activeCardIdRef.current !== card.cardId) return
           return navigateToCardRef.current(card.cardId)
