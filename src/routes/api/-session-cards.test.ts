@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   readBranchReplay: vi.fn(),
   reserveBranchReplay: vi.fn(),
   completeBranchReplay: vi.fn(),
+  reconcileBranchReplay: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -60,6 +61,7 @@ vi.mock('../../server/session-card-store', () => ({
   readSessionCardBranchReplay: mocks.readBranchReplay,
   reserveSessionCardBranchReplay: mocks.reserveBranchReplay,
   completeSessionCardBranchReplay: mocks.completeBranchReplay,
+  reconcileSessionCardBranchReplay: mocks.reconcileBranchReplay,
 }))
 
 vi.mock('../../server/session-card-history', () => ({
@@ -83,7 +85,9 @@ type MutationHandler = GetHandler
 type ListTestRoute = { server: { handlers: { GET: GetHandler } } }
 type MetadataTestRoute = { server: { handlers: { PATCH: MutationHandler } } }
 type ArchiveTestRoute = { server: { handlers: { POST: MutationHandler } } }
-type BranchTestRoute = { server: { handlers: { POST: MutationHandler } } }
+type BranchTestRoute = {
+  server: { handlers: { POST: MutationHandler; PATCH: MutationHandler } }
+}
 type HistoryTestRoute = { server: { handlers: { GET: GetHandler } } }
 
 const listHandler = (ListRoute as unknown as ListTestRoute).server.handlers.GET
@@ -93,6 +97,8 @@ const archiveHandler = (ArchiveRoute as unknown as ArchiveTestRoute).server
   .handlers.POST
 const branchHandler = (BranchRoute as unknown as BranchTestRoute).server
   .handlers.POST
+const branchReconcileHandler = (BranchRoute as unknown as BranchTestRoute)
+  .server.handlers.PATCH
 const historyHandler = (HistoryRoute as unknown as HistoryTestRoute).server
   .handlers.GET
 
@@ -287,6 +293,29 @@ beforeEach(() => {
       durableBranchReplays.set(requestKeyHash, { fingerprint, outcome })
     },
   )
+  mocks.reconcileBranchReplay.mockImplementation(
+    (
+      _cardId: string,
+      requestKeyHash: string,
+      fingerprint: string,
+      evidence: Record<string, unknown>,
+    ) => {
+      if (evidence.kind === 'operator-no-effect') {
+        durableBranchReplays.delete(requestKeyHash)
+        return { status: 'removed' }
+      }
+      const replay = {
+        fingerprint,
+        outcome: {
+          kind: 'created',
+          canonicalSegmentKey: evidence.canonicalSegmentKey,
+          childSessionKey: evidence.childSessionKey,
+        },
+      }
+      durableBranchReplays.set(requestKeyHash, replay)
+      return { status: 'reconciled', replay }
+    },
+  )
 })
 
 describe('GET /api/session-cards', () => {
@@ -440,6 +469,14 @@ describe('Session Card JSON mutation boundaries', () => {
         ),
         params: { cardId: 'remote:root' },
       }),
+      branchReconcileHandler({
+        request: jsonRequest(
+          '/api/session-cards/remote%3Aroot/branch',
+          'PATCH',
+          '{}',
+        ),
+        params: { cardId: 'remote:root' },
+      }),
       historyHandler({
         request: getRequest('/api/session-cards/remote%3Aroot/history'),
         params: { cardId: 'remote:root' },
@@ -447,7 +484,7 @@ describe('Session Card JSON mutation boundaries', () => {
     ])
 
     expect(responses.map((response) => response.status)).toEqual([
-      401, 401, 401, 401,
+      401, 401, 401, 401, 401,
     ])
     expect(mocks.resolveCard).not.toHaveBeenCalled()
     expect(mocks.getHistory).not.toHaveBeenCalled()
@@ -1081,6 +1118,200 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(await response.json()).toMatchObject({ ok: false, retryable: true })
     expect(mocks.forkSession).not.toHaveBeenCalled()
     expect(mocks.completeBranchReplay).not.toHaveBeenCalled()
+  })
+
+  it('reconciles projection-confirmed ambiguity and replays it without another fork', async () => {
+    mocks.reserveBranchReplay.mockImplementationOnce(
+      (_cardId: string, requestKeyHash: string, fingerprint: string) => {
+        const replay = { fingerprint, outcome: { kind: 'ambiguous' } }
+        durableBranchReplays.set(requestKeyHash, replay)
+        return { status: 'completed', replay }
+      },
+    )
+    mocks.resolveCard.mockResolvedValue(resolvedCardWithBranch())
+    const intent = {
+      expectedCanonicalSegmentKey: 'remote:tip',
+      idempotencyKey: 'projection-reconciled-branch',
+      title: 'Recovered branch',
+    }
+    const ambiguous = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        JSON.stringify(intent),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+    expect(ambiguous.status).toBe(503)
+
+    const reconciled = await branchReconcileHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'PATCH',
+        JSON.stringify({
+          ...intent,
+          resolution: {
+            kind: 'projection-created',
+            childSessionKey: 'remote:child-upstream',
+          },
+        }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(reconciled.status).toBe(200)
+    expect(await reconciled.json()).toMatchObject({
+      ok: true,
+      cardId: 'remote:root',
+      childSessionKey: 'remote:child-upstream',
+      reconciled: true,
+    })
+    expect(mocks.reconcileBranchReplay).toHaveBeenCalledWith(
+      'remote:root',
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      {
+        kind: 'projection-created',
+        canonicalSegmentKey: 'remote:tip',
+        childSessionKey: 'remote:child-upstream',
+      },
+    )
+
+    mocks.readBranchReplay.mockImplementation(
+      (_cardId: string, requestKeyHash: string) =>
+        durableBranchReplays.get(requestKeyHash) ?? null,
+    )
+    const replay = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        JSON.stringify(intent),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+    expect(replay.status).toBe(201)
+    expect(await replay.json()).toMatchObject({
+      childSessionKey: 'remote:child-upstream',
+    })
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+  })
+
+  it('rejects impossible projection evidence without clearing ambiguity', async () => {
+    mocks.readBranchReplay.mockReturnValue({
+      fingerprint: expect.any(String),
+      outcome: { kind: 'ambiguous' },
+    })
+    mocks.resolveCard.mockResolvedValue(resolvedCard())
+
+    const response = await branchReconcileHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'PATCH',
+        JSON.stringify({
+          expectedCanonicalSegmentKey: 'remote:tip',
+          idempotencyKey: 'impossible-projection-evidence',
+          resolution: {
+            kind: 'projection-created',
+            childSessionKey: 'remote:not-a-child',
+          },
+        }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(409)
+    expect(mocks.reconcileBranchReplay).not.toHaveBeenCalled()
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+  })
+
+  it('allows only a password-authenticated operator assertion to clear a no-effect ambiguity', async () => {
+    mocks.reserveBranchReplay.mockImplementationOnce(
+      (_cardId: string, requestKeyHash: string, fingerprint: string) => {
+        const replay = { fingerprint, outcome: { kind: 'ambiguous' } }
+        durableBranchReplays.set(requestKeyHash, replay)
+        return { status: 'completed', replay }
+      },
+    )
+    const branchIntent = {
+      expectedCanonicalSegmentKey: 'remote:tip',
+      idempotencyKey: 'operator-cleared-no-effect',
+    }
+    const ambiguous = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        JSON.stringify(branchIntent),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+    expect(ambiguous.status).toBe(503)
+
+    const body = JSON.stringify({
+      ...branchIntent,
+      resolution: {
+        kind: 'operator-no-effect',
+        confirmation:
+          'I verified the upstream fork did not occur and cannot still complete',
+      },
+    })
+    const invoke = () =>
+      branchReconcileHandler({
+        request: new Request(
+          'http://workspace.test/api/session-cards/remote%3Aroot/branch',
+          {
+            method: 'PATCH',
+            headers: {
+              'content-type': 'application/json',
+              cookie: 'claude-auth=operator-session',
+            },
+            body,
+          },
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+    expect((await invoke()).status).toBe(403)
+    expect(mocks.reconcileBranchReplay).not.toHaveBeenCalled()
+
+    mocks.isPasswordProtectionEnabled.mockReturnValue(true)
+    const reconciled = await invoke()
+    expect(reconciled.status).toBe(200)
+    expect(await reconciled.json()).toMatchObject({
+      ok: true,
+      effect: 'absent',
+      reconciled: true,
+    })
+    expect(mocks.reconcileBranchReplay).toHaveBeenCalledWith(
+      'remote:root',
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      {
+        kind: 'operator-no-effect',
+        actorFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+        assertedAt: expect.any(Number),
+      },
+    )
+
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedCard())
+      .mockResolvedValueOnce(resolvedCardWithBranch())
+    mocks.forkSession.mockResolvedValue({
+      session: {
+        id: 'child-upstream',
+        parent_session_id: 'tip-upstream',
+      },
+      forkedFrom: 'tip-upstream',
+    })
+    const recovered = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        JSON.stringify(branchIntent),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+    expect(recovered.status).toBe(201)
+    expect(mocks.forkSession).toHaveBeenCalledTimes(1)
   })
 
   it('replays a durable projection-pending outcome after process-local coalescing ends', async () => {

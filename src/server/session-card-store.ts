@@ -82,7 +82,30 @@ export type PersistedSessionCardBranchReplay = {
   reservationId?: string
   completedAt?: number
   outcome?: SessionCardBranchReplayOutcome
+  reconciliation?: {
+    kind: 'authoritative-projection'
+    reconciledAt: number
+  }
 }
+
+export type SessionCardBranchReplayReconciliationEvidence =
+  | {
+      kind: 'projection-created'
+      canonicalSegmentKey: string
+      childSessionKey: string
+    }
+  | {
+      kind: 'operator-no-effect'
+      actorFingerprint: string
+      assertedAt: number
+    }
+
+export type SessionCardBranchReplayReconciliation =
+  | {
+      status: 'reconciled'
+      replay: PersistedSessionCardBranchReplay
+    }
+  | { status: 'removed' }
 
 export type SessionCardBranchReplayReservation =
   | { status: 'reserved'; reservationId: string }
@@ -226,7 +249,8 @@ function validateBranchReplay(
         field !== 'attemptCount' &&
         field !== 'reservationId' &&
         field !== 'completedAt' &&
-        field !== 'outcome',
+        field !== 'outcome' &&
+        field !== 'reconciliation',
     ) ||
     typeof value.requestKeyHash !== 'string' ||
     !SHA256_HEX_PATTERN.test(value.requestKeyHash) ||
@@ -291,7 +315,27 @@ function validateBranchReplay(
     replay.completedAt = completedAt
     replay.outcome = outcome
     if ('reservationId' in value) return null
-  } else if ('completedAt' in value) {
+    if ('reconciliation' in value) {
+      const reconciliation = value.reconciliation
+      if (
+        outcome.kind !== 'created' ||
+        !isRecord(reconciliation) ||
+        Object.keys(reconciliation).some(
+          (field) => field !== 'kind' && field !== 'reconciledAt',
+        ) ||
+        reconciliation.kind !== 'authoritative-projection' ||
+        !isTimestamp(reconciliation.reconciledAt) ||
+        reconciliation.reconciledAt < value.createdAt ||
+        reconciliation.reconciledAt > updatedAt
+      ) {
+        return null
+      }
+      replay.reconciliation = {
+        kind: 'authoritative-projection',
+        reconciledAt: reconciliation.reconciledAt,
+      }
+    }
+  } else if ('completedAt' in value || 'reconciliation' in value) {
     return null
   } else if ('reservationId' in value) {
     if (
@@ -984,7 +1028,9 @@ export function readSessionCardBranchReplay(
     (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
   )
   return replay &&
-    (replay.outcome?.kind === 'ambiguous' || replay.expiresAt > Date.now())
+    (replay.reconciliation !== undefined ||
+      replay.outcome?.kind === 'ambiguous' ||
+      replay.expiresAt > Date.now())
     ? replay
     : null
 }
@@ -1017,7 +1063,11 @@ function pruneExpiredBranchReplays(
       if (replay.requestKeyHash === requestedKeyHash) {
         retained.push(replay)
       } else if (replay.outcome) {
-        if (replay.outcome.kind === 'ambiguous' || replay.expiresAt > now) {
+        if (
+          replay.reconciliation !== undefined ||
+          replay.outcome.kind === 'ambiguous' ||
+          replay.expiresAt > now
+        ) {
           retained.push(replay)
         } else changed = true
       } else if (replay.expiresAt <= now) {
@@ -1058,7 +1108,9 @@ export function reserveSessionCardBranchReplay(
       }
       if (
         existing.outcome &&
-        (existing.outcome.kind === 'ambiguous' || existing.expiresAt > now)
+        (existing.reconciliation !== undefined ||
+          existing.outcome.kind === 'ambiguous' ||
+          existing.expiresAt > now)
       ) {
         if (existing.fingerprint !== normalizedFingerprint) {
           return { status: 'conflict' }
@@ -1189,6 +1241,112 @@ export function completeSessionCardBranchReplay(
     card.branchReplays![replayIndex] = replay
     writeStore(store)
     return replay
+  })
+}
+
+export function reconcileSessionCardBranchReplay(
+  cardId: string,
+  requestKeyHash: string,
+  fingerprint: string,
+  evidence: SessionCardBranchReplayReconciliationEvidence,
+): SessionCardBranchReplayReconciliation {
+  const normalizedCardId = assertCardId(cardId)
+  const normalizedRequestKeyHash = assertBranchReplayHash(requestKeyHash)
+  const normalizedFingerprint = assertBranchReplayHash(fingerprint)
+  if (!isRecord(evidence)) {
+    throw new Error('Invalid Session Card branch reconciliation evidence')
+  }
+
+  const now = Date.now()
+  const evidenceRecord = evidence as unknown as Record<string, unknown>
+  const evidenceKind = evidenceRecord.kind
+  if (evidenceKind === 'projection-created') {
+    const canonicalSegmentKey = evidenceRecord.canonicalSegmentKey
+    const childSessionKey = evidenceRecord.childSessionKey
+    if (
+      Object.keys(evidence).some(
+        (field) =>
+          field !== 'kind' &&
+          field !== 'canonicalSegmentKey' &&
+          field !== 'childSessionKey',
+      ) ||
+      typeof canonicalSegmentKey !== 'string' ||
+      !isBoundedBranchKey(canonicalSegmentKey) ||
+      typeof childSessionKey !== 'string' ||
+      !isBoundedBranchKey(childSessionKey) ||
+      canonicalSegmentKey === childSessionKey
+    ) {
+      throw new Error('Invalid Session Card branch reconciliation evidence')
+    }
+  } else if (evidenceKind === 'operator-no-effect') {
+    const actorFingerprint = evidenceRecord.actorFingerprint
+    const assertedAt = evidenceRecord.assertedAt
+    if (
+      Object.keys(evidence).some(
+        (field) =>
+          field !== 'kind' &&
+          field !== 'actorFingerprint' &&
+          field !== 'assertedAt',
+      ) ||
+      typeof actorFingerprint !== 'string' ||
+      !SHA256_HEX_PATTERN.test(actorFingerprint) ||
+      !isTimestamp(assertedAt) ||
+      assertedAt > now ||
+      now - assertedAt > SESSION_CARD_BRANCH_PENDING_TTL_MS
+    ) {
+      throw new Error('Invalid Session Card branch reconciliation evidence')
+    }
+  } else {
+    throw new Error('Invalid Session Card branch reconciliation evidence')
+  }
+
+  return withSessionCardStoreLock(() => {
+    const store = readStoreForBranchReplay()
+    const card = store.cards[normalizedCardId]
+    const replayIndex = card?.branchReplays?.findIndex(
+      (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
+    )
+    const replay =
+      replayIndex === undefined || replayIndex < 0
+        ? undefined
+        : card?.branchReplays?.[replayIndex]
+    if (
+      !card ||
+      replayIndex === undefined ||
+      replayIndex < 0 ||
+      !replay ||
+      replay.fingerprint !== normalizedFingerprint ||
+      replay.outcome?.kind !== 'ambiguous'
+    ) {
+      throw new Error('Session Card branch ambiguity is unavailable')
+    }
+
+    if (evidence.kind === 'operator-no-effect') {
+      card.branchReplays!.splice(replayIndex, 1)
+      if (card.branchReplays!.length === 0) delete card.branchReplays
+      writeStore(store)
+      return { status: 'removed' }
+    }
+
+    const reconciled: PersistedSessionCardBranchReplay = {
+      ...replay,
+      updatedAt: now,
+      completedAt: now,
+      expiresAt: now + SESSION_CARD_BRANCH_COMPLETED_TTL_MS,
+      outcome: {
+        kind: 'created',
+        canonicalSegmentKey: evidence.canonicalSegmentKey,
+        childSessionKey: evidence.childSessionKey,
+      },
+      reconciliation: {
+        kind: 'authoritative-projection',
+        reconciledAt: now,
+      },
+    }
+    delete reconciled.reservationId
+    card.branchReplays![replayIndex] = reconciled
+    writeStore(store)
+    return { status: 'reconciled', replay: reconciled }
   })
 }
 

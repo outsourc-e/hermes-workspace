@@ -16,6 +16,7 @@ import { sessionCardService } from '../../server/session-card-service'
 import {
   completeSessionCardBranchReplay,
   readSessionCardBranchReplay,
+  reconcileSessionCardBranchReplay,
   reserveSessionCardBranchReplay,
 } from '../../server/session-card-store'
 import {
@@ -36,6 +37,8 @@ const MAX_CANONICAL_SEGMENT_KEY_LENGTH = 2_048
 const MAX_IDEMPOTENCY_KEY_LENGTH = 128
 const MAX_ACTIVE_BRANCHES = 256
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]+$/
+const OPERATOR_NO_EFFECT_CONFIRMATION =
+  'I verified the upstream fork did not occur and cannot still complete'
 
 type BranchReplay = {
   status: number
@@ -415,6 +418,208 @@ async function executeBranch(
 export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
   server: {
     handlers: {
+      PATCH: async ({ request, params }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const contentTypeError = requireSessionCardJsonContentType(request)
+        if (contentTypeError) return contentTypeError
+
+        const cardId = normalizedCardId(params.cardId)
+        if (!cardId) return invalidRequest('Valid cardId required')
+        const body = await readJsonObject(request)
+        if (!body) return invalidRequest('Request body must be a JSON object')
+        if (
+          Object.keys(body).some(
+            (key) =>
+              key !== 'expectedCanonicalSegmentKey' &&
+              key !== 'idempotencyKey' &&
+              key !== 'title' &&
+              key !== 'resolution',
+          )
+        ) {
+          return invalidRequest(
+            'Only the original branch intent and a resolution may be provided',
+          )
+        }
+        if (
+          typeof body.expectedCanonicalSegmentKey !== 'string' ||
+          body.expectedCanonicalSegmentKey.length === 0 ||
+          body.expectedCanonicalSegmentKey.length >
+            MAX_CANONICAL_SEGMENT_KEY_LENGTH ||
+          body.expectedCanonicalSegmentKey.trim() !==
+            body.expectedCanonicalSegmentKey
+        ) {
+          return invalidRequest('Valid expected canonical segment required')
+        }
+        if (
+          typeof body.idempotencyKey !== 'string' ||
+          body.idempotencyKey.length === 0 ||
+          body.idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH ||
+          !IDEMPOTENCY_KEY_PATTERN.test(body.idempotencyKey)
+        ) {
+          return invalidRequest('Valid branch idempotency key required')
+        }
+        if (body.title !== undefined && typeof body.title !== 'string') {
+          return invalidRequest('title must be a string')
+        }
+        const title = typeof body.title === 'string' ? body.title.trim() : ''
+        if (title.length > MAX_BRANCH_TITLE_LENGTH) {
+          return invalidRequest('title must be 500 characters or fewer')
+        }
+        if (!isRecord(body.resolution)) {
+          return invalidRequest('Valid branch ambiguity resolution required')
+        }
+
+        const expectedCanonicalSegmentKey = body.expectedCanonicalSegmentKey
+        const idempotencyKey = body.idempotencyKey
+        const requestKeyHash = sha256Fingerprint([
+          'session-card-branch-key-v1',
+          cardId,
+          idempotencyKey,
+        ])
+        let ambiguous: PersistedSessionCardBranchReplay | null
+        try {
+          ambiguous = readSessionCardBranchReplay(cardId, requestKeyHash)
+        } catch {
+          return replayCapacityUnavailable()
+        }
+        if (!ambiguous || ambiguous.outcome?.kind !== 'ambiguous') {
+          return branchConflict()
+        }
+
+        const resolution = body.resolution
+        if (resolution.kind === 'operator-no-effect') {
+          if (
+            Object.keys(resolution).some(
+              (key) => key !== 'kind' && key !== 'confirmation',
+            ) ||
+            resolution.confirmation !== OPERATOR_NO_EFFECT_CONFIRMATION
+          ) {
+            return invalidRequest(
+              'Exact operator no-effect confirmation is required',
+            )
+          }
+          // Clearing an opaque effect intent permits a later retry. Require a
+          // real password-authenticated operator, never open-mode auth.
+          if (!isPasswordProtectionEnabled()) {
+            return json(
+              { ok: false, error: 'Password-authenticated operator required' },
+              { status: 403 },
+            )
+          }
+          const token = getSessionTokenFromCookie(request.headers.get('cookie'))
+          if (!token) {
+            return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          }
+          try {
+            reconcileSessionCardBranchReplay(
+              cardId,
+              requestKeyHash,
+              ambiguous.fingerprint,
+              {
+                kind: 'operator-no-effect',
+                actorFingerprint: sha256Fingerprint([
+                  'session-card-branch-operator-v1',
+                  token,
+                ]),
+                assertedAt: Date.now(),
+              },
+            )
+          } catch {
+            return branchConflict()
+          }
+          return json({
+            ok: true,
+            cardId,
+            reconciled: true,
+            effect: 'absent',
+          })
+        }
+
+        if (
+          resolution.kind !== 'projection-created' ||
+          Object.keys(resolution).some(
+            (key) => key !== 'kind' && key !== 'childSessionKey',
+          ) ||
+          typeof resolution.childSessionKey !== 'string' ||
+          resolution.childSessionKey.length === 0 ||
+          resolution.childSessionKey.length >
+            MAX_CANONICAL_SEGMENT_KEY_LENGTH ||
+          resolution.childSessionKey.trim() !== resolution.childSessionKey ||
+          resolution.childSessionKey === expectedCanonicalSegmentKey
+        ) {
+          return invalidRequest('Valid projection reconciliation required')
+        }
+
+        let resolved
+        try {
+          resolved = await sessionCardService.resolveCard(cardId, {
+            includeArchived: true,
+          })
+        } catch (error) {
+          if (isSessionCardNotFound(error)) return notFoundResponse()
+          return branchConflict()
+        }
+        const child = resolved.card.childNodes.find(
+          (candidate) =>
+            candidate.relationshipKind === 'branch' &&
+            candidate.cardId === resolution.childSessionKey &&
+            candidate.sessionKey === resolution.childSessionKey,
+        )
+        const parentSource = resolved.sourceBySegmentKey.get(
+          expectedCanonicalSegmentKey,
+        )
+        const parentUpstreamKey = resolved.upstreamKeyBySegmentKey.get(
+          expectedCanonicalSegmentKey,
+        )
+        const childSource = child
+          ? resolved.sourceBySegmentKey.get(child.sessionKey)
+          : undefined
+        const childUpstreamKey = child
+          ? resolved.upstreamKeyBySegmentKey.get(child.sessionKey)
+          : undefined
+        if (
+          resolved.collection.completeness !== 'complete' ||
+          resolved.card.cardId !== cardId ||
+          resolved.card.relationshipKind !== 'root' ||
+          resolved.card.canonicalSource !== 'remote' ||
+          resolved.card.canonicalTransport !== 'gateway' ||
+          !resolved.card.continuationSegmentKeys.includes(
+            expectedCanonicalSegmentKey,
+          ) ||
+          !child ||
+          parentSource !== 'gateway' ||
+          childSource !== 'gateway' ||
+          !parentUpstreamKey ||
+          !childUpstreamKey ||
+          childUpstreamKey === parentUpstreamKey
+        ) {
+          return branchConflict()
+        }
+
+        try {
+          reconcileSessionCardBranchReplay(
+            cardId,
+            requestKeyHash,
+            ambiguous.fingerprint,
+            {
+              kind: 'projection-created',
+              canonicalSegmentKey: expectedCanonicalSegmentKey,
+              childSessionKey: child.sessionKey,
+            },
+          )
+        } catch {
+          return branchConflict()
+        }
+        return json({
+          ok: true,
+          cardId,
+          canonicalSegmentKey: expectedCanonicalSegmentKey,
+          childSessionKey: child.sessionKey,
+          reconciled: true,
+        })
+      },
       POST: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })

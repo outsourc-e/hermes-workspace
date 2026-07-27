@@ -29,6 +29,7 @@ import {
   listSessionCardMetadata,
   readSessionCardBranchReplay,
   readSessionCardMetadata,
+  reconcileSessionCardBranchReplay,
   reserveSessionCardBranchReplay,
   resolveSessionCardTitle,
   sessionCardStoreLockPath,
@@ -430,7 +431,7 @@ describe('Session Card metadata persistence', () => {
     ).toBeNull()
   })
 
-  it('retains ambiguous opaque forks instead of reclaiming their capacity unsafely', () => {
+  it('recovers ambiguous capacity only after fresh authenticated operator evidence', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
     for (let index = 0; index < 32; index += 1) {
@@ -455,6 +456,192 @@ describe('Session Card metadata persistence', () => {
         'b'.repeat(64),
       ),
     ).toEqual({ status: 'capacity' })
+
+    const reconciledKey = '0'.repeat(64)
+    const reconciledFingerprint = (500).toString(16).padStart(64, '0')
+    expect(
+      reconcileSessionCardBranchReplay(
+        'card-abandoned-capacity',
+        reconciledKey,
+        reconciledFingerprint,
+        {
+          kind: 'operator-no-effect',
+          actorFingerprint: 'c'.repeat(64),
+          assertedAt: Date.now(),
+        },
+      ),
+    ).toEqual({ status: 'removed' })
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-abandoned-capacity',
+        'a'.repeat(64),
+        'b'.repeat(64),
+      ),
+    ).toMatchObject({ status: 'reserved' })
+  })
+
+  it('recovers global ambiguous capacity only after authoritative no-effect evidence', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
+    for (let cardIndex = 0; cardIndex < 8; cardIndex += 1) {
+      for (let replayIndex = 0; replayIndex < 32; replayIndex += 1) {
+        const ordinal = cardIndex * 32 + replayIndex
+        expect(
+          reserveSessionCardBranchReplay(
+            `card-global-capacity-${cardIndex}`,
+            ordinal.toString(16).padStart(64, '0'),
+            (ordinal + 1_000).toString(16).padStart(64, '0'),
+          ),
+        ).toMatchObject({ status: 'reserved' })
+      }
+    }
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_PENDING_TTL_MS + 1)
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-global-overflow',
+        'a'.repeat(64),
+        'b'.repeat(64),
+      ),
+    ).toEqual({ status: 'capacity' })
+
+    expect(
+      reconcileSessionCardBranchReplay(
+        'card-global-capacity-0',
+        '0'.repeat(64),
+        (1_000).toString(16).padStart(64, '0'),
+        {
+          kind: 'operator-no-effect',
+          actorFingerprint: 'c'.repeat(64),
+          assertedAt: Date.now(),
+        },
+      ),
+    ).toEqual({ status: 'removed' })
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-global-overflow',
+        'a'.repeat(64),
+        'b'.repeat(64),
+      ),
+    ).toMatchObject({ status: 'reserved' })
+  })
+
+  it('rejects stale or impossible ambiguity reconciliation evidence', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
+    const requestKeyHash = 'd'.repeat(64)
+    const fingerprint = 'e'.repeat(64)
+    reserveSessionCardBranchReplay(
+      'card-impossible-evidence',
+      requestKeyHash,
+      fingerprint,
+    )
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_PENDING_TTL_MS + 1)
+    reserveSessionCardBranchReplay(
+      'card-impossible-evidence',
+      requestKeyHash,
+      fingerprint,
+    )
+
+    expect(() =>
+      reconcileSessionCardBranchReplay(
+        'card-impossible-evidence',
+        requestKeyHash,
+        fingerprint,
+        {
+          kind: 'operator-no-effect',
+          actorFingerprint: 'f'.repeat(64),
+          assertedAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+        },
+      ),
+    ).toThrow(/evidence/i)
+    expect(() =>
+      reconcileSessionCardBranchReplay(
+        'card-impossible-evidence',
+        requestKeyHash,
+        fingerprint,
+        {
+          kind: 'projection-created',
+          canonicalSegmentKey: 'remote:same',
+          childSessionKey: 'remote:same',
+        },
+      ),
+    ).toThrow(/evidence/i)
+    expect(() =>
+      reconcileSessionCardBranchReplay(
+        'card-impossible-evidence',
+        requestKeyHash,
+        fingerprint,
+        {
+          kind: 'unknown-evidence',
+          actorFingerprint: 'f'.repeat(64),
+          assertedAt: Date.now(),
+        } as never,
+      ),
+    ).toThrow(/evidence/i)
+    expect(
+      readSessionCardBranchReplay('card-impossible-evidence', requestKeyHash),
+    ).toMatchObject({ outcome: { kind: 'ambiguous' } })
+  })
+
+  it('replays a projection-reconciled ambiguity without reserving another fork', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
+    const requestKeyHash = '1'.repeat(64)
+    const fingerprint = '2'.repeat(64)
+    reserveSessionCardBranchReplay(
+      'card-projected-reconciliation',
+      requestKeyHash,
+      fingerprint,
+    )
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_PENDING_TTL_MS + 1)
+    reserveSessionCardBranchReplay(
+      'card-projected-reconciliation',
+      requestKeyHash,
+      fingerprint,
+    )
+
+    expect(
+      reconcileSessionCardBranchReplay(
+        'card-projected-reconciliation',
+        requestKeyHash,
+        fingerprint,
+        {
+          kind: 'projection-created',
+          canonicalSegmentKey: 'remote:parent',
+          childSessionKey: 'remote:child',
+        },
+      ),
+    ).toMatchObject({
+      status: 'reconciled',
+      replay: {
+        outcome: {
+          kind: 'created',
+          canonicalSegmentKey: 'remote:parent',
+          childSessionKey: 'remote:child',
+        },
+      },
+    })
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-projected-reconciliation',
+        requestKeyHash,
+        fingerprint,
+      ),
+    ).toMatchObject({
+      status: 'completed',
+      replay: { outcome: { kind: 'created' } },
+    })
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_COMPLETED_TTL_MS + 1)
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-projected-reconciliation',
+        requestKeyHash,
+        fingerprint,
+      ),
+    ).toMatchObject({
+      status: 'completed',
+      replay: { outcome: { kind: 'created' } },
+    })
   })
 
   it('rejects a new branch reservation when archive committed after projection', () => {
