@@ -273,7 +273,7 @@ beforeEach(() => {
         }
       }
       durableBranchReplays.set(requestKeyHash, { fingerprint })
-      return { status: 'reserved' }
+      return { status: 'reserved', reservationId: requestKeyHash.slice(0, 32) }
     },
   )
   mocks.completeBranchReplay.mockImplementation(
@@ -281,6 +281,7 @@ beforeEach(() => {
       _cardId: string,
       requestKeyHash: string,
       fingerprint: string,
+      _reservationId: string,
       outcome: Record<string, unknown>,
     ) => {
       durableBranchReplays.set(requestKeyHash, { fingerprint, outcome })
@@ -1006,6 +1007,34 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(mocks.forkSession).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps a cross-process reservation loser retryable without a duplicate fork', async () => {
+    mocks.reserveBranchReplay.mockReturnValueOnce({
+      status: 'pending',
+      replay: {
+        fingerprint: 'a'.repeat(64),
+        createdAt: Date.now(),
+      },
+    })
+
+    const response = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        JSON.stringify({ idempotencyKey: 'independent-process-loser' }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('retry-after')).toBe('5')
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      retryable: true,
+    })
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+    expect(mocks.completeBranchReplay).not.toHaveBeenCalled()
+  })
+
   it('replays a durable projection-pending outcome after process-local coalescing ends', async () => {
     mocks.forkSession.mockResolvedValue({
       session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
@@ -1039,6 +1068,7 @@ describe('POST /api/session-cards/$cardId/branch', () => {
       'remote:root',
       expect.stringMatching(/^[a-f0-9]{64}$/),
       expect.stringMatching(/^[a-f0-9]{64}$/),
+      expect.stringMatching(/^[a-f0-9]{32}$/),
       {
         kind: 'projection-pending',
         canonicalSegmentKey: 'remote:tip',

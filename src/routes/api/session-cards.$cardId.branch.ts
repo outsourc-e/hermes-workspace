@@ -80,6 +80,17 @@ function replayCapacityUnavailable(): Response {
   )
 }
 
+function replayPendingUnavailable(): Response {
+  return json(
+    {
+      ok: false,
+      error: 'Branch request is still being finalized',
+      retryable: true,
+    },
+    { status: 503, headers: { 'Retry-After': '5' } },
+  )
+}
+
 async function captureReplay(response: Response): Promise<BranchReplay> {
   return {
     status: response.status,
@@ -148,7 +159,7 @@ function durableReplayResponse(
   replay: PersistedSessionCardBranchReplay,
 ): Response {
   const outcome = replay.outcome
-  if (!outcome) return replayCapacityUnavailable()
+  if (!outcome) return replayPendingUnavailable()
   if (outcome.kind === 'failed') return branchFailure()
   if (outcome.kind === 'unavailable') return unavailableResponse(cardId)
   if (outcome.kind === 'projection-pending') {
@@ -477,7 +488,9 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
           return replayCapacityUnavailable()
         }
 
-        const operationState = { sideEffectStarted: false }
+        const operationState: { reservationId: string | null } = {
+          reservationId: null,
+        }
         const operation = Promise.resolve().then(async () => {
           const response = await executeBranch(
             cardId,
@@ -501,22 +514,23 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
                 return replayCapacityUnavailable()
               }
               if (reservation.status === 'pending') {
-                return replayCapacityUnavailable()
+                return replayPendingUnavailable()
               }
               if (reservation.status === 'completed') {
                 return durableReplayResponse(cardId, reservation.replay)
               }
-              operationState.sideEffectStarted = true
+              operationState.reservationId = reservation.reservationId
               return null
             },
           )
           let replay = await captureReplay(response)
-          if (operationState.sideEffectStarted) {
+          if (operationState.reservationId) {
             try {
               completeSessionCardBranchReplay(
                 cardId,
                 requestKeyHash,
                 fingerprint,
+                operationState.reservationId,
                 outcomeFromReplay(replay),
               )
             } catch {

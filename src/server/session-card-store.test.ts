@@ -1,3 +1,4 @@
+import { fork } from 'node:child_process'
 import {
   existsSync,
   fsyncSync,
@@ -11,6 +12,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -18,6 +20,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   DEFAULT_SESSION_CARD_TITLE,
+  SESSION_CARD_BRANCH_COMPLETED_TTL_MS,
+  SESSION_CARD_BRANCH_PENDING_TTL_MS,
   SESSION_CARD_STORE_MAX_BYTES,
   SESSION_CARD_TITLE_MAX_LENGTH,
   archiveSessionCardMetadata,
@@ -27,9 +31,69 @@ import {
   readSessionCardMetadata,
   reserveSessionCardBranchReplay,
   resolveSessionCardTitle,
+  sessionCardStoreLockPath,
   sessionCardStorePath,
   updateSessionCardMetadata,
 } from './session-card-store'
+import type { ChildProcess } from 'node:child_process'
+
+type WorkerReservation = {
+  ok: boolean
+  reservation?: { status: string }
+}
+
+type ActualFs = {
+  renameSync: typeof renameSync
+  unlinkSync: typeof unlinkSync
+  writeFileSync: typeof writeFileSync
+}
+
+function waitForWorkerMessage<T>(worker: ChildProcess): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const onMessage = (message: T) => {
+      cleanup()
+      resolve(message)
+    }
+    const onExit = (code: number | null) => {
+      cleanup()
+      reject(new Error(`Session Card test worker exited with code ${code}`))
+    }
+    const cleanup = () => {
+      worker.off('message', onMessage)
+      worker.off('exit', onExit)
+    }
+    worker.once('message', onMessage)
+    worker.once('exit', onExit)
+  })
+}
+
+async function startReservationWorker(): Promise<ChildProcess> {
+  const worker = fork(
+    fileURLToPath(
+      new URL(
+        './test-fixtures/session-card-store-concurrency-worker.ts',
+        import.meta.url,
+      ),
+    ),
+    [],
+    {
+      env: { ...process.env, HERMES_WORKSPACE_STATE_DIR: stateDir },
+      execArgv: ['--import', 'tsx'],
+      stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
+    },
+  )
+  await waitForWorkerMessage<{ ready: true }>(worker)
+  return worker
+}
+
+function reserveInWorker(
+  worker: ChildProcess,
+  request: { cardId: string; requestKeyHash: string; fingerprint: string },
+): Promise<WorkerReservation> {
+  const response = waitForWorkerMessage<WorkerReservation>(worker)
+  worker.send(request)
+  return response
+}
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
@@ -149,14 +213,26 @@ describe('Session Card title resolution', () => {
 
 describe('Session Card metadata persistence', () => {
   it('durably replays a completed Card branch after a fresh module load', async () => {
-    expect(
-      reserveSessionCardBranchReplay('card-1', 'a'.repeat(64), 'b'.repeat(64)),
-    ).toEqual({ status: 'reserved' })
-    completeSessionCardBranchReplay('card-1', 'a'.repeat(64), 'b'.repeat(64), {
-      kind: 'projection-pending',
-      canonicalSegmentKey: 'remote:tip',
-      childSessionKey: 'remote:child',
-    })
+    const reservation = reserveSessionCardBranchReplay(
+      'card-1',
+      'a'.repeat(64),
+      'b'.repeat(64),
+    )
+    expect(reservation).toMatchObject({ status: 'reserved' })
+    if (reservation.status !== 'reserved') {
+      throw new Error('Expected durable replay reservation')
+    }
+    completeSessionCardBranchReplay(
+      'card-1',
+      'a'.repeat(64),
+      'b'.repeat(64),
+      reservation.reservationId,
+      {
+        kind: 'projection-pending',
+        canonicalSegmentKey: 'remote:tip',
+        childSessionKey: 'remote:child',
+      },
+    )
 
     vi.resetModules()
     const reloaded = await import('./session-card-store')
@@ -175,7 +251,7 @@ describe('Session Card metadata persistence', () => {
   it('atomically conflicts on a reused Card branch key with a different fingerprint', () => {
     expect(
       reserveSessionCardBranchReplay('card-1', 'c'.repeat(64), 'd'.repeat(64)),
-    ).toEqual({ status: 'reserved' })
+    ).toMatchObject({ status: 'reserved' })
 
     expect(
       reserveSessionCardBranchReplay('card-1', 'c'.repeat(64), 'e'.repeat(64)),
@@ -193,7 +269,7 @@ describe('Session Card metadata persistence', () => {
           index.toString(16).padStart(64, '0'),
           (index + 100).toString(16).padStart(64, '0'),
         ),
-      ).toEqual({ status: 'reserved' })
+      ).toMatchObject({ status: 'reserved' })
     }
 
     expect(
@@ -203,6 +279,252 @@ describe('Session Card metadata persistence', () => {
       { fingerprint: (100).toString(16).padStart(64, '0') },
     )
   })
+
+  it('recovers one expired reservation after restart and rejects the stale owner', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
+    const requestKeyHash = '1'.repeat(64)
+    const fingerprint = '2'.repeat(64)
+    const first = reserveSessionCardBranchReplay(
+      'card-restart',
+      requestKeyHash,
+      fingerprint,
+    )
+    expect(first).toMatchObject({
+      status: 'reserved',
+      reservationId: expect.stringMatching(/^[a-f0-9]{32}$/),
+    })
+
+    vi.resetModules()
+    const restarted = await import('./session-card-store')
+    expect(
+      restarted.reserveSessionCardBranchReplay(
+        'card-restart',
+        requestKeyHash,
+        fingerprint,
+      ),
+    ).toMatchObject({ status: 'pending' })
+
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_PENDING_TTL_MS + 1)
+    const recovered = restarted.reserveSessionCardBranchReplay(
+      'card-restart',
+      requestKeyHash,
+      fingerprint,
+    )
+    expect(recovered).toMatchObject({
+      status: 'reserved',
+      reservationId: expect.stringMatching(/^[a-f0-9]{32}$/),
+    })
+    if (first.status !== 'reserved' || recovered.status !== 'reserved') {
+      throw new Error('Expected original and recovered reservations')
+    }
+    expect(recovered.reservationId).not.toBe(first.reservationId)
+    expect(() =>
+      restarted.completeSessionCardBranchReplay(
+        'card-restart',
+        requestKeyHash,
+        fingerprint,
+        first.reservationId,
+        { kind: 'failed' },
+      ),
+    ).toThrow(/reservation.*unavailable/i)
+
+    restarted.completeSessionCardBranchReplay(
+      'card-restart',
+      requestKeyHash,
+      fingerprint,
+      recovered.reservationId,
+      { kind: 'failed' },
+    )
+    expect(
+      restarted.readSessionCardBranchReplay('card-restart', requestKeyHash),
+    ).toMatchObject({ outcome: { kind: 'failed' } })
+  })
+
+  it('terminalizes an ambiguous reservation after one bounded recovery attempt', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
+    const requestKeyHash = '3'.repeat(64)
+    const fingerprint = '4'.repeat(64)
+
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-bounded',
+        requestKeyHash,
+        fingerprint,
+      ),
+    ).toMatchObject({ status: 'reserved' })
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_PENDING_TTL_MS + 1)
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-bounded',
+        requestKeyHash,
+        fingerprint,
+      ),
+    ).toMatchObject({ status: 'reserved' })
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_PENDING_TTL_MS + 1)
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-bounded',
+        requestKeyHash,
+        fingerprint,
+      ),
+    ).toMatchObject({
+      status: 'completed',
+      replay: { outcome: { kind: 'failed' } },
+    })
+  })
+
+  it('evicts expired completed outcomes so capacity eventually admits new keys', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
+    for (let index = 0; index < 32; index += 1) {
+      const requestKeyHash = index.toString(16).padStart(64, '0')
+      const fingerprint = (index + 100).toString(16).padStart(64, '0')
+      const reservation = reserveSessionCardBranchReplay(
+        'card-capacity',
+        requestKeyHash,
+        fingerprint,
+      )
+      if (reservation.status !== 'reserved') {
+        throw new Error('Expected capacity fixture reservation')
+      }
+      completeSessionCardBranchReplay(
+        'card-capacity',
+        requestKeyHash,
+        fingerprint,
+        reservation.reservationId,
+        { kind: 'failed' },
+      )
+    }
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-capacity',
+        'e'.repeat(64),
+        'f'.repeat(64),
+      ),
+    ).toEqual({ status: 'capacity' })
+
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_COMPLETED_TTL_MS + 1)
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-capacity',
+        'e'.repeat(64),
+        'f'.repeat(64),
+      ),
+    ).toMatchObject({ status: 'reserved' })
+    expect(
+      readSessionCardBranchReplay('card-capacity', '0'.repeat(64)),
+    ).toBeNull()
+  })
+
+  it('evicts abandoned reservations after their bounded recovery window', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
+    for (let index = 0; index < 32; index += 1) {
+      expect(
+        reserveSessionCardBranchReplay(
+          'card-abandoned-capacity',
+          index.toString(16).padStart(64, '0'),
+          (index + 500).toString(16).padStart(64, '0'),
+        ),
+      ).toMatchObject({ status: 'reserved' })
+    }
+
+    vi.advanceTimersByTime(
+      SESSION_CARD_BRANCH_PENDING_TTL_MS +
+        SESSION_CARD_BRANCH_COMPLETED_TTL_MS +
+        1,
+    )
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-abandoned-capacity',
+        'a'.repeat(64),
+        'b'.repeat(64),
+      ),
+    ).toMatchObject({ status: 'reserved' })
+  })
+
+  it('recovers a stale exclusive store lock left by another process', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
+    mkdirSync(stateDir, { recursive: true })
+    writeFileSync(
+      sessionCardStoreLockPath(),
+      `${JSON.stringify({
+        token: 'a'.repeat(32),
+        pid: 999_999_999,
+        createdAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+      })}\n`,
+      { encoding: 'utf8', mode: 0o600 },
+    )
+
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-stale-lock',
+        '5'.repeat(64),
+        '6'.repeat(64),
+      ),
+    ).toMatchObject({ status: 'reserved' })
+    expect(existsSync(sessionCardStoreLockPath())).toBe(false)
+  })
+
+  it('does not release a successor lock after ownership changes', async () => {
+    const actualFs = await vi.importActual<ActualFs>('node:fs')
+    const successor = {
+      token: 'b'.repeat(32),
+      pid: process.pid + 1,
+      createdAt: Date.now(),
+    }
+    vi.mocked(renameSync).mockImplementationOnce((oldPath, newPath) => {
+      actualFs.renameSync(oldPath, newPath)
+      actualFs.unlinkSync(sessionCardStoreLockPath())
+      actualFs.writeFileSync(
+        sessionCardStoreLockPath(),
+        `${JSON.stringify(successor)}\n`,
+        { encoding: 'utf8', mode: 0o600 },
+      )
+    })
+
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-successor-lock',
+        '7'.repeat(64),
+        '8'.repeat(64),
+      ),
+    ).toMatchObject({ status: 'reserved' })
+    expect(
+      JSON.parse(readFileSync(sessionCardStoreLockPath(), 'utf8')),
+    ).toEqual(successor)
+    actualFs.unlinkSync(sessionCardStoreLockPath())
+  })
+
+  it('admits exactly one reservation across independent server processes', async () => {
+    const workers = await Promise.all([
+      startReservationWorker(),
+      startReservationWorker(),
+    ])
+    try {
+      for (let index = 0; index < 24; index += 1) {
+        const request = {
+          cardId: `process-card-${index}`,
+          requestKeyHash: index.toString(16).padStart(64, '0'),
+          fingerprint: (index + 1000).toString(16).padStart(64, '0'),
+        }
+        const results = await Promise.all(
+          workers.map((worker) => reserveInWorker(worker, request)),
+        )
+        expect(results.every((result) => result.ok)).toBe(true)
+        expect(
+          results
+            .map((result) => result.reservation?.status)
+            .sort((a, b) => String(a).localeCompare(String(b))),
+        ).toEqual(['pending', 'reserved'])
+      }
+    } finally {
+      for (const worker of workers) worker.kill()
+    }
+  }, 20_000)
 
   it.each(['toString', 'hasOwnProperty'])(
     'returns null for absent inherited-key card ID %s',
@@ -275,6 +597,42 @@ describe('Session Card metadata persistence', () => {
       reserveSessionCardBranchReplay('card-1', 'a'.repeat(64), 'b'.repeat(64)),
     ).toThrow(/json|store|metadata/i)
     expect(readFileSync(sessionCardStorePath(), 'utf8')).toBe(corrupt)
+  })
+
+  it('rejects persisted replay leases that exceed the bounded TTL', () => {
+    const now = Date.now()
+    writeFileSync(
+      sessionCardStorePath(),
+      JSON.stringify({
+        version: 1,
+        cards: {
+          'card-lease': {
+            cardId: 'card-lease',
+            updatedAt: now,
+            branchReplays: [
+              {
+                requestKeyHash: 'a'.repeat(64),
+                fingerprint: 'b'.repeat(64),
+                createdAt: now,
+                updatedAt: now,
+                expiresAt: now + SESSION_CARD_BRANCH_PENDING_TTL_MS + 1,
+                attemptCount: 1,
+                reservationId: 'c'.repeat(32),
+              },
+            ],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    expect(() =>
+      reserveSessionCardBranchReplay(
+        'card-lease',
+        'a'.repeat(64),
+        'b'.repeat(64),
+      ),
+    ).toThrow(/invalid|store|metadata/i)
   })
 
   it('falls back safely for corrupt or oversized files and can recover atomically', () => {

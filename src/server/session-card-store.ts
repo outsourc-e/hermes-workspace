@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import {
   closeSync,
   fsyncSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -25,8 +26,16 @@ const SESSION_CARD_RECORD_MAX_BYTES = 96 * 1024
 const SESSION_CARD_RECORD_MAX_COUNT = 2000
 const SESSION_CARD_BRANCH_REPLAY_MAX_COUNT = 256
 const SESSION_CARD_BRANCH_REPLAY_MAX_PER_CARD = 32
+export const SESSION_CARD_BRANCH_PENDING_TTL_MS = 5 * 60 * 1000
+export const SESSION_CARD_BRANCH_COMPLETED_TTL_MS = 24 * 60 * 60 * 1000
+const SESSION_CARD_BRANCH_MAX_ATTEMPTS = 2
+const SESSION_CARD_STORE_LOCK_STALE_MS = 30 * 1000
+const SESSION_CARD_STORE_LOCK_WAIT_MS = 2 * 1000
+const SESSION_CARD_STORE_LOCK_POLL_MS = 10
 const SESSION_CARD_BRANCH_KEY_MAX_LENGTH = 2048
+const SESSION_CARD_STORE_LOCK_FILE = `${SESSION_CARD_STORE_FILE}.lock`
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/
+const LOCK_TOKEN_PATTERN = /^[a-f0-9]{32}$/
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 const RECORD_FIELDS = new Set([
   'cardId',
@@ -62,16 +71,20 @@ export type PersistedSessionCardBranchReplay = {
   requestKeyHash: string
   fingerprint: string
   createdAt: number
+  updatedAt: number
+  expiresAt: number
+  attemptCount: number
+  reservationId?: string
+  completedAt?: number
   outcome?: SessionCardBranchReplayOutcome
 }
 
 export type SessionCardBranchReplayReservation =
-  | { status: 'reserved' }
-  | {
-      status: 'pending' | 'completed'
-      replay: PersistedSessionCardBranchReplay
-    }
-  | { status: 'conflict' | 'capacity' }
+  | { status: 'reserved'; reservationId: string }
+  | { status: 'pending'; replay: PersistedSessionCardBranchReplay }
+  | { status: 'completed'; replay: PersistedSessionCardBranchReplay }
+  | { status: 'conflict' }
+  | { status: 'capacity' }
 
 export type PersistedSessionCardStore = {
   version: typeof SESSION_CARD_STORE_VERSION
@@ -198,6 +211,11 @@ function validateBranchReplay(
         field !== 'requestKeyHash' &&
         field !== 'fingerprint' &&
         field !== 'createdAt' &&
+        field !== 'updatedAt' &&
+        field !== 'expiresAt' &&
+        field !== 'attemptCount' &&
+        field !== 'reservationId' &&
+        field !== 'completedAt' &&
         field !== 'outcome',
     ) ||
     typeof value.requestKeyHash !== 'string' ||
@@ -208,15 +226,71 @@ function validateBranchReplay(
   ) {
     return null
   }
+
+  const outcome =
+    'outcome' in value ? validateBranchReplayOutcome(value.outcome) : undefined
+  if ('outcome' in value && !outcome) return null
+  const updatedAt =
+    'updatedAt' in value && isTimestamp(value.updatedAt)
+      ? value.updatedAt
+      : value.createdAt
+  const expiresAt =
+    'expiresAt' in value && isTimestamp(value.expiresAt)
+      ? value.expiresAt
+      : updatedAt +
+        (outcome
+          ? SESSION_CARD_BRANCH_COMPLETED_TTL_MS
+          : SESSION_CARD_BRANCH_PENDING_TTL_MS)
+  const attemptCount =
+    'attemptCount' in value &&
+    Number.isSafeInteger(value.attemptCount) &&
+    Number(value.attemptCount) >= 1 &&
+    Number(value.attemptCount) <= SESSION_CARD_BRANCH_MAX_ATTEMPTS
+      ? Number(value.attemptCount)
+      : 'attemptCount' in value
+        ? null
+        : 1
+  const expectedTtl = outcome
+    ? SESSION_CARD_BRANCH_COMPLETED_TTL_MS
+    : SESSION_CARD_BRANCH_PENDING_TTL_MS
+  if (
+    attemptCount === null ||
+    !Number.isSafeInteger(expiresAt) ||
+    updatedAt < value.createdAt ||
+    updatedAt > Date.now() + SESSION_CARD_BRANCH_PENDING_TTL_MS ||
+    expiresAt <= updatedAt ||
+    expiresAt - updatedAt > expectedTtl
+  ) {
+    return null
+  }
+
   const replay: PersistedSessionCardBranchReplay = {
     requestKeyHash: value.requestKeyHash,
     fingerprint: value.fingerprint,
     createdAt: value.createdAt,
+    updatedAt,
+    expiresAt,
+    attemptCount,
   }
-  if ('outcome' in value) {
-    const outcome = validateBranchReplayOutcome(value.outcome)
-    if (!outcome) return null
+  if (outcome) {
+    const completedAt =
+      'completedAt' in value && isTimestamp(value.completedAt)
+        ? value.completedAt
+        : updatedAt
+    if (completedAt < value.createdAt || completedAt > updatedAt) return null
+    replay.completedAt = completedAt
     replay.outcome = outcome
+    if ('reservationId' in value) return null
+  } else if ('completedAt' in value) {
+    return null
+  } else if ('reservationId' in value) {
+    if (
+      typeof value.reservationId !== 'string' ||
+      !LOCK_TOKEN_PATTERN.test(value.reservationId)
+    ) {
+      return null
+    }
+    replay.reservationId = value.reservationId
   }
   return replay
 }
@@ -386,6 +460,161 @@ function assertWritableStore(store: PersistedSessionCardStore): string {
   return serialized
 }
 
+type SessionCardStoreLock = { token: string; release: () => void }
+
+function sleepSync(milliseconds: number): void {
+  const signal = new Int32Array(new SharedArrayBuffer(4))
+  Atomics.wait(signal, 0, 0, milliseconds)
+}
+
+function unlinkIfPresent(path: string): void {
+  try {
+    unlinkSync(path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  }
+}
+
+function lockCreatedAt(path: string): number | null {
+  const stat = lstatSync(path)
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 1024) {
+    throw new Error('Session Card metadata lock is invalid')
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown
+    if (
+      !isRecord(parsed) ||
+      typeof parsed.token !== 'string' ||
+      !LOCK_TOKEN_PATTERN.test(parsed.token) ||
+      !isTimestamp(parsed.createdAt)
+    ) {
+      return null
+    }
+    return parsed.createdAt
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw error
+    return null
+  }
+}
+
+function recoverStaleLock(lockPath: string, now: number): boolean {
+  let createdAt: number | null
+  let observed
+  try {
+    observed = lstatSync(lockPath)
+    createdAt = lockCreatedAt(lockPath)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
+    throw error
+  }
+  const persistedAgeSource = createdAt ?? Math.floor(observed.mtimeMs)
+  const ageSource =
+    persistedAgeSource > now + SESSION_CARD_STORE_LOCK_STALE_MS
+      ? now - SESSION_CARD_STORE_LOCK_STALE_MS
+      : persistedAgeSource
+  if (now - ageSource < SESSION_CARD_STORE_LOCK_STALE_MS) return false
+
+  const claimPath = `${lockPath}.claim.${process.pid}.${randomBytes(8).toString('hex')}`
+  try {
+    linkSync(lockPath, claimPath)
+    const current = lstatSync(lockPath)
+    const claim = lstatSync(claimPath)
+    if (
+      current.dev === claim.dev &&
+      current.ino === claim.ino &&
+      observed.dev === claim.dev &&
+      observed.ino === claim.ino
+    ) {
+      unlinkSync(lockPath)
+    }
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
+    throw error
+  } finally {
+    unlinkIfPresent(claimPath)
+  }
+}
+
+function acquireSessionCardStoreLock(): SessionCardStoreLock {
+  const stateDir = getStateDir()
+  mkdirSync(stateDir, { recursive: true })
+  const lockPath = sessionCardStoreLockPath()
+  const token = randomBytes(16).toString('hex')
+  const startedAt = process.hrtime.bigint()
+
+  for (;;) {
+    let descriptor: number | null = null
+    try {
+      descriptor = openSync(lockPath, 'wx', 0o600)
+      writeFileSync(
+        descriptor,
+        `${JSON.stringify({ token, pid: process.pid, createdAt: Date.now() })}\n`,
+        'utf8',
+      )
+      fsyncSync(descriptor)
+      closeSync(descriptor)
+      descriptor = null
+      return {
+        token,
+        release: () => {
+          let owned = false
+          try {
+            const parsed = JSON.parse(readFileSync(lockPath, 'utf8')) as unknown
+            owned = isRecord(parsed) && parsed.token === token
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+            throw error
+          }
+          if (owned) unlinkIfPresent(lockPath)
+        },
+      }
+    } catch (error) {
+      if (descriptor !== null) {
+        try {
+          closeSync(descriptor)
+        } finally {
+          unlinkIfPresent(lockPath)
+        }
+      }
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      if (recoverStaleLock(lockPath, Date.now())) continue
+      const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000
+      if (elapsedMs >= SESSION_CARD_STORE_LOCK_WAIT_MS) {
+        throw new Error('Session Card metadata store is busy')
+      }
+      sleepSync(SESSION_CARD_STORE_LOCK_POLL_MS)
+    }
+  }
+}
+
+function withSessionCardStoreLock<T>(operation: () => T): T {
+  const lock = acquireSessionCardStoreLock()
+  let failed = false
+  let failure: unknown
+  let result: T | undefined
+  try {
+    result = operation()
+  } catch (error) {
+    failed = true
+    failure = error
+  }
+
+  try {
+    lock.release()
+  } catch (releaseError) {
+    if (failed) {
+      throw new AggregateError(
+        [failure, releaseError],
+        'Session Card metadata operation and lock release failed',
+      )
+    }
+    throw releaseError
+  }
+  if (failed) throw failure
+  return result as T
+}
+
 function writeStore(store: PersistedSessionCardStore): void {
   const serialized = assertWritableStore(store)
   const targetPath = sessionCardStorePath()
@@ -472,6 +701,10 @@ export function sessionCardStorePath(): string {
   return join(getStateDir(), SESSION_CARD_STORE_FILE)
 }
 
+export function sessionCardStoreLockPath(): string {
+  return join(getStateDir(), SESSION_CARD_STORE_LOCK_FILE)
+}
+
 export function resolveSessionCardTitle(
   metadata: PersistedSessionCard | null | undefined,
 ): ResolvedSessionCardTitle {
@@ -519,7 +752,52 @@ export function readSessionCardBranchReplay(
   ]?.branchReplays?.find(
     (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
   )
-  return replay ?? null
+  return replay && replay.expiresAt > Date.now() ? replay : null
+}
+
+function failedExpiredReplay(
+  replay: PersistedSessionCardBranchReplay,
+): PersistedSessionCardBranchReplay {
+  const completedAt = replay.expiresAt
+  const failed: PersistedSessionCardBranchReplay = {
+    ...replay,
+    updatedAt: completedAt,
+    completedAt,
+    expiresAt: completedAt + SESSION_CARD_BRANCH_COMPLETED_TTL_MS,
+    outcome: { kind: 'failed' },
+  }
+  delete failed.reservationId
+  return failed
+}
+
+function pruneExpiredBranchReplays(
+  store: PersistedSessionCardStore,
+  now: number,
+  requestedKeyHash: string,
+): boolean {
+  let changed = false
+  for (const card of Object.values(store.cards)) {
+    if (!card.branchReplays) continue
+    const retained: Array<PersistedSessionCardBranchReplay> = []
+    for (const replay of card.branchReplays) {
+      if (replay.requestKeyHash === requestedKeyHash) {
+        retained.push(replay)
+      } else if (replay.outcome) {
+        if (replay.expiresAt > now) retained.push(replay)
+        else changed = true
+      } else if (replay.expiresAt <= now) {
+        const failed = failedExpiredReplay(replay)
+        if (failed.expiresAt > now) retained.push(failed)
+        changed = true
+      } else {
+        retained.push(replay)
+      }
+    }
+    if (retained.length !== card.branchReplays.length) changed = true
+    if (retained.length > 0) card.branchReplays = retained
+    else delete card.branchReplays
+  }
+  return changed
 }
 
 export function reserveSessionCardBranchReplay(
@@ -530,86 +808,159 @@ export function reserveSessionCardBranchReplay(
   const normalizedCardId = assertCardId(cardId)
   const normalizedRequestKeyHash = assertBranchReplayHash(requestKeyHash)
   const normalizedFingerprint = assertBranchReplayHash(fingerprint)
-  const store = readStoreForBranchReplay()
-  const previous = store.cards[normalizedCardId]
-  const branchReplays = previous?.branchReplays ?? []
-  const existing = branchReplays.find(
-    (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
-  )
-  if (existing) {
-    if (existing.fingerprint !== normalizedFingerprint) {
-      return { status: 'conflict' }
-    }
-    return {
-      status: existing.outcome ? 'completed' : 'pending',
-      replay: existing,
-    }
-  }
+  return withSessionCardStoreLock(() => {
+    const now = Date.now()
+    const store = readStoreForBranchReplay()
+    const previous = store.cards[normalizedCardId]
+    const branchReplays = previous?.branchReplays ?? []
+    const existingIndex = branchReplays.findIndex(
+      (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
+    )
+    let changed = false
+    if (existingIndex >= 0) {
+      const existing = branchReplays[existingIndex]
+      if (!existing) {
+        throw new Error('Session Card branch replay reservation is unavailable')
+      }
+      if (existing.outcome && existing.expiresAt > now) {
+        if (existing.fingerprint !== normalizedFingerprint) {
+          return { status: 'conflict' }
+        }
+        return { status: 'completed', replay: existing }
+      }
+      if (!existing.outcome && existing.expiresAt > now) {
+        if (existing.fingerprint !== normalizedFingerprint) {
+          return { status: 'conflict' }
+        }
+        return { status: 'pending', replay: existing }
+      }
 
-  const totalReplays = Object.values(store.cards).reduce(
-    (count, card) => count + (card.branchReplays?.length ?? 0),
-    0,
-  )
-  if (
-    branchReplays.length >= SESSION_CARD_BRANCH_REPLAY_MAX_PER_CARD ||
-    totalReplays >= SESSION_CARD_BRANCH_REPLAY_MAX_COUNT
-  ) {
-    return { status: 'capacity' }
-  }
+      if (
+        !existing.outcome &&
+        existing.fingerprint === normalizedFingerprint &&
+        existing.attemptCount < SESSION_CARD_BRANCH_MAX_ATTEMPTS
+      ) {
+        const reservationId = randomBytes(16).toString('hex')
+        branchReplays[existingIndex] = {
+          ...existing,
+          updatedAt: now,
+          expiresAt: now + SESSION_CARD_BRANCH_PENDING_TTL_MS,
+          attemptCount: existing.attemptCount + 1,
+          reservationId,
+        }
+        writeStore(store)
+        return { status: 'reserved', reservationId }
+      }
 
-  const now = Date.now()
-  store.cards[normalizedCardId] = {
-    ...previous,
-    cardId: normalizedCardId,
-    updatedAt: previous?.updatedAt ?? now,
-    branchReplays: [
-      ...branchReplays,
-      {
-        requestKeyHash: normalizedRequestKeyHash,
-        fingerprint: normalizedFingerprint,
-        createdAt: now,
-      },
-    ],
-  }
-  writeStore(store)
-  return { status: 'reserved' }
+      const retained = existing.outcome ? null : failedExpiredReplay(existing)
+      if (retained && retained.expiresAt > now) {
+        branchReplays[existingIndex] = retained
+        writeStore(store)
+        if (retained.fingerprint !== normalizedFingerprint) {
+          return { status: 'conflict' }
+        }
+        return { status: 'completed', replay: retained }
+      }
+      branchReplays.splice(existingIndex, 1)
+      changed = true
+    }
+
+    changed =
+      pruneExpiredBranchReplays(store, now, normalizedRequestKeyHash) || changed
+    const current = store.cards[normalizedCardId]
+    const currentBranchReplays = current?.branchReplays ?? []
+    const totalReplays = Object.values(store.cards).reduce(
+      (count, card) => count + (card.branchReplays?.length ?? 0),
+      0,
+    )
+    if (
+      currentBranchReplays.length >= SESSION_CARD_BRANCH_REPLAY_MAX_PER_CARD ||
+      totalReplays >= SESSION_CARD_BRANCH_REPLAY_MAX_COUNT
+    ) {
+      if (changed) writeStore(store)
+      return { status: 'capacity' }
+    }
+
+    const reservationId = randomBytes(16).toString('hex')
+    store.cards[normalizedCardId] = {
+      ...current,
+      cardId: normalizedCardId,
+      updatedAt: current?.updatedAt ?? now,
+      branchReplays: [
+        ...currentBranchReplays,
+        {
+          requestKeyHash: normalizedRequestKeyHash,
+          fingerprint: normalizedFingerprint,
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: now + SESSION_CARD_BRANCH_PENDING_TTL_MS,
+          attemptCount: 1,
+          reservationId,
+        },
+      ],
+    }
+    writeStore(store)
+    return { status: 'reserved', reservationId }
+  })
 }
 
 export function completeSessionCardBranchReplay(
   cardId: string,
   requestKeyHash: string,
   fingerprint: string,
+  reservationId: string,
   outcome: SessionCardBranchReplayOutcome,
 ): PersistedSessionCardBranchReplay {
   const normalizedCardId = assertCardId(cardId)
   const normalizedRequestKeyHash = assertBranchReplayHash(requestKeyHash)
   const normalizedFingerprint = assertBranchReplayHash(fingerprint)
+  if (
+    typeof reservationId !== 'string' ||
+    !LOCK_TOKEN_PATTERN.test(reservationId)
+  ) {
+    throw new Error('Invalid Session Card branch replay reservation')
+  }
   const normalizedOutcome = validateBranchReplayOutcome(outcome)
   if (!normalizedOutcome) {
     throw new Error('Invalid Session Card branch replay outcome')
   }
 
-  const store = readStoreForBranchReplay()
-  const card = store.cards[normalizedCardId]
-  const replayIndex = card?.branchReplays?.findIndex(
-    (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
-  )
-  if (
-    !card ||
-    replayIndex === undefined ||
-    replayIndex < 0 ||
-    card.branchReplays?.[replayIndex]?.fingerprint !== normalizedFingerprint
-  ) {
-    throw new Error('Session Card branch replay reservation is unavailable')
-  }
+  return withSessionCardStoreLock(() => {
+    const now = Date.now()
+    const store = readStoreForBranchReplay()
+    const card = store.cards[normalizedCardId]
+    const replayIndex = card?.branchReplays?.findIndex(
+      (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
+    )
+    const pending =
+      replayIndex === undefined || replayIndex < 0
+        ? undefined
+        : card?.branchReplays?.[replayIndex]
+    if (
+      !card ||
+      replayIndex === undefined ||
+      replayIndex < 0 ||
+      !pending ||
+      pending.outcome ||
+      pending.fingerprint !== normalizedFingerprint ||
+      pending.reservationId !== reservationId ||
+      pending.expiresAt <= now
+    ) {
+      throw new Error('Session Card branch replay reservation is unavailable')
+    }
 
-  const replay: PersistedSessionCardBranchReplay = {
-    ...card.branchReplays[replayIndex],
-    outcome: normalizedOutcome,
-  }
-  card.branchReplays[replayIndex] = replay
-  writeStore(store)
-  return replay
+    const replay: PersistedSessionCardBranchReplay = {
+      ...pending,
+      updatedAt: now,
+      completedAt: now,
+      expiresAt: now + SESSION_CARD_BRANCH_COMPLETED_TTL_MS,
+      outcome: normalizedOutcome,
+    }
+    delete replay.reservationId
+    card.branchReplays![replayIndex] = replay
+    writeStore(store)
+    return replay
+  })
 }
 
 export function updateSessionCardMetadata(
@@ -618,44 +969,48 @@ export function updateSessionCardMetadata(
 ): PersistedSessionCard {
   const normalizedCardId = assertCardId(cardId)
   const normalizedPatch = normalizeUpdate(patch)
-  const store = readStore()
-  const previous = store.cards[normalizedCardId]
-  const next: PersistedSessionCard = {
-    ...previous,
-    cardId: normalizedCardId,
-    updatedAt: Date.now(),
-  }
+  return withSessionCardStoreLock(() => {
+    const store = readStore()
+    const previous = store.cards[normalizedCardId]
+    const next: PersistedSessionCard = {
+      ...previous,
+      cardId: normalizedCardId,
+      updatedAt: Date.now(),
+    }
 
-  if ('manualTitle' in normalizedPatch) {
-    if (normalizedPatch.manualTitle === null) delete next.manualTitle
-    else next.manualTitle = normalizedPatch.manualTitle
-  }
-  if ('autoTitle' in normalizedPatch) {
-    if (normalizedPatch.autoTitle === null) delete next.autoTitle
-    else next.autoTitle = normalizedPatch.autoTitle
-  }
-  if (next.archivedAt !== undefined) delete next.pinned
-  else if ('pinned' in normalizedPatch) next.pinned = normalizedPatch.pinned
+    if ('manualTitle' in normalizedPatch) {
+      if (normalizedPatch.manualTitle === null) delete next.manualTitle
+      else next.manualTitle = normalizedPatch.manualTitle
+    }
+    if ('autoTitle' in normalizedPatch) {
+      if (normalizedPatch.autoTitle === null) delete next.autoTitle
+      else next.autoTitle = normalizedPatch.autoTitle
+    }
+    if (next.archivedAt !== undefined) delete next.pinned
+    else if ('pinned' in normalizedPatch) next.pinned = normalizedPatch.pinned
 
-  store.cards[normalizedCardId] = next
-  writeStore(store)
-  return next
+    store.cards[normalizedCardId] = next
+    writeStore(store)
+    return next
+  })
 }
 
 export function archiveSessionCardMetadata(
   cardId: string,
 ): PersistedSessionCard {
   const normalizedCardId = assertCardId(cardId)
-  const store = readStore()
-  const now = Date.now()
-  const next: PersistedSessionCard = {
-    ...store.cards[normalizedCardId],
-    cardId: normalizedCardId,
-    updatedAt: now,
-    archivedAt: now,
-  }
-  delete next.pinned
-  store.cards[normalizedCardId] = next
-  writeStore(store)
-  return next
+  return withSessionCardStoreLock(() => {
+    const store = readStore()
+    const now = Date.now()
+    const next: PersistedSessionCard = {
+      ...store.cards[normalizedCardId],
+      cardId: normalizedCardId,
+      updatedAt: now,
+      archivedAt: now,
+    }
+    delete next.pinned
+    store.cards[normalizedCardId] = next
+    writeStore(store)
+    return next
+  })
 }
