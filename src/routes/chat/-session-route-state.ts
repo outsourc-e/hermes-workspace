@@ -1,4 +1,5 @@
 import {
+  hasExactCompleteSessionCardProjection,
   moveHistoryMessages,
   reconcileSessionDraft,
 } from '../../screens/chat/chat-queries'
@@ -113,22 +114,7 @@ export function isCardProjectionComplete(
   response: SessionCardListWire,
   cardId: string,
 ): boolean {
-  const card = response.cards.find((candidate) => candidate.cardId === cardId)
-  if (
-    !card ||
-    (card.canonicalSource !== 'remote' && card.canonicalSource !== 'local') ||
-    !Array.isArray(response.cardResolutions)
-  ) {
-    return false
-  }
-  const matches = response.cardResolutions.filter(
-    (resolution) => resolution.cardId === cardId,
-  )
-  return (
-    matches.length === 1 &&
-    matches[0]!.completeness === 'complete' &&
-    matches[0]!.retryable === false
-  )
+  return hasExactCompleteSessionCardProjection(response, cardId)
 }
 
 /** Resolve route identity exclusively from the strictly validated Card list. */

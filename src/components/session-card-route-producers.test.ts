@@ -55,6 +55,18 @@ describe('Session Card route producers', () => {
         completeness: 'incomplete',
         retryable: true,
       }),
+    ).toEqual([card])
+    expect(
+      recentSessionCards({
+        ...response,
+        cardResolutions: [
+          {
+            cardId: card.cardId,
+            completeness: 'incomplete',
+            retryable: true,
+          },
+        ],
+      }),
     ).toEqual([])
   })
 

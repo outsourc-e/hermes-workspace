@@ -136,6 +136,60 @@ export type SessionCardListWire = {
   sources: Array<SessionCardSourceStatusWire>
 }
 
+/**
+ * A Card is safe to retain only when both the Card and its resolution metadata
+ * are unique and the resolution explicitly says the Card is complete and not
+ * retryable. Collection-level completeness cannot establish this per-Card
+ * contract.
+ */
+export function hasExactCompleteSessionCardProjection(
+  response: SessionCardListWire,
+  cardId: string,
+): boolean {
+  if (
+    !Array.isArray(response.cards) ||
+    !Array.isArray(response.cardResolutions)
+  ) {
+    return false
+  }
+  const cards = response.cards.filter((card) => card.cardId === cardId)
+  const resolutions = response.cardResolutions.filter(
+    (resolution) => resolution.cardId === cardId,
+  )
+  return (
+    cards.length === 1 &&
+    (cards[0]!.canonicalSource === 'remote' ||
+      cards[0]!.canonicalSource === 'local') &&
+    resolutions.length === 1 &&
+    resolutions[0]!.completeness === 'complete' &&
+    resolutions[0]!.retryable === false
+  )
+}
+
+/** Retain only exact per-Card complete projections and their evidence. */
+export function retainCompleteSessionCardProjections(
+  response: SessionCardListWire | undefined,
+): SessionCardListWire | undefined {
+  if (
+    !response ||
+    !Array.isArray(response.cards) ||
+    !Array.isArray(response.cardResolutions)
+  ) {
+    return undefined
+  }
+  const cards = response.cards.filter((card) =>
+    hasExactCompleteSessionCardProjection(response, card.cardId),
+  )
+  const retainedCardIds = new Set(cards.map((card) => card.cardId))
+  return {
+    ...response,
+    cards,
+    cardResolutions: response.cardResolutions.filter((resolution) =>
+      retainedCardIds.has(resolution.cardId),
+    ),
+  }
+}
+
 export type SessionCardHistoryWire = {
   cardId: string
   canonicalSegmentKey: string

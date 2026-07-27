@@ -20,7 +20,10 @@ import {
   resetPendingSend,
 } from './pending-send'
 import type { SessionRouteResolutionPayload } from '../../routes/chat/-session-route-state'
-import type { SessionCardHistoryResponse } from './chat-queries'
+import type {
+  SessionCardHistoryResponse,
+  SessionCardListWire,
+} from './chat-queries'
 import type { ChatMessage, HistoryResponse, SessionCard } from './types'
 
 const navigate = vi.fn()
@@ -55,7 +58,26 @@ const queryContext = vi.hoisted(() => ({
     forcedSessionKey?: string
   },
   legacySessionsRefetch: vi.fn(),
+  mobileSessionCards: [] as Array<SessionCard>,
 }))
+
+function cardList(
+  cards: Array<SessionCard>,
+  incompleteCardIds: ReadonlyArray<string> = [],
+): SessionCardListWire {
+  const incompleteIds = new Set(incompleteCardIds)
+  return {
+    cards,
+    cardResolutions: cards.map((card) => ({
+      cardId: card.cardId,
+      completeness: incompleteIds.has(card.cardId) ? 'incomplete' : 'complete',
+      retryable: incompleteIds.has(card.cardId),
+    })),
+    completeness: 'complete',
+    retryable: false,
+    sources: [],
+  }
+}
 
 vi.mock('./chat-queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -209,34 +231,48 @@ vi.mock('@/components/model-suggestion-toast', () => ({
 }))
 vi.mock('@/components/mobile-sessions-panel', () => ({
   MobileSessionsPanel: (props: {
+    sessionCards: Array<SessionCard>
+    onSelectSession?: (cardId: string) => void
     onRenameCard?: (cardId: string, nextTitle: string) => void
     onTogglePin?: (cardId: string) => void
     onBranchCard?: (cardId: string) => void
     onArchiveCard?: (cardId: string) => void
-  }) => (
-    <div>
-      <button
-        type="button"
-        data-testid="mobile-rename"
-        onClick={() => props.onRenameCard?.('remote:parent', 'Mobile title')}
-      />
-      <button
-        type="button"
-        data-testid="mobile-pin"
-        onClick={() => props.onTogglePin?.('remote:parent')}
-      />
-      <button
-        type="button"
-        data-testid="mobile-branch"
-        onClick={() => props.onBranchCard?.('remote:parent')}
-      />
-      <button
-        type="button"
-        data-testid="mobile-archive"
-        onClick={() => props.onArchiveCard?.('remote:parent')}
-      />
-    </div>
-  ),
+  }) => {
+    queryContext.mobileSessionCards = props.sessionCards
+    return (
+      <div>
+        {props.sessionCards.map((card) => (
+          <button
+            key={card.cardId}
+            type="button"
+            onClick={() => props.onSelectSession?.(card.cardId)}
+          >
+            {card.title}
+          </button>
+        ))}
+        <button
+          type="button"
+          data-testid="mobile-rename"
+          onClick={() => props.onRenameCard?.('remote:parent', 'Mobile title')}
+        />
+        <button
+          type="button"
+          data-testid="mobile-pin"
+          onClick={() => props.onTogglePin?.('remote:parent')}
+        />
+        <button
+          type="button"
+          data-testid="mobile-branch"
+          onClick={() => props.onBranchCard?.('remote:parent')}
+        />
+        <button
+          type="button"
+          data-testid="mobile-archive"
+          onClick={() => props.onArchiveCard?.('remote:parent')}
+        />
+      </div>
+    )
+  },
 }))
 vi.mock('@/components/usage-meter/context-alert-modal', () => ({
   ContextAlertModal: () => null,
@@ -656,6 +692,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryContext.legacySessionsEnabled = undefined
     queryContext.legacyHistoryInput = null
     queryContext.legacySessionsRefetch.mockReset()
+    queryContext.mobileSessionCards = []
     for (const sessionKey of [
       'new',
       'backend-parent',
@@ -723,7 +760,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
             <ChatScreen
               activeFriendlyId={activeCard.cardId}
               activeCard={activeCard}
-              sessionCards={[parentCard, newerCard]}
+              sessionCardList={cardList([parentCard, newerCard])}
             />
           </QueryClientProvider>,
         )
@@ -752,6 +789,61 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
 
     React.act(() => root.unmount())
     document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('mounts one complete and one incomplete Card but gives the mobile menu only the complete Card', () => {
+    queryContext.mobile = true
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const complete: SessionCard = {
+      cardId: 'remote:parent',
+      canonicalSource: 'remote',
+      title: 'Complete Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: 'remote:parent-tip',
+      continuationSegmentKeys: ['remote:parent-tip'],
+      continuationCount: 1,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 2,
+      archived: false,
+      pinned: false,
+    }
+    const incomplete: SessionCard = {
+      ...complete,
+      cardId: 'remote:incomplete',
+      title: 'Incomplete Card',
+      canonicalSegmentKey: 'remote:incomplete-tip',
+      continuationSegmentKeys: ['remote:incomplete-tip'],
+    }
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={complete.cardId}
+            activeCard={complete}
+            sessionCardList={cardList(
+              [complete, incomplete],
+              [incomplete.cardId],
+            )}
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    expect(queryContext.mobileSessionCards).toEqual([complete])
+    expect(container.textContent).toContain(complete.title)
+    expect(container.textContent).not.toContain(incomplete.title)
+
+    React.act(() => root.unmount())
+    container.remove()
     queryClient.clear()
   })
 
@@ -823,7 +915,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
               activeFriendlyId="remote:parent"
               activeCard={activeCard}
               inspectedChildCardId={inspectedChildCardId}
-              sessionCards={[activeCard]}
+              sessionCardList={cardList([activeCard])}
             />
           </QueryClientProvider>,
         )
@@ -922,7 +1014,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           <ChatScreen
             activeFriendlyId="remote:parent"
             activeCard={activeCard}
-            sessionCards={[activeCard]}
+            sessionCardList={cardList([activeCard])}
             compact
           />
         </QueryClientProvider>,
@@ -1008,7 +1100,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
             activeFriendlyId="remote:parent"
             activeCard={activeCard}
             inspectedChildCardId="remote:child"
-            sessionCards={[activeCard]}
+            sessionCardList={cardList([activeCard])}
             compact
           />
         </QueryClientProvider>,
@@ -1082,7 +1174,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           <ChatScreen
             activeFriendlyId={activeCard.cardId}
             activeCard={activeCard}
-            sessionCards={[activeCard]}
+            sessionCardList={cardList([activeCard])}
             compact
           />
         </QueryClientProvider>,
@@ -1158,7 +1250,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           <ChatScreen
             activeFriendlyId={activeCard.cardId}
             activeCard={activeCard}
-            sessionCards={[activeCard]}
+            sessionCardList={cardList([activeCard])}
             compact
           />
         </QueryClientProvider>,
@@ -1224,7 +1316,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           <ChatScreen
             activeFriendlyId={activeCard.cardId}
             activeCard={activeCard}
-            sessionCards={[activeCard]}
+            sessionCardList={cardList([activeCard])}
             compact
           />
         </QueryClientProvider>,
@@ -1418,7 +1510,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           <ChatScreen
             activeFriendlyId="remote:parent"
             activeCard={activeCard}
-            sessionCards={[activeCard]}
+            sessionCardList={cardList([activeCard])}
             compact
           />
         </QueryClientProvider>,
@@ -1523,7 +1615,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           <ChatScreen
             activeFriendlyId="remote:parent"
             activeCard={activeCard}
-            sessionCards={[activeCard]}
+            sessionCardList={cardList([activeCard])}
             compact
           />
         </QueryClientProvider>,
@@ -1538,7 +1630,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           <ChatScreen
             activeFriendlyId="remote:parent"
             activeCard={activeCard}
-            sessionCards={[activeCard]}
+            sessionCardList={cardList([activeCard])}
             compact
           />
         </QueryClientProvider>,
@@ -1596,7 +1688,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           <ChatScreen
             activeFriendlyId="remote:parent"
             activeCard={activeCard}
-            sessionCards={[activeCard]}
+            sessionCardList={cardList([activeCard])}
           />
         </QueryClientProvider>,
       )

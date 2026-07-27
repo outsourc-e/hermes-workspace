@@ -19,6 +19,7 @@ import type { SessionRouteResolutionPayload } from '@/routes/chat/-session-route
 import { ChatScreen } from '@/screens/chat/chat-screen'
 import {
   fetchSessionCards,
+  retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
 import {
@@ -75,17 +76,14 @@ function resolveChatPanelCardRouteState({
   if (queryStatus === 'error' || !response) {
     return { status: 'unavailable', reason: 'query' }
   }
-  if (response.completeness !== 'complete') {
-    return { status: 'unavailable', reason: 'projection' }
-  }
-
   const target = resolveSessionCardProducerNavigation(response, [routeKey])
   const card = target
     ? response.cards.find((candidate) => candidate.cardId === target.cardId)
     : undefined
-  return card
-    ? { status: 'selected', card }
-    : { status: 'rejected', reason: 'missing' }
+  if (card) return { status: 'selected', card }
+  return response.completeness === 'complete'
+    ? { status: 'rejected', reason: 'missing' }
+    : { status: 'unavailable', reason: 'projection' }
 }
 
 export function ChatPanel() {
@@ -117,11 +115,11 @@ export function ChatPanel() {
     cardRouteResolution?.status === 'selected'
       ? cardRouteResolution.card
       : undefined
-  const authoritativeCards =
-    sessionCardsQuery.status === 'success' &&
-    sessionCardsQuery.data.completeness === 'complete'
-      ? sessionCardsQuery.data.cards
+  const authoritativeCardList =
+    sessionCardsQuery.status === 'success'
+      ? retainCompleteSessionCardProjections(sessionCardsQuery.data)
       : undefined
+  const authoritativeCards = authoritativeCardList?.cards
   const isExplicitBootstrap = selectedCardId === 'new'
   const isNewChat = selectedCardId === 'new' && !bootstrapRecovery
   const activeFriendlyId =
@@ -382,7 +380,7 @@ export function ChatPanel() {
                 <ChatScreen
                   activeFriendlyId={activeFriendlyId}
                   activeCard={activeCard}
-                  sessionCards={authoritativeCards}
+                  sessionCardList={authoritativeCardList}
                   isNewChat={isNewChat}
                   forcedSessionKey={bootstrapRecovery?.sessionKey}
                   onSessionResolved={

@@ -247,7 +247,7 @@ describe('ChatPanel Card routing', () => {
     expect(props).toMatchObject({
       activeFriendlyId: parent.cardId,
       activeCard: parent,
-      sessionCards: [parent, other],
+      sessionCardList: expect.objectContaining({ cards: [parent, other] }),
       compact: true,
       embedded: true,
     })
@@ -294,6 +294,47 @@ describe('ChatPanel Card routing', () => {
     expect(mocks.workspaceState.chatPanelCardId).toBe(other.cardId)
     expect(mocks.chatScreenProps.at(-1)?.activeCard).toEqual(other)
     expect(screen.getByText('Other Card')).toBeTruthy()
+  })
+
+  it('mounts one complete and one incomplete Card but exposes only the complete Card', () => {
+    const complete = card()
+    const incomplete = card({
+      cardId: 'remote:incomplete-card',
+      title: 'Incomplete Card',
+      canonicalSegmentKey: 'remote:incomplete-tip',
+      continuationSegmentKeys: [
+        'remote:incomplete-card',
+        'remote:incomplete-tip',
+      ],
+    })
+    const list = wire([complete, incomplete])
+    list.cardResolutions[1] = {
+      cardId: incomplete.cardId,
+      completeness: 'incomplete',
+      retryable: true,
+    }
+    mocks.queryState = {
+      status: 'success',
+      data: list,
+      isPending: false,
+      refetch: vi.fn(),
+    }
+
+    renderPanel()
+    React.act(() => fireEvent.click(screen.getByText(complete.title)))
+
+    expect(
+      screen.getByRole('button', { name: `Open ${complete.title}` }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: `Open ${incomplete.title}` }),
+    ).toBeNull()
+    expect(mocks.chatScreenProps.at(-1)?.sessionCardList).toEqual(
+      expect.objectContaining({
+        cards: [complete],
+        cardResolutions: [list.cardResolutions[0]],
+      }),
+    )
   })
 
   it('fails closed for incomplete projections', async () => {
@@ -555,7 +596,7 @@ describe('ChatPanel Card routing', () => {
       activeFriendlyId: 'new',
       isNewChat: true,
       activeCard: undefined,
-      sessionCards: [],
+      sessionCardList: expect.objectContaining({ cards: [] }),
       compact: true,
       embedded: true,
     })

@@ -32,6 +32,7 @@ import {
   fetchStatus,
   mergeSessionCardHistoryResponse,
   moveSessionCardHistoryMessages,
+  retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
   updateHistoryMessageByClientId,
   updateHistoryMessageByClientIdEverywhere,
@@ -76,7 +77,10 @@ import {
   CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
 import type { AuthoritativeCardHandoff } from './hooks/use-streaming-message'
-import type { SessionCardHistoryResponse } from './chat-queries'
+import type {
+  SessionCardHistoryResponse,
+  SessionCardListWire,
+} from './chat-queries'
 import type {
   ChatRunCommandDetail,
   ChatSubmitSelectionDetail,
@@ -136,7 +140,7 @@ type ChatScreenProps = {
   activeFriendlyId: string
   activeCard?: SessionCard
   inspectedChildCardId?: string
-  sessionCards?: Array<SessionCard>
+  sessionCardList?: SessionCardListWire
   isNewChat?: boolean
   onSessionResolved?: (
     payload:
@@ -495,13 +499,17 @@ export function ChatScreen({
   activeFriendlyId,
   activeCard,
   inspectedChildCardId,
-  sessionCards,
+  sessionCardList,
   isNewChat = false,
   onSessionResolved,
   forcedSessionKey,
   compact = false,
   embedded = false,
 }: ChatScreenProps) {
+  const sessionCards = useMemo(
+    () => retainCompleteSessionCardProjections(sessionCardList)?.cards,
+    [sessionCardList],
+  )
   const navigate = useNavigate()
   const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
   const setChatFocusMode = useWorkspaceStore((s) => s.setChatFocusMode)
@@ -3046,11 +3054,8 @@ export function ChatScreen({
   }, [])
 
   const findSessionCard = useCallback(
-    (cardId: string) => {
-      if (activeCard?.cardId === cardId) return activeCard
-      return sessionCards?.find((card) => card.cardId === cardId)
-    },
-    [activeCard, sessionCards],
+    (cardId: string) => sessionCards?.find((card) => card.cardId === cardId),
+    [sessionCards],
   )
 
   const runCardMutation = useCallback(

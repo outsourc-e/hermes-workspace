@@ -39,6 +39,7 @@ import {
 import { cn } from '@/lib/utils'
 import {
   fetchSessionCards,
+  retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
 
@@ -68,8 +69,9 @@ const SCREEN_GROUP_ORDER = [
 ] as const
 
 export function recentSessionCards(response: SessionCardListWire | undefined) {
-  if (!response || response.completeness !== 'complete') return []
-  return [...response.cards]
+  const completeResponse = retainCompleteSessionCardProjections(response)
+  if (!completeResponse) return []
+  return [...completeResponse.cards]
     .sort((left, right) => right.updatedAt - left.updatedAt)
     .slice(0, 5)
 }
