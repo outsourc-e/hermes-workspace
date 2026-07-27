@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import {
   closeSync,
   fsyncSync,
@@ -674,8 +675,10 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
-function getProcessIdentity(pid: number): string | null {
-  if (process.platform !== 'linux') return null
+type ProcessCreationLookup = (pid: number) => string | null
+type ProcessLivenessLookup = (pid: number) => boolean
+
+function readLinuxProcessStartTime(pid: number): string | null {
   try {
     const raw = readFileSync(`/proc/${pid}/stat`, 'utf8')
     const closingParenthesis = raw.lastIndexOf(') ')
@@ -685,35 +688,85 @@ function getProcessIdentity(pid: number): string | null {
       .trim()
       .split(/\s+/u)
     const startTime = fieldsAfterCommand[19]
-    return startTime && /^\d+$/u.test(startTime) ? `linux:${startTime}` : null
+    return startTime && /^\d+$/u.test(startTime) ? startTime : null
   } catch {
     return null
   }
 }
 
-function lockOwnerIsRecoverable(
+function readWindowsProcessCreationTime(pid: number): string | null {
+  const command = [
+    "$ErrorActionPreference = 'Stop'",
+    `$processInfo = Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId = ${pid}'`,
+    'if ($null -ne $processInfo) { [Console]::Out.Write($processInfo.CreationDate.ToUniversalTime().Ticks) }',
+  ].join('; ')
+  try {
+    const creationTime = execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', command],
+      {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 2_000,
+        maxBuffer: 1024,
+      },
+    ).trim()
+    return /^\d+$/u.test(creationTime) ? creationTime : null
+  } catch {
+    return null
+  }
+}
+
+/** Platform seam for process-creation identity. Windows uses CIM rather than
+ * lease age so PID reuse can be distinguished without evicting a paused live
+ * owner. Unsupported or failed lookups safely return null. */
+export function resolveProcessIdentity(
+  pid: number,
+  platform: NodeJS.Platform,
+  linuxStartTimeLookup: ProcessCreationLookup = readLinuxProcessStartTime,
+  windowsCreationTimeLookup: ProcessCreationLookup = readWindowsProcessCreationTime,
+): string | null {
+  const lookup =
+    platform === 'linux'
+      ? linuxStartTimeLookup
+      : platform === 'win32'
+        ? windowsCreationTimeLookup
+        : null
+  if (!lookup) return null
+  const creationIdentity = lookup(pid)
+  return creationIdentity && /^\d+$/u.test(creationIdentity)
+    ? `${platform === 'win32' ? 'windows' : 'linux'}:${creationIdentity}`
+    : null
+}
+
+function getProcessIdentity(pid: number): string | null {
+  return resolveProcessIdentity(pid, process.platform)
+}
+
+export function sessionCardStoreLockOwnerIsRecoverable(
   owner: SessionCardStoreLockMetadata | null,
   lockModifiedAt: number,
   now: number,
+  processLivenessLookup: ProcessLivenessLookup = processIsAlive,
+  processIdentityLookup: ProcessCreationLookup = getProcessIdentity,
 ): boolean {
   if (!owner) {
     return now - lockModifiedAt >= SESSION_CARD_STORE_LOCK_STALE_MS
   }
-  if (!processIsAlive(owner.pid)) return true
+  if (!processLivenessLookup(owner.pid)) return true
 
   if (owner.processIdentity) {
-    const currentIdentity = getProcessIdentity(owner.pid)
+    const currentIdentity = processIdentityLookup(owner.pid)
     // A matching PID + process-start identity is authoritative liveness. Never
     // evict that owner merely because wall-clock timestamps or its lease aged.
     if (currentIdentity === owner.processIdentity) return false
     if (currentIdentity !== null) return true
   }
 
-  const leaseUntil =
-    owner.leaseUntil ??
-    Math.max(owner.createdAt, Math.floor(lockModifiedAt)) +
-      SESSION_CARD_STORE_LOCK_STALE_MS
-  return now > leaseUntil
+  // A lease cannot fence a paused writer. If the PID is confirmed live but its
+  // creation identity is unavailable, waiting for process death is the only
+  // safe cross-platform fallback.
+  return false
 }
 
 function createFenceMarker(prefix: string, fence: number): void {
@@ -749,7 +802,11 @@ function recoverStaleLock(lockPath: string, now: number): boolean {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
     throw error
   }
-  if (!lockOwnerIsRecoverable(metadata, observed.mtimeMs, now)) return false
+  if (
+    !sessionCardStoreLockOwnerIsRecoverable(metadata, observed.mtimeMs, now)
+  ) {
+    return false
+  }
 
   const claimPath = `${lockPath}.claim.${process.pid}.${randomBytes(8).toString('hex')}`
   try {

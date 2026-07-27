@@ -32,7 +32,9 @@ import {
   readSessionCardMetadata,
   reconcileSessionCardBranchReplay,
   reserveSessionCardBranchReplay,
+  resolveProcessIdentity,
   resolveSessionCardTitle,
+  sessionCardStoreLockOwnerIsRecoverable,
   sessionCardStoreLockPath,
   sessionCardStorePath,
   updateSessionCardMetadata,
@@ -814,26 +816,135 @@ describe('Session Card metadata persistence', () => {
     },
   )
 
-  it('reclaims an expired legacy lease when a live PID has no process identity', () => {
-    mkdirSync(stateDir, { recursive: true })
-    writeFileSync(
-      sessionCardStoreLockPath(),
-      `${JSON.stringify({
-        token: 'b'.repeat(32),
-        pid: process.pid,
-        createdAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
-        leaseUntil: Date.now() - 1,
-      })}\n`,
-      { encoding: 'utf8', mode: 0o600 },
-    )
+  it('resolves Windows process creation identity through the platform seam', () => {
+    const linuxStartTimeLookup = vi.fn<() => string | null>()
+    const windowsCreationTimeLookup = vi.fn(() => '134127360000000000')
 
     expect(
-      updateSessionCardMetadata('card-expired-legacy-lock', {
-        autoTitle: 'Recovered from legacy lease',
-      }),
-    ).toMatchObject({ autoTitle: 'Recovered from legacy lease' })
-    expect(existsSync(sessionCardStoreLockPath())).toBe(false)
+      resolveProcessIdentity(
+        42,
+        'win32',
+        linuxStartTimeLookup,
+        windowsCreationTimeLookup,
+      ),
+    ).toBe('windows:134127360000000000')
+    expect(linuxStartTimeLookup).not.toHaveBeenCalled()
+    expect(windowsCreationTimeLookup).toHaveBeenCalledWith(42)
   })
+
+  it('never reclaims a stale Windows lock whose live owner identity still matches', () => {
+    const processIdentity = 'windows:134127360000000000'
+    const identityLookup = vi.fn(() => processIdentity)
+
+    expect(
+      sessionCardStoreLockOwnerIsRecoverable(
+        {
+          token: 'b'.repeat(32),
+          pid: 42,
+          processIdentity,
+          createdAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+          leaseUntil: Date.now() - 1,
+        },
+        Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+        Date.now(),
+        () => true,
+        identityLookup,
+      ),
+    ).toBe(false)
+    expect(identityLookup).toHaveBeenCalledWith(42)
+  })
+
+  it('fails closed when a positive PID is live but process identity lookup is unavailable', () => {
+    const identityLookup = vi.fn(() => null)
+
+    expect(
+      sessionCardStoreLockOwnerIsRecoverable(
+        {
+          token: 'b'.repeat(32),
+          pid: 42,
+          processIdentity: 'windows:134127360000000000',
+          createdAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+          leaseUntil: Date.now() - 1,
+        },
+        Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+        Date.now(),
+        () => true,
+        identityLookup,
+      ),
+    ).toBe(false)
+  })
+
+  it('safely reclaims stale invalid, dead, and PID-reused Windows lock owners', () => {
+    const now = Date.now()
+    const staleModifiedAt = now - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1
+    const liveLookup = vi.fn(() => true)
+    const identityLookup = vi.fn(() => 'windows:134127360000000001')
+
+    expect(
+      sessionCardStoreLockOwnerIsRecoverable(
+        null,
+        staleModifiedAt,
+        now,
+        liveLookup,
+        identityLookup,
+      ),
+    ).toBe(true)
+    expect(
+      sessionCardStoreLockOwnerIsRecoverable(
+        {
+          token: 'c'.repeat(32),
+          pid: 42,
+          processIdentity: 'windows:134127360000000000',
+          createdAt: now,
+          leaseUntil: now + SESSION_CARD_BRANCH_PENDING_TTL_MS,
+        },
+        now,
+        now,
+        () => false,
+        identityLookup,
+      ),
+    ).toBe(true)
+    expect(
+      sessionCardStoreLockOwnerIsRecoverable(
+        {
+          token: 'd'.repeat(32),
+          pid: 42,
+          processIdentity: 'windows:134127360000000000',
+          createdAt: now,
+          leaseUntil: now + SESSION_CARD_BRANCH_PENDING_TTL_MS,
+        },
+        now,
+        now,
+        liveLookup,
+        identityLookup,
+      ),
+    ).toBe(true)
+  })
+
+  it('does not reclaim an expired legacy lease when its PID is still live', () => {
+    mkdirSync(stateDir, { recursive: true })
+    const owner = {
+      token: 'e'.repeat(32),
+      pid: process.pid,
+      createdAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+      leaseUntil: Date.now() - 1,
+    }
+    writeFileSync(sessionCardStoreLockPath(), `${JSON.stringify(owner)}\n`, {
+      encoding: 'utf8',
+      mode: 0o600,
+    })
+
+    expect(() =>
+      updateSessionCardMetadata('card-expired-legacy-lock', {
+        autoTitle: 'Must not commit',
+      }),
+    ).toThrow(/busy/i)
+    expect(
+      JSON.parse(readFileSync(sessionCardStoreLockPath(), 'utf8')),
+    ).toEqual(owner)
+    expect(readSessionCardMetadata('card-expired-legacy-lock')).toBeNull()
+    unlinkSync(sessionCardStoreLockPath())
+  }, 5_000)
 
   it('does not release a successor lock after ownership changes', async () => {
     const actualFs = await vi.importActual<ActualFs>('node:fs')
