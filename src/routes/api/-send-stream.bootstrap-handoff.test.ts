@@ -3934,4 +3934,136 @@ describe('send-stream bootstrap session handoff', () => {
       },
     )
   })
+
+  it('keeps a rejected Card migration recoverable without disrupting the handoff stream', async () => {
+    const card = (
+      canonicalSegmentKey: string,
+      continuationSegmentKeys: Array<string>,
+      upstreamEntries: Array<[string, string]>,
+    ) => ({
+      card: {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey,
+        continuationSegmentKeys,
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map(
+        upstreamEntries.map(([segmentKey]) => [segmentKey, 'gateway']),
+      ),
+      upstreamKeyBySegmentKey: new Map(upstreamEntries),
+    })
+    mocks.resolveSessionCard
+      .mockResolvedValueOnce(
+        card(
+          'remote:created-session',
+          ['remote:created-session'],
+          [['remote:created-session', 'created-session']],
+        ),
+      )
+      .mockResolvedValue(
+        card(
+          'remote:successor-session',
+          ['remote:created-session', 'remote:successor-session'],
+          [
+            ['remote:created-session', 'created-session'],
+            ['remote:successor-session', 'successor-session'],
+          ],
+        ),
+      )
+    mocks.migratePersistedRun.mockRejectedValueOnce(
+      new Error('forced Card migration rejection'),
+    )
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'card-run', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'assistant.delta',
+          data: {
+            run_id: 'card-run',
+            session_id: 'successor-session',
+            delta: 'continued response',
+          },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'card-run', session_id: 'successor-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'remote:parent-card',
+          sessionKey: 'remote:created-session',
+          friendlyId: 'remote:parent-card',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(events.filter(({ event }) => event === 'card_handoff')).toEqual([
+      {
+        event: 'card_handoff',
+        data: {
+          cardId: 'remote:parent-card',
+          fromSegmentKey: 'remote:created-session',
+          canonicalSegmentKey: 'remote:successor-session',
+          runId: 'card-run',
+        },
+      },
+    ])
+    expect(events.at(-1)).toEqual({
+      event: 'done',
+      data: {
+        state: 'complete',
+        sessionKey: 'remote:successor-session',
+        runId: 'card-run',
+      },
+    })
+    expect(mocks.migratePersistedRun).toHaveBeenCalledWith(
+      'remote:created-session',
+      'remote:successor-session',
+      'card-run',
+      'remote:parent-card',
+      {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey: 'remote:successor-session',
+      },
+    )
+    expect(mocks.appendRunText).toHaveBeenCalledWith(
+      'remote:created-session',
+      'card-run',
+      'continued response',
+      { replace: false },
+    )
+    expect(mocks.markRunStatus).toHaveBeenCalledWith(
+      'remote:created-session',
+      'card-run',
+      'complete',
+      undefined,
+    )
+    expect(mocks.migratePersistedRun.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.appendRunText.mock.invocationCallOrder[0]!,
+    )
+    expect(mocks.appendRunText.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.markRunStatus.mock.invocationCallOrder[0]!,
+    )
+  })
 })

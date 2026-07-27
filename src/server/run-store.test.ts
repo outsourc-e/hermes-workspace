@@ -306,8 +306,13 @@ describe('run-store persistence', () => {
   })
 
   it('keeps a failed migration recoverable through the stable card id', async () => {
-    const { createPersistedRun, getActiveRunForCard, migratePersistedRun } =
-      await import('./run-store')
+    const {
+      createPersistedRun,
+      getActiveRunForCard,
+      getPersistedRun,
+      listAllActiveRuns,
+      migratePersistedRun,
+    } = await import('./run-store')
 
     await createPersistedRun({
       runId: 'recoverable-card-run',
@@ -343,6 +348,49 @@ describe('run-store persistence', () => {
       sessionKey: 'remote:parent',
       canonicalSegmentKey: 'remote:parent',
     })
+    expect(
+      await getActiveRunForCard('remote:parent-card', 'remote:continuation'),
+    ).toMatchObject({
+      runId: 'recoverable-card-run',
+      sessionKey: 'remote:parent',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:continuation',
+      recoverySourceCanonicalSegmentKey: 'remote:parent',
+    })
+    expect(
+      await getPersistedRun('remote:parent', 'recoverable-card-run'),
+    ).toMatchObject({
+      canonicalSegmentKey: 'remote:parent',
+    })
+    expect(await listAllActiveRuns()).toEqual([
+      expect.objectContaining({
+        runId: 'recoverable-card-run',
+        sessionKey: 'remote:parent',
+        canonicalSegmentKey: 'remote:parent',
+      }),
+    ])
+  })
+
+  it('fails closed when multiple old Card owners make recovery ambiguous', async () => {
+    const { createPersistedRun, getActiveRunForCard } =
+      await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'old-owner-a',
+      sessionKey: 'remote:old-a',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:old-a',
+    })
+    await createPersistedRun({
+      runId: 'old-owner-b',
+      sessionKey: 'remote:old-b',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:old-b',
+    })
+
+    await expect(
+      getActiveRunForCard('remote:parent-card', 'remote:continuation'),
+    ).resolves.toBeNull()
   })
 
   it('does not leave a successor recovery clone when source unlink fails', async () => {

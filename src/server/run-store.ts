@@ -446,10 +446,14 @@ export async function getActiveRunForSession(
   }
 }
 
+export type CardScopedActiveRun = PersistedRunState & {
+  recoverySourceCanonicalSegmentKey?: string
+}
+
 export async function getActiveRunForCard(
   cardId: string,
   canonicalSegmentKey: string,
-): Promise<PersistedRunState | null> {
+): Promise<CardScopedActiveRun | null> {
   const normalizedCardId = cardId.trim()
   const normalizedCanonicalSegmentKey = canonicalSegmentKey.trim()
   if (!normalizedCardId || !normalizedCanonicalSegmentKey) return null
@@ -461,22 +465,44 @@ export async function getActiveRunForCard(
         .map((entry) => readRunsInDir(path.join(RUNS_ROOT, entry.name))),
     )
     const now = Date.now()
-    return (
-      runsBySession
-        .flat()
-        .filter((run) => run.cardId === normalizedCardId)
-        .filter(
-          (run) => run.canonicalSegmentKey === normalizedCanonicalSegmentKey,
-        )
-        .filter((run) => !['complete', 'error'].includes(run.status))
-        .filter((run) => now - run.updatedAt < STALE_RUN_THRESHOLD_MS)
-        .sort(
-          (a, b) =>
-            b.updatedAt - a.updatedAt ||
-            b.createdAt - a.createdAt ||
-            a.runId.localeCompare(b.runId),
-        )[0] ?? null
+    const candidates = runsBySession
+      .flat()
+      .filter((run) => run.cardId === normalizedCardId)
+      .filter((run) => !['complete', 'error'].includes(run.status))
+      .filter((run) => now - run.updatedAt < STALE_RUN_THRESHOLD_MS)
+      .sort(
+        (a, b) =>
+          b.updatedAt - a.updatedAt ||
+          b.createdAt - a.createdAt ||
+          a.runId.localeCompare(b.runId),
+      )
+
+    const currentCanonicalRun = candidates.find(
+      (run) => run.canonicalSegmentKey === normalizedCanonicalSegmentKey,
     )
+    if (currentCanonicalRun) return currentCanonicalRun
+
+    // A failed migration deliberately rolls back the successor clone, leaving
+    // the source as the sole durable owner. The Card projection can already
+    // have advanced by the time the browser reloads, so expose that one
+    // unambiguous owner through the requested canonical identity while keeping
+    // its physical sessionKey intact for subsequent recovery operations.
+    if (candidates.length !== 1) return null
+    const recoveryRun = candidates[0]
+    const recoverySourceCanonicalSegmentKey =
+      recoveryRun?.canonicalSegmentKey?.trim()
+    if (
+      !recoveryRun ||
+      !recoverySourceCanonicalSegmentKey ||
+      recoverySourceCanonicalSegmentKey === normalizedCanonicalSegmentKey
+    ) {
+      return null
+    }
+    return {
+      ...recoveryRun,
+      canonicalSegmentKey: normalizedCanonicalSegmentKey,
+      recoverySourceCanonicalSegmentKey,
+    }
   } catch {
     return null
   }

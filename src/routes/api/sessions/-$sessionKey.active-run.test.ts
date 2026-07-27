@@ -101,6 +101,30 @@ describe('GET /api/sessions/$sessionKey/active-run', () => {
     expect(mocks.getActiveRunForSession).not.toHaveBeenCalled()
   })
 
+  it('accepts an explicit recovery projection from the Card old physical owner', async () => {
+    const recoveredRun = {
+      runId: 'card-run',
+      sessionKey: 'remote:root',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      recoverySourceCanonicalSegmentKey: 'remote:root',
+      status: 'active',
+    }
+    mocks.getActiveRunForCard.mockResolvedValue(recoveredRun)
+
+    const response = await handler(cardRequest())
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      run: recoveredRun,
+    })
+    expect(mocks.getActiveRunForCard).toHaveBeenCalledWith(
+      'remote:root',
+      'remote:tip',
+    )
+  })
+
   it.each([
     'cardId=',
     'cardId=%20root',
