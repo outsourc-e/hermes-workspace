@@ -79,6 +79,12 @@ describe('gateway agent Session Card navigation', () => {
 
   it('fails closed for missing, incomplete, and unmapped Card projections', () => {
     expect(
+      resolveAgentSessionCardNavigation(completeResponse, {
+        sessionKey: 'parent-tip',
+        friendlyId: 'parent-card',
+      }),
+    ).toBeUndefined()
+    expect(
       resolveAgentSessionCardNavigation(undefined, {
         sessionKey: 'remote:parent-tip',
       }),

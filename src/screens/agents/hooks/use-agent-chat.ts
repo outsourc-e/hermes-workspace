@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { SessionHistoryMessage } from '@/lib/gateway-api'
 import { fetchSessionHistory, sendToSession } from '@/lib/gateway-api'
+import { sessionCardQueryKeys } from '@/screens/chat/chat-queries'
 
 export type OperationsChatMessage = {
   id: string
@@ -80,7 +81,7 @@ export function useAgentChat(sessionKey: string) {
         queryKey: ['operations', 'chat', sessionKey],
       })
       await queryClient.invalidateQueries({
-        queryKey: ['operations', 'sessions'],
+        queryKey: sessionCardQueryKeys.list(false),
       })
     },
   })

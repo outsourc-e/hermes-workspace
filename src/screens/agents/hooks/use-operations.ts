@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { CronJob } from '@/components/cron-manager/cron-types'
-import type { GatewaySession } from '@/lib/gateway-api'
+import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
 import { toast } from '@/components/ui/toast'
 import { fetchCronJobs } from '@/lib/cron-api'
-import { fetchSessions } from '@/lib/gateway-api'
+import {
+  fetchSessionCards,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
+import { resolveAgentSessionCardNavigation } from '@/components/agent-view/agent-session-card-navigation'
 import {
   formatModelName,
   formatRelativeTime,
@@ -56,10 +60,11 @@ export type OperationsAgentStatus = 'active' | 'idle' | 'error'
 
 export type OperationsOutputItem = {
   id: string
-  agentId: string
   summary: string
   timestamp: number
-  source: 'session' | 'cron'
+  status: 'idle' | 'running' | 'complete' | 'error'
+  relationship: 'root' | 'child'
+  navigation: SessionCardProducerNavigation
 }
 
 export type OperationsAgent = GatewayConfigAgent & {
@@ -67,8 +72,6 @@ export type OperationsAgent = GatewayConfigAgent & {
   shortModel: string
   status: OperationsAgentStatus
   sessionKey: string
-  sessions: Array<GatewaySession>
-  latestSession: GatewaySession | null
   jobs: Array<CronJob>
   nextRunAt: number | null
   lastActivityAt: number | null
@@ -164,36 +167,6 @@ function readTimestamp(value: unknown): number | null {
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
-}
-
-function extractSessionText(session: GatewaySession): string {
-  const lastMessage = session.lastMessage
-  if (lastMessage) {
-    if (typeof lastMessage.text === 'string' && lastMessage.text.trim()) {
-      return lastMessage.text.trim()
-    }
-    if (Array.isArray(lastMessage.content)) {
-      const text = lastMessage.content
-        .filter((part) => !part.type || part.type === 'text')
-        .map((part) => part.text ?? '')
-        .join('\n')
-        .trim()
-      if (text) return text
-    }
-  }
-
-  return (
-    readString(session.derivedTitle) ||
-    readString(session.title) ||
-    readString(session.task) ||
-    readString(session.initialMessage)
-  )
-}
-
-function truncate(text: string, maxLength = 120): string {
-  const normalized = text.replace(/\s+/g, ' ').trim()
-  if (normalized.length <= maxLength) return normalized
-  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
 }
 
 function normalizeAgentList(input: unknown): Array<GatewayConfigAgent> {
@@ -427,65 +400,6 @@ function getAgentJobs(agentId: string, jobs: Array<CronJob>): Array<CronJob> {
   return jobs.filter((job) => job.name.startsWith(`ops:${agentId}:`))
 }
 
-function getAgentSessions(
-  agentId: string,
-  sessions: Array<GatewaySession>,
-): Array<GatewaySession> {
-  return [...sessions]
-    .filter((session) => {
-      const label = readString(session.label)
-      const key = readString(session.key)
-      return label.includes(agentId) || key.includes(agentId)
-    })
-    .sort((left, right) => {
-      const leftTs = readTimestamp(left.updatedAt) ?? 0
-      const rightTs = readTimestamp(right.updatedAt) ?? 0
-      return rightTs - leftTs
-    })
-}
-
-function getAgentStatus(
-  latestSession: GatewaySession | null,
-): OperationsAgentStatus {
-  if (!latestSession) return 'idle'
-
-  const status = readString(latestSession.status).toLowerCase()
-  if (status.includes('fail') || status.includes('error')) return 'error'
-
-  const updatedAt = readTimestamp(latestSession.updatedAt)
-  if (updatedAt && Date.now() - updatedAt < 120_000) return 'active'
-
-  return 'idle'
-}
-
-function getProgressStatus(
-  status: OperationsAgentStatus,
-  latestSession: GatewaySession | null,
-): OperationsAgent['progressStatus'] {
-  if (status === 'error') return 'failed'
-  if (status === 'active') return 'running'
-
-  const sessionStatus = readString(latestSession?.status).toLowerCase()
-  if (sessionStatus.includes('complete') || sessionStatus.includes('done')) {
-    return 'complete'
-  }
-  return latestSession ? 'thinking' : 'queued'
-}
-
-function getProgressValue(
-  status: OperationsAgentStatus,
-  latestSession: GatewaySession | null,
-): number {
-  const rawProgress = latestSession?.progress
-  if (typeof rawProgress === 'number' && Number.isFinite(rawProgress)) {
-    return Math.max(5, Math.min(100, rawProgress))
-  }
-  if (status === 'active') return 72
-  if (status === 'error') return 100
-  if (latestSession) return 100
-  return 18
-}
-
 function formatUpcomingTime(timestamp: number): string {
   const diff = timestamp - Date.now()
   if (diff <= 0) return 'soon'
@@ -504,44 +418,57 @@ function slugifyJobLabel(value: string): string {
   return normalizeAgentId(value) || 'scheduled-run'
 }
 
-function buildCronOutput(
-  job: CronJob,
-  agentId: string,
-): OperationsOutputItem | null {
-  const startedAt = readTimestamp(job.lastRun?.startedAt)
-  const summary = truncate(
-    readString(job.lastRun?.deliverySummary) ||
-      readString(job.description) ||
-      readString(job.name).replace(`ops:${agentId}:`, '').replace(/-/g, ' '),
-  )
+/**
+ * Project only exact, complete Card-owned activity. The producer resolver also
+ * rejects unqualified identities, so Operations never guesses a local/remote
+ * source for an operational identifier.
+ */
+export function projectOperationsSessionCardActivity(
+  response: Awaited<ReturnType<typeof fetchSessionCards>> | undefined,
+): Array<OperationsOutputItem> {
+  if (!response) return []
 
-  if (!startedAt || !summary) return null
+  return response.cards
+    .flatMap((card): Array<OperationsOutputItem> => {
+      const rootNavigation = resolveAgentSessionCardNavigation(response, {
+        key: card.cardId,
+      })
+      if (!rootNavigation || rootNavigation.inspectedChildCardId) return []
 
-  return {
-    id: `cron-${job.id}`,
-    agentId,
-    summary,
-    timestamp: startedAt,
-    source: 'cron',
-  }
-}
-
-function buildSessionOutput(
-  session: GatewaySession,
-  agentId: string,
-): OperationsOutputItem | null {
-  const timestamp =
-    readTimestamp(session.updatedAt) ?? readTimestamp(session.createdAt)
-  const summary = truncate(extractSessionText(session))
-  if (!timestamp || !summary) return null
-
-  return {
-    id: `session-${readString(session.key) || timestamp}`,
-    agentId,
-    summary,
-    timestamp,
-    source: 'session',
-  }
+      const rootStatus = card.childNodes.some(
+        (child) => child.status === 'running',
+      )
+        ? 'running'
+        : 'idle'
+      const root: OperationsOutputItem = {
+        id: card.cardId,
+        summary: card.title,
+        timestamp: card.updatedAt,
+        status: rootStatus,
+        relationship: 'root',
+        navigation: rootNavigation,
+      }
+      const children = card.childNodes.flatMap(
+        (child): Array<OperationsOutputItem> => {
+          const navigation = resolveAgentSessionCardNavigation(response, {
+            key: child.cardId,
+          })
+          if (!navigation?.inspectedChildCardId) return []
+          return [
+            {
+              id: child.cardId,
+              summary: child.title,
+              timestamp: child.updatedAt,
+              status: child.status,
+              relationship: 'child',
+              navigation,
+            },
+          ]
+        },
+      )
+      return [root, ...children]
+    })
+    .sort((left, right) => right.timestamp - left.timestamp)
 }
 
 export function getOperationsSessionKey(agentId: string): string {
@@ -562,12 +489,9 @@ export function useOperations() {
     refetchInterval: 30_000,
   })
 
-  const sessionsQuery = useQuery({
-    queryKey: ['operations', 'sessions'],
-    queryFn: async () => {
-      const response = await fetchSessions()
-      return Array.isArray(response.sessions) ? response.sessions : []
-    },
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
     refetchInterval: 15_000,
   })
 
@@ -588,7 +512,6 @@ export function useOperations() {
       'pc1-critic',
     ])
     const configAgents = allAgents.filter((a) => !HIDDEN_AGENTS.has(a.id))
-    const sessions = sessionsQuery.data ?? []
     const cronJobs = cronJobsQuery.data ?? []
 
     return configAgents.map((agent) => {
@@ -596,8 +519,6 @@ export function useOperations() {
         description: agent.description,
         systemPrompt: agent.systemPrompt,
       })
-      const agentSessions = getAgentSessions(agent.id, sessions)
-      const latestSession = agentSessions.at(0) ?? null
       const jobs = getAgentJobs(agent.id, cronJobs)
       const nextRunAt =
         jobs
@@ -606,23 +527,11 @@ export function useOperations() {
           .filter((value): value is number => value !== null)
           .sort((left, right) => left - right)[0] ?? null
       const lastActivityAt =
-        readTimestamp(latestSession?.updatedAt) ??
         jobs
           .map((job) => readTimestamp(job.lastRun?.startedAt))
           .filter((value): value is number => value !== null)
           .sort((left, right) => right - left)
-          .at(0) ??
-        null
-      const status = getAgentStatus(latestSession)
-      const recentOutputs = [
-        ...agentSessions.map((session) =>
-          buildSessionOutput(session, agent.id),
-        ),
-        ...jobs.map((job) => buildCronOutput(job, agent.id)),
-      ]
-        .filter((item): item is OperationsOutputItem => Boolean(item))
-        .sort((left, right) => right.timestamp - left.timestamp)
-        .slice(0, 5)
+          .at(0) ?? null
 
       const needsSetup = !agent.model || agent.model.trim().length === 0
 
@@ -630,10 +539,8 @@ export function useOperations() {
         ...agent,
         meta,
         shortModel: formatModelName(agent.model || 'Custom'),
-        status,
+        status: 'idle',
         sessionKey: getOperationsSessionKey(agent.id),
-        sessions: agentSessions,
-        latestSession,
         jobs,
         nextRunAt,
         lastActivityAt,
@@ -642,23 +549,23 @@ export function useOperations() {
           : lastActivityAt
             ? `Last ${formatRelativeTime(lastActivityAt)}`
             : 'No activity yet',
-        progressValue: getProgressValue(status, latestSession),
-        progressStatus: getProgressStatus(status, latestSession),
-        recentOutputs,
+        progressValue: 18,
+        progressStatus: 'queued',
+        recentOutputs: [],
         needsSetup,
       } satisfies OperationsAgent
     })
-  }, [configQuery.data, sessionsQuery.data, cronJobsQuery.data, metaVersion])
+  }, [configQuery.data, cronJobsQuery.data, metaVersion])
 
   const selectedAgent =
     agents.find((agent) => agent.id === selectedAgentId) ?? null
 
   const recentActivity = useMemo(() => {
-    return agents
-      .flatMap((agent) => agent.recentOutputs)
-      .sort((left, right) => right.timestamp - left.timestamp)
-      .slice(0, settings.activityFeedLength)
-  }, [agents, settings.activityFeedLength])
+    return projectOperationsSessionCardActivity(sessionCardsQuery.data).slice(
+      0,
+      settings.activityFeedLength,
+    )
+  }, [sessionCardsQuery.data, settings.activityFeedLength])
 
   const createAgentMutation = useMutation({
     mutationFn: async (input: {
@@ -768,7 +675,7 @@ export function useOperations() {
         queryKey: ['operations', 'config'],
       })
       await queryClient.invalidateQueries({
-        queryKey: ['operations', 'sessions'],
+        queryKey: sessionCardQueryKeys.list(false),
       })
       toast('Agent deleted', { type: 'success' })
     },
@@ -800,7 +707,7 @@ export function useOperations() {
     selectedAgentId,
     setSelectedAgent: setSelectedAgentId,
     configQuery,
-    sessionsQuery,
+    sessionCardsQuery,
     cronJobsQuery,
     recentActivity,
     settings,
@@ -818,7 +725,9 @@ export function useOperations() {
     refreshAll: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['operations', 'config'] }),
-        queryClient.invalidateQueries({ queryKey: ['operations', 'sessions'] }),
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.list(false),
+        }),
         queryClient.invalidateQueries({ queryKey: ['operations', 'cron'] }),
       ])
     },

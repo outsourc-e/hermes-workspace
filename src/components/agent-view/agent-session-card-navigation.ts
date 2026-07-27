@@ -8,15 +8,26 @@ export type AgentSessionRouteIdentity = {
   friendlyId?: string | null
 }
 
-/** Resolve gateway agent/session identities through the authoritative Card list. */
+function sourceQualifiedIdentity(value: string | null | undefined) {
+  const identity = value?.trim() ?? ''
+  if (
+    (identity.startsWith('local:') && identity.length > 'local:'.length) ||
+    (identity.startsWith('remote:') && identity.length > 'remote:'.length)
+  ) {
+    return identity
+  }
+  return undefined
+}
+
+/** Resolve only source-qualified agent/session identities through the Card list. */
 export function resolveAgentSessionCardNavigation(
   response: SessionCardListWire | undefined,
   identity: AgentSessionRouteIdentity,
 ): SessionCardProducerNavigation | undefined {
   return resolveSessionCardProducerNavigation(response, [
-    identity.sessionKey,
-    identity.key,
-    identity.friendlyId,
+    sourceQualifiedIdentity(identity.sessionKey),
+    sourceQualifiedIdentity(identity.key),
+    sourceQualifiedIdentity(identity.friendlyId),
   ])
 }
 
