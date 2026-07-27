@@ -15,13 +15,23 @@
  *     [--chop-max-range-pct 15] [--efficiency-gate] [--efficiency-lookback 50]
  *     [--max-efficiency-ratio 30] [--split-pct 70]
  *     [--folds 4] [--fold-train-pct 70] [--rearm-outside 0]
+ *     [--absolute-stop-floor]
  */
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { runGridBacktest, DEFAULT_GRID_BACKTEST_CONFIG } from '../src/server/grid-backtest'
-import type { GridBacktestConfig, GridBacktestReport } from '../src/server/grid-backtest'
-import { buildWalkForwardWindows, splitCandlesByIndex } from '../src/server/trading-backtest'
+import {
+  runGridBacktest,
+  DEFAULT_GRID_BACKTEST_CONFIG,
+} from '../src/server/grid-backtest'
+import type {
+  GridBacktestConfig,
+  GridBacktestReport,
+} from '../src/server/grid-backtest'
+import {
+  buildWalkForwardWindows,
+  splitCandlesByIndex,
+} from '../src/server/trading-backtest'
 import type { Candle } from '../src/server/trading-strategies'
 
 function arg(name: string, fallback: string): string {
@@ -55,8 +65,11 @@ function loadCache(
     candles: Array<Candle>
   }
   const cutoff = Date.now() - days * 86_400_000
-  const upperBound = minDaysAgo > 0 ? Date.now() - minDaysAgo * 86_400_000 : Infinity
-  return parsed.candles.filter((c) => c.openTime >= cutoff && c.openTime < upperBound)
+  const upperBound =
+    minDaysAgo > 0 ? Date.now() - minDaysAgo * 86_400_000 : Infinity
+  return parsed.candles.filter(
+    (c) => c.openTime >= cutoff && c.openTime < upperBound,
+  )
 }
 
 const fmt = (n: number, d = 2) => n.toFixed(d)
@@ -91,7 +104,10 @@ interface GridFoldReport {
   test: GridBacktestReport
 }
 
-function printWalkForwardSummary(folds: Array<GridFoldReport>, initialTrainPct: number) {
+function printWalkForwardSummary(
+  folds: Array<GridFoldReport>,
+  initialTrainPct: number,
+) {
   const testReports = folds.map((f) => f.test)
   const totalPnlQuote = testReports.reduce((s, r) => s + r.totalPnlQuote, 0)
   const totalFeesQuote = testReports.reduce((s, r) => s + r.totalFeesQuote, 0)
@@ -106,24 +122,44 @@ function printWalkForwardSummary(folds: Array<GridFoldReport>, initialTrainPct: 
   const grossLoss = testReports
     .flatMap((r) => r.trades)
     .reduce((s, t) => s + Math.max(0, -t.pnlQuote), 0)
-  const pf = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : null
-  const maxDrawdownPct = testReports.reduce((m, r) => Math.max(m, r.maxDrawdownPct), 0)
-  const startingBalanceQuote = folds[0]?.test.finalEquityQuote - folds[0]?.test.totalPnlQuote || 0
-  const returnPct = startingBalanceQuote > 0 ? (totalPnlQuote / startingBalanceQuote) * 100 : 0
+  const pf =
+    grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : null
+  const maxDrawdownPct = testReports.reduce(
+    (m, r) => Math.max(m, r.maxDrawdownPct),
+    0,
+  )
+  const startingBalanceQuote =
+    folds[0]?.test.finalEquityQuote - folds[0]?.test.totalPnlQuote || 0
+  const returnPct =
+    startingBalanceQuote > 0 ? (totalPnlQuote / startingBalanceQuote) * 100 : 0
 
-  console.log(`\nWalk-forward OOS: ${folds.length} folds · initial train ${fmt(initialTrainPct, 1)}%`)
+  console.log(
+    `\nWalk-forward OOS: ${folds.length} folds · initial train ${fmt(initialTrainPct, 1)}%`,
+  )
   console.log('─'.repeat(78))
   console.log(
     `OOS realized ${totalPnlQuote >= 0 ? '+' : ''}${fmt(totalPnlQuote)} USDT (${returnPct >= 0 ? '+' : ''}${fmt(returnPct)}%, avg/fold) over ${trades} trades · win ${fmt(trades > 0 ? (wins / trades) * 100 : 0, 1)}% · PF ${pf == null ? '—' : fmt(pf)} · fees ${fmt(totalFeesQuote)} USDT · max fold DD ${fmt(maxDrawdownPct)}%`,
   )
   console.log('\nfolds:')
-  console.log('  fold  test window                 train%  train ret  test ret  trades     PF')
+  console.log(
+    '  fold  test window                 train%  train ret  test ret  trades     PF',
+  )
   for (const fold of folds) {
     const test = fold.test
-    const testGrossProfit = test.trades.reduce((s, t) => s + Math.max(0, t.pnlQuote), 0)
-    const testGrossLoss = test.trades.reduce((s, t) => s + Math.max(0, -t.pnlQuote), 0)
+    const testGrossProfit = test.trades.reduce(
+      (s, t) => s + Math.max(0, t.pnlQuote),
+      0,
+    )
+    const testGrossLoss = test.trades.reduce(
+      (s, t) => s + Math.max(0, -t.pnlQuote),
+      0,
+    )
     const testPf =
-      testGrossLoss > 0 ? testGrossProfit / testGrossLoss : testGrossProfit > 0 ? Infinity : null
+      testGrossLoss > 0
+        ? testGrossProfit / testGrossLoss
+        : testGrossProfit > 0
+          ? Infinity
+          : null
     console.log(
       `  ${String(fold.fold).padStart(4)}  ${test.from.slice(0, 10)} → ${test.to.slice(0, 10)}  ${fmt(fold.trainEndPct, 1).padStart(6)}  ${fmt(fold.train.returnPct).padStart(9)}  ${fmt(test.returnPct).padStart(8)}  ${String(test.trades.length).padStart(6)}  ${(testPf == null ? '  —' : fmt(testPf)).padStart(5)}`,
     )
@@ -143,8 +179,12 @@ function printReport(report: GridBacktestReport, title?: string) {
     ? ` · efficiency-gate ${(config.maxEfficiencyRatio * 100).toFixed(0)}%/${config.efficiencyLookbackCandles}c`
     : ''
   const stops = [
-    config.upperStopPct > 0 ? `upper-stop ${fmt(config.upperStopPct * 100, 1)}%` : '',
-    config.lowerStopPct > 0 ? `lower-stop ${fmt(config.lowerStopPct * 100, 1)}%` : '',
+    config.upperStopPct > 0
+      ? `upper-stop ${fmt(config.upperStopPct * 100, 1)}%`
+      : '',
+    config.lowerStopPct > 0
+      ? `lower-stop ${fmt(config.lowerStopPct * 100, 1)}%`
+      : '',
   ]
     .filter(Boolean)
     .join(' · ')
@@ -196,21 +236,29 @@ function main() {
   const config: GridBacktestConfig = {
     ...DEFAULT_GRID_BACKTEST_CONFIG,
     interval,
-    gridCount: Number(arg('grid-count', String(DEFAULT_GRID_BACKTEST_CONFIG.gridCount))),
+    gridCount: Number(
+      arg('grid-count', String(DEFAULT_GRID_BACKTEST_CONFIG.gridCount)),
+    ),
     spacing: parseSpacing(arg('spacing', DEFAULT_GRID_BACKTEST_CONFIG.spacing)),
     quotePerGrid: Number(
       arg('quote-per-grid', String(DEFAULT_GRID_BACKTEST_CONFIG.quotePerGrid)),
     ),
     feeRatePerSide: Number(arg('fee-bps', '10')) / 10_000,
     rangeLookbackCandles: Number(
-      arg('range-lookback', String(DEFAULT_GRID_BACKTEST_CONFIG.rangeLookbackCandles)),
+      arg(
+        'range-lookback',
+        String(DEFAULT_GRID_BACKTEST_CONFIG.rangeLookbackCandles),
+      ),
     ),
     upperStopPct: Number(arg('upper-stop-pct', '0')) / 100,
     lowerStopPct: Number(arg('lower-stop-pct', '0')) / 100,
     autoRecenter: hasFlag('auto-recenter'),
     chopGate: hasFlag('chop-gate'),
     chopLookbackCandles: Number(
-      arg('chop-lookback', String(DEFAULT_GRID_BACKTEST_CONFIG.chopLookbackCandles)),
+      arg(
+        'chop-lookback',
+        String(DEFAULT_GRID_BACKTEST_CONFIG.chopLookbackCandles),
+      ),
     ),
     chopMaxRangePct: Number(arg('chop-max-range-pct', '15')) / 100,
     efficiencyGate: hasFlag('efficiency-gate'),
@@ -222,17 +270,27 @@ function main() {
     ),
     maxEfficiencyRatio: Number(arg('max-efficiency-ratio', '30')) / 100,
     rearmOutsideRangeCandles: Number(arg('rearm-outside', '0')),
+    absoluteStopFloorEnabled: hasFlag('absolute-stop-floor'),
   }
 
   const candlesBySymbol: Record<string, Array<Candle>> = {}
   for (const symbol of symbols)
     candlesBySymbol[symbol] = loadCache(symbol, interval, days, minDaysAgo)
 
-  const reportDir = path.join(os.homedir(), '.hermes', 'finance', 'backtest-reports')
+  const reportDir = path.join(
+    os.homedir(),
+    '.hermes',
+    'finance',
+    'backtest-reports',
+  )
   fs.mkdirSync(reportDir, { recursive: true })
 
   if (foldCount > 0) {
-    const windows = buildWalkForwardWindows(candlesBySymbol, foldTrainPct, foldCount)
+    const windows = buildWalkForwardWindows(
+      candlesBySymbol,
+      foldTrainPct,
+      foldCount,
+    )
     const folds: Array<GridFoldReport> = windows.map((window) => ({
       fold: window.fold,
       trainEndPct: window.trainEndPct,
@@ -242,7 +300,13 @@ function main() {
       test: runGridBacktest(window.test, config),
     }))
     printWalkForwardSummary(folds, foldTrainPct)
-    const out = reportPath(reportDir, symbols, interval, days, `folds${foldCount}`)
+    const out = reportPath(
+      reportDir,
+      symbols,
+      interval,
+      days,
+      `folds${foldCount}`,
+    )
     fs.writeFileSync(out, JSON.stringify({ config, folds }, null, 2))
     console.log(`\nsaved: ${out}`)
     return
@@ -254,8 +318,17 @@ function main() {
     const testReport = runGridBacktest(test, config)
     printReport(trainReport, 'TRAIN')
     printReport(testReport, 'TEST (out-of-sample)')
-    const out = reportPath(reportDir, symbols, interval, days, `split${splitPct}`)
-    fs.writeFileSync(out, JSON.stringify({ config, train: trainReport, test: testReport }, null, 2))
+    const out = reportPath(
+      reportDir,
+      symbols,
+      interval,
+      days,
+      `split${splitPct}`,
+    )
+    fs.writeFileSync(
+      out,
+      JSON.stringify({ config, train: trainReport, test: testReport }, null, 2),
+    )
     console.log(`\nsaved: ${out}`)
     return
   }

@@ -175,6 +175,86 @@ describe('runGridBacktest', () => {
     expect(report.symbolReports[0].stopOuts).toBeGreaterThanOrEqual(1)
   })
 
+  it('without the absolute floor, autoRecenter keeps sliding the stop down through a sustained decline', () => {
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    // Sweeps both the 90 and 100 levels (open sits on 100, low dips to 89).
+    candles.push(candle(5, { open: 100, high: 101, low: 89, close: 99 }))
+    // Breach the original 10%-under-lower stop (90 * 0.9 = 81) — normal stop-out, re-arms.
+    candles.push(candle(6, { open: 99, high: 100, low: 70, close: 75 }))
+    // Fill the re-centered range's new lower level (70).
+    candles.push(candle(7, { open: 85, high: 88, low: 69, close: 85 }))
+    // Keeps declining well past the ORIGINAL floor (81), but the re-centered
+    // lowerBound (70 * 0.9 = 63) is untouched — without the floor this just
+    // keeps trading, which is exactly the live bug this fix closes.
+    candles.push(candle(8, { open: 85, high: 86, low: 78, close: 79 }))
+    // Recovery — with no floor, the grid should still be armed and able to
+    // take a fresh round trip here (unlike the floor-enabled test below).
+    for (let i = 9; i < 13; i++) candles.push(candle(i, { open: 90, high: 105, low: 88, close: 100 }))
+
+    const report = runGridBacktest(
+      { BTCUSDT: candles },
+      cfg({
+        rangeLookbackCandles: 5,
+        gridCount: 3,
+        spacing: 'arithmetic',
+        lowerStopPct: 0.1,
+        autoRecenter: true,
+        absoluteStopFloorEnabled: false,
+      }),
+    )
+
+    expect(report.trades.filter((t) => t.reason === 'absolute-floor-liquidation')).toHaveLength(0)
+    // Unlike the floor-enabled test, the grid keeps operating through the
+    // recovery and completes at least one full round trip.
+    expect(report.trades.filter((t) => t.reason === 'grid-fill').length).toBeGreaterThan(0)
+  })
+
+  it('engages the absolute floor once a re-arm has recentered below it, and halts for good', () => {
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    // Fill the 90 level.
+    candles.push(candle(5, { open: 100, high: 101, low: 89, close: 99 }))
+    // Breach the original floor (90 * 0.9 = 81) for the first time — this is
+    // still an ordinary stop-out: `lower` (90) sits above its own floor by
+    // construction, so autoRecenter re-arms as usual, not a halt.
+    candles.push(candle(6, { open: 99, high: 100, low: 70, close: 75 }))
+    // Fill the re-centered range's new lower level (70). Close (85) stays
+    // above the frozen floor (81), so this bar trades normally.
+    candles.push(candle(7, { open: 85, high: 88, low: 69, close: 85 }))
+    // Now the active range has recentered below the frozen floor (new lower
+    // 70 < 81) AND price closes below that floor (79 < 81) — the exact
+    // sustained-decline case that slipped past the relative stop above.
+    candles.push(candle(8, { open: 85, high: 86, low: 78, close: 79 }))
+    // Price recovers well back into the original range — should NOT re-enter,
+    // proving the halt is permanent, unlike a normal autoRecenter stop-out.
+    for (let i = 9; i < 13; i++) candles.push(candle(i, { open: 90, high: 105, low: 88, close: 100 }))
+
+    const report = runGridBacktest(
+      { BTCUSDT: candles },
+      cfg({
+        rangeLookbackCandles: 5,
+        gridCount: 3,
+        spacing: 'arithmetic',
+        lowerStopPct: 0.1,
+        autoRecenter: true,
+        absoluteStopFloorEnabled: true,
+      }),
+    )
+
+    const stopTrades = report.trades.filter((t) => t.reason === 'stop-liquidation')
+    const floorTrades = report.trades.filter((t) => t.reason === 'absolute-floor-liquidation')
+    // Bar 5 sweeps both the 90 and 100 levels, so the first (ordinary) stop
+    // breach at bar 6 liquidates two held positions.
+    expect(stopTrades).toHaveLength(2)
+    expect(floorTrades).toHaveLength(1)
+    expect(floorTrades[0].exitPrice).toBe(79)
+    // Nothing should have re-entered after the floor halt, despite autoRecenter
+    // and the price recovery in the tail candles.
+    expect(report.trades.filter((t) => t.reason === 'grid-fill')).toHaveLength(0)
+    expect(report.trades).toHaveLength(3)
+  })
+
   it('pauses entries once the chop gate detects a trend, and resumes after', () => {
     const candles: Array<Candle> = []
     // Tight warmup so the range it defines doesn't itself look "wide" to the

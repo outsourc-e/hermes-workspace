@@ -74,6 +74,19 @@ export interface GridBacktestConfig {
    * above its upper bound, daily P&L decayed +2.96 → +0.04).
    */
   rearmOutsideRangeCandles: number
+  /**
+   * Closes the sustained-decline gap in `autoRecenter`: normally each
+   * stop-triggered re-arm recomputes `lower` from the current window, so the
+   * effective stop price slides downward right along with a falling market
+   * and never acts as a hard floor (confirmed live in grid-paper-engine.ts,
+   * 2026-07-23). When enabled, the lower stop bound from the most recent
+   * *non-stop-triggered* arm (initial arm, chop-gate recovery, or idle-range
+   * re-arm — all legitimate "market moved to a new regime" events) is frozen
+   * as an absolute floor. A stop-triggered re-arm keeps that floor unchanged;
+   * if price ever closes below it the grid liquidates and halts for good,
+   * regardless of `autoRecenter`.
+   */
+  absoluteStopFloorEnabled: boolean
 }
 
 export const DEFAULT_GRID_BACKTEST_CONFIG: GridBacktestConfig = {
@@ -93,6 +106,7 @@ export const DEFAULT_GRID_BACKTEST_CONFIG: GridBacktestConfig = {
   efficiencyLookbackCandles: 50,
   maxEfficiencyRatio: 0.3,
   rearmOutsideRangeCandles: 0,
+  absoluteStopFloorEnabled: false,
 }
 
 export interface GridTrade {
@@ -110,6 +124,7 @@ export interface GridTrade {
     | 'stop-liquidation'
     | 'chop-pause-liquidation'
     | 'range-idle-rearm'
+    | 'absolute-floor-liquidation'
   openedAt: string
   closedAt: string
 }
@@ -254,6 +269,10 @@ function runSymbolGrid(
   // warming up" — without this, the initial-warmup branch below would
   // silently re-arm a halted (autoRecenter: false) grid on the very next bar.
   let halted = false
+  // Absolute stop floor (see absoluteStopFloorEnabled doc): set from a
+  // "fresh" arm (initial/chop-recovery/idle-rearm), left untouched across a
+  // stop-triggered re-arm so it can't slide down with a falling market.
+  let floorPrice: number | null = null
 
   const arm = (endIndex: number): boolean => {
     const range = rangeFromWindow(candles, endIndex, config.rangeLookbackCandles)
@@ -264,6 +283,9 @@ function runSymbolGrid(
     outsideRangeStreak = 0
     return levels.length > 1
   }
+
+  const computeFloor = (): number | null =>
+    config.lowerStopPct > 0 ? lower * (1 - config.lowerStopPct) : null
 
   const liquidateAll = (
     price: number,
@@ -304,7 +326,10 @@ function runSymbolGrid(
     // so checking it for fills would trivially "sweep" whichever boundary it
     // just set. Always arm-and-skip: trading starts on the next bar.
     if (!armed) {
-      if (!halted && i >= config.rangeLookbackCandles - 1) armed = arm(i)
+      if (!halted && i >= config.rangeLookbackCandles - 1) {
+        armed = arm(i)
+        if (armed && config.absoluteStopFloorEnabled) floorPrice = computeFloor()
+      }
       equityContribution.push({ at, equity: realizedPnl })
       continue
     }
@@ -330,6 +355,28 @@ function runSymbolGrid(
     } else if (!trending && pausedForChop) {
       pausedForChop = false
       armed = arm(i)
+      if (armed && config.absoluteStopFloorEnabled) floorPrice = computeFloor()
+      equityContribution.push({ at, equity: realizedPnl })
+      continue
+    }
+
+    // Absolute floor: only engages once a stop-triggered re-arm has already
+    // recentered the active range below the frozen floor (`lower < floorPrice`).
+    // Right after a fresh arm, `lower` always sits above its own floor by
+    // construction, so an ordinary first stop-out still goes through the
+    // normal autoRecenter path below — this only catches the case where a
+    // sustained decline has already outrun the floor once and is doing it
+    // again (see absoluteStopFloorEnabled doc).
+    const floorActive =
+      config.absoluteStopFloorEnabled &&
+      floorPrice != null &&
+      lower < floorPrice &&
+      candle.close < floorPrice
+    if (floorActive) {
+      liquidateAll(candle.close, at, 'absolute-floor-liquidation')
+      stopOuts++
+      armed = false
+      halted = true
       equityContribution.push({ at, equity: realizedPnl })
       continue
     }
@@ -365,6 +412,7 @@ function runSymbolGrid(
       if (outsideRangeStreak >= config.rearmOutsideRangeCandles) {
         liquidateAll(candle.close, at, 'range-idle-rearm')
         armed = arm(i)
+        if (armed && config.absoluteStopFloorEnabled) floorPrice = computeFloor()
         equityContribution.push({ at, equity: realizedPnl })
         continue
       }
