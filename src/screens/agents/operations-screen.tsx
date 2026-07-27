@@ -66,6 +66,7 @@ export function OperationsScreen() {
   const [view, setView] = useState<'overview' | 'outputs'>('overview')
   const {
     agents,
+    orchestratorChat,
     recentActivity,
     configQuery,
     sessionCardsQuery,
@@ -180,7 +181,10 @@ export function OperationsScreen() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <OrchestratorCard totalAgents={agents.length} />
+              <OrchestratorCard
+                totalAgents={agents.length}
+                chat={orchestratorChat}
+              />
             </motion.div>
 
             <motion.div

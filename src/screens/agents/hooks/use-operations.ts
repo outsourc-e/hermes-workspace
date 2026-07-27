@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { CronJob } from '@/components/cron-manager/cron-types'
 import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import type { SessionCard } from '@/screens/chat/types'
 import { toast } from '@/components/ui/toast'
 import { fetchCronJobs } from '@/lib/cron-api'
 import {
@@ -67,11 +69,25 @@ export type OperationsOutputItem = {
   navigation: SessionCardProducerNavigation
 }
 
+export type OperationsChatTarget = {
+  status: 'ready'
+  card: SessionCard
+  cardList: SessionCardListWire
+  inspectedChildCardId?: string
+}
+
+export type OperationsChatResolution =
+  | OperationsChatTarget
+  | { status: 'absent'; cardList: SessionCardListWire }
+  | { status: 'unavailable' }
+
 export type OperationsAgent = GatewayConfigAgent & {
   meta: OperationsAgentMeta
   shortModel: string
   status: OperationsAgentStatus
+  /** Internal control-plane identity. Never render or use for chat history. */
   sessionKey: string
+  chat: OperationsChatResolution
   jobs: Array<CronJob>
   nextRunAt: number | null
   lastActivityAt: number | null
@@ -471,6 +487,83 @@ export function projectOperationsSessionCardActivity(
     .sort((left, right) => right.timestamp - left.timestamp)
 }
 
+function resolveQualifiedOperationsChatTarget(
+  response: SessionCardListWire | undefined,
+  identities: ReadonlyArray<string>,
+): OperationsChatTarget | undefined {
+  if (!response) return undefined
+  const navigations = identities
+    .map((key) => resolveAgentSessionCardNavigation(response, { key }))
+    .filter((navigation): navigation is SessionCardProducerNavigation =>
+      Boolean(navigation),
+    )
+  const uniqueNavigations = new Map(
+    navigations.map((navigation) => [
+      `${navigation.cardId}\u0000${navigation.inspectedChildCardId ?? ''}`,
+      navigation,
+    ]),
+  )
+  if (uniqueNavigations.size !== 1) return undefined
+  const navigation = [...uniqueNavigations.values()][0]!
+  const cards = response.cards.filter(
+    (card) => card.cardId === navigation.cardId,
+  )
+  if (cards.length !== 1) return undefined
+  return {
+    status: 'ready',
+    card: cards[0]!,
+    cardList: response,
+    ...(navigation.inspectedChildCardId
+      ? { inspectedChildCardId: navigation.inspectedChildCardId }
+      : {}),
+  }
+}
+
+/**
+ * Resolve an internal Operations identity without choosing its source. Both
+ * server-defined qualifications are considered and exactly one complete Card
+ * must own the identity.
+ */
+export function resolveOperationsChat(
+  response: SessionCardListWire | undefined,
+  upstreamSessionKey: string,
+): OperationsChatResolution {
+  const normalized = upstreamSessionKey.trim()
+  if (!response || !normalized) return { status: 'unavailable' }
+  const encoded = encodeURIComponent(normalized)
+  const identities = [`local:${encoded}`, `remote:${encoded}`]
+  const target = resolveQualifiedOperationsChatTarget(response, identities)
+  if (target) return target
+  const hasProjectedIdentity = response.cards.some(
+    (card) =>
+      identities.some(
+        (identity) =>
+          identity === card.cardId ||
+          identity === card.canonicalSegmentKey ||
+          card.continuationSegmentKeys.includes(identity),
+      ) ||
+      card.childNodes.some((child) =>
+        identities.some(
+          (identity) =>
+            identity === child.cardId ||
+            identity === child.sessionKey ||
+            child.continuationSegmentKeys.includes(identity),
+        ),
+      ),
+  )
+  if (hasProjectedIdentity) return { status: 'unavailable' }
+  return response.completeness === 'complete' && response.retryable === false
+    ? { status: 'absent', cardList: response }
+    : { status: 'unavailable' }
+}
+
+export function resolveOperationsChatCardId(
+  response: SessionCardListWire | undefined,
+  cardId: string,
+): OperationsChatTarget | undefined {
+  return resolveQualifiedOperationsChatTarget(response, [cardId])
+}
+
 export function getOperationsSessionKey(agentId: string): string {
   return `agent:main:ops-${agentId}`
 }
@@ -541,6 +634,10 @@ export function useOperations() {
         shortModel: formatModelName(agent.model || 'Custom'),
         status: 'idle',
         sessionKey: getOperationsSessionKey(agent.id),
+        chat: resolveOperationsChat(
+          sessionCardsQuery.data,
+          getOperationsSessionKey(agent.id),
+        ),
         jobs,
         nextRunAt,
         lastActivityAt,
@@ -555,7 +652,12 @@ export function useOperations() {
         needsSetup,
       } satisfies OperationsAgent
     })
-  }, [configQuery.data, cronJobsQuery.data, metaVersion])
+  }, [
+    configQuery.data,
+    cronJobsQuery.data,
+    metaVersion,
+    sessionCardsQuery.data,
+  ])
 
   const selectedAgent =
     agents.find((agent) => agent.id === selectedAgentId) ?? null
@@ -703,6 +805,7 @@ export function useOperations() {
 
   return {
     agents,
+    orchestratorChat: resolveOperationsChat(sessionCardsQuery.data, 'main'),
     selectedAgent,
     selectedAgentId,
     setSelectedAgent: setSelectedAgentId,

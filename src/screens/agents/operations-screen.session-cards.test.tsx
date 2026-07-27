@@ -12,7 +12,12 @@ import type {
 
 type QueryOptions = {
   queryKey: ReadonlyArray<unknown>
-  queryFn: () => Promise<unknown>
+  queryFn: (context?: { signal?: AbortSignal }) => Promise<unknown>
+}
+
+type MutationOptions = {
+  mutationFn: (input: any) => Promise<unknown>
+  onSuccess?: () => Promise<unknown> | unknown
 }
 
 type QueryResult = {
@@ -25,6 +30,9 @@ type QueryResult = {
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   queryOptions: [] as Array<QueryOptions>,
+  mutationOptions: [] as Array<MutationOptions>,
+  chatScreenProps: [] as Array<Record<string, any>>,
+  invalidateQueries: vi.fn(),
   cardResponse: undefined as SessionCardListWire | undefined,
 }))
 
@@ -51,6 +59,11 @@ vi.mock('@tanstack/react-query', () => ({
                 name: 'Worker',
                 model: 'test-model',
               },
+              {
+                id: 'child-worker',
+                name: 'Child Worker',
+                model: 'test-model',
+              },
             ],
           },
           defaultModel: 'test-model',
@@ -58,6 +71,17 @@ vi.mock('@tanstack/react-query', () => ({
       })
     }
     if (key[0] === 'chat' && key[1] === 'session-cards') {
+      if (key[2] === 'history' || key[2] === 'child-history') {
+        return {
+          ...queryResult({
+            messages: [],
+            completeness: 'complete',
+            retryable: false,
+            missingSegments: [],
+          }),
+          isFetching: false,
+        }
+      }
       return queryResult(mocks.cardResponse)
     }
     if (key[0] === 'operations' && key[1] === 'sessions') {
@@ -73,11 +97,19 @@ vi.mock('@tanstack/react-query', () => ({
     if (key[0] === 'operations' && key[1] === 'cron') return queryResult([])
     return queryResult(undefined)
   },
-  useMutation: () => ({
-    isPending: false,
-    mutateAsync: vi.fn(),
-  }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useMutation: (options: MutationOptions) => {
+    mocks.mutationOptions.push(options)
+    return {
+      isPending: false,
+      mutate: vi.fn((input) => void options.mutationFn(input)),
+      mutateAsync: vi.fn(async (input) => {
+        const result = await options.mutationFn(input)
+        await options.onSuccess?.()
+        return result
+      }),
+    }
+  },
+  useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -85,6 +117,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 vi.mock('motion/react', () => ({
+  AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
   motion: {
     div: ({ children, ...props }: React.ComponentProps<'div'>) => (
       <div {...props}>{children}</div>
@@ -92,27 +125,27 @@ vi.mock('motion/react', () => ({
     button: ({ children, ...props }: React.ComponentProps<'button'>) => (
       <button {...props}>{children}</button>
     ),
+    section: ({ children, ...props }: React.ComponentProps<'section'>) => (
+      <section {...props}>{children}</section>
+    ),
   },
 }))
 
 vi.mock('@hugeicons/react', () => ({ HugeiconsIcon: () => null }))
-vi.mock('./components/orchestrator-card', () => ({
-  OrchestratorCard: () => null,
+vi.mock('@/screens/chat/chat-screen', () => ({
+  ChatScreen: (props: Record<string, any>) => {
+    mocks.chatScreenProps.push(props)
+    return <div data-testid="orchestrator-card-chat">Card chat</div>
+  },
 }))
-vi.mock('./components/operations-agent-card', () => ({
-  OperationsAgentCard: ({
-    agent,
-  }: {
-    agent: { name: string; sessionKey: string }
-  }) => (
-    <button
-      type="button"
-      aria-label={`Control ${agent.name}`}
-      data-control-session-key={agent.sessionKey}
-    >
-      {agent.name}
-    </button>
-  ),
+vi.mock('@/components/agent-view/agent-progress', () => ({
+  AgentProgress: () => null,
+}))
+vi.mock('@/components/agent-swarm/pixel-avatar', () => ({
+  PixelAvatar: () => null,
+}))
+vi.mock('@/components/prompt-kit/markdown', () => ({
+  Markdown: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 vi.mock('./components/operations-agent-detail', () => ({
   OperationsAgentDetail: () => null,
@@ -128,7 +161,13 @@ vi.mock('./components/full-outputs-view', () => ({
 }))
 vi.mock('./components/agent-bus-panel', () => ({ AgentBusPanel: () => null }))
 vi.mock('@/components/ui/button', () => ({
-  Button: ({ children, ...props }: React.ComponentProps<'button'>) => (
+  Button: ({
+    children,
+    render: _render,
+    size: _size,
+    variant: _variant,
+    ...props
+  }: React.ComponentProps<'button'> & Record<string, unknown>) => (
     <button {...props}>{children}</button>
   ),
 }))
@@ -146,23 +185,40 @@ function sessionCardResponse({
   rootCompleteness?: 'complete' | 'incomplete'
   includeMissingResolution?: boolean
 } = {}): SessionCardListWire {
+  const main: SessionCardWire = {
+    cardId: 'local:main-card',
+    canonicalSource: 'local',
+    title: 'Main Card activity',
+    titleSource: 'manual',
+    canonicalSegmentKey: 'local:main',
+    continuationSegmentKeys: ['local:main-card', 'local:main'],
+    continuationCount: 2,
+    relationshipKind: 'root',
+    childNodes: [],
+    updatedAt: 5,
+    archived: false,
+    pinned: false,
+  }
   const root: SessionCardWire = {
-    cardId: 'remote:worker-root',
+    cardId: 'remote:worker-card',
     canonicalSource: 'remote',
     canonicalTransport: 'gateway',
     title: 'Worker root activity',
     titleSource: 'manual',
-    canonicalSegmentKey: 'remote:worker-tip',
-    continuationSegmentKeys: ['remote:worker-root', 'remote:worker-tip'],
+    canonicalSegmentKey: 'remote:agent%3Amain%3Aops-worker',
+    continuationSegmentKeys: [
+      'remote:worker-card',
+      'remote:agent%3Amain%3Aops-worker',
+    ],
     continuationCount: 2,
     relationshipKind: 'root',
     childNodes: [
       {
-        cardId: 'remote:worker-child',
-        sessionKey: 'remote:worker-child-tip',
+        cardId: 'remote:worker-child-card',
+        sessionKey: 'remote:agent%3Amain%3Aops-child-worker',
         continuationSegmentKeys: [
-          'remote:worker-child',
-          'remote:worker-child-tip',
+          'remote:worker-child-card',
+          'remote:agent%3Amain%3Aops-child-worker',
         ],
         continuationCount: 2,
         relationshipKind: 'child',
@@ -186,10 +242,17 @@ function sessionCardResponse({
     continuationCount: 1,
     childNodes: [],
   }
-  const cards = includeMissingResolution ? [root, missingResolution] : [root]
+  const cards = includeMissingResolution
+    ? [main, root, missingResolution]
+    : [main, root]
   return {
     cards,
     cardResolutions: [
+      {
+        cardId: main.cardId,
+        completeness: 'complete',
+        retryable: false,
+      },
       {
         cardId: root.cardId,
         completeness: rootCompleteness,
@@ -218,7 +281,10 @@ async function renderOperations() {
 
 beforeEach(() => {
   mocks.navigate.mockReset()
+  mocks.invalidateQueries.mockReset()
   mocks.queryOptions.length = 0
+  mocks.mutationOptions.length = 0
+  mocks.chatScreenProps.length = 0
   mocks.cardResponse = sessionCardResponse()
 })
 
@@ -228,20 +294,49 @@ afterEach(() => {
 })
 
 describe('mounted Operations Session Card activity', () => {
-  it('uses the Card endpoint and routes exact complete root and child activity', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(Response.json(mocks.cardResponse))
+  it('uses Card history/stream transport for source-qualified root and child chats', async () => {
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      const url = String(input)
+      if (url === '/api/session-cards') {
+        return Promise.resolve(Response.json(mocks.cardResponse))
+      }
+      if (url.includes('/history')) {
+        const isChild = url.includes('worker-child-card')
+        return Promise.resolve(
+          Response.json({
+            cardId: isChild ? 'remote:worker-child-card' : 'remote:worker-card',
+            canonicalSegmentKey: isChild
+              ? 'remote:agent%3Amain%3Aops-child-worker'
+              : 'remote:agent%3Amain%3Aops-worker',
+            messages: [],
+            completeness: 'complete',
+            retryable: false,
+            missingSegments: [],
+          }),
+        )
+      }
+      if (url === '/api/send-stream' && init?.method === 'POST') {
+        return Promise.resolve(new Response('event: done\ndata: {}\n\n'))
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
     vi.stubGlobal('fetch', fetchMock)
 
     await renderOperations()
 
     expect(screen.queryByText('Raw session must stay hidden')).toBeNull()
-    expect(
-      screen
-        .getByRole('button', { name: 'Control Worker' })
-        .getAttribute('data-control-session-key'),
-    ).toBe('agent:main:ops-worker')
+    expect(document.body.textContent).not.toContain('agent:main:ops-')
+    expect(mocks.chatScreenProps.at(-1)).toMatchObject({
+      activeFriendlyId: 'local:main-card',
+      activeCard: {
+        cardId: 'local:main-card',
+        canonicalSegmentKey: 'local:main',
+        canonicalSource: 'local',
+      },
+      embedded: true,
+      isNewChat: false,
+    })
+
     React.act(() =>
       fireEvent.click(
         screen.getByRole('button', { name: 'Open Worker root activity' }),
@@ -249,7 +344,7 @@ describe('mounted Operations Session Card activity', () => {
     )
     expect(mocks.navigate).toHaveBeenLastCalledWith({
       to: '/chat/$sessionKey',
-      params: { sessionKey: 'remote:worker-root' },
+      params: { sessionKey: 'remote:worker-card' },
       search: {},
     })
     React.act(() =>
@@ -259,8 +354,8 @@ describe('mounted Operations Session Card activity', () => {
     )
     expect(mocks.navigate).toHaveBeenLastCalledWith({
       to: '/chat/$sessionKey',
-      params: { sessionKey: 'remote:worker-root' },
-      search: { inspect: 'remote:worker-child' },
+      params: { sessionKey: 'remote:worker-card' },
+      search: { inspect: 'remote:worker-child-card' },
     })
 
     expect(
@@ -269,17 +364,56 @@ describe('mounted Operations Session Card activity', () => {
           queryKey[0] === 'operations' && queryKey[1] === 'sessions',
       ),
     ).toBe(false)
-    const cardQuery = mocks.queryOptions.find(
+    const cardListQuery = mocks.queryOptions.find(
       ({ queryKey }) =>
-        queryKey[0] === 'chat' && queryKey[1] === 'session-cards',
+        queryKey[0] === 'chat' &&
+        queryKey[1] === 'session-cards' &&
+        queryKey[2] === 'list',
     )
-    await expect(cardQuery?.queryFn()).resolves.toEqual(mocks.cardResponse)
-    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
-      '/api/session-cards',
-    ])
-    expect(fetchMock.mock.calls.map(([input]) => String(input))).not.toContain(
-      '/api/sessions',
+    await expect(cardListQuery?.queryFn()).resolves.toEqual(mocks.cardResponse)
+
+    const historyQueries = mocks.queryOptions.filter(
+      ({ queryKey }) =>
+        queryKey[0] === 'chat' &&
+        queryKey[1] === 'session-cards' &&
+        (queryKey[2] === 'history' || queryKey[2] === 'child-history'),
     )
+    expect(historyQueries).toHaveLength(2)
+    await Promise.all(
+      historyQueries.map((query) => query.queryFn({ signal: undefined })),
+    )
+
+    const rootInput = screen.getByPlaceholderText('Message Worker...')
+    await React.act(async () => {
+      fireEvent.change(rootInput, { target: { value: 'hello Card' } })
+      fireEvent.keyDown(rootInput, { key: 'Enter' })
+      await Promise.resolve()
+    })
+    const childInput = screen.getAllByPlaceholderText<HTMLInputElement>(
+      'Session Card chat unavailable',
+    )[0]!
+    expect(childInput.disabled).toBe(true)
+    expect(screen.getByText('Direct child transcript · read-only')).toBeTruthy()
+
+    const requests = fetchMock.mock.calls.map(([input]) => String(input))
+    expect(requests).toContain('/api/session-cards')
+    expect(requests.filter((url) => url.includes('/history'))).toHaveLength(2)
+    expect(requests).toContain('/api/send-stream')
+    expect(requests.join('\n')).not.toMatch(
+      /\/api\/(history|session-history|session-send)(?:\?|$)/,
+    )
+    const sendCall = fetchMock.mock.calls.find(
+      ([input]) => String(input) === '/api/send-stream',
+    )
+    expect(JSON.parse(String(sendCall?.[1]?.body))).toMatchObject({
+      cardId: 'remote:worker-card',
+      sessionKey: 'remote:agent%3Amain%3Aops-worker',
+      friendlyId: 'remote:worker-card',
+      message: 'hello Card',
+    })
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['chat', 'session-cards', 'list', false],
+    })
   })
 
   it('hides incomplete and unresolved Card activity', async () => {
@@ -299,6 +433,51 @@ describe('mounted Operations Session Card activity', () => {
     expect(screen.queryByText('Worker root activity')).toBeNull()
     expect(screen.queryByText('Worker child activity')).toBeNull()
     expect(screen.queryByText('Unmapped Card activity')).toBeNull()
+    expect(document.body.textContent).not.toContain('agent:main:ops-')
+    const unavailableInputs = screen.getAllByPlaceholderText<HTMLInputElement>(
+      'Session Card chat unavailable',
+    )
+    expect(unavailableInputs).toHaveLength(2)
+    expect(unavailableInputs.every((input) => input.disabled)).toBe(true)
+    expect(
+      screen.getAllByText(
+        'Chat unavailable: no complete Session Card was resolved.',
+      ),
+    ).toHaveLength(2)
     expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
+  it('offers only explicit new bootstrap after authoritative main Card absence', async () => {
+    mocks.cardResponse = sessionCardResponse()
+    mocks.cardResponse.cards = mocks.cardResponse.cards.filter(
+      (card) => card.cardId !== 'local:main-card',
+    )
+    mocks.cardResponse.cardResolutions =
+      mocks.cardResponse.cardResolutions.filter(
+        (resolution) => resolution.cardId !== 'local:main-card',
+      )
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(Response.json(mocks.cardResponse)),
+    )
+
+    await renderOperations()
+
+    expect(mocks.chatScreenProps).toHaveLength(0)
+    expect(document.body.textContent).not.toContain('activeFriendlyId="main"')
+    await React.act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Start new conversation' }),
+      )
+      await Promise.resolve()
+    })
+    expect(mocks.chatScreenProps.at(-1)).toMatchObject({
+      activeFriendlyId: 'new',
+      embedded: true,
+      isNewChat: true,
+    })
+    expect(mocks.chatScreenProps.at(-1)).not.toHaveProperty('activeCard')
   })
 })

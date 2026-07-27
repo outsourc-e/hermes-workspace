@@ -18,6 +18,8 @@ import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { runCronJob, toggleCronJob } from '@/lib/cron-api'
+import { sendToSession } from '@/lib/gateway-api'
+import { sessionCardQueryKeys } from '@/screens/chat/chat-queries'
 import { cn } from '@/lib/utils'
 
 function getStatusStyles(status: OperationsAgent['status']) {
@@ -69,12 +71,14 @@ export function OperationsInlineChat({
   agentName,
   messages,
   sendMessage,
+  canSend,
   isSending,
   error,
 }: {
   agentName: string
   messages: Array<OperationsChatMessage>
   sendMessage: (message: string) => Promise<unknown>
+  canSend: boolean
   isSending: boolean
   error: string | null
 }) {
@@ -90,7 +94,7 @@ export function OperationsInlineChat({
 
   async function handleSend() {
     const message = draft.trim()
-    if (!message || isSending) return
+    if (!message || isSending || !canSend) return
     await sendMessage(message)
     setDraft('')
   }
@@ -156,14 +160,19 @@ export function OperationsInlineChat({
                 void handleSend()
               }
             }}
-            placeholder={`Message ${stripEmojiPrefix(agentName)}...`}
+            placeholder={
+              canSend
+                ? `Message ${stripEmojiPrefix(agentName)}...`
+                : 'Session Card chat unavailable'
+            }
+            disabled={!canSend}
             className="h-8 flex-1 bg-transparent px-1.5 text-xs text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)]"
           />
           <Button
             size="icon-sm"
             className="rounded-lg bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)]"
             onClick={() => void handleSend()}
-            disabled={!draft.trim() || isSending}
+            disabled={!canSend || !draft.trim() || isSending}
             aria-label={isSending ? 'Sending message' : 'Send message'}
           >
             <HugeiconsIcon
@@ -190,11 +199,29 @@ export function OperationsAgentCard({
   const displayName = stripEmojiPrefix(agent.name)
   const [showCronPanel, setShowCronPanel] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
-  const { messages, sendMessage, isSending, error } = useAgentChat(
-    agent.sessionKey,
-  )
+  const chatTarget = agent.chat.status === 'ready' ? agent.chat : undefined
+  const { messages, sendMessage, canSend, isSending, error } =
+    useAgentChat(chatTarget)
   const cronJobCount = agent.jobs.length
   const isActive = agent.status === 'active' && !isPaused
+
+  const controlMutation = useMutation({
+    mutationFn: async () =>
+      sendToSession(agent.sessionKey, 'Run your primary task now'),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: sessionCardQueryKeys.list(false),
+      })
+    },
+    onError: (mutationError) => {
+      toast(
+        mutationError instanceof Error
+          ? mutationError.message
+          : 'Failed to run agent',
+        { type: 'error' },
+      )
+    },
+  })
 
   const toggleMutation = useMutation({
     mutationFn: async (payload: { jobId: string; enabled: boolean }) =>
@@ -235,7 +262,7 @@ export function OperationsAgentCard({
     }
 
     setIsPaused(false)
-    await sendMessage('Run your primary task now')
+    await controlMutation.mutateAsync()
   }
 
   return (
@@ -298,7 +325,7 @@ export function OperationsAgentCard({
               }
               void handlePlayPause()
             }}
-            disabled={isSending && !isActive}
+            disabled={controlMutation.isPending && !isActive}
             title={
               agent.needsSetup
                 ? 'No model configured — open settings to set one up'
@@ -470,6 +497,7 @@ export function OperationsAgentCard({
           agentName={agent.name}
           messages={messages}
           sendMessage={sendMessage}
+          canSend={canSend}
           isSending={isSending}
           error={error}
         />

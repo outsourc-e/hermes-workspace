@@ -1,8 +1,12 @@
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { SessionHistoryMessage } from '@/lib/gateway-api'
-import { fetchSessionHistory, sendToSession } from '@/lib/gateway-api'
-import { sessionCardQueryKeys } from '@/screens/chat/chat-queries'
+import type { OperationsChatTarget } from './use-operations'
+import type { ChatMessage } from '@/screens/chat/types'
+import {
+  fetchCompleteSessionCardHistory,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
+import { textFromMessage } from '@/screens/chat/utils'
 
 export type OperationsChatMessage = {
   id: string
@@ -11,101 +15,133 @@ export type OperationsChatMessage = {
   timestamp?: number
 }
 
-function extractMessageText(message: SessionHistoryMessage): string {
-  if (typeof message.content === 'string') return message.content
-  if (Array.isArray(message.content)) {
-    return message.content
-      .filter((part) => !part.type || part.type === 'text')
-      .map((part) => part.text ?? '')
-      .join('\n')
-  }
-  return ''
-}
-
 function normalizeMessage(
-  message: SessionHistoryMessage,
+  message: ChatMessage,
   index: number,
 ): OperationsChatMessage | null {
-  const content = extractMessageText(message).trim()
+  const content = textFromMessage(message).trim()
   if (!content) return null
-
   const role =
     message.role === 'assistant'
       ? 'assistant'
       : message.role === 'user'
         ? 'user'
         : 'system'
-
   return {
-    id: `${role}-${message.timestamp ?? index}-${index}`,
+    id:
+      (typeof message.id === 'string' && message.id) ||
+      `${role}-${message.timestamp ?? index}-${index}`,
     role,
     content,
-    timestamp: message.timestamp,
+    ...(typeof message.timestamp === 'number'
+      ? { timestamp: message.timestamp }
+      : {}),
   }
 }
 
-export function useAgentChat(sessionKey: string) {
+function childForTarget(target: OperationsChatTarget) {
+  if (!target.inspectedChildCardId) return undefined
+  return target.card.childNodes.find(
+    (child) => child.cardId === target.inspectedChildCardId,
+  )
+}
+
+/** Card-only history and send transport for mounted Operations agent chats. */
+export function useAgentChat(target: OperationsChatTarget | undefined) {
   const queryClient = useQueryClient()
+  const child = target ? childForTarget(target) : undefined
+  const cardId = child?.cardId ?? target?.card.cardId ?? ''
+  const canonicalSegmentKey =
+    child?.sessionKey ?? target?.card.canonicalSegmentKey ?? ''
+  const historyQueryKey =
+    child && target
+      ? sessionCardQueryKeys.childHistory(
+          target.card.cardId,
+          child.cardId,
+          child.sessionKey,
+        )
+      : sessionCardQueryKeys.history(cardId, canonicalSegmentKey)
 
   const historyQuery = useQuery({
-    queryKey: ['operations', 'chat', sessionKey],
-    queryFn: async () => {
-      try {
-        // Try the ClawSuite history endpoint first (uses sessionKey param)
-        const res = await fetch(
-          `/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=50`,
-        )
-        if (res.ok) {
-          const data = await res.json()
-          if (Array.isArray(data.messages))
-            return data.messages as Array<SessionHistoryMessage>
-        }
-      } catch {
-        // fall through
+    queryKey: historyQueryKey,
+    queryFn: ({ signal }) => {
+      if (!target || !cardId || !canonicalSegmentKey) {
+        throw new Error('Operations chat Card is unavailable')
       }
-      // Fallback to gateway-api
-      const response = await fetchSessionHistory(sessionKey, { limit: 50 })
-      if (response.ok === false) return []
-      return Array.isArray(response.messages) ? response.messages : []
+      return fetchCompleteSessionCardHistory({
+        ...(child ? { parentCardId: target.card.cardId } : {}),
+        cardId,
+        canonicalSegmentKey,
+        signal,
+      })
     },
+    enabled: Boolean(target && cardId && canonicalSegmentKey),
     refetchInterval: 5_000,
-    enabled: Boolean(sessionKey),
   })
 
   const sendMutation = useMutation({
     mutationFn: async (message: string) => {
-      await sendToSession(sessionKey, message)
+      if (!target || child) {
+        throw new Error(
+          child
+            ? 'Child Session Card transcripts are read-only'
+            : 'Operations chat Card is unavailable',
+        )
+      }
+      const response = await fetch('/api/send-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cardId: target.card.cardId,
+          sessionKey: target.card.canonicalSegmentKey,
+          friendlyId: target.card.cardId,
+          message,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      })
+      if (!response.ok) {
+        throw new Error((await response.text()) || 'Failed to send message')
+      }
+      // Keep the mutation pending for the stream lifetime. The authoritative
+      // Card history refetch below supplies the rendered transcript.
+      await response.text()
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ['operations', 'chat', sessionKey],
-      })
-      await queryClient.invalidateQueries({
-        queryKey: sessionCardQueryKeys.list(false),
-      })
+      if (!target) return
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: historyQueryKey }),
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.list(false),
+        }),
+      ])
     },
   })
 
   const messages = useMemo(
     () =>
-      (historyQuery.data ?? [])
+      (historyQuery.data?.messages ?? [])
         .map(normalizeMessage)
         .filter((message): message is OperationsChatMessage =>
           Boolean(message),
         ),
-    [historyQuery.data],
+    [historyQuery.data?.messages],
   )
+  const error = !target
+    ? 'Chat unavailable: no complete Session Card was resolved.'
+    : child
+      ? 'Direct child transcript · read-only'
+      : (historyQuery.error instanceof Error && historyQuery.error.message) ||
+        (sendMutation.error instanceof Error && sendMutation.error.message) ||
+        null
 
   return {
     messages,
     sendMessage: sendMutation.mutateAsync,
+    canSend: Boolean(target && !child),
     isLoading: historyQuery.isPending,
     isRefreshing: historyQuery.isFetching,
     isSending: sendMutation.isPending,
-    error:
-      (historyQuery.error instanceof Error && historyQuery.error.message) ||
-      (sendMutation.error instanceof Error && sendMutation.error.message) ||
-      null,
+    error,
     refresh: historyQuery.refetch,
   }
 }
