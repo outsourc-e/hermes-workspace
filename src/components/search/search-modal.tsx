@@ -10,7 +10,6 @@ import {
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SearchInput } from './search-input'
@@ -18,8 +17,7 @@ import { QuickActions } from './quick-actions'
 import { SearchResults } from './search-results'
 import type { QuickAction } from './quick-actions'
 import type { SearchResultItemData } from './search-results'
-import type { SearchSession } from '@/hooks/use-search-data'
-import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import type { SearchSessionCard } from '@/hooks/use-search-data'
 import type { SearchScope } from '@/hooks/use-search-modal'
 import {
   SEARCH_MODAL_EVENTS,
@@ -28,11 +26,6 @@ import {
 } from '@/hooks/use-search-modal'
 import { filterResults, useSearchData } from '@/hooks/use-search-data'
 import { cn } from '@/lib/utils'
-import {
-  fetchSessionCards,
-  sessionCardQueryKeys,
-} from '@/screens/chat/chat-queries'
-import { resolveSessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
 
 const SCOPE_TABS: Array<{ value: SearchScope; label: string }> = [
   { value: 'all', label: 'All' },
@@ -60,24 +53,50 @@ function getFileBadge(ext: string) {
   return ext.toUpperCase()
 }
 
-export function resolveSearchSessionCardNavigation(
-  response: SessionCardListWire | undefined,
-  session: Pick<SearchSession, 'key' | 'friendlyId'>,
-) {
-  return resolveSessionCardProducerNavigation(response, [
-    session.key,
-    session.friendlyId,
-  ])
+export type SearchSessionCardMatch = {
+  cardId: string
+  title: string
+  updatedAt: number
+  inspectedChildCardId?: string
+}
+
+export function matchSearchSessionCards(
+  cards: Array<SearchSessionCard>,
+  query: string,
+  maxResults: number = RESULT_LIMITS.chats,
+): Array<SearchSessionCardMatch> {
+  const normalized = query.trim().toLowerCase()
+  if (!normalized || maxResults <= 0) return []
+
+  const matches: Array<SearchSessionCardMatch> = []
+  for (const card of cards) {
+    if (card.title.toLowerCase().includes(normalized)) {
+      matches.push({
+        cardId: card.cardId,
+        title: card.title,
+        updatedAt: card.updatedAt,
+      })
+    } else {
+      const matchingChildren = card.inspectableChildren.filter((child) =>
+        child.title.toLowerCase().includes(normalized),
+      )
+      // An ambiguous child-title match must not choose a child identity by list
+      // order. Only the owning Card's unique authoritative child may inspect.
+      if (matchingChildren.length !== 1) continue
+      matches.push({
+        cardId: card.cardId,
+        title: card.title,
+        updatedAt: card.updatedAt,
+        inspectedChildCardId: matchingChildren[0]!.cardId,
+      })
+    }
+    if (matches.length >= maxResults) break
+  }
+  return matches
 }
 
 export function SearchModal() {
   const navigate = useNavigate()
-  const sessionCardsQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false),
-    queryFn: () => fetchSessionCards(),
-    retry: 1,
-    staleTime: 5_000,
-  })
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const isOpen = useSearchModal((state) => state.isOpen)
@@ -96,10 +115,7 @@ export function SearchModal() {
   const deferredQuery = useDeferredValue(debouncedQuery)
 
   // Real data (Phase 3.2)
-  const { sessions, sessionSearchResults, files, skills } = useSearchData(
-    scope,
-    deferredQuery,
-  )
+  const { sessionCards, files, skills } = useSearchData(scope)
   const searchableFiles = useMemo(
     () => files.filter((entry) => entry.type === 'file'),
     [files],
@@ -207,51 +223,27 @@ export function SearchModal() {
     const normalized = deferredQuery.trim()
     if (!normalized) return []
 
-    // Real sessions data — search across friendlyId, key, derived title,
-    // and preview so user queries match chat content (#291).
-    const chatCandidates =
-      sessionSearchResults.length > 0
-        ? sessionSearchResults
-        : filterResults(
-            sessions,
-            normalized,
-            ['friendlyId', 'key', 'title', 'preview'],
-            RESULT_LIMITS.chats,
-          )
-
-    const chats = chatCandidates
-      .flatMap<SearchResultItemData>((entry) => {
-        const target = resolveSearchSessionCardNavigation(
-          sessionCardsQuery.data,
-          entry,
-        )
-        if (!target) return []
-        return [
-          {
-            id: entry.id,
-            scope: 'chats',
-            icon: (
-              <HugeiconsIcon icon={Chat01Icon} size={20} strokeWidth={1.5} />
-            ),
-            title: entry.title || entry.friendlyId,
-            snippet: entry.preview || `Session: ${entry.key}`,
-            meta: entry.updatedAt
-              ? new Date(entry.updatedAt).toLocaleTimeString()
-              : '',
-            onSelect: () => {
-              closeModal()
-              navigate({
-                to: '/chat/$sessionKey',
-                params: { sessionKey: target.cardId },
-                search: target.inspectedChildCardId
-                  ? { inspect: target.inspectedChildCardId }
-                  : {},
-              })
-            },
-          },
-        ]
-      })
-      .slice(0, RESULT_LIMITS.chats)
+    const chats = matchSearchSessionCards(
+      sessionCards,
+      normalized,
+    ).map<SearchResultItemData>((entry) => ({
+      id: entry.cardId,
+      scope: 'chats',
+      icon: <HugeiconsIcon icon={Chat01Icon} size={20} strokeWidth={1.5} />,
+      title: entry.title,
+      snippet: 'Session Card',
+      meta: new Date(entry.updatedAt).toLocaleTimeString(),
+      onSelect: () => {
+        closeModal()
+        navigate({
+          to: '/chat/$sessionKey',
+          params: { sessionKey: entry.cardId },
+          search: entry.inspectedChildCardId
+            ? { inspect: entry.inspectedChildCardId }
+            : {},
+        })
+      },
+    }))
 
     // Real files data
     const fileResults = filterResults(
@@ -340,9 +332,7 @@ export function SearchModal() {
     quickActions,
     scope,
     searchableFiles,
-    sessionSearchResults,
-    sessionCardsQuery.data,
-    sessions,
+    sessionCards,
     skills,
   ])
 
@@ -416,7 +406,6 @@ export function SearchModal() {
       if (/^[1-9]$/.test(event.key)) {
         const index = Number(event.key) - 1
         const target = resultItems[index]
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
         if (!target) return
         event.preventDefault()
         const finalQuery = debouncedQuery.trim() || query.trim()
@@ -515,7 +504,6 @@ export function SearchModal() {
                   onHoverIndex={(index) => setSelectedIndex(index)}
                   onSelectIndex={(index) => {
                     const item = resultItems[index]
-                    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
                     if (!item) return
                     const finalQuery = debouncedQuery.trim() || query.trim()
                     if (finalQuery) recordRecentSearch(finalQuery)

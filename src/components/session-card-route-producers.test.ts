@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { resolveSessionRowCardNavigation } from '../screens/dashboard/components/sessions-intelligence-card'
 import { resolveBackgroundRunCardNavigation } from './agent-view/background-runs-section'
 import { recentSessionCards } from './command-palette'
-import { resolveSearchSessionCardNavigation } from './search/search-modal'
 import type { SessionCardListWire } from '../screens/chat/chat-queries'
 import type { SessionCard } from '../screens/chat/types'
 
@@ -48,21 +47,6 @@ describe('Session Card route producers', () => {
         retryable: true,
       }),
     ).toEqual([])
-  })
-
-  it('maps search results to the owning parent Card and fails closed', () => {
-    expect(
-      resolveSearchSessionCardNavigation(response, {
-        key: 'remote:parent-root',
-        friendlyId: 'legacy-parent-label',
-      }),
-    ).toEqual({ cardId: 'remote:parent-card' })
-    expect(
-      resolveSearchSessionCardNavigation(response, {
-        key: 'raw-without-card',
-        friendlyId: 'another-raw-id',
-      }),
-    ).toBeUndefined()
   })
 
   it('maps dashboard rows to Card routes instead of raw session keys', () => {
