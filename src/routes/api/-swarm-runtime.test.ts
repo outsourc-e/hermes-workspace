@@ -3,6 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('../../server/auth-middleware', () => ({
+  isAuthenticated: () => true,
+}))
+
 const RAW_LOG_SENTINEL = 'RAW_AGENT_LOG_ACTIVITY_MUST_NOT_LEAVE_API'
 const RAW_TITLE_SENTINEL = 'RAW_STATE_DB_TITLE_MUST_NOT_LEAVE_API'
 
