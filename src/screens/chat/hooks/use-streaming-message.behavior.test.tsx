@@ -15,6 +15,7 @@ import {
 } from '../pending-send'
 import { useStreamingMessage } from './use-streaming-message'
 import type { ChatMessage, HistoryResponse } from '../types'
+import type { AuthoritativeCardHandoff } from './use-streaming-message'
 
 type ChatStoreState = ReturnType<typeof useChatStore.getState>
 
@@ -43,6 +44,8 @@ function StreamingHarness({
   onSessionResolved,
   onAbort,
   pinMainSession,
+  activeCardId,
+  onCardHandoff,
 }: {
   onReady: (controller: StreamingController) => void
   onSessionResolved: (payload: {
@@ -53,11 +56,15 @@ function StreamingHarness({
   }) => void
   onAbort: () => void
   pinMainSession: boolean
+  activeCardId?: string
+  onCardHandoff?: (payload: AuthoritativeCardHandoff) => void
 }) {
   const streaming = useStreamingMessage({
     onSessionResolved,
     onAbort,
     pinMainSession,
+    activeCardId,
+    onCardHandoff,
   })
   useEffect(() => onReady(streaming), [onReady, streaming])
   return null
@@ -426,6 +433,129 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       React.act(() => root.unmount())
       document.body.removeChild(container)
       queryClient.clear()
+    },
+  )
+
+  it.each([
+    {
+      name: 'accepts the promoted Card handoff',
+      handoffCardId: 'remote:created-card',
+      expectedHandoffs: 1,
+    },
+    {
+      name: 'rejects a handoff for an unrelated Card',
+      handoffCardId: 'remote:unrelated-card',
+      expectedHandoffs: 0,
+    },
+  ])(
+    '$name after the bootstrap session handoff',
+    async ({ handoffCardId, expectedHandoffs }) => {
+      const encoder = new TextEncoder()
+      let resolveCardHandoffRead: (
+        result: ReadableStreamReadResult<Uint8Array>,
+      ) => void = () => undefined
+      const cardHandoffRead = new Promise<ReadableStreamReadResult<Uint8Array>>(
+        (resolve) => {
+          resolveCardHandoffRead = resolve
+        },
+      )
+      const reader = {
+        read: vi
+          .fn()
+          .mockResolvedValueOnce({
+            done: false,
+            value: encoder.encode(
+              [
+                'event: session_handoff',
+                `data: ${JSON.stringify({ fromSessionKey: 'new', sessionKey: 'remote:created-segment', friendlyId: 'remote:created-card', runId: 'run-bootstrap' })}`,
+                '',
+                '',
+              ].join('\n'),
+            ),
+          })
+          .mockReturnValueOnce(cardHandoffRead)
+          .mockResolvedValueOnce({ done: true, value: undefined }),
+        cancel: vi.fn().mockResolvedValue(undefined),
+      }
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        body: { getReader: () => reader },
+        text: () => Promise.resolve(''),
+      } as unknown as Response)
+
+      const onSessionResolved = vi.fn()
+      const onCardHandoff = vi.fn()
+      const onAbort = vi.fn()
+      let controller: StreamingController | null = null
+      const onReady = (next: StreamingController) => {
+        controller = next
+      }
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+      const renderHarness = (activeCardId?: string) => (
+        <StreamingHarness
+          onReady={onReady}
+          onSessionResolved={onSessionResolved}
+          onAbort={onAbort}
+          pinMainSession={false}
+          activeCardId={activeCardId}
+          onCardHandoff={onCardHandoff}
+        />
+      )
+
+      React.act(() => root.render(renderHarness()))
+      expect(controller).not.toBeNull()
+
+      let streamPromise: Promise<void> | undefined
+      React.act(() => {
+        streamPromise = controller!.startStreaming({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'bootstrap Card',
+          idempotencyKey: 'client-bootstrap-card',
+        })
+      })
+
+      await vi.waitFor(() => {
+        expect(onSessionResolved).toHaveBeenCalledWith({
+          fromSessionKey: 'new',
+          sessionKey: 'remote:created-segment',
+          friendlyId: 'remote:created-card',
+          reason: 'bootstrap',
+        })
+      })
+      React.act(() => root.render(renderHarness('remote:created-card')))
+
+      await React.act(async () => {
+        resolveCardHandoffRead({
+          done: false,
+          value: encoder.encode(
+            [
+              'event: card_handoff',
+              `data: ${JSON.stringify({ cardId: handoffCardId, fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-continuation' })}`,
+              '',
+              '',
+            ].join('\n'),
+          ),
+        })
+        await streamPromise
+      })
+
+      expect(onCardHandoff).toHaveBeenCalledTimes(expectedHandoffs)
+      if (expectedHandoffs === 1) {
+        expect(onCardHandoff).toHaveBeenCalledWith({
+          cardId: 'remote:created-card',
+          fromSegmentKey: 'remote:created-segment',
+          canonicalSegmentKey: 'remote:continuation-segment',
+          runId: 'run-continuation',
+        })
+      }
+      expect(reader.cancel).not.toHaveBeenCalled()
+      expect(onAbort).not.toHaveBeenCalled()
+
+      React.act(() => root.unmount())
+      document.body.removeChild(container)
     },
   )
 })

@@ -945,6 +945,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     ],
   )
 
+  // A stream reader can outlive the render that started it. Dispatch through
+  // the latest callback so a bootstrap route rerender can supply its accepted
+  // Card identity before a later card_handoff arrives on the same reader.
+  const processEventRef = useRef(processEvent)
+  processEventRef.current = processEvent
+
   const startStreaming = useCallback(
     async (params: {
       sessionKey: string
@@ -1109,7 +1115,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
             if (!currentEvent || !currentData) continue
             try {
-              processEvent(currentEvent, JSON.parse(currentData))
+              processEventRef.current(currentEvent, JSON.parse(currentData))
             } catch {
               // Ignore invalid SSE data.
             }
@@ -1163,7 +1169,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       markFailed,
       onAbort,
       onMessageAccepted,
-      processEvent,
       resetActiveStreamState,
       schedulePostAcceptanceTimeout,
     ],
