@@ -14,8 +14,8 @@ import { OfficeView } from './components/office-view'
 import { useConductorGateway } from './hooks/use-conductor-gateway'
 import type { CSSProperties } from 'react'
 import type { AgentWorkingRow } from './components/agents-working-panel'
-import type { GatewaySession } from '@/lib/gateway-api'
 import type {
+  ConductorCardActivity,
   MissionHistoryEntry,
   MissionHistoryWorkerDetail,
 } from './hooks/use-conductor-gateway'
@@ -26,11 +26,6 @@ import { cn } from '@/lib/utils'
 
 type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
 type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
-
-type HistoryMessage = {
-  role?: string
-  content?: string | Array<{ type?: string; text?: string }>
-}
 
 type MissionCostWorker = {
   id: string
@@ -466,17 +461,8 @@ function WorkerCard({
 }) {
   const dot = getWorkerDot(worker.status)
   const persona = getAgentPersona(index)
-  const workerOutput =
-    conductor.workerOutputs[worker.key] ??
-    getLastAssistantMessage(
-      worker.raw.messages as Array<HistoryMessage> | undefined,
-    )
-  const workerStartedAt =
-    typeof worker.raw.createdAt === 'string'
-      ? worker.raw.createdAt
-      : typeof worker.raw.startedAt === 'string'
-        ? worker.raw.startedAt
-        : conductor.missionStartedAt
+  const workerOutput = conductor.workerOutputs[worker.key] ?? ''
+  const workerStartedAt = conductor.missionStartedAt
   const workerEndTime =
     worker.status === 'complete' || worker.status === 'stale'
       ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime()
@@ -865,31 +851,6 @@ function ModelSelectorDropdown({
   )
 }
 
-function extractMessageText(message: HistoryMessage | undefined): string {
-  if (!message) return ''
-  if (typeof message.content === 'string') return message.content
-  if (Array.isArray(message.content)) {
-    return message.content
-      .map((part) => (typeof part.text === 'string' ? part.text : ''))
-      .filter(Boolean)
-      .join('\n')
-  }
-  return ''
-}
-
-function getLastAssistantMessage(
-  messages: Array<HistoryMessage> | undefined,
-): string {
-  if (!Array.isArray(messages)) return ''
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages.at(index)
-    if (message?.role !== 'assistant') continue
-    const text = extractMessageText(message)
-    if (text.trim()) return text.trim()
-  }
-  return ''
-}
-
 function extractProjectPath(text: string): string | null {
   const structuredPatterns = [
     /\b(?:Created|Output|Wrote|Saved to|Built|Generated|Written to)\s+(\/tmp\/dispatch-[^\s"')`\]>]+)/gi,
@@ -925,19 +886,10 @@ function extractProjectPath(text: string): string | null {
 }
 
 function deriveSessionStatus(
-  session: GatewaySession,
+  session: ConductorCardActivity,
 ): 'running' | 'completed' | 'failed' {
-  const updatedMs = new Date(session.updatedAt as string).getTime()
-  const staleness = Number.isFinite(updatedMs) ? Date.now() - updatedMs : 0
-  const tokens =
-    typeof session.totalTokens === 'number' ? session.totalTokens : 0
-  const statusText =
-    `${session.status ?? ''} ${session.state ?? ''}`.toLowerCase()
-
-  if (statusText.includes('error') || statusText.includes('failed'))
-    return 'failed'
-  if (tokens > 0 && staleness > 30_000) return 'completed'
-  if (staleness > 120_000 && tokens === 0) return 'failed'
+  if (session.status === 'error') return 'failed'
+  if (session.status === 'complete') return 'completed'
   return 'running'
 }
 
@@ -1109,13 +1061,6 @@ export function Conductor() {
     const continuationSummarySource =
       completeSummary ??
       Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
-      conductor.workers
-        .map((worker) =>
-          getLastAssistantMessage(
-            worker.raw.messages as Array<HistoryMessage> | undefined,
-          ),
-        )
-        .find((output) => output.trim()) ??
       conductor.streamText
 
     const combinedPrompt = [
@@ -1214,13 +1159,8 @@ export function Conductor() {
     }
     return sessions.slice(0, 6).map((session, i) => {
       const s = session
-      const updatedAt =
-        typeof s.updatedAt === 'string'
-          ? new Date(s.updatedAt).getTime()
-          : typeof s.updatedAt === 'number'
-            ? s.updatedAt
-            : 0
-      const statusText = `${s.status ?? ''} ${s.kind ?? ''}`.toLowerCase()
+      const updatedAt = s.updatedAt
+      const statusText = `${s.status ?? ''} ${s.kind}`.toLowerCase()
       const status = /error|failed/.test(statusText)
         ? ('error' as const)
         : /pause/.test(statusText)
@@ -1229,15 +1169,15 @@ export function Conductor() {
             ? ('active' as const)
             : ('idle' as const)
       return {
-        id: s.key ?? `session-${i}`,
-        name: OFFICE_NAMES[i % OFFICE_NAMES.length] ?? `Agent ${i + 1}`,
-        modelId: s.model ?? 'auto',
+        id: s.cardId,
+        name: OFFICE_NAMES.at(i % OFFICE_NAMES.length) ?? `Agent ${i + 1}`,
+        modelId: 'Session Card',
         status,
-        lastLine: s.task ?? s.label ?? s.title ?? s.derivedTitle ?? 'Working…',
+        lastLine: s.title,
         lastAt: updatedAt || undefined,
         taskCount: 0,
-        roleDescription: s.label ?? 'Worker',
-        sessionKey: s.key ?? undefined,
+        roleDescription: s.kind,
+        sessionKey: s.cardId,
       }
     })
   }, [conductor.recentSessions])
@@ -1249,11 +1189,7 @@ export function Conductor() {
         const currentTask = conductor.tasks.find(
           (task) => task.workerKey === worker.key && task.status === 'running',
         )?.title
-        const lastLine =
-          conductor.workerOutputs[worker.key] ??
-          getLastAssistantMessage(
-            worker.raw.messages as Array<HistoryMessage> | undefined,
-          )
+        const lastLine = conductor.workerOutputs[worker.key] ?? ''
         const isWorkerPaused =
           conductor.isPaused &&
           (worker.status === 'running' || worker.status === 'idle')
@@ -1278,7 +1214,7 @@ export function Conductor() {
             (task) => task.workerKey === worker.key,
           ).length,
           currentTask: isWorkerPaused ? 'Paused' : currentTask,
-          sessionKey: worker.key,
+          sessionKey: worker.cardId,
         }
       })
     }
@@ -1306,14 +1242,9 @@ export function Conductor() {
   ])
 
   const completePhaseProjectPath = useMemo(() => {
-    const workerOutputTexts = [
-      ...Object.values(conductor.workerOutputs),
-      ...conductor.workers.map((worker) =>
-        getLastAssistantMessage(
-          worker.raw.messages as Array<HistoryMessage> | undefined,
-        ),
-      ),
-    ].filter(Boolean)
+    const workerOutputTexts = Object.values(conductor.workerOutputs).filter(
+      Boolean,
+    )
 
     for (const text of workerOutputTexts) {
       const extractedPath = extractProjectPath(text)
@@ -1435,13 +1366,6 @@ export function Conductor() {
     const summarySource =
       completeSummary ??
       Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
-      conductor.workers
-        .map((worker) =>
-          getLastAssistantMessage(
-            worker.raw.messages as Array<HistoryMessage> | undefined,
-          ),
-        )
-        .find((output) => output.trim()) ??
       conductor.streamText
     return truncateContinuationText(summarySource)
   }, [
@@ -1464,11 +1388,11 @@ export function Conductor() {
   const filteredSessions = (() => {
     const sessions = conductor.recentSessions
     if (activityFilter === 'all') return sessions
-    return sessions
-      .filter((session) => (session.label as string).startsWith('worker-'))
-      .filter((session) => deriveSessionStatus(session) === activityFilter)
+    return sessions.filter(
+      (session) => deriveSessionStatus(session) === activityFilter,
+    )
   })()
-  const activityItems: Array<MissionHistoryEntry | GatewaySession> =
+  const activityItems: Array<MissionHistoryEntry | ConductorCardActivity> =
     hasMissionHistory ? filteredHistory : filteredSessions
   const ACTIVITY_PAGE_SIZE = 3
   const activityTotalPages = Math.max(
@@ -1948,25 +1872,11 @@ export function Conductor() {
                           )
                         })
                       : visibleActivityItems.map((item) => {
-                          const recentSession = item as GatewaySession
-                          const label =
-                            recentSession.label ?? recentSession.key ?? ''
-                          const displayName = label
-                            .replace(/^worker-/, '')
-                            .replace(/[-_]+/g, ' ')
-                          const tokens =
-                            typeof recentSession.totalTokens === 'number'
-                              ? recentSession.totalTokens
-                              : 0
-                          const model = getShortModelName(recentSession.model)
-                          const updatedAt =
-                            typeof recentSession.updatedAt === 'string'
-                              ? recentSession.updatedAt
-                              : typeof recentSession.startedAt === 'string'
-                                ? recentSession.startedAt
-                                : typeof recentSession.createdAt === 'string'
-                                  ? recentSession.createdAt
-                                  : null
+                          const recentSession = item as ConductorCardActivity
+                          const displayName = recentSession.title
+                          const updatedAt = new Date(
+                            recentSession.updatedAt,
+                          ).toISOString()
                           const sessionStatus =
                             deriveSessionStatus(recentSession)
                           const dotClass =
@@ -2005,11 +1915,8 @@ export function Conductor() {
                               <span className="shrink-0 text-xs text-[var(--theme-muted-2)]">
                                 {formatRelativeTime(updatedAt, now)}
                               </span>
-                              <span className="hidden shrink-0 text-xs text-[var(--theme-muted)] sm:inline">
-                                {tokens.toLocaleString()} tok
-                              </span>
-                              <span className="hidden shrink-0 text-xs text-[var(--theme-muted)] sm:inline">
-                                {model}
+                              <span className="hidden shrink-0 text-xs capitalize text-[var(--theme-muted)] sm:inline">
+                                {recentSession.kind}
                               </span>
                             </div>
                           )
@@ -2750,12 +2657,7 @@ export function Conductor() {
                 const outputSections = conductor.workers
                   .map((worker, index) => {
                     const output = (
-                      conductor.workerOutputs[worker.key] ??
-                      getLastAssistantMessage(
-                        worker.raw.messages as
-                          | Array<HistoryMessage>
-                          | undefined,
-                      )
+                      conductor.workerOutputs[worker.key] ?? ''
                     ).trim()
                     if (!output) return null
                     const persona = getAgentPersona(index)

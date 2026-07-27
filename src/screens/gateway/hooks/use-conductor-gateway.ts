@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { Dispatch, SetStateAction } from 'react'
-import type { GatewaySession } from '@/lib/gateway-api'
-import { fetchSessions } from '@/lib/gateway-api'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import {
+  fetchCompleteSessionCardHistory,
+  fetchSessionCards,
+  retainCompleteSessionCardProjections,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
 
 type HistoryMessagePart = {
   type?: string
@@ -12,11 +17,6 @@ type HistoryMessagePart = {
 type HistoryMessage = {
   role?: string
   content?: string | Array<HistoryMessagePart>
-}
-
-type HistoryResponse = {
-  messages?: Array<HistoryMessage>
-  error?: string
 }
 
 type ConductorMissionRecord = {
@@ -129,6 +129,10 @@ type PortableStreamResult = {
 
 export type ConductorWorker = {
   key: string
+  cardId?: string
+  canonicalSegmentKey?: string
+  parentCardId?: string
+  relationshipKind?: ConductorCardActivity['kind']
   label: string
   model: string | null
   status: 'running' | 'complete' | 'stale' | 'idle'
@@ -137,7 +141,20 @@ export type ConductorWorker = {
   totalTokens: number
   contextTokens: number
   tokenUsageLabel: string
-  raw: GatewaySession
+}
+
+export type ConductorCardActivity = {
+  key: string
+  cardId: string
+  canonicalSegmentKey: string
+  parentCardId?: string
+  title: string
+  label: string
+  kind: 'root' | 'orphan' | 'branch' | 'child'
+  status?: 'idle' | 'running' | 'complete' | 'error'
+  updatedAt: number
+  identityAliases: Array<string>
+  parentTitle?: string
 }
 
 export type ConductorTask = {
@@ -269,12 +286,11 @@ function normalizeMatchText(value: string): string {
     .trim()
 }
 
-function getSessionSearchText(session: GatewaySession): string {
+function getSessionSearchText(session: ConductorCardActivity): string {
   return [
     readString(session.label),
     readString(session.title),
-    readString(session.derivedTitle),
-    readString(session.preview),
+    readString(session.parentTitle),
     readString(session.kind),
   ]
     .filter((value): value is string => Boolean(value))
@@ -290,21 +306,15 @@ function buildMissionNeedles(goal: string): Array<string> {
 }
 
 function sessionMatchesMissionContext(
-  session: GatewaySession,
+  session: ConductorCardActivity,
   missionStartMs: number,
   missionNeedles: Array<string>,
 ): boolean {
-  const createdAt = toIso(
-    session.createdAt ?? session.startedAt ?? session.updatedAt,
-  )
+  const createdAt = toIso(session.updatedAt)
   if (!createdAt) return false
 
   const createdMs = new Date(createdAt).getTime()
   if (!Number.isFinite(createdMs) || createdMs < missionStartMs) return false
-
-  const totalTokens =
-    readNumber(session.totalTokens) ?? readNumber(session.tokenCount) ?? 0
-  if (totalTokens <= 0) return false
 
   const text = normalizeMatchText(getSessionSearchText(session))
   if (!text) return false
@@ -603,125 +613,132 @@ function clearMissionHistoryStorage(): void {
   }
 }
 
-function readContextTokens(session: GatewaySession): number {
-  return (
-    readNumber(session.contextTokens) ??
-    readNumber(session.maxTokens) ??
-    readNumber(session.contextWindow) ??
-    readNumber(
-      session.usage && typeof session.usage === 'object'
-        ? (session.usage as Record<string, unknown>).contextTokens
-        : null,
-    ) ??
-    0
-  )
-}
-
-function deriveWorkerStatus(
-  session: GatewaySession,
-  updatedAt: string | null,
-): ConductorWorker['status'] {
-  const status = readString(session.status)?.toLowerCase()
-  if (
-    status &&
-    ['complete', 'completed', 'done', 'success', 'succeeded'].includes(status)
-  )
-    return 'complete'
-  if (status && ['idle', 'waiting', 'sleeping'].includes(status)) return 'idle'
-  if (
-    status &&
-    ['error', 'errored', 'failed', 'cancelled', 'canceled', 'killed'].includes(
-      status,
-    )
-  )
-    return 'stale'
-
-  const updatedMs = updatedAt ? new Date(updatedAt).getTime() : 0
-  const staleness = updatedMs > 0 ? Date.now() - updatedMs : 0
-  const totalTokens =
-    readNumber(session.totalTokens) ?? readNumber(session.tokenCount) ?? 0
-
-  if (totalTokens > 0 && staleness > 10_000) return 'complete'
-  if (staleness > 120_000) return 'stale'
-  return 'running'
-}
-
 function workersLookComplete(
   workers: Array<ConductorWorker>,
-  staleAfterMs: number,
+  _staleAfterMs: number,
 ): boolean {
   if (workers.length === 0) return false
 
-  return workers.every((worker) => {
-    if (worker.totalTokens <= 0) return false
-    if (!worker.updatedAt) return false
-    const updatedMs = new Date(worker.updatedAt).getTime()
-    if (!Number.isFinite(updatedMs)) return false
-    return Date.now() - updatedMs >= staleAfterMs
+  return workers.every(
+    (worker) =>
+      worker.relationshipKind === 'root' ||
+      worker.relationshipKind === 'orphan' ||
+      worker.status === 'complete' ||
+      worker.status === 'stale',
+  )
+}
+
+function projectSessionCardActivities(
+  response: SessionCardListWire | undefined,
+): Array<ConductorCardActivity> {
+  const complete = retainCompleteSessionCardProjections(response)
+  if (!complete) return []
+  return complete.cards.flatMap((card) => {
+    const root: ConductorCardActivity = {
+      key: card.cardId,
+      cardId: card.cardId,
+      canonicalSegmentKey: card.canonicalSegmentKey,
+      title: card.title,
+      label: card.title,
+      kind: card.relationshipKind,
+      updatedAt: card.updatedAt,
+      identityAliases: [
+        card.cardId,
+        card.canonicalSegmentKey,
+        ...card.continuationSegmentKeys,
+      ],
+    }
+    const children = card.childNodes.map(
+      (child): ConductorCardActivity => ({
+        key: child.cardId,
+        cardId: child.cardId,
+        canonicalSegmentKey: child.sessionKey,
+        parentCardId: card.cardId,
+        title: child.title,
+        label: child.title,
+        kind: child.relationshipKind,
+        status: child.status,
+        updatedAt: child.updatedAt,
+        identityAliases: [
+          child.cardId,
+          child.sessionKey,
+          ...child.continuationSegmentKeys,
+        ],
+        parentTitle: card.title,
+      }),
+    )
+    return [root, ...children]
   })
 }
 
-function prettifyCronLabel(value: string): string {
-  // Claude cron sessions are keyed `cron_<jobId>_<YYYYMMDD>_<HHMMSS>`
-  // and Conductor names jobs `conductor-<unix_ms>`. Strip both to a
-  // human-friendly tag instead of leaking the raw runtime key.
-  const cronMatch = value.match(/^cron[_:]([0-9a-f]{6,})/i)
-  const cronId = cronMatch?.at(1)
-  if (cronId) {
-    return `Mission ${cronId.slice(0, 6)}`
-  }
-  const conductorMatch = value.match(/^conductor[-_](\d+)/i)
-  const conductorId = conductorMatch?.at(1)
-  if (conductorId) {
-    return `Mission ${conductorId.slice(-6)}`
-  }
-  return value.replace(/[-_]+/g, ' ').trim()
-}
-
-function formatDisplayName(session: GatewaySession): string {
-  const label = readString(session.label)
-  if (label) {
-    if (/^cron[_:]|^conductor[-_]/i.test(label)) return prettifyCronLabel(label)
-    return label.replace(/^worker-/, '').replace(/[-_]+/g, ' ')
-  }
-  const title = readString(session.title) ?? readString(session.derivedTitle)
-  if (title) {
-    if (/^cron[_:]|^conductor[-_]/i.test(title)) return prettifyCronLabel(title)
-    return title
-  }
-  const key = readString(session.key) ?? 'worker'
-  if (/^cron[_:]/i.test(key)) return prettifyCronLabel(key)
-  return key.split(':').pop()?.replace(/[-_]+/g, ' ') ?? key
-}
-
-function formatTokenUsage(totalTokens: number, contextTokens: number): string {
-  if (contextTokens > 0)
-    return `${totalTokens.toLocaleString()} / ${contextTokens.toLocaleString()} tok`
-  return `${totalTokens.toLocaleString()} tok`
-}
-
-function toWorker(session: GatewaySession): ConductorWorker | null {
-  const key = readString(session.key)
-  if (!key) return null
-  const label = readString(session.label) ?? 'worker'
-  const updatedAt = toIso(
-    session.updatedAt ?? session.startedAt ?? session.createdAt,
+function remoteControlKeyForPrefix(
+  response: SessionCardListWire | undefined,
+  prefix: string,
+): string | null {
+  const normalizedPrefix = prefix.trim()
+  if (!normalizedPrefix) return null
+  const qualifiedPrefix = `remote:${normalizedPrefix}`
+  const matches = projectSessionCardActivities(response)
+    .filter((activity) =>
+      activity.identityAliases.some((identity) =>
+        identity.startsWith(qualifiedPrefix),
+      ),
+    )
+    .map((activity) => activity.canonicalSegmentKey)
+    .filter((identity) => identity.startsWith('remote:'))
+  const uniqueMatches = [...new Set(matches)]
+  if (uniqueMatches.length === 0) return null
+  const shortestLength = Math.min(...uniqueMatches.map((key) => key.length))
+  const shortestMatches = uniqueMatches.filter(
+    (key) => key.length === shortestLength,
   )
-  const totalTokens =
-    readNumber(session.totalTokens) ?? readNumber(session.tokenCount) ?? 0
-  const contextTokens = readContextTokens(session)
+  if (shortestMatches.length !== 1) return null
+  return shortestMatches[0]!.slice('remote:'.length) || null
+}
 
+function activityMatchesMissionWorker(
+  activity: ConductorCardActivity,
+  workerKeys: ReadonlySet<string>,
+): boolean {
+  for (const workerKey of workerKeys) {
+    const normalized = workerKey.trim()
+    if (!normalized) continue
+    if (normalized.startsWith('remote:') || normalized.startsWith('local:')) {
+      if (activity.identityAliases.includes(normalized)) return true
+      continue
+    }
+    // Dashboard Conductor returns upstream gateway keys. Compare those only to
+    // the authoritative remote-qualified Card aliases; local identities must
+    // already arrive qualified so same-key local/remote Cards cannot collide.
+    if (activity.identityAliases.includes(`remote:${normalized}`)) return true
+  }
+  return false
+}
+
+function activityStatus(
+  status: ConductorCardActivity['status'],
+): ConductorWorker['status'] {
+  if (status === 'complete') return 'complete'
+  if (status === 'error') return 'stale'
+  if (status === 'idle') return 'idle'
+  return 'running'
+}
+
+function toWorker(session: ConductorCardActivity): ConductorWorker {
   return {
-    key,
-    label,
-    model: readString(session.model),
-    status: deriveWorkerStatus(session, updatedAt),
-    updatedAt,
-    displayName: formatDisplayName(session),
-    totalTokens,
-    contextTokens,
-    tokenUsageLabel: formatTokenUsage(totalTokens, contextTokens),
-    raw: session,
+    key: session.cardId,
+    cardId: session.cardId,
+    canonicalSegmentKey: session.canonicalSegmentKey,
+    ...(session.parentCardId ? { parentCardId: session.parentCardId } : {}),
+    relationshipKind: session.kind,
+    label: session.title,
+    model: null,
+    status: activityStatus(session.status),
+    updatedAt: toIso(session.updatedAt),
+    displayName: session.title,
+    totalTokens: 0,
+    contextTokens: 0,
+    tokenUsageLabel: 'Unavailable in Card projection',
   }
 }
 
@@ -863,14 +880,7 @@ function buildMissionOutputPath(
   tasks: Array<ConductorTask>,
   streamText: string,
 ): string | null {
-  const workerOutputTexts = [
-    ...Object.values(workerOutputs),
-    ...workers.map((worker) =>
-      getLastAssistantMessage(
-        worker.raw.messages as Array<HistoryMessage> | undefined,
-      ),
-    ),
-  ].filter(Boolean)
+  const workerOutputTexts = Object.values(workerOutputs).filter(Boolean)
 
   for (const text of workerOutputTexts) {
     const extractedPath = extractProjectPath(text)
@@ -889,17 +899,18 @@ function buildMissionOutputPath(
   return null
 }
 
-function summarizeWorkers(workers: Array<ConductorWorker>): Array<string> {
+function summarizeWorkers(
+  workers: Array<ConductorWorker>,
+  workerOutputs: Record<string, string>,
+): Array<string> {
   return workers.map((worker) => {
-    const output = getLastAssistantMessage(
-      worker.raw.messages as Array<HistoryMessage> | undefined,
-    )
+    const output = workerOutputs[worker.key] ?? ''
     const firstLine = output
       .split(/\n+/)
       .map((line) => line.trim())
       .find(Boolean)
     const statusLabel = worker.status === 'stale' ? 'failed' : worker.status
-    return `${worker.displayName}: ${firstLine ?? `${statusLabel} · ${worker.totalTokens.toLocaleString()} tok`}`
+    return `${worker.displayName}: ${firstLine ?? statusLabel}`
   })
 }
 
@@ -963,12 +974,7 @@ function buildMissionOutputText(
 ): string {
   const workerSections = workers
     .map((worker) => {
-      const output = (
-        workerOutputs[worker.key] ??
-        getLastAssistantMessage(
-          worker.raw.messages as Array<HistoryMessage> | undefined,
-        )
-      ).trim()
+      const output = (workerOutputs[worker.key] ?? '').trim()
       if (!output) return null
       return `### ${worker.displayName}\n\n${output}`
     })
@@ -981,18 +987,17 @@ function buildMissionOutputText(
   return streamText.trim().slice(0, 5000)
 }
 
-async function fetchWorkerOutput(
-  sessionKey: string,
-  limit = 5,
-): Promise<string> {
-  const response = await fetch(
-    `/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=${limit}`,
-  )
-  const payload = (await response.json().catch(() => ({}))) as HistoryResponse
-  if (!response.ok) {
-    throw new Error(payload.error || `Failed to load history for ${sessionKey}`)
-  }
-  return getLastAssistantMessage(payload.messages)
+async function fetchWorkerOutput(worker: {
+  cardId: string
+  canonicalSegmentKey: string
+  parentCardId?: string
+}): Promise<string> {
+  const history = await fetchCompleteSessionCardHistory({
+    cardId: worker.cardId,
+    canonicalSegmentKey: worker.canonicalSegmentKey,
+    ...(worker.parentCardId ? { parentCardId: worker.parentCardId } : {}),
+  })
+  return getLastAssistantMessage(history.messages as Array<HistoryMessage>)
 }
 
 function appendStreamEvent(
@@ -1239,86 +1244,9 @@ export function useConductorGateway() {
   const lastWorkerSnapshotRef = useRef('')
   const portableStreamAbortRef = useRef<AbortController | null>(null)
 
-  const sessionsQuery = useQuery({
-    queryKey: ['conductor', 'gateway', 'sessions'],
-    queryFn: async () => {
-      const payload = await fetchSessions()
-      const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
-      const missionStartMs = missionStartedAt
-        ? new Date(missionStartedAt).getTime()
-        : 0
-      const missionNeedles = buildMissionNeedles(goal)
-      return sessions
-        .filter((session) => {
-          const label = readString(session.label) ?? ''
-          const key = readString(session.key) ?? ''
-
-          // Match by known worker keys (includes orchestrator + any children it spawned)
-          if (missionWorkerKeys.size > 0 && missionWorkerKeys.has(key)) {
-            return true
-          }
-
-          // Match by worker label pattern
-          if (label.startsWith('worker-') || label.startsWith('conductor-')) {
-            if (
-              missionWorkerLabels.size > 0 &&
-              missionWorkerLabels.has(label)
-            ) {
-              return true
-            }
-            // Match by creation time (workers spawned after mission start)
-            const createdIso = toIso(
-              session.createdAt ?? session.startedAt ?? session.updatedAt,
-            )
-            if (
-              createdIso &&
-              missionStartMs &&
-              new Date(createdIso).getTime() >= missionStartMs
-            ) {
-              return true
-            }
-          }
-
-          // Match subagent sessions created after mission start
-          if (key.includes(':subagent:')) {
-            const createdIso = toIso(
-              session.createdAt ?? session.startedAt ?? session.updatedAt,
-            )
-            if (
-              createdIso &&
-              missionStartMs &&
-              new Date(createdIso).getTime() >= missionStartMs
-            ) {
-              return true
-            }
-          }
-
-          if (
-            missionStartMs > 0 &&
-            sessionMatchesMissionContext(
-              session,
-              missionStartMs,
-              missionNeedles,
-            )
-          ) {
-            return true
-          }
-
-          return false
-        })
-        .map(toWorker)
-        .filter((session): session is ConductorWorker => session !== null)
-        .sort((a, b) => {
-          const statusRank = { running: 0, idle: 1, complete: 2, stale: 3 }
-          const rankDiff = statusRank[a.status] - statusRank[b.status]
-          if (rankDiff !== 0) return rankDiff
-          return (
-            new Date(b.updatedAt ?? 0).getTime() -
-            new Date(a.updatedAt ?? 0).getTime()
-          )
-        })
-    },
-    enabled: phase !== 'idle',
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
     refetchInterval:
       phase === 'decomposing' ||
       phase === 'running' ||
@@ -1327,41 +1255,17 @@ export function useConductorGateway() {
         : false,
   })
 
-  const recentSessionsQuery = useQuery({
-    queryKey: ['conductor', 'recent-sessions'],
-    queryFn: async () => {
-      const payload = await fetchSessions()
-      const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
-      const cutoff = Date.now() - 24 * 60 * 60_000
-      return sessions
-        .filter((session) => {
-          const label = readString(session.label) ?? ''
-          const key = readString(session.key) ?? ''
-          const updatedAt = toIso(
-            session.updatedAt ?? session.startedAt ?? session.createdAt,
-          )
-          if (!updatedAt) return false
-          const isConductorSession =
-            label.startsWith('worker-') ||
-            label.startsWith('conductor-') ||
-            /^cron[_:]/i.test(key) ||
-            key.includes(':subagent:')
-          return isConductorSession && new Date(updatedAt).getTime() >= cutoff
-        })
-        .sort((a, b) => {
-          const updatedA = new Date(
-            toIso(a.updatedAt ?? a.startedAt ?? a.createdAt) ?? 0,
-          ).getTime()
-          const updatedB = new Date(
-            toIso(b.updatedAt ?? b.startedAt ?? b.createdAt) ?? 0,
-          ).getTime()
-          return updatedB - updatedA
-        })
-        .slice(0, 20)
-    },
-    enabled: phase === 'idle',
-    refetchInterval: false,
-  })
+  const cardActivities = useMemo(
+    () => projectSessionCardActivities(sessionCardsQuery.data),
+    [sessionCardsQuery.data],
+  )
+  const recentSessions = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60_000
+    return cardActivities
+      .filter((activity) => activity.updatedAt >= cutoff)
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .slice(0, 20)
+  }, [cardActivities])
 
   const missionStatusQuery = useQuery({
     queryKey: ['conductor', 'mission-status', missionId],
@@ -1377,7 +1281,34 @@ export function useConductorGateway() {
       Math.min(2000 * 2 ** attemptIndex, 10_000),
   })
 
-  const sessionWorkers = sessionsQuery.data ?? []
+  const sessionWorkers = useMemo<Array<ConductorWorker>>(() => {
+    if (phase === 'idle') return []
+    const missionStartMs = missionStartedAt
+      ? new Date(missionStartedAt).getTime()
+      : 0
+    const missionNeedles = buildMissionNeedles(goal)
+    return cardActivities
+      .filter(
+        (activity) =>
+          activityMatchesMissionWorker(activity, missionWorkerKeys) ||
+          (missionStartMs > 0 &&
+            sessionMatchesMissionContext(
+              activity,
+              missionStartMs,
+              missionNeedles,
+            )),
+      )
+      .map(toWorker)
+      .sort((left, right) => {
+        const statusRank = { running: 0, idle: 1, complete: 2, stale: 3 }
+        const rankDiff = statusRank[left.status] - statusRank[right.status]
+        if (rankDiff !== 0) return rankDiff
+        return (
+          new Date(right.updatedAt ?? 0).getTime() -
+          new Date(left.updatedAt ?? 0).getTime()
+        )
+      })
+  }, [cardActivities, goal, missionStartedAt, missionWorkerKeys, phase])
 
   // For native-swarm missions, build virtual worker cards from the mission
   // assignments so the UI shows progress instead of "Spawning workers..." forever.
@@ -1417,17 +1348,6 @@ export function useConductorGateway() {
         totalTokens: 0,
         contextTokens: 0,
         tokenUsageLabel: state,
-        raw: {
-          key: workerId,
-          label: workerId,
-          friendlyId: workerId,
-          status: isComplete ? 'completed' : 'running',
-          model: 'native-swarm',
-          lastMessage: null,
-          createdAt: missionStatusQuery.data?.updatedAt ?? Date.now(),
-          startedAt: missionStatusQuery.data?.updatedAt ?? Date.now(),
-          updatedAt: Date.now(),
-        } as GatewaySession,
       }
     })
   }, [isNativeSwarm, swarmAssignments])
@@ -1518,27 +1438,6 @@ export function useConductorGateway() {
   }
 
   useEffect(() => {
-    if (missionWorkerLabels.size === 0 || workers.length === 0) return
-    const matchedKeys = workers
-      .filter((worker) => missionWorkerLabels.has(worker.label))
-      .map((worker) => worker.key)
-
-    if (matchedKeys.length === 0) return
-
-    setMissionWorkerKeys((current) => {
-      const next = new Set(current)
-      let changed = false
-      for (const key of matchedKeys) {
-        if (!next.has(key)) {
-          next.add(key)
-          changed = true
-        }
-      }
-      return changed ? next : current
-    })
-  }, [missionWorkerLabels, workers])
-
-  useEffect(() => {
     if (phase !== 'decomposing') return
 
     if (workers.length > 0) {
@@ -1623,11 +1522,15 @@ export function useConductorGateway() {
 
     const fetchAll = async () => {
       for (const worker of workers) {
-        // Fetch output for any worker that has tokens OR is complete
-        // (complete workers always have output even if token count hasn't updated yet)
-        if (worker.totalTokens <= 0 && worker.status !== 'complete') continue
+        if (!worker.cardId || !worker.canonicalSegmentKey) continue
         try {
-          const output = await fetchWorkerOutput(worker.key, 10)
+          const output = await fetchWorkerOutput({
+            cardId: worker.cardId,
+            canonicalSegmentKey: worker.canonicalSegmentKey,
+            ...(worker.parentCardId
+              ? { parentCardId: worker.parentCardId }
+              : {}),
+          })
           if (cancelled || !output) continue
           setWorkerOutputs((current) => {
             if (current[worker.key] === output) return current
@@ -1727,7 +1630,7 @@ export function useConductorGateway() {
       tasks,
       streamText,
     )
-    const workerSummary = summarizeWorkers(workers)
+    const workerSummary = summarizeWorkers(workers, workerOutputs)
     const outputText = buildMissionOutputText(
       workers,
       workerOutputs,
@@ -2041,15 +1944,15 @@ export function useConductorGateway() {
 
       // native-swarm mode: local swarm workers handle the mission, no orchestrator session
       if (result.mode === 'native-swarm') {
-        const missionId = result.missionId ?? null
-        setMissionId(missionId)
+        const spawnedMissionId = result.missionId ?? null
+        setMissionId(spawnedMissionId)
         setMissionJobId(result.jobId ?? null)
-        setOrchestratorSessionKey(missionId)
-        if (missionId) {
+        setOrchestratorSessionKey(spawnedMissionId)
+        if (spawnedMissionId) {
           setMissionWorkerKeys((current) => {
-            if (current.has(missionId)) return current
+            if (current.has(spawnedMissionId)) return current
             const next = new Set(current)
-            next.add(missionId)
+            next.add(spawnedMissionId)
             return next
           })
         }
@@ -2093,16 +1996,9 @@ export function useConductorGateway() {
           for (let attempt = 0; attempt < 30; attempt += 1) {
             await new Promise((resolve) => setTimeout(resolve, 1500))
             try {
-              const sessionPayload = await fetchSessions()
-              const sessions = Array.isArray(sessionPayload.sessions)
-                ? sessionPayload.sessions
-                : []
-              const match = sessions.find((session) => {
-                const key = typeof session.key === 'string' ? session.key : ''
-                return key.startsWith(prefix)
-              })
-              if (match && typeof match.key === 'string') {
-                const matchedKey = match.key
+              const cards = await fetchSessionCards()
+              const matchedKey = remoteControlKeyForPrefix(cards, prefix)
+              if (matchedKey) {
                 setOrchestratorSessionKey(matchedKey)
                 setMissionWorkerKeys((current) => {
                   const next = new Set(current)
@@ -2189,12 +2085,7 @@ export function useConductorGateway() {
   const stopMission = async () => {
     portableStreamAbortRef.current?.abort()
     portableStreamAbortRef.current = null
-    const sessionKeys = [
-      ...new Set([
-        ...missionWorkerKeys,
-        ...workers.map((worker) => worker.key),
-      ]),
-    ]
+    const sessionKeys = [...missionWorkerKeys]
     const missionIds = missionId ? [missionId] : []
 
     try {
@@ -2249,7 +2140,7 @@ export function useConductorGateway() {
     hasPersistedMission,
     selectedHistoryEntry,
     setSelectedHistoryEntry,
-    recentSessions: recentSessionsQuery.data ?? [],
+    recentSessions,
     missionWorkerKeys,
     workerOutputs,
     conductorSettings,
@@ -2264,7 +2155,7 @@ export function useConductorGateway() {
     resetSavedState,
     stopMission,
     retryMission,
-    refreshWorkers: sessionsQuery.refetch,
-    isRefreshingWorkers: sessionsQuery.isFetching,
+    refreshWorkers: sessionCardsQuery.refetch,
+    isRefreshingWorkers: sessionCardsQuery.isFetching,
   }
 }
