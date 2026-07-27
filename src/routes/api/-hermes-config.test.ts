@@ -7,8 +7,10 @@ vi.mock('@tanstack/react-router', () => ({
   createFileRoute: (_path: string) => (opts: any) => opts,
 }))
 
+let mockAuthenticated = true
+
 vi.mock('../../server/auth-middleware', () => ({
-  isAuthenticated: () => true,
+  isAuthenticated: () => mockAuthenticated,
 }))
 
 vi.mock('../../server/gateway-capabilities', () => ({
@@ -35,6 +37,7 @@ beforeEach(() => {
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-config-route-'))
   setEnv('HERMES_HOME', tmpHome)
   setEnv('CLAUDE_HOME', undefined)
+  mockAuthenticated = true
   vi.resetModules()
 })
 
@@ -53,6 +56,19 @@ async function loadHandlers(modulePath: string) {
 }
 
 describe('canonical /api/hermes-config route', () => {
+  it('GET returns 401 JSON instead of throwing when the request is not authenticated', async () => {
+    mockAuthenticated = false
+
+    const handlers = await loadHandlers('./hermes-config')
+    const res = await handlers.GET({
+      request: new Request('http://localhost/api/hermes-config'),
+    })
+    const body = await res.json()
+
+    expect(res.status).toBe(401)
+    expect(body).toEqual({ ok: false, error: 'Unauthorized' })
+  })
+
   it('GET returns normalized provider state with paths and active provider', async () => {
     fs.writeFileSync(
       path.join(tmpHome, 'config.yaml'),
