@@ -10,6 +10,7 @@ import {
 import path from 'node:path'
 
 import { getHermesRoot } from './claude-paths'
+import { assertSafeRunId, isSafeRunId } from './run-id'
 
 export type PersistedRunToolCall = {
   id: string
@@ -64,6 +65,8 @@ export function persistedRunMatchesOwner(
 ): run is PersistedRunState {
   if (
     !run ||
+    !isSafeRunId(run.runId) ||
+    !isSafeRunId(owner.runId) ||
     run.runId !== owner.runId ||
     run.sessionKey !== owner.sessionKey ||
     run.friendlyId !== owner.friendlyId
@@ -84,19 +87,29 @@ export function persistedRunMatchesOwner(
   )
 }
 
-const RUNS_ROOT = path.join(getHermesRoot(), 'webui-mvp', 'runs')
+const RUNS_ROOT = path.resolve(getHermesRoot(), 'webui-mvp', 'runs')
 const runUpdateQueues = new Map<string, Promise<void>>()
 
 function encodeSessionKey(sessionKey: string): string {
   return encodeURIComponent(sessionKey || 'main')
 }
 
+function resolveDescendant(root: string, ...segments: Array<string>): string {
+  const resolvedRoot = path.resolve(root)
+  const resolvedPath = path.resolve(resolvedRoot, ...segments)
+  if (!resolvedPath.startsWith(`${resolvedRoot}${path.sep}`)) {
+    throw new Error('Resolved path must stay beneath the runs root')
+  }
+  return resolvedPath
+}
+
 function sessionDir(sessionKey: string): string {
-  return path.join(RUNS_ROOT, encodeSessionKey(sessionKey))
+  return resolveDescendant(RUNS_ROOT, encodeSessionKey(sessionKey))
 }
 
 function runPath(sessionKey: string, runId: string): string {
-  return path.join(sessionDir(sessionKey), `${runId}.json`)
+  assertSafeRunId(runId)
+  return resolveDescendant(sessionDir(sessionKey), `${runId}.json`)
 }
 
 async function ensureDir(dir: string): Promise<void> {
@@ -104,6 +117,7 @@ async function ensureDir(dir: string): Promise<void> {
 }
 
 async function writeRun(run: PersistedRunState): Promise<void> {
+  assertSafeRunId(run.runId)
   const dir = sessionDir(run.sessionKey)
   await ensureDir(dir)
   const targetPath = runPath(run.sessionKey, run.runId)
@@ -115,6 +129,7 @@ async function writeRun(run: PersistedRunState): Promise<void> {
 }
 
 async function writeRunExclusive(run: PersistedRunState): Promise<void> {
+  assertSafeRunId(run.runId)
   const dir = sessionDir(run.sessionKey)
   await ensureDir(dir)
   const targetPath = runPath(run.sessionKey, run.runId)
@@ -161,6 +176,7 @@ export async function createPersistedRun(input: {
   cardId?: string
   canonicalSegmentKey?: string
 }): Promise<PersistedRunState> {
+  assertSafeRunId(input.runId)
   const now = Date.now()
   const run: PersistedRunState = {
     runId: input.runId,
@@ -189,7 +205,15 @@ export async function getPersistedRun(
 ): Promise<PersistedRunState | null> {
   try {
     const raw = await readFile(runPath(sessionKey, runId), 'utf8')
-    return JSON.parse(raw) as PersistedRunState
+    const run = JSON.parse(raw) as PersistedRunState
+    if (
+      !isSafeRunId(run.runId) ||
+      run.runId !== runId ||
+      run.sessionKey !== sessionKey
+    ) {
+      return null
+    }
+    return run
   } catch {
     return null
   }
@@ -204,8 +228,8 @@ export async function migratePersistedRun(
 ): Promise<PersistedRunState | null> {
   const normalizedFrom = fromSessionKey.trim()
   const normalizedTo = toSessionKey.trim()
-  const normalizedRunId = runId.trim()
-  if (!normalizedFrom || !normalizedTo || !normalizedRunId) return null
+  if (!normalizedFrom || !normalizedTo || !isSafeRunId(runId)) return null
+  const normalizedRunId = runId
   const normalizedFriendlyId = friendlyId?.trim() || normalizedTo
   const normalizedCardId = cardIdentity?.cardId.trim()
   const normalizedCanonicalSegmentKey = cardIdentity?.canonicalSegmentKey.trim()
@@ -348,6 +372,7 @@ export async function updatePersistedRun(
   runId: string,
   updater: (run: PersistedRunState) => PersistedRunState,
 ): Promise<PersistedRunState | null> {
+  if (!isSafeRunId(runId)) return null
   return enqueueRunUpdate(sessionKey, runId, async () => {
     const current = await getPersistedRun(sessionKey, runId)
     if (!current) return null
@@ -551,13 +576,18 @@ export async function markRunStatus(
 const STALE_RUN_THRESHOLD_MS = 5 * 60 * 1000
 
 async function readRunsInDir(dir: string): Promise<Array<PersistedRunState>> {
-  const files = (await readdir(dir)).filter((name) => name.endsWith('.json'))
+  const files = (await readdir(dir)).filter((name) => {
+    if (!name.endsWith('.json')) return false
+    return isSafeRunId(name.slice(0, -'.json'.length))
+  })
   if (files.length === 0) return []
   const runs = await Promise.all(
     files.map(async (name) => {
       try {
         const raw = await readFile(path.join(dir, name), 'utf8')
-        return JSON.parse(raw) as PersistedRunState
+        const run = JSON.parse(raw) as PersistedRunState
+        const fileRunId = name.slice(0, -'.json'.length)
+        return run.runId === fileRunId && isSafeRunId(run.runId) ? run : null
       } catch {
         return null
       }

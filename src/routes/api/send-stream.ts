@@ -5,6 +5,7 @@ import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
+import { isSafeRunId } from '../../server/run-id'
 import {
   registerActiveSendRun,
   unregisterActiveSendRun,
@@ -689,7 +690,7 @@ export const Route = createFileRoute('/api/send-stream')({
           friendlyId: string,
           cardIdentity?: { cardId: string; canonicalSegmentKey: string },
         ) => {
-          if (!runId || persistedRunReady) return
+          if (!isSafeRunId(runId) || persistedRunReady) return
           persistedRunId = runId
           activeRunSessionKey = runSessionKey
           persistedRunReady = createPersistedRun({
@@ -1673,8 +1674,13 @@ export const Route = createFileRoute('/api/send-stream')({
                     signal: abortController.signal,
                     async onEvent({ event, data }) {
                       if (streamTransportUnavailable()) return
-                      const upstreamRunId = readString(data.run_id)
-                      const runId = upstreamRunId || activeRunId || undefined
+                      const hasUpstreamRunId =
+                        Object.prototype.hasOwnProperty.call(data, 'run_id')
+                      const rawUpstreamRunId =
+                        typeof data.run_id === 'string' ? data.run_id : ''
+                      const upstreamRunId = isSafeRunId(rawUpstreamRunId)
+                        ? rawUpstreamRunId
+                        : undefined
                       const upstreamSessionKey = readString(data.session_id)
                       const rawChildSessionKey =
                         typeof data.session_id === 'string'
@@ -1687,8 +1693,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         rawChildSessionKey.length > 0 &&
                         rawChildSessionKey.trim() === rawChildSessionKey &&
                         rawChildSessionKey !== sessionKey &&
-                        rawChildRunId.length > 0 &&
-                        rawChildRunId.trim() === rawChildRunId
+                        isSafeRunId(rawChildRunId)
                       ) {
                         const childObservation = await waitWithinStreamLifetime(
                           sessionCardService
@@ -1716,6 +1721,40 @@ export const Route = createFileRoute('/api/send-stream')({
                           return
                         }
                       }
+                      if (hasUpstreamRunId && !upstreamRunId) {
+                        streamEventProvenance.quarantine({
+                          sessionKey: upstreamSessionKey,
+                          sourceIsExplicitlyNonParent:
+                            upstreamSessionKey !== sessionKey,
+                        })
+                        return
+                      }
+                      if (
+                        activeRunId &&
+                        upstreamRunId &&
+                        upstreamRunId !== activeRunId
+                      ) {
+                        streamEventProvenance.quarantine({
+                          sessionKey: upstreamSessionKey,
+                          runId: upstreamRunId,
+                          sourceIsExplicitlyNonParent:
+                            upstreamSessionKey !== sessionKey,
+                        })
+                        return
+                      }
+                      if (!activeRunId && !upstreamRunId) {
+                        streamEventProvenance.quarantine({
+                          sessionKey: upstreamSessionKey,
+                          sourceIsExplicitlyNonParent:
+                            upstreamSessionKey !== sessionKey,
+                        })
+                        return
+                      }
+                      // Once one safe parent run is accepted, every parent event
+                      // is translated, emitted, persisted, and terminalized only
+                      // under that immutable run identity. Identifier-less tails
+                      // remain compatible by inheriting the active parent run.
+                      const runId = activeRunId ?? upstreamRunId
                       const hasExplicitNonParentFacts = hasNonParentStreamFacts(
                         data,
                         activeParentSource,

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -194,6 +194,55 @@ describe('run text persistence buffer', () => {
 })
 
 describe('run-store persistence', () => {
+  it('rejects unsafe run ids without writing outside the session directory', async () => {
+    const { createPersistedRun, getPersistedRun } = await import('./run-store')
+    const escapedPath = join(tempHome!, 'webui-mvp', 'escaped-run.json')
+
+    await expect(
+      createPersistedRun({
+        runId: '../../escaped-run',
+        sessionKey: 'session-a',
+      }),
+    ).rejects.toThrow(/run id/i)
+    expect(existsSync(escapedPath)).toBe(false)
+
+    for (const runId of [
+      '..',
+      '.',
+      'run/child',
+      String.raw`run\child`,
+      'run%2fchild',
+      'run%252fchild',
+      'run.id',
+      ' run-id',
+      'run-id ',
+      'x'.repeat(129),
+    ]) {
+      await expect(
+        createPersistedRun({ runId, sessionKey: 'session-a' }),
+      ).rejects.toThrow(/run id/i)
+      await expect(getPersistedRun('session-a', runId)).resolves.toBeNull()
+    }
+
+    const boundedRunId = 'x'.repeat(128)
+    await expect(
+      createPersistedRun({ runId: boundedRunId, sessionKey: 'session-a' }),
+    ).resolves.toMatchObject({ runId: boundedRunId })
+    await expect(
+      getPersistedRun('session-a', boundedRunId),
+    ).resolves.toMatchObject({ runId: boundedRunId })
+  })
+
+  it('confines encoded session directories beneath the runs root', async () => {
+    const { createPersistedRun } = await import('./run-store')
+    const escapedPath = join(tempHome!, 'webui-mvp', 'safe-run.json')
+
+    await expect(
+      createPersistedRun({ runId: 'safe-run', sessionKey: '..' }),
+    ).rejects.toThrow(/runs root/i)
+    expect(existsSync(escapedPath)).toBe(false)
+  })
+
   it('moves an active run to the authoritative successor for recovery polling', async () => {
     const {
       appendRunText,

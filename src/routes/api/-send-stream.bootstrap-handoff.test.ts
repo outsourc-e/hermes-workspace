@@ -2161,6 +2161,188 @@ describe('send-stream bootstrap session handoff', () => {
     )
   })
 
+  it('rejects unsafe upstream run ids before lifecycle ownership or emission', async () => {
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: '../../escaped-run', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'tool.started',
+          data: {
+            run_id: 'run%2fencoded',
+            session_id: 'created-session',
+            tool_name: 'unsafe_tool',
+          },
+        })
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'safe-run', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'assistant.delta',
+          data: {
+            run_id: 'safe-run',
+            session_id: 'created-session',
+            delta: 'safe output',
+          },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'safe-run', session_id: 'created-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'created-session',
+          friendlyId: 'created-session',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(events.filter(({ event }) => event === 'started')).toEqual([
+      {
+        event: 'started',
+        data: {
+          runId: 'safe-run',
+          sessionKey: 'created-session',
+          friendlyId: 'created-session',
+        },
+      },
+    ])
+    expect(events.filter(({ event }) => event === 'chunk')).toEqual([
+      {
+        event: 'chunk',
+        data: {
+          text: 'safe output',
+          sessionKey: 'created-session',
+          runId: 'safe-run',
+        },
+      },
+    ])
+    expect(mocks.createPersistedRun).toHaveBeenCalledTimes(1)
+    expect(mocks.createPersistedRun).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: 'safe-run' }),
+    )
+    expect(mocks.upsertRunToolCall).not.toHaveBeenCalled()
+    expect(mocks.markRunStatus).toHaveBeenCalledWith(
+      'created-session',
+      'safe-run',
+      'complete',
+      undefined,
+    )
+  })
+
+  it('binds same-parent tool and terminal events to the first accepted run id', async () => {
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'run-a', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'tool.started',
+          data: {
+            run_id: 'run-b',
+            session_id: 'created-session',
+            tool_name: 'wrong_run_tool',
+            tool_call_id: 'wrong-call',
+          },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'run-b', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'tool.started',
+          data: {
+            run_id: 'run-a',
+            session_id: 'created-session',
+            tool_name: 'right_run_tool',
+            tool_call_id: 'right-call',
+          },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'run-a', session_id: 'created-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'created-session',
+          friendlyId: 'created-session',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(events.filter(({ event }) => event === 'tool')).toEqual([
+      {
+        event: 'tool',
+        data: expect.objectContaining({
+          name: 'right_run_tool',
+          toolCallId: 'right-call',
+          runId: 'run-a',
+        }),
+      },
+    ])
+    expect(events.filter(({ event }) => event === 'done')).toEqual([
+      {
+        event: 'done',
+        data: {
+          state: 'complete',
+          sessionKey: 'created-session',
+          runId: 'run-a',
+        },
+      },
+    ])
+    expect(mocks.upsertRunToolCall).toHaveBeenCalledTimes(1)
+    expect(mocks.upsertRunToolCall).toHaveBeenCalledWith(
+      'created-session',
+      'run-a',
+      expect.objectContaining({ id: 'right-call', name: 'right_run_tool' }),
+    )
+    expect(mocks.markRunStatus).toHaveBeenCalledTimes(1)
+    expect(mocks.markRunStatus).toHaveBeenCalledWith(
+      'created-session',
+      'run-a',
+      'complete',
+      undefined,
+    )
+  })
+
   it('invalidates an origin poll and terminally backfills successor-only tool activity after handoff', async () => {
     mocks.resolveSessionKey.mockResolvedValueOnce({
       sessionKey: 'created-session',
