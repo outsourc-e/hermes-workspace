@@ -2492,6 +2492,119 @@ describe('send-stream bootstrap session handoff', () => {
     expect(events.findIndex(({ event }) => event === 'tool')).toBeLessThan(
       events.findIndex(({ event }) => event === 'done'),
     )
+    expect(mocks.upsertRunToolCall).toHaveBeenCalledTimes(1)
+    expect(mocks.upsertRunToolCall).toHaveBeenCalledWith(
+      'successor-session',
+      'run-tools',
+      {
+        id: 'handoff-tool',
+        name: 'search',
+        phase: 'complete',
+        args: { query: 'lineage' },
+        result: 'successor result',
+      },
+    )
+    expect(mocks.upsertRunToolCall.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.markRunStatus.mock.invocationCallOrder[0]!,
+    )
+  })
+
+  it('durably records synthetic tool progress before emission and its terminal upgrade before completion', async () => {
+    vi.useFakeTimers()
+    try {
+      const callingMessages = [
+        {
+          role: 'assistant',
+          tool_calls: [
+            {
+              id: 'synthetic-tool',
+              function: {
+                name: 'read_file',
+                arguments: { path: '/tmp/input.txt' },
+              },
+            },
+          ],
+        },
+      ]
+      const completeMessages = [
+        ...callingMessages,
+        {
+          role: 'tool',
+          tool_call_id: 'synthetic-tool',
+          content: 'durable output',
+        },
+      ]
+      mocks.getMessages
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(callingMessages)
+        .mockResolvedValueOnce(completeMessages)
+      mocks.streamChat.mockImplementationOnce(
+        async (
+          _sessionKey: string,
+          _request: unknown,
+          options: {
+            onEvent: (payload: {
+              event: string
+              data: Record<string, unknown>
+            }) => Promise<void>
+          },
+        ) => {
+          await options.onEvent({
+            event: 'run.started',
+            data: { run_id: 'run-synthetic', session_id: 'created-session' },
+          })
+          await vi.advanceTimersByTimeAsync(600)
+          await options.onEvent({
+            event: 'run.completed',
+            data: { run_id: 'run-synthetic', session_id: 'created-session' },
+          })
+        },
+      )
+
+      const response = await handler({
+        request: new Request('http://workspace.test/api/send-stream', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            sessionKey: 'created-session',
+            friendlyId: 'created-session',
+            message: 'hello',
+          }),
+        }),
+      })
+
+      const events = parseEvents(await response.text())
+      expect(
+        events
+          .filter(({ event }) => event === 'tool')
+          .map(({ data }) => data?.phase),
+      ).toEqual(['calling', 'complete'])
+      expect(mocks.upsertRunToolCall).toHaveBeenCalledTimes(2)
+      expect(mocks.upsertRunToolCall).toHaveBeenNthCalledWith(
+        1,
+        'created-session',
+        'run-synthetic',
+        expect.objectContaining({
+          id: 'synthetic-tool',
+          phase: 'calling',
+        }),
+      )
+      expect(mocks.upsertRunToolCall).toHaveBeenNthCalledWith(
+        2,
+        'created-session',
+        'run-synthetic',
+        expect.objectContaining({
+          id: 'synthetic-tool',
+          phase: 'complete',
+          result: 'durable output',
+        }),
+      )
+      expect(mocks.upsertRunToolCall.mock.invocationCallOrder[1]).toBeLessThan(
+        mocks.markRunStatus.mock.invocationCallOrder[0]!,
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('closes the stream deadline while the authoritative parent lookup is pending', async () => {
@@ -3705,6 +3818,108 @@ describe('send-stream bootstrap session handoff', () => {
     })
   })
 
+  it('qualifies every Card-owned portable main identity while retaining raw main only for the backend call', async () => {
+    mocks.getChatMode.mockReturnValue('portable')
+    mocks.resolveLocalCardByUpstreamSession.mockResolvedValueOnce({
+      card: {
+        cardId: 'local:main-card',
+        canonicalSegmentKey: 'local:main',
+        canonicalSource: 'local',
+        continuationSegmentKeys: ['local:main'],
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['local:main', 'local']]),
+      upstreamKeyBySegmentKey: new Map([['local:main', 'main']]),
+    })
+    mocks.openaiChat.mockResolvedValueOnce([
+      {
+        type: 'tool',
+        name: 'read_file',
+        toolCallId: 'portable-main-tool',
+        status: 'completed',
+        label: 'read complete',
+      },
+      { type: 'text', text: 'portable main response' },
+    ])
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'main',
+          friendlyId: 'main',
+          message: 'hello portable main',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const events = parseEvents(await response.text())
+    expect(mocks.openaiChat).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ sessionId: 'main' }),
+    )
+    expect(
+      events
+        .filter(({ data }) => data?.sessionKey !== undefined)
+        .map(({ data }) => data?.sessionKey),
+    ).toEqual(['local:main', 'local:main', 'local:main', 'local:main'])
+    expect(events.find(({ event }) => event === 'started')?.data).toMatchObject(
+      {
+        sessionKey: 'local:main',
+        friendlyId: 'local:main-card',
+      },
+    )
+    expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+      sessionKey: 'local:main',
+      friendlyId: 'local:main-card',
+    })
+    expect(mocks.createPersistedRun).toHaveBeenCalledWith({
+      runId: expect.any(String),
+      sessionKey: 'local:main',
+      friendlyId: 'local:main-card',
+      cardId: 'local:main-card',
+      canonicalSegmentKey: 'local:main',
+    })
+  })
+
+  it('preserves raw portable main identities when no authoritative local Card exists', async () => {
+    mocks.getChatMode.mockReturnValue('portable')
+    mocks.openaiChat.mockResolvedValueOnce([
+      { type: 'text', text: 'legacy portable response' },
+    ])
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'main',
+          friendlyId: 'main',
+          message: 'hello legacy portable main',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(
+      events
+        .filter(({ data }) => data?.sessionKey !== undefined)
+        .map(({ data }) => data?.sessionKey),
+    ).toEqual(['main', 'main', 'main'])
+    expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+      sessionKey: 'main',
+      friendlyId: 'main',
+    })
+    expect(mocks.createPersistedRun).toHaveBeenCalledWith({
+      runId: expect.any(String),
+      sessionKey: 'main',
+      friendlyId: 'main',
+    })
+  })
+
   it('converges a portable new bootstrap through a fresh local parent Card before starting the run', async () => {
     mocks.getChatMode.mockReturnValue('portable')
     mocks.resolveLocalCardByUpstreamSession.mockImplementationOnce(
@@ -3913,7 +4128,7 @@ describe('send-stream bootstrap session handoff', () => {
     expect(mocks.createPersistedRun).not.toHaveBeenCalled()
   })
 
-  it('keeps portable main pinned while persisting its run by authoritative local Card identity', async () => {
+  it('qualifies portable main after resolving its authoritative local Card identity', async () => {
     mocks.getChatMode.mockReturnValue('portable')
     mocks.resolveLocalCardByUpstreamSession.mockResolvedValueOnce({
       card: {
@@ -3949,16 +4164,20 @@ describe('send-stream bootstrap session handoff', () => {
       event: 'started',
       data: {
         runId: expect.any(String),
-        sessionKey: 'main',
-        friendlyId: 'main',
+        sessionKey: 'local:main',
+        friendlyId: 'local:main-card',
       },
     })
     expect(mocks.createPersistedRun).toHaveBeenCalledWith({
       runId: expect.any(String),
-      sessionKey: 'main',
+      sessionKey: 'local:main',
       friendlyId: 'local:main-card',
       cardId: 'local:main-card',
       canonicalSegmentKey: 'local:main',
+    })
+    expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+      sessionKey: 'local:main',
+      friendlyId: 'local:main-card',
     })
   })
 

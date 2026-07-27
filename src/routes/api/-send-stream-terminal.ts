@@ -10,6 +10,7 @@ export type RunTerminalTransitionCoordinator = {
   transition: (
     status: RunTerminalStatus,
     errorMessage?: string,
+    beforeSeal?: () => Promise<void>,
   ) => Promise<void>
 }
 
@@ -66,12 +67,17 @@ export function createRunTerminalTransitionCoordinator(
   const transition = (
     status: RunTerminalStatus,
     errorMessage?: string,
+    beforeSeal?: () => Promise<void>,
   ): Promise<void> => {
     if (terminalPersistence) return terminalPersistence
 
     const selected = { status, errorMessage }
     winner = selected
     terminalPersistence = (async () => {
+      // Completion may need one final authoritative history refresh. Claim the
+      // terminal winner first, but keep the durable run writable until every
+      // accepted final activity item has joined its persistence queue.
+      await beforeSeal?.()
       // Never persist a terminal status if transcript sealing was exhausted:
       // retained text must not be hidden behind an apparently terminal run.
       await options.sealTranscript()

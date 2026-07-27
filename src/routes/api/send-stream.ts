@@ -614,6 +614,76 @@ export const Route = createFileRoute('/api/send-stream')({
           // fresh complete local Card projection maps it authoritatively.
           sessionKey = crypto.randomUUID()
         }
+        const resolvePortableBootstrapCard = async (
+          upstreamSessionKey: string,
+        ): Promise<string> => {
+          const resolvedBootstrapCard = await waitWithinStreamLifetime(
+            sessionCardService.resolveLocalCardByUpstreamSession(
+              upstreamSessionKey,
+            ),
+          )
+          ensureStreamTransportAvailable()
+          const canonicalSegmentKey =
+            resolvedBootstrapCard.card.canonicalSegmentKey
+          const canonicalSource =
+            resolvedBootstrapCard.sourceBySegmentKey
+              .get(canonicalSegmentKey)
+              ?.trim() ?? ''
+          const canonicalUpstreamKey =
+            resolvedBootstrapCard.upstreamKeyBySegmentKey
+              .get(canonicalSegmentKey)
+              ?.trim() ?? ''
+          const mappedBootstrapSegments =
+            resolvedBootstrapCard.card.continuationSegmentKeys.filter(
+              (segmentKey) =>
+                resolvedBootstrapCard.upstreamKeyBySegmentKey.get(
+                  segmentKey,
+                ) === upstreamSessionKey,
+            )
+          const isCompleteLocalParentCard =
+            resolvedBootstrapCard.collection.completeness === 'complete' &&
+            resolvedBootstrapCard.card.canonicalSource === 'local' &&
+            (resolvedBootstrapCard.card.relationshipKind === 'root' ||
+              resolvedBootstrapCard.card.relationshipKind === 'orphan') &&
+            resolvedBootstrapCard.card.parentCardId === undefined
+          if (
+            !isCompleteLocalParentCard ||
+            canonicalSource !== 'local' ||
+            !canonicalUpstreamKey ||
+            mappedBootstrapSegments.length !== 1
+          ) {
+            throw new Error('authoritative local bootstrap Card unavailable')
+          }
+
+          activeCardResolution = resolvedBootstrapCard
+          activeCardId = resolvedBootstrapCard.card.cardId
+          activeCardCanonicalSegmentKey = canonicalSegmentKey
+          activeCardCanonicalSource = canonicalSource
+          resolvedFriendlyId = resolvedBootstrapCard.card.cardId
+          return canonicalUpstreamKey
+        }
+        let portableBootstrapProjectionAttemptedBeforeStream = false
+        if (portableBootstrapSessionKey === 'main' && !activeCardId) {
+          // Headers are committed when the Response is constructed, before the
+          // async stream body can resolve. Resolve an existing local main Card
+          // now so its source-qualified identity owns headers as well as SSE.
+          ensureLocalSession(
+            sessionKey,
+            typeof body.model === 'string' ? body.model : undefined,
+          )
+          portableBootstrapProjectionAttemptedBeforeStream = true
+          try {
+            sessionKey = await resolvePortableBootstrapCard(sessionKey)
+          } catch (error) {
+            if (error === streamTimeoutError) {
+              return finishPreStreamResponse(streamTimeoutResponse())
+            }
+            if (error === streamAbortError || streamTransportUnavailable()) {
+              return finishPreStreamResponse(abortedResponse())
+            }
+            // A genuine no-Card bootstrap remains on the legacy main identity.
+          }
+        }
         // Once a request has a validated Card projection, every public identity
         // uses its source-qualified canonical segment. The upstream key remains
         // private to provider calls below. Unresolved bootstrap/legacy requests
@@ -785,17 +855,45 @@ export const Route = createFileRoute('/api/send-stream')({
           }
         }
 
+        const queueActiveRunPersistence = (
+          write: (sessionKey: string, runId: string) => Promise<unknown>,
+          allowAfterTerminalClaim = false,
+        ): Promise<void> => {
+          if (terminalRunTransition.isSealed() && !allowAfterTerminalClaim) {
+            return Promise.resolve()
+          }
+          if (!activeRunId || !activeRunSessionKey) return Promise.resolve()
+          const runId = activeRunId
+          const runSessionKey = activeRunSessionKey
+          const nextReady = (persistedRunReady ?? Promise.resolve())
+            .then(() => write(runSessionKey, runId))
+            .then(() => null)
+            .catch(() => null)
+          persistedRunReady = nextReady
+          return nextReady.then(() => undefined)
+        }
+
         const persistActiveRun = (
           write: (sessionKey: string, runId: string) => Promise<unknown>,
         ) => {
-          if (terminalRunTransition.isSealed()) return
-          if (!activeRunId || !activeRunSessionKey) return
-          const runId = activeRunId
-          const runSessionKey = activeRunSessionKey
-          persistedRunReady = (persistedRunReady ?? Promise.resolve())
-            .then(() => write(runSessionKey, runId))
-            .catch(() => null)
+          void queueActiveRunPersistence(write)
         }
+
+        const persistSyntheticToolActivity = (
+          synthetic: ReturnType<typeof collectSyntheticLiveToolEvents>[number],
+          allowAfterTerminalClaim = false,
+        ) =>
+          queueActiveRunPersistence(
+            (runSessionKey, activeId) =>
+              upsertRunToolCall(runSessionKey, activeId, {
+                id: synthetic.toolCallId,
+                name: synthetic.name,
+                phase: synthetic.phase,
+                args: synthetic.args,
+                result: synthetic.result,
+              }),
+            allowAfterTerminalClaim,
+          )
 
         const persistRunText = (text: string, replace = false) => {
           if (terminalRunTransition.isSealed()) return
@@ -806,8 +904,13 @@ export const Route = createFileRoute('/api/send-stream')({
         async function persistTerminalRun(
           status: 'handoff' | 'complete' | 'error',
           errorMessage?: string,
+          beforeSeal?: () => Promise<void>,
         ): Promise<void> {
-          await terminalRunTransition.transition(status, errorMessage)
+          await terminalRunTransition.transition(
+            status,
+            errorMessage,
+            beforeSeal,
+          )
         }
 
         async function finalizeTerminalPersistence(
@@ -919,57 +1022,14 @@ export const Route = createFileRoute('/api/send-stream')({
                   typeof body.model === 'string' ? body.model : undefined,
                 )
 
-                if (portableBootstrapSessionKey && !activeCardId) {
+                if (
+                  portableBootstrapSessionKey &&
+                  !activeCardId &&
+                  !portableBootstrapProjectionAttemptedBeforeStream
+                ) {
                   try {
-                    const resolvedBootstrapCard =
-                      await waitWithinStreamLifetime(
-                        sessionCardService.resolveLocalCardByUpstreamSession(
-                          portableSessionKey,
-                        ),
-                      )
-                    ensureStreamTransportAvailable()
-                    const canonicalSegmentKey =
-                      resolvedBootstrapCard.card.canonicalSegmentKey
-                    const canonicalSource =
-                      resolvedBootstrapCard.sourceBySegmentKey
-                        .get(canonicalSegmentKey)
-                        ?.trim() ?? ''
-                    const canonicalUpstreamKey =
-                      resolvedBootstrapCard.upstreamKeyBySegmentKey
-                        .get(canonicalSegmentKey)
-                        ?.trim() ?? ''
-                    const mappedBootstrapSegments =
-                      resolvedBootstrapCard.card.continuationSegmentKeys.filter(
-                        (segmentKey) =>
-                          resolvedBootstrapCard.upstreamKeyBySegmentKey.get(
-                            segmentKey,
-                          ) === portableSessionKey,
-                      )
-                    const isCompleteLocalParentCard =
-                      resolvedBootstrapCard.collection.completeness ===
-                        'complete' &&
-                      resolvedBootstrapCard.card.canonicalSource === 'local' &&
-                      (resolvedBootstrapCard.card.relationshipKind === 'root' ||
-                        resolvedBootstrapCard.card.relationshipKind ===
-                          'orphan') &&
-                      resolvedBootstrapCard.card.parentCardId === undefined
-                    if (
-                      !isCompleteLocalParentCard ||
-                      canonicalSource !== 'local' ||
-                      !canonicalUpstreamKey ||
-                      mappedBootstrapSegments.length !== 1
-                    ) {
-                      throw new Error(
-                        'authoritative local bootstrap Card unavailable',
-                      )
-                    }
-
-                    activeCardResolution = resolvedBootstrapCard
-                    activeCardId = resolvedBootstrapCard.card.cardId
-                    activeCardCanonicalSegmentKey = canonicalSegmentKey
-                    activeCardCanonicalSource = canonicalSource
-                    portableSessionKey = canonicalUpstreamKey
-                    resolvedFriendlyId = resolvedBootstrapCard.card.cardId
+                    portableSessionKey =
+                      await resolvePortableBootstrapCard(portableSessionKey)
                   } catch (error) {
                     if (
                       error === streamTimeoutError ||
@@ -985,25 +1045,19 @@ export const Route = createFileRoute('/api/send-stream')({
                 }
 
                 const portableClientSessionKey =
-                  portableBootstrapSessionKey === 'main'
-                    ? portableSessionKey
-                    : (activeCardCanonicalSegmentKey ??
-                      portableBootstrapSessionKey ??
-                      portableSessionKey)
+                  activeCardCanonicalSegmentKey ??
+                  portableBootstrapSessionKey ??
+                  portableSessionKey
                 const portableClientFriendlyId =
-                  portableBootstrapSessionKey === 'main'
-                    ? portableBootstrapSessionKey
-                    : (activeCardId ??
-                        portableBootstrapSessionKey ??
-                        resolvedFriendlyId) ||
-                      portableClientSessionKey
+                  (activeCardId ??
+                    portableBootstrapSessionKey ??
+                    resolvedFriendlyId) ||
+                  portableClientSessionKey
                 const portableRunSessionKey =
-                  portableBootstrapSessionKey === 'main'
-                    ? portableSessionKey
-                    : (activeCardCanonicalSegmentKey ??
-                      (portableBootstrapSessionKey === 'new'
-                        ? null
-                        : portableSessionKey))
+                  activeCardCanonicalSegmentKey ??
+                  (portableBootstrapSessionKey === 'new'
+                    ? null
+                    : portableSessionKey)
                 const portableRunFriendlyId =
                   activeCardId ?? portableClientFriendlyId
                 let accumulated = ''
@@ -1650,6 +1704,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       continue
                     }
                     for (const synthetic of syntheticEvents) {
+                      void persistSyntheticToolActivity(synthetic)
                       sendEvent('tool', synthetic)
                     }
                   } catch {
@@ -2275,108 +2330,85 @@ export const Route = createFileRoute('/api/send-stream')({
                         stopLivePolling()
                         // Claim completion before any asynchronous backfill so
                         // a later abort cannot overwrite the observed winner.
-                        const terminalPersistence =
-                          persistTerminalRun('complete')
+                        // The coordinator delays transcript sealing until the
+                        // authoritative final activity refresh has joined the
+                        // durable write queue.
+                        const terminalPersistence = persistTerminalRun(
+                          'complete',
+                          undefined,
+                          async () => {
+                            // Backfill tool calls from session history.
+                            // Hermes Agent currently does not stream tool.* events
+                            // reliably, but it persists tool calls on the assistant
+                            // message. Fetch the latest assistant message and emit
+                            // synthetic 'tool' events for each tool call so the
+                            // Workspace UI can render the Activity card.
+                            try {
+                              const sid =
+                                readString(data.session_id) ||
+                                sessionKeyFromEvent ||
+                                ''
+                              if (sid) {
+                                let persistedMessages: Array<
+                                  Record<string, unknown>
+                                > = []
+                                try {
+                                  persistedMessages =
+                                    (await waitWithinStreamLifetime(
+                                      getSessionMessagesFromAgent(sid),
+                                    )) as unknown as Array<
+                                      Record<string, unknown>
+                                    >
+                                  if (streamTransportUnavailable()) return
+                                } catch (error) {
+                                  if (
+                                    error === streamTimeoutError ||
+                                    error === streamAbortError ||
+                                    streamTransportUnavailable()
+                                  ) {
+                                    return
+                                  }
+                                  persistedMessages = []
+                                }
+                                // Use the rebased per-run baseline so we never
+                                // read tool calls from a previous turn. A session
+                                // handoff resets this count before successor events.
+                                const sliceFrom = Math.max(
+                                  0,
+                                  Math.min(
+                                    liveBaselineCount,
+                                    Math.max(0, persistedMessages.length - 1),
+                                  ),
+                                )
+                                const recent =
+                                  persistedMessages.slice(sliceFrom)
+                                const syntheticEvents =
+                                  collectSyntheticLiveToolEvents({
+                                    messages: recent,
+                                    tracker: syntheticLiveToolTracker,
+                                    sessionKey: sessionKeyFromEvent,
+                                    runId,
+                                  })
+                                for (const synthetic of syntheticEvents) {
+                                  await persistSyntheticToolActivity(
+                                    synthetic,
+                                    true,
+                                  )
+                                  sendEvent('tool', synthetic)
+                                }
+                              }
+                            } catch (err) {
+                              // Backfill is best-effort; don't fail the run.
+                              console.warn(
+                                '[send-stream] tool backfill failed:',
+                                err,
+                              )
+                            }
+                          },
+                        )
                         // Backfill can outlive bounded sealing retries; attach a
                         // handler now, then re-observe any failure below.
                         void terminalPersistence.catch(() => undefined)
-
-                        // Backfill tool calls from session history.
-                        // Hermes Agent currently does not stream tool.* events
-                        // reliably, but it persists tool calls on the assistant
-                        // message. Fetch the latest assistant message and emit
-                        // synthetic 'tool' events for each tool call so the
-                        // Workspace UI can render the Activity card.
-                        try {
-                          const sid =
-                            readString(data.session_id) ||
-                            sessionKeyFromEvent ||
-                            ''
-                          if (sid) {
-                            let persistedMessages: Array<
-                              Record<string, unknown>
-                            > = []
-                            try {
-                              persistedMessages =
-                                (await waitWithinStreamLifetime(
-                                  getSessionMessagesFromAgent(sid),
-                                )) as unknown as Array<Record<string, unknown>>
-                              if (streamTransportUnavailable()) return
-                            } catch (error) {
-                              if (
-                                error === streamTimeoutError ||
-                                error === streamAbortError ||
-                                streamTransportUnavailable()
-                              ) {
-                                return
-                              }
-                              persistedMessages = []
-                            }
-                            // Walk back to the most recent assistant message in
-                            // this run; tool_calls are siblings on it. Also
-                            // collect tool_result entries that immediately
-                            // follow it so we can pair input/output.
-                            // Use the rebased per-run baseline so we never read
-                            // tool calls from a previous turn. A session handoff
-                            // resets this count before any successor event is
-                            // translated.
-                            const sliceFrom = Math.max(
-                              0,
-                              Math.min(
-                                liveBaselineCount,
-                                Math.max(0, persistedMessages.length - 1),
-                              ),
-                            )
-                            const recent = persistedMessages.slice(sliceFrom)
-                            let lastAssistantIndex = -1
-                            for (let i = recent.length - 1; i >= 0; i--) {
-                              const m = recent.at(i)
-                              if (m && m.role === 'assistant') {
-                                lastAssistantIndex = i
-                                break
-                              }
-                            }
-                            if (lastAssistantIndex >= 0) {
-                              const lastAssistant =
-                                recent.at(lastAssistantIndex)
-                              const rawToolCalls = (lastAssistant?.tool_calls ??
-                                (lastAssistant as any)?.toolCalls) as
-                                | Array<Record<string, unknown>>
-                                | undefined
-                              const toolCalls =
-                                Array.isArray(rawToolCalls) &&
-                                rawToolCalls.length
-                                  ? rawToolCalls
-                                  : []
-
-                              const syntheticEvents =
-                                collectSyntheticLiveToolEvents({
-                                  messages: recent,
-                                  tracker: syntheticLiveToolTracker,
-                                  sessionKey: sessionKeyFromEvent,
-                                  runId,
-                                })
-                              for (const synthetic of syntheticEvents) {
-                                persistActiveRun((runSessionKey, activeId) =>
-                                  upsertRunToolCall(runSessionKey, activeId, {
-                                    id: synthetic.toolCallId,
-                                    name: synthetic.name,
-                                    phase: synthetic.phase,
-                                    args: synthetic.args,
-                                    result: synthetic.result,
-                                  }),
-                                )
-                                sendEvent('tool', synthetic)
-                              }
-                            }
-                          }
-                        } catch (err) {
-                          // Backfill is best-effort; don't fail the run.
-                          console.warn(
-                            '[send-stream] tool backfill failed:',
-                            err,
-                          )
-                        }
 
                         const translated = {
                           state: 'complete',

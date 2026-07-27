@@ -85,24 +85,27 @@ describe('run terminal transition coordinator', () => {
 
   it('claims completion before asynchronous backfill so later cancellation cannot win', async () => {
     const backfill = createDeferred()
+    const sealTranscript = vi.fn(() => Promise.resolve())
     const persist = vi.fn(() => Promise.resolve())
     const coordinator = createRunTerminalTransitionCoordinator({
-      sealTranscript: () => Promise.resolve(),
+      sealTranscript,
       persist,
     })
 
-    const runCompletedHandler = async () => {
-      const terminalPersistence = coordinator.transition('complete')
-      await backfill.promise
-      await terminalPersistence
-    }
-    const completion = runCompletedHandler()
+    const completion = coordinator.transition(
+      'complete',
+      undefined,
+      () => backfill.promise,
+    )
     expect(coordinator.isSealed()).toBe(true)
+    expect(sealTranscript).not.toHaveBeenCalled()
+    expect(persist).not.toHaveBeenCalled()
 
     const cancellationDuringBackfill = coordinator.transition('handoff')
     backfill.resolve()
     await Promise.all([completion, cancellationDuringBackfill])
 
+    expect(sealTranscript).toHaveBeenCalledTimes(1)
     expect(persist).toHaveBeenCalledTimes(1)
     expect(persist).toHaveBeenCalledWith('complete', undefined)
   })
