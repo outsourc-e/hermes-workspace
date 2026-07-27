@@ -19,8 +19,12 @@ import type {
   SessionMeta,
 } from '../screens/chat/types'
 
-export const DEFAULT_SESSION_CARD_PAGE_SIZE = 100
 export const DEFAULT_SESSION_CARD_SAFE_CAP = 2000
+// The current Hermes gateway and dashboard return an offset/total contract but
+// do not provide a stable snapshot token. Collect the bounded inventory in one
+// request so that a snapshot-less backend remains authoritative up to the safe
+// cap; paging it would correctly (but permanently) be classified as unstable.
+export const DEFAULT_SESSION_CARD_PAGE_SIZE = DEFAULT_SESSION_CARD_SAFE_CAP
 
 export type SessionCardSessionPage = {
   sessions: Array<SessionMeta>

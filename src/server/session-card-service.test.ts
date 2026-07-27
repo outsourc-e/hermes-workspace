@@ -267,6 +267,40 @@ describe('SessionCardService collection and resolution', () => {
     })
   })
 
+  it('uses the bounded safe cap in one request for a snapshot-less default source', async () => {
+    const listPage = vi.fn((limit: number, offset: number) =>
+      Promise.resolve(
+        page(
+          [session('a'), session('b'), session('c')].slice(
+            offset,
+            offset + limit,
+          ),
+          offset,
+          3,
+        ),
+      ),
+    )
+    const service = new SessionCardService({
+      remoteSource: { source: 'remote', listPage },
+      localSource: null,
+      metadataStore: metadataStore(),
+    })
+
+    await expect(service.listCards()).resolves.toMatchObject({
+      completeness: 'complete',
+      retryable: false,
+      sources: [
+        expect.objectContaining({
+          source: 'remote',
+          status: 'complete',
+          fetched: 3,
+        }),
+      ],
+    })
+    expect(listPage).toHaveBeenCalledTimes(1)
+    expect(listPage).toHaveBeenCalledWith(2000, 0, undefined)
+  })
+
   it('never declares a same-total mutable offset collection complete without a source snapshot', async () => {
     const listPage = vi
       .fn()
