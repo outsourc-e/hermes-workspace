@@ -26,7 +26,6 @@ import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
-import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
 import {
   CHAT_BOOTSTRAP_CARD_ID,
   buildChatCardNavigation,
@@ -236,23 +235,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const showDesktopSidebarBackdrop =
     !isChromeFreeSurface && !isMobile && !isOnChatRoute && !sidebarCollapsed
 
-  const isNewChat = activeFriendlyId === 'new'
-
   useEffect(() => {
     if (routeChatCardId !== null) setActiveChatCardId(routeChatCardId)
   }, [routeChatCardId, setActiveChatCardId])
-
-  // Sessions state — shared semantic source for sidebar and chat header
-  const {
-    sessions,
-    sessionsLoading,
-    sessionsFetching,
-    sessionsError,
-    refetchSessions,
-  } = useChatSessions({
-    activeFriendlyId,
-    isNewChat,
-  })
 
   const startNewChat = useCallback(() => {
     setCreatingSession(true)
@@ -394,7 +379,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           {!isMobile && !hideChatSidebar && (
             <div className="relative z-30">
               <ChatSidebar
-                sessions={sessions}
+                sessions={[]}
                 activeFriendlyId={activeFriendlyId}
                 creatingSession={creatingSession}
                 onCreateSession={startNewChat}
@@ -402,10 +387,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 onToggleCollapse={toggleSidebar}
                 onSelectSession={handleSelectSession}
                 onActiveSessionDelete={handleActiveSessionDelete}
-                sessionsLoading={sessionsLoading}
-                sessionsFetching={sessionsFetching}
-                sessionsError={sessionsError}
-                onRetrySessions={refetchSessions}
+                sessionsLoading={false}
+                sessionsFetching={false}
+                sessionsError={null}
+                onRetrySessions={() => undefined}
               />
             </div>
           )}
@@ -508,7 +493,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       {!isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
         <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
       ) : null}
-      <CommandPalette pathname={pathname} sessions={sessions} />
+      <CommandPalette pathname={pathname} sessions={[]} />
     </>
   )
 }

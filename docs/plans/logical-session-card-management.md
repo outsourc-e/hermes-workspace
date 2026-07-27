@@ -22,6 +22,7 @@ bridge, migrate, or provide fallback behavior for the former per-session UI:
 
 Only backend session records and their validated lineage facts remain inputs to
 the new Session Card projection. They are data, not retained UI behavior.
+
 ### One logical parent card
 
 - The Sessions section displays exactly one top-level card for each independent logical conversation.
@@ -60,13 +61,13 @@ Pinning, unpinning, renaming, auto-naming, branching, deletion/archive, sharing,
 
 ## Terminology and identities
 
-| Term | Meaning | Stable across continuations? |
-| --- | --- | --- |
-| `cardId` | Workspace logical-conversation identity. Prefer a validated lineage root ID; otherwise use the first validated segment/anchor key. | Yes |
-| `canonicalSegmentKey` | The current backend session key that receives parent sends and live parent stream events. | No |
-| `segmentKey` | A concrete backend session record in a confirmed continuation component. | No |
-| `childSessionKey` | A delegated/subagent/branch backend record attached to a card, with its own transcript. | N/A |
-| `inspectedChildSessionKey` | Ephemeral UI state for optional child transcript inspection. | N/A |
+| Term                       | Meaning                                                                                                                            | Stable across continuations? |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `cardId`                   | Workspace logical-conversation identity. Prefer a validated lineage root ID; otherwise use the first validated segment/anchor key. | Yes                          |
+| `canonicalSegmentKey`      | The current backend session key that receives parent sends and live parent stream events.                                          | No                           |
+| `segmentKey`               | A concrete backend session record in a confirmed continuation component.                                                           | No                           |
+| `childSessionKey`          | A delegated/subagent/branch backend record attached to a card, with its own transcript.                                            | N/A                          |
+| `inspectedChildSessionKey` | Ephemeral UI state for optional child transcript inspection.                                                                       | N/A                          |
 
 `parent_session_id` alone must never establish a card relationship. A continuation requires backend-authoritative continuation metadata, compatible sources, and a valid lifecycle boundary; explicit forks and `child_session` records are never continuations.
 
@@ -162,7 +163,7 @@ The current `fetchHistory()` and `/api/history` request one `sessionKey` and cal
 Implement `fetchSessionCardHistory()` and a card-history React Query key such as:
 
 ```ts
-['chat', 'card-history', cardId, canonicalSegmentKey, cursor]
+;['chat', 'card-history', cardId, canonicalSegmentKey, cursor]
 ```
 
 The server history assembler must:
