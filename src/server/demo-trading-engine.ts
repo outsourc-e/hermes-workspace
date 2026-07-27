@@ -613,7 +613,11 @@ class PaperBinanceClient implements BinanceExecutionClient {
   readonly environment: BinanceExecutionEnvironment = 'paper'
 
   ping(): Promise<boolean> {
-    return Promise.resolve(true)
+    return Promise.resolve(true);
+  }
+
+  buildUserDataStreamSubscribeParams(): Record<string, unknown> {
+    return {};
   }
 
   async getPrice(symbol: string): Promise<number> {

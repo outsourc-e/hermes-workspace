@@ -111,6 +111,7 @@ export interface BinanceExecutionClient {
   testOrder?: (input: BinanceOrderInput) => Promise<void>
   /** LOT_SIZE/NOTIONAL exchange filters; optional so paper/test fakes can omit it. */
   getSymbolFilters?: (symbol: string) => Promise<SymbolFilters>
+  buildUserDataStreamSubscribeParams: () => Record<string, unknown>;
 }
 
 export class DemoEnvironmentError extends Error {
@@ -197,6 +198,9 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
   abstract readonly environment: BinanceExecutionEnvironment
   protected abstract assertBaseUrl(baseUrl: string): string
   protected abstract errorPrefix(): string
+  buildUserDataStreamSubscribeParams(): Record<string, unknown> {
+    return {}
+  }
 
   constructor(config: { apiKey: string; apiSecret: string; baseUrl: string; recvWindow?: number; fetchImpl?: typeof fetch }) {
     if (!config.apiKey || !config.apiSecret) {

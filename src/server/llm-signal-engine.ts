@@ -304,7 +304,7 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
   const settings = db.settings as Record<string, unknown>
   const config = resolveLlmSignalConfig(settings.demoTradingLlm)
   const gate = executionModeAllowed(settings, config)
-  if (!gate.allowed) return { ran: false, reason: gate.reason }
+  if (!gate.allowed) return { ran: false, reason: gate.reason };
 
   const rows = db.strategy_results
   const positions = rows.filter((r) => r.kind === SR_KIND_LLM_POSITION) as unknown as Array<LlmPosition>
@@ -379,7 +379,7 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
   if (!decision || decision.signal === 'HOLD' || !decidedSymbol) {
     return { ran: true, decision: decision ? { ...decision, symbol: decidedSymbol } : undefined }
   }
-  if (decision.confidence < config.minConfidence) {
+  if (typeof decision.confidence !== "number" || !isFinite(decision.confidence) || decision.confidence < config.minConfidence) {
     return { ran: true, decision: { ...decision, symbol: decidedSymbol } }
   }
   if (!config.symbols.includes(decidedSymbol)) {
