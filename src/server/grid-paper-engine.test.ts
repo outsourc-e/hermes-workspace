@@ -283,6 +283,96 @@ describe('advanceSymbolState — idle-range re-arm', () => {
   })
 })
 
+describe('advanceSymbolState — absolute stop floor', () => {
+  it('engages only after a re-arm has recentered below the frozen floor, and halts for good', () => {
+    const config = cfg({
+      rangeLookbackCandles: 5,
+      gridCount: 3,
+      spacing: 'arithmetic',
+      efficiencyGate: false,
+      lowerStopPct: 0.1,
+      autoRecenter: true,
+      absoluteStopFloorEnabled: true,
+    })
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    // Sweeps both the 90 and 100 levels.
+    candles.push(candle(5, { open: 100, high: 101, low: 89, close: 99 }))
+    // First (ordinary) stop breach — lower (90) sits above its own floor by
+    // construction, so this re-arms as usual, not a halt.
+    candles.push(candle(6, { open: 99, high: 100, low: 70, close: 75 }))
+    // Fill the re-centered range's new lower level (70); close (85) stays
+    // above the frozen floor (81), so this bar trades normally.
+    candles.push(candle(7, { open: 85, high: 88, low: 69, close: 85 }))
+    // Active range has recentered below the frozen floor (new lower 70 < 81)
+    // AND price closes below it (79 < 81) — halts for good.
+    candles.push(candle(8, { open: 85, high: 86, low: 78, close: 79 }))
+    // Recovers well back into the original range — should NOT re-enter.
+    for (let i = 9; i < 13; i++) candles.push(candle(i, { open: 90, high: 105, low: 88, close: 100 }))
+
+    const { state, trades } = advanceSymbolState('BTCUSDT', undefined, candles, config)
+
+    const stopTrades = trades.filter((t) => t.reason === 'stop-liquidation')
+    const floorTrades = trades.filter((t) => t.reason === 'absolute-floor-liquidation')
+    expect(stopTrades).toHaveLength(2)
+    expect(floorTrades).toHaveLength(1)
+    expect(floorTrades[0].exitPrice).toBe(79)
+    expect(trades.filter((t) => t.reason === 'grid-fill')).toHaveLength(0)
+    expect(state.halted).toBe(true)
+    expect(state.armed).toBe(false)
+  })
+
+  it('persists floorPrice across separate cron-tick calls', () => {
+    const config = cfg({
+      rangeLookbackCandles: 5,
+      gridCount: 3,
+      spacing: 'arithmetic',
+      efficiencyGate: false,
+      lowerStopPct: 0.1,
+      autoRecenter: true,
+      absoluteStopFloorEnabled: true,
+    })
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    candles.push(candle(5, { open: 100, high: 101, low: 89, close: 99 }))
+    candles.push(candle(6, { open: 99, high: 100, low: 70, close: 75 }))
+
+    // First cron tick: cold-starts and processes through the first stop-out.
+    const first = advanceSymbolState('BTCUSDT', undefined, candles, config)
+    expect(first.state.floorPrice).toBeCloseTo(81, 6)
+
+    // Second cron tick reloads from persisted state — the floor must survive
+    // the round trip through the finance store, not just live in memory.
+    const tail = [candle(7, { open: 85, high: 88, low: 69, close: 85 })]
+    const second = advanceSymbolState('BTCUSDT', first.state, tail, config)
+    expect(second.state.floorPrice).toBeCloseTo(81, 6)
+  })
+
+  it('leaves the floor unset and behaves as before when disabled (default)', () => {
+    const config = cfg({
+      rangeLookbackCandles: 5,
+      gridCount: 3,
+      spacing: 'arithmetic',
+      efficiencyGate: false,
+      lowerStopPct: 0.1,
+      autoRecenter: true,
+      absoluteStopFloorEnabled: false,
+    })
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    candles.push(candle(5, { open: 100, high: 101, low: 89, close: 99 }))
+    candles.push(candle(6, { open: 99, high: 100, low: 70, close: 75 }))
+    candles.push(candle(7, { open: 85, high: 88, low: 69, close: 85 }))
+    candles.push(candle(8, { open: 85, high: 86, low: 78, close: 79 }))
+
+    const { state, trades } = advanceSymbolState('BTCUSDT', undefined, candles, config)
+    expect(state.floorPrice ?? null).toBeNull()
+    expect(trades.filter((t) => t.reason === 'absolute-floor-liquidation')).toHaveLength(0)
+    // Without the floor, the grid stays armed through the same decline.
+    expect(state.halted).toBe(false)
+  })
+})
+
 describe('runGridPaperCycle — I/O + lock', () => {
   it('does not run when the connectivity breaker is tripped — this engine\'s first-ever global gate', async () => {
     const { recordConnectivityOutcome } = await import('./connectivity-breaker')

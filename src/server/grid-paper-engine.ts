@@ -64,6 +64,19 @@ export interface GridEngineConfig {
    */
   rearmOutsideRangeCandles: number
   /**
+   * Closes the sustained-decline gap where autoRecenter's stop-triggered
+   * re-arm recomputes `lower` from the current window, so the effective
+   * stop slides down with a falling market instead of acting as a hard
+   * floor (root-caused live 2026-07-23, ~line 416-423 above; backtest
+   * validation in grid-backtest.ts's absoluteStopFloorEnabled). When
+   * enabled, the lower stop bound from the most recent non-stop-triggered
+   * arm (initial/cold-start, chop-recovery, or idle-range re-arm) is frozen
+   * as an absolute floor; a stop-triggered re-arm keeps it unchanged, and
+   * once the active range has recentered below it, closing below the
+   * floor liquidates and halts for good regardless of autoRecenter.
+   */
+  absoluteStopFloorEnabled: boolean
+  /**
    * 'paper' (default) = simulate only, no keys needed. 'testnet_execute' =
    * additionally mirror each paper fill as a real MARKET order on the
    * hard-locked Binance testnet. Paper stays authoritative either way; the
@@ -93,6 +106,7 @@ export const DEFAULT_GRID_ENGINE_CONFIG: GridEngineConfig = {
   maxEfficiencyRatio: 0.25,
   fetchCandleLimit: 500,
   rearmOutsideRangeCandles: 0,
+  absoluteStopFloorEnabled: false,
   executionMode: 'paper',
   maxDailyLossQuote: 25,
   maxRealOrdersPerCycle: 12,
@@ -134,6 +148,8 @@ export interface GridSymbolState {
   updatedAt: string
   /** Consecutive closes outside [lower, upper]; drives rearmOutsideRangeCandles. */
   outsideRangeStreak?: number
+  /** Absolute stop floor (see absoluteStopFloorEnabled doc); persisted so it survives cron restarts. */
+  floorPrice?: number | null
 }
 
 export interface GridPaperTrade {
@@ -153,6 +169,7 @@ export interface GridPaperTrade {
     | 'stop-liquidation'
     | 'chop-pause-liquidation'
     | 'range-idle-rearm'
+    | 'absolute-floor-liquidation'
   openedAt: string
   closedAt: string
 }
@@ -326,6 +343,10 @@ export function advanceSymbolState(
     ? persisted.levels.map((l) => ({ ...l }))
     : []
   let lastProcessedOpenTime = persisted?.lastProcessedOpenTime ?? 0
+  let floorPrice: number | null = persisted?.floorPrice ?? null
+
+  const computeFloor = (): number | null =>
+    config.lowerStopPct > 0 ? lower * (1 - config.lowerStopPct) : null
 
   let startIndex = candles.findIndex((c) => c.openTime > lastProcessedOpenTime)
 
@@ -340,6 +361,7 @@ export function advanceSymbolState(
       upper = armResult.upper
       levels = armResult.levels
       armed = true
+      if (config.absoluteStopFloorEnabled) floorPrice = computeFloor()
     }
     if (candles[warmupIndex]) lastProcessedOpenTime = candles[warmupIndex].openTime
     startIndex = warmupIndex + 1
@@ -359,6 +381,7 @@ export function advanceSymbolState(
         lastProcessedOpenTime,
         updatedAt: now,
         outsideRangeStreak,
+        floorPrice,
       },
       trades,
       buys,
@@ -379,6 +402,7 @@ export function advanceSymbolState(
           upper = armResult.upper
           levels = armResult.levels
           outsideRangeStreak = 0
+          if (config.absoluteStopFloorEnabled) floorPrice = computeFloor()
         }
       }
       continue
@@ -403,7 +427,24 @@ export function advanceSymbolState(
         upper = armResult.upper
         levels = armResult.levels
         outsideRangeStreak = 0
+        if (config.absoluteStopFloorEnabled) floorPrice = computeFloor()
       }
+      continue
+    }
+
+    // Absolute floor: only engages once a stop-triggered re-arm has already
+    // recentered the active range below the frozen floor — an ordinary
+    // first stop-out still autoRecenters normally below (see
+    // absoluteStopFloorEnabled doc).
+    if (
+      config.absoluteStopFloorEnabled &&
+      floorPrice != null &&
+      lower < floorPrice &&
+      candle.close < floorPrice
+    ) {
+      liquidateAll(levels, candle.close, at, 'absolute-floor-liquidation', symbol, config, trades)
+      armed = false
+      halted = true
       continue
     }
 
@@ -446,6 +487,7 @@ export function advanceSymbolState(
           lower = armResult.lower
           upper = armResult.upper
           levels = armResult.levels
+          if (config.absoluteStopFloorEnabled) floorPrice = computeFloor()
         }
         outsideRangeStreak = 0
         continue
@@ -517,6 +559,7 @@ export function advanceSymbolState(
       lastProcessedOpenTime,
       updatedAt: now,
       outsideRangeStreak,
+      floorPrice,
     },
     trades,
     buys,
