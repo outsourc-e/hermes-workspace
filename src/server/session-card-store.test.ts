@@ -42,6 +42,11 @@ type WorkerReservation = {
   reservation?: { status: string }
 }
 
+type WorkerUpdate = {
+  ok: boolean
+  error?: string
+}
+
 type ActualFs = {
   renameSync: typeof renameSync
   unlinkSync: typeof unlinkSync
@@ -93,6 +98,16 @@ function reserveInWorker(
   const response = waitForWorkerMessage<WorkerReservation>(worker)
   worker.send(request)
   return response
+}
+
+async function waitForPath(path: string): Promise<void> {
+  const deadline = Date.now() + 5_000
+  while (!existsSync(path)) {
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for Session Card worker path: ${path}`)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
 }
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -280,7 +295,7 @@ describe('Session Card metadata persistence', () => {
     )
   })
 
-  it('recovers one expired reservation after restart and rejects the stale owner', async () => {
+  it('terminalizes an expired opaque-fork reservation after restart and rejects the stale owner', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
     const requestKeyHash = '1'.repeat(64)
@@ -294,6 +309,8 @@ describe('Session Card metadata persistence', () => {
       status: 'reserved',
       reservationId: expect.stringMatching(/^[a-f0-9]{32}$/),
     })
+    const opaqueFork = vi.fn()
+    opaqueFork()
 
     vi.resetModules()
     const restarted = await import('./session-card-store')
@@ -312,13 +329,12 @@ describe('Session Card metadata persistence', () => {
       fingerprint,
     )
     expect(recovered).toMatchObject({
-      status: 'reserved',
-      reservationId: expect.stringMatching(/^[a-f0-9]{32}$/),
+      status: 'completed',
+      replay: { outcome: { kind: 'ambiguous' } },
     })
-    if (first.status !== 'reserved' || recovered.status !== 'reserved') {
-      throw new Error('Expected original and recovered reservations')
+    if (first.status !== 'reserved') {
+      throw new Error('Expected original reservation')
     }
-    expect(recovered.reservationId).not.toBe(first.reservationId)
     expect(() =>
       restarted.completeSessionCardBranchReplay(
         'card-restart',
@@ -328,20 +344,13 @@ describe('Session Card metadata persistence', () => {
         { kind: 'failed' },
       ),
     ).toThrow(/reservation.*unavailable/i)
-
-    restarted.completeSessionCardBranchReplay(
-      'card-restart',
-      requestKeyHash,
-      fingerprint,
-      recovered.reservationId,
-      { kind: 'failed' },
-    )
     expect(
       restarted.readSessionCardBranchReplay('card-restart', requestKeyHash),
-    ).toMatchObject({ outcome: { kind: 'failed' } })
+    ).toMatchObject({ outcome: { kind: 'ambiguous' } })
+    expect(opaqueFork).toHaveBeenCalledTimes(1)
   })
 
-  it('terminalizes an ambiguous reservation after one bounded recovery attempt', () => {
+  it('never reserves an ambiguous opaque fork again, even after completed replay TTL', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
     const requestKeyHash = '3'.repeat(64)
@@ -361,8 +370,11 @@ describe('Session Card metadata persistence', () => {
         requestKeyHash,
         fingerprint,
       ),
-    ).toMatchObject({ status: 'reserved' })
-    vi.advanceTimersByTime(SESSION_CARD_BRANCH_PENDING_TTL_MS + 1)
+    ).toMatchObject({
+      status: 'completed',
+      replay: { outcome: { kind: 'ambiguous' } },
+    })
+    vi.advanceTimersByTime(SESSION_CARD_BRANCH_COMPLETED_TTL_MS + 1)
     expect(
       reserveSessionCardBranchReplay(
         'card-bounded',
@@ -371,7 +383,7 @@ describe('Session Card metadata persistence', () => {
       ),
     ).toMatchObject({
       status: 'completed',
-      replay: { outcome: { kind: 'failed' } },
+      replay: { outcome: { kind: 'ambiguous' } },
     })
   })
 
@@ -418,7 +430,7 @@ describe('Session Card metadata persistence', () => {
     ).toBeNull()
   })
 
-  it('evicts abandoned reservations after their bounded recovery window', () => {
+  it('retains ambiguous opaque forks instead of reclaiming their capacity unsafely', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
     for (let index = 0; index < 32; index += 1) {
@@ -442,7 +454,25 @@ describe('Session Card metadata persistence', () => {
         'a'.repeat(64),
         'b'.repeat(64),
       ),
-    ).toMatchObject({ status: 'reserved' })
+    ).toEqual({ status: 'capacity' })
+  })
+
+  it('rejects a new branch reservation when archive committed after projection', () => {
+    updateSessionCardMetadata('card-archived-race', {
+      manualTitle: 'Projected while active',
+    })
+    archiveSessionCardMetadata('card-archived-race')
+
+    expect(
+      reserveSessionCardBranchReplay(
+        'card-archived-race',
+        '9'.repeat(64),
+        'a'.repeat(64),
+      ),
+    ).toEqual({ status: 'archived' })
+    expect(
+      readSessionCardBranchReplay('card-archived-race', '9'.repeat(64)),
+    ).toBeNull()
   })
 
   it('recovers a stale exclusive store lock left by another process', () => {
@@ -486,18 +516,66 @@ describe('Session Card metadata persistence', () => {
       )
     })
 
-    expect(
+    expect(() =>
       reserveSessionCardBranchReplay(
         'card-successor-lock',
         '7'.repeat(64),
         '8'.repeat(64),
       ),
-    ).toMatchObject({ status: 'reserved' })
+    ).toThrow(/lock|fenc|ownership/i)
     expect(
       JSON.parse(readFileSync(sessionCardStoreLockPath(), 'utf8')),
     ).toEqual(successor)
     actualFs.unlinkSync(sessionCardStoreLockPath())
   })
+
+  it('fences a suspended cross-process owner after stale-lock takeover', async () => {
+    updateSessionCardMetadata('card-suspended-owner', {
+      autoTitle: 'Baseline title',
+    })
+    const worker = await startReservationWorker()
+    const pauseMarker = join(stateDir, 'owner-paused')
+    const resumeMarker = join(stateDir, 'owner-resume')
+    const response = waitForWorkerMessage<WorkerUpdate>(worker)
+    worker.send({
+      action: 'paused-update',
+      cardId: 'card-suspended-owner',
+      title: 'Stale owner title',
+      pauseMarker,
+      resumeMarker,
+    })
+
+    try {
+      await waitForPath(pauseMarker)
+      const staleLock = JSON.parse(
+        readFileSync(sessionCardStoreLockPath(), 'utf8'),
+      ) as Record<string, unknown>
+      writeFileSync(
+        sessionCardStoreLockPath(),
+        `${JSON.stringify({
+          ...staleLock,
+          createdAt: Date.now() - SESSION_CARD_BRANCH_PENDING_TTL_MS - 1,
+        })}\n`,
+        'utf8',
+      )
+
+      updateSessionCardMetadata('card-suspended-owner', {
+        autoTitle: 'Successor title',
+      })
+      writeFileSync(resumeMarker, 'resume\n', 'utf8')
+
+      expect(await response).toMatchObject({
+        ok: false,
+        error: expect.stringMatching(/lock|fenc|ownership/i),
+      })
+      expect(readSessionCardMetadata('card-suspended-owner')?.autoTitle).toBe(
+        'Successor title',
+      )
+    } finally {
+      writeFileSync(resumeMarker, 'resume\n', 'utf8')
+      worker.kill()
+    }
+  }, 10_000)
 
   it('admits exactly one reservation across independent server processes', async () => {
     const workers = await Promise.all([

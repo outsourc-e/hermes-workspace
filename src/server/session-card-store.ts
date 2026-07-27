@@ -7,6 +7,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readdirSync,
   renameSync,
   unlinkSync,
   writeFileSync,
@@ -28,12 +29,15 @@ const SESSION_CARD_BRANCH_REPLAY_MAX_COUNT = 256
 const SESSION_CARD_BRANCH_REPLAY_MAX_PER_CARD = 32
 export const SESSION_CARD_BRANCH_PENDING_TTL_MS = 5 * 60 * 1000
 export const SESSION_CARD_BRANCH_COMPLETED_TTL_MS = 24 * 60 * 60 * 1000
-const SESSION_CARD_BRANCH_MAX_ATTEMPTS = 2
 const SESSION_CARD_STORE_LOCK_STALE_MS = 30 * 1000
 const SESSION_CARD_STORE_LOCK_WAIT_MS = 2 * 1000
 const SESSION_CARD_STORE_LOCK_POLL_MS = 10
 const SESSION_CARD_BRANCH_KEY_MAX_LENGTH = 2048
 const SESSION_CARD_STORE_LOCK_FILE = `${SESSION_CARD_STORE_FILE}.lock`
+const SESSION_CARD_STORE_COMMIT_PREFIX = `${SESSION_CARD_STORE_FILE}.commit.`
+const SESSION_CARD_STORE_FENCE_PREFIX = `${SESSION_CARD_STORE_FILE}.fence.`
+const SESSION_CARD_STORE_FENCED_PREFIX = `${SESSION_CARD_STORE_FILE}.fenced.`
+const SESSION_CARD_STORE_FENCE_WIDTH = 16
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/
 const LOCK_TOKEN_PATTERN = /^[a-f0-9]{32}$/
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
@@ -66,6 +70,7 @@ export type SessionCardBranchReplayOutcome =
     }
   | { kind: 'failed' }
   | { kind: 'unavailable' }
+  | { kind: 'ambiguous' }
 
 export type PersistedSessionCardBranchReplay = {
   requestKeyHash: string
@@ -85,6 +90,7 @@ export type SessionCardBranchReplayReservation =
   | { status: 'completed'; replay: PersistedSessionCardBranchReplay }
   | { status: 'conflict' }
   | { status: 'capacity' }
+  | { status: 'archived' }
 
 export type PersistedSessionCardStore = {
   version: typeof SESSION_CARD_STORE_VERSION
@@ -176,7 +182,11 @@ function validateBranchReplayOutcome(
   value: unknown,
 ): SessionCardBranchReplayOutcome | null {
   if (!isRecord(value) || typeof value.kind !== 'string') return null
-  if (value.kind === 'failed' || value.kind === 'unavailable') {
+  if (
+    value.kind === 'failed' ||
+    value.kind === 'unavailable' ||
+    value.kind === 'ambiguous'
+  ) {
     return Object.keys(value).length === 1 ? { kind: value.kind } : null
   }
   if (value.kind !== 'created' && value.kind !== 'projection-pending') {
@@ -245,7 +255,7 @@ function validateBranchReplay(
     'attemptCount' in value &&
     Number.isSafeInteger(value.attemptCount) &&
     Number(value.attemptCount) >= 1 &&
-    Number(value.attemptCount) <= SESSION_CARD_BRANCH_MAX_ATTEMPTS
+    Number(value.attemptCount) <= 2
       ? Number(value.attemptCount)
       : 'attemptCount' in value
         ? null
@@ -401,9 +411,83 @@ function parseStore(raw: string, strict = false): PersistedSessionCardStore {
   return { version: SESSION_CARD_STORE_VERSION, cards }
 }
 
+type SessionCardStoreFenceState = {
+  highWater: number
+  commits: Map<number, string>
+  fenced: Set<number>
+}
+
+function parseFenceSuffix(name: string, prefix: string): number | null {
+  if (!name.startsWith(prefix)) return null
+  const suffix = name.slice(prefix.length)
+  if (
+    suffix.length !== SESSION_CARD_STORE_FENCE_WIDTH ||
+    !/^\d+$/u.test(suffix)
+  ) {
+    return null
+  }
+  const fence = Number(suffix)
+  return Number.isSafeInteger(fence) && fence >= 0 ? fence : null
+}
+
+function sessionCardStoreFencePath(prefix: string, fence: number): string {
+  return join(
+    getStateDir(),
+    `${prefix}${String(fence).padStart(SESSION_CARD_STORE_FENCE_WIDTH, '0')}`,
+  )
+}
+
+function readSessionCardStoreFenceState(): SessionCardStoreFenceState {
+  const commits = new Map<number, string>()
+  const fenced = new Set<number>()
+  let highWater = 0
+  let names: Array<string>
+  try {
+    names = readdirSync(getStateDir())
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { highWater, commits, fenced }
+    }
+    throw error
+  }
+
+  for (const name of names) {
+    const commitFence = parseFenceSuffix(name, SESSION_CARD_STORE_COMMIT_PREFIX)
+    if (commitFence !== null) {
+      commits.set(commitFence, join(getStateDir(), name))
+      highWater = Math.max(highWater, commitFence)
+      continue
+    }
+    const activeFence = parseFenceSuffix(name, SESSION_CARD_STORE_FENCE_PREFIX)
+    if (activeFence !== null) {
+      highWater = Math.max(highWater, activeFence)
+      continue
+    }
+    const invalidatedFence = parseFenceSuffix(
+      name,
+      SESSION_CARD_STORE_FENCED_PREFIX,
+    )
+    if (invalidatedFence !== null) {
+      fenced.add(invalidatedFence)
+      highWater = Math.max(highWater, invalidatedFence)
+    }
+  }
+  return { highWater, commits, fenced }
+}
+
+function authoritativeSessionCardStorePath(): string {
+  const state = readSessionCardStoreFenceState()
+  const latest = Array.from(state.commits.keys())
+    .filter((fence) => !state.fenced.has(fence))
+    .sort((left, right) => right - left)[0]
+  return latest === undefined
+    ? sessionCardStorePath()
+    : (state.commits.get(latest) ?? sessionCardStorePath())
+}
+
 function readStore(): PersistedSessionCardStore {
   try {
-    const path = sessionCardStorePath()
+    const path = authoritativeSessionCardStorePath()
     const stat = lstatSync(path)
     if (!stat.isFile() || stat.isSymbolicLink()) return emptyStore()
     if (stat.size > SESSION_CARD_STORE_MAX_BYTES) return emptyStore()
@@ -414,7 +498,7 @@ function readStore(): PersistedSessionCardStore {
 }
 
 function readStoreForBranchReplay(): PersistedSessionCardStore {
-  const path = sessionCardStorePath()
+  const path = authoritativeSessionCardStorePath()
   try {
     const stat = lstatSync(path)
     if (!stat.isFile() || stat.isSymbolicLink()) {
@@ -460,7 +544,19 @@ function assertWritableStore(store: PersistedSessionCardStore): string {
   return serialized
 }
 
-type SessionCardStoreLock = { token: string; release: () => void }
+type SessionCardStoreLock = {
+  token: string
+  fence: number
+  release: () => void
+}
+
+type SessionCardStoreLockMetadata = {
+  token: string
+  createdAt: number
+  fence?: number
+}
+
+let activeSessionCardStoreLock: SessionCardStoreLock | null = null
 
 function sleepSync(milliseconds: number): void {
   const signal = new Int32Array(new SharedArrayBuffer(4))
@@ -475,7 +571,7 @@ function unlinkIfPresent(path: string): void {
   }
 }
 
-function lockCreatedAt(path: string): number | null {
+function readLockMetadata(path: string): SessionCardStoreLockMetadata | null {
   const stat = lstatSync(path)
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 1024) {
     throw new Error('Session Card metadata lock is invalid')
@@ -490,24 +586,57 @@ function lockCreatedAt(path: string): number | null {
     ) {
       return null
     }
-    return parsed.createdAt
+    const metadata: SessionCardStoreLockMetadata = {
+      token: parsed.token,
+      createdAt: parsed.createdAt,
+    }
+    if ('fence' in parsed) {
+      if (!Number.isSafeInteger(parsed.fence) || Number(parsed.fence) < 1) {
+        return null
+      }
+      metadata.fence = Number(parsed.fence)
+    }
+    return metadata
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw error
     return null
   }
 }
 
+function createFenceMarker(prefix: string, fence: number): void {
+  const path = sessionCardStoreFencePath(prefix, fence)
+  let descriptor: number | null = null
+  try {
+    descriptor = openSync(path, 'wx', 0o600)
+    writeFileSync(descriptor, `${fence}\n`, 'utf8')
+    fsyncSync(descriptor)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+  } finally {
+    if (descriptor !== null) closeSync(descriptor)
+  }
+}
+
+function pruneOlderFenceMarkers(currentFence: number): void {
+  for (const name of readdirSync(getStateDir())) {
+    const fence = parseFenceSuffix(name, SESSION_CARD_STORE_FENCE_PREFIX)
+    if (fence !== null && fence < currentFence) {
+      unlinkIfPresent(join(getStateDir(), name))
+    }
+  }
+}
+
 function recoverStaleLock(lockPath: string, now: number): boolean {
-  let createdAt: number | null
+  let metadata: SessionCardStoreLockMetadata | null
   let observed
   try {
     observed = lstatSync(lockPath)
-    createdAt = lockCreatedAt(lockPath)
+    metadata = readLockMetadata(lockPath)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
     throw error
   }
-  const persistedAgeSource = createdAt ?? Math.floor(observed.mtimeMs)
+  const persistedAgeSource = metadata?.createdAt ?? Math.floor(observed.mtimeMs)
   const ageSource =
     persistedAgeSource > now + SESSION_CARD_STORE_LOCK_STALE_MS
       ? now - SESSION_CARD_STORE_LOCK_STALE_MS
@@ -525,6 +654,21 @@ function recoverStaleLock(lockPath: string, now: number): boolean {
       observed.dev === claim.dev &&
       observed.ino === claim.ino
     ) {
+      const fence =
+        metadata?.fence ?? readSessionCardStoreFenceState().highWater + 1
+      const commitPath = sessionCardStoreFencePath(
+        SESSION_CARD_STORE_COMMIT_PREFIX,
+        fence,
+      )
+      try {
+        lstatSync(commitPath)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+        // Once takeover wins, a delayed publication from the expired owner is
+        // permanently ignored even if that owner resumes after the successor.
+        createFenceMarker(SESSION_CARD_STORE_FENCED_PREFIX, fence)
+      }
+      createFenceMarker(SESSION_CARD_STORE_FENCE_PREFIX, fence)
       unlinkSync(lockPath)
     }
     return true
@@ -546,27 +690,49 @@ function acquireSessionCardStoreLock(): SessionCardStoreLock {
   for (;;) {
     let descriptor: number | null = null
     try {
+      const fence = readSessionCardStoreFenceState().highWater + 1
+      if (!Number.isSafeInteger(fence)) {
+        throw new Error('Session Card metadata fence is exhausted')
+      }
       descriptor = openSync(lockPath, 'wx', 0o600)
       writeFileSync(
         descriptor,
-        `${JSON.stringify({ token, pid: process.pid, createdAt: Date.now() })}\n`,
+        `${JSON.stringify({
+          token,
+          pid: process.pid,
+          createdAt: Date.now(),
+          fence,
+        })}\n`,
         'utf8',
       )
       fsyncSync(descriptor)
       closeSync(descriptor)
       descriptor = null
+      try {
+        createFenceMarker(SESSION_CARD_STORE_FENCE_PREFIX, fence)
+      } catch (error) {
+        unlinkIfPresent(lockPath)
+        throw error
+      }
       return {
         token,
+        fence,
         release: () => {
           let owned = false
           try {
-            const parsed = JSON.parse(readFileSync(lockPath, 'utf8')) as unknown
-            owned = isRecord(parsed) && parsed.token === token
+            const current = readLockMetadata(lockPath)
+            owned =
+              current !== null &&
+              current.token === token &&
+              current.fence === fence
           } catch (error) {
             if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
             throw error
           }
-          if (owned) unlinkIfPresent(lockPath)
+          if (owned) {
+            unlinkIfPresent(lockPath)
+            pruneOlderFenceMarkers(fence)
+          }
         },
       }
     } catch (error) {
@@ -588,8 +754,25 @@ function acquireSessionCardStoreLock(): SessionCardStoreLock {
   }
 }
 
+function assertSessionCardStoreLockOwned(lock: SessionCardStoreLock): void {
+  let current: SessionCardStoreLockMetadata | null
+  try {
+    current = readLockMetadata(sessionCardStoreLockPath())
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new Error('Session Card metadata lock ownership was lost')
+    }
+    throw error
+  }
+  if (current?.token !== lock.token || current.fence !== lock.fence) {
+    throw new Error('Session Card metadata lock ownership was lost')
+  }
+}
+
 function withSessionCardStoreLock<T>(operation: () => T): T {
   const lock = acquireSessionCardStoreLock()
+  const previousActiveLock = activeSessionCardStoreLock
+  activeSessionCardStoreLock = lock
   let failed = false
   let failure: unknown
   let result: T | undefined
@@ -598,6 +781,8 @@ function withSessionCardStoreLock<T>(operation: () => T): T {
   } catch (error) {
     failed = true
     failure = error
+  } finally {
+    activeSessionCardStoreLock = previousActiveLock
   }
 
   try {
@@ -617,13 +802,22 @@ function withSessionCardStoreLock<T>(operation: () => T): T {
 
 function writeStore(store: PersistedSessionCardStore): void {
   const serialized = assertWritableStore(store)
+  const lock = activeSessionCardStoreLock
+  if (!lock) {
+    throw new Error('Session Card metadata write requires lock ownership')
+  }
+  assertSessionCardStoreLockOwned(lock)
+
   const targetPath = sessionCardStorePath()
   const stateDir = getStateDir()
   mkdirSync(stateDir, { recursive: true })
 
-  const tempPath = join(
-    stateDir,
-    `.${SESSION_CARD_STORE_FILE}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`,
+  const nonce = `${process.pid}.${randomBytes(6).toString('hex')}`
+  const tempPath = join(stateDir, `.${SESSION_CARD_STORE_FILE}.${nonce}.tmp`)
+  const preparedPath = `${tempPath}.prepared`
+  const commitPath = sessionCardStoreFencePath(
+    SESSION_CARD_STORE_COMMIT_PREFIX,
+    lock.fence,
   )
   let writeFailed = false
   let writeFailure: unknown
@@ -635,7 +829,40 @@ function writeStore(store: PersistedSessionCardStore): void {
     } finally {
       closeSync(descriptor)
     }
-    renameSync(tempPath, targetPath)
+    renameSync(tempPath, preparedPath)
+    assertSessionCardStoreLockOwned(lock)
+
+    // Hard-link publication is an immutable create-if-absent commit. A stale
+    // owner can never replace a successor's generation, and takeover records a
+    // permanent invalidation marker before removing the expired lock.
+    linkSync(preparedPath, commitPath)
+    unlinkSync(preparedPath)
+
+    const fenceState = readSessionCardStoreFenceState()
+    if (
+      fenceState.fenced.has(lock.fence) ||
+      fenceState.highWater > lock.fence
+    ) {
+      throw new Error('Session Card metadata publication was fenced')
+    }
+
+    const projectionPath = join(
+      stateDir,
+      `.${SESSION_CARD_STORE_FILE}.${nonce}.projection`,
+    )
+    try {
+      linkSync(commitPath, projectionPath)
+      renameSync(projectionPath, targetPath)
+    } finally {
+      unlinkIfPresent(projectionPath)
+    }
+
+    // Keep only the newest authoritative snapshot. Invalidation markers remain
+    // durable because an arbitrarily delayed expired process may still resume.
+    for (const [fence, path] of fenceState.commits) {
+      if (fence < lock.fence) unlinkIfPresent(path)
+    }
+    pruneOlderFenceMarkers(lock.fence)
   } catch (error) {
     writeFailed = true
     writeFailure = error
@@ -643,12 +870,16 @@ function writeStore(store: PersistedSessionCardStore): void {
 
   let cleanupFailed = false
   let cleanupFailure: unknown
-  try {
-    unlinkSync(tempPath)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      cleanupFailed = true
-      cleanupFailure = error
+  for (const path of [tempPath, preparedPath]) {
+    try {
+      unlinkSync(path)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        cleanupFailed = true
+        cleanupFailure = cleanupFailure
+          ? new AggregateError([cleanupFailure, error])
+          : error
+      }
     }
   }
 
@@ -752,22 +983,25 @@ export function readSessionCardBranchReplay(
   ]?.branchReplays?.find(
     (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
   )
-  return replay && replay.expiresAt > Date.now() ? replay : null
+  return replay &&
+    (replay.outcome?.kind === 'ambiguous' || replay.expiresAt > Date.now())
+    ? replay
+    : null
 }
 
-function failedExpiredReplay(
+function ambiguousExpiredReplay(
   replay: PersistedSessionCardBranchReplay,
 ): PersistedSessionCardBranchReplay {
   const completedAt = replay.expiresAt
-  const failed: PersistedSessionCardBranchReplay = {
+  const ambiguous: PersistedSessionCardBranchReplay = {
     ...replay,
     updatedAt: completedAt,
     completedAt,
     expiresAt: completedAt + SESSION_CARD_BRANCH_COMPLETED_TTL_MS,
-    outcome: { kind: 'failed' },
+    outcome: { kind: 'ambiguous' },
   }
-  delete failed.reservationId
-  return failed
+  delete ambiguous.reservationId
+  return ambiguous
 }
 
 function pruneExpiredBranchReplays(
@@ -783,11 +1017,11 @@ function pruneExpiredBranchReplays(
       if (replay.requestKeyHash === requestedKeyHash) {
         retained.push(replay)
       } else if (replay.outcome) {
-        if (replay.expiresAt > now) retained.push(replay)
-        else changed = true
+        if (replay.outcome.kind === 'ambiguous' || replay.expiresAt > now) {
+          retained.push(replay)
+        } else changed = true
       } else if (replay.expiresAt <= now) {
-        const failed = failedExpiredReplay(replay)
-        if (failed.expiresAt > now) retained.push(failed)
+        retained.push(ambiguousExpiredReplay(replay))
         changed = true
       } else {
         retained.push(replay)
@@ -822,7 +1056,10 @@ export function reserveSessionCardBranchReplay(
       if (!existing) {
         throw new Error('Session Card branch replay reservation is unavailable')
       }
-      if (existing.outcome && existing.expiresAt > now) {
+      if (
+        existing.outcome &&
+        (existing.outcome.kind === 'ambiguous' || existing.expiresAt > now)
+      ) {
         if (existing.fingerprint !== normalizedFingerprint) {
           return { status: 'conflict' }
         }
@@ -835,25 +1072,10 @@ export function reserveSessionCardBranchReplay(
         return { status: 'pending', replay: existing }
       }
 
-      if (
-        !existing.outcome &&
-        existing.fingerprint === normalizedFingerprint &&
-        existing.attemptCount < SESSION_CARD_BRANCH_MAX_ATTEMPTS
-      ) {
-        const reservationId = randomBytes(16).toString('hex')
-        branchReplays[existingIndex] = {
-          ...existing,
-          updatedAt: now,
-          expiresAt: now + SESSION_CARD_BRANCH_PENDING_TTL_MS,
-          attemptCount: existing.attemptCount + 1,
-          reservationId,
-        }
-        writeStore(store)
-        return { status: 'reserved', reservationId }
-      }
-
-      const retained = existing.outcome ? null : failedExpiredReplay(existing)
-      if (retained && retained.expiresAt > now) {
+      const retained = existing.outcome
+        ? null
+        : ambiguousExpiredReplay(existing)
+      if (retained) {
         branchReplays[existingIndex] = retained
         writeStore(store)
         if (retained.fingerprint !== normalizedFingerprint) {
@@ -873,6 +1095,10 @@ export function reserveSessionCardBranchReplay(
       (count, card) => count + (card.branchReplays?.length ?? 0),
       0,
     )
+    if (current?.archivedAt !== undefined) {
+      if (changed) writeStore(store)
+      return { status: 'archived' }
+    }
     if (
       currentBranchReplays.length >= SESSION_CARD_BRANCH_REPLAY_MAX_PER_CARD ||
       totalReplays >= SESSION_CARD_BRANCH_REPLAY_MAX_COUNT
@@ -889,6 +1115,9 @@ export function reserveSessionCardBranchReplay(
       branchReplays: [
         ...currentBranchReplays,
         {
+          // Reservation is the durable effect-intent boundary. The adapter has
+          // no upstream idempotency/reconciliation key, so an incomplete lease
+          // is ambiguous and must never be reclaimed for another opaque fork.
           requestKeyHash: normalizedRequestKeyHash,
           fingerprint: normalizedFingerprint,
           createdAt: now,

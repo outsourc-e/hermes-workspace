@@ -1035,6 +1035,54 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(mocks.completeBranchReplay).not.toHaveBeenCalled()
   })
 
+  it('rejects an archive that commits between projection and effect reservation', async () => {
+    mocks.reserveBranchReplay.mockReturnValueOnce({ status: 'archived' })
+
+    const response = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        JSON.stringify({
+          expectedCanonicalSegmentKey: 'remote:tip',
+          idempotencyKey: 'archive-race',
+        }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ ok: false, retryable: true })
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+    expect(mocks.completeBranchReplay).not.toHaveBeenCalled()
+  })
+
+  it('replays durable opaque-fork ambiguity without invoking fork again', async () => {
+    mocks.reserveBranchReplay.mockImplementationOnce(
+      (_cardId: string, _requestKeyHash: string, fingerprint: string) => ({
+        status: 'completed',
+        replay: { fingerprint, outcome: { kind: 'ambiguous' } },
+      }),
+    )
+
+    const response = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        JSON.stringify({
+          expectedCanonicalSegmentKey: 'remote:tip',
+          idempotencyKey: 'ambiguous-opaque-fork',
+        }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('retry-after')).toBe('5')
+    expect(await response.json()).toMatchObject({ ok: false, retryable: true })
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+    expect(mocks.completeBranchReplay).not.toHaveBeenCalled()
+  })
+
   it('replays a durable projection-pending outcome after process-local coalescing ends', async () => {
     mocks.forkSession.mockResolvedValue({
       session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },

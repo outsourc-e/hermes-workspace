@@ -91,6 +91,18 @@ function replayPendingUnavailable(): Response {
   )
 }
 
+function replayAmbiguousUnavailable(): Response {
+  return json(
+    {
+      ok: false,
+      error:
+        'The upstream branch outcome is unknown; this idempotency key will not be forked again',
+      retryable: true,
+    },
+    { status: 503, headers: { 'Retry-After': '5' } },
+  )
+}
+
 async function captureReplay(response: Response): Promise<BranchReplay> {
   return {
     status: response.status,
@@ -160,6 +172,7 @@ function durableReplayResponse(
 ): Response {
   const outcome = replay.outcome
   if (!outcome) return replayPendingUnavailable()
+  if (outcome.kind === 'ambiguous') return replayAmbiguousUnavailable()
   if (outcome.kind === 'failed') return branchFailure()
   if (outcome.kind === 'unavailable') return unavailableResponse(cardId)
   if (outcome.kind === 'projection-pending') {
@@ -512,6 +525,9 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
               }
               if (reservation.status === 'capacity') {
                 return replayCapacityUnavailable()
+              }
+              if (reservation.status === 'archived') {
+                return branchConflict()
               }
               if (reservation.status === 'pending') {
                 return replayPendingUnavailable()
