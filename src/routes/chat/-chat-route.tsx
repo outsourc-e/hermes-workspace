@@ -90,8 +90,15 @@ export function ChatRoute() {
   }, [activeFriendlyId, navigate, selectedCardId])
 
   useEffect(() => {
-    syncLastSessionCardPersistence({ activeFriendlyId, selectedCardId })
-  }, [activeFriendlyId, selectedCardId])
+    const persistenceAction = syncLastSessionCardPersistence({
+      activeFriendlyId,
+      selectedCardId,
+      cardRouteResolution,
+    })
+    if (persistenceAction === 'bootstrap-new') {
+      void navigate(buildSessionReplaceNavigation('new'))
+    }
+  }, [activeFriendlyId, cardRouteResolution, navigate, selectedCardId])
 
   // Clear history cache when navigating to new chat
   useEffect(() => {

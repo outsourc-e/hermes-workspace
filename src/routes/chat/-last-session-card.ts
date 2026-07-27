@@ -1,5 +1,9 @@
+import type { SessionCardRouteResolution } from './-session-route-state'
+
 const LAST_SESSION_CARD_KEY = 'hermes-last-session-card'
 const CHAT_BOOTSTRAP_CARD_ID = 'new'
+
+export type LastSessionCardPersistenceAction = 'unchanged' | 'bootstrap-new'
 
 export function readLastSessionCard(): string {
   try {
@@ -16,18 +20,37 @@ export function readLastSessionCard(): string {
 export function syncLastSessionCardPersistence({
   activeFriendlyId,
   selectedCardId,
+  cardRouteResolution,
 }: {
   activeFriendlyId: string
   selectedCardId: string | undefined
-}): void {
+  cardRouteResolution?: SessionCardRouteResolution | null
+}): LastSessionCardPersistenceAction {
   if (activeFriendlyId === CHAT_BOOTSTRAP_CARD_ID) {
     try {
       localStorage.removeItem(LAST_SESSION_CARD_KEY)
     } catch {}
-    return
+    return 'unchanged'
   }
-  if (!selectedCardId) return
+  if (selectedCardId) {
+    try {
+      localStorage.setItem(LAST_SESSION_CARD_KEY, selectedCardId)
+    } catch {}
+    return 'unchanged'
+  }
+  if (
+    cardRouteResolution?.status !== 'rejected' ||
+    cardRouteResolution.reason !== 'missing'
+  ) {
+    return 'unchanged'
+  }
   try {
-    localStorage.setItem(LAST_SESSION_CARD_KEY, selectedCardId)
-  } catch {}
+    if (localStorage.getItem(LAST_SESSION_CARD_KEY) !== activeFriendlyId) {
+      return 'unchanged'
+    }
+    localStorage.removeItem(LAST_SESSION_CARD_KEY)
+    return 'bootstrap-new'
+  } catch {
+    return 'unchanged'
+  }
 }
