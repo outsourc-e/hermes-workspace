@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { SidebarSessions } from './sidebar-sessions'
 import type { SessionCard } from '../../types'
+import type { SessionCardListWire } from '../../chat-queries'
 
 const reactActEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -128,6 +129,10 @@ function renderSidebar(
     onRename?: (value: SessionCard) => void
     onArchive?: (value: SessionCard) => void
     onBranch?: (value: SessionCard) => void
+    cardResolutions?: SessionCardListWire['cardResolutions']
+    completeness?: SessionCardListWire['completeness']
+    fetching?: boolean
+    onRetry?: () => void
   } = {},
 ) {
   const container = document.createElement('div')
@@ -144,10 +149,12 @@ function renderSidebar(
         onRename={options.onRename ?? vi.fn()}
         onArchive={options.onArchive ?? vi.fn()}
         onBranch={options.onBranch ?? vi.fn()}
+        cardResolutions={options.cardResolutions}
+        completeness={options.completeness ?? 'complete'}
         loading={false}
-        fetching={false}
+        fetching={options.fetching ?? false}
         error={null}
-        onRetry={vi.fn()}
+        onRetry={options.onRetry ?? vi.fn()}
       />,
     )
   })
@@ -169,6 +176,55 @@ describe('SidebarSessions Card-only surface', () => {
     expect(
       screen.getByText('No sessions yet. Start a conversation →'),
     ).toBeTruthy()
+  })
+
+  it('preserves complete Cards but replaces incomplete inventory with retry UI and no row actions', () => {
+    const complete = card({
+      cardId: 'card:complete',
+      title: 'Stable Card',
+      canonicalSegmentKey: 'local:complete',
+      continuationSegmentKeys: ['local:complete'],
+      childNodes: [],
+    })
+    const incomplete = card({
+      cardId: 'card:incomplete',
+      title: 'Unstable Card',
+      canonicalSegmentKey: 'remote:incomplete',
+      continuationSegmentKeys: ['remote:incomplete'],
+      childNodes: [],
+    })
+    const onRetry = vi.fn()
+
+    renderSidebar({
+      cards: [complete, incomplete],
+      completeness: 'incomplete',
+      cardResolutions: [
+        {
+          cardId: complete.cardId,
+          completeness: 'complete',
+          retryable: false,
+        },
+        {
+          cardId: incomplete.cardId,
+          completeness: 'incomplete',
+          retryable: true,
+        },
+      ],
+      onRetry,
+    })
+
+    expect(screen.getByText('Stable Card')).toBeTruthy()
+    expect(screen.queryByText('Unstable Card')).toBeNull()
+    expect(
+      screen.getByText('Some sessions are temporarily unavailable.'),
+    ).toBeTruthy()
+    expect(
+      screen.getAllByRole('button', { name: 'Card options' }),
+    ).toHaveLength(1)
+    React.act(() =>
+      fireEvent.click(screen.getByRole('button', { name: 'Retry sessions' })),
+    )
+    expect(onRetry).toHaveBeenCalledTimes(1)
   })
 
   it('routes the parent by cardId and inspects children without replacing the parent route', () => {

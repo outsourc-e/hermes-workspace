@@ -41,6 +41,7 @@ import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
+import type { SessionCardListWire } from '../chat-queries'
 import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionCard, SessionMeta } from '../types'
 
@@ -712,6 +713,8 @@ type DesktopSidebarContentProps = {
   profileAvatarDataUrl: string | null
   handleOpenSettings: (section?: 'appearance' | 'claude') => void
   sessionCards: Array<SessionCard>
+  cardResolutions: SessionCardListWire['cardResolutions']
+  completeness: SessionCardListWire['completeness']
   sessionForkAvailable: boolean
   onTogglePin: (card: SessionCard) => void
   onRename: (card: SessionCard) => void
@@ -740,6 +743,8 @@ function DesktopSidebarContent({
   profileAvatarDataUrl,
   handleOpenSettings,
   sessionCards,
+  cardResolutions,
+  completeness,
   sessionForkAvailable,
   onTogglePin,
   onRename,
@@ -923,6 +928,8 @@ function DesktopSidebarContent({
               <div className="flex min-h-0 flex-1">
                 <SidebarSessions
                   sessionCards={sessionCards}
+                  cardResolutions={cardResolutions}
+                  completeness={completeness}
                   sessionForkAvailable={sessionForkAvailable}
                   activeCardId={activeCardId}
                   inspectedChildCardId={inspectedChildCardId}
@@ -1394,6 +1401,8 @@ function ChatSidebarComponent({
           profileAvatarDataUrl={profileAvatarDataUrl}
           handleOpenSettings={handleOpenSettings}
           sessionCards={sessionCardsQuery.data?.cards ?? []}
+          cardResolutions={sessionCardsQuery.data?.cardResolutions}
+          completeness={sessionCardsQuery.data?.completeness ?? 'complete'}
           sessionForkAvailable={sessionForkAvailable}
           onTogglePin={handleTogglePin}
           onRename={handleOpenRename}
@@ -1589,6 +1598,12 @@ function ChatSidebarComponent({
                     <div className="flex-1 min-h-0">
                       <SidebarSessions
                         sessionCards={sessionCardsQuery.data?.cards ?? []}
+                        cardResolutions={
+                          sessionCardsQuery.data?.cardResolutions
+                        }
+                        completeness={
+                          sessionCardsQuery.data?.completeness ?? 'complete'
+                        }
                         sessionForkAvailable={sessionForkAvailable}
                         activeCardId={activeFriendlyId}
                         inspectedChildCardId={inspectedChildCardId}

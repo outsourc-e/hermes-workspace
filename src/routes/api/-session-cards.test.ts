@@ -3,6 +3,7 @@ import { SessionCardHistoryCursorError as CardHistoryCursorError } from '../../s
 import {
   SessionCardNotFoundError as CardNotFoundError,
   SessionCardPinNotEligibleError as CardPinNotEligibleError,
+  SessionCardProjectionIncompleteError as CardProjectionIncompleteError,
 } from '../../server/session-card-service'
 import { requireSessionCardJsonContentType } from './-session-card-http'
 import { Route as ListRoute } from './session-cards'
@@ -34,6 +35,7 @@ vi.mock('../../server/auth-middleware', () => ({
 vi.mock('../../server/session-card-service', () => ({
   SessionCardNotFoundError: class SessionCardNotFoundError extends Error {},
   SessionCardPinNotEligibleError: class SessionCardPinNotEligibleError extends Error {},
+  SessionCardProjectionIncompleteError: class SessionCardProjectionIncompleteError extends Error {},
   sessionCardService: {
     listCards: mocks.listCards,
     resolveCard: mocks.resolveCard,
@@ -133,6 +135,16 @@ function resolvedCard() {
 function resolvedOrphanCard() {
   const resolved = resolvedCard()
   resolved.card.relationshipKind = 'orphan'
+  return resolved
+}
+
+function resolvedIncompleteCard() {
+  const resolved = resolvedCard()
+  resolved.collection = {
+    completeness: 'incomplete',
+    retryable: true,
+    sources: [],
+  }
   return resolved
 }
 
@@ -509,6 +521,50 @@ describe('PATCH /api/session-cards/$cardId', () => {
     expect(mocks.updateCardMetadata).not.toHaveBeenCalled()
   })
 
+  it('fails closed on incomplete fresh Card projection before metadata mutation', async () => {
+    mocks.resolveCard.mockResolvedValueOnce(resolvedIncompleteCard())
+
+    const response = await metadataHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot',
+        'PATCH',
+        JSON.stringify({ manualTitle: 'Unsafe rename' }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Session Card inventory is temporarily unavailable',
+      retryable: true,
+    })
+    expect(mocks.updateCardMetadata).not.toHaveBeenCalled()
+  })
+
+  it('maps a projection that becomes incomplete at the service mutation boundary to the stable retry response', async () => {
+    mocks.resolveCard.mockResolvedValueOnce(resolvedCard())
+    mocks.updateCardMetadata.mockRejectedValueOnce(
+      new CardProjectionIncompleteError('remote:root'),
+    )
+
+    const response = await metadataHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot',
+        'PATCH',
+        JSON.stringify({ manualTitle: 'Unsafe rename' }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Session Card inventory is temporarily unavailable',
+      retryable: true,
+    })
+  })
+
   it('accepts an exact boolean pin and returns the resolved Card pin state', async () => {
     const fresh = resolvedCard()
     fresh.card.pinned = true
@@ -620,6 +676,50 @@ describe('POST /api/session-cards/$cardId/archive', () => {
       error: 'Only root Session Cards can be archived',
     })
     expect(mocks.archiveCard).not.toHaveBeenCalled()
+  })
+
+  it('fails closed on incomplete fresh Card projection before archive mutation', async () => {
+    mocks.resolveCard.mockResolvedValueOnce(resolvedIncompleteCard())
+
+    const response = await archiveHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/archive',
+        'POST',
+        '{}',
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Session Card inventory is temporarily unavailable',
+      retryable: true,
+    })
+    expect(mocks.archiveCard).not.toHaveBeenCalled()
+  })
+
+  it('maps an archive projection that becomes incomplete at the service mutation boundary to the stable retry response', async () => {
+    mocks.resolveCard.mockResolvedValueOnce(resolvedCard())
+    mocks.archiveCard.mockRejectedValueOnce(
+      new CardProjectionIncompleteError('remote:root'),
+    )
+
+    const response = await archiveHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/archive',
+        'POST',
+        '{}',
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Session Card inventory is temporarily unavailable',
+      retryable: true,
+    })
   })
 })
 
@@ -904,6 +1004,28 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(await response.json()).toEqual({
       ok: false,
       error: 'Only root Session Cards can be branched',
+    })
+    expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
+    expect(mocks.forkSession).not.toHaveBeenCalled()
+  })
+
+  it('fails closed on incomplete fresh Card projection before capability probing or forking', async () => {
+    mocks.resolveCard.mockResolvedValueOnce(resolvedIncompleteCard())
+
+    const response = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        '{}',
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Session Card inventory is temporarily unavailable',
+      retryable: true,
     })
     expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
     expect(mocks.forkSession).not.toHaveBeenCalled()

@@ -56,6 +56,17 @@ function projectionPendingResponse(
   )
 }
 
+function projectionUnavailable(): Response {
+  return json(
+    {
+      ok: false,
+      error: 'Session Card inventory is temporarily unavailable',
+      retryable: true,
+    },
+    { status: 503 },
+  )
+}
+
 function remoteProjectedKey(upstreamKey: string): string {
   return `remote:${encodeURIComponent(upstreamKey)}`
 }
@@ -106,6 +117,9 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
           return branchFailure()
         }
 
+        if (resolved.collection.completeness !== 'complete') {
+          return projectionUnavailable()
+        }
         if (resolved.card.relationshipKind !== 'root') {
           return invalidRequest('Only root Session Cards can be branched')
         }
@@ -115,10 +129,7 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
           resolved.sourceBySegmentKey.get(canonicalSegmentKey)
         const authoritativeUpstreamKey =
           resolved.upstreamKeyBySegmentKey.get(canonicalSegmentKey)
-        if (
-          canonicalSource !== 'gateway' ||
-          resolved.collection.completeness !== 'complete'
-        ) {
+        if (canonicalSource !== 'gateway') {
           return unavailableResponse(resolved.card.cardId)
         }
         if (!authoritativeUpstreamKey) return branchFailure()

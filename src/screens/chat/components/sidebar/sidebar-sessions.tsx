@@ -5,6 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { memo, useMemo, useState } from 'react'
 import { SessionTreeRow } from './session-tree-row'
 import type { SessionCardTreeRow } from './session-tree-row'
+import type { SessionCardListWire } from '../../chat-queries'
 import type { SessionCard, SessionCardChild } from '../../types'
 import {
   Collapsible,
@@ -22,6 +23,8 @@ import { Button } from '@/components/ui/button'
 type SidebarSessionsProps = {
   /** Authoritative, server-backed logical conversations. */
   sessionCards: Array<SessionCard>
+  cardResolutions?: SessionCardListWire['cardResolutions']
+  completeness: SessionCardListWire['completeness']
   activeCardId: string
   inspectedChildCardId?: string
   defaultOpen?: boolean
@@ -52,6 +55,8 @@ type CardRowNode = Pick<
 
 export const SidebarSessions = memo(function SidebarSessions({
   sessionCards,
+  cardResolutions,
+  completeness,
   activeCardId,
   inspectedChildCardId,
   defaultOpen = true,
@@ -70,10 +75,32 @@ export const SidebarSessions = memo(function SidebarSessions({
   const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(
     () => new Set(),
   )
-  const roots = sessionCards
+  const resolutionByCardId = useMemo(
+    () =>
+      cardResolutions === undefined
+        ? null
+        : new Map(
+            cardResolutions.map((resolution) => [
+              resolution.cardId,
+              resolution,
+            ]),
+          ),
+    [cardResolutions],
+  )
+  const roots = useMemo(
+    () =>
+      sessionCards.filter((card) =>
+        resolutionByCardId === null
+          ? completeness === 'complete'
+          : resolutionByCardId.get(card.cardId)?.completeness === 'complete',
+      ),
+    [completeness, resolutionByCardId, sessionCards],
+  )
+  const inventoryIncomplete =
+    completeness !== 'complete' || roots.length !== sessionCards.length
   const cardsById = useMemo(
-    () => new Map(sessionCards.map((card) => [card.cardId, card])),
-    [sessionCards],
+    () => new Map(roots.map((card) => [card.cardId, card])),
+    [roots],
   )
 
   const pinnedCardIds = useMemo(
@@ -237,23 +264,50 @@ export const SidebarSessions = memo(function SidebarSessions({
                     Retry
                   </Button>
                 </div>
-              ) : unpinnedRows.length > 0 ? (
-                <>
-                  {pinnedRows.length > 0 ? (
-                    <div className="my-1 border-t border-primary-200/80" />
-                  ) : null}
-                  <section aria-label="Sessions">
-                    {renderRoots(unpinnedRows)}
-                  </section>
-                </>
               ) : (
-                <div className="px-2 py-2 text-xs text-primary-500">
-                  {pinnedRows.length > 0
-                    ? 'All sessions are pinned.'
-                    : 'No sessions yet. Start a conversation →'}
-                </div>
+                <>
+                  {inventoryIncomplete ? (
+                    <div
+                      role="status"
+                      className="px-2 py-2 text-xs text-primary-500"
+                    >
+                      <div>Some sessions are temporarily unavailable.</div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="mt-2"
+                        disabled={fetching}
+                        aria-label="Retry sessions"
+                        onClick={onRetry}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  ) : null}
+                  {unpinnedRows.length > 0 ? (
+                    <>
+                      {pinnedRows.length > 0 ? (
+                        <div className="my-1 border-t border-primary-200/80" />
+                      ) : null}
+                      <section aria-label="Sessions">
+                        {renderRoots(unpinnedRows)}
+                      </section>
+                    </>
+                  ) : pinnedRows.length > 0 ? (
+                    inventoryIncomplete ? null : (
+                      <div className="px-2 py-2 text-xs text-primary-500">
+                        All sessions are pinned.
+                      </div>
+                    )
+                  ) : inventoryIncomplete ? null : (
+                    <div className="px-2 py-2 text-xs text-primary-500">
+                      No sessions yet. Start a conversation →
+                    </div>
+                  )}
+                </>
               )}
-              {fetching && !loading && !error && sessionCards.length > 0 ? (
+              {fetching && !loading && !error && roots.length > 0 ? (
                 <div className="px-2 py-1 text-[11px] text-primary-400">
                   Updating…
                 </div>
@@ -274,6 +328,8 @@ function areSidebarSessionsEqual(
   next: SidebarSessionsProps,
 ) {
   if (prev.sessionCards !== next.sessionCards) return false
+  if (prev.cardResolutions !== next.cardResolutions) return false
+  if (prev.completeness !== next.completeness) return false
   if (prev.activeCardId !== next.activeCardId) return false
   if (prev.inspectedChildCardId !== next.inspectedChildCardId) return false
   if (prev.defaultOpen !== next.defaultOpen) return false

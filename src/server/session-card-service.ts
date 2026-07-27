@@ -122,6 +122,13 @@ export class SessionCardPinNotEligibleError extends Error {
   }
 }
 
+export class SessionCardProjectionIncompleteError extends Error {
+  constructor(cardId: string) {
+    super(`Session Card projection is incomplete: ${cardId}`)
+    this.name = 'SessionCardProjectionIncompleteError'
+  }
+}
+
 type SessionCardServiceOptions = {
   remoteSource?: SessionCardRemoteSource | null
   localSource?: SessionCardLocalSource | null
@@ -1307,6 +1314,9 @@ export class SessionCardService {
     patch: SessionCardMetadataUpdate,
   ): Promise<PersistedSessionCard> {
     const resolved = await this.resolveCard(cardId)
+    if (resolved.collection.completeness !== 'complete') {
+      throw new SessionCardProjectionIncompleteError(resolved.card.cardId)
+    }
     if (patch.pinned === true && !resolved.pinEligible) {
       throw new SessionCardPinNotEligibleError(resolved.card.cardId)
     }
@@ -1315,6 +1325,9 @@ export class SessionCardService {
 
   async archiveCard(cardId: string): Promise<PersistedSessionCard> {
     const resolved = await this.resolveCard(cardId, { includeArchived: true })
+    if (resolved.collection.completeness !== 'complete') {
+      throw new SessionCardProjectionIncompleteError(resolved.card.cardId)
+    }
     return this.metadataStore.archive(resolved.card.cardId)
   }
 }

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   SessionCardNotFoundError,
   SessionCardPinNotEligibleError,
+  SessionCardProjectionIncompleteError,
   SessionCardService,
 } from './session-card-service'
 import type {
@@ -1043,6 +1044,7 @@ describe('SessionCardService collection and resolution', () => {
   })
 
   it('ties resolved-card completeness only to the source required by that card', async () => {
+    const store = metadataStore()
     const service = new SessionCardService({
       remoteSource: {
         source: 'remote',
@@ -1052,7 +1054,7 @@ describe('SessionCardService collection and resolution', () => {
         source: 'local',
         listSessions: () => [session('local-card', { source: 'local' })],
       },
-      metadataStore: metadataStore(),
+      metadataStore: store,
     })
 
     await expect(service.listCards()).resolves.toMatchObject({
@@ -1077,6 +1079,42 @@ describe('SessionCardService collection and resolution', () => {
         ],
       },
     })
+    await expect(
+      service.updateCardMetadata('local:local-card', {
+        manualTitle: 'Still authoritative',
+      }),
+    ).resolves.toMatchObject({
+      cardId: 'local:local-card',
+      manualTitle: 'Still authoritative',
+    })
+    expect(store.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects metadata and archive mutations when the required Card projection is incomplete', async () => {
+    const store = metadataStore()
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () =>
+          Promise.resolve({
+            ...page([session('root')], 0, 2),
+            hasMore: true,
+            pagination: 'unsupported',
+          }),
+      },
+      localSource: null,
+      metadataStore: store,
+      maxSessions: 1,
+    })
+
+    await expect(
+      service.updateCardMetadata('root', { manualTitle: 'Unsafe' }),
+    ).rejects.toBeInstanceOf(SessionCardProjectionIncompleteError)
+    await expect(service.archiveCard('root')).rejects.toBeInstanceOf(
+      SessionCardProjectionIncompleteError,
+    )
+    expect(store.update).not.toHaveBeenCalled()
+    expect(store.archive).not.toHaveBeenCalled()
   })
 
   it('archives by fresh card ID without invoking any backend deletion', async () => {

@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { sessionCardService } from '../../server/session-card-service'
+import {
+  SessionCardProjectionIncompleteError,
+  sessionCardService,
+} from '../../server/session-card-service'
 import {
   internalFailure,
   invalidRequest,
@@ -11,6 +14,17 @@ import {
   readJsonObject,
   requireSessionCardJsonContentType,
 } from './-session-card-http'
+
+function projectionUnavailable(): Response {
+  return json(
+    {
+      ok: false,
+      error: 'Session Card inventory is temporarily unavailable',
+      retryable: true,
+    },
+    { status: 503 },
+  )
+}
 
 export const Route = createFileRoute('/api/session-cards/$cardId/archive')({
   server: {
@@ -33,6 +47,9 @@ export const Route = createFileRoute('/api/session-cards/$cardId/archive')({
           const current = await sessionCardService.resolveCard(cardId, {
             includeArchived: true,
           })
+          if (current.collection.completeness !== 'complete') {
+            return projectionUnavailable()
+          }
           if (current.card.relationshipKind !== 'root') {
             return invalidRequest('Only root Session Cards can be archived')
           }
@@ -44,6 +61,9 @@ export const Route = createFileRoute('/api/session-cards/$cardId/archive')({
           })
         } catch (error) {
           if (isSessionCardNotFound(error)) return notFoundResponse()
+          if (error instanceof SessionCardProjectionIncompleteError) {
+            return projectionUnavailable()
+          }
           return internalFailure('Unable to archive Session Card')
         }
       },
