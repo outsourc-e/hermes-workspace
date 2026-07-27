@@ -32,7 +32,9 @@ import {
   fetchStatus,
   isAuthoritativeCompleteSessionCardHistory,
   mergeSessionCardHistoryResponse,
+  moveLegacyHistoryMessagesToSessionCard,
   moveSessionCardHistoryMessages,
+  moveSessionCardHistoryToCard,
   retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
   updateHistoryMessageByClientId,
@@ -1476,6 +1478,8 @@ export function ChatScreen({
         reason: 'bootstrap' | 'stream-handoff'
       }) => {
         const activeSend = activeSendRef.current
+        const sourceFriendlyId = activeSend?.friendlyId || activeFriendlyId
+        const sourceSessionKey = activeSend?.sessionKey || fromSessionKey
         const currentAuthoritativeSessionKey =
           forcedSessionKey ||
           activeSend?.sessionKey ||
@@ -1510,6 +1514,27 @@ export function ChatScreen({
           friendlyId,
           reason,
         })
+        if (reason === 'bootstrap') {
+          // The parent route first moves `new/new` to this resolved legacy
+          // key. Promote that transient message into the Card cache that the
+          // destination route actually renders.
+          moveLegacyHistoryMessagesToSessionCard(
+            queryClient,
+            friendlyId,
+            sessionKey,
+          )
+        } else if (!activeCard) {
+          // A bootstrap can be immediately followed by a successor handoff in
+          // the same stream reader batch, before the route has mounted the
+          // first Card. Keep the transient overlay on that final Card.
+          moveSessionCardHistoryToCard(
+            queryClient,
+            sourceFriendlyId,
+            sourceSessionKey,
+            friendlyId,
+            sessionKey,
+          )
+        }
       },
       [
         activeCanonicalKey,

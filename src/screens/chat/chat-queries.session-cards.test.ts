@@ -5,11 +5,13 @@ import {
   appendSessionCardHistoryMessage,
   archiveSessionCard,
   branchSessionCard,
+  chatQueryKeys,
   fetchCompleteSessionCardHistory,
   fetchSessionCardHistory,
   fetchSessionCards,
   isAuthoritativeCompleteSessionCardHistory,
   mergeSessionCardHistoryResponse,
+  moveLegacyHistoryMessagesToSessionCard,
   moveSessionCardHistoryMessages,
   sessionCardQueryKeys,
   updateSessionCardMetadata,
@@ -1158,6 +1160,75 @@ describe('Session Card fetchers', () => {
     expect(
       mergeSessionCardHistoryResponse(server as any, cached as any).messages,
     ).toEqual([expect.objectContaining({ id: 'server-partial' })])
+  })
+
+  it('keeps an accepted local user message while complete Card history catches up', () => {
+    const server = {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [{ id: 'assistant-1', role: 'assistant' as const, content: [] }],
+      completeness: 'complete' as const,
+      retryable: false,
+      missingSegments: [],
+    }
+    const cached = {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [
+        {
+          role: 'user' as const,
+          content: [{ type: 'text' as const, text: 'still here' }],
+          clientId: 'client-1',
+          status: 'done',
+        },
+      ],
+      completeness: 'partial' as const,
+      retryable: true,
+      missingSegments: [],
+    }
+
+    expect(mergeSessionCardHistoryResponse(server, cached)).toMatchObject({
+      completeness: 'complete',
+      messages: [
+        { id: 'assistant-1' },
+        { role: 'user', clientId: 'client-1', status: 'done' },
+      ],
+    })
+  })
+
+  it('moves bootstrap transient messages from legacy history into Card history', () => {
+    const queryClient = new QueryClient()
+    const legacyKey = chatQueryKeys.history('remote:root', 'remote:tip')
+    const cardKey = sessionCardQueryKeys.history('remote:root', 'remote:tip')
+    queryClient.setQueryData(legacyKey, {
+      sessionKey: 'remote:tip',
+      messages: [
+        {
+          role: 'user' as const,
+          content: [{ type: 'text' as const, text: 'bootstrap prompt' }],
+          clientId: 'client-bootstrap',
+          status: 'queued',
+        },
+      ],
+    })
+
+    moveLegacyHistoryMessagesToSessionCard(
+      queryClient,
+      'remote:root',
+      'remote:tip',
+    )
+
+    expect(queryClient.getQueryData(legacyKey)).toBeUndefined()
+    expect(queryClient.getQueryData(cardKey)).toMatchObject({
+      completeness: 'partial',
+      retryable: true,
+      messages: [
+        { role: 'user', clientId: 'client-bootstrap', status: 'queued' },
+      ],
+    })
+    queryClient.clear()
   })
 
   it('keeps optimistic-only and partial caches non-authoritative', () => {

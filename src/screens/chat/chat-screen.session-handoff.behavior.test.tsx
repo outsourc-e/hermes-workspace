@@ -2205,7 +2205,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       'intermediate-friendly',
       'backend-a',
     )
-    const targetHistoryKey = chatQueryKeys.history(
+    const targetCardHistoryKey = sessionCardQueryKeys.history(
       'successor-friendly',
       'backend-b',
     )
@@ -2276,7 +2276,8 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
     expect(queryClient.getQueryData(intermediateHistoryKey)).toBeUndefined()
     expect(
-      queryClient.getQueryData<HistoryResponse>(targetHistoryKey)?.messages,
+      queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
+        ?.messages,
     ).toEqual([optimisticMessage])
     expect(readPendingMessage('backend-b', 'successor-friendly')).toMatchObject(
       {
@@ -2306,7 +2307,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     queryContext.client = queryClient
     const sourceHistoryKey = chatQueryKeys.history('new', 'new')
-    const targetHistoryKey = chatQueryKeys.history(
+    const targetCardHistoryKey = sessionCardQueryKeys.history(
       'remote:created-card',
       'remote:created-segment',
     )
@@ -2381,7 +2382,8 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
     expect(
-      queryClient.getQueryData<HistoryResponse>(targetHistoryKey)?.messages,
+      queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
+        ?.messages,
     ).toEqual([optimisticMessage])
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)
@@ -2398,7 +2400,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     queryContext.client = queryClient
     const sourceHistoryKey = chatQueryKeys.history('new', 'new')
-    const targetHistoryKey = chatQueryKeys.history(
+    const targetCardHistoryKey = sessionCardQueryKeys.history(
       'local:created-card',
       'local:created-segment',
     )
@@ -2478,7 +2480,8 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
     expect(
-      queryClient.getQueryData<HistoryResponse>(targetHistoryKey)?.messages,
+      queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
+        ?.messages,
     ).toEqual([optimisticMessage])
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)

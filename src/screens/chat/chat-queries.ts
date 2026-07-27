@@ -832,25 +832,31 @@ function mergeCardHistoryMessages(
   return messages
 }
 
+function isUnechoedLocalUserMessage(message: ChatMessage): boolean {
+  const raw = message as Record<string, unknown>
+  if (message.role !== 'user') return false
+  if (nonblankWireString(raw.__optimisticId) !== null) return true
+  if (raw.status === 'sending' || raw.status === 'queued') return true
+
+  // Hermes accepts user messages before its history endpoint necessarily
+  // echoes them. Once stream lifecycle events mark that message sent/done, its
+  // client ID is the only durable identity until the server assigns one.
+  if (raw.status !== 'sent' && raw.status !== 'done') return false
+  const clientId =
+    nonblankWireString(raw.clientId) ?? nonblankWireString(raw.client_id)
+  const serverId =
+    nonblankWireString(raw.id) ?? nonblankWireString(raw.messageId)
+  return clientId !== null && serverId === null
+}
+
 export function mergeSessionCardHistoryResponse(
   server: SessionCardHistoryResponse,
   cached: SessionCardHistoryResponse | undefined,
 ): SessionCardHistoryResponse {
-  if (
-    !cached ||
-    !isAuthoritativeCompleteSessionCardHistory(server) ||
-    !isAuthoritativeCompleteSessionCardHistory(cached)
-  ) {
+  if (!cached || !isAuthoritativeCompleteSessionCardHistory(server)) {
     return server
   }
-  const optimistic = cached.messages.filter((message) => {
-    const raw = message as Record<string, unknown>
-    return (
-      nonblankWireString(raw.__optimisticId) !== null ||
-      raw.status === 'sending' ||
-      raw.status === 'queued'
-    )
-  })
+  const optimistic = cached.messages.filter(isUnechoedLocalUserMessage)
   return {
     ...server,
     messages: mergeCardHistoryMessages(server.messages, optimistic),
@@ -1469,6 +1475,69 @@ export function moveHistoryMessages(
     messages,
   })
   queryClient.removeQueries({ queryKey: fromKey, exact: true })
+}
+
+export function moveSessionCardHistoryToCard(
+  queryClient: QueryClient,
+  fromCardId: string,
+  fromCanonicalSegmentKey: string,
+  toCardId: string,
+  toCanonicalSegmentKey: string,
+) {
+  if (
+    fromCardId === toCardId &&
+    fromCanonicalSegmentKey === toCanonicalSegmentKey
+  ) {
+    return
+  }
+  const fromKey = sessionCardQueryKeys.history(
+    fromCardId,
+    fromCanonicalSegmentKey,
+  )
+  const toKey = sessionCardQueryKeys.history(toCardId, toCanonicalSegmentKey)
+  const fromData = queryClient.getQueryData<SessionCardHistoryResponse>(fromKey)
+  if (!fromData) return
+  const toData = queryClient.getQueryData<SessionCardHistoryResponse>(toKey)
+  queryClient.setQueryData(toKey, {
+    ...fromData,
+    ...toData,
+    sessionKey: toCanonicalSegmentKey,
+    cardId: toCardId,
+    canonicalSegmentKey: toCanonicalSegmentKey,
+    messages: mergeCardHistoryMessages(
+      fromData.messages,
+      toData?.messages ?? [],
+    ),
+  } satisfies SessionCardHistoryResponse)
+  queryClient.removeQueries({ queryKey: fromKey, exact: true })
+}
+
+/**
+ * A bootstrap stream starts under the legacy `new/new` cache before its
+ * authoritative Session Card exists. Once the route resolves, carry only its
+ * transient user messages into the Card cache—the only transcript rendered by
+ * a Card route. The Card entry remains partial until the server supplies a
+ * complete history response.
+ */
+export function moveLegacyHistoryMessagesToSessionCard(
+  queryClient: QueryClient,
+  friendlyId: string,
+  sessionKey: string,
+  cardId = friendlyId,
+) {
+  const fromKey = chatQueryKeys.history(friendlyId, sessionKey)
+  const fromData = queryClient.getQueryData<HistoryResponse>(fromKey)
+  if (!fromData) return
+  const transient = fromData.messages.filter(isUnechoedLocalUserMessage)
+  queryClient.removeQueries({ queryKey: fromKey, exact: true })
+  if (transient.length === 0) return
+
+  updateSessionCardHistoryMessages(
+    queryClient,
+    cardId,
+    sessionKey,
+    (messages) => mergeCardHistoryMessages(transient, messages),
+  )
 }
 
 export function reconcileSessionDraft(
