@@ -7,9 +7,11 @@ import {
   resolveSessionCardRouteState,
   validatedInspectedChildCardId,
 } from './-session-route-state'
+import type { SessionCardListWire } from '../../screens/chat/chat-queries'
 
 const rootCard = {
   cardId: 'remote:root',
+  canonicalSource: 'remote' as const,
   title: 'Root card',
   titleSource: 'manual' as const,
   canonicalSegmentKey: 'remote:tip',
@@ -47,6 +49,17 @@ const localCard = {
   childNodes: [],
 }
 
+function cardResolutions(
+  cards: Array<{ cardId: string }>,
+  completeness: 'complete' | 'incomplete' = 'complete',
+) {
+  return cards.map((card) => ({
+    cardId: card.cardId,
+    completeness,
+    retryable: completeness === 'incomplete',
+  }))
+}
+
 describe('chat canonical replace navigation', () => {
   it('preserves search, hash, and route state', () => {
     expect(buildSessionReplaceNavigation('canonical-friendly')).toEqual({
@@ -64,6 +77,7 @@ describe('Session Card route resolution', () => {
   it('maps raw producer identities, including every child continuation alias', () => {
     const response = {
       cards: [rootCard],
+      cardResolutions: cardResolutions([rootCard]),
       completeness: 'complete' as const,
       retryable: false,
       sources: [],
@@ -92,11 +106,15 @@ describe('Session Card route resolution', () => {
               ...rootCard,
               cardId: 'remote:other',
               canonicalSegmentKey: 'remote:other-tip',
-              continuationSegmentKeys: ['remote:friendly-alias'],
+              continuationSegmentKeys: ['remote:other', 'remote:other-tip'],
               childNodes: [],
             },
             rootCard,
           ],
+          cardResolutions: cardResolutions([
+            { cardId: 'remote:other' },
+            rootCard,
+          ]),
         },
         ['remote:tip', 'remote:friendly-alias'],
       ),
@@ -106,7 +124,12 @@ describe('Session Card route resolution', () => {
     ).toBeUndefined()
     expect(
       resolveSessionCardProducerNavigation(
-        { ...response, completeness: 'incomplete', retryable: true },
+        {
+          ...response,
+          cardResolutions: cardResolutions([rootCard], 'incomplete'),
+          completeness: 'incomplete',
+          retryable: true,
+        },
         ['remote:child-middle'],
       ),
     ).toBeUndefined()
@@ -133,6 +156,7 @@ describe('Session Card route resolution', () => {
         routeKey: 'remote:root',
         response: {
           cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
           completeness: 'complete',
           retryable: false,
           sources: [],
@@ -147,6 +171,7 @@ describe('Session Card route resolution', () => {
         routeKey: 'remote:tip',
         response: {
           cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
           completeness: 'complete',
           retryable: false,
           sources: [],
@@ -163,6 +188,7 @@ describe('Session Card route resolution', () => {
           routeKey,
           response: {
             cards: [rootCard],
+            cardResolutions: cardResolutions([rootCard]),
             completeness: 'complete',
             retryable: false,
             sources: [],
@@ -178,6 +204,7 @@ describe('Session Card route resolution', () => {
         routeKey: 'remote:missing',
         response: {
           cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
           completeness: 'complete',
           retryable: false,
           sources: [],
@@ -192,6 +219,7 @@ describe('Session Card route resolution', () => {
         routeKey: 'new',
         response: {
           cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
           completeness: 'complete',
           retryable: false,
           sources: [],
@@ -200,24 +228,19 @@ describe('Session Card route resolution', () => {
     ).toEqual({ status: 'bootstrap' })
   })
 
-  it('resolves the former main alias only through its authoritative Card', () => {
-    const mainCard = {
-      ...rootCard,
-      cardId: 'remote:main-card',
-      canonicalSegmentKey: 'remote:main-tip',
-      continuationSegmentKeys: ['main', 'remote:main-tip'],
-    }
+  it('does not infer the former bare main alias from an authoritative Card', () => {
     expect(
       resolveSessionCardRoute({
         routeKey: 'main',
         response: {
-          cards: [mainCard],
+          cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
           completeness: 'complete',
           retryable: false,
           sources: [],
         },
       }),
-    ).toEqual({ status: 'selected', card: mainCard })
+    ).toEqual({ status: 'rejected', reason: 'missing' })
   })
 
   it('fails closed when the Card projection is incomplete', () => {
@@ -226,6 +249,7 @@ describe('Session Card route resolution', () => {
         routeKey: 'remote:root',
         response: {
           cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard], 'incomplete'),
           completeness: 'incomplete',
           retryable: true,
           sources: [
@@ -306,7 +330,10 @@ describe('Session Card route resolution', () => {
       sources: [],
     }
     expect(
-      resolveSessionCardRoute({ routeKey: 'local:root', response }),
+      resolveSessionCardRoute({
+        routeKey: 'local:root',
+        response: response as unknown as SessionCardListWire,
+      }),
     ).toEqual({ status: 'unavailable', reason: 'projection' })
     expect(
       resolveSessionCardRoute({

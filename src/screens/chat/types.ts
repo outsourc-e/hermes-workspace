@@ -186,6 +186,7 @@ export type SessionCardCanonicalTransport = 'dashboard' | 'gateway'
 export type SessionCardChild = {
   cardId: string
   sessionKey: string
+  continuationSegmentKeys: Array<string>
   relationshipKind: 'branch' | 'child'
   title: string
   status: SessionCardChildStatus

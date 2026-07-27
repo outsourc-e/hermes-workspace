@@ -638,18 +638,169 @@ function canonicalTransportForCard(
     : undefined
 }
 
-function attachCanonicalSources(
-  cards: Array<SessionCard>,
+function expandedContinuationSegmentKeys(
+  card: SessionCard,
   collection: SessionCardCollection,
-): Array<SessionCard> {
-  return cards.map((card) => {
-    const canonicalTransport = canonicalTransportForCard(card, collection)
+): Array<string> {
+  const continuationSegmentKeys: Array<string> = []
+  const seenContinuationSegmentKeys = new Set<string>()
+  for (const loadedSegmentKey of card.continuationSegmentKeys) {
+    const knownMissing =
+      collection.knownMissingContinuationSegmentKeysBySessionKey.get(
+        loadedSegmentKey,
+      ) ?? []
+    for (const segmentKey of [...knownMissing, loadedSegmentKey]) {
+      if (seenContinuationSegmentKeys.has(segmentKey)) continue
+      seenContinuationSegmentKeys.add(segmentKey)
+      continuationSegmentKeys.push(segmentKey)
+    }
+  }
+  return continuationSegmentKeys
+}
+
+function isSourceQualifiedCardIdentity(
+  identity: string,
+  source: 'local' | 'remote',
+): boolean {
+  const prefix = `${source}:`
+  return (
+    identity.trim() === identity &&
+    identity.startsWith(prefix) &&
+    identity.length > prefix.length
+  )
+}
+
+function assertAuthoritativeContinuationAliases(
+  owner: { cardId: string; canonicalSegmentKey: string },
+  continuationSegmentKeys: Array<string>,
+  continuationCount: number,
+  canonicalSource: 'local' | 'remote',
+): void {
+  if (
+    !isSourceQualifiedCardIdentity(owner.cardId, canonicalSource) ||
+    !isSourceQualifiedCardIdentity(
+      owner.canonicalSegmentKey,
+      canonicalSource,
+    ) ||
+    continuationSegmentKeys.length === 0 ||
+    continuationCount !== continuationSegmentKeys.length ||
+    new Set(continuationSegmentKeys).size !== continuationSegmentKeys.length ||
+    continuationSegmentKeys[0] !== owner.cardId ||
+    continuationSegmentKeys.at(-1) !== owner.canonicalSegmentKey ||
+    continuationSegmentKeys.some(
+      (identity) => !isSourceQualifiedCardIdentity(identity, canonicalSource),
+    )
+  ) {
+    throw new Error(
+      `Invalid authoritative Session Card aliases: ${owner.cardId}`,
+    )
+  }
+}
+
+function authoritativeCardProjection(
+  fresh: FreshProjection,
+  card: SessionCard,
+): SessionCard {
+  const canonicalSource = canonicalSourceForCard(card, fresh.collection)
+  const canonicalTransport = canonicalTransportForCard(card, fresh.collection)
+  const continuationSegmentKeys = expandedContinuationSegmentKeys(
+    card,
+    fresh.collection,
+  )
+  const childNodes = card.childNodes.map((childNode) => {
+    const childCard = fresh.projection.indexByCardId.get(childNode.cardId)
+    if (
+      !childCard ||
+      childCard.parentCardId !== card.cardId ||
+      childCard.canonicalSegmentKey !== childNode.sessionKey ||
+      (childCard.relationshipKind !== 'branch' &&
+        childCard.relationshipKind !== 'child')
+    ) {
+      throw new Error(
+        `Invalid authoritative Session Card child: ${childNode.cardId}`,
+      )
+    }
+    const childSource = canonicalSourceForCard(childCard, fresh.collection)
+    if (childSource !== canonicalSource) {
+      throw new Error(
+        `Invalid authoritative Session Card child source: ${childNode.cardId}`,
+      )
+    }
+    const childContinuationSegmentKeys = expandedContinuationSegmentKeys(
+      childCard,
+      fresh.collection,
+    )
+    assertAuthoritativeContinuationAliases(
+      childCard,
+      childContinuationSegmentKeys,
+      childContinuationSegmentKeys.length,
+      childSource,
+    )
     return {
-      ...card,
-      canonicalSource: canonicalSourceForCard(card, collection),
-      ...(canonicalTransport === undefined ? {} : { canonicalTransport }),
+      ...childNode,
+      sessionKey: childCard.canonicalSegmentKey,
+      continuationSegmentKeys: childContinuationSegmentKeys,
+      continuationCount: childContinuationSegmentKeys.length,
     }
   })
+  const projectedCard: SessionCard = {
+    ...card,
+    canonicalSource,
+    ...(canonicalTransport === undefined ? {} : { canonicalTransport }),
+    continuationSegmentKeys,
+    continuationCount: continuationSegmentKeys.length,
+    childNodes,
+  }
+  assertAuthoritativeContinuationAliases(
+    projectedCard,
+    continuationSegmentKeys,
+    projectedCard.continuationCount,
+    canonicalSource,
+  )
+  if (projectedCard.archived && projectedCard.pinned) {
+    throw new Error(
+      `Invalid archived Session Card pin: ${projectedCard.cardId}`,
+    )
+  }
+  return projectedCard
+}
+
+function authoritativeCardProjections(
+  fresh: FreshProjection,
+  cards: Array<SessionCard>,
+): Array<SessionCard> {
+  const projectedCards = cards.map((card) =>
+    authoritativeCardProjection(fresh, card),
+  )
+  const ownerByIdentity = new Map<string, object>()
+  const claimIdentity = (identity: string, owner: object) => {
+    const existingOwner = ownerByIdentity.get(identity)
+    if (existingOwner !== undefined && existingOwner !== owner) {
+      throw new Error(
+        `Conflicting authoritative Session Card alias: ${identity}`,
+      )
+    }
+    ownerByIdentity.set(identity, owner)
+  }
+  for (const card of projectedCards) {
+    for (const identity of [
+      card.cardId,
+      card.canonicalSegmentKey,
+      ...card.continuationSegmentKeys,
+    ]) {
+      claimIdentity(identity, card)
+    }
+    for (const child of card.childNodes) {
+      for (const identity of [
+        child.cardId,
+        child.sessionKey,
+        ...child.continuationSegmentKeys,
+      ]) {
+        claimIdentity(identity, child)
+      }
+    }
+  }
+  return projectedCards
 }
 
 function resolveProjectedCard(
@@ -660,26 +811,7 @@ function resolveProjectedCard(
 ): ResolvedSessionCard {
   const sourceBySegmentKey = new Map<string, string>()
   const upstreamKeyBySegmentKey = new Map<string, string>()
-  const continuationSegmentKeys: Array<string> = []
-  const seenContinuationSegmentKeys = new Set<string>()
-  for (const loadedSegmentKey of card.continuationSegmentKeys) {
-    const knownMissing =
-      fresh.collection.knownMissingContinuationSegmentKeysBySessionKey.get(
-        loadedSegmentKey,
-      ) ?? []
-    for (const segmentKey of [...knownMissing, loadedSegmentKey]) {
-      if (seenContinuationSegmentKeys.has(segmentKey)) continue
-      seenContinuationSegmentKeys.add(segmentKey)
-      continuationSegmentKeys.push(segmentKey)
-    }
-  }
-  const canonicalTransport = canonicalTransportForCard(card, fresh.collection)
-  const resolvedCard: SessionCard = {
-    ...card,
-    canonicalSource: canonicalSourceForCard(card, fresh.collection),
-    ...(canonicalTransport === undefined ? {} : { canonicalTransport }),
-    continuationSegmentKeys,
-  }
+  const resolvedCard = authoritativeCardProjections(fresh, [card])[0]!
   const requiredSources: Array<SessionCardSourceStatus> = []
   const seenRequiredSources = new Set<SessionCardSourceStatus>()
   let componentComplete = true
@@ -700,14 +832,15 @@ function resolveProjectedCard(
   }
 
   // Relationship projection alone is not authoritative enough for mutations.
-  // Expose each direct child's fresh source-qualified upstream identity too.
+  // Expose each direct child's fresh source-qualified upstream identities too.
   for (const child of resolvedCard.childNodes) {
-    const source = fresh.collection.sourceBySessionKey.get(child.sessionKey)
-    const upstreamKey = fresh.collection.upstreamKeyBySessionKey.get(
-      child.sessionKey,
-    )
-    if (source) sourceBySegmentKey.set(child.sessionKey, source)
-    if (upstreamKey) upstreamKeyBySegmentKey.set(child.sessionKey, upstreamKey)
+    for (const segmentKey of child.continuationSegmentKeys) {
+      const source = fresh.collection.sourceBySessionKey.get(segmentKey)
+      const upstreamKey =
+        fresh.collection.upstreamKeyBySessionKey.get(segmentKey)
+      if (source) sourceBySegmentKey.set(segmentKey, source)
+      if (upstreamKey) upstreamKeyBySegmentKey.set(segmentKey, upstreamKey)
+    }
   }
 
   return {
@@ -1113,12 +1246,12 @@ export class SessionCardService {
     options: { includeArchived?: boolean } = {},
   ): Promise<SessionCardListResult> {
     const fresh = await this.freshProjection()
-    const cards = visibleRootCards(
-      fresh.projection,
-      options.includeArchived === true,
+    const cards = authoritativeCardProjections(
+      fresh,
+      visibleRootCards(fresh.projection, options.includeArchived === true),
     )
     return {
-      cards: attachCanonicalSources(cards, fresh.collection),
+      cards,
       cardResolutions: cards.map((card) => {
         const resolved = resolveProjectedCard(
           fresh,

@@ -8,21 +8,23 @@ import type { SessionCard } from '../screens/chat/types'
 
 const card: SessionCard = {
   cardId: 'remote:parent-card',
+  canonicalSource: 'remote',
   title: 'Parent Card',
   titleSource: 'manual',
   canonicalSegmentKey: 'remote:parent-tip',
-  continuationSegmentKeys: ['remote:parent-root', 'remote:parent-tip'],
+  continuationSegmentKeys: ['remote:parent-card', 'remote:parent-tip'],
   continuationCount: 2,
   relationshipKind: 'root',
   childNodes: [
     {
       cardId: 'remote:child-card',
       sessionKey: 'remote:child-tip',
+      continuationSegmentKeys: ['remote:child-card', 'remote:child-tip'],
       relationshipKind: 'child',
       title: 'Child Card',
       status: 'running',
       updatedAt: 2,
-      continuationCount: 1,
+      continuationCount: 2,
     },
   ],
   updatedAt: 3,
@@ -32,6 +34,13 @@ const card: SessionCard = {
 
 const response: SessionCardListWire = {
   cards: [card],
+  cardResolutions: [
+    {
+      cardId: card.cardId,
+      completeness: 'complete',
+      retryable: false,
+    },
+  ],
   completeness: 'complete',
   retryable: false,
   sources: [],

@@ -101,6 +101,7 @@ function card(overrides: Partial<SessionCard> = {}): SessionCard {
       {
         cardId: 'card:child',
         sessionKey: 'remote:child',
+        continuationSegmentKeys: ['remote:child'],
         relationshipKind: 'child',
         title: 'Delegated research',
         status: 'running',
@@ -149,7 +150,14 @@ function renderSidebar(
         onRename={options.onRename ?? vi.fn()}
         onArchive={options.onArchive ?? vi.fn()}
         onBranch={options.onBranch ?? vi.fn()}
-        cardResolutions={options.cardResolutions}
+        cardResolutions={
+          options.cardResolutions ??
+          (options.cards ?? [card()]).map((sessionCard) => ({
+            cardId: sessionCard.cardId,
+            completeness: 'complete' as const,
+            retryable: false,
+          }))
+        }
         completeness={options.completeness ?? 'complete'}
         loading={false}
         fetching={options.fetching ?? false}

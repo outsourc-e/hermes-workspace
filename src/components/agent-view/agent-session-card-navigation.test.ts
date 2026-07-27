@@ -8,21 +8,23 @@ import type { SessionCard } from '@/screens/chat/types'
 
 const parentCard: SessionCard = {
   cardId: 'remote:parent-card',
+  canonicalSource: 'remote',
   title: 'Parent Card',
   titleSource: 'manual',
   canonicalSegmentKey: 'remote:parent-tip',
-  continuationSegmentKeys: ['remote:parent-root', 'remote:parent-tip'],
+  continuationSegmentKeys: ['remote:parent-card', 'remote:parent-tip'],
   continuationCount: 2,
   relationshipKind: 'root',
   childNodes: [
     {
       cardId: 'remote:child-card',
       sessionKey: 'remote:child-tip',
+      continuationSegmentKeys: ['remote:child-card', 'remote:child-tip'],
       relationshipKind: 'child',
       title: 'Child Card',
       status: 'running',
       updatedAt: 2,
-      continuationCount: 1,
+      continuationCount: 2,
     },
   ],
   updatedAt: 3,
@@ -32,6 +34,13 @@ const parentCard: SessionCard = {
 
 const completeResponse: SessionCardListWire = {
   cards: [parentCard],
+  cardResolutions: [
+    {
+      cardId: parentCard.cardId,
+      completeness: 'complete',
+      retryable: false,
+    },
+  ],
   completeness: 'complete',
   retryable: false,
   sources: [],
@@ -47,7 +56,7 @@ describe('gateway agent Session Card navigation', () => {
     ).toEqual({ cardId: 'remote:parent-card' })
     expect(
       resolveAgentSessionCardNavigation(completeResponse, {
-        key: 'remote:parent-root',
+        key: 'remote:parent-card',
       }),
     ).toEqual({ cardId: 'remote:parent-card' })
   })
@@ -78,6 +87,13 @@ describe('gateway agent Session Card navigation', () => {
       resolveAgentSessionCardNavigation(
         {
           ...completeResponse,
+          cardResolutions: [
+            {
+              cardId: parentCard.cardId,
+              completeness: 'incomplete',
+              retryable: true,
+            },
+          ],
           completeness: 'incomplete',
           retryable: true,
         },

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
+import { SessionCardService } from '../../server/session-card-service'
 import {
   archiveSessionCard,
   branchSessionCard,
@@ -28,11 +29,37 @@ const card = {
   pinned: false,
 }
 
-function response(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
+function response(body: unknown, status = 200) {
+  const responseBody =
+    typeof body === 'object' &&
+    body !== null &&
+    Array.isArray((body as { cards?: unknown }).cards) &&
+    !Object.hasOwn(body, 'cardResolutions')
+      ? {
+          ...body,
+          cardResolutions: completeCardResolutions(
+            (body as { cards: Array<unknown> }).cards.flatMap((candidate) =>
+              typeof candidate === 'object' &&
+              candidate !== null &&
+              typeof (candidate as { cardId?: unknown }).cardId === 'string'
+                ? [{ cardId: (candidate as { cardId: string }).cardId }]
+                : [],
+            ),
+          ),
+        }
+      : body
+  return new Response(JSON.stringify(responseBody), {
     status,
     headers: { 'content-type': 'application/json' },
   })
+}
+
+function completeCardResolutions(cards: Array<{ cardId: string }>) {
+  return cards.map(({ cardId }) => ({
+    cardId,
+    completeness: 'complete' as const,
+    retryable: false,
+  }))
 }
 
 afterEach(() => {
@@ -131,6 +158,141 @@ describe('Session Card fetchers', () => {
     )
   })
 
+  it('accepts an actual service projection with authoritative child continuation aliases', async () => {
+    const sessions = [
+      {
+        key: 'parent',
+        friendlyId: 'parent',
+        updatedAt: 1,
+        lineage: { source: 'cli' as const },
+      },
+      {
+        key: 'child-root',
+        friendlyId: 'child-root',
+        updatedAt: 2,
+        lineage: {
+          parentSessionId: 'parent',
+          relationshipType: 'child_session' as const,
+          source: 'cli' as const,
+          endReason: 'compression' as const,
+          endedAt: 3,
+          lineageRootId: 'child-root',
+          lineageTipId: 'child-tip',
+        },
+      },
+      {
+        key: 'child-tip',
+        friendlyId: 'child-tip',
+        updatedAt: 3,
+        lineage: {
+          parentSessionId: 'child-root',
+          source: 'cli' as const,
+          startedAt: 3,
+          lineageRootId: 'child-root',
+          lineageTipId: 'child-tip',
+        },
+      },
+    ]
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () =>
+          Promise.resolve({
+            sessions,
+            offset: 0,
+            limit: sessions.length,
+            total: sessions.length,
+            hasMore: false,
+            pagination: 'supported',
+          }),
+      },
+      localSource: null,
+      metadataStore: {
+        list: () => [],
+        update: () => {
+          throw new Error('not used')
+        },
+        archive: () => {
+          throw new Error('not used')
+        },
+      },
+    })
+    const projected = await service.listCards()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(projected)))
+
+    await expect(fetchSessionCards()).resolves.toMatchObject({
+      cards: [
+        {
+          cardId: 'remote:parent',
+          childNodes: [
+            {
+              cardId: 'remote:child-root',
+              sessionKey: 'remote:child-tip',
+              continuationSegmentKeys: [
+                'remote:child-root',
+                'remote:child-tip',
+              ],
+              continuationCount: 2,
+            },
+          ],
+        },
+      ],
+      cardResolutions: [
+        {
+          cardId: 'remote:parent',
+          completeness: 'complete',
+          retryable: false,
+        },
+      ],
+    })
+  })
+
+  it('rejects a Card list without exact per-Card resolution evidence', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            cards: [card],
+            completeness: 'complete',
+            retryable: false,
+            sources: [],
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    )
+
+    await expect(fetchSessionCards()).rejects.toThrow(
+      'Invalid Session Card response',
+    )
+  })
+
+  it('rejects an archived Card that is also pinned', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          cards: [{ ...card, archived: true, pinned: true }],
+          cardResolutions: [
+            {
+              cardId: card.cardId,
+              completeness: 'complete',
+              retryable: false,
+            },
+          ],
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        }),
+      ),
+    )
+
+    await expect(fetchSessionCards()).rejects.toThrow(
+      'Invalid Session Card response',
+    )
+  })
+
   it.each([
     [
       'unknown Card ID',
@@ -206,6 +368,7 @@ describe('Session Card fetchers', () => {
       vi.fn().mockResolvedValue(
         response({
           cards: [orphan],
+          cardResolutions: completeCardResolutions([orphan]),
           completeness: 'complete',
           retryable: false,
           sources: [],
@@ -257,6 +420,9 @@ describe('Session Card fetchers', () => {
         vi.fn().mockResolvedValue(
           response({
             cards: [candidate],
+            cardResolutions: completeCardResolutions([
+              candidate as { cardId: string },
+            ]),
             completeness: 'complete',
             retryable: false,
             sources: [],
@@ -606,6 +772,7 @@ describe('Session Card fetchers', () => {
       vi.fn().mockResolvedValue(
         response({
           cards: [card, otherCard],
+          cardResolutions: completeCardResolutions([card, otherCard]),
           completeness: 'complete',
           retryable: false,
           sources: [],
@@ -638,6 +805,7 @@ describe('Session Card fetchers', () => {
       vi.fn().mockResolvedValue(
         response({
           cards: [{ ...card, childNodes: [child] }],
+          cardResolutions: completeCardResolutions([card]),
           completeness: 'complete',
           retryable: false,
           sources: [],

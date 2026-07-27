@@ -251,6 +251,7 @@ export function projectSessionCards(
     parentCard.childNodes.push({
       cardId: card.cardId,
       sessionKey: card.canonicalSegmentKey,
+      continuationSegmentKeys: [...card.continuationSegmentKeys],
       relationshipKind: card.relationshipKind,
       title: card.title,
       status: childActivity?.status ?? 'idle',

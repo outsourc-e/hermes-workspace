@@ -70,7 +70,7 @@ function parentCard(
     title: 'Parent Card',
     titleSource: 'manual',
     canonicalSegmentKey: 'remote:parent-tip',
-    continuationSegmentKeys: ['remote:parent-root', 'remote:parent-tip'],
+    continuationSegmentKeys: ['remote:parent-card', 'remote:parent-tip'],
     continuationCount: 2,
     relationshipKind: 'root',
     childNodes: [
@@ -102,6 +102,11 @@ function wire(
 ): SessionCardListWire {
   return {
     cards,
+    cardResolutions: cards.map((card) => ({
+      cardId: card.cardId,
+      completeness,
+      retryable: completeness === 'incomplete',
+    })),
     completeness,
     retryable: completeness === 'incomplete',
     sources:

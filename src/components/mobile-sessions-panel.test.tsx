@@ -33,6 +33,7 @@ function card(): SessionCard {
       {
         cardId: 'card:child',
         sessionKey: 'remote:child',
+        continuationSegmentKeys: ['remote:child'],
         relationshipKind: 'child',
         title: 'Child activity',
         status: 'running',

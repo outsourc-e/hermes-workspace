@@ -90,7 +90,7 @@ export function resolveSessionCardProducerNavigation(
         (candidate) =>
           identity === candidate.cardId ||
           identity === candidate.sessionKey ||
-          candidate.continuationSegmentKeys?.includes(identity) === true,
+          candidate.continuationSegmentKeys.includes(identity),
       )
       if (child) {
         return isCardProjectionComplete(response, card.cardId)
@@ -109,15 +109,16 @@ function isBootstrapRoute(routeKey: string): boolean {
   return routeKey === 'new'
 }
 
-function isCardProjectionComplete(
+export function isCardProjectionComplete(
   response: SessionCardListWire,
   cardId: string,
 ): boolean {
-  if (response.cardResolutions === undefined) {
-    return response.completeness === 'complete'
-  }
   const card = response.cards.find((candidate) => candidate.cardId === cardId)
-  if (card?.canonicalSource !== 'local' && card?.canonicalSource !== 'remote') {
+  if (
+    !card ||
+    (card.canonicalSource !== 'remote' && card.canonicalSource !== 'local') ||
+    !Array.isArray(response.cardResolutions)
+  ) {
     return false
   }
   const matches = response.cardResolutions.filter(
@@ -145,7 +146,7 @@ export function resolveSessionCardRoute({
       (child) =>
         child.cardId === routeKey ||
         child.sessionKey === routeKey ||
-        child.continuationSegmentKeys?.includes(routeKey) === true,
+        child.continuationSegmentKeys.includes(routeKey),
     ),
   )
   if (isChildRoute) return { status: 'rejected', reason: 'child' }

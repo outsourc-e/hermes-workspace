@@ -118,10 +118,7 @@ export type SessionCardSourceStatusWire = {
   error?: string
 }
 
-export type SessionCardChildWire = SessionCardChild & {
-  /** Present after wire parsing; optional on legacy in-memory projections. */
-  continuationSegmentKeys?: Array<string>
-}
+export type SessionCardChildWire = SessionCardChild
 
 export type SessionCardWire = Omit<SessionCard, 'childNodes'> & {
   childNodes: Array<SessionCardChildWire>
@@ -129,7 +126,7 @@ export type SessionCardWire = Omit<SessionCard, 'childNodes'> & {
 
 export type SessionCardListWire = {
   cards: Array<SessionCardWire>
-  cardResolutions?: Array<{
+  cardResolutions: Array<{
     cardId: string
     completeness: 'complete' | 'incomplete'
     retryable: boolean
@@ -204,11 +201,7 @@ function invalidSessionCardResponse(): never {
   throw new Error('Invalid Session Card response')
 }
 
-type ParsedSessionCardChild = SessionCardChildWire & {
-  continuationSegmentKeys: Array<string>
-}
-
-function parseSessionCardChild(value: unknown): ParsedSessionCardChild {
+function parseSessionCardChild(value: unknown): SessionCardChildWire {
   if (!isWireRecord(value)) return invalidSessionCardResponse()
   const cardIdentity = sourceQualifiedWireIdentity(value.cardId)
   const sessionIdentity = sourceQualifiedWireIdentity(value.sessionKey)
@@ -309,6 +302,7 @@ function parseSessionCard(value: unknown): SessionCardWire {
       .size !== continuationSegmentIdentities.length ||
     !Number.isSafeInteger(value.continuationCount) ||
     Number(value.continuationCount) !== continuationSegmentIdentities.length ||
+    continuationSegmentIdentities[0]?.identity !== cardIdentity.identity ||
     canonicalSegmentIdentity.identity !==
       continuationSegmentIdentities.at(-1)?.identity ||
     !relationshipKind ||
@@ -316,7 +310,8 @@ function parseSessionCard(value: unknown): SessionCardWire {
     typeof value.updatedAt !== 'number' ||
     !Number.isFinite(value.updatedAt) ||
     typeof value.archived !== 'boolean' ||
-    typeof value.pinned !== 'boolean'
+    typeof value.pinned !== 'boolean' ||
+    (value.archived && value.pinned)
   ) {
     return invalidSessionCardResponse()
   }
@@ -404,7 +399,7 @@ function hasUniqueSessionCardOwnership(cards: Array<SessionCardWire>): boolean {
       const childAliases = [
         child.cardId,
         child.sessionKey,
-        ...(child.continuationSegmentKeys ?? []),
+        ...child.continuationSegmentKeys,
       ]
       if (childAliases.some((alias) => !claimIdentity(alias, owner))) {
         return false
@@ -467,7 +462,7 @@ function parseSourceStatus(value: unknown): SessionCardSourceStatusWire {
 
 function parseCardResolution(
   value: unknown,
-): NonNullable<SessionCardListWire['cardResolutions']>[number] {
+): SessionCardListWire['cardResolutions'][number] {
   if (!isWireRecord(value)) return invalidSessionCardResponse()
   const cardId = nonblankWireString(value.cardId)
   const completeness = wireEnum(value.completeness, ['complete', 'incomplete'])
@@ -490,18 +485,14 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
     (value.completeness !== 'complete' &&
       value.completeness !== 'incomplete') ||
     typeof value.retryable !== 'boolean' ||
-    !Array.isArray(value.sources)
+    !Array.isArray(value.sources) ||
+    !Array.isArray(value.cardResolutions)
   ) {
     return invalidSessionCardResponse()
   }
   const cards = value.cards.map(parseSessionCard)
   const sources = value.sources.map(parseSourceStatus)
-  const cardResolutions =
-    value.cardResolutions === undefined
-      ? undefined
-      : Array.isArray(value.cardResolutions)
-        ? value.cardResolutions.map(parseCardResolution)
-        : invalidSessionCardResponse()
+  const cardResolutions = value.cardResolutions.map(parseCardResolution)
   const hasIncompleteSource = sources.some(
     (source) => source.status !== 'complete',
   )
@@ -510,13 +501,12 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
     cards.some((card) => !hasTopLevelCardRelationshipSemantics(card)) ||
     new Set(cards.map((card) => card.cardId)).size !== cards.length ||
     !hasUniqueSessionCardOwnership(cards) ||
-    (cardResolutions !== undefined &&
-      (cardResolutions.length !== cards.length ||
-        new Set(cardResolutions.map(({ cardId }) => cardId)).size !==
-          cardResolutions.length ||
-        cardResolutions.some(
-          ({ cardId }) => !cards.some((card) => card.cardId === cardId),
-        ))) ||
+    cardResolutions.length !== cards.length ||
+    new Set(cardResolutions.map(({ cardId }) => cardId)).size !==
+      cardResolutions.length ||
+    cardResolutions.some(
+      ({ cardId }) => !cards.some((card) => card.cardId === cardId),
+    ) ||
     (value.completeness === 'complete' &&
       (value.retryable || hasIncompleteSource)) ||
     (value.completeness === 'incomplete' && !hasIncompleteSource) ||
@@ -526,7 +516,7 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
   }
   return {
     cards,
-    ...(cardResolutions === undefined ? {} : { cardResolutions }),
+    cardResolutions,
     completeness: value.completeness,
     retryable: value.retryable,
     sources,

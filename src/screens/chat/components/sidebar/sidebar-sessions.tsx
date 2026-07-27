@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 type SidebarSessionsProps = {
   /** Authoritative, server-backed logical conversations. */
   sessionCards: Array<SessionCard>
-  cardResolutions?: SessionCardListWire['cardResolutions']
+  cardResolutions: SessionCardListWire['cardResolutions']
   completeness: SessionCardListWire['completeness']
   activeCardId: string
   inspectedChildCardId?: string
@@ -77,22 +77,16 @@ export const SidebarSessions = memo(function SidebarSessions({
   )
   const resolutionByCardId = useMemo(
     () =>
-      cardResolutions === undefined
-        ? null
-        : new Map(
-            cardResolutions.map((resolution) => [
-              resolution.cardId,
-              resolution,
-            ]),
-          ),
+      new Map(
+        cardResolutions.map((resolution) => [resolution.cardId, resolution]),
+      ),
     [cardResolutions],
   )
   const roots = useMemo(
     () =>
-      sessionCards.filter((card) =>
-        resolutionByCardId === null
-          ? completeness === 'complete'
-          : resolutionByCardId.get(card.cardId)?.completeness === 'complete',
+      sessionCards.filter(
+        (card) =>
+          resolutionByCardId.get(card.cardId)?.completeness === 'complete',
       ),
     [completeness, resolutionByCardId, sessionCards],
   )

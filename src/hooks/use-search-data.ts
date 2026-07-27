@@ -154,7 +154,6 @@ function hasCompleteCardResolution(
   response: SessionCardListWire,
   cardId: string,
 ): boolean {
-  if (response.cardResolutions === undefined) return true
   const matches = response.cardResolutions.filter(
     (resolution) => resolution.cardId === cardId,
   )

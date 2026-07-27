@@ -614,9 +614,25 @@ describe('SessionCardService collection and resolution', () => {
       card: {
         cardId: 'remote:root',
         continuationSegmentKeys: ['remote:root', 'remote:hidden', 'remote:tip'],
+        childNodes: [
+          expect.objectContaining({
+            cardId: 'remote:child',
+            sessionKey: 'remote:child',
+            continuationSegmentKeys: ['remote:child'],
+            continuationCount: 1,
+          }),
+        ],
       },
       aliases: ['remote:root', 'root'],
     })
+    expect((await service.listCards()).cards[0]?.childNodes).toEqual([
+      expect.objectContaining({
+        cardId: 'remote:child',
+        sessionKey: 'remote:child',
+        continuationSegmentKeys: ['remote:child'],
+        continuationCount: 1,
+      }),
+    ])
     expect(resolved.sourceBySegmentKey.get('remote:child')).toBe('remote')
     expect(resolved.upstreamKeyBySegmentKey.get('remote:child')).toBe('child')
     await expect(service.resolveCard('hidden')).rejects.toBeInstanceOf(

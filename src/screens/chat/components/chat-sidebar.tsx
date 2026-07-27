@@ -1405,7 +1405,7 @@ function ChatSidebarComponent({
           profileAvatarDataUrl={profileAvatarDataUrl}
           handleOpenSettings={handleOpenSettings}
           sessionCards={sessionCardsQuery.data?.cards ?? []}
-          cardResolutions={sessionCardsQuery.data?.cardResolutions}
+          cardResolutions={sessionCardsQuery.data?.cardResolutions ?? []}
           completeness={sessionCardsQuery.data?.completeness ?? 'complete'}
           sessionForkAvailable={sessionForkAvailable}
           onTogglePin={handleTogglePin}
@@ -1603,7 +1603,7 @@ function ChatSidebarComponent({
                       <SidebarSessions
                         sessionCards={sessionCardsQuery.data?.cards ?? []}
                         cardResolutions={
-                          sessionCardsQuery.data?.cardResolutions
+                          sessionCardsQuery.data?.cardResolutions ?? []
                         }
                         completeness={
                           sessionCardsQuery.data?.completeness ?? 'complete'

@@ -127,7 +127,7 @@ function card(overrides: Partial<SessionCard> = {}): SessionCard {
     title: 'Parent Card',
     titleSource: 'manual',
     canonicalSegmentKey: 'remote:parent-tip',
-    continuationSegmentKeys: ['remote:parent-root', 'remote:parent-tip'],
+    continuationSegmentKeys: ['remote:parent-card', 'remote:parent-tip'],
     continuationCount: 2,
     relationshipKind: 'root',
     childNodes: [],
@@ -144,6 +144,11 @@ function wire(
 ): SessionCardListWire {
   return {
     cards,
+    cardResolutions: cards.map((sessionCard) => ({
+      cardId: sessionCard.cardId,
+      completeness,
+      retryable: completeness === 'incomplete',
+    })),
     completeness,
     retryable: completeness === 'incomplete',
     sources:
@@ -223,7 +228,7 @@ describe('ChatPanel Card routing', () => {
       cardId: 'remote:other-card',
       title: 'Other Card',
       canonicalSegmentKey: 'remote:other-tip',
-      continuationSegmentKeys: ['remote:other-root', 'remote:other-tip'],
+      continuationSegmentKeys: ['remote:other-card', 'remote:other-tip'],
     })
     const list = wire([parent, other])
     mocks.queryState = {
@@ -271,7 +276,7 @@ describe('ChatPanel Card routing', () => {
       cardId: 'remote:other-card',
       title: 'Other Card',
       canonicalSegmentKey: 'remote:other-tip',
-      continuationSegmentKeys: ['remote:other-root', 'remote:other-tip'],
+      continuationSegmentKeys: ['remote:other-card', 'remote:other-tip'],
     })
     mocks.queryState = {
       status: 'success',
@@ -333,12 +338,12 @@ describe('ChatPanel Card routing', () => {
     expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
-  it('resolves main only through an authoritative Card alias and expands by cardId', () => {
-    mocks.workspaceState.chatPanelCardId = 'main'
+  it('resolves a persisted authoritative Card ID and expands by cardId', () => {
+    mocks.workspaceState.chatPanelCardId = 'remote:main-card'
     const mainCard = card({
       cardId: 'remote:main-card',
-      canonicalSegmentKey: 'main',
-      continuationSegmentKeys: ['remote:main-root', 'main'],
+      canonicalSegmentKey: 'remote:main-tip',
+      continuationSegmentKeys: ['remote:main-card', 'remote:main-tip'],
     })
     mocks.queryState = {
       status: 'success',
@@ -349,9 +354,7 @@ describe('ChatPanel Card routing', () => {
 
     renderPanel()
 
-    expect(mocks.workspaceState.setChatPanelCardId).toHaveBeenCalledWith(
-      mainCard.cardId,
-    )
+    expect(mocks.workspaceState.setChatPanelCardId).not.toHaveBeenCalled()
     expect(mocks.chatScreenProps.at(-1)).toMatchObject({
       activeFriendlyId: mainCard.cardId,
       activeCard: mainCard,
@@ -532,7 +535,7 @@ describe('ChatPanel Card routing', () => {
     const created = card({
       cardId: 'remote:created-card',
       canonicalSegmentKey: 'remote:created-tip',
-      continuationSegmentKeys: ['remote:created-root', 'remote:created-tip'],
+      continuationSegmentKeys: ['remote:created-card', 'remote:created-tip'],
     })
     mocks.queryState = {
       status: 'success',
