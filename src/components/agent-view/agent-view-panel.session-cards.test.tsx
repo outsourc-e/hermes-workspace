@@ -331,6 +331,13 @@ function wire(
 ): SessionCardListWire {
   return {
     cards: [card()],
+    cardResolutions: [
+      {
+        cardId: 'remote:parent-card',
+        completeness,
+        retryable: completeness === 'incomplete',
+      },
+    ],
     completeness,
     retryable: completeness === 'incomplete',
     sources: [

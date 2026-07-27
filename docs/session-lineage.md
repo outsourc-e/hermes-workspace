@@ -118,7 +118,6 @@ Follow `AGENTS.md`: reuse the existing gateway on `127.0.0.1:8642` and Dashboard
    Do not use `pnpm start:all`, because it also starts another gateway.
 
 3. For an authenticated `200` response, inspect the Card response rather than treating HTTP success as projection success. The top-level object contains `cards`, `cardResolutions`, `completeness`, `retryable`, and `sources`:
-
    - `cards` contains Card objects, including stable `cardId`, `canonicalSource`, optional `canonicalTransport`, mutable `canonicalSegmentKey`, `continuationSegmentKeys`, `relationshipKind`, and `childNodes`. `canonicalTransport`, when present, is exactly `gateway` or `dashboard` and names the mutation-owning adapter for the remote canonical segment. An empty array is valid.
    - `cardResolutions` contains one entry per returned Card, keyed by `cardId`, with `completeness` and `retryable`.
    - `sources` reports each source's `status` (`complete`, `incomplete`, or `unavailable`), `fetched`, and `retryable`; a bounded `reason` or sanitized `error` may also be present.
@@ -130,7 +129,6 @@ Follow `AGENTS.md`: reuse the existing gateway on `127.0.0.1:8642` and Dashboard
    Use `sources` to distinguish a partially fetched source from an unavailable one. Restore or wait for that canonical service, then refresh/retry. Do not start duplicate services solely because one source is degraded, mutate lineage data, manually merge transcripts, or archive/delete a Card as a recovery step.
 
 5. With a disposable, non-sensitive fixture that has a parent continuation and a child, verify on both desktop and mobile:
-
    - the parent Card remains selected and keeps the same Card route while its canonical continuation changes;
    - parent history is continuous across validated continuation segments, without segment rows or separators;
    - the child appears beneath the parent, can be inspected, and `Back to parent conversation` restores the parent history;

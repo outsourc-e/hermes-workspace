@@ -115,7 +115,6 @@ Reuse the canonical gateway on `127.0.0.1:8642` and Dashboard on `127.0.0.1:9119
    The `sources` array identifies whether collection was incomplete or unavailable and whether retry is safe. Restore or wait for the affected canonical service, then refresh/retry. Do not start duplicate services solely because one source is degraded, edit lineage to force completeness, merge transcripts manually, or archive/delete the Card to recover.
 
 5. With disposable, non-sensitive Card data, verify the same behavior on desktop and mobile:
-
    - send parent turns before and after a validated continuation and confirm the Card route and selection stay stable while delivery resolves to the current canonical segment;
    - refresh and confirm one continuous parent history spans the validated continuation segments;
    - inspect a child and use `Back to parent conversation`; confirm neither inspection nor child activity replaces the parent Card or parent send target;

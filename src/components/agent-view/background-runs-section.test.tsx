@@ -56,12 +56,28 @@ const roots: Array<() => void> = []
 function cards(): SessionCardListWire {
   return {
     completeness: 'complete',
+    retryable: false,
+    sources: [
+      {
+        source: 'gateway',
+        status: 'complete',
+        fetched: 1,
+        retryable: false,
+      },
+    ],
+    cardResolutions: [
+      {
+        cardId: 'remote:parent-card',
+        completeness: 'complete',
+        retryable: false,
+      },
+    ],
     cards: [
       {
         cardId: 'remote:parent-card',
         canonicalSource: 'remote',
         canonicalSegmentKey: 'remote:parent-tip',
-        continuationSegmentKeys: ['remote:parent-tip'],
+        continuationSegmentKeys: ['remote:parent-card', 'remote:parent-tip'],
         sessionKey: 'remote:parent-tip',
         title: 'Parent Card title',
         status: 'running',
@@ -78,8 +94,12 @@ function cards(): SessionCardListWire {
             updatedAt: 1_700_000_000_010,
             messageCount: 2,
             relationshipKind: 'child',
-            continuationCount: 2,
-            continuationSegmentKeys: ['remote:child-tip', 'remote:child-old'],
+            continuationCount: 3,
+            continuationSegmentKeys: [
+              'remote:child-card',
+              'remote:child-old',
+              'remote:child-tip',
+            ],
           },
         ],
       },

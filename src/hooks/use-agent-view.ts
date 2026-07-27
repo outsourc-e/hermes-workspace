@@ -196,10 +196,7 @@ function projectCardActivities(response: SessionCardListWire): {
     historyAgents: historyAgents
       .sort((left, right) => left.name.localeCompare(right.name))
       .slice(0, 10),
-    unavailable:
-      unresolvedActivityExists ||
-      (response.cardResolutions === undefined &&
-        response.completeness !== 'complete'),
+    unavailable: unresolvedActivityExists,
   }
 }
 
