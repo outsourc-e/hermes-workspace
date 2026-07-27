@@ -22,10 +22,6 @@ type DirectChatResponse = {
   delivered: boolean
   delivery?: 'tmux'
   error?: string | null
-  sessionId: string | null
-  sessionTitle: string | null
-  messages: Array<SwarmChatMessage>
-  source: 'state.db' | 'unavailable'
   fetchedAt: number
 }
 
@@ -259,10 +255,6 @@ async function waitForReply(
       delivered: true,
       delivery: 'tmux',
       error: chat.ok ? null : (chat.error ?? 'Failed to read worker messages'),
-      sessionId: chat.sessionId,
-      sessionTitle: chat.sessionTitle,
-      messages: chat.messages,
-      source: chat.ok ? 'state.db' : 'unavailable',
       fetchedAt: Date.now(),
     }
     if (chat.ok) {
@@ -290,10 +282,6 @@ async function waitForReply(
     error: finalChat.ok
       ? null
       : (finalChat.error ?? 'Timed out waiting for worker reply'),
-    sessionId: finalChat.sessionId,
-    sessionTitle: finalChat.sessionTitle,
-    messages: finalChat.messages,
-    source: finalChat.ok ? 'state.db' : 'unavailable',
     fetchedAt: Date.now(),
   }
 }
@@ -347,10 +335,6 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
               workerId,
               delivered: false,
               error: delivered.error,
-              sessionId: baselineChat.sessionId,
-              sessionTitle: baselineChat.sessionTitle,
-              messages: baselineChat.messages,
-              source: baselineChat.ok ? 'state.db' : 'unavailable',
               fetchedAt: Date.now(),
             } satisfies DirectChatResponse,
             { status: 500 },

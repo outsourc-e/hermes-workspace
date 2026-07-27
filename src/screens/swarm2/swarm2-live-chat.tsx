@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertCircleIcon,
   Clock01Icon,
   SentIcon,
 } from '@hugeicons/core-free-icons'
-import { useQueryClient } from '@tanstack/react-query'
 import type { SwarmChatMessage } from '@/hooks/use-swarm-chat'
 import { ChatComposer } from '@/screens/chat/components/chat-composer'
 import { cn } from '@/lib/utils'
@@ -15,6 +15,7 @@ import { useSwarmChat } from '@/hooks/use-swarm-chat'
 
 type Swarm2LiveChatProps = {
   workerId: string
+  activityCardId?: string | null
   className?: string
   preview?: boolean
   previewLimit?: number
@@ -207,65 +208,31 @@ function MessageBubble({
 
 export function Swarm2LiveChat({
   workerId,
+  activityCardId,
   className,
   preview = false,
   previewLimit = 4,
   nativeStyle = false,
 }: Swarm2LiveChatProps) {
-  const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const {
     messages,
     isLoading,
-    isFetching,
     sendMessage,
     isSending,
     error,
     sendError,
-    sessionId,
     sessionTitle,
-    source,
-  } = useSwarmChat({ workerId, limit: 30, enabled: Boolean(workerId) })
+    target,
+    transcriptStatus,
+  } = useSwarmChat({
+    workerId,
+    activityCardId,
+    limit: 30,
+    enabled: Boolean(workerId),
+  })
   const [draft, setDraft] = useState('')
-  const [localPending, setLocalPending] = useState<{
-    prompt: string
-    sentAt: number
-    baselineLastId: string | null
-  } | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-
-  // Active poll while a send is pending; pushes fresh data into the shared query cache.
-  useEffect(() => {
-    if (!localPending || !workerId) return
-    let cancelled = false
-    const startedAt = Date.now()
-    const queryKey = ['swarm', 'chat', workerId, 30] as const
-    async function poll() {
-      try {
-        const res = await fetch(
-          `/api/swarm-chat?workerId=${encodeURIComponent(workerId)}&limit=30`,
-          { cache: 'no-store' },
-        )
-        if (!res.ok) return
-        const data = await res.json()
-        if (cancelled) return
-        queryClient.setQueryData(queryKey, data)
-      } catch {
-        /* keep optimistic state */
-      }
-    }
-    void poll()
-    const interval = window.setInterval(() => {
-      if (Date.now() - startedAt > 120_000) {
-        window.clearInterval(interval)
-        return
-      }
-      void poll()
-    }, 1_000)
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-    }
-  }, [localPending, workerId, queryClient])
 
   useEffect(() => {
     if (!scrollRef.current) return
@@ -276,80 +243,21 @@ export function Swarm2LiveChat({
     return () => cancelAnimationFrame(id)
   }, [preview, nativeStyle, workerId])
 
-  // Determine whether we have a new assistant reply since the moment we sent.
-  // Single source of truth: state.db `messages` array, anchored by baselineLastId.
-  const pendingState = useMemo(() => {
-    if (!localPending) return { hasUserEcho: false, hasAssistantReply: false }
-    const baselineId = localPending.baselineLastId
-    const baselineIndex = baselineId
-      ? messages.findIndex((m) => m.id === baselineId)
-      : -1
-    const newSlice =
-      baselineIndex >= 0 ? messages.slice(baselineIndex + 1) : messages
-    const prompt = localPending.prompt.trim()
-    const hasUserEcho = newSlice.some(
-      (m) =>
-        m.role === 'user' &&
-        (m.content.trim() === prompt ||
-          m.content.includes(prompt) ||
-          prompt.includes(m.content.trim())),
-    )
-    const hasAssistantReply = newSlice.some((m) => m.role === 'assistant')
-    return { hasUserEcho, hasAssistantReply }
-  }, [messages, localPending])
-
-  const renderedMessages = useMemo(() => {
-    if (!localPending) return messages
-    const extra: Array<SwarmChatMessage> = []
-    if (!pendingState.hasUserEcho) {
-      extra.push({
-        id: `local-user-${localPending.sentAt}`,
-        role: 'user',
-        content: localPending.prompt,
-        timestamp: localPending.sentAt,
-        origin: 'optimistic',
-        pending: true,
-      })
-    }
-    if (!pendingState.hasAssistantReply) {
-      extra.push({
-        id: `local-assistant-${localPending.sentAt}`,
-        role: 'assistant',
-        content: 'Thinking…',
-        timestamp: localPending.sentAt,
-        origin: 'optimistic',
-        pending: true,
-      })
-    }
-    return [...messages, ...extra]
-  }, [messages, localPending, pendingState])
-
-  useEffect(() => {
-    if (!localPending) return
-    if (pendingState.hasAssistantReply) setLocalPending(null)
-  }, [pendingState, localPending])
-
-  const previewMessages = preview
-    ? renderedMessages.slice(-previewLimit)
-    : renderedMessages
+  const previewMessages = preview ? messages.slice(-previewLimit) : messages
   const allErrors = sendError || error
 
   useEffect(() => {
     if (!scrollRef.current) return
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [renderedMessages.length])
+  }, [messages.length])
 
   async function handleSend() {
     const text = draft.trim()
     if (!text || isSending) return
-    const sentAt = Date.now()
-    const baselineLastId = messages.at(-1)?.id ?? null
-    setLocalPending({ prompt: text, sentAt, baselineLastId })
     setDraft('')
     try {
       await sendMessage(text)
     } catch {
-      setLocalPending(null)
       setDraft(text)
     }
   }
@@ -363,11 +271,25 @@ export function Swarm2LiveChat({
     >
       {!nativeStyle ? (
         <header className="flex items-center justify-between gap-2 border-b border-[var(--theme-border)]/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]/85">
-          <span>Chat</span>
+          <span>Card history</span>
           <span className="text-[9px] normal-case tracking-normal">
-            {source === 'state.db' ? 'live' : 'no session'}
+            {transcriptStatus === 'ready' ? 'authoritative' : 'unavailable'}
           </span>
         </header>
+      ) : null}
+
+      {target ? (
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--theme-border)]/70 px-3 py-1.5 text-[10px] text-[var(--theme-muted)]">
+          <span className="truncate">{sessionTitle}</span>
+          <button
+            type="button"
+            aria-label={`Open ${sessionTitle}`}
+            onClick={() => void navigate(target.route)}
+            className="shrink-0 rounded-full border border-[var(--theme-border)] px-2 py-0.5 font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
+          >
+            Open chat
+          </button>
+        </div>
       ) : null}
 
       <div
@@ -381,13 +303,22 @@ export function Swarm2LiveChat({
               : 'max-h-[250px] min-h-[120px]',
         )}
       >
-        {isLoading ? (
+        {transcriptStatus === 'unmapped' ? (
           <p className="text-center text-[11px] text-[var(--theme-muted)]">
-            Loading session…
+            Transcript unavailable: no complete Session Card is mapped to this
+            worker.
+          </p>
+        ) : transcriptStatus === 'incomplete' ? (
+          <p className="text-center text-[11px] text-[var(--theme-muted)]">
+            Transcript unavailable: Session Card history is incomplete.
+          </p>
+        ) : isLoading || transcriptStatus === 'loading' ? (
+          <p className="text-center text-[11px] text-[var(--theme-muted)]">
+            Loading Session Card history…
           </p>
         ) : previewMessages.length === 0 ? (
           <p className="text-center text-[11px] text-[var(--theme-muted)]">
-            No messages yet for {workerId}. Send a prompt below.
+            No messages yet on the authoritative Session Card.
           </p>
         ) : (
           previewMessages.map((m) => (
@@ -414,12 +345,8 @@ export function Swarm2LiveChat({
               onSubmit={(value, _attachments, _fastMode, helpers) => {
                 const text = value.trim()
                 if (!text || isSending) return
-                const sentAt = Date.now()
-                const baselineLastId = messages.at(-1)?.id ?? null
-                setLocalPending({ prompt: text, sentAt, baselineLastId })
                 helpers.reset()
                 void sendMessage(text).catch(() => {
-                  setLocalPending(null)
                   helpers.setValue(text)
                 })
               }}
