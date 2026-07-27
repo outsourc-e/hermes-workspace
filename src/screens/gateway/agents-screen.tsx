@@ -643,7 +643,9 @@ function sessionCardRegistryActivity(
   return response.cards.flatMap((card) => {
     if (!isCardProjectionComplete(response, card.cardId)) return []
 
-    const rootStatus = card.childNodes.some((child) => child.status === 'running')
+    const rootStatus = card.childNodes.some(
+      (child) => child.status === 'running',
+    )
       ? 'running'
       : 'idle'
     const root: SessionEntry = {
@@ -784,7 +786,6 @@ export function AgentsScreen({
     retry: 1,
   })
 
-
   const sessionCardsQuery = useQuery({
     queryKey: sessionCardQueryKeys.list(false),
     queryFn: () => fetchSessionCards(),
@@ -893,11 +894,7 @@ export function AgentsScreen({
         matchedSessions,
       } satisfies AgentRuntime
     })
-  }, [
-    registryDefinitions,
-    sessionCardsQuery.data,
-    optimisticPausedByAgentId,
-  ])
+  }, [registryDefinitions, sessionCardsQuery.data, optimisticPausedByAgentId])
 
   const unmatchedSessions = useMemo(() => {
     const sessions = sessionCardRegistryActivity(sessionCardsQuery.data)
