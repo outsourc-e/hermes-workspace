@@ -209,6 +209,24 @@ describe('runTradingCycle gating', () => {
     expect(res.reason).toMatch(/connectivity breaker/)
   })
 
+  it('audits a bailed cycle instead of failing silently', async () => {
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    db.settings.tradingMode = 'testnet_execute' as never
+    db.settings.emergencyKillSwitch = true
+    store.writeFinanceStore(db)
+    const { runTradingCycle } = await import('./demo-trading-engine')
+    await runTradingCycle({ client: fakeClient() as never })
+    const auditText = fs.readFileSync(
+      path.join(tmp, '.hermes', 'finance', 'audit.jsonl'),
+      'utf8',
+    )
+    const lines = auditText.trim().split('\n').map((l) => JSON.parse(l))
+    const bailed = lines.find((l) => l.action === 'demo_trading_cycle_bailed')
+    expect(bailed).toBeTruthy()
+    expect(bailed.details.reason).toMatch(/kill switch/)
+  })
+
   it('force runs regardless of mode', async () => {
     await setMode('observe_only')
     const { runTradingCycle } = await import('./demo-trading-engine')
