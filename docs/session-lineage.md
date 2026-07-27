@@ -90,15 +90,15 @@ Lineage and Card metadata are list-safe relationship data, not permission to com
 
 Follow `AGENTS.md`: reuse the existing gateway on `127.0.0.1:8642` and Dashboard on `127.0.0.1:9119`; do not start duplicate backends.
 
-1. Probe the canonical services and check for an existing Workspace without supplying credentials:
+1. Probe the canonical services and the Card-native Workspace endpoint without supplying credentials:
 
    ```bash
    curl -i --max-time 2 http://127.0.0.1:8642/health
    curl -i --max-time 2 http://127.0.0.1:9119/
-   curl -i --max-time 2 http://127.0.0.1:3000/api/sessions
+   curl -i --max-time 2 http://127.0.0.1:3000/api/session-cards
    ```
 
-   A response proves that a listener exists, not that Card behavior is correct. Do not paste tokens into these commands.
+   Do not probe `/api/sessions` as a Card-health substitute. A `401` from `/api/session-cards` proves only that Workspace is listening and requires authentication; do not paste tokens into the command or shell history. Use the already-authenticated Workspace UI or the operator-approved credential mechanism to continue the smoke test.
 
 2. If Workspace is not already listening on `:3000`, start only Workspace from this checkout:
 
@@ -108,7 +108,20 @@ Follow `AGENTS.md`: reuse the existing gateway on `127.0.0.1:8642` and Dashboard
 
    Do not use `pnpm start:all`, because it also starts another gateway.
 
-3. With a disposable, non-sensitive fixture that has a parent continuation and a child, verify on both desktop and mobile:
+3. For an authenticated `200` response, inspect the Card response rather than treating HTTP success as projection success. The top-level object contains `cards`, `cardResolutions`, `completeness`, `retryable`, and `sources`:
+
+   - `cards` contains Card objects, including stable `cardId`, `canonicalSource`, mutable `canonicalSegmentKey`, `continuationSegmentKeys`, `relationshipKind`, and `childNodes`. An empty array is valid.
+   - `cardResolutions` contains one entry per returned Card, keyed by `cardId`, with `completeness` and `retryable`.
+   - `sources` reports each source's `status` (`complete`, `incomplete`, or `unavailable`), `fetched`, and `retryable`; a bounded `reason` or sanitized `error` may also be present.
+
+   A fully complete response has top-level `completeness: "complete"` and `retryable: false`; every reported source is complete and non-retryable; and every Card has exactly one matching resolution with `completeness: "complete"` and `retryable: false`. Global completeness alone is insufficient: a complete collection can still contain a Card whose confirmed continuation component is incomplete.
+
+4. Treat a `200` response with top-level `completeness: "incomplete"` and `retryable: true` as a partial snapshot, not proof that an absent Card does not exist. Already returned Cards can remain usable only when their own single `cardResolutions` entry is complete and non-retryable. A Card is unavailable for selection, sends, or recovery when its resolution is incomplete/retryable, missing, duplicated, or inconsistent, or when its `canonicalSource` is absent or invalid. Preserve the selected Card and retry the Card list after the affected source recovers; do not guess a segment, route through a child, or fall back to `/api/sessions`.
+
+   Use `sources` to distinguish a partially fetched source from an unavailable one. Restore or wait for that canonical service, then refresh/retry. Do not start duplicate services solely because one source is degraded, mutate lineage data, manually merge transcripts, or archive/delete a Card as a recovery step.
+
+5. With a disposable, non-sensitive fixture that has a parent continuation and a child, verify on both desktop and mobile:
+
    - the parent Card remains selected and keeps the same Card route while its canonical continuation changes;
    - parent history is continuous across validated continuation segments, without segment rows or separators;
    - the child appears beneath the parent, can be inspected, and `Back to parent conversation` restores the parent history;
@@ -117,4 +130,4 @@ Follow `AGENTS.md`: reuse the existing gateway on `127.0.0.1:8642` and Dashboard
    - a created branch remains beneath the parent and does not change parent selection;
    - archiving removes the Card from the active list without presenting or performing remote logical-Card deletion.
 
-4. If no safe continuation/child fixture exists, leave that case unforced. Do not edit backend lineage, include secrets, or record raw user transcript, attachment, or tool-output content merely to manufacture a demonstration.
+6. If no safe continuation/child fixture exists, leave that case unforced. Do not edit backend lineage, include secrets, or record raw user transcript, attachment, or tool-output content merely to manufacture a demonstration.

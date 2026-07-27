@@ -75,13 +75,15 @@ Malformed or incomplete Card data must not invent a relationship or destination.
 
 Reuse the canonical gateway on `127.0.0.1:8642` and Dashboard on `127.0.0.1:9119`. Do not start duplicate backends.
 
-1. Probe the existing services and Workspace endpoint without supplying credentials:
+1. Probe the existing services and the Card-native Workspace endpoint without supplying credentials:
 
    ```bash
    curl -i --max-time 2 http://127.0.0.1:8642/health
    curl -i --max-time 2 http://127.0.0.1:9119/
-   curl -i --max-time 2 http://127.0.0.1:3000/api/sessions
+   curl -i --max-time 2 http://127.0.0.1:3000/api/session-cards
    ```
+
+   `/api/sessions` is not a Card-health probe. A `401` from `/api/session-cards` confirms only that Workspace is reachable and authentication is required. Do not put a token in this command or shell history; continue through the already-authenticated Workspace UI or the operator-approved credential mechanism.
 
 2. If Workspace is not already listening, start only Workspace on `:3000`:
 
@@ -91,7 +93,16 @@ Reuse the canonical gateway on `127.0.0.1:8642` and Dashboard on `127.0.0.1:9119
 
    Do not use `pnpm start:all`; it also starts another gateway.
 
-3. With disposable, non-sensitive Card data, verify the same behavior on desktop and mobile:
+3. An authenticated successful list is a `200` JSON object with `cards`, `cardResolutions`, `completeness`, `retryable`, and `sources`. Each Card exposes its stable `cardId`, authoritative `canonicalSource`, mutable `canonicalSegmentKey`, continuation keys, relationship information, and child nodes. Each returned Card must have exactly one matching `cardResolutions` entry. Each source entry reports `source`, `status`, `fetched`, and `retryable`, with an optional bounded `reason` or sanitized `error`.
+
+   Treat the projection as fully complete only when top-level `completeness` is `complete`, top-level `retryable` is `false`, every reported source is complete/non-retryable, and every Card resolution is complete/non-retryable. An empty `cards` array can be a valid complete result. Do not rely on top-level completeness alone: source collection may be complete while one Card remains incomplete because a confirmed continuation segment is unavailable.
+
+4. A top-level incomplete/retryable response is a usable partial snapshot, not a complete inventory. A returned Card remains routable only when its own unique resolution is complete/non-retryable and its `canonicalSource` is `local` or `remote`. Treat that Card as unavailable if its resolution is incomplete/retryable, absent, duplicated, or contradictory, or if its canonical source is missing or invalid. Keep the user's Card selection, disable unsafe sends/recovery, and retry `/api/session-cards` after the affected source recovers. Never guess the canonical segment, route via a child, or fall back to `/api/sessions`.
+
+   The `sources` array identifies whether collection was incomplete or unavailable and whether retry is safe. Restore or wait for the affected canonical service, then refresh/retry. Do not start duplicate services solely because one source is degraded, edit lineage to force completeness, merge transcripts manually, or archive/delete the Card to recover.
+
+5. With disposable, non-sensitive Card data, verify the same behavior on desktop and mobile:
+
    - send parent turns before and after a validated continuation and confirm the Card route and selection stay stable while delivery resolves to the current canonical segment;
    - refresh and confirm one continuous parent history spans the validated continuation segments;
    - inspect a child and use `Back to parent conversation`; confirm neither inspection nor child activity replaces the parent Card or parent send target;
@@ -99,4 +110,4 @@ Reuse the canonical gateway on `127.0.0.1:8642` and Dashboard on `127.0.0.1:9119
    - confirm the branch remains beneath the parent and the parent stays selected;
    - confirm an archived Card leaves the active list without any remote logical-Card deletion claim or flow.
 
-4. A health response proves reachability only. If no safe continuation/child fixture exists, leave that case unforced. Do not supply or record credentials, raw user transcript content, attachments, or tool output.
+6. Health and list responses prove only the states described above, not end-to-end Card behavior. If no safe continuation/child fixture exists, leave that case unforced. Do not supply or record credentials, raw user transcript content, attachments, or tool output.
