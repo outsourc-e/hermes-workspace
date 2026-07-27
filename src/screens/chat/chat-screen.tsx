@@ -849,9 +849,14 @@ export function ChatScreen({
   const storeWaiting = useChatStore((s) => s.waitingSessionKeys)
   const sessionKeyForWaiting = useRef<string | undefined>(undefined)
   const pendingVerifySessionKeyRef = useRef<string | undefined>(undefined)
+  // A handoff emitted by this mounted stream is live state, not a stale
+  // sessionStorage recovery. Keep it out of the active-run recovery gate.
+  const liveStreamSessionKeyRef = useRef<string | undefined>(undefined)
 
-  // Keep the waiting-state ref in sync with the resolved session key
-  sessionKeyForWaiting.current = resolvedSessionKey
+  // A `new` route can momentarily resolve legacy history to `main` before its
+  // optimistic cache is present. Waiting is owned by the send target, so never
+  // let that fallback move a live new-chat wait state onto `main`.
+  sessionKeyForWaiting.current = isNewChat ? 'new' : resolvedSessionKey
 
   // Synchronously detect stale waiting state from sessionStorage.
   // This runs during render (not in an effect) so the guard in
@@ -860,6 +865,7 @@ export function ChatScreen({
   const needsStaleCheck =
     resolvedSessionKey &&
     !isNewChat &&
+    liveStreamSessionKeyRef.current !== resolvedSessionKey &&
     storeWaiting.has(resolvedSessionKey) &&
     pendingVerifySessionKeyRef.current !== resolvedSessionKey
 
@@ -903,6 +909,11 @@ export function ChatScreen({
   useEffect(() => {
     const currentSessionKey = resolvedSessionKey
     if (!currentSessionKey || isNewChat) return
+    if (liveStreamSessionKeyRef.current === currentSessionKey) {
+      pendingVerifySessionKeyRef.current = undefined
+      setActiveRunCheckDone(true)
+      return
+    }
     const store = useChatStore.getState()
     if (store.isSessionWaiting(currentSessionKey)) {
       pendingVerifySessionKeyRef.current = currentSessionKey
@@ -1448,6 +1459,10 @@ export function ChatScreen({
             sessionKey: handoff.canonicalSegmentKey,
             friendlyId: activeCard.cardId,
           }
+          const store = useChatStore.getState()
+          liveStreamSessionKeyRef.current = handoff.canonicalSegmentKey
+          store.clearSessionWaiting(handoff.fromSegmentKey)
+          store.setSessionWaiting(handoff.canonicalSegmentKey)
         }
         moveSessionCardHistoryMessages(
           queryClient,
@@ -1497,6 +1512,10 @@ export function ChatScreen({
             sessionKey,
             friendlyId,
           }
+          const store = useChatStore.getState()
+          liveStreamSessionKeyRef.current = sessionKey
+          store.clearSessionWaiting(sourceSessionKey)
+          store.setSessionWaiting(sessionKey)
         }
         if (alreadyResolved) return
         streamHandoffRouteRef.current = { sessionKey, friendlyId }
@@ -1588,6 +1607,7 @@ export function ChatScreen({
           )
         }
         activeSendRef.current = null
+        liveStreamSessionKeyRef.current = undefined
         refreshHistoryRef.current()
         setSending(false)
         // Clear waitingForResponse so ThinkingBubble hides and message renders
@@ -1614,6 +1634,7 @@ export function ChatScreen({
           )
         }
         activeSendRef.current = null
+        liveStreamSessionKeyRef.current = undefined
         setSending(false)
         if (isMissingAuth(messageText)) {
           if (!embedded) {
@@ -2352,6 +2373,13 @@ export function ChatScreen({
   useEffect(() => {
     const resetKey = isNewChat ? 'new' : activeFriendlyId
     if (!resetKey) return
+    const expectedLiveSessionKey = isNewChat ? 'new' : resolvedSessionKey
+    if (
+      liveStreamSessionKeyRef.current &&
+      liveStreamSessionKeyRef.current !== expectedLiveSessionKey
+    ) {
+      liveStreamSessionKeyRef.current = undefined
+    }
     retriedQueuedMessageKeysRef.current.clear()
     if (pendingStartRef.current) {
       pendingStartRef.current = false
@@ -2364,7 +2392,7 @@ export function ChatScreen({
     streamStop()
     lastAssistantSignature.current = ''
     setWaitingForResponse(false)
-  }, [activeFriendlyId, isNewChat, streamStop])
+  }, [activeFriendlyId, isNewChat, resolvedSessionKey, streamStop])
 
   /**
    * Simplified sendMessage - fire and forget.
@@ -2441,6 +2469,7 @@ export function ChatScreen({
       setPendingGeneration(true)
       setSending(true)
       setError(null)
+      liveStreamSessionKeyRef.current = sessionKey
       clearCompletedStreaming()
       setWaitingForResponse(true)
       activeSendRef.current = {

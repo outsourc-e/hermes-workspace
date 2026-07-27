@@ -56,6 +56,7 @@ const queryContext = vi.hoisted(() => ({
   },
   mobile: false,
   legacySessionsFailure: false,
+  newRouteResolvesLegacyMain: false,
   legacySessionsEnabled: undefined as boolean | undefined,
   legacyHistoryInput: null as null | {
     activeFriendlyId: string
@@ -359,20 +360,29 @@ vi.mock('./hooks/use-chat-sessions', () => ({
     enabled?: boolean
   }) => {
     queryContext.legacySessionsEnabled = enabled
-    const sessionKey = forcedSessionKey ?? activeFriendlyId
-    const activeSession = {
-      key: sessionKey,
-      friendlyId: activeFriendlyId,
-      updatedAt: 1,
-      lineage: { source: 'remote' as const },
-    }
+    const routeHasNoLegacySession =
+      queryContext.newRouteResolvesLegacyMain && activeFriendlyId === 'new'
+    const sessionKey = routeHasNoLegacySession
+      ? ''
+      : (forcedSessionKey ?? activeFriendlyId)
+    const activeSession = routeHasNoLegacySession
+      ? undefined
+      : {
+          key: sessionKey,
+          friendlyId: activeFriendlyId,
+          updatedAt: 1,
+          lineage: { source: 'remote' as const },
+        }
     return {
       sessionsQuery: {
         status: queryContext.legacySessionsFailure ? 'error' : 'success',
         isSuccess: !queryContext.legacySessionsFailure,
         refetch: queryContext.legacySessionsRefetch,
       },
-      sessions: queryContext.legacySessionsFailure ? [] : [activeSession],
+      sessions:
+        queryContext.legacySessionsFailure || !activeSession
+          ? []
+          : [activeSession],
       activeSession: queryContext.legacySessionsFailure
         ? undefined
         : activeSession,
@@ -403,7 +413,12 @@ vi.mock('./hooks/use-chat-history', () => ({
       activeSessionKey,
       ...(forcedSessionKey === undefined ? {} : { forcedSessionKey }),
     }
-    const sessionKey = forcedSessionKey ?? activeSessionKey
+    const sessionKey =
+      forcedSessionKey ??
+      (activeSessionKey ||
+        (queryContext.newRouteResolvesLegacyMain && activeFriendlyId === 'new'
+          ? 'main'
+          : activeSessionKey))
     return {
       historyQuery: {
         data: { sessionKey, messages: [] },
@@ -745,6 +760,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryContext.activeRunInput = null
     queryContext.mobile = false
     queryContext.legacySessionsFailure = false
+    queryContext.newRouteResolvesLegacyMain = false
     queryContext.legacySessionsEnabled = undefined
     queryContext.legacyHistoryInput = null
     queryContext.legacySessionsRefetch.mockReset()
@@ -2200,6 +2216,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       defaultOptions: { queries: { retry: false } },
     })
     queryContext.client = queryClient
+    queryContext.newRouteResolvesLegacyMain = true
     const sourceHistoryKey = chatQueryKeys.history('new', 'new')
     const intermediateHistoryKey = chatQueryKeys.history(
       'intermediate-friendly',
@@ -2243,6 +2260,8 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     await waitForAssertion(() => {
       expect(stream.getRequestSignal()).toBeDefined()
+      expect(useChatStore.getState().isSessionWaiting('new')).toBe(true)
+      expect(useChatStore.getState().isSessionWaiting('main')).toBe(false)
       expect(
         queryClient.getQueryData<HistoryResponse>(sourceHistoryKey)?.messages,
       ).toHaveLength(1)

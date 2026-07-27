@@ -142,12 +142,15 @@ function hasChildRelationshipProvenance(session: SessionMeta): boolean {
   )
 }
 
-function normalizedTitle(value: string | undefined): string | undefined {
+function normalizedTitle(value: string | null | undefined): string | undefined {
   const title = value?.trim()
   return title || undefined
 }
 
-function cardTitle(metadata: SessionCardMetadata | undefined): {
+function cardTitle(
+  metadata: SessionCardMetadata | undefined,
+  session: SessionMeta,
+): {
   title: string
   titleSource: SessionCardTitleSource
 } {
@@ -156,6 +159,17 @@ function cardTitle(metadata: SessionCardMetadata | undefined): {
 
   const autoTitle = normalizedTitle(metadata?.autoTitle)
   if (autoTitle) return { title: autoTitle, titleSource: 'auto' }
+
+  // Existing remote sessions already carry a server-derived title/preview.
+  // The Card migration must retain that display metadata instead of making the
+  // sidebar look like every historical conversation is brand new. Persisted
+  // Card metadata still wins above; this is a read-only projection fallback.
+  const sessionTitle =
+    normalizedTitle(session.title) ??
+    normalizedTitle(session.label) ??
+    normalizedTitle(session.derivedTitle) ??
+    normalizedTitle(session.preview)
+  if (sessionTitle) return { title: sessionTitle, titleSource: 'auto' }
 
   return { title: DEFAULT_CARD_TITLE, titleSource: 'default' }
 }
@@ -212,7 +226,7 @@ export function projectSessionCards(
     const members = orderContinuationMembers(
       membersByVisibleKey.get(row.key) ?? [row.session],
     )
-    const title = cardTitle(metadata)
+    const title = cardTitle(metadata, row.session)
 
     cardsByVisibleKey.set(row.key, {
       cardId,
