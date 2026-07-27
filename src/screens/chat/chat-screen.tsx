@@ -3432,7 +3432,12 @@ export function ChatScreen({
             />
           ) : null}
         </main>
-        {!compact && !isFocusMode && <AgentViewPanel />}
+        {!compact && !isFocusMode && (
+          <AgentViewPanel
+            activeCard={activeCard}
+            sessionCardList={sessionCardList}
+          />
+        )}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
 

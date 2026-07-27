@@ -9,6 +9,7 @@ import { AgentViewPanel } from './agent-view-panel'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import type { SessionCard } from '@/screens/chat/types'
 import { useAgentViewStore } from '@/hooks/use-agent-view'
+import { useChatActivityStore } from '@/stores/chat-activity-store'
 
 type SessionCardWithChildAliases = SessionCard & {
   childNodes: Array<
@@ -33,8 +34,6 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   queryOptions: [] as Array<QueryOptions>,
   queryState: {} as QueryState,
-  startGatewayPoll: vi.fn(),
-  stopGatewayPoll: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-query', () => ({
@@ -48,37 +47,42 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => mocks.navigate,
 }))
 
-vi.mock('zustand', () => ({
-  create:
-    () =>
-    (
-      creator: (
-        set: (
-          update:
-            | Record<string, unknown>
-            | ((state: Record<string, unknown>) => Record<string, unknown>),
-        ) => void,
-      ) => Record<string, unknown>,
+vi.mock('zustand', () => {
+  type Creator = (
+    set: (
+      update:
+        | Record<string, unknown>
+        | ((state: Record<string, unknown>) => Record<string, unknown>),
+    ) => void,
+    get: () => Record<string, unknown>,
+  ) => Record<string, unknown>
+
+  function buildStore(creator: Creator) {
+    let state: Record<string, unknown>
+    const set = (
+      update:
+        | Record<string, unknown>
+        | ((current: Record<string, unknown>) => Record<string, unknown>),
     ) => {
-      let state: Record<string, unknown>
-      const set = (
-        update:
-          | Record<string, unknown>
-          | ((current: Record<string, unknown>) => Record<string, unknown>),
-      ) => {
-        state = {
-          ...state,
-          ...(typeof update === 'function' ? update(state) : update),
-        }
+      state = {
+        ...state,
+        ...(typeof update === 'function' ? update(state) : update),
       }
-      state = creator(set)
-      const useStore = (
-        selector: (current: Record<string, unknown>) => unknown,
-      ) => selector(state)
-      useStore.setState = set
-      return useStore
-    },
-}))
+    }
+    const get = () => state
+    state = creator(set, get)
+    const useStore = (
+      selector: (current: Record<string, unknown>) => unknown,
+    ) => selector(state)
+    useStore.setState = set
+    useStore.getState = get
+    return useStore
+  }
+
+  return {
+    create: (creator?: Creator) => (creator ? buildStore(creator) : buildStore),
+  }
+})
 
 vi.mock('zustand/middleware', () => ({
   persist: (creator: unknown) => creator,
@@ -193,7 +197,12 @@ vi.mock('@/components/agent-card', () => ({
 }))
 
 vi.mock('@/components/orchestrator-avatar', () => ({
-  OrchestratorAvatar: () => null,
+  OrchestratorAvatar: ({ activityVisible }: { activityVisible?: boolean }) => (
+    <div
+      data-testid="orchestrator-avatar"
+      data-activity-visible={String(activityVisible)}
+    />
+  ),
 }))
 
 vi.mock('@/components/inspector/inspector-panel', () => ({
@@ -258,23 +267,6 @@ vi.mock('@/hooks/use-cli-agents', () => ({
 }))
 
 vi.mock('@/hooks/use-sounds', () => ({ useSounds: () => undefined }))
-
-vi.mock('@/hooks/use-orchestrator-state', () => ({
-  useOrchestratorState: () => ({ state: 'idle', label: 'Idle' }),
-}))
-
-vi.mock('@/stores/chat-activity-store', () => ({
-  useChatActivityStore: (
-    selector: (state: {
-      startGatewayPoll: () => void
-      stopGatewayPoll: () => void
-    }) => unknown,
-  ) =>
-    selector({
-      startGatewayPoll: mocks.startGatewayPoll,
-      stopGatewayPoll: mocks.stopGatewayPoll,
-    }),
-}))
 
 vi.mock('@/stores/mission-store', () => ({
   useMissionStore: (
@@ -361,12 +353,20 @@ function response(body: unknown, status = 200) {
   })
 }
 
-async function renderPanel() {
+async function renderPanel(
+  activeCard: SessionCard = card(),
+  sessionCardList: SessionCardListWire = wire(),
+) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   await React.act(async () => {
-    root.render(<AgentViewPanel />)
+    root.render(
+      <AgentViewPanel
+        activeCard={activeCard}
+        sessionCardList={sessionCardList}
+      />,
+    )
     await Promise.resolve()
   })
   mountedRoots.push(() => {
@@ -379,8 +379,10 @@ beforeEach(() => {
   window.innerWidth = 1280
   mocks.navigate.mockReset()
   mocks.queryOptions.length = 0
-  mocks.startGatewayPoll.mockReset()
-  mocks.stopGatewayPoll.mockReset()
+  useChatActivityStore.setState({
+    activity: 'idle',
+    localActivity: 'idle',
+  })
   useAgentViewStore.setState({ isOpen: true, historyOpen: true })
 })
 
@@ -397,15 +399,40 @@ describe('AgentViewPanel mounted Card cutover', () => {
     const fetchMock = vi.fn<typeof fetch>((input) => {
       const url = String(input)
       if (url === '/api/session-cards') return Promise.resolve(response(body))
+      if (url === '/api/gateway/sessions') {
+        return Promise.resolve(
+          response({
+            ok: true,
+            data: {
+              sessions: [
+                {
+                  key: 'raw:gateway-session',
+                  status: 'thinking',
+                  updatedAt: Date.now(),
+                },
+              ],
+            },
+          }),
+        )
+      }
       return Promise.resolve(response({}, 404))
     })
     vi.stubGlobal('fetch', fetchMock)
+    useChatActivityStore.getState().setLocalActivity('responding')
 
-    await renderPanel()
+    await renderPanel(card(), body)
 
+    expect(screen.getByText('Responding...')).toBeTruthy()
+    expect(
+      screen
+        .getByTestId('orchestrator-avatar')
+        .getAttribute('data-activity-visible'),
+    ).toBe('true')
+    expect(screen.queryByText('Thinking...')).toBeNull()
     expect(screen.getByText('Delegated research')).toBeTruthy()
     expect(screen.getByText('Child Card activity')).toBeTruthy()
     expect(document.body.textContent).not.toContain('remote:child-tip')
+    expect(document.body.textContent).not.toContain('raw:gateway-session')
     expect(
       screen
         .getByText('Delegated research')
@@ -433,6 +460,7 @@ describe('AgentViewPanel mounted Card cutover', () => {
     const urls = fetchMock.mock.calls.map(([input]) => String(input))
     expect(urls).toContain('/api/session-cards')
     expect(urls).not.toContain('/api/sessions')
+    expect(urls).not.toContain('/api/gateway/sessions')
     expect(urls.some((url) => url.startsWith('/api/history'))).toBe(false)
     expect(urls).not.toContain('/api/sessions/send')
   })
@@ -442,10 +470,17 @@ describe('AgentViewPanel mounted Card cutover', () => {
     mocks.queryState = { status: 'success', data: body }
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response(body))
     vi.stubGlobal('fetch', fetchMock)
+    useChatActivityStore.getState().setLocalActivity('tool-use')
 
-    await renderPanel()
+    await renderPanel(card(), body)
 
     expect(screen.getByText('Card activity unavailable')).toBeTruthy()
+    expect(screen.queryByText('Using tools...')).toBeNull()
+    expect(
+      screen
+        .getByTestId('orchestrator-avatar')
+        .getAttribute('data-activity-visible'),
+    ).toBe('false')
     expect(screen.queryByText('Delegated research')).toBeNull()
     expect(screen.queryByRole('button', { name: 'View Output' })).toBeNull()
     expect(document.body.textContent).not.toContain('remote:child-tip')
@@ -460,10 +495,17 @@ describe('AgentViewPanel mounted Card cutover', () => {
     }
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({}, 503))
     vi.stubGlobal('fetch', fetchMock)
+    useChatActivityStore.getState().setLocalActivity('thinking')
 
-    await renderPanel()
+    await renderPanel(card(), wire('incomplete'))
 
     expect(screen.getByText('Card activity unavailable')).toBeTruthy()
+    expect(screen.queryByText('Thinking...')).toBeNull()
+    expect(
+      screen
+        .getByTestId('orchestrator-avatar')
+        .getAttribute('data-activity-visible'),
+    ).toBe('false')
     expect(screen.queryByRole('button', { name: 'View Output' })).toBeNull()
     expect(mocks.navigate).not.toHaveBeenCalled()
     const urls = fetchMock.mock.calls.map(([input]) => String(input))

@@ -1694,10 +1694,18 @@ type OrchestratorAvatarProps = {
   size?: number
   /** When true, hides tooltip, edit pencil, and picker — just the avatar + state dot */
   compact?: boolean
+  /** Hide activity decoration when no complete Session Card owns the state. */
+  activityVisible?: boolean
 }
 
-function OrchestratorAvatarComponent({ size = 48, compact = false }: OrchestratorAvatarProps) {
-  const { state, label } = useOrchestratorState()
+function OrchestratorAvatarComponent({
+  size = 48,
+  compact = false,
+  activityVisible = true,
+}: OrchestratorAvatarProps) {
+  const orchestrator = useOrchestratorState()
+  const state = activityVisible ? orchestrator.state : 'idle'
+  const label = activityVisible ? orchestrator.label : 'Activity unavailable'
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>(getStoredAvatar)
   const [showPicker, setShowPicker] = useState(false)
 
@@ -1723,15 +1731,17 @@ function OrchestratorAvatarComponent({ size = 48, compact = false }: Orchestrato
         style={{ width: size + 4, height: size + 4 }}
       >
         <Renderer state={state} size={size} />
-        <span
-          className="absolute bottom-0 right-0 block rounded-full border-2 border-surface"
-          style={{
-            width: Math.max(6, size / 6),
-            height: Math.max(6, size / 6),
-            backgroundColor: dotColor,
-            transition: 'background-color 300ms ease',
-          }}
-        />
+        {activityVisible ? (
+          <span
+            className="absolute bottom-0 right-0 block rounded-full border-2 border-surface"
+            style={{
+              width: Math.max(6, size / 6),
+              height: Math.max(6, size / 6),
+              backgroundColor: dotColor,
+              transition: 'background-color 300ms ease',
+            }}
+          />
+        ) : null}
       </div>
     )
   }
@@ -1748,15 +1758,17 @@ function OrchestratorAvatarComponent({ size = 48, compact = false }: Orchestrato
               >
                 <Renderer state={state} size={size} />
                 {/* State dot */}
-                <span
-                  className="absolute bottom-0 right-0 block rounded-full border-2 border-primary-50"
-                  style={{
-                    width: Math.max(8, size / 6),
-                    height: Math.max(8, size / 6),
-                    backgroundColor: dotColor,
-                    transition: 'background-color 300ms ease',
-                  }}
-                />
+                {activityVisible ? (
+                  <span
+                    className="absolute bottom-0 right-0 block rounded-full border-2 border-primary-50"
+                    style={{
+                      width: Math.max(8, size / 6),
+                      height: Math.max(8, size / 6),
+                      backgroundColor: dotColor,
+                      transition: 'background-color 300ms ease',
+                    }}
+                  />
+                ) : null}
               </div>
             }
           />

@@ -23,6 +23,8 @@ import type {
 } from './agent-card'
 import type { ActiveAgent } from '@/hooks/use-agent-view'
 import type { AgentCardStatus } from '@/components/agent-card'
+import type { SessionCard } from '@/screens/chat/types'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import { AgentCard as MiniAgentCard } from '@/components/agent-card'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,13 +44,13 @@ import { useCliAgents } from '@/hooks/use-cli-agents'
 import { useSounds } from '@/hooks/use-sounds'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
-import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { cn } from '@/lib/utils'
 import {
   InspectorPanel,
   InspectorToggleButton,
 } from '@/components/inspector/inspector-panel'
 import { buildAgentSessionCardRoute } from '@/components/agent-view/agent-session-card-navigation'
+import { hasExactCompleteSessionCardProjection } from '@/screens/chat/chat-queries'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
   const nodes = document.querySelectorAll<HTMLElement>(
@@ -208,12 +210,15 @@ function ocParseContextPct(payload: unknown): number {
 function OrchestratorCard({
   compact = false,
   cardRef,
+  activityAvailable,
 }: {
   compact?: boolean
   cardRef?: (element: HTMLElement | null) => void
+  activityAvailable: boolean
 }) {
-  const { state, label } = useOrchestratorState()
-  const glowClass = STATE_GLOW[state] ?? STATE_GLOW.idle
+  const { state, label: activityLabel } = useOrchestratorState()
+  const visibleState = activityAvailable ? state : 'idle'
+  const glowClass = STATE_GLOW[visibleState] ?? STATE_GLOW.idle
 
   const [agentName, setAgentName] = useState(getStoredAgentName)
   const [sessionName, setSessionName] = useState('')
@@ -421,7 +426,7 @@ function OrchestratorCard({
         glowClass,
       )}
     >
-      {state !== 'idle' && (
+      {activityAvailable && state !== 'idle' && (
         <div className="pointer-events-none absolute inset-0 animate-pulse rounded-2xl bg-gradient-to-br from-accent-500/[0.03] to-transparent" />
       )}
 
@@ -432,7 +437,10 @@ function OrchestratorCard({
         )}
       >
         <div className="flex flex-col items-center gap-0.5">
-          <OrchestratorAvatar size={compact ? 40 : 88} />
+          <OrchestratorAvatar
+            size={compact ? 40 : 88}
+            activityVisible={activityAvailable}
+          />
           {!compact ? (
             <span className="rounded bg-accent-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent-700">
               Main Agent
@@ -475,39 +483,41 @@ function OrchestratorCard({
               </button>
             )}
           </div>
-          {/* State indicator — dot + label */}
-          <div
-            className={cn(
-              'flex items-center gap-1.5 mt-0.5',
-              !compact && 'justify-center',
-            )}
-          >
-            <span
+          {/* Activity is shown only for the complete Card owning this chat. */}
+          {activityAvailable ? (
+            <div
               className={cn(
-                'inline-block h-1.5 w-1.5 rounded-full shrink-0',
-                state === 'idle'
-                  ? 'bg-primary-400'
-                  : state === 'thinking'
-                    ? 'bg-yellow-400 animate-pulse'
-                    : state === 'tool-use'
-                      ? 'bg-violet-400 animate-pulse'
-                      : state === 'responding'
-                        ? 'bg-emerald-400 animate-pulse'
-                        : state === 'reading'
-                          ? 'bg-blue-400 animate-pulse'
-                          : 'bg-accent-400 animate-pulse',
-              )}
-            />
-            <p
-              className={cn(
-                'text-primary-600',
-                compact ? 'text-[9px]' : 'text-[10px]',
-                state !== 'idle' && 'font-medium text-primary-700',
+                'flex items-center gap-1.5 mt-0.5',
+                !compact && 'justify-center',
               )}
             >
-              {label}
-            </p>
-          </div>
+              <span
+                className={cn(
+                  'inline-block h-1.5 w-1.5 rounded-full shrink-0',
+                  state === 'idle'
+                    ? 'bg-primary-400'
+                    : state === 'thinking'
+                      ? 'bg-yellow-400 animate-pulse'
+                      : state === 'tool-use'
+                        ? 'bg-violet-400 animate-pulse'
+                        : state === 'responding'
+                          ? 'bg-emerald-400 animate-pulse'
+                          : state === 'reading'
+                            ? 'bg-blue-400 animate-pulse'
+                            : 'bg-accent-400 animate-pulse',
+                )}
+              />
+              <p
+                className={cn(
+                  'text-primary-600',
+                  compact ? 'text-[9px]' : 'text-[10px]',
+                  state !== 'idle' && 'font-medium text-primary-700',
+                )}
+              >
+                {activityLabel}
+              </p>
+            </div>
+          ) : null}
           {!compact && model ? (
             <p className="mt-0.5 truncate text-[9px] font-mono text-primary-400 text-center">
               {model}
@@ -657,18 +667,24 @@ function getStatusBubble(
   return { type: 'checkpoint', text: `${clampedProgress}% complete` }
 }
 
-export function AgentViewPanel() {
+export type AgentViewPanelProps = {
+  activeCard?: SessionCard
+  sessionCardList?: SessionCardListWire
+}
+
+export function AgentViewPanel({
+  activeCard,
+  sessionCardList,
+}: AgentViewPanelProps) {
   const navigate = useNavigate()
   // Sound notifications for agent events
   useSounds({ autoPlay: true })
 
-  // Start gateway polling for orchestrator state (detects activity from Telegram/other channels)
-  const startGatewayPoll = useChatActivityStore((s) => s.startGatewayPoll)
-  const stopGatewayPoll = useChatActivityStore((s) => s.stopGatewayPoll)
-  useEffect(() => {
-    startGatewayPoll()
-    return () => stopGatewayPoll()
-  }, [startGatewayPoll, stopGatewayPoll])
+  const activeCardActivityAvailable = Boolean(
+    activeCard &&
+    sessionCardList &&
+    hasExactCompleteSessionCardProjection(sessionCardList, activeCard.cardId),
+  )
 
   const {
     isOpen,
@@ -993,7 +1009,10 @@ export function AgentViewPanel() {
                 <InspectorPanel embedded />
 
                 {/* Main Agent Card (includes usage section) */}
-                <OrchestratorCard compact={false} />
+                <OrchestratorCard
+                  compact={false}
+                  activityAvailable={activeCardActivityAvailable}
+                />
 
                 {errorMessage &&
                 activeCount === 0 &&
@@ -1426,7 +1445,10 @@ export function AgentViewPanel() {
                 </div>
                 {/* Content — same as desktop sidebar */}
                 <div className="space-y-3 p-3">
-                  <OrchestratorCard compact={false} />
+                  <OrchestratorCard
+                    compact={false}
+                    activityAvailable={activeCardActivityAvailable}
+                  />
 
                   <section className="rounded-2xl bg-primary-200/15 p-1">
                     <div className="mb-1 flex justify-center">
