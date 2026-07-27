@@ -21,8 +21,11 @@ import {
   SESSION_CARD_STORE_MAX_BYTES,
   SESSION_CARD_TITLE_MAX_LENGTH,
   archiveSessionCardMetadata,
+  completeSessionCardBranchReplay,
   listSessionCardMetadata,
+  readSessionCardBranchReplay,
   readSessionCardMetadata,
+  reserveSessionCardBranchReplay,
   resolveSessionCardTitle,
   sessionCardStorePath,
   updateSessionCardMetadata,
@@ -145,6 +148,62 @@ describe('Session Card title resolution', () => {
 })
 
 describe('Session Card metadata persistence', () => {
+  it('durably replays a completed Card branch after a fresh module load', async () => {
+    expect(
+      reserveSessionCardBranchReplay('card-1', 'a'.repeat(64), 'b'.repeat(64)),
+    ).toEqual({ status: 'reserved' })
+    completeSessionCardBranchReplay('card-1', 'a'.repeat(64), 'b'.repeat(64), {
+      kind: 'projection-pending',
+      canonicalSegmentKey: 'remote:tip',
+      childSessionKey: 'remote:child',
+    })
+
+    vi.resetModules()
+    const reloaded = await import('./session-card-store')
+    expect(
+      reloaded.readSessionCardBranchReplay('card-1', 'a'.repeat(64)),
+    ).toMatchObject({
+      fingerprint: 'b'.repeat(64),
+      outcome: {
+        kind: 'projection-pending',
+        canonicalSegmentKey: 'remote:tip',
+        childSessionKey: 'remote:child',
+      },
+    })
+  })
+
+  it('atomically conflicts on a reused Card branch key with a different fingerprint', () => {
+    expect(
+      reserveSessionCardBranchReplay('card-1', 'c'.repeat(64), 'd'.repeat(64)),
+    ).toEqual({ status: 'reserved' })
+
+    expect(
+      reserveSessionCardBranchReplay('card-1', 'c'.repeat(64), 'e'.repeat(64)),
+    ).toEqual({ status: 'conflict' })
+    expect(readSessionCardBranchReplay('card-1', 'c'.repeat(64))).toMatchObject(
+      { fingerprint: 'd'.repeat(64) },
+    )
+  })
+
+  it('bounds durable branch history without evicting an earlier replay', () => {
+    for (let index = 0; index < 32; index += 1) {
+      expect(
+        reserveSessionCardBranchReplay(
+          'card-1',
+          index.toString(16).padStart(64, '0'),
+          (index + 100).toString(16).padStart(64, '0'),
+        ),
+      ).toEqual({ status: 'reserved' })
+    }
+
+    expect(
+      reserveSessionCardBranchReplay('card-1', 'f'.repeat(64), 'e'.repeat(64)),
+    ).toEqual({ status: 'capacity' })
+    expect(readSessionCardBranchReplay('card-1', '0'.repeat(64))).toMatchObject(
+      { fingerprint: (100).toString(16).padStart(64, '0') },
+    )
+  })
+
   it.each(['toString', 'hasOwnProperty'])(
     'returns null for absent inherited-key card ID %s',
     (cardId) => {
@@ -203,6 +262,19 @@ describe('Session Card metadata persistence', () => {
     expect(readSessionCardMetadata('good')?.autoTitle).toBe('Safe title')
     expect(readSessionCardMetadata('mismatched')).toBeNull()
     expect(readSessionCardMetadata('sensitive')).toBeNull()
+  })
+
+  it('fails closed for branch replay operations when durable metadata is corrupt', () => {
+    writeFileSync(sessionCardStorePath(), '{ definitely not json', 'utf8')
+    const corrupt = readFileSync(sessionCardStorePath(), 'utf8')
+
+    expect(() => readSessionCardBranchReplay('card-1', 'a'.repeat(64))).toThrow(
+      /json|store|metadata/i,
+    )
+    expect(() =>
+      reserveSessionCardBranchReplay('card-1', 'a'.repeat(64), 'b'.repeat(64)),
+    ).toThrow(/json|store|metadata/i)
+    expect(readFileSync(sessionCardStorePath(), 'utf8')).toBe(corrupt)
   })
 
   it('falls back safely for corrupt or oversized files and can recover atomically', () => {

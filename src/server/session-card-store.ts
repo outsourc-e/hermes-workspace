@@ -21,10 +21,12 @@ export const SESSION_CARD_STORE_MAX_BYTES = 1024 * 1024
 const SESSION_CARD_STORE_VERSION = 1 as const
 const SESSION_CARD_STORE_FILE = 'session-cards.v1.json'
 const SESSION_CARD_ID_MAX_LENGTH = 256
-// v1 remains backward compatible; reserve a bounded 16-byte JSON budget for
-// an optional `pinned: false` field without changing the overall store cap.
-const SESSION_CARD_RECORD_MAX_BYTES = 1040
+const SESSION_CARD_RECORD_MAX_BYTES = 96 * 1024
 const SESSION_CARD_RECORD_MAX_COUNT = 2000
+const SESSION_CARD_BRANCH_REPLAY_MAX_COUNT = 256
+const SESSION_CARD_BRANCH_REPLAY_MAX_PER_CARD = 32
+const SESSION_CARD_BRANCH_KEY_MAX_LENGTH = 2048
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 const RECORD_FIELDS = new Set([
   'cardId',
@@ -33,6 +35,7 @@ const RECORD_FIELDS = new Set([
   'pinned',
   'updatedAt',
   'archivedAt',
+  'branchReplays',
 ])
 const PATCH_FIELDS = new Set(['manualTitle', 'autoTitle', 'pinned'])
 
@@ -43,7 +46,32 @@ export type PersistedSessionCard = {
   pinned?: boolean
   updatedAt: number
   archivedAt?: number
+  branchReplays?: Array<PersistedSessionCardBranchReplay>
 }
+
+export type SessionCardBranchReplayOutcome =
+  | {
+      kind: 'created' | 'projection-pending'
+      canonicalSegmentKey: string
+      childSessionKey: string
+    }
+  | { kind: 'failed' }
+  | { kind: 'unavailable' }
+
+export type PersistedSessionCardBranchReplay = {
+  requestKeyHash: string
+  fingerprint: string
+  createdAt: number
+  outcome?: SessionCardBranchReplayOutcome
+}
+
+export type SessionCardBranchReplayReservation =
+  | { status: 'reserved' }
+  | {
+      status: 'pending' | 'completed'
+      replay: PersistedSessionCardBranchReplay
+    }
+  | { status: 'conflict' | 'capacity' }
 
 export type PersistedSessionCardStore = {
   version: typeof SESSION_CARD_STORE_VERSION
@@ -121,6 +149,78 @@ function isTimestamp(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0
 }
 
+function isBoundedBranchKey(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= SESSION_CARD_BRANCH_KEY_MAX_LENGTH &&
+    value.trim() === value &&
+    !hasControlCharacters(value)
+  )
+}
+
+function validateBranchReplayOutcome(
+  value: unknown,
+): SessionCardBranchReplayOutcome | null {
+  if (!isRecord(value) || typeof value.kind !== 'string') return null
+  if (value.kind === 'failed' || value.kind === 'unavailable') {
+    return Object.keys(value).length === 1 ? { kind: value.kind } : null
+  }
+  if (value.kind !== 'created' && value.kind !== 'projection-pending') {
+    return null
+  }
+  if (
+    Object.keys(value).some(
+      (field) =>
+        field !== 'kind' &&
+        field !== 'canonicalSegmentKey' &&
+        field !== 'childSessionKey',
+    ) ||
+    !isBoundedBranchKey(value.canonicalSegmentKey) ||
+    !isBoundedBranchKey(value.childSessionKey)
+  ) {
+    return null
+  }
+  return {
+    kind: value.kind,
+    canonicalSegmentKey: value.canonicalSegmentKey,
+    childSessionKey: value.childSessionKey,
+  }
+}
+
+function validateBranchReplay(
+  value: unknown,
+): PersistedSessionCardBranchReplay | null {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some(
+      (field) =>
+        field !== 'requestKeyHash' &&
+        field !== 'fingerprint' &&
+        field !== 'createdAt' &&
+        field !== 'outcome',
+    ) ||
+    typeof value.requestKeyHash !== 'string' ||
+    !SHA256_HEX_PATTERN.test(value.requestKeyHash) ||
+    typeof value.fingerprint !== 'string' ||
+    !SHA256_HEX_PATTERN.test(value.fingerprint) ||
+    !isTimestamp(value.createdAt)
+  ) {
+    return null
+  }
+  const replay: PersistedSessionCardBranchReplay = {
+    requestKeyHash: value.requestKeyHash,
+    fingerprint: value.fingerprint,
+    createdAt: value.createdAt,
+  }
+  if ('outcome' in value) {
+    const outcome = validateBranchReplayOutcome(value.outcome)
+    if (!outcome) return null
+    replay.outcome = outcome
+  }
+  return replay
+}
+
 function validatePersistedCard(
   key: string,
   value: unknown,
@@ -156,6 +256,24 @@ function validatePersistedCard(
       if (!isTimestamp(value.archivedAt)) return null
       card.archivedAt = value.archivedAt
     }
+    if ('branchReplays' in value) {
+      if (
+        !Array.isArray(value.branchReplays) ||
+        value.branchReplays.length > SESSION_CARD_BRANCH_REPLAY_MAX_PER_CARD
+      ) {
+        return null
+      }
+      const branchReplays = value.branchReplays.map(validateBranchReplay)
+      if (
+        branchReplays.some((replay) => replay === null) ||
+        new Set(branchReplays.map((replay) => replay?.requestKeyHash)).size !==
+          branchReplays.length
+      ) {
+        return null
+      }
+      card.branchReplays =
+        branchReplays as Array<PersistedSessionCardBranchReplay>
+    }
     // Pins only apply to visible Cards. Retain archive/title metadata from an
     // older or externally-corrupted record, but fail closed on its pin state.
     if (card.archivedAt !== undefined) delete card.pinned
@@ -165,9 +283,14 @@ function validatePersistedCard(
   }
 }
 
-function parseStore(raw: string): PersistedSessionCardStore {
+function invalidPersistedStore(strict: boolean): PersistedSessionCardStore {
+  if (strict) throw new Error('Session Card metadata store is invalid')
+  return emptyStore()
+}
+
+function parseStore(raw: string, strict = false): PersistedSessionCardStore {
   if (Buffer.byteLength(raw, 'utf8') > SESSION_CARD_STORE_MAX_BYTES) {
-    return emptyStore()
+    return invalidPersistedStore(strict)
   }
 
   const parsed = JSON.parse(raw) as unknown
@@ -179,16 +302,27 @@ function parseStore(raw: string): PersistedSessionCardStore {
     parsed.version !== SESSION_CARD_STORE_VERSION ||
     !isRecord(parsed.cards)
   ) {
-    return emptyStore()
+    return invalidPersistedStore(strict)
   }
 
   const entries = Object.entries(parsed.cards)
-  if (entries.length > SESSION_CARD_RECORD_MAX_COUNT) return emptyStore()
+  if (entries.length > SESSION_CARD_RECORD_MAX_COUNT) {
+    return invalidPersistedStore(strict)
+  }
 
   const cards: Record<string, PersistedSessionCard> = {}
+  let branchReplayCount = 0
   for (const [key, value] of entries) {
     const card = validatePersistedCard(key, value)
-    if (card) cards[key] = card
+    if (card) {
+      branchReplayCount += card.branchReplays?.length ?? 0
+      if (branchReplayCount > SESSION_CARD_BRANCH_REPLAY_MAX_COUNT) {
+        return invalidPersistedStore(strict)
+      }
+      cards[key] = card
+    } else if (strict) {
+      return invalidPersistedStore(true)
+    }
   }
   return { version: SESSION_CARD_STORE_VERSION, cards }
 }
@@ -205,12 +339,38 @@ function readStore(): PersistedSessionCardStore {
   }
 }
 
+function readStoreForBranchReplay(): PersistedSessionCardStore {
+  const path = sessionCardStorePath()
+  try {
+    const stat = lstatSync(path)
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new Error('Session Card metadata store is not a regular file')
+    }
+    if (stat.size > SESSION_CARD_STORE_MAX_BYTES) {
+      throw new Error('Session Card metadata store is too large')
+    }
+    return parseStore(readFileSync(path, 'utf8'), true)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return emptyStore()
+    throw error
+  }
+}
+
 function assertWritableStore(store: PersistedSessionCardStore): string {
   const cards = Object.values(store.cards)
   if (cards.length > SESSION_CARD_RECORD_MAX_COUNT) {
     throw new Error('Session Card metadata store has too many records')
   }
+  let branchReplayCount = 0
   for (const card of cards) {
+    branchReplayCount += card.branchReplays?.length ?? 0
+    if (
+      (card.branchReplays?.length ?? 0) >
+        SESSION_CARD_BRANCH_REPLAY_MAX_PER_CARD ||
+      branchReplayCount > SESSION_CARD_BRANCH_REPLAY_MAX_COUNT
+    ) {
+      throw new Error('Session Card branch replay store is at capacity')
+    }
     if (
       Buffer.byteLength(JSON.stringify(card), 'utf8') >
       SESSION_CARD_RECORD_MAX_BYTES
@@ -339,6 +499,117 @@ export function listSessionCardMetadata(): Array<PersistedSessionCard> {
   return Object.values(readStore().cards).sort((a, b) =>
     a.cardId.localeCompare(b.cardId),
   )
+}
+
+function assertBranchReplayHash(value: string): string {
+  if (typeof value !== 'string' || !SHA256_HEX_PATTERN.test(value)) {
+    throw new Error('Invalid Session Card branch replay fingerprint')
+  }
+  return value
+}
+
+export function readSessionCardBranchReplay(
+  cardId: string,
+  requestKeyHash: string,
+): PersistedSessionCardBranchReplay | null {
+  const normalizedCardId = assertCardId(cardId)
+  const normalizedRequestKeyHash = assertBranchReplayHash(requestKeyHash)
+  const replay = readStoreForBranchReplay().cards[
+    normalizedCardId
+  ]?.branchReplays?.find(
+    (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
+  )
+  return replay ?? null
+}
+
+export function reserveSessionCardBranchReplay(
+  cardId: string,
+  requestKeyHash: string,
+  fingerprint: string,
+): SessionCardBranchReplayReservation {
+  const normalizedCardId = assertCardId(cardId)
+  const normalizedRequestKeyHash = assertBranchReplayHash(requestKeyHash)
+  const normalizedFingerprint = assertBranchReplayHash(fingerprint)
+  const store = readStoreForBranchReplay()
+  const previous = store.cards[normalizedCardId]
+  const branchReplays = previous?.branchReplays ?? []
+  const existing = branchReplays.find(
+    (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
+  )
+  if (existing) {
+    if (existing.fingerprint !== normalizedFingerprint) {
+      return { status: 'conflict' }
+    }
+    return {
+      status: existing.outcome ? 'completed' : 'pending',
+      replay: existing,
+    }
+  }
+
+  const totalReplays = Object.values(store.cards).reduce(
+    (count, card) => count + (card.branchReplays?.length ?? 0),
+    0,
+  )
+  if (
+    branchReplays.length >= SESSION_CARD_BRANCH_REPLAY_MAX_PER_CARD ||
+    totalReplays >= SESSION_CARD_BRANCH_REPLAY_MAX_COUNT
+  ) {
+    return { status: 'capacity' }
+  }
+
+  const now = Date.now()
+  store.cards[normalizedCardId] = {
+    ...previous,
+    cardId: normalizedCardId,
+    updatedAt: previous?.updatedAt ?? now,
+    branchReplays: [
+      ...branchReplays,
+      {
+        requestKeyHash: normalizedRequestKeyHash,
+        fingerprint: normalizedFingerprint,
+        createdAt: now,
+      },
+    ],
+  }
+  writeStore(store)
+  return { status: 'reserved' }
+}
+
+export function completeSessionCardBranchReplay(
+  cardId: string,
+  requestKeyHash: string,
+  fingerprint: string,
+  outcome: SessionCardBranchReplayOutcome,
+): PersistedSessionCardBranchReplay {
+  const normalizedCardId = assertCardId(cardId)
+  const normalizedRequestKeyHash = assertBranchReplayHash(requestKeyHash)
+  const normalizedFingerprint = assertBranchReplayHash(fingerprint)
+  const normalizedOutcome = validateBranchReplayOutcome(outcome)
+  if (!normalizedOutcome) {
+    throw new Error('Invalid Session Card branch replay outcome')
+  }
+
+  const store = readStoreForBranchReplay()
+  const card = store.cards[normalizedCardId]
+  const replayIndex = card?.branchReplays?.findIndex(
+    (candidate) => candidate.requestKeyHash === normalizedRequestKeyHash,
+  )
+  if (
+    !card ||
+    replayIndex === undefined ||
+    replayIndex < 0 ||
+    card.branchReplays?.[replayIndex]?.fingerprint !== normalizedFingerprint
+  ) {
+    throw new Error('Session Card branch replay reservation is unavailable')
+  }
+
+  const replay: PersistedSessionCardBranchReplay = {
+    ...card.branchReplays[replayIndex],
+    outcome: normalizedOutcome,
+  }
+  card.branchReplays[replayIndex] = replay
+  writeStore(store)
+  return replay
 }
 
 export function updateSessionCardMetadata(

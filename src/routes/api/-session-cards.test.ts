@@ -14,6 +14,7 @@ import { Route as HistoryRoute } from './session-cards.$cardId.history'
 
 const mocks = vi.hoisted(() => ({
   isAuthenticated: vi.fn(),
+  isPasswordProtectionEnabled: vi.fn(),
   listCards: vi.fn(),
   resolveCard: vi.fn(),
   updateCardMetadata: vi.fn(),
@@ -22,6 +23,9 @@ const mocks = vi.hoisted(() => ({
   ensureGatewayProbed: vi.fn(),
   forkSession: vi.fn(),
   deleteSession: vi.fn(),
+  readBranchReplay: vi.fn(),
+  reserveBranchReplay: vi.fn(),
+  completeBranchReplay: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -29,7 +33,14 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 vi.mock('../../server/auth-middleware', () => ({
+  getSessionTokenFromCookie: (cookie: string | null) =>
+    cookie
+      ?.split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('claude-auth='))
+      ?.slice('claude-auth='.length) ?? null,
   isAuthenticated: mocks.isAuthenticated,
+  isPasswordProtectionEnabled: mocks.isPasswordProtectionEnabled,
 }))
 
 vi.mock('../../server/session-card-service', () => ({
@@ -42,6 +53,13 @@ vi.mock('../../server/session-card-service', () => ({
     updateCardMetadata: mocks.updateCardMetadata,
     archiveCard: mocks.archiveCard,
   },
+}))
+
+vi.mock('../../server/session-card-store', () => ({
+  SESSION_CARD_TITLE_MAX_LENGTH: 200,
+  readSessionCardBranchReplay: mocks.readBranchReplay,
+  reserveSessionCardBranchReplay: mocks.reserveBranchReplay,
+  completeSessionCardBranchReplay: mocks.completeBranchReplay,
 }))
 
 vi.mock('../../server/session-card-history', () => ({
@@ -107,6 +125,10 @@ function jsonRequest(
 }
 
 let branchIntentSequence = 0
+const durableBranchReplays = new Map<
+  string,
+  { fingerprint: string; outcome?: Record<string, unknown> }
+>()
 
 function branchRequestBody(patch: Record<string, unknown> = {}): string {
   branchIntentSequence += 1
@@ -225,7 +247,9 @@ function resolvedCardWithBranch(
 
 beforeEach(() => {
   vi.clearAllMocks()
+  durableBranchReplays.clear()
   mocks.isAuthenticated.mockReturnValue(true)
+  mocks.isPasswordProtectionEnabled.mockReturnValue(false)
   mocks.resolveCard.mockResolvedValue(resolvedCard())
   mocks.listCards.mockResolvedValue({
     cards: [resolvedCard().card],
@@ -234,6 +258,34 @@ beforeEach(() => {
     sources: [],
   })
   mocks.ensureGatewayProbed.mockResolvedValue({ sessionFork: true })
+  mocks.readBranchReplay.mockImplementation(
+    (_cardId: string, requestKeyHash: string) =>
+      durableBranchReplays.get(requestKeyHash) ?? null,
+  )
+  mocks.reserveBranchReplay.mockImplementation(
+    (_cardId: string, requestKeyHash: string, fingerprint: string) => {
+      const existing = durableBranchReplays.get(requestKeyHash)
+      if (existing) {
+        if (existing.fingerprint !== fingerprint) return { status: 'conflict' }
+        return {
+          status: existing.outcome ? 'completed' : 'pending',
+          replay: existing,
+        }
+      }
+      durableBranchReplays.set(requestKeyHash, { fingerprint })
+      return { status: 'reserved' }
+    },
+  )
+  mocks.completeBranchReplay.mockImplementation(
+    (
+      _cardId: string,
+      requestKeyHash: string,
+      fingerprint: string,
+      outcome: Record<string, unknown>,
+    ) => {
+      durableBranchReplays.set(requestKeyHash, { fingerprint, outcome })
+    },
+  )
 })
 
 describe('GET /api/session-cards', () => {
@@ -915,6 +967,7 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(JSON.stringify(payload)).not.toContain('remote:fresh-tip')
     expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
     expect(mocks.forkSession).not.toHaveBeenCalled()
+    expect(mocks.reserveBranchReplay).not.toHaveBeenCalled()
   })
 
   it('coalesces concurrent same-key same-intent requests into one fork and one replayed response', async () => {
@@ -953,6 +1006,81 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(mocks.forkSession).toHaveBeenCalledTimes(1)
   })
 
+  it('replays a durable projection-pending outcome after process-local coalescing ends', async () => {
+    mocks.forkSession.mockResolvedValue({
+      session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
+      forkedFrom: 'tip-upstream',
+    })
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedCard())
+      .mockResolvedValueOnce(resolvedCard())
+    const body = JSON.stringify({
+      expectedCanonicalSegmentKey: 'remote:tip',
+      idempotencyKey: 'durable-pending-intent',
+    })
+    const invoke = () =>
+      branchHandler({
+        request: jsonRequest(
+          '/api/session-cards/remote%3Aroot/branch',
+          'POST',
+          body,
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+    const first = await invoke()
+    expect(first.status).toBe(202)
+    const firstPayload = await first.json()
+    const replay = await invoke()
+
+    expect(replay.status).toBe(202)
+    expect(await replay.json()).toEqual(firstPayload)
+    expect(mocks.completeBranchReplay).toHaveBeenCalledWith(
+      'remote:root',
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      {
+        kind: 'projection-pending',
+        canonicalSegmentKey: 'remote:tip',
+        childSessionKey: 'remote:child-upstream',
+      },
+    )
+    expect(mocks.resolveCard).toHaveBeenCalledTimes(2)
+    expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails closed without a second fork when durable outcome persistence fails', async () => {
+    mocks.forkSession.mockResolvedValue({
+      session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
+      forkedFrom: 'tip-upstream',
+    })
+    mocks.completeBranchReplay.mockImplementationOnce(() => {
+      throw new Error('private persistence detail')
+    })
+    const body = JSON.stringify({
+      expectedCanonicalSegmentKey: 'remote:tip',
+      idempotencyKey: 'failed-persistence-intent',
+    })
+    const invoke = () =>
+      branchHandler({
+        request: jsonRequest(
+          '/api/session-cards/remote%3Aroot/branch',
+          'POST',
+          body,
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+    const first = await invoke()
+    const replay = await invoke()
+
+    expect(first.status).toBe(502)
+    expect(JSON.stringify(await first.json())).not.toContain('private')
+    expect(replay.status).toBe(503)
+    expect(JSON.stringify(await replay.json())).not.toContain('private')
+    expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+  })
+
   it('conflicts instead of replaying a key across a different expected parent or title', async () => {
     mocks.forkSession.mockResolvedValue({
       session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
@@ -981,6 +1109,39 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(differentParent.status).toBe(409)
     expect(differentTitle.status).toBe(409)
     expect(mocks.resolveCard).toHaveBeenCalledTimes(2)
+    expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('binds a durable idempotency key to the authenticated requester', async () => {
+    mocks.isPasswordProtectionEnabled.mockReturnValue(true)
+    mocks.forkSession.mockResolvedValue({
+      session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
+      forkedFrom: 'tip-upstream',
+    })
+    const body = JSON.stringify({
+      expectedCanonicalSegmentKey: 'remote:tip',
+      idempotencyKey: 'requester-bound-intent',
+    })
+    const invoke = (token: string) =>
+      branchHandler({
+        request: new Request(
+          'http://workspace.test/api/session-cards/remote%3Aroot/branch',
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              cookie: `claude-auth=${token}`,
+            },
+            body,
+          },
+        ),
+        params: { cardId: 'remote:root' },
+      })
+
+    expect((await invoke('requester-one')).status).toBe(202)
+    const conflict = await invoke('requester-two')
+
+    expect(conflict.status).toBe(409)
     expect(mocks.forkSession).toHaveBeenCalledTimes(1)
   })
 

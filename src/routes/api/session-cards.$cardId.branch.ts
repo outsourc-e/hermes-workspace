@@ -1,13 +1,23 @@
+import { createHash } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { createCapabilityUnavailablePayload } from '../../lib/feature-gates'
-import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  getSessionTokenFromCookie,
+  isAuthenticated,
+  isPasswordProtectionEnabled,
+} from '../../server/auth-middleware'
 import {
   SessionForkUnavailableError,
   ensureGatewayProbed,
   forkSession,
 } from '../../server/claude-api'
 import { sessionCardService } from '../../server/session-card-service'
+import {
+  completeSessionCardBranchReplay,
+  readSessionCardBranchReplay,
+  reserveSessionCardBranchReplay,
+} from '../../server/session-card-store'
 import {
   invalidRequest,
   isSessionCardNotFound,
@@ -16,12 +26,15 @@ import {
   readJsonObject,
   requireSessionCardJsonContentType,
 } from './-session-card-http'
+import type {
+  PersistedSessionCardBranchReplay,
+  SessionCardBranchReplayOutcome,
+} from '../../server/session-card-store'
 
 const MAX_BRANCH_TITLE_LENGTH = 500
 const MAX_CANONICAL_SEGMENT_KEY_LENGTH = 2_048
 const MAX_IDEMPOTENCY_KEY_LENGTH = 128
-const MAX_BRANCH_REPLAYS = 256
-const BRANCH_REPLAY_TTL_MS = 10 * 60 * 1_000
+const MAX_ACTIVE_BRANCHES = 256
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]+$/
 
 type BranchReplay = {
@@ -34,8 +47,6 @@ type BranchReplay = {
 type BranchReplayEntry = {
   fingerprint: string
   promise: Promise<BranchReplay>
-  expiresAt: number
-  settled: boolean
 }
 
 const branchReplayEntries = new Map<string, BranchReplayEntry>()
@@ -86,10 +97,77 @@ function replayResponse(replay: BranchReplay): Response {
   })
 }
 
-function pruneBranchReplays(now: number): void {
-  for (const [key, entry] of branchReplayEntries) {
-    if (entry.settled && entry.expiresAt <= now) branchReplayEntries.delete(key)
+function sha256Fingerprint(parts: Array<string>): string {
+  return createHash('sha256').update(JSON.stringify(parts)).digest('hex')
+}
+
+function requesterSemantic(request: Request): string {
+  if (!isPasswordProtectionEnabled()) {
+    return sha256Fingerprint([
+      'session-card-branch-requester-v1',
+      'unprotected',
+    ])
   }
+  const token = getSessionTokenFromCookie(request.headers.get('cookie'))
+  return sha256Fingerprint([
+    'session-card-branch-requester-v1',
+    token ? `session:${token}` : 'authenticated',
+  ])
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function outcomeFromReplay(
+  replay: BranchReplay,
+): SessionCardBranchReplayOutcome {
+  if (replay.status === 201 || replay.status === 202) {
+    try {
+      const payload = JSON.parse(replay.body) as unknown
+      if (
+        isRecord(payload) &&
+        typeof payload.canonicalSegmentKey === 'string' &&
+        typeof payload.childSessionKey === 'string'
+      ) {
+        return {
+          kind: replay.status === 201 ? 'created' : 'projection-pending',
+          canonicalSegmentKey: payload.canonicalSegmentKey,
+          childSessionKey: payload.childSessionKey,
+        }
+      }
+    } catch {
+      // Persist only a stable failure marker when an internal response is malformed.
+    }
+  }
+  return { kind: replay.status === 503 ? 'unavailable' : 'failed' }
+}
+
+function durableReplayResponse(
+  cardId: string,
+  replay: PersistedSessionCardBranchReplay,
+): Response {
+  const outcome = replay.outcome
+  if (!outcome) return replayCapacityUnavailable()
+  if (outcome.kind === 'failed') return branchFailure()
+  if (outcome.kind === 'unavailable') return unavailableResponse(cardId)
+  if (outcome.kind === 'projection-pending') {
+    return projectionPendingResponse(
+      cardId,
+      outcome.canonicalSegmentKey,
+      outcome.childSessionKey,
+    )
+  }
+  return json(
+    {
+      ok: true,
+      cardId,
+      canonicalSegmentKey: outcome.canonicalSegmentKey,
+      childSessionKey: outcome.childSessionKey,
+      supported: true,
+    },
+    { status: 201 },
+  )
 }
 
 function unavailableResponse(cardId: string): Response {
@@ -150,7 +228,7 @@ async function executeBranch(
   cardId: string,
   expectedCanonicalSegmentKey: string,
   title: string,
-  markSideEffectStarted: () => void,
+  beginSideEffect: () => Response | null,
 ): Promise<Response> {
   let resolved
   try {
@@ -192,7 +270,8 @@ async function executeBranch(
   if (!supported) return unavailableResponse(resolved.card.cardId)
 
   try {
-    markSideEffectStarted()
+    const reservationFailure = beginSideEffect()
+    if (reservationFailure) return reservationFailure
     const result = await forkSession(
       authoritativeUpstreamKey,
       title ? { title } : undefined,
@@ -363,48 +442,97 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
 
         const expectedCanonicalSegmentKey = body.expectedCanonicalSegmentKey
         const idempotencyKey = body.idempotencyKey
-        const scopeKey = `${cardId}\n${idempotencyKey}`
-        const fingerprint = JSON.stringify([expectedCanonicalSegmentKey, title])
-        const now = Date.now()
-        pruneBranchReplays(now)
-        const existing = branchReplayEntries.get(scopeKey)
-        if (existing) {
-          if (existing.fingerprint !== fingerprint) return idempotencyConflict()
-          return replayResponse(await existing.promise)
+        const requestKeyHash = sha256Fingerprint([
+          'session-card-branch-key-v1',
+          cardId,
+          idempotencyKey,
+        ])
+        const fingerprint = sha256Fingerprint([
+          'session-card-branch-intent-v1',
+          cardId,
+          idempotencyKey,
+          expectedCanonicalSegmentKey,
+          title,
+          requesterSemantic(request),
+        ])
+        const active = branchReplayEntries.get(requestKeyHash)
+        if (active) {
+          if (active.fingerprint !== fingerprint) return idempotencyConflict()
+          return replayResponse(await active.promise)
         }
-        if (branchReplayEntries.size >= MAX_BRANCH_REPLAYS) {
+
+        let durableReplay: PersistedSessionCardBranchReplay | null
+        try {
+          durableReplay = readSessionCardBranchReplay(cardId, requestKeyHash)
+        } catch {
+          return replayCapacityUnavailable()
+        }
+        if (durableReplay) {
+          if (durableReplay.fingerprint !== fingerprint) {
+            return idempotencyConflict()
+          }
+          return durableReplayResponse(cardId, durableReplay)
+        }
+        if (branchReplayEntries.size >= MAX_ACTIVE_BRANCHES) {
           return replayCapacityUnavailable()
         }
 
         const operationState = { sideEffectStarted: false }
-        const operation = Promise.resolve().then(async () =>
-          captureReplay(
-            await executeBranch(
-              cardId,
-              expectedCanonicalSegmentKey,
-              title,
-              () => {
-                operationState.sideEffectStarted = true
-              },
-            ),
-          ),
-        )
-        const entry: BranchReplayEntry = {
-          fingerprint,
-          promise: operation,
-          expiresAt: Number.POSITIVE_INFINITY,
-          settled: false,
-        }
-        branchReplayEntries.set(scopeKey, entry)
+        const operation = Promise.resolve().then(async () => {
+          const response = await executeBranch(
+            cardId,
+            expectedCanonicalSegmentKey,
+            title,
+            () => {
+              let reservation
+              try {
+                reservation = reserveSessionCardBranchReplay(
+                  cardId,
+                  requestKeyHash,
+                  fingerprint,
+                )
+              } catch {
+                return replayCapacityUnavailable()
+              }
+              if (reservation.status === 'conflict') {
+                return idempotencyConflict()
+              }
+              if (reservation.status === 'capacity') {
+                return replayCapacityUnavailable()
+              }
+              if (reservation.status === 'pending') {
+                return replayCapacityUnavailable()
+              }
+              if (reservation.status === 'completed') {
+                return durableReplayResponse(cardId, reservation.replay)
+              }
+              operationState.sideEffectStarted = true
+              return null
+            },
+          )
+          let replay = await captureReplay(response)
+          if (operationState.sideEffectStarted) {
+            try {
+              completeSessionCardBranchReplay(
+                cardId,
+                requestKeyHash,
+                fingerprint,
+                outcomeFromReplay(replay),
+              )
+            } catch {
+              replay = await captureReplay(branchFailure())
+            }
+          }
+          return replay
+        })
+        const entry: BranchReplayEntry = { fingerprint, promise: operation }
+        branchReplayEntries.set(requestKeyHash, entry)
 
         try {
           return replayResponse(await operation)
         } finally {
-          entry.settled = true
-          if (operationState.sideEffectStarted) {
-            entry.expiresAt = Date.now() + BRANCH_REPLAY_TTL_MS
-          } else if (branchReplayEntries.get(scopeKey) === entry) {
-            branchReplayEntries.delete(scopeKey)
+          if (branchReplayEntries.get(requestKeyHash) === entry) {
+            branchReplayEntries.delete(requestKeyHash)
           }
         }
       },
