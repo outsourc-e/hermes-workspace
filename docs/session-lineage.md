@@ -20,9 +20,15 @@ Workspace normalizes sessions into five relationship kinds:
 
 Workspace does not infer a continuation from `parentSessionId`, a declared root/tip, a title, or a continuation label alone. A continuation requires compatible sources and valid backend lifecycle evidence. Explicit forks and child sessions are never continuation members. Unknown or unsafe relationships remain visible as orphans rather than being guessed.
 
-## Stable Card Identity and Canonical Segments
+## Stable Card Identity, Read Source, and Mutation Transport
 
 A `cardId` is the stable user-facing identity of a logical parent conversation. A `canonicalSegmentKey` is the mutable backend session key that currently receives parent sends and live parent events.
+
+The Card wire also separates read authority from mutation transport:
+
+- `canonicalSource` is the validated read/identity domain for the canonical segment. Its allowed values are `local` and `remote`.
+- `canonicalTransport` identifies the exact remote adapter that owns transport-specific mutation of that segment. Its allowed values are `gateway` and `dashboard`.
+- A transport value does not replace source-qualified Card or segment identity, and a global capability does not replace transport ownership. Missing or unsupported transport data fails closed rather than being inferred from `canonicalSource`.
 
 - Chat routes select the stable Card ID, not an individual storage segment.
 - User-facing navigation returns to the last stable Card ID. `new` is the only controlled bootstrap destination; `main` is not a permanent route alias or fallback destination.
@@ -46,7 +52,7 @@ If the child Card no longer belongs to the parent, the inspection value is malfo
 User actions belong to the parent Session Card, never to a hidden continuation segment or ordinary child node.
 
 - **Title and pin:** update Card metadata keyed by `cardId`; a continuation or child has no separate title or pin action.
-- **Branch:** fork the whole parent conversation from the server-resolved canonical segment. The result appears beneath the parent and cannot replace its selection.
+- **Branch:** fork the whole parent conversation from the server-resolved canonical segment only when the Card's read source is `remote`, its authorized mutation transport is `gateway`, and that gateway positively advertises whole-session fork support. The result appears beneath the parent and cannot replace its selection.
 - **Archive:** hide/archive the Card through Workspace metadata. Archival does not delete backend segments.
 
 Branch and archive completion respect newer user intent. If a mutation starts for Card A and the user selects Card B before it completes, the late completion reconciles the Card list but does not navigate away from B. Archiving the still-selected Card moves to the controlled `new` bootstrap only after the archive succeeds.
@@ -60,7 +66,7 @@ Malformed or incomplete Card data must fail safely:
 - Missing, cyclic, cross-source, or unverified lineage does not create a relationship, hide a record, or reroute parent traffic.
 - If the server cannot retrieve the complete confirmed continuation component, Card history reports an explicit incomplete or unavailable state. The selected Card is preserved; Workspace does not fabricate continuity, substitute a child history, or silently fall back to a legacy per-segment route.
 - If the canonical parent segment cannot be validated for a send or recovery, Workspace keeps the Card selected and exposes a safe unavailable/retry state rather than guessing a destination.
-- Branching remains unavailable when the whole-conversation fork capability or a consistent backend response is absent.
+- Branching remains unavailable when `canonicalTransport` is absent/unsupported, is `dashboard`, the gateway's whole-conversation fork capability is absent, or a consistent backend response is unavailable. A Card can remain valid for dashboard-backed reads while this mutation fails closed.
 - Metadata corruption must not introduce transcript data or inferred relationships; a safe default display state is preferable to invented Card state.
 
 ## Privacy and Source Boundaries
@@ -82,9 +88,12 @@ Lineage and Card metadata are list-safe relationship data, not permission to com
 
 ### The branch action is missing or fails
 
-1. A missing action is expected when whole-conversation fork capability has not been confirmed or no canonical parent segment can be validated.
-2. Branch the complete Card only; message-targeted branching is not part of this contract.
-3. An inconsistent fork response must leave the parent Card selected and unchanged.
+1. Locate the Card in the already-authenticated `/api/session-cards` response using its exact source-qualified `cardId`; never strip or rewrite the source prefix.
+2. Confirm its unique Card resolution is complete/non-retryable and `canonicalSource` is `remote`. `canonicalSource` establishes the read source, not permission to mutate through any available adapter.
+3. Check `canonicalTransport`. Only `gateway` authorizes this transport-specific mutation. `dashboard` or an absent value safely disables the affordance even when the Card is otherwise valid; any other value is unsupported and must be rejected, not coerced.
+4. For a `gateway` Card, confirm that the same gateway advertises `sessionFork`. An absent/failed capability probe or a false capability leaves branching unavailable.
+5. Branch the complete Card only; message-targeted branching is not part of this contract. An inconsistent fork response must leave the parent Card selected and unchanged.
+6. Restore the owning source/capability and refresh. Do not expose credentials, edit source-qualified identity, fall back to a raw session route, or start a duplicate gateway to manufacture support.
 
 ## Credential-Free Manual Verification
 
@@ -110,13 +119,13 @@ Follow `AGENTS.md`: reuse the existing gateway on `127.0.0.1:8642` and Dashboard
 
 3. For an authenticated `200` response, inspect the Card response rather than treating HTTP success as projection success. The top-level object contains `cards`, `cardResolutions`, `completeness`, `retryable`, and `sources`:
 
-   - `cards` contains Card objects, including stable `cardId`, `canonicalSource`, mutable `canonicalSegmentKey`, `continuationSegmentKeys`, `relationshipKind`, and `childNodes`. An empty array is valid.
+   - `cards` contains Card objects, including stable `cardId`, `canonicalSource`, optional `canonicalTransport`, mutable `canonicalSegmentKey`, `continuationSegmentKeys`, `relationshipKind`, and `childNodes`. `canonicalTransport`, when present, is exactly `gateway` or `dashboard` and names the mutation-owning adapter for the remote canonical segment. An empty array is valid.
    - `cardResolutions` contains one entry per returned Card, keyed by `cardId`, with `completeness` and `retryable`.
    - `sources` reports each source's `status` (`complete`, `incomplete`, or `unavailable`), `fetched`, and `retryable`; a bounded `reason` or sanitized `error` may also be present.
 
    A fully complete response has top-level `completeness: "complete"` and `retryable: false`; every reported source is complete and non-retryable; and every Card has exactly one matching resolution with `completeness: "complete"` and `retryable: false`. Global completeness alone is insufficient: a complete collection can still contain a Card whose confirmed continuation component is incomplete.
 
-4. Treat a `200` response with top-level `completeness: "incomplete"` and `retryable: true` as a partial snapshot, not proof that an absent Card does not exist. Already returned Cards can remain usable only when their own single `cardResolutions` entry is complete and non-retryable. A Card is unavailable for selection, sends, or recovery when its resolution is incomplete/retryable, missing, duplicated, or inconsistent, or when its `canonicalSource` is absent or invalid. Preserve the selected Card and retry the Card list after the affected source recovers; do not guess a segment, route through a child, or fall back to `/api/sessions`.
+4. Treat a `200` response with top-level `completeness: "incomplete"` and `retryable: true` as a partial snapshot, not proof that an absent Card does not exist. Already returned Cards can remain usable only when their own single `cardResolutions` entry is complete and non-retryable. A Card is unavailable for selection, sends, or recovery when its resolution is incomplete/retryable, missing, duplicated, or inconsistent, or when its `canonicalSource` is absent or invalid. Read validity does not grant branch authority: whole-Card branching additionally requires `canonicalSource: "remote"`, `canonicalTransport: "gateway"`, and the gateway's positive fork capability. Preserve the selected Card and retry the Card list after the affected source recovers; do not guess a segment or transport, route through a child, or fall back to `/api/sessions`.
 
    Use `sources` to distinguish a partially fetched source from an unavailable one. Restore or wait for that canonical service, then refresh/retry. Do not start duplicate services solely because one source is degraded, mutate lineage data, manually merge transcripts, or archive/delete a Card as a recovery step.
 
