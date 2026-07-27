@@ -19,7 +19,6 @@ import {
 import { OperationalWorkerCard } from './operational-worker-card'
 import { Swarm2OrchestratorCard } from './swarm2-orchestrator-card'
 import { Swarm2Wires } from './swarm2-wires'
-import { Swarm2ActivityFeed } from './swarm2-activity-feed'
 import { Swarm2KanbanBoard } from './swarm2-kanban-board'
 import { Swarm2ReportsView, buildSwarm2InboxLanes } from './swarm2-reports-view'
 import type { Swarm2InboxItem } from './swarm2-reports-view'
@@ -123,7 +122,7 @@ export const SWARM2_REAL_API_ENDPOINTS = [
   '/api/terminal-close',
 ] as const
 
-type TerminalKind = 'tmux' | 'log-tail' | 'shell' | 'none'
+type TerminalKind = 'tmux' | 'shell' | 'none'
 
 type RuntimeArtifact = {
   id: string
@@ -152,7 +151,6 @@ type RuntimeEntry = {
   displayName?: string | null
   role?: string | null
   currentTask: string | null
-  recentLogTail: string | null
   pid: number | null
   startedAt: number | null
   lastOutputAt: number | null
@@ -170,9 +168,7 @@ type RuntimeEntry = {
   cronJobCount?: number | null
   tmuxSession: string | null
   tmuxAttachable: boolean
-  logPath?: string | null
   terminalKind?: TerminalKind
-  lastSessionStartedAt?: number | null
   source?: 'runtime.json' | 'fallback'
   artifacts?: Array<RuntimeArtifact>
   previews?: Array<RuntimePreview>
@@ -397,10 +393,32 @@ type RuntimeResponse = {
   checkedAt?: number
 }
 
+const RAW_ACTIVITY_RUNTIME_KEYS = [
+  'recentLogTail',
+  'lastSessionStartedAt',
+  'logPath',
+  'session',
+  'sessionId',
+  'sessionTitle',
+  'historySource',
+] as const
+
+function sanitizeRuntimeEntry(entry: RuntimeEntry): RuntimeEntry {
+  const sanitized: Record<string, unknown> = { ...entry }
+  for (const key of RAW_ACTIVITY_RUNTIME_KEYS) delete sanitized[key]
+  return sanitized as RuntimeEntry
+}
+
 async function fetchRuntime(): Promise<RuntimeResponse> {
   const res = await fetch('/api/swarm-runtime')
   if (!res.ok) throw new Error(`Runtime request failed: ${res.status}`)
-  return res.json()
+  const data = (await res.json()) as RuntimeResponse
+  return {
+    ...data,
+    entries: Array.isArray(data.entries)
+      ? data.entries.map(sanitizeRuntimeEntry)
+      : [],
+  }
 }
 
 async function fetchHealth(): Promise<HealthData> {
@@ -452,16 +470,14 @@ export type RuntimeCommand = {
   label: string
 }
 
-export type RuntimeCommandMode = 'auto' | 'logs' | 'shell'
+export type RuntimeCommandMode = 'auto' | 'shell'
 
 // Pick the live command for a worker pane.
 //
 // Priority for `mode='auto'` (the default):
 //   1. tmux attach when an attachable session exists (interactive TUI, ideal)
-//   2. shell at worker cwd (real PTY, chat-able, no extra deps)
-//   3. tail -F on agent.log (read-only stream, only when no shell context)
+//   2. shell at worker cwd (real PTY, chat-able, no raw activity fallback)
 //
-// `mode='logs'` forces tail -F (when a logPath exists).
 // `mode='shell'` forces a workspace shell even if tmux is available.
 export function commandForRuntime(
   runtime: RuntimeEntry | undefined,
@@ -473,18 +489,6 @@ export function commandForRuntime(
     kind: 'shell',
     label: cwd ? 'shell @ cwd' : 'shell',
   })
-  const logCommand = (): RuntimeCommand | null =>
-    runtime?.logPath
-      ? {
-          command: ['tail', '-n', '200', '-F', runtime.logPath],
-          kind: 'log-tail',
-          label: 'tail -F agent.log',
-        }
-      : null
-
-  if (mode === 'logs') {
-    return logCommand() ?? shellCommand()
-  }
   if (mode === 'shell') {
     return shellCommand()
   }
@@ -499,15 +503,7 @@ export function commandForRuntime(
   if (runtime?.cwd) {
     return shellCommand()
   }
-  return logCommand() ?? shellCommand()
-}
-
-function recentLines(entry: RuntimeEntry | undefined): Array<string> {
-  return (entry?.recentLogTail ?? '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(-4)
+  return shellCommand()
 }
 
 function rankMember(roomIds: Array<string>) {
@@ -542,7 +538,7 @@ function isRuntimeActive(entry: RuntimeEntry | undefined): boolean {
   if (!entry) return false
   if (entry.tmuxAttachable) return true
   if (entry.currentTask?.trim()) return true
-  const last = entry.lastOutputAt ?? entry.lastSessionStartedAt
+  const last = entry.lastOutputAt
   return typeof last === 'number' && Date.now() - last < 12 * 60 * 60 * 1000
 }
 
@@ -782,13 +778,6 @@ type ControlPlaneStageProps = {
     state: 'working' | 'reviewing' | 'blocked' | 'ready'
     age: string
   }>
-  recentUpdates: Array<{
-    workerId: string
-    workerName: string
-    text: string
-    age: string
-    tone: 'idle' | 'active' | 'warning'
-  }>
   latestMission: {
     id: string
     title: string
@@ -839,7 +828,6 @@ function ControlPlaneStage({
   workspaceModel,
   lanes,
   activeAgents,
-  recentUpdates,
   latestMission,
   missions,
   runtimeEntries,
@@ -952,7 +940,6 @@ function ControlPlaneStage({
           onViewModeChange={onViewModeChange}
           lanes={lanes}
           activeAgents={activeAgents}
-          recentUpdates={recentUpdates}
           latestMission={latestMission}
           inboxCounts={inboxCounts}
           members={members}
@@ -989,12 +976,7 @@ function ControlPlaneStage({
                       currentTask={runtime?.currentTask ?? null}
                       checkpointStatus={runtime?.checkpointStatus ?? null}
                       runtimeState={runtime?.state ?? null}
-                      recentLines={recentLines(runtime)}
-                      recentOutputAt={
-                        runtime?.lastOutputAt ??
-                        runtime?.lastSessionStartedAt ??
-                        null
-                      }
+                      recentOutputAt={runtime?.lastOutputAt ?? null}
                       recentSummary={
                         runtime?.lastRealSummary ??
                         runtime?.lastRealResult ??
@@ -1082,9 +1064,7 @@ function ControlPlaneStage({
                   const kindBadgeClass =
                     cmd.kind === 'tmux'
                       ? 'border-[var(--theme-accent)]/40 bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
-                      : cmd.kind === 'log-tail'
-                        ? 'border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] text-[var(--theme-warning)]'
-                        : 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)]'
+                      : 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)]'
                   const titleLabel = member.displayName || member.id
                   const modelLabel = formatAssignedModel(
                     member.model,
@@ -1184,11 +1164,7 @@ function ControlPlaneStage({
                           )}
                           title={cmd.command.join(' ')}
                         >
-                          {cmd.kind === 'tmux'
-                            ? 'tmux'
-                            : cmd.kind === 'log-tail'
-                              ? 'logs'
-                              : 'shell'}
+                          {cmd.kind === 'tmux' ? 'tmux' : 'shell'}
                         </span>
                       </div>
                       <SwarmTerminal
@@ -1417,18 +1393,23 @@ export function Swarm2Screen() {
     )
   }, [])
 
+  const runtimeEntries = useMemo(
+    () => (runtimeQuery.data?.entries ?? []).map(sanitizeRuntimeEntry),
+    [runtimeQuery.data?.entries],
+  )
   const runtimeByWorker = useMemo(() => {
     const map = new Map<string, RuntimeEntry>()
-    for (const entry of runtimeQuery.data?.entries ?? [])
-      map.set(entry.workerId, entry)
+    for (const entry of runtimeEntries) map.set(entry.workerId, entry)
     return map
-  }, [runtimeQuery.data])
+  }, [runtimeEntries])
   const members = useMemo(() => {
     const merged = sortSwarmMembers(crew, roomIds).map((member) => {
       const runtime = runtimeByWorker.get(member.id)
       const roster = rosterQuery.data?.find((worker) => worker.id === member.id)
       return {
         ...member,
+        lastSessionTitle: null,
+        lastSessionAt: null,
         displayName: runtime?.displayName || roster?.name || member.displayName,
         role: roster?.role || runtime?.role || member.role,
         specialty: roster?.specialty,
@@ -1455,7 +1436,7 @@ export function Swarm2Screen() {
         mission: worker.mission,
         skills: worker.skills ?? [],
         capabilities: worker.capabilities ?? [],
-        lastSessionTitle: worker.mission || null,
+        lastSessionTitle: null,
         lastSessionAt: null,
         sessionCount: 0,
         messageCount: 0,
@@ -1598,11 +1579,7 @@ export function Swarm2Screen() {
                   .includes('review')
               ? 'reviewing'
               : 'working'
-        const ts =
-          runtime?.lastOutputAt ??
-          runtime?.lastSessionStartedAt ??
-          member.lastSessionAt ??
-          null
+        const ts = runtime?.lastOutputAt ?? null
         return {
           workerId: member.id,
           workerName: member.displayName || member.id,
@@ -1638,9 +1615,9 @@ export function Swarm2Screen() {
     () =>
       buildSwarm2InboxLanes({
         missions: missionsQuery.data ?? [],
-        runtimes: runtimeQuery.data?.entries ?? [],
+        runtimes: runtimeEntries,
       }),
-    [missionsQuery.data, runtimeQuery.data?.entries],
+    [missionsQuery.data, runtimeEntries],
   )
 
   const openInboxItem = useCallback((item: Swarm2InboxItem) => {
@@ -1714,58 +1691,6 @@ export function Swarm2Screen() {
   const actionableNotificationCount = swarmNotifications.filter(
     (item) => item.actionable,
   ).length
-
-  const recentUpdates = useMemo(() => {
-    return members
-      .map((member) => {
-        const runtime = runtimeByWorker.get(member.id)
-        const ts =
-          runtime?.lastOutputAt ??
-          runtime?.lastSessionStartedAt ??
-          member.lastSessionAt ??
-          null
-        const rawText =
-          runtime?.lastRealSummary ??
-          runtime?.lastRealResult ??
-          runtime?.lastSummary ??
-          runtime?.lastResult ??
-          runtime?.blockedReason ??
-          runtime?.currentTask ??
-          member.lastSessionTitle ??
-          `Ready in ${member.role || 'worker'} lane`
-        const state = (
-          runtime?.phase ||
-          runtime?.currentTask ||
-          ''
-        ).toLowerCase()
-        const tone: 'idle' | 'active' | 'warning' = runtime?.blockedReason
-          ? 'warning'
-          : state.includes('review') ||
-              state.includes('write') ||
-              state.includes('build') ||
-              state.includes('implement') ||
-              state.includes('active')
-            ? 'active'
-            : 'idle'
-        return {
-          workerId: member.id,
-          workerName: member.displayName || member.id,
-          text: compactText(rawText, 72),
-          age: relativeTime(ts),
-          ts: ts ?? 0,
-          tone,
-        }
-      })
-      .sort((a, b) => b.ts - a.ts || a.workerId.localeCompare(b.workerId))
-      .slice(0, 3)
-      .map(({ workerId, workerName, text, age, tone }) => ({
-        workerId,
-        workerName,
-        text,
-        age,
-        tone,
-      }))
-  }, [members, runtimeByWorker])
 
   function toggleRoom(id: string) {
     setRoomIds((current) =>
@@ -2003,10 +1928,9 @@ export function Swarm2Screen() {
               setRouterOpen(true)
             }}
             runtimeByWorker={runtimeByWorker}
-            recentUpdates={recentUpdates}
             latestMission={latestMission}
             missions={missionsQuery.data ?? []}
-            runtimeEntries={runtimeQuery.data?.entries ?? []}
+            runtimeEntries={runtimeEntries}
             inboxCounts={{
               needsReview: inboxLanes.needs_review.length,
               blocked: inboxLanes.blocked.length,
@@ -2029,15 +1953,6 @@ export function Swarm2Screen() {
             }}
           />
         </div>
-
-        {viewMode === 'cards' && members.length > 0 ? (
-          <Swarm2ActivityFeed
-            members={members}
-            runtimeByWorker={runtimeByWorker}
-            selectedId={selectedId}
-            onSelect={(workerId) => setSelectedId(workerId)}
-          />
-        ) : null}
       </div>
 
       {addSwarmOpen ? (

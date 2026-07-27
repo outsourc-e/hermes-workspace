@@ -93,18 +93,23 @@ describe('Swarm2 surface contract', () => {
 describe('Swarm2 runtime tab command resolution', () => {
   const { commandForRuntime } = __runtimeTabInternals
 
+  const runtime = {
+    workerId: 'swarm4',
+    currentTask: null,
+    pid: null,
+    startedAt: null,
+    lastOutputAt: null,
+    cwd: '/tmp/work',
+    tmuxSession: null,
+    tmuxAttachable: false,
+    terminalKind: 'shell' as const,
+  }
+
   it('prefers tmux attach when an attachable session exists', () => {
     const result = commandForRuntime({
-      workerId: 'swarm4',
-      currentTask: null,
-      recentLogTail: null,
-      pid: null,
-      startedAt: null,
-      lastOutputAt: null,
-      cwd: '/tmp',
+      ...runtime,
       tmuxSession: 'swarm-swarm4',
       tmuxAttachable: true,
-      logPath: '/tmp/agent.log',
       terminalKind: 'tmux',
     })
     expect(result.kind).toBe('tmux')
@@ -112,66 +117,18 @@ describe('Swarm2 runtime tab command resolution', () => {
     expect(result.label).toContain('tmux:swarm-swarm4')
   })
 
-  it('prefers a chat-able shell over read-only log tail when no tmux is available', () => {
-    const result = commandForRuntime({
-      workerId: 'swarm4',
-      currentTask: null,
-      recentLogTail: null,
-      pid: null,
-      startedAt: null,
-      lastOutputAt: null,
-      cwd: '/tmp/work',
-      tmuxSession: null,
-      tmuxAttachable: false,
-      logPath: '/tmp/agent.log',
-      terminalKind: 'shell',
-    })
+  it('uses a chat-able workspace shell when no tmux is available', () => {
+    const result = commandForRuntime(runtime)
     expect(result.kind).toBe('shell')
     expect(result.command[0]).toBe('zsh')
     expect(result.command.join(' ')).toContain('cd "/tmp/work"')
   })
 
-  it('falls back to tail -F when no tmux and no cwd are available', () => {
-    const result = commandForRuntime({
-      workerId: 'swarm4',
-      currentTask: null,
-      recentLogTail: null,
-      pid: null,
-      startedAt: null,
-      lastOutputAt: null,
-      cwd: null,
-      tmuxSession: null,
-      tmuxAttachable: false,
-      logPath: '/tmp/agent.log',
-      terminalKind: 'log-tail',
-    })
-    expect(result.kind).toBe('log-tail')
-    expect(result.command).toEqual([
-      'tail',
-      '-n',
-      '200',
-      '-F',
-      '/tmp/agent.log',
-    ])
-  })
-
-  it('falls back to a workspace shell when no tmux and no log file exist', () => {
-    const result = commandForRuntime({
-      workerId: 'swarm4',
-      currentTask: null,
-      recentLogTail: null,
-      pid: null,
-      startedAt: null,
-      lastOutputAt: null,
-      cwd: '/tmp/work',
-      tmuxSession: null,
-      tmuxAttachable: false,
-      logPath: null,
-      terminalKind: 'shell',
-    })
+  it('fails closed to a shell instead of tailing raw activity without a cwd', () => {
+    const result = commandForRuntime({ ...runtime, cwd: null })
     expect(result.kind).toBe('shell')
     expect(result.command[0]).toBe('zsh')
-    expect(result.command.join(' ')).toContain('cd "/tmp/work"')
+    expect(result.command).not.toContain('tail')
   })
 
   it('handles entirely missing runtime metadata gracefully', () => {
@@ -180,40 +137,12 @@ describe('Swarm2 runtime tab command resolution', () => {
     expect(result.command[0]).toBe('zsh')
   })
 
-  it('mode=logs forces tail -F even when a cwd would normally win', () => {
-    const result = commandForRuntime(
-      {
-        workerId: 'swarm4',
-        currentTask: null,
-        recentLogTail: null,
-        pid: null,
-        startedAt: null,
-        lastOutputAt: null,
-        cwd: '/tmp/work',
-        tmuxSession: null,
-        tmuxAttachable: false,
-        logPath: '/tmp/agent.log',
-        terminalKind: 'shell',
-      },
-      'logs',
-    )
-    expect(result.kind).toBe('log-tail')
-    expect(result.command).toContain('-F')
-  })
-
   it('mode=shell skips tmux attach in favor of a workspace shell', () => {
     const result = commandForRuntime(
       {
-        workerId: 'swarm4',
-        currentTask: null,
-        recentLogTail: null,
-        pid: null,
-        startedAt: null,
-        lastOutputAt: null,
-        cwd: '/tmp/work',
+        ...runtime,
         tmuxSession: 'swarm-swarm4',
         tmuxAttachable: true,
-        logPath: '/tmp/agent.log',
         terminalKind: 'tmux',
       },
       'shell',

@@ -37,7 +37,6 @@ type RuntimeReportEntry = {
   role?: string | null
   currentTask?: string | null
   lastOutputAt?: number | null
-  lastSessionStartedAt?: number | null
   lastSummary?: string | null
   lastRealSummary?: string | null
   lastResult?: string | null
@@ -45,7 +44,6 @@ type RuntimeReportEntry = {
   blockedReason?: string | null
   checkpointStatus?: string | null
   needsHuman?: boolean | null
-  recentLogTail?: string | null
   artifacts?: Array<RuntimeArtifact>
   previews?: Array<RuntimePreview>
 }
@@ -314,7 +312,7 @@ export function buildSwarm2ReportRows({
     if (!hasRuntimeOutput) continue
     const state = stateForRuntime(runtime)
     rows.push({
-      id: `runtime:${runtime.workerId}:${runtime.lastOutputAt ?? runtime.lastSessionStartedAt ?? 'latest'}`,
+      id: `runtime:${runtime.workerId}:${runtime.lastOutputAt ?? 'latest'}`,
       kind:
         (runtime.artifacts?.length ?? 0) > 0 ||
         (runtime.previews?.length ?? 0) > 0
@@ -335,7 +333,7 @@ export function buildSwarm2ReportRows({
       workerName: runtime.displayName || runtime.workerId,
       state,
       stateLabel: stateLabel(state),
-      updatedAt: runtime.lastOutputAt ?? runtime.lastSessionStartedAt ?? null,
+      updatedAt: runtime.lastOutputAt ?? null,
       summary: compact(
         runtime.blockedReason ??
           runtime.lastRealResult ??
@@ -358,10 +356,6 @@ export function buildSwarm2ReportRows({
         { label: 'Real result', value: clean(runtime.lastRealResult) },
         { label: 'Blocked reason', value: clean(runtime.blockedReason) },
         { label: 'Checkpoint status', value: clean(runtime.checkpointStatus) },
-        {
-          label: 'Recent log tail',
-          value: compact(runtime.recentLogTail, 900),
-        },
       ],
       artifacts: runtime.artifacts ?? [],
       previews: runtime.previews ?? [],
