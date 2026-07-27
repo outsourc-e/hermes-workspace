@@ -7,6 +7,7 @@ import type {
   AgentRegistryStatus,
 } from '@/components/agent-view/agent-registry-card'
 import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import { AgentRegistryCard } from '@/components/agent-view/agent-registry-card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -24,6 +25,7 @@ import {
   buildAgentSessionCardRoute,
   resolveAgentSessionCardNavigation,
 } from '@/components/agent-view/agent-session-card-navigation'
+import { isCardProjectionComplete } from '@/routes/chat/-session-route-state'
 
 type AgentGatewayEntry = {
   id?: string
@@ -53,6 +55,7 @@ type SessionEntry = {
   status?: string
   updatedAt?: number | string
   enabled?: boolean
+  cardNavigation?: SessionCardProducerNavigation
   [key: string]: unknown
 }
 
@@ -627,6 +630,45 @@ function deriveAgentStatus(
   return 'idle'
 }
 
+/**
+ * Build registry activity exclusively from Cards with a complete owning
+ * resolution. Segment aliases stay inside the Card projection; they never
+ * become independent inventory rows or guessed raw control identities.
+ */
+function sessionCardRegistryActivity(
+  response: SessionCardListWire | undefined,
+): Array<SessionEntry> {
+  if (!response) return []
+
+  return response.cards.flatMap((card) => {
+    if (!isCardProjectionComplete(response, card.cardId)) return []
+
+    const rootStatus = card.childNodes.some((child) => child.status === 'running')
+      ? 'running'
+      : 'idle'
+    const root: SessionEntry = {
+      key: card.cardId,
+      title: card.title,
+      status: rootStatus,
+      updatedAt: card.updatedAt,
+      cardNavigation: { cardId: card.cardId },
+    }
+    const children = card.childNodes.map(
+      (child): SessionEntry => ({
+        key: child.cardId,
+        title: child.title,
+        status: child.status,
+        updatedAt: child.updatedAt,
+        cardNavigation: {
+          cardId: card.cardId,
+          inspectedChildCardId: child.cardId,
+        },
+      }),
+    )
+    return [root, ...children]
+  })
+}
+
 function formatRelativeTime(value: unknown): string {
   const timestamp = readTimestamp(value)
   if (!timestamp) return 'No activity timestamp'
@@ -697,8 +739,6 @@ export function AgentsScreen({
   const [optimisticPausedByAgentId, setOptimisticPausedByAgentId] = useState<
     Record<string, boolean>
   >({})
-  const [optimisticPausedByControlKey, setOptimisticPausedByControlKey] =
-    useState<Record<string, boolean>>({})
   const [spawningByAgentId, setSpawningByAgentId] = useState<
     Record<string, boolean>
   >({})
@@ -744,17 +784,6 @@ export function AgentsScreen({
     retry: 1,
   })
 
-  const sessionsQuery = useQuery({
-    queryKey: ['agent-registry', 'sessions'],
-    queryFn: async () => {
-      const res = await fetch('/api/sessions')
-      if (!res.ok) return [] as Array<SessionEntry>
-      const payload = (await res.json()) as { sessions?: Array<SessionEntry> }
-      return Array.isArray(payload.sessions) ? payload.sessions : []
-    },
-    refetchInterval: 10_000,
-    retry: false,
-  })
 
   const sessionCardsQuery = useQuery({
     queryKey: sessionCardQueryKeys.list(false),
@@ -772,9 +801,8 @@ export function AgentsScreen({
 
   const handlePullRefresh = useCallback(() => {
     void agentsQuery.refetch()
-    void sessionsQuery.refetch()
     void sessionCardsQuery.refetch()
-  }, [agentsQuery, sessionCardsQuery, sessionsQuery])
+  }, [agentsQuery, sessionCardsQuery])
 
   const {
     isPulling: agentHubPulling,
@@ -783,17 +811,13 @@ export function AgentsScreen({
   } = usePullToRefresh(isMobile, handlePullRefresh, scrollContainerRef)
 
   useEffect(() => {
-    if (!sessionsQuery.isSuccess) return
+    if (!sessionCardsQuery.isSuccess) return
 
     setOptimisticPausedByAgentId((previous) => {
       if (Object.keys(previous).length === 0) return previous
       return {}
     })
-    setOptimisticPausedByControlKey((previous) => {
-      if (Object.keys(previous).length === 0) return previous
-      return {}
-    })
-  }, [sessionsQuery.dataUpdatedAt, sessionsQuery.isSuccess])
+  }, [sessionCardsQuery.dataUpdatedAt, sessionCardsQuery.isSuccess])
 
   const parsedDefinitions = useMemo(
     () => parseAgentDefinitions(agentsQuery.data),
@@ -827,7 +851,7 @@ export function AgentsScreen({
   }, [parsedDefinitions])
 
   const runtimeAgents = useMemo(() => {
-    const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
+    const sessions = sessionCardRegistryActivity(sessionCardsQuery.data)
 
     return registryDefinitions.map((definition) => {
       const matchedSessions = sessions
@@ -851,19 +875,10 @@ export function AgentsScreen({
         optimisticPausedByAgentId,
         definition.id,
       )
-      const sessionKey = readString(primarySession?.key)
-      const controlKey = sessionKey || definition.id
-      const hasControlOverride = Object.prototype.hasOwnProperty.call(
-        optimisticPausedByControlKey,
-        controlKey,
-      )
-      const pausedOverride = hasControlOverride
-        ? optimisticPausedByControlKey[controlKey]
-        : hasOverride
-          ? optimisticPausedByAgentId[definition.id]
-          : undefined
+      const pausedOverride = hasOverride
+        ? optimisticPausedByAgentId[definition.id]
+        : undefined
 
-      const friendlyId = getSessionFriendlyId(primarySession)
       const status = deriveAgentStatus(primarySession, pausedOverride)
 
       return {
@@ -873,21 +888,19 @@ export function AgentsScreen({
         category: definition.category,
         color: definition.color,
         status,
-        sessionKey: sessionKey || undefined,
-        friendlyId: friendlyId || undefined,
-        controlKey,
+        cardNavigation: primarySession?.cardNavigation,
+        controlKey: undefined,
         matchedSessions,
       } satisfies AgentRuntime
     })
   }, [
     registryDefinitions,
-    sessionsQuery.data,
+    sessionCardsQuery.data,
     optimisticPausedByAgentId,
-    optimisticPausedByControlKey,
   ])
 
   const unmatchedSessions = useMemo(() => {
-    const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
+    const sessions = sessionCardRegistryActivity(sessionCardsQuery.data)
     const matchedSessionKeys = new Set<string>()
 
     runtimeAgents.forEach((agent) => {
@@ -903,14 +916,13 @@ export function AgentsScreen({
       .filter((session) => {
         const sessionKey = readString(session.key)
         if (!sessionKey || matchedSessionKeys.has(sessionKey)) return false
-        if (!sessionKey.includes('subagent:')) return false
         return readTimestamp(session.updatedAt) >= cutoff
       })
       .sort(
         (left, right) =>
           readTimestamp(right.updatedAt) - readTimestamp(left.updatedAt),
       )
-  }, [runtimeAgents, sessionsQuery.data])
+  }, [runtimeAgents, sessionCardsQuery.data])
 
   const groupedSections = useMemo(() => {
     const grouped = new Map<string, Array<AgentRuntime>>()
@@ -1084,7 +1096,6 @@ export function AgentsScreen({
       }
 
       toast(`${agent.name} session started`, { type: 'success' })
-      void sessionsQuery.refetch()
 
       return { sessionKey, friendlyId: resolvedFriendlyId }
     } catch (error) {
@@ -1106,6 +1117,11 @@ export function AgentsScreen({
   }
 
   async function handleChat(agent: AgentRegistryCardData) {
+    if (agent.cardNavigation) {
+      openSessionCardChat(agent.cardNavigation)
+      return
+    }
+
     const existingIdentity = {
       sessionKey: readString(agent.sessionKey),
       friendlyId: readString(agent.friendlyId),
@@ -1164,19 +1180,10 @@ export function AgentsScreen({
       agent.id,
     )
     const previousValue = optimisticPausedByAgentId[agent.id]
-    const hadControlPrevious = Object.prototype.hasOwnProperty.call(
-      optimisticPausedByControlKey,
-      controlKey,
-    )
-    const previousControlValue = optimisticPausedByControlKey[controlKey]
 
     setOptimisticPausedByAgentId((previous) => ({
       ...previous,
       [agent.id]: nextPaused,
-    }))
-    setOptimisticPausedByControlKey((previous) => ({
-      ...previous,
-      [controlKey]: nextPaused,
     }))
 
     try {
@@ -1188,15 +1195,11 @@ export function AgentsScreen({
         ...previous,
         [agent.id]: paused,
       }))
-      setOptimisticPausedByControlKey((previous) => ({
-        ...previous,
-        [controlKey]: paused,
-      }))
 
       toast(`${agent.name} ${paused ? 'paused' : 'resumed'}`, {
         type: 'success',
       })
-      void sessionsQuery.refetch()
+      void sessionCardsQuery.refetch()
     } catch (error) {
       setOptimisticPausedByAgentId((previous) => {
         const next = { ...previous }
@@ -1204,15 +1207,6 @@ export function AgentsScreen({
           next[agent.id] = previousValue
         } else {
           delete next[agent.id]
-        }
-        return next
-      })
-      setOptimisticPausedByControlKey((previous) => {
-        const next = { ...previous }
-        if (hadControlPrevious && previousControlValue !== undefined) {
-          next[controlKey] = previousControlValue
-        } else {
-          delete next[controlKey]
         }
         return next
       })
@@ -1298,14 +1292,7 @@ export function AgentsScreen({
       delete next[agent.id]
       return next
     })
-    setOptimisticPausedByControlKey((previous) => {
-      const controlKey = readString(agent.controlKey)
-      if (!controlKey) return previous
-      const next = { ...previous }
-      delete next[controlKey]
-      return next
-    })
-    void sessionsQuery.refetch()
+    void sessionCardsQuery.refetch()
   }
 
   const lastUpdated = agentsQuery.dataUpdatedAt
@@ -1466,14 +1453,7 @@ export function AgentsScreen({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {unmatchedSessions.map((session, index) => {
                       const sessionKey = readString(session.key)
-                      const sessionNavigation =
-                        resolveAgentSessionCardNavigation(
-                          sessionCardsQuery.data,
-                          {
-                            key: sessionKey,
-                            friendlyId: readString(session.friendlyId),
-                          },
-                        )
+                      const sessionNavigation = session.cardNavigation
                       const sessionModel = getSessionModelName(session)
 
                       return (
@@ -1485,9 +1465,6 @@ export function AgentsScreen({
                             <div className="min-w-0">
                               <p className="truncate text-sm font-semibold text-primary-100">
                                 {getSessionTitle(session)}
-                              </p>
-                              <p className="mt-1 truncate text-xs text-primary-400">
-                                {sessionKey}
                               </p>
                             </div>
                             <span
@@ -2023,13 +2000,7 @@ export function AgentsScreen({
                 {selectedHistoryAgent.matchedSessions
                   .slice(0, 8)
                   .map((session, index) => {
-                    const sessionNavigation = resolveAgentSessionCardNavigation(
-                      sessionCardsQuery.data,
-                      {
-                        key: readString(session.key),
-                        friendlyId: readString(session.friendlyId),
-                      },
-                    )
+                    const sessionNavigation = session.cardNavigation
                     const sessionModel = getSessionModelName(session)
                     return (
                       <div

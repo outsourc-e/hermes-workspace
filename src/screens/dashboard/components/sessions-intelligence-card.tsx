@@ -1,12 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import { formatModelName } from '@/screens/dashboard/lib/formatters'
-import {
-  fetchSessionCards,
-  sessionCardQueryKeys,
-} from '@/screens/chat/chat-queries'
 import { resolveSessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
 
 export type SessionRowData = {
@@ -165,23 +160,19 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
  */
 export function SessionsIntelligenceCard({
   sessions,
+  cardResponse,
 }: {
   sessions: Array<SessionRowData>
+  cardResponse?: SessionCardListWire
 }) {
   const navigate = useNavigate()
-  const sessionCardsQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false),
-    queryFn: () => fetchSessionCards(),
-    retry: 1,
-    staleTime: 5_000,
-  })
   const enriched = useMemo(() => {
     return sessions.map((s) => ({
       session: s,
       badges: buildBadges(s),
-      navigation: resolveSessionRowCardNavigation(sessionCardsQuery.data, s),
+      navigation: resolveSessionRowCardNavigation(cardResponse, s),
     }))
-  }, [sessionCardsQuery.data, sessions])
+  }, [cardResponse, sessions])
 
   // Highlight: top hot session, otherwise top tool-heavy, otherwise top recent.
   const highlightId = useMemo(() => {

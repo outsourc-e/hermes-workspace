@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { KillConfirmDialog } from './kill-confirm-dialog'
 import { SteerModal } from './steer-modal'
 
+import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
+
 export type AgentRegistryStatus = 'active' | 'idle' | 'available' | 'paused'
 
 export type AgentRegistryCardData = {
@@ -13,7 +15,8 @@ export type AgentRegistryCardData = {
   status: AgentRegistryStatus
   sessionKey?: string
   friendlyId?: string
-  controlKey: string
+  controlKey?: string
+  cardNavigation?: SessionCardProducerNavigation
 }
 
 type AgentRegistryCardProps = {
@@ -90,6 +93,7 @@ export function AgentRegistryCard({
   }, [agent.id, agent.sessionKey, agent.status])
 
   const hasSession = Boolean(agent.sessionKey)
+  const hasControlIdentity = Boolean(agent.sessionKey && agent.controlKey)
   const isPaused = agent.status === 'paused'
 
   function showSpawnFirstNotice() {
@@ -194,7 +198,7 @@ export function AgentRegistryCard({
                     onClick={() => {
                       void handlePauseToggle()
                     }}
-                    disabled={pausePending}
+                    disabled={pausePending || !hasControlIdentity}
                     className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-60 dark:text-neutral-200 dark:hover:bg-neutral-800"
                   >
                     {pausePending

@@ -39,13 +39,17 @@ import { TokenMixHourCard } from './components/token-mix-hour-card'
 import { TopModelsCard } from './components/top-models-card'
 import { VelocityCard } from './components/velocity-card'
 import { WidgetShell } from './components/widget-shell'
-import { normalizeDashboardSessionsPayload } from './lib/sessions-query'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
 import type { SessionRowData } from './components/sessions-intelligence-card'
 import type { AnalyticsPeriod } from './components/analytics-chart-card'
 import type { ReactNode } from 'react'
 import type { ClaudeSession } from '@/server/claude-api'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import {
+  fetchSessionCards,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
+import { isCardProjectionComplete } from '@/routes/chat/-session-route-state'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { cn } from '@/lib/utils'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
@@ -634,133 +638,51 @@ function SessionRow({
 export function DashboardScreen() {
   const navigate = useNavigate()
   const skillsAvailable = useFeatureAvailable('skills')
-  const sessionsQuery = useQuery({
-    // Use a dedicated query key — NOT chatQueryKeys.sessions — to avoid
-    // cache collisions with the chat sidebar which fetches fewer sessions
-    // and overwrites the dashboard's larger dataset.
-    // Also use the workspace proxy (/api/sessions) rather than the server-side
-    // listSessions() — the latter calls the gateway via CLAUDE_API which is
-    // only available server-side and returns nothing when called from the client.
-    // Do not gate this direct proof behind /api/gateway-status. That probe can
-    // be stale/loading while /api/sessions already works, which made the
-    // dashboard show a bogus “Enhanced API required” warning even though
-    // sessions were healthy.
-    queryKey: ['dashboard', 'sessions'],
-    queryFn: async () => {
-      const res = await fetch('/api/sessions?limit=200&offset=0')
-      if (!res.ok) {
-        throw new Error(`Sessions API returned HTTP ${res.status}`)
-      }
-      const data = await res.json()
-      return normalizeDashboardSessionsPayload(data)
-    },
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
     staleTime: 10_000,
     refetchInterval: 30_000,
     retry: 1,
   })
 
-  const sessionsResult = sessionsQuery.data
-
-  // Raw rows from the sessions endpoint. Used both for hero stats
-  // (count/tokens) and for the SessionsIntelligenceCard below.
-  const rawSessions = sessionsResult?.sessions ?? []
-  const sessionsUnavailable = Boolean(sessionsResult?.unavailable)
-  const sessionsUnavailableMessage =
-    sessionsResult?.message ?? getUnavailableReason('sessions')
-
-  // Adapter shape kept for the legacy fallbacks that still reference
-  // ClaudeSession (HeroMetrics fallback path, etc.).
-  const sessions = useMemo(
+  const completeCards = useMemo(
     () =>
-      rawSessions.map((s) => ({
-        id: (s.key ?? s.id) as string,
-        started_at: s.startedAt ? (s.startedAt as number) / 1000 : undefined,
-        message_count: (s.message_count as number | undefined) ?? 0,
-        tool_call_count: (s.tool_call_count as number | undefined) ?? 0,
-        input_tokens: (s.tokenCount as number | undefined) ?? 0,
-        output_tokens: 0,
-      })) as Array<ClaudeSession>,
-    [rawSessions],
+      (sessionCardsQuery.data?.cards ?? []).filter((card) =>
+        isCardProjectionComplete(sessionCardsQuery.data!, card.cardId),
+      ),
+    [sessionCardsQuery.data],
   )
 
-  // Enriched rows for the Sessions Intelligence card. Keeps the rich
-  // fields (`derivedTitle`, `kind`, `status`, `source`, `updatedAt`,
-  // etc.) the legacy adapter dropped.
+  // Dashboard activity is a logical Card inventory. Continuation segments are
+  // represented once by their owning Card and never become independent rows.
   const sessionRows: Array<SessionRowData> = useMemo(
     () =>
-      [...rawSessions]
-        .sort(
-          (a, b) =>
-            ((b.updatedAt as number | undefined) ??
-              (b.startedAt as number | undefined) ??
-              0) -
-            ((a.updatedAt as number | undefined) ??
-              (a.startedAt as number | undefined) ??
-              0),
-        )
+      [...completeCards]
+        .sort((a, b) => b.updatedAt - a.updatedAt)
         .slice(0, 12)
-        .map((s) => ({
-          key: String(s.key ?? s.id ?? ''),
-          title:
-            (s.derivedTitle as string | undefined) ||
-            (s.title as string | undefined) ||
-            (s.preview as string | undefined) ||
-            String(s.key ?? ''),
-          kind: String(s.kind ?? 'chat'),
-          status: String(s.status ?? ''),
-          source: (s.source as string | undefined) ?? null,
-          model: (s.model as string | undefined) ?? null,
-          messageCount:
-            ((s.messageCount as number | undefined) ??
-              (s.message_count as number | undefined) ??
-              0),
-          toolCallCount:
-            ((s.toolCallCount as number | undefined) ??
-              (s.tool_call_count as number | undefined) ??
-              0),
-          tokenCount:
-            ((s.tokenCount as number | undefined) ??
-              (s.totalTokens as number | undefined) ??
-              0),
-          startedAt: (s.startedAt as number | undefined) ?? null,
-          updatedAt: (s.updatedAt as number | undefined) ?? null,
+        .map((card) => ({
+          key: card.cardId,
+          title: card.title,
+          kind: 'chat',
+          status: '',
+          source: card.canonicalSource ?? null,
+          model: null,
+          messageCount: 0,
+          toolCallCount: 0,
+          tokenCount: 0,
+          startedAt: card.updatedAt,
+          updatedAt: card.updatedAt,
         })),
-    [rawSessions],
+    [completeCards],
   )
 
-  const stats = useMemo(() => {
-    let totalMessages = 0,
-      totalToolCalls = 0,
-      totalTokens = 0
-    for (const s of sessions) {
-      totalMessages += s.message_count ?? 0
-      totalToolCalls += s.tool_call_count ?? 0
-      totalTokens += (s.input_tokens ?? 0) + (s.output_tokens ?? 0)
-    }
-    return {
-      totalSessions: sessions.length,
-      totalMessages,
-      totalToolCalls,
-      totalTokens,
-    }
-  }, [sessions])
-
-  const recentSessions = useMemo(
-    () =>
-      [...sessions]
-        .sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0))
-        .slice(0, 6),
-    [sessions],
-  )
-
-  const maxTokens = useMemo(() => {
-    let max = 0
-    for (const s of recentSessions) {
-      const t = (s.input_tokens ?? 0) + (s.output_tokens ?? 0)
-      if (t > max) max = t
-    }
-    return max
-  }, [recentSessions])
+  const stats = {
+    totalSessions: completeCards.length,
+    totalMessages: 0,
+    totalToolCalls: 0,
+    totalTokens: 0,
+  }
 
   // Skills count for the SkillsUsageCard sub-text. Cheap query, used
   // only for the "X of Y used" microcopy.
@@ -1142,17 +1064,18 @@ export function DashboardScreen() {
           {layout.isVisible('sessions_intelligence') ? (
             <div className="flex min-h-0 flex-1 flex-col">
               <WidgetShell id="sessions_intelligence" layout={layout}>
-                {sessionsQuery.isError || sessionsUnavailable ? (
+                {sessionCardsQuery.isError ||
+                (sessionCardsQuery.data?.completeness === 'incomplete' &&
+                  completeCards.length === 0) ? (
                   <UnavailableWidget
                     title="Recent Sessions"
-                    description={
-                      sessionsQuery.isError
-                        ? getUnavailableReason('sessions')
-                        : sessionsUnavailableMessage
-                    }
+                    description="Session Card inventory is unavailable or incomplete."
                   />
                 ) : (
-                  <SessionsIntelligenceCard sessions={sessionRows} />
+                  <SessionsIntelligenceCard
+                    sessions={sessionRows}
+                    cardResponse={sessionCardsQuery.data}
+                  />
                 )}
               </WidgetShell>
             </div>
