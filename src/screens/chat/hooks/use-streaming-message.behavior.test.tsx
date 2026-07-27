@@ -88,6 +88,8 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
     useChatStore.getState().clearSession('main')
     useChatStore.getState().clearSession('backend-parent')
     useChatStore.getState().clearSession('canonical-child')
+    useChatStore.getState().clearSession('remote:created-segment')
+    useChatStore.getState().clearSession('remote:continuation-segment')
   })
 
   afterEach(() => {
@@ -435,6 +437,103 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       queryClient.clear()
     },
   )
+
+  it('applies a bootstrap and Card handoff coalesced in one reader chunk before rerender', async () => {
+    const encoder = new TextEncoder()
+    const reader = {
+      read: vi
+        .fn()
+        .mockResolvedValueOnce({
+          done: false,
+          value: encoder.encode(
+            [
+              'event: session_handoff',
+              `data: ${JSON.stringify({ fromSessionKey: 'new', sessionKey: 'remote:created-segment', friendlyId: 'remote:created-card', runId: 'run-bootstrap' })}`,
+              '',
+              'event: card_handoff',
+              `data: ${JSON.stringify({ cardId: 'remote:created-card', fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-continuation' })}`,
+              '',
+              'event: chunk',
+              'data: {"delta":"content after the chained handoff"}',
+              '',
+              'event: done',
+              'data: {"state":"complete","sessionKey":"remote:continuation-segment","runId":"run-continuation"}',
+              '',
+              '',
+            ].join('\n'),
+          ),
+        })
+        .mockResolvedValueOnce({ done: true, value: undefined }),
+      cancel: vi.fn().mockResolvedValue(undefined),
+    }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+      text: () => Promise.resolve(''),
+    } as unknown as Response)
+
+    const onSessionResolved = vi.fn()
+    const onCardHandoff = vi.fn()
+    const onAbort = vi.fn()
+    let controller: StreamingController | null = null
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+
+    React.act(() => {
+      root.render(
+        <StreamingHarness
+          onReady={(next) => {
+            controller = next
+          }}
+          onSessionResolved={onSessionResolved}
+          onAbort={onAbort}
+          pinMainSession={false}
+          onCardHandoff={onCardHandoff}
+        />,
+      )
+    })
+
+    await React.act(async () => {
+      await controller!.startStreaming({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'bootstrap Card',
+        idempotencyKey: 'client-coalesced-card',
+      })
+    })
+
+    expect(onSessionResolved).toHaveBeenCalledWith({
+      fromSessionKey: 'new',
+      sessionKey: 'remote:created-segment',
+      friendlyId: 'remote:created-card',
+      reason: 'bootstrap',
+    })
+    expect(onCardHandoff).toHaveBeenCalledWith({
+      cardId: 'remote:created-card',
+      fromSegmentKey: 'remote:created-segment',
+      canonicalSegmentKey: 'remote:continuation-segment',
+      runId: 'run-continuation',
+    })
+    expect(
+      useChatStore
+        .getState()
+        .getRealtimeMessages('remote:continuation-segment'),
+    ).toMatchObject([
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'content after the chained handoff' }],
+      },
+    ])
+    expect(
+      useChatStore.getState().getRealtimeMessages('remote:created-segment'),
+    ).toEqual([])
+    expect(reader.cancel).not.toHaveBeenCalled()
+    expect(onAbort).not.toHaveBeenCalled()
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+  })
 
   it.each([
     {

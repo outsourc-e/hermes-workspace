@@ -9,6 +9,19 @@ function isExactNonblankIdentity(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.trim() === value
 }
 
+function sourceQualifiedIdentitySource(
+  value: unknown,
+): 'local' | 'remote' | null {
+  if (!isExactNonblankIdentity(value)) return null
+  if (value.startsWith('local:') && value.length > 'local:'.length) {
+    return 'local'
+  }
+  if (value.startsWith('remote:') && value.length > 'remote:'.length) {
+    return 'remote'
+  }
+  return null
+}
+
 /**
  * Determine whether authoritative stream session data should trigger a route
  * handoff. Portable `main` remains pinned, but remote concrete sessions may
@@ -228,6 +241,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     typeof setTimeout
   > | null>(null)
   const activeSessionKeyRef = useRef<string>('main')
+  // Stream-owned Card authority. Unlike the render-captured activeCardId, this
+  // advances synchronously while a coalesced SSE batch is being processed.
+  // That lets a bootstrap handoff establish Card ownership before a chained
+  // card_handoff in the same reader.read() result, without weakening the exact
+  // Card/segment checks for unrelated events.
+  const activeStreamCardIdRef = useRef<string | null>(null)
   // Monotonically increasing token. Each call to startStreaming bumps this so
   // any in-flight processStream loop (or pending microtask processing chunks
   // it has already read into the SSE buffer) can detect that it's stale and
@@ -288,6 +307,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         delayedUnregisterTimerRef.current = null
       }
       clearStreamingSession(activeSessionKeyRef.current)
+      activeStreamCardIdRef.current = null
       if (nextSessionKey) {
         activeSessionKeyRef.current = nextSessionKey
       }
@@ -542,6 +562,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       fromSessionKey: string,
       resolvedSessionKey: string,
       resolvedFriendlyId: string,
+      resolvedCardId?: string,
     ) => {
       const currentSessionKey = activeSessionKeyRef.current
       if (fromSessionKey !== currentSessionKey) return
@@ -558,6 +579,15 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       handoffSession(fromSessionKey, resolvedSessionKey)
       activeSessionKeyRef.current = resolvedSessionKey
+      const resolvedCardSource = sourceQualifiedIdentitySource(resolvedCardId)
+      if (
+        SESSION_BOOTSTRAP_KEYS.has(fromSessionKey) &&
+        resolvedCardSource &&
+        resolvedCardId === resolvedFriendlyId &&
+        sourceQualifiedIdentitySource(resolvedSessionKey) === resolvedCardSource
+      ) {
+        activeStreamCardIdRef.current = resolvedCardId
+      }
       onSessionResolved?.({
         fromSessionKey,
         sessionKey: resolvedSessionKey,
@@ -632,7 +662,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             !handoff ||
             !shouldApplyCardHandoff({
               handoff,
-              activeCardId,
+              activeCardId: activeStreamCardIdRef.current ?? undefined,
               currentSegmentKey: activeSessionKeyRef.current,
             })
           ) {
@@ -644,11 +674,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           }
           handoffSession(handoff.fromSegmentKey, handoff.canonicalSegmentKey)
           activeSessionKeyRef.current = handoff.canonicalSegmentKey
+          activeStreamCardIdRef.current = handoff.cardId
           onCardHandoff?.(handoff)
           break
         }
         case 'session_handoff': {
-          if (activeCardId) break
+          if (activeStreamCardIdRef.current) break
           const handoff = resolveAuthoritativeSessionHandoffEvent(event, data)
           if (!handoff) break
           if (handoff.runId) {
@@ -659,6 +690,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             handoff.fromSessionKey,
             handoff.sessionKey,
             handoff.friendlyId,
+            isExactNonblankIdentity(payload.friendlyId)
+              ? payload.friendlyId
+              : undefined,
           )
           break
         }
@@ -928,7 +962,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
     },
     [
-      activeCardId,
       applySessionHandoff,
       finishStream,
       handoffSession,
@@ -997,6 +1030,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       eventSourceRef.current = abortController
       finishedRef.current = false
       resetActiveStreamState(params.sessionKey)
+      activeStreamCardIdRef.current = isExactNonblankIdentity(activeCardId)
+        ? activeCardId
+        : null
       lifecyclePhaseRef.current = 'requesting'
       requestedSessionKeyRef.current = params.sessionKey
 
@@ -1163,6 +1199,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
     },
     [
+      activeCardId,
       applySessionHandoff,
       finishStream,
       markAccepted,
