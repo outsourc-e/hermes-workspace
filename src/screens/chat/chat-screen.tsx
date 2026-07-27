@@ -95,6 +95,8 @@ import { hapticTap } from '@/lib/haptics'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
+import { buildProjectScopedTextMessage } from '@/lib/project-context'
+import { getProjectForSession, useProjectStore } from '@/stores/project-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
@@ -111,6 +113,7 @@ import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
+import { useProjects } from '@/hooks/use-projects'
 import {  useChatActivityStore } from '@/stores/chat-activity-store'
 
 export let _localModelOverride = ''
@@ -587,6 +590,37 @@ export function ChatScreen({
     historyRefetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
     portableMode: isPortableMode,
   })
+  const {
+    activeProjectId: _activeProjectId,
+    sessionProjectMap,
+    activeProjects,
+    assignSessionToProject,
+    setActiveProject,
+  } = useProjects()
+  void _activeProjectId
+  void setActiveProject
+
+  const activeProjectId = useMemo(() => {
+    if (isNewChat) return _activeProjectId
+    const keys = [activeFriendlyId, activeSession?.key, activeSessionKey, activeCanonicalKey].filter(Boolean) as Array<string>
+    for (const key of keys) {
+      const projectId = sessionProjectMap[key]
+      if (projectId) return projectId
+    }
+    return null
+  }, [
+    _activeProjectId,
+    activeCanonicalKey,
+    activeFriendlyId,
+    activeSession?.key,
+    activeSessionKey,
+    isNewChat,
+    sessionProjectMap,
+  ])
+  const activeProject = useMemo(
+    () => activeProjects.find((project) => project.id === activeProjectId) ?? null,
+    [activeProjectId, activeProjects],
+  )
 
   // --- Waiting state management (Issue #43 + #449) ---
   // resolvedSessionKey is now available (defined above from useChatHistory).
@@ -1223,12 +1257,8 @@ export function ChatScreen({
         activeSendRef.current = null
         setSending(false)
         if (isMissingAuth(messageText)) {
-          if (!embedded) {
-            try {
-              navigate({ to: '/', replace: true })
-            } catch {
-              /* router not ready */
-            }
+          if (!embedded && typeof window !== 'undefined') {
+            window.location.assign('/')
           }
           return
         }
@@ -1781,8 +1811,9 @@ export function ChatScreen({
       }
       return
     }
-    if (isMissingAuth(messageText) && !embedded) {
-      navigate({ to: '/', replace: true })
+    if (isMissingAuth(messageText) && !embedded && typeof window !== 'undefined') {
+      window.location.assign('/')
+      return
     }
     const message = sessionsError
       ? `Failed to load sessions. ${sessionsError}`
@@ -2047,6 +2078,7 @@ export function ChatScreen({
         fastMode,
         model: currentModel || undefined,
         idempotencyKey: optimisticClientId || crypto.randomUUID(),
+        projectId: activeProject?.id || undefined,
       }).catch((err: unknown) => {
         const messageText = err instanceof Error ? err.message : String(err)
         if (import.meta.env.DEV) {
@@ -2063,6 +2095,7 @@ export function ChatScreen({
       streamFinish,
       streamStart,
       currentModel,
+      activeProject,
     ],
   )
 
@@ -2454,6 +2487,8 @@ export function ChatScreen({
         }),
       )
 
+      const scopedBody = buildProjectScopedTextMessage(trimmedBody, activeProject)
+
       if (isNewChat) {
         // In portable mode, use 'main' — no server-side sessions exist.
         // In enhanced mode, create a UUID thread for the sessions API.
@@ -2479,10 +2514,14 @@ export function ChatScreen({
           })
         }
 
+        if (activeProject?.id) {
+          assignSessionToProject(threadId, activeProject.id)
+        }
+
         sendMessage(
           threadId,
           threadId,
-          trimmedBody,
+          scopedBody,
           attachmentPayload,
           fastMode,
           true,
@@ -2507,14 +2546,16 @@ export function ChatScreen({
       sendMessage(
         sessionKeyForSend,
         isPortableMode ? 'main' : activeFriendlyId,
-        trimmedBody,
+        scopedBody,
         attachmentPayload,
         fastMode,
       )
     },
     [
       activeFriendlyId,
+      activeProject,
       activeSessionKey,
+      assignSessionToProject,
       createSessionForMessage,
       forcedSessionKey,
       isNewChat,

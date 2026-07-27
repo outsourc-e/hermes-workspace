@@ -199,6 +199,109 @@ async function tryServeStatic(req, res) {
 }
 
 async function requestHandler(req, res) {
+  const reqUrl = new URL(
+    req.url || '/',
+    `http://${req.headers.host || 'localhost'}`,
+  )
+  const pathname = decodeURIComponent(reqUrl.pathname)
+
+  // Proxy root-level API requests to the gateway for remote/Tailscale access.
+  // The workspace UI makes requests to /terminal-resize, /sessions, /commands, etc.
+  // which only exist on the gateway. When accessed remotely, proxy them through
+  // the workspace server so the browser doesn't need direct gateway access.
+  const gatewayProxyPaths = [
+    '/send-stream', '/send',
+    '/session-send', '/start-agent',
+    '/agent-bus', '/crew-status',
+    '/swarm-dispatch', '/swarm-lifecycle', '/swarm-checkpoint',
+    '/swarm-roster', '/swarm-missions', '/swarm-runtime',
+    '/swarm-environment', '/swarm-health', '/swarm-project',
+    '/swarm-reports', '/swarm-memory', '/swarm-kanban',
+    '/swarm-chat', '/swarm-direct-chat', '/swarm-decompose',
+    '/swarm-orchestrator-loop', '/swarm-tmux-start',
+    '/swarm-tmux-stop', '/swarm-tmux-scroll',
+    '/conductor-spawn', '/conductor-stop',
+    '/artifacts', '/files', '/preview-file',
+    '/skills', '/jobs', '/plugins', '/mcp',
+    '/models', '/providers', '/provider-usage',
+    '/config', '/env', '/update', '/system-metrics',
+    '/memory', '/external-memory', '/search',
+    '/transcribe', '/ping', '/health',
+  ]
+
+  // Map root-level paths that the workspace UI expects.
+  // The UI was designed for same-origin access where the gateway serves
+  // these routes at the root. When accessed remotely, map them to the
+  // workspace server's own /api/ handlers.
+  const rootToApiMap = {
+    '/connection-status': '/api/connection-status',
+    '/session-status': '/api/session-status',
+    '/commands': '/api/commands',
+    '/sessions': '/api/sessions',
+    '/events': '/api/events',
+    '/history': '/api/session-history',
+    '/start-claude': '/api/start-claude',
+    '/terminal-stream': '/api/terminal-stream',
+    '/terminal-resize': '/api/terminal-resize',
+    '/terminal-input': '/api/terminal-input',
+    '/terminal-close': '/api/terminal-close',
+  }
+
+  const shouldProxy = gatewayProxyPaths.some(p => pathname === p || pathname.startsWith(p + '/'))
+  const mappedPath = rootToApiMap[pathname]
+
+  if (mappedPath) {
+    // Rewrite the URL to the /api/ equivalent and fall through to SSR handler
+    req.url = mappedPath + reqUrl.search
+  } else if (shouldProxy) {
+    const gatewayUrl = 'http://127.0.0.1:8642'
+    const targetUrl = `${gatewayUrl}${pathname}${reqUrl.search}`
+
+    try {
+      const proxyHeaders = { ...req.headers }
+      delete proxyHeaders.host
+      delete proxyHeaders['content-length']
+
+      let body = undefined
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        body = await new Promise((resolve) => {
+          const chunks = []
+          req.on('data', (chunk) => chunks.push(chunk))
+          req.on('end', () => resolve(Buffer.concat(chunks)))
+        })
+      }
+
+      const proxyRes = await fetch(targetUrl, {
+        method: req.method,
+        headers: proxyHeaders,
+        body,
+      })
+
+      res.writeHead(proxyRes.status, Object.fromEntries(proxyRes.headers.entries()))
+      if (proxyRes.body) {
+        const reader = proxyRes.body.getReader()
+        const pump = async () => {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            res.write(value)
+          }
+          res.end()
+        }
+        pump().catch(() => res.end())
+      } else {
+        const text = await proxyRes.text()
+        res.end(text)
+      }
+      return
+    } catch (err) {
+      console.error(`[proxy] ${req.method} ${pathname} -> ${targetUrl} failed:`, err.message)
+      res.writeHead(502)
+      res.end('Gateway proxy error')
+      return
+    }
+  }
+
   // Try static files first (client assets)
   if (req.method === 'GET' || req.method === 'HEAD') {
     const served = await tryServeStatic(req, res)

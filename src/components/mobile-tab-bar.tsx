@@ -4,14 +4,17 @@ import {
   BrainIcon,
   Building01Icon,
   Chat01Icon,
+  CheckmarkCircle02Icon,
   Clock01Icon,
   CommandLineIcon,
   DashboardSquare01Icon,
   File01Icon,
+  Mail01Icon,
   McpServerIcon,
   PuzzleIcon,
   Rocket01Icon,
   Settings01Icon,
+  Target01Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
 import {
@@ -47,11 +50,39 @@ type TabItem = {
 
 export const MOBILE_NAV_TABS: Array<TabItem> = [
   {
+    id: 'mission-control',
+    label: 'Mission',
+    icon: Target01Icon,
+    to: '/mission-control',
+    match: (p) => p === '/mission-control',
+  },
+  {
+    id: 'notion',
+    label: 'Notion',
+    icon: Building01Icon,
+    to: '/notion',
+    match: (p) => p.startsWith('/notion'),
+  },
+  {
     id: 'dashboard',
     label: 'Home',
     icon: DashboardSquare01Icon,
     to: '/dashboard',
     match: (p) => p === '/dashboard',
+  },
+  {
+    id: 'approval-queue',
+    label: 'Approvals',
+    icon: CheckmarkCircle02Icon,
+    to: '/approval-queue',
+    match: (p) => p.startsWith('/approval-queue'),
+  },
+  {
+    id: 'outreach',
+    label: 'Outreach',
+    icon: Mail01Icon,
+    to: '/outreach',
+    match: (p) => p.startsWith('/outreach'),
   },
   {
     id: 'chat',

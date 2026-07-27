@@ -8,10 +8,12 @@ import {
   Castle02Icon,
   Chat01Icon,
   CheckListIcon,
+  CheckmarkCircle02Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
   DashboardSquare01Icon,
   File01Icon,
+  Mail01Icon,
   McpServerIcon,
   MessageMultiple01Icon,
   Moon02Icon,
@@ -21,6 +23,7 @@ import {
   Search01Icon,
   Settings01Icon,
   Sun02Icon,
+  Target01Icon,
   UserGroupIcon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
@@ -35,6 +38,7 @@ import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
+import { SidebarProjects } from './sidebar/sidebar-projects'
 import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionMeta } from '../types'
 import { t } from '@/lib/i18n'
@@ -63,6 +67,7 @@ import {
   MenuTrigger,
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { useProjects } from '@/hooks/use-projects'
 
 type WorkspaceStats = Record<string, unknown>
 
@@ -125,7 +130,7 @@ type ChatSidebarProps = {
   sessions: Array<SessionMeta>
   activeFriendlyId: string
   creatingSession: boolean
-  onCreateSession: () => void
+  onCreateSession: (projectId?: string) => void
   isCollapsed: boolean
   onToggleCollapse: () => void
   onSelectSession?: () => void
@@ -519,7 +524,9 @@ function usePersistedBool(key: string, defaultValue: boolean) {
 function ChatSidebarComponent({
   sessions,
   activeFriendlyId,
+  creatingSession,
   isCollapsed,
+  onCreateSession,
   onToggleCollapse,
   onSelectSession,
   onActiveSessionDelete,
@@ -536,6 +543,19 @@ function ChatSidebarComponent({
   )
   const { deleteSession } = useDeleteSession()
   const { renameSession } = useRenameSession()
+  const {
+    activeProjects: _activeProjects,
+    sessionProjectMap,
+  } = useProjects()
+  void _activeProjects
+  const unassignedSessions = useMemo(
+    () =>
+      sessions.filter((session) => {
+        const keys = [session.friendlyId, session.key].filter(Boolean)
+        return !keys.some((key) => Boolean(sessionProjectMap[key]))
+      }),
+    [sessionProjectMap, sessions],
+  )
   const openSearchModal = useSearchModal((state) => state.openModal)
   const isSearchModalOpen = useSearchModal((state) => state.isOpen)
   const pathname = useRouterState({
@@ -587,6 +607,10 @@ function ChatSidebarComponent({
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
+  const isMissionControlActive = pathname === '/mission-control'
+  const isNotionActive = pathname.startsWith('/notion')
+  const isApprovalQueueActive = pathname.startsWith('/approval-queue')
+  const isOutreachActive = pathname.startsWith('/outreach')
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
   )
@@ -610,6 +634,10 @@ function ChatSidebarComponent({
   } as const
 
   // Collapsible section states
+  const [seoBusinessExpanded, toggleSeoBusiness] = usePersistedBool(
+    'claude-sidebar-seo-business-expanded',
+    true,
+  )
   const [mainExpanded, toggleMain] = usePersistedBool(
     'claude-sidebar-main-expanded',
     true,
@@ -783,6 +811,44 @@ function ChatSidebarComponent({
 
   const isDashboardActive = pathname === '/dashboard'
 
+  const seoBusinessItems: Array<NavItemDef> = [
+    {
+      kind: 'link',
+      to: '/mission-control',
+      icon: Target01Icon,
+      label: 'Mission Control',
+      active: isMissionControlActive,
+    },
+    {
+      kind: 'link',
+      to: '/tasks',
+      icon: CheckListIcon,
+      label: 'To-Do / Tasks',
+      active: isTasksActive,
+    },
+    {
+      kind: 'link',
+      to: '/notion',
+      icon: Building01Icon,
+      label: 'Notion Browser',
+      active: isNotionActive,
+    },
+    {
+      kind: 'link',
+      to: '/approval-queue',
+      icon: CheckmarkCircle02Icon,
+      label: 'Approvals',
+      active: isApprovalQueueActive,
+    },
+    {
+      kind: 'link',
+      to: '/outreach',
+      icon: Mail01Icon,
+      label: 'Outreach Pipeline',
+      active: isOutreachActive,
+    },
+  ]
+
   const mainItems: Array<NavItemDef> = [
     {
       kind: 'link',
@@ -819,13 +885,6 @@ function ChatSidebarComponent({
       icon: Clock01Icon,
       label: t('nav.jobs'),
       active: isJobsActive,
-    },
-    {
-      kind: 'link',
-      to: '/tasks',
-      icon: CheckListIcon,
-      label: 'Tasks',
-      active: isTasksActive,
     },
     {
       kind: 'link',
@@ -1024,7 +1083,9 @@ function ChatSidebarComponent({
           <Link
             to="/chat/$sessionKey"
             params={{ sessionKey: 'new' }}
-            onClick={() => {
+            onClick={(event) => {
+              event.preventDefault()
+              onCreateSession()
               onSelectSession?.()
             }}
             className={cn(
@@ -1089,7 +1150,24 @@ function ChatSidebarComponent({
       {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
         {/* Navigation sections */}
-        <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
+        <div className="shrink-0 space-y-0.5 px-2">
+          <SectionLabel
+            label="SEO Business"
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            collapsible
+            expanded={seoBusinessExpanded}
+            onToggle={toggleSeoBusiness}
+            navigateTo="/mission-control"
+          />
+          <CollapsibleSection
+            expanded={seoBusinessExpanded || isCollapsed}
+            items={seoBusinessItems}
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
+
           <SectionLabel
             label="Main"
             isCollapsed={isVisuallyCollapsed}
@@ -1135,7 +1213,7 @@ function ChatSidebarComponent({
         </div>
 
         {/* Sessions list */}
-        <div className={cn('shrink-0 mt-1', isMobile && 'order-1')}>
+        <div className="shrink-0 mt-1">
           <AnimatePresence initial={false}>
             {!isVisuallyCollapsed && (
               <motion.div
@@ -1147,8 +1225,15 @@ function ChatSidebarComponent({
                 className="flex flex-col w-full min-h-0 h-full"
               >
                 <div className="flex-1 min-h-0">
-                  <SidebarSessions
+                  <SidebarProjects
                     sessions={sessions}
+                    activeFriendlyId={activeFriendlyId}
+                    onSelect={onSelectSession}
+                    onRename={handleOpenRename}
+                    onDelete={handleOpenDelete}
+                  />
+                  <SidebarSessions
+                    sessions={unassignedSessions}
                     activeFriendlyId={activeFriendlyId}
                     onSelect={onSelectSession}
                     onRename={handleOpenRename}

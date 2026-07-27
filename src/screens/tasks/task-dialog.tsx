@@ -15,12 +15,12 @@ type Props = {
   onOpenChange: (open: boolean) => void
   task?: ClaudeTask | null
   defaultColumn?: TaskColumn
-  assignees: Array<TaskAssignee>
+  assignees?: Array<TaskAssignee>
   onSubmit: (input: CreateTaskInput) => Promise<void>
   isSubmitting: boolean
 }
 
-export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees, onSubmit, isSubmitting }: Props) {
+export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees = [], onSubmit, isSubmitting }: Props) {
   const isEdit = Boolean(task)
 
   const [title, setTitle] = useState('')

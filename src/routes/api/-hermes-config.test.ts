@@ -96,6 +96,84 @@ describe('canonical /api/hermes-config route', () => {
     expect(openrouter.isDefault).toBe(true)
   })
 
+  it('GET exposes the current Hermes provider catalog for future provider switching', async () => {
+    fs.writeFileSync(
+      path.join(tmpHome, 'config.yaml'),
+      'provider: gemini\nmodel: gemini-3.5-flash\n',
+      'utf-8',
+    )
+    fs.writeFileSync(
+      path.join(tmpHome, '.env'),
+      'GOOGLE_API_KEY=google-test-key\nDEEPSEEK_API_KEY=deepseek-test-key\n',
+      'utf-8',
+    )
+
+    const handlers = await loadHandlers('./hermes-config')
+    const res = await handlers.GET({
+      request: new Request('http://localhost/api/hermes-config'),
+    })
+    const body = await res.json()
+    const ids = body.providers.map((p: any) => p.id)
+
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        'openrouter',
+        'openai-api',
+        'openai-codex',
+        'anthropic',
+        'gemini',
+        'google-gemini-cli',
+        'deepseek',
+        'xai',
+        'zai',
+        'kimi-coding',
+        'minimax',
+        'alibaba',
+        'huggingface',
+        'kilocode',
+        'opencode-zen',
+        'opencode-go',
+        'qwen-oauth',
+      ]),
+    )
+
+    const gemini = body.providers.find((p: any) => p.id === 'gemini')
+    expect(gemini.envKeys).toEqual(['GOOGLE_API_KEY', 'GEMINI_API_KEY'])
+    expect(gemini.configured).toBe(true)
+    expect(gemini.isDefault).toBe(true)
+    expect(gemini.maskedCredentials.GOOGLE_API_KEY).toBeTruthy()
+
+    const deepseek = body.providers.find((p: any) => p.id === 'deepseek')
+    expect(deepseek.configured).toBe(true)
+  })
+
+  it('PATCH legacy { config } can delete stale base_url when switching to hosted providers', async () => {
+    fs.writeFileSync(
+      path.join(tmpHome, 'config.yaml'),
+      'provider: ollama\nmodel: qwen-local\nbase_url: http://localhost:11434/v1\n',
+      'utf-8',
+    )
+
+    const handlers = await loadHandlers('./hermes-config')
+    await handlers.PATCH({
+      request: new Request('http://localhost/api/hermes-config', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          config: {
+            provider: 'openrouter',
+            model: 'anthropic/claude-sonnet-4.6',
+            base_url: null,
+          },
+        }),
+      }),
+    })
+
+    const onDisk = fs.readFileSync(path.join(tmpHome, 'config.yaml'), 'utf-8')
+    expect(onDisk).toContain('provider: openrouter')
+    expect(onDisk).toContain('model: anthropic/claude-sonnet-4.6')
+    expect(onDisk).not.toContain('base_url:')
+  })
+
   it('PATCH dispatches set-default-model and returns the action message', async () => {
     const handlers = await loadHandlers('./hermes-config')
     const res = await handlers.PATCH({

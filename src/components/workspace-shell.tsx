@@ -27,6 +27,7 @@ import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
 import { useWorkspaceStore } from '@/stores/workspace-store'
+import { useProjectStore } from '@/stores/project-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 // Lazy: ChatPanel statically imports ChatScreen and with it the chat
@@ -82,6 +83,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
+  const setPendingNewSessionProject = useProjectStore(
+    (s) => s.setPendingNewSessionProject,
+  )
+  const clearPendingNewSessionProject = useProjectStore(
+    (s) => s.clearPendingNewSessionProject,
+  )
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
 
   // ChatGPT-style: track visual viewport height for keyboard-aware layout
@@ -99,18 +106,21 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
   const getTabIndex = useCallback((path: string): number => {
-    if (path === '/dashboard') return 0
-    if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
-    if (path.startsWith('/files')) return 2
-    if (path.startsWith('/terminal')) return 3
-    if (path.startsWith('/jobs')) return 4
-    if (path === '/swarm' || path.startsWith('/swarm2')) return 5
-    if (path.startsWith('/echo-studio')) return 5
-    if (path.startsWith('/memory')) return 6
-    if (path.startsWith('/skills')) return 7
-    if (path.startsWith('/mcp')) return 8
-    if (path.startsWith('/profiles')) return 9
-    if (path.startsWith('/settings')) return 10
+    if (path === '/mission-control') return 0
+    if (path === '/dashboard') return 1
+    if (path.startsWith('/chat') || path === '/new' || path === '/') return 2
+    if (path.startsWith('/files')) return 3
+    if (path.startsWith('/terminal')) return 4
+    if (path.startsWith('/jobs')) return 5
+    if (path === '/swarm' || path.startsWith('/swarm2')) return 6
+    if (path.startsWith('/echo-studio')) return 6
+    if (path.startsWith('/memory')) return 7
+    if (path.startsWith('/skills')) return 8
+    if (path.startsWith('/mcp')) return 9
+    if (path.startsWith('/outreach')) return 10
+    if (path.startsWith('/profiles')) return 11
+    if (path.startsWith('/settings')) return 12
+    if (path.startsWith('/approval-queue')) return 13
     return -1
   }, [])
 
@@ -174,6 +184,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   // Derive active session from URL
   const mobilePageTitle = (() => {
+    if (pathname.startsWith('/mission-control')) return 'Mission Control'
     if (pathname.startsWith('/terminal')) return 'Terminal'
     if (pathname.startsWith('/files')) return 'Files'
     if (pathname.startsWith('/jobs')) return 'Jobs'
@@ -184,10 +195,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (pathname.startsWith('/memory')) return 'Memory'
     if (pathname.startsWith('/skills')) return 'Skills'
     if (pathname.startsWith('/mcp')) return 'MCP'
+    if (pathname.startsWith('/outreach')) return 'Outreach'
     if (pathname.startsWith('/profiles')) return 'Profiles'
     if (pathname.startsWith('/settings')) return 'Settings'
     if (pathname.startsWith('/debug')) return 'Debug'
     if (pathname.startsWith('/activity')) return 'Activity'
+    if (pathname.startsWith('/approval-queue')) return 'Approval Queue'
     return null
   })()
 
@@ -218,14 +231,22 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     isNewChat,
   })
 
-  const startNewChat = useCallback(() => {
-    setCreatingSession(true)
-    navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } }).then(
-      () => {
-        setCreatingSession(false)
-      },
-    )
-  }, [navigate])
+  const startNewChat = useCallback(
+    (projectId?: string) => {
+      setCreatingSession(true)
+      if (projectId) {
+        setPendingNewSessionProject(projectId)
+      } else {
+        clearPendingNewSessionProject()
+      }
+      navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } }).then(
+        () => {
+          setCreatingSession(false)
+        },
+      )
+    },
+    [clearPendingNewSessionProject, navigate, setPendingNewSessionProject],
+  )
 
   const handleSelectSession = useCallback(() => {
     // On mobile, collapse sidebar after selecting
