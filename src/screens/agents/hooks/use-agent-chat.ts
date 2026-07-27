@@ -4,6 +4,7 @@ import type { OperationsChatTarget } from './use-operations'
 import type { ChatMessage } from '@/screens/chat/types'
 import {
   fetchCompleteSessionCardHistory,
+  isAuthoritativeCompleteSessionCardHistory,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
 import { textFromMessage } from '@/screens/chat/utils'
@@ -117,22 +118,32 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     },
   })
 
+  const completeHistory = isAuthoritativeCompleteSessionCardHistory(
+    historyQuery.data,
+  )
+    ? historyQuery.data
+    : undefined
+  const historyUnavailable = Boolean(
+    target && historyQuery.data && !completeHistory,
+  )
   const messages = useMemo(
     () =>
-      (historyQuery.data?.messages ?? [])
+      (completeHistory?.messages ?? [])
         .map(normalizeMessage)
         .filter((message): message is OperationsChatMessage =>
           Boolean(message),
         ),
-    [historyQuery.data?.messages],
+    [completeHistory?.messages],
   )
   const error = !target
     ? 'Chat unavailable: no complete Session Card was resolved.'
-    : child
-      ? 'Direct child transcript · read-only'
-      : (historyQuery.error instanceof Error && historyQuery.error.message) ||
-        (sendMutation.error instanceof Error && sendMutation.error.message) ||
-        null
+    : historyUnavailable
+      ? 'Chat history unavailable until a complete transcript is available.'
+      : child
+        ? 'Direct child transcript · read-only'
+        : (historyQuery.error instanceof Error && historyQuery.error.message) ||
+          (sendMutation.error instanceof Error && sendMutation.error.message) ||
+          null
 
   return {
     messages,
@@ -142,6 +153,9 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     isRefreshing: historyQuery.isFetching,
     isSending: sendMutation.isPending,
     error,
+    canRetryHistory: Boolean(
+      target && (historyUnavailable || historyQuery.error),
+    ),
     refresh: historyQuery.refetch,
   }
 }

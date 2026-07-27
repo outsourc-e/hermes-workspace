@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { screen } from '@testing-library/dom'
+import { fireEvent, screen } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -323,5 +323,152 @@ describe('mounted /conductor Session Card inventory', () => {
     expect(screen.getByText('1 active')).not.toBeNull()
     expect(container.textContent).not.toContain('remote:shared-runtime-key')
     expect(container.textContent).not.toContain('raw-incomplete-session')
+  })
+
+  it.each([
+    ['partial', 'partial', true],
+    ['retryable', 'complete', true],
+  ] as const)(
+    'hides %s worker history output and exposes a retry control',
+    async (_case, completeness, retryable) => {
+      localStorage.setItem(
+        'conductor:active-mission',
+        JSON.stringify({
+          goal: 'A mission whose title does not match any Card',
+          phase: 'running',
+          missionStartedAt: '2026-07-27T11:59:00.000Z',
+          isPaused: false,
+          pausedElapsedMs: 0,
+          accumulatedPausedMs: 0,
+          pauseStartedAt: null,
+          workerKeys: ['remote:shared-runtime-key'],
+          workerLabels: [],
+          workerOutputs: {
+            'remote:shared-worker': 'persisted unsafe worker transcript',
+          },
+          streamText: '',
+          planText: '',
+          completedAt: null,
+          tasks: [],
+        }),
+      )
+      const fetchMock = vi.fn<typeof fetch>((input) => {
+        const url = String(input)
+        if (url.includes('/history')) {
+          return Promise.resolve(
+            Response.json({
+              cardId: 'remote:shared-worker',
+              canonicalSegmentKey: 'remote:shared-runtime-key',
+              messages: [
+                {
+                  segmentKey: 'remote:shared-runtime-key',
+                  message: {
+                    role: 'assistant',
+                    content: 'unsafe Conductor transcript',
+                  },
+                },
+              ],
+              completeness,
+              retryable,
+              missingSegments:
+                completeness === 'partial'
+                  ? [
+                      {
+                        segmentKey: 'remote:missing',
+                        retryable: true,
+                        error: 'temporarily unavailable',
+                      },
+                    ]
+                  : [],
+            }),
+          )
+        }
+        if (url === '/api/session-cards') {
+          return Promise.resolve(Response.json(mocks.cardResponse))
+        }
+        return Promise.resolve(Response.json({}, { status: 404 }))
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const container = await renderConductor()
+      await React.act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(container.textContent).not.toContain('unsafe Conductor transcript')
+      expect(container.textContent).not.toContain(
+        'persisted unsafe worker transcript',
+      )
+      expect(
+        screen.getByText(
+          'Worker transcript unavailable until complete history can be loaded.',
+        ),
+      ).toBeTruthy()
+      const retry = screen.getByRole('button', {
+        name: 'Retry worker transcript',
+      })
+      React.act(() => fireEvent.click(retry))
+      expect(
+        fetchMock.mock.calls.filter(([input]) =>
+          String(input).includes('/history'),
+        ).length,
+      ).toBeGreaterThan(1)
+    },
+  )
+
+  it('renders worker output from complete non-retryable Card history', async () => {
+    localStorage.setItem(
+      'conductor:active-mission',
+      JSON.stringify({
+        goal: 'A mission whose title does not match any Card',
+        phase: 'running',
+        missionStartedAt: '2026-07-27T11:59:00.000Z',
+        isPaused: false,
+        pausedElapsedMs: 0,
+        accumulatedPausedMs: 0,
+        pauseStartedAt: null,
+        workerKeys: ['remote:shared-runtime-key'],
+        workerLabels: [],
+        workerOutputs: {},
+        streamText: '',
+        planText: '',
+        completedAt: null,
+        tasks: [],
+      }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>((input) =>
+        Promise.resolve(
+          String(input).includes('/history')
+            ? Response.json({
+                cardId: 'remote:shared-worker',
+                canonicalSegmentKey: 'remote:shared-runtime-key',
+                messages: [
+                  {
+                    segmentKey: 'remote:shared-runtime-key',
+                    message: {
+                      role: 'assistant',
+                      content: 'complete Conductor transcript',
+                    },
+                  },
+                ],
+                completeness: 'complete',
+                retryable: false,
+                missingSegments: [],
+              })
+            : Response.json(mocks.cardResponse),
+        ),
+      ),
+    )
+
+    const container = await renderConductor()
+    await React.act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).toContain('complete Conductor transcript')
   })
 })

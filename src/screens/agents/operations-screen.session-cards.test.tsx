@@ -33,6 +33,13 @@ const mocks = vi.hoisted(() => ({
   mutationOptions: [] as Array<MutationOptions>,
   chatScreenProps: [] as Array<Record<string, any>>,
   invalidateQueries: vi.fn(),
+  historyRefetch: vi.fn(),
+  historyResponse: {
+    messages: [],
+    completeness: 'complete',
+    retryable: false,
+    missingSegments: [],
+  } as Record<string, unknown>,
   cardResponse: undefined as SessionCardListWire | undefined,
 }))
 
@@ -73,13 +80,9 @@ vi.mock('@tanstack/react-query', () => ({
     if (key[0] === 'chat' && key[1] === 'session-cards') {
       if (key[2] === 'history' || key[2] === 'child-history') {
         return {
-          ...queryResult({
-            messages: [],
-            completeness: 'complete',
-            retryable: false,
-            missingSegments: [],
-          }),
+          ...queryResult(mocks.historyResponse),
           isFetching: false,
+          refetch: mocks.historyRefetch,
         }
       }
       return queryResult(mocks.cardResponse)
@@ -282,6 +285,14 @@ async function renderOperations() {
 beforeEach(() => {
   mocks.navigate.mockReset()
   mocks.invalidateQueries.mockReset()
+  mocks.historyRefetch.mockReset()
+  mocks.historyRefetch.mockResolvedValue({ data: mocks.historyResponse })
+  mocks.historyResponse = {
+    messages: [],
+    completeness: 'complete',
+    retryable: false,
+    missingSegments: [],
+  }
   mocks.queryOptions.length = 0
   mocks.mutationOptions.length = 0
   mocks.chatScreenProps.length = 0
@@ -445,6 +456,71 @@ describe('mounted Operations Session Card activity', () => {
       ),
     ).toHaveLength(2)
     expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['partial', 'partial', true],
+    ['retryable', 'complete', true],
+  ] as const)(
+    'hides %s Card history message content and offers an explicit retry',
+    async (_case, completeness, retryable) => {
+      mocks.historyResponse = {
+        messages: [
+          {
+            id: 'unsafe-message',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'unsafe Operations transcript' }],
+          },
+        ],
+        completeness,
+        retryable,
+        missingSegments:
+          completeness === 'partial'
+            ? [
+                {
+                  segmentKey: 'remote:missing',
+                  retryable: true,
+                  error: 'temporarily unavailable',
+                },
+              ]
+            : [],
+      }
+
+      await renderOperations()
+
+      expect(document.body.textContent).not.toContain(
+        'unsafe Operations transcript',
+      )
+      expect(
+        screen.getAllByText(
+          'Chat history unavailable until a complete transcript is available.',
+        ).length,
+      ).toBeGreaterThan(0)
+      const retry = screen.getAllByRole('button', {
+        name: 'Retry Card history',
+      })[0]!
+      React.act(() => fireEvent.click(retry))
+      expect(mocks.historyRefetch).toHaveBeenCalled()
+    },
+  )
+
+  it('renders message content from complete non-retryable Card history', async () => {
+    mocks.historyResponse = {
+      messages: [
+        {
+          id: 'safe-message',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'complete Operations transcript' }],
+        },
+      ],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+
+    await renderOperations()
+
+    expect(screen.getAllByText('complete Operations transcript').length).toBe(2)
   })
 
   it('offers only explicit new bootstrap after authoritative main Card absence', async () => {

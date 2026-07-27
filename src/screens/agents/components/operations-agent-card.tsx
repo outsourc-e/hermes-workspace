@@ -74,6 +74,8 @@ export function OperationsInlineChat({
   canSend,
   isSending,
   error,
+  canRetryHistory,
+  onRetryHistory,
 }: {
   agentName: string
   messages: Array<OperationsChatMessage>
@@ -81,6 +83,8 @@ export function OperationsInlineChat({
   canSend: boolean
   isSending: boolean
   error: string | null
+  canRetryHistory: boolean
+  onRetryHistory: () => void
 }) {
   const [draft, setDraft] = useState('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -144,7 +148,21 @@ export function OperationsInlineChat({
       </div>
 
       <div className="border-t border-[var(--theme-border)] px-3 py-3">
-        {error ? <p className="mb-2 text-xs text-red-600">{error}</p> : null}
+        {error ? (
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs text-red-600">
+            <p>{error}</p>
+            {canRetryHistory ? (
+              <button
+                type="button"
+                className="shrink-0 rounded-md border border-red-300 px-2 py-1 font-semibold"
+                aria-label="Retry Card history"
+                onClick={onRetryHistory}
+              >
+                Retry history
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex items-center gap-2 rounded-[1rem] border border-[var(--theme-border)] bg-[var(--theme-bg)] p-2">
           <input
             type="text"
@@ -200,8 +218,15 @@ export function OperationsAgentCard({
   const [showCronPanel, setShowCronPanel] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const chatTarget = agent.chat.status === 'ready' ? agent.chat : undefined
-  const { messages, sendMessage, canSend, isSending, error } =
-    useAgentChat(chatTarget)
+  const {
+    messages,
+    sendMessage,
+    canSend,
+    isSending,
+    error,
+    canRetryHistory,
+    refresh,
+  } = useAgentChat(chatTarget)
   const cronJobCount = agent.jobs.length
   const isActive = agent.status === 'active' && !isPaused
 
@@ -500,6 +525,8 @@ export function OperationsAgentCard({
           canSend={canSend}
           isSending={isSending}
           error={error}
+          canRetryHistory={canRetryHistory}
+          onRetryHistory={() => void refresh()}
         />
       </div>
     </article>

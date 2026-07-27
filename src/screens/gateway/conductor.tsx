@@ -455,13 +455,20 @@ function WorkerCard({
   index: number
   conductor: Pick<
     ReturnType<typeof useConductorGateway>,
-    'workerOutputs' | 'isPaused' | 'pausedAtMs' | 'missionStartedAt'
+    | 'workerOutputs'
+    | 'workerOutputStatuses'
+    | 'retryWorkerOutput'
+    | 'isPaused'
+    | 'pausedAtMs'
+    | 'missionStartedAt'
   >
   now: number
 }) {
   const dot = getWorkerDot(worker.status)
   const persona = getAgentPersona(index)
   const workerOutput = conductor.workerOutputs[worker.key] ?? ''
+  const workerOutputStatus =
+    conductor.workerOutputStatuses[worker.key] ?? 'loading'
   const workerStartedAt = conductor.missionStartedAt
   const workerEndTime =
     worker.status === 'complete' || worker.status === 'stale'
@@ -525,10 +532,25 @@ function WorkerCard({
       </div>
 
       <div className="mt-3 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4">
-        {workerOutput ? (
+        {workerOutputStatus === 'ready' && workerOutput ? (
           <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">
             {workerOutput}
           </Markdown>
+        ) : workerOutputStatus === 'unavailable' ? (
+          <div className="flex flex-col items-start gap-3 text-sm text-[var(--theme-muted)]">
+            <p>
+              Worker transcript unavailable until complete history can be
+              loaded.
+            </p>
+            <button
+              type="button"
+              className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-semibold text-[var(--theme-text)]"
+              aria-label="Retry worker transcript"
+              onClick={() => void conductor.retryWorkerOutput(worker)}
+            >
+              Retry transcript
+            </button>
+          </div>
         ) : (
           <CyclingStatus
             steps={WORKING_STEPS}

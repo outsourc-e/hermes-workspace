@@ -30,6 +30,7 @@ import {
   clearHistoryMessages,
   fetchCompleteSessionCardHistory,
   fetchStatus,
+  isAuthoritativeCompleteSessionCardHistory,
   mergeSessionCardHistoryResponse,
   moveSessionCardHistoryMessages,
   retainCompleteSessionCardProjections,
@@ -799,9 +800,18 @@ export function ChatScreen({
     retry: 1,
     refetchOnWindowFocus: true,
   })
+  const completeCardHistory = isAuthoritativeCompleteSessionCardHistory(
+    cardHistoryQuery.data,
+  )
+    ? cardHistoryQuery.data
+    : undefined
+  const completeInspectedChildHistory =
+    isAuthoritativeCompleteSessionCardHistory(inspectedChildHistoryQuery.data)
+      ? inspectedChildHistoryQuery.data
+      : undefined
   const historyQuery = activeCard ? cardHistoryQuery : legacyHistoryQuery
   const historyMessages = activeCard
-    ? (cardHistoryQuery.data?.messages ?? [])
+    ? (completeCardHistory?.messages ?? [])
     : legacyHistoryMessages
   const messageCount = activeCard ? historyMessages.length : legacyMessageCount
   const historyError = activeCard
@@ -815,6 +825,10 @@ export function ChatScreen({
     : activeCard
       ? cardHistoryQuery.data
       : undefined
+  const displayedCardHistoryRetryable = displayedCardHistory?.retryable === true
+  const displayedCardHistoryReady =
+    !activeCard ||
+    isAuthoritativeCompleteSessionCardHistory(displayedCardHistory)
   const displayedHistoryError = inspectedChildCard
     ? (inspectedChildHistoryQuery.error?.message ?? null)
     : historyError
@@ -1890,7 +1904,7 @@ export function ChatScreen({
   ])
 
   const inspectedChildDisplayMessages = useMemo(() => {
-    const messages = inspectedChildHistoryQuery.data?.messages ?? []
+    const messages = completeInspectedChildHistory?.messages ?? []
     return messages
       .filter((message) => {
         if (message.role === 'user') {
@@ -1903,10 +1917,12 @@ export function ChatScreen({
         return content.some((part) => part.type === 'toolCall')
       })
       .map((message) => stripQueuedWrapperFromUserMessage(message))
-  }, [inspectedChildHistoryQuery.data?.messages])
-  const finalDisplayMessages = inspectedChildCard
-    ? inspectedChildDisplayMessages
-    : parentDisplayMessages
+  }, [completeInspectedChildHistory?.messages])
+  const finalDisplayMessages = displayedCardHistoryReady
+    ? inspectedChildCard
+      ? inspectedChildDisplayMessages
+      : parentDisplayMessages
+    : []
 
   const derivedStreamingInfo = useMemo(() => {
     if (activeIsRealtimeStreaming) {
@@ -3002,14 +3018,14 @@ export function ChatScreen({
     legacyRedirecting
   const historyEmpty = !historyLoading && finalDisplayMessages.length === 0
   const incompleteHistoryNotice =
-    displayedCardHistory?.completeness === 'partial' ? (
+    displayedCardHistory && !displayedCardHistoryReady ? (
       <div className="mx-4 mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-200">
         <p role="status">
           {inspectedChildCard
-            ? 'Inspected child history is incomplete. Some messages may be unavailable.'
-            : 'Conversation history is incomplete. Some messages may be unavailable.'}
+            ? 'Inspected child history is unavailable until the complete transcript can be loaded.'
+            : 'Conversation history is unavailable until the complete transcript can be loaded.'}
         </p>
-        {displayedCardHistory.retryable ? (
+        {displayedCardHistoryRetryable ? (
           <button
             type="button"
             className="shrink-0 rounded-md border border-amber-400 px-2.5 py-1 text-xs font-semibold hover:bg-amber-100 dark:border-amber-600 dark:hover:bg-amber-900/40"
@@ -3366,7 +3382,9 @@ export function ChatScreen({
               notice={null}
               noticePosition="end"
               waitingForResponse={
-                inspectedChildCard ? false : waitingForResponse
+                !displayedCardHistoryReady || inspectedChildCard
+                  ? false
+                  : waitingForResponse
               }
               sessionKey={inspectedChildCard?.sessionKey ?? activeCanonicalKey}
               pinToTop={false}
@@ -3377,36 +3395,60 @@ export function ChatScreen({
                 isMobile ? mobileScrollBottomOffset : terminalPanelInset
               }
               isStreaming={
-                inspectedChildCard ? false : derivedStreamingInfo.isStreaming
+                !displayedCardHistoryReady || inspectedChildCard
+                  ? false
+                  : derivedStreamingInfo.isStreaming
               }
               streamingMessageId={
-                inspectedChildCard
+                !displayedCardHistoryReady || inspectedChildCard
                   ? null
                   : derivedStreamingInfo.streamingMessageId
               }
               streamingText={
-                inspectedChildCard
+                !displayedCardHistoryReady || inspectedChildCard
                   ? undefined
                   : stableActiveStreamingText ||
                     completedStreamingText.current ||
                     undefined
               }
               streamingThinking={
-                inspectedChildCard
+                !displayedCardHistoryReady || inspectedChildCard
                   ? undefined
                   : realtimeStreamingThinking ||
                     completedStreamingThinking.current ||
                     undefined
               }
               lifecycleEvents={
-                inspectedChildCard ? [] : realtimeLifecycleEvents
+                !displayedCardHistoryReady || inspectedChildCard
+                  ? []
+                  : realtimeLifecycleEvents
               }
               hideSystemMessages
-              activeToolCalls={inspectedChildCard ? [] : activeToolCalls}
-              liveToolActivity={inspectedChildCard ? [] : liveToolActivity}
-              researchCard={inspectedChildCard ? undefined : researchCard}
-              isCompacting={inspectedChildCard ? false : isCompacting}
-              sending={inspectedChildCard ? false : sending}
+              activeToolCalls={
+                !displayedCardHistoryReady || inspectedChildCard
+                  ? []
+                  : activeToolCalls
+              }
+              liveToolActivity={
+                !displayedCardHistoryReady || inspectedChildCard
+                  ? []
+                  : liveToolActivity
+              }
+              researchCard={
+                !displayedCardHistoryReady || inspectedChildCard
+                  ? undefined
+                  : researchCard
+              }
+              isCompacting={
+                !displayedCardHistoryReady || inspectedChildCard
+                  ? false
+                  : isCompacting
+              }
+              sending={
+                !displayedCardHistoryReady || inspectedChildCard
+                  ? false
+                  : sending
+              }
             />
           )}
           {showComposer ? (

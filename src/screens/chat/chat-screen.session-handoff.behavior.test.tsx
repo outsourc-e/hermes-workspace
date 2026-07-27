@@ -1111,14 +1111,14 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       const transcript =
         container.querySelector('[data-testid="chat-transcript"]')
           ?.textContent ?? ''
-      expect(transcript).toContain('child transcript')
+      expect(transcript).not.toContain('child transcript')
       expect(transcript).not.toContain('parent transcript')
       expect(
         container.querySelector('[data-testid="chat-header-title"]')
           ?.textContent,
       ).toBe('Parent Card title')
       expect(getByRole(container, 'status').textContent).toContain(
-        'Inspected child history is incomplete',
+        'Inspected child history is unavailable until the complete transcript can be loaded',
       )
     })
     React.act(() => {
@@ -1152,7 +1152,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
-  it('discloses retryable incomplete parent Card history and refetches that Card in place', async () => {
+  it('hides retryable incomplete parent Card history and refetches that Card in place', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -1206,9 +1206,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
 
     await waitForAssertion(() => {
-      expect(container.textContent).toContain('available transcript')
+      expect(container.textContent).not.toContain('available transcript')
       expect(getByRole(container, 'status').textContent).toContain(
-        'Conversation history is incomplete',
+        'Conversation history is unavailable until the complete transcript can be loaded',
       )
       expect(container.textContent).not.toContain('remote:missing-segment')
     })
@@ -1218,7 +1218,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       }).click()
     })
     expect(retryParentHistory).toHaveBeenCalledTimes(1)
-    expect(container.textContent).toContain('available transcript')
+    expect(container.textContent).not.toContain('available transcript')
 
     React.act(() => root.unmount())
     document.body.removeChild(container)

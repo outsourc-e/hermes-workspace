@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { Dispatch, SetStateAction } from 'react'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import {
   fetchCompleteSessionCardHistory,
   fetchSessionCards,
+  isAuthoritativeCompleteSessionCardHistory,
   retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
@@ -164,6 +165,8 @@ export type ConductorTask = {
   workerKey: string | null
   output: string | null
 }
+
+export type ConductorWorkerOutputStatus = 'loading' | 'ready' | 'unavailable'
 
 export type MissionHistoryWorkerDetail = {
   label: string
@@ -991,13 +994,22 @@ async function fetchWorkerOutput(worker: {
   cardId: string
   canonicalSegmentKey: string
   parentCardId?: string
-}): Promise<string> {
+}): Promise<{
+  status: Exclude<ConductorWorkerOutputStatus, 'loading'>
+  output: string
+}> {
   const history = await fetchCompleteSessionCardHistory({
     cardId: worker.cardId,
     canonicalSegmentKey: worker.canonicalSegmentKey,
     ...(worker.parentCardId ? { parentCardId: worker.parentCardId } : {}),
   })
-  return getLastAssistantMessage(history.messages as Array<HistoryMessage>)
+  if (!isAuthoritativeCompleteSessionCardHistory(history)) {
+    return { status: 'unavailable', output: '' }
+  }
+  return {
+    status: 'ready',
+    output: getLastAssistantMessage(history.messages as Array<HistoryMessage>),
+  }
 }
 
 function appendStreamEvent(
@@ -1224,8 +1236,13 @@ export function useConductorGateway() {
     () => new Set(initialMission?.workerLabels ?? []),
   )
   const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>(
-    () => initialMission?.workerOutputs ?? {},
+    // Persisted text is not proof that the currently mounted Card history is
+    // still complete. Revalidate every transcript before rendering or reuse.
+    {},
   )
+  const [workerOutputStatuses, setWorkerOutputStatuses] = useState<
+    Record<string, ConductorWorkerOutputStatus>
+  >({})
   const [tasks, setTasks] = useState<Array<ConductorTask>>(
     () => initialMission?.tasks ?? [],
   )
@@ -1364,6 +1381,57 @@ export function useConductorGateway() {
     [workers],
   )
   const hasPersistedMission = initialMission !== null
+
+  const applyWorkerOutputResult = useCallback(
+    (
+      workerKey: string,
+      result: {
+        status: Exclude<ConductorWorkerOutputStatus, 'loading'>
+        output: string
+      },
+    ) => {
+      setWorkerOutputs((current) => {
+        if (result.status === 'ready' && result.output) {
+          if (current[workerKey] === result.output) return current
+          return { ...current, [workerKey]: result.output }
+        }
+        if (!(workerKey in current)) return current
+        const next = { ...current }
+        delete next[workerKey]
+        return next
+      })
+      setWorkerOutputStatuses((current) =>
+        current[workerKey] === result.status
+          ? current
+          : { ...current, [workerKey]: result.status },
+      )
+    },
+    [],
+  )
+
+  const retryWorkerOutput = useCallback(
+    async (worker: ConductorWorker) => {
+      if (!worker.cardId || !worker.canonicalSegmentKey) return
+      setWorkerOutputStatuses((current) => ({
+        ...current,
+        [worker.key]: 'loading',
+      }))
+      try {
+        const result = await fetchWorkerOutput({
+          cardId: worker.cardId,
+          canonicalSegmentKey: worker.canonicalSegmentKey,
+          ...(worker.parentCardId ? { parentCardId: worker.parentCardId } : {}),
+        })
+        applyWorkerOutputResult(worker.key, result)
+      } catch {
+        applyWorkerOutputResult(worker.key, {
+          status: 'unavailable',
+          output: '',
+        })
+      }
+    },
+    [applyWorkerOutputResult],
+  )
 
   useEffect(() => {
     const mission = missionStatusQuery.data
@@ -1524,20 +1592,21 @@ export function useConductorGateway() {
       for (const worker of workers) {
         if (!worker.cardId || !worker.canonicalSegmentKey) continue
         try {
-          const output = await fetchWorkerOutput({
+          const result = await fetchWorkerOutput({
             cardId: worker.cardId,
             canonicalSegmentKey: worker.canonicalSegmentKey,
             ...(worker.parentCardId
               ? { parentCardId: worker.parentCardId }
               : {}),
           })
-          if (cancelled || !output) continue
-          setWorkerOutputs((current) => {
-            if (current[worker.key] === output) return current
-            return { ...current, [worker.key]: output }
-          })
+          if (cancelled) continue
+          applyWorkerOutputResult(worker.key, result)
         } catch {
-          // Ignore transient history fetch errors and retry on the next poll.
+          if (cancelled) continue
+          applyWorkerOutputResult(worker.key, {
+            status: 'unavailable',
+            output: '',
+          })
         }
       }
     }
@@ -1568,7 +1637,7 @@ export function useConductorGateway() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [phase, workers])
+  }, [applyWorkerOutputResult, phase, workers])
 
   useEffect(() => {
     if (!planText) return
@@ -1785,6 +1854,7 @@ export function useConductorGateway() {
     setMissionWorkerKeys(new Set())
     setMissionWorkerLabels(new Set())
     setWorkerOutputs({})
+    setWorkerOutputStatuses({})
     setTasks([])
     setSelectedHistoryEntry(null)
     seenToolCallRef.current = false
@@ -2143,6 +2213,8 @@ export function useConductorGateway() {
     recentSessions,
     missionWorkerKeys,
     workerOutputs,
+    workerOutputStatuses,
+    retryWorkerOutput,
     conductorSettings,
     setConductorSettings,
     sendMission: (nextGoal: string) =>

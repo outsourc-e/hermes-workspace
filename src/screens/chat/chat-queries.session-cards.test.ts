@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import { SessionCardService } from '../../server/session-card-service'
 import {
+  appendSessionCardHistoryMessage,
   archiveSessionCard,
   branchSessionCard,
   fetchCompleteSessionCardHistory,
   fetchSessionCardHistory,
   fetchSessionCards,
+  isAuthoritativeCompleteSessionCardHistory,
+  mergeSessionCardHistoryResponse,
   moveSessionCardHistoryMessages,
   sessionCardQueryKeys,
   updateSessionCardMetadata,
@@ -1068,6 +1071,148 @@ describe('Session Card fetchers', () => {
       '/api/session-cards/remote%3Aroot/history?limit=500&cursor=page-2',
       { signal: undefined },
     )
+  })
+
+  it('accepts only complete non-retryable Card history as an authoritative transcript', () => {
+    const base = {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [{ id: 'message', role: 'assistant', content: [] }],
+    }
+
+    expect(
+      isAuthoritativeCompleteSessionCardHistory({
+        ...base,
+        completeness: 'complete',
+        retryable: false,
+        missingSegments: [],
+      }),
+    ).toBe(true)
+    expect(
+      isAuthoritativeCompleteSessionCardHistory({
+        ...base,
+        completeness: 'partial',
+        retryable: true,
+        missingSegments: [
+          {
+            segmentKey: 'remote:missing',
+            retryable: true,
+            error: 'temporarily unavailable',
+          },
+        ],
+      }),
+    ).toBe(false)
+    expect(
+      isAuthoritativeCompleteSessionCardHistory({
+        ...base,
+        completeness: 'complete',
+        retryable: true,
+        missingSegments: [],
+      } as any),
+    ).toBe(false)
+  })
+
+  it('does not reuse cached optimistic messages when server history is partial', () => {
+    const server = {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [
+        {
+          id: 'server-partial',
+          role: 'assistant' as const,
+          content: [],
+        },
+      ],
+      completeness: 'partial' as const,
+      retryable: true as const,
+      missingSegments: [
+        {
+          segmentKey: 'remote:missing',
+          retryable: true,
+          error: 'temporarily unavailable',
+        },
+      ],
+    }
+    const cached = {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [
+        {
+          id: 'cached-optimistic',
+          role: 'user',
+          content: [],
+          __optimistic: true,
+        },
+      ],
+      completeness: 'complete' as const,
+      retryable: false,
+      missingSegments: [],
+    }
+
+    expect(mergeSessionCardHistoryResponse(server as any, cached as any)).toBe(
+      server,
+    )
+    expect(
+      mergeSessionCardHistoryResponse(server as any, cached as any).messages,
+    ).toEqual([expect.objectContaining({ id: 'server-partial' })])
+  })
+
+  it('keeps optimistic-only and partial caches non-authoritative', () => {
+    const queryClient = new QueryClient()
+    const key = sessionCardQueryKeys.history('remote:root', 'remote:tip')
+    const optimisticMessage = {
+      id: 'cached-optimistic',
+      role: 'user' as const,
+      content: [],
+      __optimistic: true,
+    }
+
+    appendSessionCardHistoryMessage(
+      queryClient,
+      'remote:root',
+      'remote:tip',
+      optimisticMessage,
+    )
+    expect(queryClient.getQueryData(key)).toMatchObject({
+      completeness: 'partial',
+      retryable: true,
+      messages: [{ id: 'cached-optimistic' }],
+    })
+    expect(
+      isAuthoritativeCompleteSessionCardHistory(queryClient.getQueryData(key)),
+    ).toBe(false)
+
+    const partial = {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [{ id: 'server-partial', role: 'assistant', content: [] }],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: 'remote:missing',
+          retryable: true,
+          error: 'temporarily unavailable',
+        },
+      ],
+    }
+    queryClient.setQueryData(key, partial)
+    appendSessionCardHistoryMessage(
+      queryClient,
+      'remote:root',
+      'remote:tip',
+      optimisticMessage,
+    )
+    expect(queryClient.getQueryData(key)).toMatchObject({
+      completeness: 'partial',
+      retryable: true,
+      messages: [{ id: 'server-partial' }, { id: 'cached-optimistic' }],
+    })
+    queryClient.clear()
   })
 
   it('moves Card history cache across canonical handoff without changing Card identity', () => {

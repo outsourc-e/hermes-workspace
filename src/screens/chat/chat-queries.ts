@@ -734,6 +734,21 @@ export type SessionCardHistoryResponse = HistoryResponse & {
   missingSegments: SessionCardHistoryWire['missingSegments']
 }
 
+/**
+ * Mounted transcripts are usable only when the server explicitly proves the
+ * entire Card history is complete and no retryable or missing segment remains.
+ */
+export function isAuthoritativeCompleteSessionCardHistory(
+  history: SessionCardHistoryResponse | undefined,
+): history is SessionCardHistoryResponse {
+  return Boolean(
+    history &&
+    history.completeness === 'complete' &&
+    history.retryable === false &&
+    history.missingSegments.length === 0,
+  )
+}
+
 function sessionCardMessage(
   entry: SessionCardHistoryWire['messages'][number],
 ): ChatMessage {
@@ -821,7 +836,13 @@ export function mergeSessionCardHistoryResponse(
   server: SessionCardHistoryResponse,
   cached: SessionCardHistoryResponse | undefined,
 ): SessionCardHistoryResponse {
-  if (!cached) return server
+  if (
+    !cached ||
+    !isAuthoritativeCompleteSessionCardHistory(server) ||
+    !isAuthoritativeCompleteSessionCardHistory(cached)
+  ) {
+    return server
+  }
   const optimistic = cached.messages.filter((message) => {
     const raw = message as Record<string, unknown>
     return (
@@ -845,16 +866,26 @@ export function updateSessionCardHistoryMessages(
   const queryKey = sessionCardQueryKeys.history(cardId, canonicalSegmentKey)
   queryClient.setQueryData(queryKey, function update(data: unknown) {
     const current = data as SessionCardHistoryResponse | undefined
+    if (!current) {
+      return {
+        sessionKey: canonicalSegmentKey,
+        cardId,
+        canonicalSegmentKey,
+        completeness: 'partial',
+        retryable: true,
+        missingSegments: [
+          {
+            segmentKey: canonicalSegmentKey,
+            retryable: true,
+            error: 'Complete Card history has not loaded.',
+          },
+        ],
+        messages: updater([]),
+      } satisfies SessionCardHistoryResponse
+    }
     return {
-      sessionKey: canonicalSegmentKey,
-      cardId,
-      canonicalSegmentKey,
-      completeness: current?.completeness ?? 'complete',
-      retryable: current?.retryable ?? false,
-      missingSegments: current?.missingSegments ?? [],
-      messages: updater(
-        Array.isArray(current?.messages) ? current.messages : [],
-      ),
+      ...current,
+      messages: updater(current.messages),
     } satisfies SessionCardHistoryResponse
   })
 }
