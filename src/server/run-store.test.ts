@@ -1,6 +1,7 @@
 import { fork } from 'node:child_process'
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -43,6 +44,40 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 const originalHermesHome = process.env.HERMES_HOME
 
 let tempHome: string | null = null
+
+function writePersistedRunFixture(
+  sessionKey: string,
+  runId: string,
+  overrides: Record<string, unknown> = {},
+): string {
+  const dir = join(
+    tempHome!,
+    'webui-mvp',
+    'runs',
+    encodeURIComponent(sessionKey || 'main'),
+  )
+  mkdirSync(dir, { recursive: true })
+  const now = Date.now()
+  const filePath = join(dir, `${runId}.json`)
+  writeFileSync(
+    filePath,
+    JSON.stringify({
+      runId,
+      sessionKey,
+      friendlyId: sessionKey,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      lastEventAt: now,
+      assistantText: '',
+      thinkingText: '',
+      toolCalls: [],
+      lifecycleEvents: [],
+      ...overrides,
+    }),
+  )
+  return filePath
+}
 
 function createDeferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -526,6 +561,51 @@ describe('run-store persistence', () => {
     )
   })
 
+  it('redacts assistant and thinking secrets before fresh state is bounded and written', async () => {
+    const {
+      appendRunText,
+      createPersistedRun,
+      getPersistedRun,
+      setRunThinking,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'private-transcript',
+      sessionKey: 'session-a',
+    })
+
+    await appendRunText(
+      'session-a',
+      'private-transcript',
+      'Authorization: Bearer fresh-assistant-bearer-sentinel',
+    )
+    await setRunThinking(
+      'session-a',
+      'private-transcript',
+      'password=fresh-thinking-password-sentinel',
+    )
+
+    const stored = await getPersistedRun('session-a', 'private-transcript')
+    const durable = readFileSync(
+      join(
+        tempHome!,
+        'webui-mvp',
+        'runs',
+        'session-a',
+        'private-transcript.json',
+      ),
+      'utf8',
+    )
+    for (const secret of [
+      'fresh-assistant-bearer-sentinel',
+      'fresh-thinking-password-sentinel',
+    ]) {
+      expect(JSON.stringify(stored)).not.toContain(secret)
+      expect(durable).not.toContain(secret)
+    }
+    expect(stored?.assistantText).toBe('Authorization: [REDACTED]')
+    expect(stored?.thinkingText).toBe('password=[REDACTED]')
+  })
+
   it('keeps heavily escaped run text within the persisted file bound', async () => {
     const {
       MAX_PERSISTED_RUN_FILE_BYTES,
@@ -584,8 +664,8 @@ describe('run-store persistence', () => {
         createdAt: now,
         updatedAt: now,
         lastEventAt: now,
-        assistantText: 'a'.repeat(PERSISTED_ASSISTANT_TEXT_MAX_BYTES + 100),
-        thinkingText: 't'.repeat(PERSISTED_THINKING_TEXT_MAX_BYTES + 100),
+        assistantText: `Authorization: Bearer legacy-assistant-bearer-sentinel\n${'a'.repeat(PERSISTED_ASSISTANT_TEXT_MAX_BYTES + 100)}`,
+        thinkingText: `password=legacy-thinking-password-sentinel\n${'t'.repeat(PERSISTED_THINKING_TEXT_MAX_BYTES + 100)}`,
         toolCalls: Array.from(
           { length: MAX_PERSISTED_RUN_TOOL_CALLS + 10 },
           (_, index) => ({
@@ -626,6 +706,14 @@ describe('run-store persistence', () => {
     ).toBeLessThanOrEqual(PERSISTED_LIFECYCLE_TEXT_MAX_BYTES)
     expect(JSON.stringify(stored)).not.toContain('legacy-argument-secret')
     expect(JSON.stringify(stored)).not.toContain('legacy-result-secret')
+    expect(JSON.stringify(stored)).not.toContain(
+      'legacy-assistant-bearer-sentinel',
+    )
+    expect(JSON.stringify(stored)).not.toContain(
+      'legacy-thinking-password-sentinel',
+    )
+    expect(stored?.assistantText).toContain('Authorization: [REDACTED]')
+    expect(stored?.thinkingText).toContain('password=[REDACTED]')
     expect(stored).not.toHaveProperty('unknownHostileField')
   })
 
@@ -690,6 +778,118 @@ describe('run-store persistence', () => {
         expect.objectContaining({ runId: 'valid-card-run' }),
       ),
     )
+  })
+
+  it('fails Card recovery closed when the runs root exceeds its directory-entry limit', async () => {
+    const {
+      MAX_PERSISTED_RUN_DIRECTORY_ENTRIES,
+      createPersistedRun,
+      getActiveRunForCard,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'bounded-directory-target',
+      sessionKey: 'remote:bounded-directory-target',
+      friendlyId: 'bounded-card',
+      cardId: 'bounded-card',
+      canonicalSegmentKey: 'remote:bounded-directory-target',
+    })
+    const runsRoot = join(tempHome!, 'webui-mvp', 'runs')
+    for (
+      let index = 0;
+      index < MAX_PERSISTED_RUN_DIRECTORY_ENTRIES;
+      index += 1
+    ) {
+      mkdirSync(join(runsRoot, `hostile-directory-${index}`))
+    }
+
+    await expect(
+      getActiveRunForCard('bounded-card', 'remote:bounded-directory-target'),
+    ).resolves.toBeNull()
+  })
+
+  it('fails Card recovery closed when a session exceeds the global file-entry limit', async () => {
+    const {
+      MAX_PERSISTED_RUN_FILE_ENTRIES,
+      createPersistedRun,
+      getActiveRunForCard,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'bounded-file-target',
+      sessionKey: 'remote:bounded-file-target',
+      friendlyId: 'bounded-card',
+      cardId: 'bounded-card',
+      canonicalSegmentKey: 'remote:bounded-file-target',
+    })
+    const dir = join(
+      tempHome!,
+      'webui-mvp',
+      'runs',
+      'remote%3Abounded-file-target',
+    )
+    for (let index = 0; index < MAX_PERSISTED_RUN_FILE_ENTRIES; index += 1) {
+      writeFileSync(join(dir, `hostile-entry-${index}.tmp`), '')
+    }
+
+    await expect(
+      getActiveRunForCard('bounded-card', 'remote:bounded-file-target'),
+    ).resolves.toBeNull()
+  })
+
+  it('fails Card recovery closed when candidate reads exceed the aggregate byte limit', async () => {
+    const {
+      MAX_PERSISTED_RUN_FILE_BYTES,
+      MAX_PERSISTED_RUN_TREE_BYTES,
+      createPersistedRun,
+      getActiveRunForCard,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'bounded-byte-target',
+      sessionKey: 'remote:bounded-byte-target',
+      friendlyId: 'bounded-card',
+      cardId: 'bounded-card',
+      canonicalSegmentKey: 'remote:bounded-byte-target',
+    })
+    const dir = join(
+      tempHome!,
+      'webui-mvp',
+      'runs',
+      'remote%3Abounded-byte-target',
+    )
+    const hostileFileCount =
+      Math.floor(MAX_PERSISTED_RUN_TREE_BYTES / MAX_PERSISTED_RUN_FILE_BYTES) +
+      1
+    const hostilePayload = ' '.repeat(MAX_PERSISTED_RUN_FILE_BYTES)
+    for (let index = 0; index < hostileFileCount; index += 1) {
+      writeFileSync(join(dir, `hostile-byte-run-${index}.json`), hostilePayload)
+    }
+
+    await expect(
+      getActiveRunForCard('bounded-card', 'remote:bounded-byte-target'),
+    ).resolves.toBeNull()
+  })
+
+  it('fails Card recovery closed instead of dropping valid runs past the retained-result limit', async () => {
+    const { MAX_PERSISTED_RUN_RESULTS, getActiveRunForCard } =
+      await import('./run-store')
+    writePersistedRunFixture(
+      'remote:bounded-results',
+      'bounded-result-target',
+      {
+        friendlyId: 'bounded-card',
+        cardId: 'bounded-card',
+        canonicalSegmentKey: 'remote:bounded-results',
+      },
+    )
+    for (let index = 0; index < MAX_PERSISTED_RUN_RESULTS; index += 1) {
+      writePersistedRunFixture(
+        'remote:bounded-results',
+        `hostile-result-${index}`,
+      )
+    }
+
+    await expect(
+      getActiveRunForCard('bounded-card', 'remote:bounded-results'),
+    ).resolves.toBeNull()
   })
 
   it('reclaims a lock whose live PID belongs to a different process identity', async () => {

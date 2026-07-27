@@ -3,8 +3,8 @@ import {
   lstat,
   mkdir,
   open,
+  opendir,
   readFile,
-  readdir,
   rename,
   unlink,
   writeFile,
@@ -117,8 +117,15 @@ export const MAX_PERSISTED_RUN_LIFECYCLE_EVENTS = 40
 export const PERSISTED_LIFECYCLE_TEXT_MAX_BYTES = 2 * 1024
 export const PERSISTED_LIFECYCLE_EMOJI_MAX_BYTES = 64
 export const PERSISTED_ERROR_MESSAGE_MAX_BYTES = 4 * 1024
+// Recovery uses one shared budget across a tree. Every encountered entry counts,
+// including malformed or irrelevant names, so hostile filler cannot force an
+// unbounded scan before validation. Exceeding any budget makes recovery fail
+// closed rather than base Card ownership on an arbitrary partial tree.
+export const MAX_PERSISTED_RUN_DIRECTORY_ENTRIES = 256
+export const MAX_PERSISTED_RUN_FILE_ENTRIES = 1024
+export const MAX_PERSISTED_RUN_TREE_BYTES = 16 * 1024 * 1024
+export const MAX_PERSISTED_RUN_RESULTS = 512
 const PERSISTED_OWNER_FIELD_MAX_BYTES = 2 * 1024
-const RUN_FILE_READ_CONCURRENCY = 8
 const REDACTED = '[REDACTED]'
 
 const SENSITIVE_KEY_PATTERN =
@@ -211,6 +218,10 @@ function truncateJsonString(value: string, maxBytes: number): string {
     bytes += characterBytes
   }
   return result
+}
+
+function sanitizePersistedText(value: string, maxBytes: number): string {
+  return truncateJsonString(redactSensitiveString(value), maxBytes)
 }
 
 function containsControlCharacter(value: string): boolean {
@@ -448,11 +459,11 @@ function normalizePersistedRun(
     createdAt,
     updatedAt,
     lastEventAt,
-    assistantText: truncateJsonString(
+    assistantText: sanitizePersistedText(
       value.assistantText,
       PERSISTED_ASSISTANT_TEXT_MAX_BYTES,
     ),
-    thinkingText: truncateJsonString(
+    thinkingText: sanitizePersistedText(
       value.thinkingText,
       PERSISTED_THINKING_TEXT_MAX_BYTES,
     ),
@@ -482,9 +493,36 @@ function serializePersistedRun(run: PersistedRunState): string {
   return serialized
 }
 
+type RunTreeReadBudget = {
+  directoryEntries: number
+  fileEntries: number
+  bytesRead: number
+  results: number
+  exceeded: boolean
+}
+
+function createRunTreeReadBudget(): RunTreeReadBudget {
+  return {
+    directoryEntries: 0,
+    fileEntries: 0,
+    bytesRead: 0,
+    results: 0,
+    exceeded: false,
+  }
+}
+
+function runTreeBudgetExceeded(budget: RunTreeReadBudget): boolean {
+  return budget.exceeded
+}
+
+function runTreeLimitError(message: string): Error {
+  return Object.assign(new Error(message), { code: 'EFBIG' })
+}
+
 async function readBoundedUtf8File(
   filePath: string,
   maxBytes: number,
+  treeBudget?: RunTreeReadBudget,
 ): Promise<string> {
   const handle = await open(filePath, 'r')
   try {
@@ -497,6 +535,14 @@ async function readBoundedUtf8File(
         },
       )
     }
+    if (
+      treeBudget &&
+      metadata.size > MAX_PERSISTED_RUN_TREE_BYTES - treeBudget.bytesRead
+    ) {
+      treeBudget.exceeded = true
+      throw runTreeLimitError('Persisted run tree exceeds the aggregate limit')
+    }
+
     const chunks: Array<Buffer> = []
     let totalBytes = 0
     for (;;) {
@@ -506,6 +552,16 @@ async function readBoundedUtf8File(
       const { bytesRead } = await handle.read(chunk, 0, chunk.length, null)
       if (bytesRead === 0) break
       totalBytes += bytesRead
+      if (
+        treeBudget &&
+        bytesRead > MAX_PERSISTED_RUN_TREE_BYTES - treeBudget.bytesRead
+      ) {
+        treeBudget.exceeded = true
+        throw runTreeLimitError(
+          'Persisted run tree exceeds the aggregate limit',
+        )
+      }
+      if (treeBudget) treeBudget.bytesRead += bytesRead
       if (totalBytes > maxBytes) {
         throw Object.assign(new Error('Persisted run file is oversized'), {
           code: 'EFBIG',
@@ -1305,26 +1361,6 @@ export async function markRunStatus(
 // until the 120s client-side failsafe clears it.
 const STALE_RUN_THRESHOLD_MS = 5 * 60 * 1000
 
-async function mapWithConcurrency<TItem, TResult>(
-  items: Array<TItem>,
-  limit: number,
-  mapper: (item: TItem) => Promise<TResult>,
-): Promise<Array<TResult>> {
-  const results = new Array<TResult>(items.length)
-  let nextIndex = 0
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, async () => {
-      for (;;) {
-        const index = nextIndex
-        nextIndex += 1
-        if (index >= items.length) return
-        results[index] = await mapper(items[index]!)
-      }
-    }),
-  )
-  return results
-}
-
 function decodeSessionDirectory(name: string): string | null {
   try {
     const decoded = decodeURIComponent(name)
@@ -1334,47 +1370,95 @@ function decodeSessionDirectory(name: string): string | null {
   }
 }
 
+type PersistedRunSessionDirectory = { path: string; sessionKey: string }
+
+async function readSessionDirectories(
+  budget: RunTreeReadBudget,
+): Promise<Array<PersistedRunSessionDirectory>> {
+  const sessionDirectories: Array<PersistedRunSessionDirectory> = []
+  const directory = await opendir(RUNS_ROOT)
+  for await (const entry of directory) {
+    budget.directoryEntries += 1
+    if (budget.directoryEntries > MAX_PERSISTED_RUN_DIRECTORY_ENTRIES) {
+      budget.exceeded = true
+      break
+    }
+    if (!entry.isDirectory()) continue
+    const sessionKey = decodeSessionDirectory(entry.name)
+    if (sessionKey === null) continue
+    sessionDirectories.push({
+      path: path.join(RUNS_ROOT, entry.name),
+      sessionKey,
+    })
+  }
+  sessionDirectories.sort((left, right) => left.path.localeCompare(right.path))
+  return sessionDirectories
+}
+
 async function readRunsInDir(
   dir: string,
   expectedSessionKey: string,
+  budget: RunTreeReadBudget,
 ): Promise<Array<PersistedRunState>> {
-  const files: Array<string> = (await readdir(dir)).filter((name: string) => {
-    if (!name.endsWith('.json')) return false
-    return isSafeRunId(name.slice(0, -'.json'.length))
-  })
-  if (files.length === 0) return []
-  const runs = await mapWithConcurrency(
-    files,
-    RUN_FILE_READ_CONCURRENCY,
-    async (name) => {
-      try {
-        const fileRunId = name.slice(0, -'.json'.length)
-        const raw = await readBoundedUtf8File(
-          path.join(dir, name),
-          MAX_PERSISTED_RUN_FILE_BYTES,
-        )
-        return normalizePersistedRun(JSON.parse(raw) as unknown, {
-          runId: fileRunId,
-          sessionKey: expectedSessionKey,
-        })
-      } catch {
-        return null
+  const files: Array<string> = []
+  const directory = await opendir(dir)
+  for await (const entry of directory) {
+    budget.fileEntries += 1
+    if (budget.fileEntries > MAX_PERSISTED_RUN_FILE_ENTRIES) {
+      budget.exceeded = true
+      break
+    }
+    if (!entry.isFile() || !entry.name.endsWith('.json')) continue
+    if (!isSafeRunId(entry.name.slice(0, -'.json'.length))) continue
+    files.push(entry.name)
+  }
+  if (budget.exceeded || files.length === 0) return []
+  files.sort()
+
+  const runs: Array<PersistedRunState> = []
+  for (const name of files) {
+    try {
+      const fileRunId = name.slice(0, -'.json'.length)
+      const raw = await readBoundedUtf8File(
+        path.join(dir, name),
+        MAX_PERSISTED_RUN_FILE_BYTES,
+        budget,
+      )
+      const run = normalizePersistedRun(JSON.parse(raw) as unknown, {
+        runId: fileRunId,
+        sessionKey: expectedSessionKey,
+      })
+      if (!run) continue
+      budget.results += 1
+      if (budget.results > MAX_PERSISTED_RUN_RESULTS) {
+        budget.exceeded = true
+        break
       }
-    },
-  )
-  return runs.filter((run): run is PersistedRunState => Boolean(run))
+      runs.push(run)
+    } catch {
+      if (budget.exceeded) break
+    }
+  }
+  return runs
 }
 
 export async function getActiveRunForSession(
   sessionKey: string,
 ): Promise<PersistedRunState | null> {
   try {
-    const runs = await readRunsInDir(sessionDir(sessionKey), sessionKey)
+    const budget = createRunTreeReadBudget()
+    const runs = await readRunsInDir(sessionDir(sessionKey), sessionKey, budget)
+    if (budget.exceeded) return null
     const now = Date.now()
     const candidates = runs
       .filter((run) => !['complete', 'error'].includes(run.status))
       .filter((run) => now - run.updatedAt < STALE_RUN_THRESHOLD_MS)
-      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .sort(
+        (a, b) =>
+          b.updatedAt - a.updatedAt ||
+          b.createdAt - a.createdAt ||
+          a.runId.localeCompare(b.runId),
+      )
     return candidates[0] ?? null
   } catch {
     return null
@@ -1393,23 +1477,18 @@ export async function getActiveRunForCard(
   const normalizedCanonicalSegmentKey = canonicalSegmentKey.trim()
   if (!normalizedCardId || !normalizedCanonicalSegmentKey) return null
   try {
-    const entries = await readdir(RUNS_ROOT, { withFileTypes: true })
-    const sessionDirectories: Array<{ path: string; sessionKey: string }> =
-      entries.flatMap((entry: { isDirectory: () => boolean; name: string }) => {
-        if (!entry.isDirectory()) return []
-        const sessionKey = decodeSessionDirectory(entry.name)
-        return sessionKey === null
-          ? []
-          : [{ path: path.join(RUNS_ROOT, entry.name), sessionKey }]
-      })
-    const runsBySession = await mapWithConcurrency(
-      sessionDirectories,
-      RUN_FILE_READ_CONCURRENCY,
-      (session) => readRunsInDir(session.path, session.sessionKey),
-    )
+    const budget = createRunTreeReadBudget()
+    const sessionDirectories = await readSessionDirectories(budget)
+    if (budget.exceeded) return null
+    const runs: Array<PersistedRunState> = []
+    for (const session of sessionDirectories) {
+      runs.push(
+        ...(await readRunsInDir(session.path, session.sessionKey, budget)),
+      )
+      if (runTreeBudgetExceeded(budget)) return null
+    }
     const now = Date.now()
-    const candidates = runsBySession
-      .flat()
+    const candidates = runs
       .filter(
         (run) =>
           run.runId.length > 0 &&
@@ -1471,24 +1550,25 @@ export async function getActiveRunForCard(
 // abandon orphans that the staleness filter hides from the chat UI.
 export async function listAllActiveRuns(): Promise<Array<PersistedRunState>> {
   try {
-    const entries = await readdir(RUNS_ROOT, { withFileTypes: true })
-    const sessionDirectories: Array<{ path: string; sessionKey: string }> =
-      entries.flatMap((entry: { isDirectory: () => boolean; name: string }) => {
-        if (!entry.isDirectory()) return []
-        const sessionKey = decodeSessionDirectory(entry.name)
-        return sessionKey === null
-          ? []
-          : [{ path: path.join(RUNS_ROOT, entry.name), sessionKey }]
-      })
-    const runsBySession = await mapWithConcurrency(
-      sessionDirectories,
-      RUN_FILE_READ_CONCURRENCY,
-      (session) => readRunsInDir(session.path, session.sessionKey),
-    )
-    return runsBySession
-      .flat()
+    const budget = createRunTreeReadBudget()
+    const sessionDirectories = await readSessionDirectories(budget)
+    if (budget.exceeded) return []
+    const runs: Array<PersistedRunState> = []
+    for (const session of sessionDirectories) {
+      runs.push(
+        ...(await readRunsInDir(session.path, session.sessionKey, budget)),
+      )
+      if (runTreeBudgetExceeded(budget)) return []
+    }
+    return runs
       .filter((run) => !['complete', 'error'].includes(run.status))
-      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .sort(
+        (a, b) =>
+          b.updatedAt - a.updatedAt ||
+          b.createdAt - a.createdAt ||
+          a.sessionKey.localeCompare(b.sessionKey) ||
+          a.runId.localeCompare(b.runId),
+      )
   } catch {
     return []
   }
