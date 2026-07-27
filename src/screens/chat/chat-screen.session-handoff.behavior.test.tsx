@@ -760,7 +760,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
             <ChatScreen
               activeFriendlyId={activeCard.cardId}
               activeCard={activeCard}
-              sessionCards={[activeCard]}
+              sessionCardList={cardList([activeCard])}
             />
           </QueryClientProvider>,
         )
@@ -824,7 +824,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           <ChatScreen
             activeFriendlyId={orphanCard.cardId}
             activeCard={orphanCard}
-            sessionCards={[orphanCard]}
+            sessionCardList={cardList([orphanCard])}
           />
         </QueryClientProvider>,
       )
