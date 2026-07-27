@@ -42,6 +42,14 @@ let schemaReady = false
 let lastWriteError: string | null = null
 
 function financePostgresEnabled(): boolean {
+  // Test files isolate the JSON store via a $HOME override, but that does
+  // nothing for this module's Postgres connection (reads HERMES_PG_*
+  // directly) — without this guard, any test calling writeFinanceStore()
+  // silently overwrites the real production Postgres finance database.
+  // Confirmed live 2026-07-27: settings.demoTradingGrid held test-fixture
+  // values (gridCount: 3, single symbol) for 2+ days with zero audit trail,
+  // consistent with a stray test write bypassing the real API path.
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') return false
   return process.env.HERMES_FINANCE_STORE !== 'json'
 }
 
