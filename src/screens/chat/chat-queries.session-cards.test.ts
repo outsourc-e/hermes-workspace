@@ -1075,6 +1075,45 @@ describe('Session Card fetchers', () => {
     )
   })
 
+  it('normalizes string-backed Card history content into renderable text parts', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:tip',
+        messages: [
+          {
+            segmentKey: 'remote:tip',
+            message: {
+              id: 'assistant-message',
+              role: 'assistant',
+              content: 'A persisted assistant reply',
+            },
+          },
+        ],
+        completeness: 'complete',
+        retryable: false,
+        missingSegments: [],
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      fetchCompleteSessionCardHistory({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:tip',
+      }),
+    ).resolves.toMatchObject({
+      messages: [
+        {
+          id: 'assistant-message',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'A persisted assistant reply' }],
+          __segmentKey: 'remote:tip',
+        },
+      ],
+    })
+  })
+
   it('accepts only complete non-retryable Card history as an authoritative transcript', () => {
     const base = {
       sessionKey: 'remote:tip',

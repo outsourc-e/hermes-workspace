@@ -752,8 +752,20 @@ export function isAuthoritativeCompleteSessionCardHistory(
 function sessionCardMessage(
   entry: SessionCardHistoryWire['messages'][number],
 ): ChatMessage {
+  // Gateway-backed history stores persisted content as a string, while the
+  // rendered ChatMessage contract uses typed content parts. Normalize at the
+  // wire boundary so the transcript renderer can read both persisted forms.
+  const rawContent = entry.message.content
+  const content =
+    typeof rawContent === 'string'
+      ? [{ type: 'text' as const, text: rawContent }]
+      : Array.isArray(rawContent)
+        ? rawContent
+        : []
+
   return {
     ...entry.message,
+    content,
     __segmentKey: entry.segmentKey,
   } as ChatMessage
 }
