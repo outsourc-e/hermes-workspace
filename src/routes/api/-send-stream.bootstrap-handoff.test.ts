@@ -72,6 +72,7 @@ vi.mock('../../server/run-store', async (importOriginal) => {
     createPersistedRun: mocks.createPersistedRun,
     createRunTextPersistenceBuffer: actual.createRunTextPersistenceBuffer,
     migratePersistedRun: mocks.migratePersistedRun,
+    persistedRunMatchesOwner: actual.persistedRunMatchesOwner,
     markRunStatus: mocks.markRunStatus,
     setRunThinking: mocks.setRunThinking,
     upsertRunToolCall: mocks.upsertRunToolCall,
@@ -218,10 +219,12 @@ describe('send-stream bootstrap session handoff', () => {
     mocks.appendRunText.mockResolvedValue(null)
     mocks.createPersistedRun.mockResolvedValue(undefined)
     mocks.migratePersistedRun.mockImplementation(
-      (_fromSessionKey, toSessionKey, runId) =>
+      (_fromSessionKey, toSessionKey, runId, friendlyId, cardIdentity) =>
         Promise.resolve({
           sessionKey: toSessionKey,
           runId,
+          friendlyId,
+          ...cardIdentity,
         }),
     )
     mocks.markRunStatus.mockResolvedValue(null)
@@ -4065,5 +4068,124 @@ describe('send-stream bootstrap session handoff', () => {
     expect(mocks.appendRunText.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.markRunStatus.mock.invocationCallOrder[0]!,
     )
+  })
+
+  it('does not persist Card stream content into an incompatible migrated run owner', async () => {
+    const card = (
+      canonicalSegmentKey: string,
+      continuationSegmentKeys: Array<string>,
+      upstreamEntries: Array<[string, string]>,
+    ) => ({
+      card: {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey,
+        continuationSegmentKeys,
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map(
+        upstreamEntries.map(([segmentKey]) => [segmentKey, 'gateway']),
+      ),
+      upstreamKeyBySegmentKey: new Map(upstreamEntries),
+    })
+    mocks.resolveSessionCard
+      .mockResolvedValueOnce(
+        card(
+          'remote:created-session',
+          ['remote:created-session'],
+          [['remote:created-session', 'created-session']],
+        ),
+      )
+      .mockResolvedValue(
+        card(
+          'remote:successor-session',
+          ['remote:created-session', 'remote:successor-session'],
+          [
+            ['remote:created-session', 'created-session'],
+            ['remote:successor-session', 'successor-session'],
+          ],
+        ),
+      )
+    mocks.migratePersistedRun.mockResolvedValueOnce({
+      runId: 'card-run',
+      sessionKey: 'remote:successor-session',
+      friendlyId: 'remote:other-card',
+      cardId: 'remote:other-card',
+      canonicalSegmentKey: 'remote:successor-session',
+    })
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'card-run', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'assistant.delta',
+          data: {
+            run_id: 'card-run',
+            session_id: 'successor-session',
+            delta: 'parent-only response',
+          },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'card-run', session_id: 'successor-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'remote:parent-card',
+          sessionKey: 'remote:created-session',
+          friendlyId: 'remote:parent-card',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(events.at(-1)).toEqual({
+      event: 'done',
+      data: {
+        state: 'complete',
+        sessionKey: 'remote:successor-session',
+        runId: 'card-run',
+      },
+    })
+    expect(mocks.appendRunText).toHaveBeenCalledWith(
+      'remote:created-session',
+      'card-run',
+      'parent-only response',
+      { replace: false },
+    )
+    expect(mocks.markRunStatus).toHaveBeenCalledWith(
+      'remote:created-session',
+      'card-run',
+      'complete',
+      undefined,
+    )
+    expect(
+      mocks.appendRunText.mock.calls.some(
+        (call) => call[0] === 'remote:successor-session',
+      ),
+    ).toBe(false)
+    expect(
+      mocks.markRunStatus.mock.calls.some(
+        (call) => call[0] === 'remote:successor-session',
+      ),
+    ).toBe(false)
   })
 })

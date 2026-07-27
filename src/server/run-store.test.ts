@@ -265,8 +265,139 @@ describe('run-store persistence', () => {
       await getActiveRunForCard('remote:parent-card', 'remote:continuation'),
     ).toMatchObject({
       runId: 'card-run',
+      friendlyId: 'remote:parent-card',
       canonicalSegmentKey: 'remote:continuation',
     })
+  })
+
+  it('fails closed instead of overwriting a destination run owned by another Card', async () => {
+    const {
+      appendRunText,
+      createPersistedRun,
+      getPersistedRun,
+      migratePersistedRun,
+    } = await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'shared-run-id',
+      sessionKey: 'remote:parent',
+      friendlyId: 'remote:parent-card',
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:parent',
+    })
+    await appendRunText('remote:parent', 'shared-run-id', 'parent Card output')
+    await createPersistedRun({
+      runId: 'shared-run-id',
+      sessionKey: 'remote:continuation',
+      friendlyId: 'remote:other-card',
+      cardId: 'remote:other-card',
+      canonicalSegmentKey: 'remote:continuation',
+    })
+    await appendRunText(
+      'remote:continuation',
+      'shared-run-id',
+      'other Card output',
+    )
+
+    await expect(
+      migratePersistedRun(
+        'remote:parent',
+        'remote:continuation',
+        'shared-run-id',
+        'remote:parent-card',
+        {
+          cardId: 'remote:parent-card',
+          canonicalSegmentKey: 'remote:continuation',
+        },
+      ),
+    ).rejects.toThrow('destination owner')
+
+    await expect(
+      getPersistedRun('remote:parent', 'shared-run-id'),
+    ).resolves.toMatchObject({
+      cardId: 'remote:parent-card',
+      canonicalSegmentKey: 'remote:parent',
+      assistantText: 'parent Card output',
+    })
+    await expect(
+      getPersistedRun('remote:continuation', 'shared-run-id'),
+    ).resolves.toMatchObject({
+      cardId: 'remote:other-card',
+      canonicalSegmentKey: 'remote:continuation',
+      assistantText: 'other Card output',
+    })
+  })
+
+  it('does not adopt an incompatible destination Card when the source is missing', async () => {
+    const { createPersistedRun, getPersistedRun, migratePersistedRun } =
+      await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'missing-source-run',
+      sessionKey: 'remote:continuation',
+      friendlyId: 'remote:other-card',
+      cardId: 'remote:other-card',
+      canonicalSegmentKey: 'remote:continuation',
+    })
+
+    await expect(
+      migratePersistedRun(
+        'remote:missing-parent',
+        'remote:continuation',
+        'missing-source-run',
+        'remote:parent-card',
+        {
+          cardId: 'remote:parent-card',
+          canonicalSegmentKey: 'remote:continuation',
+        },
+      ),
+    ).rejects.toThrow('destination owner')
+    await expect(
+      getPersistedRun('remote:continuation', 'missing-source-run'),
+    ).resolves.toMatchObject({
+      cardId: 'remote:other-card',
+      friendlyId: 'remote:other-card',
+    })
+  })
+
+  it('does not opportunistically adopt a legacy run into a Card handoff', async () => {
+    const {
+      createPersistedRun,
+      getActiveRunForCard,
+      getPersistedRun,
+      migratePersistedRun,
+    } = await import('./run-store')
+
+    await createPersistedRun({
+      runId: 'legacy-run',
+      sessionKey: 'remote:legacy-parent',
+      friendlyId: 'remote:parent-card',
+    })
+
+    await expect(
+      getActiveRunForCard('remote:parent-card', 'remote:continuation'),
+    ).resolves.toBeNull()
+    await expect(
+      migratePersistedRun(
+        'remote:legacy-parent',
+        'remote:continuation',
+        'legacy-run',
+        'remote:parent-card',
+        {
+          cardId: 'remote:parent-card',
+          canonicalSegmentKey: 'remote:continuation',
+        },
+      ),
+    ).rejects.toThrow('source owner')
+    await expect(
+      getPersistedRun('remote:legacy-parent', 'legacy-run'),
+    ).resolves.toMatchObject({
+      sessionKey: 'remote:legacy-parent',
+      friendlyId: 'remote:parent-card',
+    })
+    await expect(
+      getPersistedRun('remote:continuation', 'legacy-run'),
+    ).resolves.toBeNull()
   })
 
   it('returns the newest active run for the stable Card and current canonical segment', async () => {
@@ -278,6 +409,7 @@ describe('run-store persistence', () => {
     await createPersistedRun({
       runId: 'older-current-run',
       sessionKey: 'tip-upstream-a',
+      friendlyId: 'remote:parent-card',
       cardId: 'remote:parent-card',
       canonicalSegmentKey: 'remote:tip',
     })
@@ -285,6 +417,7 @@ describe('run-store persistence', () => {
     await createPersistedRun({
       runId: 'newest-stale-lineage-run',
       sessionKey: 'old-tip-upstream',
+      friendlyId: 'remote:parent-card',
       cardId: 'remote:parent-card',
       canonicalSegmentKey: 'remote:old-tip',
     })
@@ -292,6 +425,7 @@ describe('run-store persistence', () => {
     await createPersistedRun({
       runId: 'newest-current-run',
       sessionKey: 'tip-upstream-b',
+      friendlyId: 'remote:parent-card',
       cardId: 'remote:parent-card',
       canonicalSegmentKey: 'remote:tip',
     })
@@ -317,6 +451,7 @@ describe('run-store persistence', () => {
     await createPersistedRun({
       runId: 'recoverable-card-run',
       sessionKey: 'remote:parent',
+      friendlyId: 'remote:parent-card',
       cardId: 'remote:parent-card',
       canonicalSegmentKey: 'remote:parent',
     })
@@ -378,12 +513,14 @@ describe('run-store persistence', () => {
     await createPersistedRun({
       runId: 'old-owner-a',
       sessionKey: 'remote:old-a',
+      friendlyId: 'remote:parent-card',
       cardId: 'remote:parent-card',
       canonicalSegmentKey: 'remote:old-a',
     })
     await createPersistedRun({
       runId: 'old-owner-b',
       sessionKey: 'remote:old-b',
+      friendlyId: 'remote:parent-card',
       cardId: 'remote:parent-card',
       canonicalSegmentKey: 'remote:old-b',
     })

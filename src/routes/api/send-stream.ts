@@ -15,6 +15,7 @@ import {
   createRunTextPersistenceBuffer,
   markRunStatus,
   migratePersistedRun,
+  persistedRunMatchesOwner,
   setRunThinking,
   upsertRunToolCall,
 } from '../../server/run-store'
@@ -748,8 +749,12 @@ export const Route = createFileRoute('/api/send-stream')({
               const migratedRun = await waitWithinStreamLifetime(migration)
               if (streamTransportUnavailable()) return
               if (
-                migratedRun?.sessionKey === toSessionKey &&
-                migratedRun.runId === runId
+                persistedRunMatchesOwner(migratedRun, {
+                  runId,
+                  sessionKey: toSessionKey,
+                  friendlyId,
+                  ...cardIdentity,
+                })
               ) {
                 activeRunSessionKey = toSessionKey
               }

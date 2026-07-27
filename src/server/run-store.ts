@@ -1,4 +1,5 @@
 import {
+  link,
   mkdir,
   readFile,
   readdir,
@@ -43,6 +44,46 @@ export type PersistedRunState = {
   errorMessage?: string
 }
 
+export type PersistedRunOwnerProjection = {
+  runId: string
+  sessionKey: string
+  friendlyId: string
+  cardId?: string
+  canonicalSegmentKey?: string
+}
+
+/**
+ * Persisted runs are accepted only through an exact owner projection. Card
+ * ownership is all-or-nothing: legacy records without Card metadata remain
+ * usable through legacy session recovery, but cannot be claimed by a Card
+ * handoff after the fact.
+ */
+export function persistedRunMatchesOwner(
+  run: PersistedRunState | null | undefined,
+  owner: PersistedRunOwnerProjection,
+): run is PersistedRunState {
+  if (
+    !run ||
+    run.runId !== owner.runId ||
+    run.sessionKey !== owner.sessionKey ||
+    run.friendlyId !== owner.friendlyId
+  ) {
+    return false
+  }
+
+  const ownerHasCardIdentity =
+    owner.cardId !== undefined || owner.canonicalSegmentKey !== undefined
+  if (!ownerHasCardIdentity) {
+    return run.cardId === undefined && run.canonicalSegmentKey === undefined
+  }
+  return (
+    owner.cardId !== undefined &&
+    owner.canonicalSegmentKey !== undefined &&
+    run.cardId === owner.cardId &&
+    run.canonicalSegmentKey === owner.canonicalSegmentKey
+  )
+}
+
 const RUNS_ROOT = path.join(getHermesRoot(), 'webui-mvp', 'runs')
 const runUpdateQueues = new Map<string, Promise<void>>()
 
@@ -71,6 +112,24 @@ async function writeRun(run: PersistedRunState): Promise<void> {
     .slice(2)}.tmp`
   await writeFile(tempPath, `${JSON.stringify(run, null, 2)}\n`, 'utf8')
   await rename(tempPath, targetPath)
+}
+
+async function writeRunExclusive(run: PersistedRunState): Promise<void> {
+  const dir = sessionDir(run.sessionKey)
+  await ensureDir(dir)
+  const targetPath = runPath(run.sessionKey, run.runId)
+  const tempPath = `${targetPath}.${process.pid}.${Date.now()}.${Math.random()
+    .toString(36)
+    .slice(2)}.tmp`
+  await writeFile(tempPath, `${JSON.stringify(run, null, 2)}\n`, 'utf8')
+  try {
+    // A hard link publishes the fully-written temp inode only when the target
+    // does not exist. Unlike rename(), this cannot replace another owner that
+    // won a destination race after our preflight check.
+    await link(tempPath, targetPath)
+  } finally {
+    await unlink(tempPath).catch(() => undefined)
+  }
 }
 
 async function enqueueRunUpdate<T>(
@@ -147,29 +206,106 @@ export async function migratePersistedRun(
   const normalizedTo = toSessionKey.trim()
   const normalizedRunId = runId.trim()
   if (!normalizedFrom || !normalizedTo || !normalizedRunId) return null
+  const normalizedFriendlyId = friendlyId?.trim() || normalizedTo
+  const normalizedCardId = cardIdentity?.cardId.trim()
+  const normalizedCanonicalSegmentKey = cardIdentity?.canonicalSegmentKey.trim()
+  const isCardMigration = cardIdentity !== undefined
+  if (
+    isCardMigration &&
+    (!normalizedCardId ||
+      !normalizedCanonicalSegmentKey ||
+      normalizedCanonicalSegmentKey !== normalizedTo ||
+      normalizedFriendlyId !== normalizedCardId)
+  ) {
+    throw new Error(
+      `Persisted run ${normalizedRunId} source owner does not match the requested Card migration`,
+    )
+  }
+
+  const targetOwner: PersistedRunOwnerProjection = {
+    runId: normalizedRunId,
+    sessionKey: normalizedTo,
+    friendlyId: normalizedFriendlyId,
+    ...(isCardMigration
+      ? {
+          cardId: normalizedCardId,
+          canonicalSegmentKey: normalizedCanonicalSegmentKey,
+        }
+      : {}),
+  }
+
   if (normalizedFrom === normalizedTo) {
-    return getPersistedRun(normalizedTo, normalizedRunId)
+    const existing = await getPersistedRun(normalizedTo, normalizedRunId)
+    if (!existing) return null
+    if (!persistedRunMatchesOwner(existing, targetOwner)) {
+      throw new Error(
+        `Persisted run ${normalizedRunId} source owner does not match the requested migration`,
+      )
+    }
+    return existing
   }
 
   return enqueueRunUpdate(normalizedFrom, normalizedRunId, async () => {
     const current = await getPersistedRun(normalizedFrom, normalizedRunId)
+    const destination = await getPersistedRun(normalizedTo, normalizedRunId)
     if (!current) {
-      return getPersistedRun(normalizedTo, normalizedRunId)
+      if (!destination) return null
+      if (!persistedRunMatchesOwner(destination, targetOwner)) {
+        throw new Error(
+          `Persisted run ${normalizedRunId} destination owner does not match the requested migration`,
+        )
+      }
+      return destination
+    }
+
+    const sourceOwner: PersistedRunOwnerProjection = {
+      runId: normalizedRunId,
+      sessionKey: normalizedFrom,
+      friendlyId: isCardMigration ? normalizedFriendlyId : current.friendlyId,
+      ...(isCardMigration
+        ? {
+            cardId: normalizedCardId,
+            canonicalSegmentKey: normalizedFrom,
+          }
+        : {}),
+    }
+    if (!persistedRunMatchesOwner(current, sourceOwner)) {
+      throw new Error(
+        `Persisted run ${normalizedRunId} source owner does not match the requested migration`,
+      )
+    }
+    if (destination) {
+      const detail = persistedRunMatchesOwner(destination, targetOwner)
+        ? 'already exists'
+        : 'does not match'
+      throw new Error(
+        `Persisted run ${normalizedRunId} destination owner ${detail} for the requested migration`,
+      )
     }
 
     const migrated: PersistedRunState = {
       ...current,
       sessionKey: normalizedTo,
-      friendlyId: friendlyId?.trim() || current.friendlyId || normalizedTo,
-      ...(cardIdentity?.cardId.trim()
-        ? { cardId: cardIdentity.cardId.trim() }
-        : {}),
-      ...(cardIdentity?.canonicalSegmentKey.trim()
-        ? { canonicalSegmentKey: cardIdentity.canonicalSegmentKey.trim() }
+      friendlyId: normalizedFriendlyId || current.friendlyId || normalizedTo,
+      ...(isCardMigration
+        ? {
+            cardId: normalizedCardId,
+            canonicalSegmentKey: normalizedCanonicalSegmentKey,
+          }
         : {}),
       updatedAt: Date.now(),
     }
-    await writeRun(migrated)
+    try {
+      await writeRunExclusive(migrated)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new Error(
+          `Persisted run ${normalizedRunId} destination owner changed during migration`,
+          { cause: error },
+        )
+      }
+      throw error
+    }
     try {
       await unlink(runPath(normalizedFrom, normalizedRunId))
     } catch (error) {
@@ -467,7 +603,22 @@ export async function getActiveRunForCard(
     const now = Date.now()
     const candidates = runsBySession
       .flat()
-      .filter((run) => run.cardId === normalizedCardId)
+      .filter(
+        (run) =>
+          run.runId.length > 0 &&
+          run.runId.trim() === run.runId &&
+          run.sessionKey.length > 0 &&
+          run.sessionKey.trim() === run.sessionKey &&
+          run.canonicalSegmentKey?.length &&
+          run.canonicalSegmentKey.trim() === run.canonicalSegmentKey &&
+          persistedRunMatchesOwner(run, {
+            runId: run.runId,
+            sessionKey: run.sessionKey,
+            friendlyId: normalizedCardId,
+            cardId: normalizedCardId,
+            canonicalSegmentKey: run.canonicalSegmentKey,
+          }),
+      )
       .filter((run) => !['complete', 'error'].includes(run.status))
       .filter((run) => now - run.updatedAt < STALE_RUN_THRESHOLD_MS)
       .sort(
