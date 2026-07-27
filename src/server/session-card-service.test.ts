@@ -209,6 +209,133 @@ describe('SessionCardService collection and resolution', () => {
     },
   )
 
+  it('qualifies upstream lineage identities without losing remote continuations or nested children', async () => {
+    const rows = [
+      session(
+        'a',
+        {
+          source: 'slack',
+          endReason: 'compression',
+          startedAt: 10,
+          endedAt: 20,
+          lineageRootId: 'a',
+          lineageTipId: 'c',
+          compressionSegmentCount: 1,
+        },
+        20,
+      ),
+      session(
+        'b',
+        {
+          source: 'slack',
+          parentSessionId: 'a',
+          relationshipType: 'continuation',
+          endReason: 'compression',
+          startedAt: 20,
+          endedAt: 30,
+          lineageRootId: 'a',
+          lineageTipId: 'c',
+          compressionSegmentCount: 2,
+        },
+        30,
+      ),
+      session(
+        'c',
+        {
+          source: 'slack',
+          parentSessionId: 'b',
+          relationshipType: 'continuation',
+          startedAt: 30,
+          lineageRootId: 'a',
+          lineageTipId: 'c',
+          compressionSegmentCount: 3,
+        },
+        40,
+      ),
+      session(
+        'fork',
+        {
+          source: 'slack',
+          parentSessionId: 'a',
+          relationshipType: 'child_session',
+          sessionSource: 'fork',
+          startedAt: 20,
+          lineageRootId: 'a',
+          lineageTipId: 'fork',
+        },
+        60,
+      ),
+      session(
+        'delegate',
+        {
+          source: 'slack',
+          parentSessionId: 'b',
+          relationshipType: 'child_session',
+          startedAt: 30,
+          lineageRootId: 'a',
+          lineageTipId: 'delegate',
+        },
+        50,
+      ),
+    ]
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'hermes',
+        listPage: () =>
+          Promise.resolve({
+            ...page(rows, 0, rows.length),
+            source: 'dashboard',
+          }),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+    })
+
+    const collection = await service.collectSessions()
+    expect(
+      collection.sessions.map((row) => [
+        row.key,
+        row.lineage?.parentSessionId,
+        row.lineage?.lineageRootId,
+        row.lineage?.lineageTipId,
+      ]),
+    ).toEqual([
+      ['remote:a', undefined, 'remote:a', 'remote:c'],
+      ['remote:b', 'remote:a', 'remote:a', 'remote:c'],
+      ['remote:c', 'remote:b', 'remote:a', 'remote:c'],
+      ['remote:fork', 'remote:a', 'remote:a', 'remote:fork'],
+      ['remote:delegate', 'remote:b', 'remote:a', 'remote:delegate'],
+    ])
+
+    await expect(service.listCards()).resolves.toMatchObject({
+      cards: [
+        {
+          cardId: 'remote:a',
+          canonicalSource: 'remote',
+          canonicalTransport: 'dashboard',
+          canonicalSegmentKey: 'remote:c',
+          continuationSegmentKeys: ['remote:a', 'remote:b', 'remote:c'],
+          continuationCount: 3,
+          childNodes: [
+            {
+              cardId: 'remote:fork',
+              sessionKey: 'remote:fork',
+              continuationSegmentKeys: ['remote:fork'],
+              relationshipKind: 'branch',
+            },
+            {
+              cardId: 'remote:delegate',
+              sessionKey: 'remote:delegate',
+              continuationSegmentKeys: ['remote:delegate'],
+              relationshipKind: 'child',
+            },
+          ],
+        },
+      ],
+      completeness: 'complete',
+    })
+  })
+
   it.each([
     {
       name: 'local adapter',

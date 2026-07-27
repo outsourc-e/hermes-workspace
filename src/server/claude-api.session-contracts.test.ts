@@ -7,7 +7,9 @@ import {
   getMessagesResult,
   listSessions,
   listSessionsPage,
+  toSessionSummary,
 } from './claude-api'
+import type { ClaudeSession } from './claude-api'
 import type { GatewayCapabilities } from './gateway-capabilities'
 
 const gatewayMocks = vi.hoisted(() => ({
@@ -73,6 +75,106 @@ beforeEach(() => {
 })
 
 describe('Session Card adapter foundations', () => {
+  it('normalizes raw transport lineage fields through toSessionSummary', () => {
+    const continuation = [
+      {
+        id: 'slack-a',
+        source: 'slack',
+        started_at: 10,
+        ended_at: 20,
+        end_reason: 'compression',
+        _lineage_root_id: 'slack-a',
+        _lineage_tip_id: 'slack-b',
+        _compression_segment_count: 1,
+      },
+      {
+        id: 'slack-b',
+        source: 'slack',
+        parent_session_id: 'slack-a',
+        relationship_type: 'continuation',
+        started_at: 20,
+        ended_at: 30,
+        end_reason: 'cli_close',
+        _lineage_root_id: 'slack-a',
+        _lineage_tip_id: 'slack-b',
+        _compression_segment_count: 2,
+      },
+    ] satisfies Array<ClaudeSession>
+    const fork = {
+      id: 'slack-fork',
+      source: 'slack',
+      parent_session_id: 'slack-a',
+      relationship_type: 'child_session',
+      session_source: 'fork',
+      _lineage_root_id: 'slack-a',
+      _lineage_tip_id: 'slack-fork',
+      started_at: 20,
+    } satisfies ClaudeSession
+    const delegatedChild = {
+      id: 'slack-delegate',
+      source: 'slack',
+      parent_session_id: 'slack-b',
+      relationship_type: 'child_session',
+      _lineage_root_id: 'slack-a',
+      _lineage_tip_id: 'slack-delegate',
+      started_at: 30,
+    } satisfies ClaudeSession
+
+    expect(continuation.map(toSessionSummary)).toMatchObject([
+      {
+        key: 'slack-a',
+        lineage: {
+          source: 'slack',
+          endReason: 'compression',
+          startedAt: 10_000,
+          endedAt: 20_000,
+          lineageRootId: 'slack-a',
+          lineageTipId: 'slack-b',
+          compressionSegmentCount: 1,
+        },
+      },
+      {
+        key: 'slack-b',
+        lineage: {
+          source: 'slack',
+          parentSessionId: 'slack-a',
+          relationshipType: 'continuation',
+          endReason: 'cli_close',
+          startedAt: 20_000,
+          endedAt: 30_000,
+          lineageRootId: 'slack-a',
+          lineageTipId: 'slack-b',
+          compressionSegmentCount: 2,
+        },
+      },
+    ])
+    expect([fork, delegatedChild].map(toSessionSummary)).toMatchObject([
+      {
+        key: 'slack-fork',
+        lineage: {
+          source: 'slack',
+          parentSessionId: 'slack-a',
+          relationshipType: 'child_session',
+          sessionSource: 'fork',
+          lineageRootId: 'slack-a',
+          lineageTipId: 'slack-fork',
+          startedAt: 20_000,
+        },
+      },
+      {
+        key: 'slack-delegate',
+        lineage: {
+          source: 'slack',
+          parentSessionId: 'slack-b',
+          relationshipType: 'child_session',
+          lineageRootId: 'slack-a',
+          lineageTipId: 'slack-delegate',
+          startedAt: 30_000,
+        },
+      },
+    ])
+  })
+
   it('preserves dashboard page metadata while retaining the generic list wrapper', async () => {
     dashboardMocks.listSessions.mockResolvedValue({
       sessions: [{ id: 'first' }, { id: 'second' }],
