@@ -551,6 +551,18 @@ describe('send-stream bootstrap session handoff', () => {
     })
 
     const events = parseEvents(await response.text())
+    expect(events.find(({ event }) => event === 'started')).toEqual({
+      event: 'started',
+      data: {
+        runId: 'parent-run',
+        sessionKey: 'created-session',
+        friendlyId: 'created-session',
+      },
+    })
+    expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+      sessionKey: 'created-session',
+      friendlyId: 'created-session',
+    })
     expect(events.filter(({ event }) => event === 'chunk')).toEqual([
       {
         event: 'chunk',
@@ -3434,7 +3446,7 @@ describe('send-stream bootstrap session handoff', () => {
     )
   })
 
-  it('sends a selected local Card with a bootstrap-shaped upstream key through portable transport', async () => {
+  it('publishes a selected local Card canonical key while sending its bootstrap-shaped upstream key', async () => {
     mocks.resolveSessionCard.mockResolvedValue({
       card: {
         cardId: 'local:parent-card',
@@ -3480,18 +3492,31 @@ describe('send-stream bootstrap session handoff', () => {
         data: {
           text: 'local response',
           fullReplace: true,
-          sessionKey: 'main',
+          sessionKey: 'local:main',
           runId: expect.any(String),
         },
       },
     ])
+    expect(events.find(({ event }) => event === 'started')).toEqual({
+      event: 'started',
+      data: {
+        runId: expect.any(String),
+        sessionKey: 'local:main',
+        friendlyId: 'local:parent-card',
+      },
+    })
+    expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+      sessionKey: 'local:main',
+      friendlyId: 'local:parent-card',
+    })
+    expect(JSON.stringify(events)).not.toContain('"sessionKey":"main"')
     expect(mocks.resolveLocalCardByUpstreamSession).not.toHaveBeenCalled()
     expect(mocks.streamChat).not.toHaveBeenCalled()
     expect(mocks.getSession).not.toHaveBeenCalled()
     expect(mocks.getMessages).not.toHaveBeenCalled()
     expect(mocks.createPersistedRun).toHaveBeenCalledWith({
       runId: expect.any(String),
-      sessionKey: 'main',
+      sessionKey: 'local:main',
       friendlyId: 'local:parent-card',
       cardId: 'local:parent-card',
       canonicalSegmentKey: 'local:main',
@@ -3755,7 +3780,7 @@ describe('send-stream bootstrap session handoff', () => {
     })
   })
 
-  it('keeps a remote Card on gateway transport when its requested model is locally discovered', async () => {
+  it('publishes a remote Card canonical key while keeping its locally discovered model on gateway transport', async () => {
     mocks.getChatMode.mockReturnValue('portable')
     mocks.resolveSessionCard.mockResolvedValue({
       card: {
@@ -3812,7 +3837,20 @@ describe('send-stream bootstrap session handoff', () => {
     })
 
     expect(response.status).toBe(200)
-    await response.text()
+    const events = parseEvents(await response.text())
+    expect(events.find(({ event }) => event === 'started')).toEqual({
+      event: 'started',
+      data: {
+        runId: 'remote-run',
+        sessionKey: 'remote:session',
+        friendlyId: 'remote:parent-card',
+      },
+    })
+    expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+      sessionKey: 'remote:session',
+      friendlyId: 'remote:parent-card',
+    })
+    expect(JSON.stringify(events)).not.toContain('"sessionKey":"session"')
     expect(mocks.streamChat).toHaveBeenCalledTimes(1)
     expect(mocks.openaiChat).not.toHaveBeenCalled()
   })

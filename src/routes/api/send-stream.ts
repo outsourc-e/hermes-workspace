@@ -613,7 +613,14 @@ export const Route = createFileRoute('/api/send-stream')({
           // fresh complete local Card projection maps it authoritatively.
           sessionKey = crypto.randomUUID()
         }
-        const publicSessionKey = portableBootstrapSessionKey ?? sessionKey
+        // Once a request has a validated Card projection, every public identity
+        // uses its source-qualified canonical segment. The upstream key remains
+        // private to provider calls below. Unresolved bootstrap/legacy requests
+        // keep their existing safe public identity.
+        const getPublicSessionKey = () =>
+          activeCardCanonicalSegmentKey ??
+          portableBootstrapSessionKey ??
+          sessionKey
         const publicFriendlyId =
           activeCardId ?? portableBootstrapSessionKey ?? resolvedFriendlyId
 
@@ -846,7 +853,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 // Use a dedicated hb_signal event (not 'thinking') so it does
                 // not pollute the activity card. The tiny comment is the
                 // actual keepalive byte for Cloudflare Tunnel/Access.
-                sendEvent('hb_signal', { sessionKey: publicSessionKey })
+                sendEvent('hb_signal', { sessionKey: getPublicSessionKey() })
                 enqueueRaw(': keepalive\n\n')
               },
             })
@@ -893,7 +900,7 @@ export const Route = createFileRoute('/api/send-stream')({
               void terminalPersistence.catch(() => undefined)
               sendEvent('error', {
                 message: streamTimeoutError.message,
-                sessionKey: publicSessionKey,
+                sessionKey: getPublicSessionKey(),
               })
               settleStreamLifetime(streamTimeoutError)
               closeStream()
@@ -977,10 +984,11 @@ export const Route = createFileRoute('/api/send-stream')({
                 }
 
                 const portableClientSessionKey =
-                  portableBootstrapSessionKey === 'new'
-                    ? (activeCardCanonicalSegmentKey ??
-                      portableBootstrapSessionKey)
-                    : portableSessionKey
+                  portableBootstrapSessionKey === 'main'
+                    ? portableSessionKey
+                    : (activeCardCanonicalSegmentKey ??
+                      portableBootstrapSessionKey ??
+                      portableSessionKey)
                 const portableClientFriendlyId =
                   portableBootstrapSessionKey === 'main'
                     ? portableBootstrapSessionKey
@@ -989,9 +997,12 @@ export const Route = createFileRoute('/api/send-stream')({
                         resolvedFriendlyId) ||
                       portableClientSessionKey
                 const portableRunSessionKey =
-                  portableBootstrapSessionKey === 'new'
-                    ? (activeCardCanonicalSegmentKey ?? null)
-                    : portableSessionKey
+                  portableBootstrapSessionKey === 'main'
+                    ? portableSessionKey
+                    : (activeCardCanonicalSegmentKey ??
+                      (portableBootstrapSessionKey === 'new'
+                        ? null
+                        : portableSessionKey))
                 const portableRunFriendlyId =
                   activeCardId ?? portableClientFriendlyId
                 let accumulated = ''
@@ -2369,7 +2380,7 @@ export const Route = createFileRoute('/api/send-stream')({
                   () => {
                     sendEvent('error', {
                       message: errorMsg,
-                      sessionKey: publicSessionKey,
+                      sessionKey: getPublicSessionKey(),
                     })
                   },
                 )
@@ -2399,7 +2410,7 @@ export const Route = createFileRoute('/api/send-stream')({
             Connection: 'keep-alive',
             'X-Accel-Buffering': 'no',
             ...buildResolvedSessionHeaders({
-              sessionKey: publicSessionKey,
+              sessionKey: getPublicSessionKey(),
               friendlyId: publicFriendlyId,
             }),
           },
