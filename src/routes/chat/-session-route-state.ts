@@ -88,7 +88,9 @@ export function resolveSessionCardProducerNavigation(
       }
       const child = card.childNodes.find(
         (candidate) =>
-          identity === candidate.cardId || identity === candidate.sessionKey,
+          identity === candidate.cardId ||
+          identity === candidate.sessionKey ||
+          candidate.continuationSegmentKeys?.includes(identity) === true,
       )
       if (child) {
         return isCardProjectionComplete(response, card.cardId)
@@ -140,7 +142,10 @@ export function resolveSessionCardRoute({
 
   const isChildRoute = response.cards.some((card) =>
     card.childNodes.some(
-      (child) => child.cardId === routeKey || child.sessionKey === routeKey,
+      (child) =>
+        child.cardId === routeKey ||
+        child.sessionKey === routeKey ||
+        child.continuationSegmentKeys?.includes(routeKey) === true,
     ),
   )
   if (isChildRoute) return { status: 'rejected', reason: 'child' }

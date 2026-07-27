@@ -18,13 +18,18 @@ const rootCard = {
   relationshipKind: 'root' as const,
   childNodes: [
     {
-      cardId: 'remote:child-card',
+      cardId: 'remote:child-root',
       sessionKey: 'remote:child-tip',
+      continuationSegmentKeys: [
+        'remote:child-root',
+        'remote:child-middle',
+        'remote:child-tip',
+      ],
       relationshipKind: 'child' as const,
       title: 'Delegate',
       status: 'running' as const,
       updatedAt: 2,
-      continuationCount: 1,
+      continuationCount: 3,
     },
   ],
   updatedAt: 2,
@@ -56,7 +61,7 @@ describe('chat canonical replace navigation', () => {
 })
 
 describe('Session Card route resolution', () => {
-  it('maps raw producer identities to a parent Card route or child inspection state', () => {
+  it('maps raw producer identities, including every child continuation alias', () => {
     const response = {
       cards: [rootCard],
       completeness: 'complete' as const,
@@ -66,12 +71,18 @@ describe('Session Card route resolution', () => {
     expect(
       resolveSessionCardProducerNavigation(response, ['remote:tip']),
     ).toEqual({ cardId: 'remote:root' })
-    expect(
-      resolveSessionCardProducerNavigation(response, ['remote:child-tip']),
-    ).toEqual({
-      cardId: 'remote:root',
-      inspectedChildCardId: 'remote:child-card',
-    })
+    for (const childIdentity of [
+      'remote:child-root',
+      'remote:child-middle',
+      'remote:child-tip',
+    ]) {
+      expect(
+        resolveSessionCardProducerNavigation(response, [childIdentity]),
+      ).toEqual({
+        cardId: 'remote:root',
+        inspectedChildCardId: 'remote:child-root',
+      })
+    }
     expect(
       resolveSessionCardProducerNavigation(
         {
@@ -96,14 +107,14 @@ describe('Session Card route resolution', () => {
     expect(
       resolveSessionCardProducerNavigation(
         { ...response, completeness: 'incomplete', retryable: true },
-        ['remote:tip'],
+        ['remote:child-middle'],
       ),
     ).toBeUndefined()
   })
 
   it('accepts inspection only for a child Card of the selected parent', () => {
-    expect(validatedInspectedChildCardId(rootCard, 'remote:child-card')).toBe(
-      'remote:child-card',
+    expect(validatedInspectedChildCardId(rootCard, 'remote:child-root')).toBe(
+      'remote:child-root',
     )
     expect(
       validatedInspectedChildCardId(rootCard, 'remote:child-tip'),
@@ -112,7 +123,7 @@ describe('Session Card route resolution', () => {
       validatedInspectedChildCardId(rootCard, 'remote:missing'),
     ).toBeUndefined()
     expect(
-      validatedInspectedChildCardId(undefined, 'remote:child-card'),
+      validatedInspectedChildCardId(undefined, 'remote:child-root'),
     ).toBeUndefined()
   })
 
@@ -144,7 +155,7 @@ describe('Session Card route resolution', () => {
     ).toEqual({ status: 'rejected', reason: 'continuation' })
   })
 
-  it.each(['remote:child-card', 'remote:child-tip'])(
+  it.each(['remote:child-root', 'remote:child-middle', 'remote:child-tip'])(
     'rejects child/branch identity %s as a parent route',
     (routeKey) => {
       expect(

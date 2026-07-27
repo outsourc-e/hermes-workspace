@@ -333,6 +333,7 @@ describe('Session Card fetchers', () => {
               {
                 cardId: 'remote:child',
                 sessionKey: 'remote:child',
+                continuationSegmentKeys: ['remote:child'],
                 relationshipKind: 'child',
                 title: 'Child',
                 status: ['idle'],
@@ -440,6 +441,7 @@ describe('Session Card fetchers', () => {
       {
         cardId: 'remote:other-root',
         sessionKey: 'remote:child-tip',
+        continuationSegmentKeys: ['remote:other-root', 'remote:child-tip'],
       },
     ],
     [
@@ -447,6 +449,7 @@ describe('Session Card fetchers', () => {
       {
         cardId: 'remote:child-root',
         sessionKey: 'remote:other-root',
+        continuationSegmentKeys: ['remote:child-root', 'remote:other-root'],
       },
     ],
   ])('rejects a %s that collides with root ownership', async (_name, child) => {
@@ -471,7 +474,7 @@ describe('Session Card fetchers', () => {
                   title: 'Child',
                   status: 'idle',
                   updatedAt: 100,
-                  continuationCount: 1,
+                  continuationCount: child.continuationSegmentKeys.length,
                 },
               ],
             },
@@ -500,6 +503,7 @@ describe('Session Card fetchers', () => {
         {
           cardId: 'remote:child',
           sessionKey: 'remote:child',
+          continuationSegmentKeys: ['remote:child'],
           relationshipKind: 'branch',
           title: 'Branch',
           status: 'idle',
@@ -523,6 +527,133 @@ describe('Session Card fetchers', () => {
     await expect(fetchSessionCards()).resolves.toMatchObject({
       cards: [card, otherCard],
     })
+  })
+
+  it('retains validated source-qualified child continuation aliases', async () => {
+    const child = {
+      cardId: 'remote:child-root',
+      sessionKey: 'remote:child-tip',
+      continuationSegmentKeys: [
+        'remote:child-root',
+        'remote:child-middle',
+        'remote:child-tip',
+      ],
+      relationshipKind: 'child',
+      title: 'Child',
+      status: 'idle',
+      updatedAt: 100,
+      continuationCount: 3,
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          cards: [{ ...card, childNodes: [child] }],
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        }),
+      ),
+    )
+
+    await expect(fetchSessionCards()).resolves.toMatchObject({
+      cards: [{ childNodes: [child] }],
+    })
+  })
+
+  it.each([
+    ['missing aliases', undefined, undefined],
+    [
+      'bare alias',
+      ['remote:child-root', 'child-middle', 'remote:child-tip'],
+      undefined,
+    ],
+    [
+      'wrong source alias',
+      ['remote:child-root', 'local:child-middle', 'remote:child-tip'],
+      undefined,
+    ],
+    [
+      'duplicate alias',
+      ['remote:child-root', 'remote:child-root', 'remote:child-tip'],
+      undefined,
+    ],
+    [
+      'wrong count',
+      ['remote:child-root', 'remote:child-middle', 'remote:child-tip'],
+      2,
+    ],
+    ['wrong root', ['remote:other-root', 'remote:child-tip'], undefined],
+    ['wrong tip', ['remote:child-root', 'remote:other-tip'], undefined],
+  ])(
+    'rejects malformed child continuation aliases: %s',
+    async (_name, aliases, continuationCount) => {
+      const child: Record<string, unknown> = {
+        cardId: 'remote:child-root',
+        sessionKey: 'remote:child-tip',
+        continuationSegmentKeys: aliases,
+        relationshipKind: 'child',
+        title: 'Child',
+        status: 'idle',
+        updatedAt: 100,
+        continuationCount:
+          continuationCount ?? (Array.isArray(aliases) ? aliases.length : 3),
+      }
+      if (aliases === undefined) delete child.continuationSegmentKeys
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          response({
+            cards: [{ ...card, childNodes: [child] }],
+            completeness: 'complete',
+            retryable: false,
+            sources: [],
+          }),
+        ),
+      )
+
+      await expect(fetchSessionCards()).rejects.toThrow(
+        'Invalid Session Card response',
+      )
+    },
+  )
+
+  it('rejects a child continuation alias owned by its parent Card', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          cards: [
+            {
+              ...card,
+              childNodes: [
+                {
+                  cardId: 'remote:child-root',
+                  sessionKey: 'remote:child-tip',
+                  continuationSegmentKeys: [
+                    'remote:child-root',
+                    'remote:tip',
+                    'remote:child-tip',
+                  ],
+                  relationshipKind: 'child',
+                  title: 'Child',
+                  status: 'idle',
+                  updatedAt: 100,
+                  continuationCount: 3,
+                },
+              ],
+            },
+          ],
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        }),
+      ),
+    )
+
+    await expect(fetchSessionCards()).rejects.toThrow(
+      'Invalid Session Card response',
+    )
   })
 
   it('loads bounded parent history by Card route without a legacy history fallback', async () => {
@@ -934,6 +1065,7 @@ describe('Session Card fetchers', () => {
           {
             cardId: 'remote:child',
             sessionKey: 'remote:child',
+            continuationSegmentKeys: ['remote:child'],
             relationshipKind: 'child',
             title: 'Child',
             status: ['idle'],
@@ -965,11 +1097,12 @@ describe('Session Card fetchers', () => {
           {
             cardId: 'remote:child',
             sessionKey: 'remote:root',
+            continuationSegmentKeys: ['remote:child', 'remote:root'],
             relationshipKind: 'child',
             title: 'Child',
             status: 'idle',
             updatedAt: 100,
-            continuationCount: 1,
+            continuationCount: 2,
           },
         ],
       },
@@ -981,20 +1114,25 @@ describe('Session Card fetchers', () => {
           {
             cardId: 'remote:child-a',
             sessionKey: 'remote:child-a-tip',
+            continuationSegmentKeys: ['remote:child-a', 'remote:child-a-tip'],
             relationshipKind: 'child',
             title: 'Child A',
             status: 'idle',
             updatedAt: 100,
-            continuationCount: 1,
+            continuationCount: 2,
           },
           {
             cardId: 'remote:child-a-tip',
             sessionKey: 'remote:child-b-tip',
+            continuationSegmentKeys: [
+              'remote:child-a-tip',
+              'remote:child-b-tip',
+            ],
             relationshipKind: 'branch',
             title: 'Child B',
             status: 'idle',
             updatedAt: 101,
-            continuationCount: 1,
+            continuationCount: 2,
           },
         ],
       },
@@ -1017,6 +1155,7 @@ describe('Session Card fetchers', () => {
         {
           cardId: 'remote:child',
           sessionKey: 'remote:child',
+          continuationSegmentKeys: ['remote:child'],
           relationshipKind: 'branch',
           title: 'Branch',
           status: 'idle',

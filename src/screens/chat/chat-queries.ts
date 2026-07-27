@@ -118,8 +118,17 @@ export type SessionCardSourceStatusWire = {
   error?: string
 }
 
+export type SessionCardChildWire = SessionCardChild & {
+  /** Present after wire parsing; optional on legacy in-memory projections. */
+  continuationSegmentKeys?: Array<string>
+}
+
+export type SessionCardWire = Omit<SessionCard, 'childNodes'> & {
+  childNodes: Array<SessionCardChildWire>
+}
+
 export type SessionCardListWire = {
-  cards: Array<SessionCard>
+  cards: Array<SessionCardWire>
   cardResolutions?: Array<{
     cardId: string
     completeness: 'complete' | 'incomplete'
@@ -169,6 +178,20 @@ function nonblankWireString(value: unknown): string | null {
   return normalized || null
 }
 
+function sourceQualifiedWireIdentity(
+  value: unknown,
+): { identity: string; source: 'local' | 'remote' } | null {
+  const identity = nonblankWireString(value)
+  if (!identity) return null
+  if (identity.startsWith('local:') && identity.length > 'local:'.length) {
+    return { identity, source: 'local' }
+  }
+  if (identity.startsWith('remote:') && identity.length > 'remote:'.length) {
+    return { identity, source: 'remote' }
+  }
+  return null
+}
+
 function wireEnum<const T extends string>(
   value: unknown,
   allowedValues: ReadonlyArray<T>,
@@ -181,11 +204,20 @@ function invalidSessionCardResponse(): never {
   throw new Error('Invalid Session Card response')
 }
 
-function parseSessionCardChild(value: unknown): SessionCardChild {
+type ParsedSessionCardChild = SessionCardChildWire & {
+  continuationSegmentKeys: Array<string>
+}
+
+function parseSessionCardChild(value: unknown): ParsedSessionCardChild {
   if (!isWireRecord(value)) return invalidSessionCardResponse()
-  const cardId = nonblankWireString(value.cardId)
-  const sessionKey = nonblankWireString(value.sessionKey)
+  const cardIdentity = sourceQualifiedWireIdentity(value.cardId)
+  const sessionIdentity = sourceQualifiedWireIdentity(value.sessionKey)
   const title = nonblankWireString(value.title)
+  const continuationSegmentIdentities = Array.isArray(
+    value.continuationSegmentKeys,
+  )
+    ? value.continuationSegmentKeys.map(sourceQualifiedWireIdentity)
+    : []
   const relationshipKind = wireEnum(value.relationshipKind, ['branch', 'child'])
   const status = wireEnum(value.status, [
     'idle',
@@ -194,21 +226,37 @@ function parseSessionCardChild(value: unknown): SessionCardChild {
     'error',
   ])
   if (
-    !cardId ||
-    !sessionKey ||
+    !cardIdentity ||
+    !sessionIdentity ||
     !title ||
     !relationshipKind ||
     !status ||
     typeof value.updatedAt !== 'number' ||
     !Number.isFinite(value.updatedAt) ||
+    !Array.isArray(value.continuationSegmentKeys) ||
+    continuationSegmentIdentities.some((identity) => identity === null) ||
+    continuationSegmentIdentities.length === 0 ||
+    new Set(continuationSegmentIdentities.map((identity) => identity?.identity))
+      .size !== continuationSegmentIdentities.length ||
     !Number.isSafeInteger(value.continuationCount) ||
-    Number(value.continuationCount) < 1
+    Number(value.continuationCount) !== continuationSegmentIdentities.length ||
+    continuationSegmentIdentities[0]?.identity !== cardIdentity.identity ||
+    continuationSegmentIdentities.at(-1)?.identity !==
+      sessionIdentity.identity ||
+    continuationSegmentIdentities.some(
+      (identity) => identity?.source !== cardIdentity.source,
+    ) ||
+    sessionIdentity.source !== cardIdentity.source
   ) {
     return invalidSessionCardResponse()
   }
+  const continuationSegmentKeys = continuationSegmentIdentities.map(
+    (identity) => identity?.identity ?? invalidSessionCardResponse(),
+  )
   return {
-    cardId,
-    sessionKey,
+    cardId: cardIdentity.identity,
+    sessionKey: sessionIdentity.identity,
+    continuationSegmentKeys,
     relationshipKind,
     title,
     status,
@@ -217,7 +265,7 @@ function parseSessionCardChild(value: unknown): SessionCardChild {
   }
 }
 
-function parseSessionCard(value: unknown): SessionCard {
+function parseSessionCard(value: unknown): SessionCardWire {
   if (!isWireRecord(value)) return invalidSessionCardResponse()
   const cardId = nonblankWireString(value.cardId)
   const canonicalSource = wireEnum(value.canonicalSource, ['local', 'remote'])
@@ -303,7 +351,7 @@ function hasTopLevelCardRelationshipSemantics(card: SessionCard): boolean {
   )
 }
 
-function hasUniqueSessionCardOwnership(cards: Array<SessionCard>): boolean {
+function hasUniqueSessionCardOwnership(cards: Array<SessionCardWire>): boolean {
   const ownerByIdentity = new Map<string, object>()
   const claimIdentity = (identity: string, owner: object): boolean => {
     const existingOwner = ownerByIdentity.get(identity)
@@ -325,10 +373,12 @@ function hasUniqueSessionCardOwnership(cards: Array<SessionCard>): boolean {
   for (const card of cards) {
     for (const child of card.childNodes) {
       const owner = {}
-      if (
-        !claimIdentity(child.cardId, owner) ||
-        !claimIdentity(child.sessionKey, owner)
-      ) {
+      const childAliases = [
+        child.cardId,
+        child.sessionKey,
+        ...(child.continuationSegmentKeys ?? []),
+      ]
+      if (childAliases.some((alias) => !claimIdentity(alias, owner))) {
         return false
       }
     }
