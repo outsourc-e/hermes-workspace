@@ -2,6 +2,7 @@ import {
   link,
   lstat,
   mkdir,
+  open,
   readFile,
   readdir,
   rename,
@@ -94,6 +95,7 @@ const runUpdateQueues = new Map<string, Promise<void>>()
 
 const RUN_LOCK_WAIT_MS = 10_000
 const RUN_LOCK_POLL_MS = 5
+const RUN_LOCK_LEASE_MS = 60_000
 const TERMINAL_RUN_STATUSES = new Set<PersistedRunState['status']>([
   'complete',
   'error',
@@ -108,6 +110,75 @@ export const PERSISTED_TOOL_ARGS_MAX_BYTES = 16 * 1024
 export const PERSISTED_TOOL_PREVIEW_MAX_BYTES = 2 * 1024
 export const PERSISTED_TOOL_RESULT_MAX_BYTES = 16 * 1024
 export const PERSISTED_TOOL_CALLS_MAX_BYTES = 256 * 1024
+export const MAX_PERSISTED_RUN_FILE_BYTES = 1024 * 1024
+export const PERSISTED_ASSISTANT_TEXT_MAX_BYTES = 512 * 1024
+export const PERSISTED_THINKING_TEXT_MAX_BYTES = 128 * 1024
+export const MAX_PERSISTED_RUN_LIFECYCLE_EVENTS = 40
+export const PERSISTED_LIFECYCLE_TEXT_MAX_BYTES = 2 * 1024
+export const PERSISTED_LIFECYCLE_EMOJI_MAX_BYTES = 64
+export const PERSISTED_ERROR_MESSAGE_MAX_BYTES = 4 * 1024
+const PERSISTED_OWNER_FIELD_MAX_BYTES = 2 * 1024
+const RUN_FILE_READ_CONCURRENCY = 8
+const REDACTED = '[REDACTED]'
+
+const SENSITIVE_KEY_PATTERN =
+  /^(?:(?:access|id|refresh)[_-]?token|api[_-]?key|access[_-]?key|authorization|auth|bearer|client[_-]?secret|cookie|credential|password|passwd|private[_-]?key|secret|token|x[_-]?api[_-]?key)$/iu
+const SENSITIVE_ASSIGNMENT_PATTERN =
+  /((?:"|'|\b)(?:(?:access|id|refresh)[_-]?token|api[_-]?key|access[_-]?key|authorization|auth|bearer|client[_-]?secret|cookie|credential|password|passwd|private[_-]?key|secret|token|x[_-]?api[_-]?key)(?:"|'|\b)\s*[:=]\s*)("[^"]*"|'[^']*'|[^\r\n,;]+)/giu
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isSensitiveKey(key: string): boolean {
+  return SENSITIVE_KEY_PATTERN.test(key)
+}
+
+function redactSensitiveString(value: string): string {
+  return value
+    .replace(
+      /-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/giu,
+      REDACTED,
+    )
+    .replace(
+      /\b(Bearer|Basic)\s+[^\s,;"']+/giu,
+      (_match, scheme: string) => `${scheme} ${REDACTED}`,
+    )
+    .replace(
+      /\b(?:github_pat|gh[opurs]|sk|xox[baprs])[-_][A-Za-z0-9_-]{8,}\b/giu,
+      REDACTED,
+    )
+    .replace(
+      SENSITIVE_ASSIGNMENT_PATTERN,
+      (_match, prefix: string, secret: string) => {
+        const quote = secret.startsWith('"')
+          ? '"'
+          : secret.startsWith("'")
+            ? "'"
+            : ''
+        return `${prefix}${quote}${REDACTED}${quote}`
+      },
+    )
+    .replace(/(https?:\/\/[^\s/:@]+:)[^\s/@]+@/giu, `$1${REDACTED}@`)
+}
+
+function redactStructuredValue(value: unknown, depth = 0): unknown {
+  if (depth > 20) {
+    return { omitted: 'Nested tool data exceeded the persistence limit.' }
+  }
+  if (typeof value === 'string') return redactSensitiveString(value)
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactStructuredValue(entry, depth + 1))
+  }
+  if (!isRecord(value)) return value
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      isSensitiveKey(key) ? REDACTED : redactStructuredValue(entry, depth + 1),
+    ]),
+  )
+}
 
 function serializedBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value), 'utf8')
@@ -119,6 +190,22 @@ function truncateUtf8(value: string, maxBytes: number): string {
   let bytes = 0
   for (const character of value) {
     const characterBytes = Buffer.byteLength(character, 'utf8')
+    if (bytes + characterBytes > maxBytes) break
+    result += character
+    bytes += characterBytes
+  }
+  return result
+}
+
+function truncateJsonString(value: string, maxBytes: number): string {
+  if (Buffer.byteLength(JSON.stringify(value), 'utf8') - 2 <= maxBytes) {
+    return value
+  }
+  let result = ''
+  let bytes = 0
+  for (const character of value) {
+    const characterBytes =
+      Buffer.byteLength(JSON.stringify(character), 'utf8') - 2
     if (bytes + characterBytes > maxBytes) break
     result += character
     bytes += characterBytes
@@ -156,15 +243,16 @@ function sanitizeToolArgs(value: unknown): unknown {
     if (Buffer.byteLength(serialized, 'utf8') > PERSISTED_TOOL_ARGS_MAX_BYTES) {
       return { omitted: 'Tool arguments exceeded the persistence limit.' }
     }
-    return JSON.parse(serialized) as unknown
+    return redactStructuredValue(JSON.parse(serialized) as unknown)
   } catch {
     return { omitted: 'Tool arguments could not be serialized safely.' }
   }
 }
 
 function sanitizePersistedToolCall(
-  input: PersistedRunToolCall,
+  input: unknown,
 ): PersistedRunToolCall | null {
+  if (!isRecord(input)) return null
   const id = boundedExactIdentifier(input.id, PERSISTED_TOOL_ID_MAX_BYTES)
   if (!id) return null
   const exactName = boundedExactIdentifier(
@@ -179,13 +267,19 @@ function sanitizePersistedToolCall(
   const args = sanitizeToolArgs(input.args)
   const preview =
     typeof input.preview === 'string'
-      ? truncateUtf8(input.preview, PERSISTED_TOOL_PREVIEW_MAX_BYTES)
+      ? truncateUtf8(
+          redactSensitiveString(input.preview),
+          PERSISTED_TOOL_PREVIEW_MAX_BYTES,
+        )
       : undefined
   const result =
     input.phase === 'error'
       ? 'Tool failed.'
       : typeof input.result === 'string'
-        ? truncateUtf8(input.result, PERSISTED_TOOL_RESULT_MAX_BYTES)
+        ? truncateUtf8(
+            redactSensitiveString(input.result),
+            PERSISTED_TOOL_RESULT_MAX_BYTES,
+          )
         : undefined
   return {
     id,
@@ -198,7 +292,7 @@ function sanitizePersistedToolCall(
 }
 
 function boundPersistedToolCalls(
-  input: Array<PersistedRunToolCall>,
+  input: Array<unknown>,
   protectedToolId?: string,
 ): Array<PersistedRunToolCall> {
   const bounded: Array<PersistedRunToolCall> = []
@@ -231,6 +325,198 @@ function boundPersistedToolCalls(
     name: 'tool',
     phase: entry.phase,
   }))
+}
+
+function normalizeTimestamp(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null
+}
+
+function sanitizeLifecycleEvents(
+  value: unknown,
+): Array<PersistedRunLifecycleEvent> | null {
+  if (!Array.isArray(value)) return null
+  const events: Array<PersistedRunLifecycleEvent> = []
+  for (const input of value.slice(-MAX_PERSISTED_RUN_LIFECYCLE_EVENTS)) {
+    if (!isRecord(input)) continue
+    const timestamp = normalizeTimestamp(input.timestamp)
+    if (
+      typeof input.text !== 'string' ||
+      typeof input.emoji !== 'string' ||
+      typeof input.isError !== 'boolean' ||
+      timestamp === null
+    ) {
+      continue
+    }
+    events.push({
+      text: truncateJsonString(
+        redactSensitiveString(input.text),
+        PERSISTED_LIFECYCLE_TEXT_MAX_BYTES,
+      ),
+      emoji: truncateJsonString(
+        input.emoji,
+        PERSISTED_LIFECYCLE_EMOJI_MAX_BYTES,
+      ),
+      timestamp,
+      isError: input.isError,
+    })
+  }
+  return events
+}
+
+const PERSISTED_RUN_STATUSES = new Set<PersistedRunState['status']>([
+  'accepted',
+  'active',
+  'handoff',
+  'stalled',
+  'complete',
+  'error',
+])
+
+function normalizePersistedRun(
+  value: unknown,
+  expected?: { runId: string; sessionKey: string },
+): PersistedRunState | null {
+  if (!isRecord(value)) return null
+  const runId = boundedExactIdentifier(value.runId, 128)
+  const providerRunId =
+    value.providerRunId === undefined
+      ? undefined
+      : boundedExactIdentifier(value.providerRunId, 128)
+  const sessionKey = boundedExactIdentifier(
+    value.sessionKey,
+    PERSISTED_OWNER_FIELD_MAX_BYTES,
+  )
+  const friendlyId = boundedExactIdentifier(
+    value.friendlyId,
+    PERSISTED_OWNER_FIELD_MAX_BYTES,
+  )
+  const cardId =
+    value.cardId === undefined
+      ? undefined
+      : boundedExactIdentifier(value.cardId, PERSISTED_OWNER_FIELD_MAX_BYTES)
+  const canonicalSegmentKey =
+    value.canonicalSegmentKey === undefined
+      ? undefined
+      : boundedExactIdentifier(
+          value.canonicalSegmentKey,
+          PERSISTED_OWNER_FIELD_MAX_BYTES,
+        )
+  const createdAt = normalizeTimestamp(value.createdAt)
+  const updatedAt = normalizeTimestamp(value.updatedAt)
+  const lastEventAt = normalizeTimestamp(value.lastEventAt)
+  const toolCalls = Array.isArray(value.toolCalls)
+    ? boundPersistedToolCalls(value.toolCalls)
+    : null
+  const lifecycleEvents = sanitizeLifecycleEvents(value.lifecycleEvents)
+  if (
+    !runId ||
+    !isSafeRunId(runId) ||
+    providerRunId === null ||
+    (providerRunId !== undefined && !isSafeRunId(providerRunId)) ||
+    !sessionKey ||
+    !friendlyId ||
+    (expected &&
+      (runId !== expected.runId || sessionKey !== expected.sessionKey)) ||
+    cardId === null ||
+    canonicalSegmentKey === null ||
+    (cardId === undefined) !== (canonicalSegmentKey === undefined) ||
+    typeof value.status !== 'string' ||
+    !PERSISTED_RUN_STATUSES.has(value.status as PersistedRunState['status']) ||
+    createdAt === null ||
+    updatedAt === null ||
+    lastEventAt === null ||
+    typeof value.assistantText !== 'string' ||
+    typeof value.thinkingText !== 'string' ||
+    toolCalls === null ||
+    lifecycleEvents === null ||
+    (value.errorMessage !== undefined && typeof value.errorMessage !== 'string')
+  ) {
+    return null
+  }
+
+  const status = value.status as PersistedRunState['status']
+  return {
+    runId,
+    ...(providerRunId === undefined ? {} : { providerRunId }),
+    sessionKey,
+    friendlyId,
+    ...(cardId === undefined ? {} : { cardId }),
+    ...(canonicalSegmentKey === undefined ? {} : { canonicalSegmentKey }),
+    status,
+    createdAt,
+    updatedAt,
+    lastEventAt,
+    assistantText: truncateJsonString(
+      value.assistantText,
+      PERSISTED_ASSISTANT_TEXT_MAX_BYTES,
+    ),
+    thinkingText: truncateJsonString(
+      value.thinkingText,
+      PERSISTED_THINKING_TEXT_MAX_BYTES,
+    ),
+    toolCalls,
+    lifecycleEvents,
+    ...(status === 'error' && typeof value.errorMessage === 'string'
+      ? {
+          errorMessage: truncateJsonString(
+            redactSensitiveString(value.errorMessage),
+            PERSISTED_ERROR_MESSAGE_MAX_BYTES,
+          ),
+        }
+      : {}),
+  }
+}
+
+function serializePersistedRun(run: PersistedRunState): string {
+  const serialized = `${JSON.stringify(run, null, 2)}\n`
+  if (Buffer.byteLength(serialized, 'utf8') > MAX_PERSISTED_RUN_FILE_BYTES) {
+    throw Object.assign(
+      new Error('Persisted run state exceeds the file limit'),
+      {
+        code: 'EFBIG',
+      },
+    )
+  }
+  return serialized
+}
+
+async function readBoundedUtf8File(
+  filePath: string,
+  maxBytes: number,
+): Promise<string> {
+  const handle = await open(filePath, 'r')
+  try {
+    const metadata = await handle.stat()
+    if (!metadata.isFile() || metadata.size > maxBytes) {
+      throw Object.assign(
+        new Error('Persisted run file is invalid or oversized'),
+        {
+          code: 'EFBIG',
+        },
+      )
+    }
+    const chunks: Array<Buffer> = []
+    let totalBytes = 0
+    for (;;) {
+      const chunk = Buffer.allocUnsafe(
+        Math.min(64 * 1024, maxBytes + 1 - totalBytes),
+      )
+      const { bytesRead } = await handle.read(chunk, 0, chunk.length, null)
+      if (bytesRead === 0) break
+      totalBytes += bytesRead
+      if (totalBytes > maxBytes) {
+        throw Object.assign(new Error('Persisted run file is oversized'), {
+          code: 'EFBIG',
+        })
+      }
+      chunks.push(chunk.subarray(0, bytesRead))
+    }
+    return Buffer.concat(chunks, totalBytes).toString('utf8')
+  } finally {
+    await handle.close()
+  }
 }
 
 function encodeSessionKey(sessionKey: string): string {
@@ -267,17 +553,40 @@ function runLockPath(identity: RunLockIdentity): string {
 
 type AcquiredRunLock = { path: string; token: string }
 
-type RunLockOwner = { token: string; pid: number }
+type RunLockOwner = {
+  token: string
+  pid: number
+  processIdentity?: string
+  leaseUntil?: number
+}
 
 function parseRunLockOwner(value: string): RunLockOwner | null {
   try {
     const parsed = JSON.parse(value) as Partial<RunLockOwner>
-    return typeof parsed.token === 'string' &&
-      /^[a-f0-9-]{36}$/u.test(parsed.token) &&
-      Number.isSafeInteger(parsed.pid) &&
-      (parsed.pid ?? 0) > 0
-      ? { token: parsed.token, pid: parsed.pid! }
-      : null
+    if (
+      typeof parsed.token !== 'string' ||
+      !/^[a-f0-9-]{36}$/u.test(parsed.token) ||
+      !Number.isSafeInteger(parsed.pid) ||
+      (parsed.pid ?? 0) <= 0 ||
+      (parsed.pid ?? 0) > 2_147_483_647 ||
+      (parsed.processIdentity !== undefined &&
+        (typeof parsed.processIdentity !== 'string' ||
+          parsed.processIdentity.length > 256)) ||
+      (parsed.leaseUntil !== undefined &&
+        (!Number.isSafeInteger(parsed.leaseUntil) || parsed.leaseUntil < 0))
+    ) {
+      return null
+    }
+    return {
+      token: parsed.token,
+      pid: parsed.pid!,
+      ...(parsed.processIdentity === undefined
+        ? {}
+        : { processIdentity: parsed.processIdentity }),
+      ...(parsed.leaseUntil === undefined
+        ? {}
+        : { leaseUntil: parsed.leaseUntil }),
+    }
   } catch {
     return null
   }
@@ -292,20 +601,57 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
+async function getProcessIdentity(pid: number): Promise<string | null> {
+  if (process.platform !== 'linux') return null
+  try {
+    const raw = await readFile(`/proc/${pid}/stat`, 'utf8')
+    const closingParenthesis = raw.lastIndexOf(') ')
+    if (closingParenthesis < 0) return null
+    const fieldsAfterCommand = raw
+      .slice(closingParenthesis + 2)
+      .trim()
+      .split(/\s+/u)
+    const startTime = fieldsAfterCommand[19]
+    return startTime && /^\d+$/u.test(startTime) ? `linux:${startTime}` : null
+  } catch {
+    return null
+  }
+}
+
+async function lockOwnerIsRecoverable(
+  owner: RunLockOwner | null,
+  lockModifiedAt: number,
+): Promise<boolean> {
+  if (!owner) return true
+  if (!processIsAlive(owner.pid)) return true
+
+  if (owner.processIdentity) {
+    const currentIdentity = await getProcessIdentity(owner.pid)
+    if (currentIdentity === owner.processIdentity) return false
+    if (currentIdentity !== null) return true
+  }
+
+  const leaseUntil = owner.leaseUntil ?? lockModifiedAt + RUN_LOCK_LEASE_MS
+  return Date.now() > leaseUntil
+}
+
 async function recoverDeadRunLock(lockPath: string): Promise<boolean> {
   let observed
   try {
     observed = await lstat(lockPath)
-    if (
-      !observed.isFile() ||
-      observed.isSymbolicLink() ||
-      observed.size > 1024
-    ) {
+    if (!observed.isFile() || observed.isSymbolicLink()) {
       throw new Error('Persisted run update lock is invalid')
     }
-    const owner = parseRunLockOwner(await readFile(lockPath, 'utf8'))
-    if (!owner) throw new Error('Persisted run update lock is invalid')
-    if (processIsAlive(owner.pid)) return false
+    let owner: RunLockOwner | null = null
+    if (observed.size <= 1024) {
+      try {
+        owner = parseRunLockOwner(await readBoundedUtf8File(lockPath, 1024))
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
+        if ((error as NodeJS.ErrnoException).code !== 'EFBIG') throw error
+      }
+    }
+    if (!(await lockOwnerIsRecoverable(owner, observed.mtimeMs))) return false
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
     throw error
@@ -346,11 +692,18 @@ async function acquireRunLock(
   const token = crypto.randomUUID()
   const candidatePath = `${lockPath}.owner.${process.pid}.${token}`
   const startedAt = Date.now()
-  await writeFile(
-    candidatePath,
-    `${JSON.stringify({ token, pid: process.pid })}\n`,
-    { encoding: 'utf8', flag: 'wx', mode: 0o600 },
-  )
+  const processIdentity = await getProcessIdentity(process.pid)
+  const owner: RunLockOwner = {
+    token,
+    pid: process.pid,
+    ...(processIdentity ? { processIdentity } : {}),
+    leaseUntil: startedAt + RUN_LOCK_LEASE_MS,
+  }
+  await writeFile(candidatePath, `${JSON.stringify(owner)}\n`, {
+    encoding: 'utf8',
+    flag: 'wx',
+    mode: 0o600,
+  })
   try {
     for (;;) {
       try {
@@ -382,7 +735,7 @@ async function acquireRunLock(
 
 async function releaseRunLock(lock: AcquiredRunLock): Promise<void> {
   try {
-    const owner = parseRunLockOwner(await readFile(lock.path, 'utf8'))
+    const owner = parseRunLockOwner(await readBoundedUtf8File(lock.path, 1024))
     if (owner?.token !== lock.token) {
       throw new Error('Persisted run update lock ownership changed')
     }
@@ -434,32 +787,52 @@ function assertSameRunOwner(
 
 async function writeRun(run: PersistedRunState): Promise<void> {
   assertSafeRunId(run.runId)
-  const dir = sessionDir(run.sessionKey)
+  const normalized = normalizePersistedRun(run)
+  if (!normalized) throw new Error('Persisted run state is invalid')
+  const dir = sessionDir(normalized.sessionKey)
   await ensureDir(dir)
-  const targetPath = runPath(run.sessionKey, run.runId)
+  const targetPath = runPath(normalized.sessionKey, normalized.runId)
   const tempPath = `${targetPath}.${process.pid}.${Date.now()}.${Math.random()
     .toString(36)
     .slice(2)}.tmp`
-  await writeFile(tempPath, `${JSON.stringify(run, null, 2)}\n`, 'utf8')
-  await rename(tempPath, targetPath)
+  try {
+    await writeFile(tempPath, serializePersistedRun(normalized), {
+      encoding: 'utf8',
+      flag: 'wx',
+      mode: 0o600,
+    })
+    await rename(tempPath, targetPath)
+  } finally {
+    await unlink(tempPath).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error
+    })
+  }
 }
 
 async function writeRunExclusive(run: PersistedRunState): Promise<void> {
   assertSafeRunId(run.runId)
-  const dir = sessionDir(run.sessionKey)
+  const normalized = normalizePersistedRun(run)
+  if (!normalized) throw new Error('Persisted run state is invalid')
+  const dir = sessionDir(normalized.sessionKey)
   await ensureDir(dir)
-  const targetPath = runPath(run.sessionKey, run.runId)
+  const targetPath = runPath(normalized.sessionKey, normalized.runId)
   const tempPath = `${targetPath}.${process.pid}.${Date.now()}.${Math.random()
     .toString(36)
     .slice(2)}.tmp`
-  await writeFile(tempPath, `${JSON.stringify(run, null, 2)}\n`, 'utf8')
+  await writeFile(tempPath, serializePersistedRun(normalized), {
+    encoding: 'utf8',
+    flag: 'wx',
+    mode: 0o600,
+  })
   try {
     // A hard link publishes the fully-written temp inode only when the target
     // does not exist. Unlike rename(), this cannot replace another owner that
     // won a destination race after our preflight check.
     await link(tempPath, targetPath)
   } finally {
-    await unlink(tempPath).catch(() => undefined)
+    await unlink(tempPath).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error
+    })
   }
 }
 
@@ -523,16 +896,14 @@ export async function getPersistedRun(
   runId: string,
 ): Promise<PersistedRunState | null> {
   try {
-    const raw = await readFile(runPath(sessionKey, runId), 'utf8')
-    const run = JSON.parse(raw) as PersistedRunState
-    if (
-      !isSafeRunId(run.runId) ||
-      run.runId !== runId ||
-      run.sessionKey !== sessionKey
-    ) {
-      return null
-    }
-    return run
+    const raw = await readBoundedUtf8File(
+      runPath(sessionKey, runId),
+      MAX_PERSISTED_RUN_FILE_BYTES,
+    )
+    return normalizePersistedRun(JSON.parse(raw) as unknown, {
+      runId,
+      sessionKey,
+    })
   } catch {
     return null
   }
@@ -711,7 +1082,8 @@ export async function updatePersistedRun(
       if (TERMINAL_RUN_STATUSES.has(current.status)) return current
       const next = updater(current)
       assertSameRunOwner(current, next)
-      const stored = { ...next, updatedAt: Date.now() }
+      const stored = normalizePersistedRun({ ...next, updatedAt: Date.now() })
+      if (!stored) throw new Error('Persisted run update is invalid')
       await writeRun(stored)
       return stored
     }),
@@ -889,13 +1261,11 @@ export async function upsertRunToolCall(
     if (existingIndex >= 0) nextTools[existingIndex] = candidate
     else nextTools.push(candidate)
     const toolCalls = boundPersistedToolCalls(nextTools, incomingId)
-    const failed = toolCall.phase === 'error'
     return {
       ...run,
-      status: failed ? 'error' : 'active',
+      status: 'active',
       lastEventAt: Date.now(),
       toolCalls,
-      errorMessage: failed ? 'A tool call failed.' : run.errorMessage,
     }
   })
 }
@@ -908,7 +1278,9 @@ export async function addRunLifecycleEvent(
   return updatePersistedRun(sessionKey, runId, (run) => ({
     ...run,
     lastEventAt: Date.now(),
-    lifecycleEvents: [...run.lifecycleEvents, event].slice(-40),
+    lifecycleEvents: [...run.lifecycleEvents, event].slice(
+      -MAX_PERSISTED_RUN_LIFECYCLE_EVENTS,
+    ),
   }))
 }
 
@@ -933,23 +1305,62 @@ export async function markRunStatus(
 // until the 120s client-side failsafe clears it.
 const STALE_RUN_THRESHOLD_MS = 5 * 60 * 1000
 
-async function readRunsInDir(dir: string): Promise<Array<PersistedRunState>> {
-  const files = (await readdir(dir)).filter((name) => {
+async function mapWithConcurrency<TItem, TResult>(
+  items: Array<TItem>,
+  limit: number,
+  mapper: (item: TItem) => Promise<TResult>,
+): Promise<Array<TResult>> {
+  const results = new Array<TResult>(items.length)
+  let nextIndex = 0
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      for (;;) {
+        const index = nextIndex
+        nextIndex += 1
+        if (index >= items.length) return
+        results[index] = await mapper(items[index]!)
+      }
+    }),
+  )
+  return results
+}
+
+function decodeSessionDirectory(name: string): string | null {
+  try {
+    const decoded = decodeURIComponent(name)
+    return encodeSessionKey(decoded) === name ? decoded : null
+  } catch {
+    return null
+  }
+}
+
+async function readRunsInDir(
+  dir: string,
+  expectedSessionKey: string,
+): Promise<Array<PersistedRunState>> {
+  const files: Array<string> = (await readdir(dir)).filter((name: string) => {
     if (!name.endsWith('.json')) return false
     return isSafeRunId(name.slice(0, -'.json'.length))
   })
   if (files.length === 0) return []
-  const runs = await Promise.all(
-    files.map(async (name) => {
+  const runs = await mapWithConcurrency(
+    files,
+    RUN_FILE_READ_CONCURRENCY,
+    async (name) => {
       try {
-        const raw = await readFile(path.join(dir, name), 'utf8')
-        const run = JSON.parse(raw) as PersistedRunState
         const fileRunId = name.slice(0, -'.json'.length)
-        return run.runId === fileRunId && isSafeRunId(run.runId) ? run : null
+        const raw = await readBoundedUtf8File(
+          path.join(dir, name),
+          MAX_PERSISTED_RUN_FILE_BYTES,
+        )
+        return normalizePersistedRun(JSON.parse(raw) as unknown, {
+          runId: fileRunId,
+          sessionKey: expectedSessionKey,
+        })
       } catch {
         return null
       }
-    }),
+    },
   )
   return runs.filter((run): run is PersistedRunState => Boolean(run))
 }
@@ -958,7 +1369,7 @@ export async function getActiveRunForSession(
   sessionKey: string,
 ): Promise<PersistedRunState | null> {
   try {
-    const runs = await readRunsInDir(sessionDir(sessionKey))
+    const runs = await readRunsInDir(sessionDir(sessionKey), sessionKey)
     const now = Date.now()
     const candidates = runs
       .filter((run) => !['complete', 'error'].includes(run.status))
@@ -983,10 +1394,18 @@ export async function getActiveRunForCard(
   if (!normalizedCardId || !normalizedCanonicalSegmentKey) return null
   try {
     const entries = await readdir(RUNS_ROOT, { withFileTypes: true })
-    const runsBySession = await Promise.all(
-      entries
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => readRunsInDir(path.join(RUNS_ROOT, entry.name))),
+    const sessionDirectories: Array<{ path: string; sessionKey: string }> =
+      entries.flatMap((entry: { isDirectory: () => boolean; name: string }) => {
+        if (!entry.isDirectory()) return []
+        const sessionKey = decodeSessionDirectory(entry.name)
+        return sessionKey === null
+          ? []
+          : [{ path: path.join(RUNS_ROOT, entry.name), sessionKey }]
+      })
+    const runsBySession = await mapWithConcurrency(
+      sessionDirectories,
+      RUN_FILE_READ_CONCURRENCY,
+      (session) => readRunsInDir(session.path, session.sessionKey),
     )
     const now = Date.now()
     const candidates = runsBySession
@@ -1053,10 +1472,19 @@ export async function getActiveRunForCard(
 export async function listAllActiveRuns(): Promise<Array<PersistedRunState>> {
   try {
     const entries = await readdir(RUNS_ROOT, { withFileTypes: true })
-    const sessionDirs = entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => path.join(RUNS_ROOT, entry.name))
-    const runsBySession = await Promise.all(sessionDirs.map(readRunsInDir))
+    const sessionDirectories: Array<{ path: string; sessionKey: string }> =
+      entries.flatMap((entry: { isDirectory: () => boolean; name: string }) => {
+        if (!entry.isDirectory()) return []
+        const sessionKey = decodeSessionDirectory(entry.name)
+        return sessionKey === null
+          ? []
+          : [{ path: path.join(RUNS_ROOT, entry.name), sessionKey }]
+      })
+    const runsBySession = await mapWithConcurrency(
+      sessionDirectories,
+      RUN_FILE_READ_CONCURRENCY,
+      (session) => readRunsInDir(session.path, session.sessionKey),
+    )
     return runsBySession
       .flat()
       .filter((run) => !['complete', 'error'].includes(run.status))

@@ -2259,6 +2259,93 @@ describe('send-stream bootstrap session handoff', () => {
     },
   )
 
+  it('persists later text and completion after a recoverable tool failure', async () => {
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        _sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'recoverable-run', session_id: 'created-session' },
+        })
+        await options.onEvent({
+          event: 'tool.failed',
+          data: {
+            run_id: 'recoverable-run',
+            session_id: 'created-session',
+            tool_name: 'search',
+            tool_call_id: 'recoverable-tool',
+            message: 'search failed but the agent recovered',
+          },
+        })
+        await options.onEvent({
+          event: 'assistant.delta',
+          data: {
+            run_id: 'recoverable-run',
+            session_id: 'created-session',
+            delta: 'answer after failed tool',
+          },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'recoverable-run', session_id: 'created-session' },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'created-session',
+          friendlyId: 'created-session',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    const events = parseEvents(await response.text())
+    expect(events.filter(({ event }) => event === 'tool')).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({
+          phase: 'error',
+          toolCallId: 'recoverable-tool',
+        }),
+      }),
+    ])
+    expect(events.filter(({ event }) => event === 'chunk')).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({ text: 'answer after failed tool' }),
+      }),
+    ])
+    expect(events.filter(({ event }) => event === 'done')).toHaveLength(1)
+    expect(mocks.upsertRunToolCall).toHaveBeenCalledWith(
+      'created-session',
+      'recoverable-run',
+      expect.objectContaining({ id: 'recoverable-tool', phase: 'error' }),
+    )
+    expect(mocks.appendRunText).toHaveBeenCalledWith(
+      'created-session',
+      'recoverable-run',
+      'answer after failed tool',
+      { replace: false },
+    )
+    expect(mocks.markRunStatus).toHaveBeenCalledWith(
+      'created-session',
+      'recoverable-run',
+      'complete',
+      undefined,
+    )
+  })
+
   it('does not let rejected terminal events fail, complete, close, or backfill the parent stream', async () => {
     const historyReads: Array<string> = []
     mocks.getMessages.mockImplementation((sessionKey: string) => {

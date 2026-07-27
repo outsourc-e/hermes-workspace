@@ -1,5 +1,13 @@
 import { fork } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -433,9 +441,14 @@ describe('run-store persistence', () => {
     ).toBeLessThanOrEqual(PERSISTED_TOOL_RESULT_MAX_BYTES)
   })
 
-  it('sanitizes persisted tool failures without copying raw provider errors', async () => {
-    const { createPersistedRun, getPersistedRun, upsertRunToolCall } =
-      await import('./run-store')
+  it('keeps tool-local failures recoverable without copying raw provider errors', async () => {
+    const {
+      appendRunText,
+      createPersistedRun,
+      getPersistedRun,
+      markRunStatus,
+      upsertRunToolCall,
+    } = await import('./run-store')
     await createPersistedRun({ runId: 'tool-error', sessionKey: 'session-a' })
 
     await upsertRunToolCall('session-a', 'tool-error', {
@@ -445,14 +458,366 @@ describe('run-store persistence', () => {
       result: 'secret-token=do-not-persist',
     })
 
+    await appendRunText('session-a', 'tool-error', 'recovered output')
+    await markRunStatus('session-a', 'tool-error', 'complete')
+
     const stored = await getPersistedRun('session-a', 'tool-error')
     expect(JSON.stringify(stored)).not.toContain('secret-token=do-not-persist')
     expect(stored).toMatchObject({
-      status: 'error',
-      errorMessage: 'A tool call failed.',
+      status: 'complete',
+      assistantText: 'recovered output',
       toolCalls: [
         expect.objectContaining({ phase: 'error', result: 'Tool failed.' }),
       ],
+    })
+    expect(stored).not.toHaveProperty('errorMessage')
+  })
+
+  it('redacts successful tool secrets and writes private run files atomically', async () => {
+    const { createPersistedRun, getPersistedRun, upsertRunToolCall } =
+      await import('./run-store')
+    await createPersistedRun({
+      runId: 'private-tools',
+      sessionKey: 'session-a',
+    })
+
+    await upsertRunToolCall('session-a', 'private-tools', {
+      id: 'successful-tool',
+      name: 'http_request',
+      phase: 'complete',
+      args: {
+        password: 'argument-password-secret',
+        nested: { apiKey: 'argument-api-key-secret' },
+        header: 'Authorization: Bearer argument-bearer-secret',
+        query: 'safe search text',
+      },
+      preview: 'token=preview-token-secret',
+      result:
+        '{"access_token":"result-access-token-secret","value":"safe result"}\nX-API-Key: result-api-key-secret',
+    })
+
+    const stored = await getPersistedRun('session-a', 'private-tools')
+    const serialized = JSON.stringify(stored)
+    for (const secret of [
+      'argument-password-secret',
+      'argument-api-key-secret',
+      'argument-bearer-secret',
+      'preview-token-secret',
+      'result-access-token-secret',
+      'result-api-key-secret',
+    ]) {
+      expect(serialized).not.toContain(secret)
+    }
+    expect(serialized).toContain('[REDACTED]')
+    expect(stored?.toolCalls[0]).toMatchObject({
+      phase: 'complete',
+      args: { query: 'safe search text' },
+    })
+    const filePath = join(
+      tempHome!,
+      'webui-mvp',
+      'runs',
+      'session-a',
+      'private-tools.json',
+    )
+    expect(statSync(filePath).mode & 0o777).toBe(0o600)
+    expect(readFileSync(filePath, 'utf8')).toBe(
+      `${JSON.stringify(stored, null, 2)}\n`,
+    )
+  })
+
+  it('keeps heavily escaped run text within the persisted file bound', async () => {
+    const {
+      MAX_PERSISTED_RUN_FILE_BYTES,
+      appendRunText,
+      createPersistedRun,
+      getPersistedRun,
+    } = await import('./run-store')
+    await createPersistedRun({ runId: 'escaped-text', sessionKey: 'session-a' })
+    await appendRunText(
+      'session-a',
+      'escaped-text',
+      String.raw`"\n`.repeat(MAX_PERSISTED_RUN_FILE_BYTES),
+    )
+
+    const filePath = join(
+      tempHome!,
+      'webui-mvp',
+      'runs',
+      'session-a',
+      'escaped-text.json',
+    )
+    expect(statSync(filePath).size).toBeLessThanOrEqual(
+      MAX_PERSISTED_RUN_FILE_BYTES,
+    )
+    await expect(
+      getPersistedRun('session-a', 'escaped-text'),
+    ).resolves.toMatchObject({ status: 'active' })
+  })
+
+  it('normalizes, sanitizes, and bounds legacy persisted state on load', async () => {
+    const {
+      MAX_PERSISTED_RUN_LIFECYCLE_EVENTS,
+      MAX_PERSISTED_RUN_TOOL_CALLS,
+      PERSISTED_ASSISTANT_TEXT_MAX_BYTES,
+      PERSISTED_LIFECYCLE_TEXT_MAX_BYTES,
+      PERSISTED_THINKING_TEXT_MAX_BYTES,
+      createPersistedRun,
+      getPersistedRun,
+    } = await import('./run-store')
+    await createPersistedRun({ runId: 'legacy-state', sessionKey: 'session-a' })
+    const filePath = join(
+      tempHome!,
+      'webui-mvp',
+      'runs',
+      'session-a',
+      'legacy-state.json',
+    )
+    const now = Date.now()
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        runId: 'legacy-state',
+        sessionKey: 'session-a',
+        friendlyId: 'session-a',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+        lastEventAt: now,
+        assistantText: 'a'.repeat(PERSISTED_ASSISTANT_TEXT_MAX_BYTES + 100),
+        thinkingText: 't'.repeat(PERSISTED_THINKING_TEXT_MAX_BYTES + 100),
+        toolCalls: Array.from(
+          { length: MAX_PERSISTED_RUN_TOOL_CALLS + 10 },
+          (_, index) => ({
+            id: `legacy-tool-${index}`,
+            name: 'shell',
+            phase: 'complete',
+            args: { token: `legacy-argument-secret-${index}` },
+            result: `password=legacy-result-secret-${index}`,
+          }),
+        ),
+        lifecycleEvents: Array.from(
+          { length: MAX_PERSISTED_RUN_LIFECYCLE_EVENTS + 10 },
+          (_, index) => ({
+            text: `${index}-${'e'.repeat(PERSISTED_LIFECYCLE_TEXT_MAX_BYTES + 100)}`,
+            emoji: 'x'.repeat(200),
+            timestamp: now + index,
+            isError: false,
+          }),
+        ),
+        unknownHostileField: 'must be dropped',
+      }),
+    )
+
+    const stored = await getPersistedRun('session-a', 'legacy-state')
+    expect(stored).not.toBeNull()
+    expect(
+      Buffer.byteLength(stored?.assistantText ?? '', 'utf8'),
+    ).toBeLessThanOrEqual(PERSISTED_ASSISTANT_TEXT_MAX_BYTES)
+    expect(
+      Buffer.byteLength(stored?.thinkingText ?? '', 'utf8'),
+    ).toBeLessThanOrEqual(PERSISTED_THINKING_TEXT_MAX_BYTES)
+    expect(stored?.toolCalls).toHaveLength(MAX_PERSISTED_RUN_TOOL_CALLS)
+    expect(stored?.lifecycleEvents).toHaveLength(
+      MAX_PERSISTED_RUN_LIFECYCLE_EVENTS,
+    )
+    expect(
+      Buffer.byteLength(stored?.lifecycleEvents[0]?.text ?? '', 'utf8'),
+    ).toBeLessThanOrEqual(PERSISTED_LIFECYCLE_TEXT_MAX_BYTES)
+    expect(JSON.stringify(stored)).not.toContain('legacy-argument-secret')
+    expect(JSON.stringify(stored)).not.toContain('legacy-result-secret')
+    expect(stored).not.toHaveProperty('unknownHostileField')
+  })
+
+  it('skips malformed and oversized state during concurrent Card scans', async () => {
+    const {
+      MAX_PERSISTED_RUN_FILE_BYTES,
+      createPersistedRun,
+      getActiveRunForCard,
+      getPersistedRun,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'valid-card-run',
+      sessionKey: 'remote:valid',
+      friendlyId: 'card-a',
+      cardId: 'card-a',
+      canonicalSegmentKey: 'remote:valid',
+    })
+    await createPersistedRun({
+      runId: 'oversized-run',
+      sessionKey: 'remote:oversized',
+      friendlyId: 'card-a',
+      cardId: 'card-a',
+      canonicalSegmentKey: 'remote:oversized',
+    })
+    const oversizedPath = join(
+      tempHome!,
+      'webui-mvp',
+      'runs',
+      'remote%3Aoversized',
+      'oversized-run.json',
+    )
+    writeFileSync(oversizedPath, 'x'.repeat(MAX_PERSISTED_RUN_FILE_BYTES + 1))
+    await createPersistedRun({
+      runId: 'malformed-run',
+      sessionKey: 'remote:malformed',
+    })
+    writeFileSync(
+      join(
+        tempHome!,
+        'webui-mvp',
+        'runs',
+        'remote%3Amalformed',
+        'malformed-run.json',
+      ),
+      JSON.stringify({
+        runId: 'malformed-run',
+        sessionKey: 'remote:malformed',
+      }),
+    )
+
+    await expect(
+      getPersistedRun('remote:oversized', 'oversized-run'),
+    ).resolves.toBeNull()
+    await expect(
+      Promise.all(
+        Array.from({ length: 16 }, () =>
+          getActiveRunForCard('card-a', 'remote:valid'),
+        ),
+      ),
+    ).resolves.toEqual(
+      Array.from({ length: 16 }, () =>
+        expect.objectContaining({ runId: 'valid-card-run' }),
+      ),
+    )
+  })
+
+  it('reclaims a lock whose live PID belongs to a different process identity', async () => {
+    const { appendRunText, createPersistedRun, getPersistedRun } =
+      await import('./run-store')
+    await createPersistedRun({
+      runId: 'reused-pid-lock',
+      sessionKey: 'session-a',
+    })
+    writeFileSync(
+      join(
+        tempHome!,
+        'webui-mvp',
+        'runs',
+        'session-a',
+        'reused-pid-lock.json.lock',
+      ),
+      `${JSON.stringify({
+        token: '00000000-0000-4000-8000-000000000000',
+        pid: process.pid,
+        processIdentity: 'linux:impossible-reused-process',
+        leaseUntil: Date.now() + 60_000,
+      })}\n`,
+    )
+
+    await appendRunText('session-a', 'reused-pid-lock', 'reclaimed')
+    await expect(
+      getPersistedRun('session-a', 'reused-pid-lock'),
+    ).resolves.toMatchObject({ assistantText: 'reclaimed' })
+  })
+
+  it('reclaims an expired lease when a legacy PID cannot prove ownership', async () => {
+    const { appendRunText, createPersistedRun, getPersistedRun } =
+      await import('./run-store')
+    await createPersistedRun({
+      runId: 'expired-lease-lock',
+      sessionKey: 'session-a',
+    })
+    writeFileSync(
+      join(
+        tempHome!,
+        'webui-mvp',
+        'runs',
+        'session-a',
+        'expired-lease-lock.json.lock',
+      ),
+      `${JSON.stringify({
+        token: '00000000-0000-4000-8000-000000000000',
+        pid: process.pid,
+        leaseUntil: Date.now() - 1,
+      })}\n`,
+    )
+
+    await appendRunText('session-a', 'expired-lease-lock', 'reclaimed')
+    await expect(
+      getPersistedRun('session-a', 'expired-lease-lock'),
+    ).resolves.toMatchObject({ assistantText: 'reclaimed' })
+  })
+
+  it('does not evict a confirmed live lock owner when its lease timestamp is stale', async () => {
+    const { appendRunText, createPersistedRun } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'live-owner-lock',
+      sessionKey: 'session-a',
+    })
+    const processStat = readFileSync(`/proc/${process.pid}/stat`, 'utf8')
+    const processIdentity = `linux:${
+      processStat.slice(processStat.lastIndexOf(') ') + 2).split(' ')[19]
+    }`
+    const lockPath = join(
+      tempHome!,
+      'webui-mvp',
+      'runs',
+      'session-a',
+      'live-owner-lock.json.lock',
+    )
+    writeFileSync(
+      lockPath,
+      `${JSON.stringify({
+        token: '00000000-0000-4000-8000-000000000000',
+        pid: process.pid,
+        processIdentity,
+        leaseUntil: Date.now() - 1,
+      })}\n`,
+    )
+
+    let settled = false
+    const blockedUpdate = appendRunText(
+      'session-a',
+      'live-owner-lock',
+      'write after release',
+    ).finally(() => {
+      settled = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(settled).toBe(false)
+    expect(existsSync(lockPath)).toBe(true)
+    unlinkSync(lockPath)
+    await expect(blockedUpdate).resolves.toMatchObject({
+      assistantText: 'write after release',
+    })
+  }, 5_000)
+
+  it('keeps true run-level errors terminal after later updates', async () => {
+    const {
+      appendRunText,
+      createPersistedRun,
+      getPersistedRun,
+      markRunStatus,
+      upsertRunToolCall,
+    } = await import('./run-store')
+    await createPersistedRun({ runId: 'run-error', sessionKey: 'session-a' })
+    await markRunStatus('session-a', 'run-error', 'error', 'stream failed')
+    await upsertRunToolCall('session-a', 'run-error', {
+      id: 'late-tool',
+      name: 'shell',
+      phase: 'complete',
+      result: 'late result',
+    })
+    await appendRunText('session-a', 'run-error', 'late text')
+
+    await expect(
+      getPersistedRun('session-a', 'run-error'),
+    ).resolves.toMatchObject({
+      status: 'error',
+      errorMessage: 'stream failed',
+      assistantText: '',
+      toolCalls: [],
     })
   })
 
