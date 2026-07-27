@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   STREAM_PROVENANCE_ID_LIMIT,
   childLifecycleStatusForEvent,
+  classifyStreamTerminalEvent,
   createStreamEventProvenanceTracker,
   hasNonParentStreamFacts,
   resolveActiveParentSource,
@@ -26,10 +27,33 @@ describe('childLifecycleStatusForEvent', () => {
     expect(childLifecycleStatusForEvent(event)).toBe('complete'),
   )
 
-  it.each(['error', 'run.failed', 'run.error', 'run.cancelled'])(
-    'maps %s to error',
-    (event) => expect(childLifecycleStatusForEvent(event)).toBe('error'),
+  it.each([
+    'error',
+    'run.failed',
+    'run.error',
+    'run.cancelled',
+    'run.canceled',
+  ])('maps %s to error', (event) =>
+    expect(childLifecycleStatusForEvent(event)).toBe('error'),
   )
+})
+
+describe('classifyStreamTerminalEvent', () => {
+  it.each([
+    ['run.completed', 'success'],
+    ['run.succeeded', 'success'],
+    ['error', 'error'],
+    ['run.failed', 'error'],
+    ['run.error', 'error'],
+    ['run.cancelled', 'cancelled'],
+    ['run.canceled', 'cancelled'],
+  ] as const)('classifies %s as %s', (event, expected) => {
+    expect(classifyStreamTerminalEvent(event)).toBe(expected)
+  })
+
+  it('does not terminalize ordinary activity', () => {
+    expect(classifyStreamTerminalEvent('assistant.delta')).toBeNull()
+  })
 })
 
 describe('createStreamEventProvenanceTracker', () => {

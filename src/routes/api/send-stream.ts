@@ -58,6 +58,7 @@ import {
 } from './-send-stream-terminal'
 import {
   childLifecycleStatusForEvent,
+  classifyStreamTerminalEvent,
   createStreamEventProvenanceTracker,
   hasNonParentStreamFacts,
   resolveAuthoritativeBootstrapHandoff,
@@ -2014,6 +2015,8 @@ export const Route = createFileRoute('/api/send-stream')({
                       if (!parentLifecycleEligible) return
                       streamEventProvenance.recordParentRun(upstreamRunId)
                       const sessionKeyFromEvent = getEnhancedClientSessionKey()
+                      const terminalEventKind =
+                        classifyStreamTerminalEvent(event)
 
                       if (runId && !activeRunId) {
                         activeRunId = runId
@@ -2320,7 +2323,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         return
                       }
 
-                      if (event === 'error') {
+                      if (terminalEventKind === 'error') {
                         const errorMessage =
                           readString(
                             (data.error as Record<string, unknown> | undefined)
@@ -2328,6 +2331,7 @@ export const Route = createFileRoute('/api/send-stream')({
                           ) ||
                           readString(data.message) ||
                           'Hermes stream error'
+                        stopLivePolling()
                         await finalizeTerminalPersistence(
                           persistTerminalRun('error', errorMessage),
                           () => {
@@ -2341,7 +2345,22 @@ export const Route = createFileRoute('/api/send-stream')({
                         return
                       }
 
-                      if (event === 'run.completed') {
+                      if (terminalEventKind === 'cancelled') {
+                        stopLivePolling()
+                        await finalizeTerminalPersistence(
+                          persistTerminalRun('handoff'),
+                          () => {
+                            sendEvent('done', {
+                              state: 'interrupted',
+                              sessionKey: sessionKeyFromEvent,
+                              runId,
+                            })
+                          },
+                        )
+                        return
+                      }
+
+                      if (terminalEventKind === 'success') {
                         // The terminal history read below is the authoritative
                         // final tool refresh. Stop scheduling live polls before
                         // it starts; an origin poll already in flight is still

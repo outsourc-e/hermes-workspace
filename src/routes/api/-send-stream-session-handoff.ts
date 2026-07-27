@@ -20,20 +20,27 @@ export type VerifiedStreamCard = {
 }
 
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
-const CHILD_SUCCESS_EVENTS = new Set(['run.completed', 'run.succeeded'])
-const CHILD_ERROR_EVENTS = new Set([
-  'error',
-  'run.failed',
-  'run.error',
-  'run.cancelled',
-  'run.canceled',
-])
+const SUCCESS_TERMINAL_EVENTS = new Set(['run.completed', 'run.succeeded'])
+const ERROR_TERMINAL_EVENTS = new Set(['error', 'run.failed', 'run.error'])
+const CANCELLED_TERMINAL_EVENTS = new Set(['run.cancelled', 'run.canceled'])
+
+export type StreamTerminalEventKind = 'success' | 'error' | 'cancelled'
+
+export function classifyStreamTerminalEvent(
+  event: string,
+): StreamTerminalEventKind | null {
+  if (SUCCESS_TERMINAL_EVENTS.has(event)) return 'success'
+  if (ERROR_TERMINAL_EVENTS.has(event)) return 'error'
+  if (CANCELLED_TERMINAL_EVENTS.has(event)) return 'cancelled'
+  return null
+}
 
 export function childLifecycleStatusForEvent(
   event: string,
 ): 'running' | 'complete' | 'error' {
-  if (CHILD_SUCCESS_EVENTS.has(event)) return 'complete'
-  if (CHILD_ERROR_EVENTS.has(event)) return 'error'
+  const terminalKind = classifyStreamTerminalEvent(event)
+  if (terminalKind === 'success') return 'complete'
+  if (terminalKind) return 'error'
   return 'running'
 }
 

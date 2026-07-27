@@ -2346,6 +2346,142 @@ describe('send-stream bootstrap session handoff', () => {
     )
   })
 
+  it.each([
+    {
+      terminalEvent: 'run.completed',
+      expectedRunStatus: 'complete',
+      expectedClientEvent: 'done',
+      expectedClientState: 'complete',
+    },
+    {
+      terminalEvent: 'run.succeeded',
+      expectedRunStatus: 'complete',
+      expectedClientEvent: 'done',
+      expectedClientState: 'complete',
+    },
+    {
+      terminalEvent: 'error',
+      expectedRunStatus: 'error',
+      expectedClientEvent: 'error',
+      expectedClientState: undefined,
+    },
+    {
+      terminalEvent: 'run.failed',
+      expectedRunStatus: 'error',
+      expectedClientEvent: 'error',
+      expectedClientState: undefined,
+    },
+    {
+      terminalEvent: 'run.error',
+      expectedRunStatus: 'error',
+      expectedClientEvent: 'error',
+      expectedClientState: undefined,
+    },
+    {
+      terminalEvent: 'run.cancelled',
+      expectedRunStatus: 'handoff',
+      expectedClientEvent: 'done',
+      expectedClientState: 'interrupted',
+    },
+    {
+      terminalEvent: 'run.canceled',
+      expectedRunStatus: 'handoff',
+      expectedClientEvent: 'done',
+      expectedClientState: 'interrupted',
+    },
+  ] as const)(
+    'terminalizes a parent run on $terminalEvent without a later deadline timeout',
+    async ({
+      terminalEvent,
+      expectedRunStatus,
+      expectedClientEvent,
+      expectedClientState,
+    }) => {
+      vi.useFakeTimers()
+      try {
+        mocks.streamChat.mockImplementationOnce(
+          async (
+            _sessionKey: string,
+            _request: unknown,
+            options: {
+              onEvent: (payload: {
+                event: string
+                data: Record<string, unknown>
+              }) => Promise<void>
+            },
+          ) => {
+            await options.onEvent({
+              event: 'run.started',
+              data: { run_id: 'parent-run', session_id: 'created-session' },
+            })
+            await options.onEvent({
+              event: terminalEvent,
+              data: {
+                run_id: 'parent-run',
+                session_id: 'created-session',
+                message: 'upstream terminal message',
+              },
+            })
+          },
+        )
+
+        const response = await handler({
+          request: new Request('http://workspace.test/api/send-stream', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              sessionKey: 'created-session',
+              friendlyId: 'created-session',
+              message: 'hello',
+            }),
+          }),
+        })
+        const responseText = response.text()
+
+        await vi.advanceTimersByTimeAsync(600_000)
+        const events = parseEvents(await responseText)
+
+        expect(
+          events.filter(({ event }) => event === expectedClientEvent),
+        ).toEqual([
+          {
+            event: expectedClientEvent,
+            data:
+              expectedClientEvent === 'error'
+                ? {
+                    message: 'upstream terminal message',
+                    sessionKey: 'created-session',
+                    runId: 'parent-run',
+                  }
+                : {
+                    state: expectedClientState,
+                    sessionKey: 'created-session',
+                    runId: 'parent-run',
+                  },
+          },
+        ])
+        expect(
+          events.some(
+            ({ event, data }) =>
+              event === 'error' && data?.message === 'Stream timeout',
+          ),
+        ).toBe(false)
+        expect(mocks.markRunStatus).toHaveBeenCalledTimes(1)
+        expect(mocks.markRunStatus).toHaveBeenCalledWith(
+          'created-session',
+          'parent-run',
+          expectedRunStatus,
+          expectedRunStatus === 'error'
+            ? 'upstream terminal message'
+            : undefined,
+        )
+        expect(vi.getTimerCount()).toBe(0)
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
+
   it('does not let rejected terminal events fail, complete, close, or backfill the parent stream', async () => {
     const historyReads: Array<string> = []
     mocks.getMessages.mockImplementation((sessionKey: string) => {
