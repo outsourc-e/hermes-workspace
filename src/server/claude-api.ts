@@ -99,6 +99,8 @@ export type ClaudeMessagesResult = {
   messages: Array<ClaudeMessage>
   source: ClaudeSessionSource
   resolvedSessionId?: string
+  total?: number
+  truncated?: boolean
 }
 
 export type ClaudeConfig = {
@@ -276,12 +278,14 @@ export async function getMessagesResult(
     (getCapabilities().dashboard.available ? 'dashboard' : 'gateway')
   if (source === 'dashboard') {
     const resp = await getDashboardSessionMessages(sessionId)
+    const messages = resp.messages as Array<ClaudeMessage>
     return {
-      messages: resp.messages as Array<ClaudeMessage>,
+      messages,
       source: 'dashboard',
       ...(typeof resp.session_id === 'string'
         ? { resolvedSessionId: resp.session_id }
         : {}),
+      ...messagePageMetadata(resp, messages.length),
     }
   }
   const resp = await claudeGet<{
@@ -289,17 +293,22 @@ export async function getMessagesResult(
     data?: Array<ClaudeMessage>
     messages?: Array<ClaudeMessage>
     total?: number
+    truncated?: boolean
+    has_more?: boolean
+    hasMore?: boolean
     session_id?: string
   }>(`/api/sessions/${sessionId}/messages`)
   // Gateway (OpenAI-compat) returns { object: 'list', data: [...] }; dashboard / older
   // shape uses { items: [...] }; some message endpoints use { messages: [...] }.
   // Accept any, and never return undefined (callers read .length / .map / .slice).
+  const messages = resp.items ?? resp.data ?? resp.messages ?? []
   return {
-    messages: resp.items ?? resp.data ?? resp.messages ?? [],
+    messages,
     source: 'gateway',
     ...(typeof resp.session_id === 'string'
       ? { resolvedSessionId: resp.session_id }
       : {}),
+    ...messagePageMetadata(resp, messages.length),
   }
 }
 
@@ -406,6 +415,33 @@ export class SessionForkUnavailableError extends Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function messagePageMetadata(
+  value: unknown,
+  messageCount: number,
+): Pick<ClaudeMessagesResult, 'total' | 'truncated'> {
+  if (!isRecord(value)) return {}
+  const total =
+    typeof value.total === 'number' &&
+    Number.isSafeInteger(value.total) &&
+    value.total >= 0
+      ? value.total
+      : undefined
+  const explicitTruncated =
+    typeof value.truncated === 'boolean'
+      ? value.truncated
+      : typeof value.has_more === 'boolean'
+        ? value.has_more
+        : typeof value.hasMore === 'boolean'
+          ? value.hasMore
+          : undefined
+  const truncated =
+    total !== undefined && total > messageCount ? true : explicitTruncated
+  return {
+    ...(total === undefined ? {} : { total }),
+    ...(truncated === undefined ? {} : { truncated }),
+  }
 }
 
 function parseForkParentIdentity(

@@ -22,6 +22,7 @@ function card(): SessionCard {
   return {
     cardId: 'card:root',
     canonicalSource: 'remote',
+    canonicalTransport: 'gateway',
     title: 'Card title',
     titleSource: 'manual',
     canonicalSegmentKey: 'remote:tip',
@@ -277,4 +278,21 @@ describe('MobileSessionsPanel Card routing', () => {
       expect(screen.getByRole('button', { name: 'Archive card' })).toBeTruthy()
     },
   )
+
+  it('omits branching for dashboard Cards while preserving ordinary actions', () => {
+    renderPanel({ cards: [{ ...card(), canonicalTransport: 'dashboard' }] })
+
+    React.act(() =>
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Card actions for Card title' }),
+      ),
+    )
+
+    expect(
+      screen.queryByRole('button', { name: 'Branch conversation' }),
+    ).toBeNull()
+    expect(screen.getByRole('button', { name: 'Pin card' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Archive card' })).toBeTruthy()
+  })
 })

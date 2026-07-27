@@ -383,6 +383,37 @@ describe('SessionCardHistoryService', () => {
     })
   })
 
+  it('reports a truncated 100-row remote message page as partial and retryable', async () => {
+    const rows = Array.from({ length: 100 }, (_, index) => ({
+      id: `message-${index + 1}`,
+      content: String(index + 1),
+    }))
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => [session('only')]),
+      messageSource: {
+        getMessages: vi.fn(() =>
+          Promise.resolve({
+            messages: rows,
+            source: 'remote',
+            resolvedSegmentKey: 'only',
+            truncated: true,
+          }),
+        ),
+      },
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'only', limit: 25 })
+
+    // A partial snapshot cannot safely issue an offset cursor, so preserve every
+    // currently available row even when that exceeds the requested page size.
+    expect(result.messages).toHaveLength(100)
+    expect(result.messages[0]?.message.id).toBe('message-1')
+    expect(result.messages[99]?.message.id).toBe('message-100')
+    expect(result).toMatchObject({ completeness: 'partial', retryable: true })
+    expect(result.nextCursor).toBeUndefined()
+  })
+
   it('never emits or consumes an offset cursor while a segment snapshot is partial', async () => {
     let secondAvailable = false
     const getMessages = vi.fn((segmentKey: string) => {
@@ -464,6 +495,7 @@ describe('SessionCardHistoryService', () => {
     expect(messages.getMessages.mock.calls.map(([key]) => key)).toEqual(['tip'])
     expect(result.messages.map((entry) => entry.message.content)).toEqual([
       'safe tip content',
+      'more tip content',
     ])
     expect(result).toMatchObject({
       cardId: 'remote:root',

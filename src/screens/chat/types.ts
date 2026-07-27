@@ -181,6 +181,7 @@ export type SessionCardRelationshipKind = Exclude<
 export type SessionCardTitleSource = 'default' | 'auto' | 'manual'
 export type SessionCardChildStatus = 'idle' | 'running' | 'complete' | 'error'
 export type SessionCardCanonicalSource = 'local' | 'remote'
+export type SessionCardCanonicalTransport = 'local' | 'dashboard' | 'gateway'
 
 export type SessionCardChild = {
   cardId: string
@@ -199,6 +200,8 @@ export type SessionCard = {
    * Card API always supplies it; pure projections omit it until server lookup.
    */
   canonicalSource?: SessionCardCanonicalSource
+  /** Exact source-aware transport that owns the canonical segment. */
+  canonicalTransport?: SessionCardCanonicalTransport
   title: string
   titleSource: SessionCardTitleSource
   canonicalSegmentKey: string
@@ -214,13 +217,19 @@ export type SessionCard = {
 
 /**
  * Whole-Card branching requires both a positively advertised gateway
- * capability and an authoritative remote canonical transport.
+ * capability and an authoritative canonical segment owned by that same
+ * gateway transport. A global gateway capability must not authorize a Card
+ * whose history/list projection came from the dashboard.
  */
 export function isWholeCardBranchAvailable(
-  card: Pick<SessionCard, 'canonicalSource'>,
+  card: Pick<SessionCard, 'canonicalSource' | 'canonicalTransport'>,
   sessionForkAvailable: boolean,
 ): boolean {
-  return sessionForkAvailable && card.canonicalSource === 'remote'
+  return (
+    sessionForkAvailable &&
+    card.canonicalSource === 'remote' &&
+    card.canonicalTransport === 'gateway'
+  )
 }
 
 export type PathsPayload = {

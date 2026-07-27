@@ -54,6 +54,7 @@ vi.mock('@/components/ui/menu', () => ({
 const rootCard: SessionCard = {
   cardId: 'card:root',
   canonicalSource: 'remote',
+  canonicalTransport: 'gateway',
   title: 'Root card',
   titleSource: 'manual',
   canonicalSegmentKey: 'remote:tip',
@@ -255,4 +256,15 @@ describe('SessionTreeRow Card routing', () => {
       expect(screen.getByRole('button', { name: 'Archive' })).toBeTruthy()
     },
   )
+
+  it('omits branching for a dashboard-backed remote root even when the gateway advertises fork', () => {
+    render({ card: { ...rootCard, canonicalTransport: 'dashboard' } })
+
+    expect(
+      screen.queryByRole('button', { name: 'Branch conversation' }),
+    ).toBeNull()
+    expect(screen.getByRole('button', { name: 'Pin card' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Archive' })).toBeTruthy()
+  })
 })

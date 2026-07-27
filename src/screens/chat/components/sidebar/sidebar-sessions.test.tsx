@@ -89,6 +89,7 @@ function card(overrides: Partial<SessionCard> = {}): SessionCard {
   return {
     cardId: 'card:root',
     canonicalSource: 'remote',
+    canonicalTransport: 'gateway',
     title: 'Authoritative card title',
     titleSource: 'manual',
     canonicalSegmentKey: 'remote:tip',

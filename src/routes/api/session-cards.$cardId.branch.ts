@@ -38,6 +38,24 @@ function branchFailure(): Response {
   )
 }
 
+function projectionPendingResponse(
+  cardId: string,
+  canonicalSegmentKey: string,
+  childSessionKey: string,
+): Response {
+  return json(
+    {
+      ok: true,
+      cardId,
+      canonicalSegmentKey,
+      childSessionKey,
+      supported: true,
+      projectionPending: true,
+    },
+    { status: 202 },
+  )
+}
+
 function remoteProjectedKey(upstreamKey: string): string {
   return `remote:${encodeURIComponent(upstreamKey)}`
 }
@@ -137,22 +155,56 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
           }
 
           const expectedChildKey = remoteProjectedKey(childUpstreamKey)
-          const fresh = await sessionCardService.resolveCard(
-            resolved.card.cardId,
-            { includeArchived: true },
-          )
+          let fresh
+          try {
+            fresh = await sessionCardService.resolveCard(resolved.card.cardId, {
+              includeArchived: true,
+            })
+          } catch {
+            return projectionPendingResponse(
+              resolved.card.cardId,
+              canonicalSegmentKey,
+              expectedChildKey,
+            )
+          }
+          if (fresh.card.cardId !== resolved.card.cardId) return branchFailure()
+          if (fresh.collection.completeness !== 'complete') {
+            return projectionPendingResponse(
+              resolved.card.cardId,
+              canonicalSegmentKey,
+              expectedChildKey,
+            )
+          }
+
           const freshCanonicalKey = fresh.card.canonicalSegmentKey
+          const malformedProjectedBranch = fresh.card.childNodes.some(
+            (candidate) =>
+              candidate.relationshipKind === 'branch' &&
+              (!fresh.sourceBySegmentKey.has(candidate.sessionKey) ||
+                !fresh.upstreamKeyBySegmentKey.has(candidate.sessionKey)),
+          )
+          if (malformedProjectedBranch) return branchFailure()
           const child = fresh.card.childNodes.find(
             (candidate) =>
               candidate.relationshipKind === 'branch' &&
               candidate.cardId === expectedChildKey &&
               candidate.sessionKey === expectedChildKey,
           )
-          if (!child) return branchFailure()
+          if (!child) {
+            return projectionPendingResponse(
+              resolved.card.cardId,
+              canonicalSegmentKey,
+              expectedChildKey,
+            )
+          }
 
           const freshParentSource =
-            fresh.sourceBySegmentKey.get(freshCanonicalKey)
+            fresh.sourceBySegmentKey.get(canonicalSegmentKey)
           const freshParentUpstreamKey =
+            fresh.upstreamKeyBySegmentKey.get(canonicalSegmentKey)
+          const freshCanonicalSource =
+            fresh.sourceBySegmentKey.get(freshCanonicalKey)
+          const freshCanonicalUpstreamKey =
             fresh.upstreamKeyBySegmentKey.get(freshCanonicalKey)
           const freshChildSource = fresh.sourceBySegmentKey.get(
             child.sessionKey,
@@ -161,9 +213,20 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
             child.sessionKey,
           )
           if (
-            fresh.card.cardId !== resolved.card.cardId ||
-            fresh.collection.completeness !== 'complete' ||
+            freshParentSource === undefined ||
+            freshParentUpstreamKey === undefined ||
+            freshCanonicalSource === undefined ||
+            freshCanonicalUpstreamKey === undefined
+          ) {
+            return projectionPendingResponse(
+              resolved.card.cardId,
+              canonicalSegmentKey,
+              expectedChildKey,
+            )
+          }
+          if (
             freshParentSource !== 'gateway' ||
+            freshCanonicalSource !== 'gateway' ||
             freshChildSource !== 'gateway' ||
             freshParentUpstreamKey !== authoritativeUpstreamKey ||
             freshChildUpstreamKey !== childUpstreamKey ||
@@ -176,7 +239,7 @@ export const Route = createFileRoute('/api/session-cards/$cardId/branch')({
             {
               ok: true,
               cardId: resolved.card.cardId,
-              canonicalSegmentKey: freshCanonicalKey,
+              canonicalSegmentKey,
               childSessionKey: child.sessionKey,
               supported: true,
             },

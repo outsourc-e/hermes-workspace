@@ -186,6 +186,41 @@ describe('Session Card adapter foundations', () => {
       { id: 'tip-message', role: 'assistant' },
     ])
   })
+
+  it('marks a 100-row gateway message page incomplete when the returned total is 150', async () => {
+    gatewayMocks.getCapabilities.mockReturnValue(
+      capabilities({ dashboard: { available: false, url: 'offline' } }),
+    )
+    const messages = Array.from({ length: 100 }, (_, index) => ({
+      id: `message-${index + 1}`,
+      session_id: 'requested-root',
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      content: String(index + 1),
+      timestamp: index + 1,
+    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            object: 'list',
+            session_id: 'requested-root',
+            data: messages,
+            total: 150,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    )
+
+    await expect(getMessagesResult('requested-root')).resolves.toMatchObject({
+      messages,
+      source: 'gateway',
+      resolvedSessionId: 'requested-root',
+      total: 150,
+      truncated: true,
+    })
+  })
 })
 
 describe('getLatestDescendant', () => {

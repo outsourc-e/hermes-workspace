@@ -792,6 +792,70 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     })
   })
 
+  it('acknowledges an upstream fork as projection-pending instead of returning a retryable failure', async () => {
+    mocks.forkSession.mockResolvedValue({
+      session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
+      forkedFrom: 'tip-upstream',
+    })
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedCard())
+      .mockResolvedValueOnce(resolvedCard())
+
+    const response = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        '{}',
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(202)
+    expect(await response.json()).toEqual({
+      ok: true,
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      childSessionKey: 'remote:child-upstream',
+      supported: true,
+      projectionPending: true,
+    })
+    expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('reconciles the fork against its original parent when the Card tip rotates after the fork', async () => {
+    mocks.forkSession.mockResolvedValue({
+      session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
+      forkedFrom: 'tip-upstream',
+    })
+    const rotated = resolvedCardWithBranch()
+    rotated.card.canonicalSegmentKey = 'remote:new-tip'
+    rotated.card.continuationSegmentKeys.push('remote:new-tip')
+    rotated.sourceBySegmentKey.set('remote:new-tip', 'gateway')
+    rotated.upstreamKeyBySegmentKey.set('remote:new-tip', 'new-tip-upstream')
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedCard())
+      .mockResolvedValueOnce(rotated)
+
+    const response = await branchHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/branch',
+        'POST',
+        '{}',
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(201)
+    expect(await response.json()).toEqual({
+      ok: true,
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      childSessionKey: 'remote:child-upstream',
+      supported: true,
+    })
+    expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects invalid Cards and unsupported capability without forking', async () => {
     mocks.resolveCard.mockRejectedValueOnce(
       new CardNotFoundError('remote:child'),
@@ -998,7 +1062,7 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(mocks.listCards).not.toHaveBeenCalled()
   })
 
-  it('returns 502 rather than fabricating a child when the fresh Card relation is absent or spoofed', async () => {
+  it('returns 502 rather than fabricating a child when the fresh Card relation is spoofed', async () => {
     mocks.forkSession.mockResolvedValue({
       session: { id: 'child-upstream', parent_session_id: 'tip-upstream' },
       forkedFrom: 'tip-upstream',

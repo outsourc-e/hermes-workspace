@@ -28,6 +28,7 @@ export type SessionCardHistoryMessageBatch = {
   source?: string
   resolvedSegmentKey?: string
   snapshot?: string
+  total?: number
   truncated?: boolean
 }
 
@@ -109,6 +110,10 @@ function defaultMessageSource(): SessionCardHistoryMessageSource {
         ...(result.resolvedSessionId === undefined
           ? {}
           : { resolvedSegmentKey: result.resolvedSessionId }),
+        ...(result.total === undefined ? {} : { total: result.total }),
+        ...(result.truncated === undefined
+          ? {}
+          : { truncated: result.truncated }),
       }
     },
   }
@@ -153,6 +158,7 @@ function historySnapshotFingerprint(
             batchSource: batch.source,
             resolvedSegmentKey: batch.resolvedSegmentKey,
             upstreamSnapshot: batch.snapshot,
+            upstreamTotal: batch.total,
             truncated: batch.truncated === true,
             messageCount: batch.messages.length,
             firstMessageId: batch.messages[0]
@@ -358,7 +364,12 @@ export class SessionCardHistoryService {
       throw new SessionCardHistoryCursorError()
     }
     if (offset > assembled.length) throw new SessionCardHistoryCursorError()
-    const messages = assembled.slice(offset, offset + limit)
+    // A partial aggregate has no stable offset cursor. Return every row that is
+    // currently available so applying the requested limit cannot make the
+    // remainder unreachable while the missing/truncated segment is retried.
+    const messages = partial
+      ? assembled
+      : assembled.slice(offset, offset + limit)
     const nextOffset = offset + messages.length
     const nextCursor =
       !partial && nextOffset < assembled.length
