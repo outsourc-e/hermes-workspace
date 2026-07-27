@@ -7,6 +7,7 @@ import {
   resolveSessionCardRouteState,
   validatedInspectedChildCardId,
 } from './-session-route-state'
+import { syncLastSessionCardPersistence } from './-last-session-card'
 import type { SessionRouteResolutionPayload } from './-session-route-state'
 import { ErrorBoundary } from '@/components/error-boundary'
 import {
@@ -130,11 +131,8 @@ function ChatRoute() {
   }, [activeFriendlyId, navigate, selectedCardId])
 
   useEffect(() => {
-    if (!selectedCardId) return
-    try {
-      localStorage.setItem('hermes-last-session-card', selectedCardId)
-    } catch {}
-  }, [selectedCardId])
+    syncLastSessionCardPersistence({ activeFriendlyId, selectedCardId })
+  }, [activeFriendlyId, selectedCardId])
 
   // Clear history cache when navigating to new chat
   useEffect(() => {
