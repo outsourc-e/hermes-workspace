@@ -588,6 +588,8 @@ describe('ChatPanel Card routing', () => {
       mocks.queryState.data = wire([created])
       return Promise.resolve()
     })
+    const fetchMock = vi.fn().mockResolvedValue(response(wire([])))
+    vi.stubGlobal('fetch', fetchMock)
 
     renderPanel()
 
@@ -600,6 +602,10 @@ describe('ChatPanel Card routing', () => {
       compact: true,
       embedded: true,
     })
+    await expect(mocks.queryOptions?.queryFn()).resolves.toEqual(wire([]))
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
+      '/api/session-cards',
+    ])
 
     React.act(() => {
       const onSessionResolved = bootstrapProps?.onSessionResolved as

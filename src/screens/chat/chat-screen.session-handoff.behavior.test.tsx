@@ -1999,6 +1999,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
 
     await waitForAssertion(() => {
+      expect(queryContext.legacySessionsEnabled).toBe(false)
       expect(stream.getRequestBody()).toMatchObject({
         sessionKey: 'new',
         friendlyId: 'new',
@@ -2018,8 +2019,8 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       vi
         .mocked(fetch)
         .mock.calls.some(
-          ([input, init]) =>
-            String(input) === '/api/sessions' && init?.method === 'POST',
+          (call: [RequestInfo | URL, RequestInit?]) =>
+            String(call[0]) === '/api/sessions',
         ),
     ).toBe(false)
 

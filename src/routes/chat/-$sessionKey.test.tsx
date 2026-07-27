@@ -18,6 +18,12 @@ const mocks = vi.hoisted(() => ({
     data: SessionCardListWire
     refetch: ReturnType<typeof vi.fn>
   },
+  queryOptions: undefined as
+    | {
+        enabled?: boolean
+        queryFn: () => Promise<SessionCardListWire>
+      }
+    | undefined,
   queryClient: {
     invalidateQueries: vi.fn(),
     removeQueries: vi.fn(),
@@ -32,7 +38,13 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 }))
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => mocks.queryState,
+  useQuery: (options: {
+    enabled?: boolean
+    queryFn: () => Promise<SessionCardListWire>
+  }) => {
+    mocks.queryOptions = options
+    return mocks.queryState
+  },
   useQueryClient: () => mocks.queryClient,
 }))
 
@@ -71,6 +83,7 @@ beforeEach(() => {
     globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true
   mocks.chatScreenProps.length = 0
+  mocks.queryOptions = undefined
   mocks.navigate.mockReset()
   mocks.queryClient.invalidateQueries.mockReset()
   mocks.queryClient.removeQueries.mockReset()
@@ -78,10 +91,49 @@ beforeEach(() => {
 
 afterEach(() => {
   while (mountedRoots.length > 0) mountedRoots.pop()?.()
+  vi.unstubAllGlobals()
 })
 
 describe('ChatRoute Session Card inventory', () => {
+  it('mounts /chat/new only as an inert bootstrap without raw session inventory', async () => {
+    mocks.params.sessionKey = 'new'
+    mocks.queryState = {
+      status: 'success',
+      data: {
+        cards: [],
+        cardResolutions: [],
+        completeness: 'complete',
+        retryable: false,
+        sources: [],
+      },
+      refetch: vi.fn(),
+    }
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    await React.act(async () => {
+      root.render(<ChatRoute />)
+      await Promise.resolve()
+    })
+    mountedRoots.push(() => {
+      React.act(() => root.unmount())
+      container.remove()
+    })
+
+    await waitFor(() => expect(mocks.chatScreenProps.length).toBeGreaterThan(0))
+    expect(mocks.queryOptions?.enabled).toBe(false)
+    expect(mocks.chatScreenProps.at(-1)).toMatchObject({
+      activeFriendlyId: 'new',
+      activeCard: undefined,
+      isNewChat: true,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('mounts one complete and one incomplete Card but fans out only the complete Card', async () => {
+    mocks.params.sessionKey = 'remote:complete'
     const complete = card('remote:complete', 'Complete Card')
     const incomplete = card('remote:incomplete', 'Incomplete Card')
     mocks.queryState = {

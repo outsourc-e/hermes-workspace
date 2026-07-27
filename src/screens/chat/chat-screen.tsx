@@ -652,12 +652,13 @@ export function ChatScreen({
   const { renameSession, renaming: renamingSessionTitle } = useRenameSession()
   const sseConnectionState = useChatStore((s) => s.connectionState)
 
-  // Card routes never feed their stable Card ID or canonical backend segment
-  // into the retired session hooks. Keep those hooks on the inert `new`
-  // bootstrap identity so React hook ordering stays stable without creating a
-  // second active-session/history path.
+  // Card routes and the `new` bootstrap sentinel never feed an identity into the
+  // retired session inventory. Keep the legacy hooks mounted on inert state so
+  // React hook ordering stays stable without creating a second active-session
+  // or history path.
   const legacyRouteFriendlyId = activeCard ? 'new' : activeFriendlyId
   const legacyForcedSessionKey = activeCard ? undefined : forcedSessionKey
+  const legacySessionInventoryEnabled = !activeCard && !isNewChat
   const {
     sessionsQuery,
     sessions,
@@ -673,7 +674,7 @@ export function ChatScreen({
     activeFriendlyId: legacyRouteFriendlyId,
     isNewChat: isNewChat || Boolean(activeCard),
     forcedSessionKey: legacyForcedSessionKey,
-    enabled: !activeCard,
+    enabled: legacySessionInventoryEnabled,
   })
   const activeSessionKey =
     activeCardCanonicalSegmentKey ?? legacyActiveSessionKey
