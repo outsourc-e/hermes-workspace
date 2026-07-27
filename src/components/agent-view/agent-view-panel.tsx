@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useNavigate } from '@tanstack/react-router'
 import {
   ArrowDown01Icon,
   ArrowRight01Icon,
@@ -22,7 +23,6 @@ import type {
 } from './agent-card'
 import type { ActiveAgent } from '@/hooks/use-agent-view'
 import type { AgentCardStatus } from '@/components/agent-card'
-import { AgentChatModal } from '@/components/agent-chat/AgentChatModal'
 import { AgentCard as MiniAgentCard } from '@/components/agent-card'
 import { Button } from '@/components/ui/button'
 import {
@@ -48,6 +48,7 @@ import {
   InspectorPanel,
   InspectorToggleButton,
 } from '@/components/inspector/inspector-panel'
+import { buildAgentSessionCardRoute } from '@/components/agent-view/agent-session-card-navigation'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
   const nodes = document.querySelectorAll<HTMLElement>(
@@ -657,6 +658,7 @@ function getStatusBubble(
 }
 
 export function AgentViewPanel() {
+  const navigate = useNavigate()
   // Sound notifications for agent events
   useSounds({ autoPlay: true })
 
@@ -689,17 +691,9 @@ export function AgentViewPanel() {
     errorMessage,
     setOpen,
     setHistoryOpen,
-    killAgent,
-    cancelQueueTask,
     activeCount,
   } = useAgentView()
 
-  // Transcript modal removed — View button now navigates to /agent-swarm
-  const [selectedAgentChat, setSelectedAgentChat] = useState<{
-    sessionKey: string
-    agentName: string
-    statusLabel: string
-  } | null>(null)
   const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
   const cliAgentsQuery = useCliAgents()
   const cliAgents = cliAgentsQuery.data ?? []
@@ -774,7 +768,6 @@ export function AgentViewPanel() {
             status,
             isLive: agent.isLive,
             statusBubble: getStatusBubble(status, agent.progress),
-            sessionKey: agent.id, // Use agent id as session key
           } satisfies AgentNode
         })
         .sort(function sortByProgressDesc(left, right) {
@@ -894,28 +887,22 @@ export function AgentViewPanel() {
   // View functionality is now handled inline within AgentCard via useInlineDetail
 
   function handleChatByNodeId(nodeId: string) {
-    const activeNode = activeNodes.find(function matchActiveNode(node) {
-      return node.id === nodeId
+    const activeAgent = activeAgents.find(function matchActiveAgent(agent) {
+      return agent.id === nodeId
     })
-    if (activeNode) {
-      setSelectedAgentChat({
-        sessionKey: activeNode.id,
-        agentName: activeNode.name,
-        statusLabel: getStatusLabel(activeNode.status),
-      })
+    if (activeAgent) {
+      setOpen(false)
+      void navigate(buildAgentSessionCardRoute(activeAgent.chatNavigation))
       return
     }
 
-    const queuedNode = queuedNodes.find(function matchQueuedNode(node) {
-      return node.id === nodeId
+    const queuedAgent = queuedAgents.find(function matchQueuedAgent(agent) {
+      return agent.id === nodeId
     })
-    if (!queuedNode) return
+    if (!queuedAgent) return
 
-    setSelectedAgentChat({
-      sessionKey: queuedNode.id,
-      agentName: queuedNode.name,
-      statusLabel: getStatusLabel(queuedNode.status),
-    })
+    setOpen(false)
+    void navigate(buildAgentSessionCardRoute(queuedAgent.chatNavigation))
   }
 
   return (
@@ -1007,6 +994,21 @@ export function AgentViewPanel() {
 
                 {/* Main Agent Card (includes usage section) */}
                 <OrchestratorCard compact={false} />
+
+                {errorMessage &&
+                activeCount === 0 &&
+                queuedAgents.length === 0 &&
+                historyAgents.length === 0 ? (
+                  <section className="rounded-xl border border-amber-300/50 bg-amber-100/30 p-3">
+                    <p className="text-xs font-semibold text-amber-800">
+                      Card activity unavailable
+                    </p>
+                    <p className="mt-1 text-[11px] text-amber-700">
+                      Agent activity is hidden until it maps through a complete
+                      validated Session Card projection.
+                    </p>
+                  </section>
+                ) : null}
 
                 {/* Agents — agent cards — only show when there's something */}
                 {(activeCount > 0 ||
@@ -1176,7 +1178,6 @@ export function AgentViewPanel() {
                                           )}
                                           viewMode={viewMode}
                                           onChat={handleChatByNodeId}
-                                          onKill={killAgent}
                                           useInlineDetail
                                           className={cn(
                                             agentSpawn.isSpawning(node.id)
@@ -1215,7 +1216,6 @@ export function AgentViewPanel() {
                                           )}
                                           viewMode={viewMode}
                                           onChat={handleChatByNodeId}
-                                          onCancel={cancelQueueTask}
                                           useInlineDetail
                                         />
                                       </div>
@@ -1474,13 +1474,9 @@ export function AgentViewPanel() {
                                 ) : (
                                   <span />
                                 )}
-                                <button
-                                  type="button"
-                                  onClick={() => killAgent(node.id)}
-                                  className="text-[10px] text-red-500 hover:text-red-700 font-medium"
-                                >
-                                  Kill
-                                </button>
+                                <span className="text-[10px] text-primary-500">
+                                  Controls unavailable
+                                </span>
                               </div>
                             }
                           />
@@ -1510,13 +1506,14 @@ export function AgentViewPanel() {
                                 <div className="flex justify-end">
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      setSelectedAgentChat({
-                                        sessionKey: agent.id,
-                                        agentName: agent.name,
-                                        statusLabel: agent.status,
-                                      })
-                                    }
+                                    onClick={() => {
+                                      setOpen(false)
+                                      void navigate(
+                                        buildAgentSessionCardRoute(
+                                          agent.chatNavigation,
+                                        ),
+                                      )
+                                    }}
                                     className="text-[10px] text-accent-600 hover:text-accent-800 font-medium"
                                   >
                                     View
@@ -1574,18 +1571,6 @@ export function AgentViewPanel() {
           </motion.button>
         ) : null}
       </AnimatePresence>
-
-      <AgentChatModal
-        open={selectedAgentChat !== null}
-        sessionKey={selectedAgentChat?.sessionKey ?? ''}
-        agentName={selectedAgentChat?.agentName ?? 'Agent'}
-        statusLabel={selectedAgentChat?.statusLabel ?? 'running'}
-        onOpenChange={function handleAgentChatOpenChange(nextOpen) {
-          if (!nextOpen) {
-            setSelectedAgentChat(null)
-          }
-        }}
-      />
     </>
   )
 }

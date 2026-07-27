@@ -179,7 +179,9 @@ export function AgentCard({
   const showActions = !node.isMain
   const isCompact = viewMode === 'compact'
   const isQueued = node.status === 'queued'
-  const sessionKey = (node.sessionKey || node.id || '').trim()
+  // Card IDs are navigation identities, not gateway agent-control identities.
+  // Fail closed unless the caller supplies a distinct control session key.
+  const sessionKey = (node.sessionKey || '').trim()
   const canWardenControl = showActions && !isQueued && sessionKey.length > 0
   const [showDetail, setShowDetail] = useState(false)
   const [steerOpen, setSteerOpen] = useState(false)

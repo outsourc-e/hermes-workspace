@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -39,6 +40,23 @@ export function resolveBackgroundRunCardNavigation(
     run.sessionKey,
     run.friendlyId,
   ])
+}
+
+function resolveBackgroundRunCardActivity(
+  response: SessionCardListWire | undefined,
+  run: BackgroundRun,
+) {
+  const navigation = resolveBackgroundRunCardNavigation(response, run)
+  if (!navigation || !response) return null
+  const owner = response.cards.find((card) => card.cardId === navigation.cardId)
+  if (!owner) return null
+  const title = navigation.inspectedChildCardId
+    ? owner.childNodes.find(
+        (child) => child.cardId === navigation.inspectedChildCardId,
+      )?.title
+    : owner.title
+  if (!title?.trim()) return null
+  return { run, navigation, title: title.trim() }
 }
 
 const POLL_INTERVAL_MS = 10_000
@@ -117,12 +135,7 @@ export function BackgroundRunsSection() {
   }, [])
 
   const handleOpen = useCallback(
-    (run: BackgroundRun) => {
-      const target = resolveBackgroundRunCardNavigation(
-        sessionCardsQuery.data,
-        run,
-      )
-      if (!target) return
+    (target: SessionCardProducerNavigation) => {
       void navigate({
         to: '/chat/$sessionKey',
         params: { sessionKey: target.cardId },
@@ -131,13 +144,25 @@ export function BackgroundRunsSection() {
           : {},
       })
     },
-    [navigate, sessionCardsQuery.data],
+    [navigate],
   )
 
-  if (runs.length === 0) return null
+  const resolvedRuns = useMemo(
+    () =>
+      runs.flatMap((run) => {
+        const activity = resolveBackgroundRunCardActivity(
+          sessionCardsQuery.data,
+          run,
+        )
+        return activity ? [activity] : []
+      }),
+    [runs, sessionCardsQuery.data],
+  )
 
-  const staleCount = runs.filter(
-    (r) => r.stalenessMs >= STALE_THRESHOLD_MS,
+  if (resolvedRuns.length === 0) return null
+
+  const staleCount = resolvedRuns.filter(
+    ({ run }) => run.stalenessMs >= STALE_THRESHOLD_MS,
   ).length
 
   return (
@@ -162,16 +187,16 @@ export function BackgroundRunsSection() {
             title={
               staleCount > 0
                 ? `${staleCount} stale (>5m silent)`
-                : `${runs.length} running`
+                : `${resolvedRuns.length} running`
             }
           >
-            {runs.length}
+            {resolvedRuns.length}
             {staleCount > 0 ? ` · ${staleCount} stale` : ''}
           </span>
         </div>
         <CollapsiblePanel contentClassName="pt-1">
           <div className="space-y-1">
-            {runs.map((run) => {
+            {resolvedRuns.map(({ run, navigation, title }) => {
               const isStale = run.stalenessMs >= STALE_THRESHOLD_MS
               const isBusy = busyRunId === run.runId
               const snippet =
@@ -181,7 +206,7 @@ export function BackgroundRunsSection() {
                 'no output yet'
               return (
                 <div
-                  key={`${run.sessionKey}:${run.runId}`}
+                  key={`${navigation.cardId}:${run.runId}`}
                   className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
                 >
                   <div className="flex items-center gap-1.5">
@@ -193,9 +218,9 @@ export function BackgroundRunsSection() {
                     />
                     <span
                       className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800"
-                      title={run.sessionKey}
+                      title={title}
                     >
-                      {run.friendlyId || run.sessionKey}
+                      {title}
                     </span>
                     <span
                       className={cn(
@@ -212,13 +237,7 @@ export function BackgroundRunsSection() {
                   <div className="mt-1 flex justify-end gap-1 pl-3">
                     <button
                       type="button"
-                      disabled={
-                        !resolveBackgroundRunCardNavigation(
-                          sessionCardsQuery.data,
-                          run,
-                        )
-                      }
-                      onClick={() => handleOpen(run)}
+                      onClick={() => handleOpen(navigation)}
                       className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-600 hover:bg-accent-100 hover:text-accent-800 disabled:cursor-default disabled:opacity-50"
                     >
                       Open

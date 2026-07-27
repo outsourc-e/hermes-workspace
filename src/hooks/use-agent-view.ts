@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type {
-  GatewaySession,
-  GatewaySessionStatusResponse,
-} from '@/lib/gateway-api'
-import { fetchSessions } from '@/lib/gateway-api'
-import { assignPersona } from '@/lib/agent-personas'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import type { SessionCardChild } from '@/screens/chat/types'
+import { resolveAgentSessionCardNavigation } from '@/components/agent-view/agent-session-card-navigation'
+import {
+  fetchSessionCards,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
 import { useMissionStore } from '@/stores/mission-store'
 
 export type AgentModel = string
+
+export type AgentCardNavigation = {
+  cardId: string
+  inspectedChildCardId: string
+}
 
 export type ActiveAgent = {
   id: string
@@ -22,6 +29,7 @@ export type ActiveAgent = {
   tokenCount: number
   estimatedCost: number
   isLive: boolean
+  chatNavigation: AgentCardNavigation
 }
 
 export type QueuePriority = 'high' | 'normal' | 'low'
@@ -31,6 +39,7 @@ export type QueuedAgentTask = {
   name: string
   description: string
   priority: QueuePriority
+  chatNavigation: AgentCardNavigation
 }
 
 export type AgentHistoryStatus = 'success' | 'failed'
@@ -44,6 +53,7 @@ export type AgentHistoryItem = {
   runtimeSeconds: number
   tokenCount: number
   cost: number
+  chatNavigation: AgentCardNavigation
 }
 
 type AgentViewState = {
@@ -60,392 +70,136 @@ const PANEL_WIDTH_PX = 288
 const MIN_DESKTOP_WIDTH = 1024
 const REFRESH_INTERVAL_MS = 5000
 
-function createDemoActiveAgents(): Array<ActiveAgent> {
-  const now = Date.now()
-  return [
-    {
-      id: 'demo-dashboard-infra',
-      name: '🎨 Roger — Frontend Developer',
-      task: 'Building dashboard widget grid with responsive layout',
-      model: 'gpt-5.3-codex',
-      status: 'running',
-      progress: 67,
-      startedAtMs: now - 204_000,
-      tokenCount: 38_240,
-      estimatedCost: 0.218,
-      isLive: false,
-    },
-    {
-      id: 'demo-skills-browser',
-      name: '🏗️ Sally — Backend Architect',
-      task: 'Creating API routes for skills marketplace',
-      model: 'gpt-5.3-codex',
-      status: 'thinking',
-      progress: 42,
-      startedAtMs: now - 131_000,
-      tokenCount: 21_915,
-      estimatedCost: 0.131,
-      isLive: false,
-    },
-    {
-      id: 'demo-terminal-integration',
-      name: '🔍 Ada — QA Engineer',
-      task: 'Running integration tests on terminal panel',
-      model: 'gpt-5.3-codex',
-      status: 'running',
-      progress: 85,
-      startedAtMs: now - 242_000,
-      tokenCount: 47_609,
-      estimatedCost: 0.286,
-      isLive: false,
-    },
-  ]
-}
-
-function createDemoQueue(): Array<QueuedAgentTask> {
-  return [
-    {
-      id: 'demo-queue-1',
-      name: 'release-notes',
-      description: 'Drafting release notes and migration checklist',
-      priority: 'high',
-    },
-    {
-      id: 'demo-queue-2',
-      name: 'theme-pass',
-      description: 'Applying dark theme polish to diagnostics screens',
-      priority: 'normal',
-    },
-  ]
-}
-
-function createDemoHistory(): Array<AgentHistoryItem> {
-  return [
-    {
-      id: 'demo-history-1',
-      name: 'api-telemetry',
-      description: 'Instrumented API telemetry dashboard',
-      model: 'gpt-5-codex',
-      status: 'success',
-      runtimeSeconds: 452,
-      tokenCount: 62_430,
-      cost: 0.348,
-    },
-    {
-      id: 'demo-history-2',
-      name: 'auth-hardening',
-      description: 'Added auth guardrails for session endpoints',
-      model: 'claude-3-5-sonnet',
-      status: 'success',
-      runtimeSeconds: 311,
-      tokenCount: 48_920,
-      cost: 0.284,
-    },
-  ]
-}
-
 function inferInitialOpenState(): boolean {
   return false
 }
 
-function readString(value: unknown): string {
-  if (typeof value !== 'string') return ''
-  return value.trim()
+function childActivityLabel(child: SessionCardChild): string {
+  return child.relationshipKind === 'branch'
+    ? 'Branch Card activity'
+    : 'Child Card activity'
 }
 
-function dedupeById<T extends { id: string }>(items: Array<T>): Array<T> {
-  const unique = new Map<string, T>()
-  items.forEach((item) => {
-    if (!item.id) return
-    if (!unique.has(item.id)) {
-      unique.set(item.id, item)
-    }
+function childNavigation(
+  response: SessionCardListWire,
+  parentCardId: string,
+  child: SessionCardChild,
+): AgentCardNavigation | null {
+  const target = resolveAgentSessionCardNavigation(response, {
+    sessionKey: child.sessionKey,
+    key: child.cardId,
   })
-  return Array.from(unique.values())
-}
-
-function readNumber(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return 0
-  return value
-}
-
-function readTimestamp(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value < 1_000_000_000_000 ? value * 1000 : value
+  if (
+    !target ||
+    target.cardId !== parentCardId ||
+    target.inspectedChildCardId !== child.cardId
+  ) {
+    return null
   }
-  if (typeof value === 'string') {
-    const parsed = Date.parse(value)
-    if (!Number.isNaN(parsed)) return parsed
+  return {
+    cardId: target.cardId,
+    inspectedChildCardId: target.inspectedChildCardId,
   }
-  return null
 }
 
-function readSessionKey(session: GatewaySession): string {
-  const key = readString(session.key)
-  if (key.length > 0) return key
-  const friendly = readString(session.friendlyId)
-  if (friendly.length > 0) return friendly
-  return ''
-}
-
-function readSessionName(session: GatewaySession): string {
-  // Assign persona based on session key + task for named agent display
-  const key = readSessionKey(session)
-  const taskText =
-    readString(session.task) ||
-    readString(session.initialMessage) ||
-    readString(session.label)
-  if (key.length > 0) {
-    const persona = assignPersona(key, taskText)
-    return `${persona.emoji} ${persona.name} — ${persona.role}`
-  }
-
-  const label = readString(session.label)
-  if (label.length > 0) return label
-  const title = readString(session.title)
-  if (title.length > 0) return title
-  const derived = readString(session.derivedTitle)
-  if (derived.length > 0) return derived
-  const friendly = readString(session.friendlyId)
-  if (friendly.length > 0) return friendly
-  return 'session'
-}
-
-function isAgentSession(session: GatewaySession): boolean {
-  const key = readSessionKey(session).toLowerCase()
-  const friendlyId = readString(session.friendlyId).toLowerCase()
-  const kind = readString(session.kind).toLowerCase()
-  const label = readString(session.label).toLowerCase()
-  const title = readString(session.title).toLowerCase()
-
-  // The right-side agent panel must only show actual delegated/worker runs.
-  // Normal Workspace chat sessions are also returned by /api/sessions with
-  // kind="chat" and transient api-* keys; treating them as agents creates
-  // phantom personas like "Nova — Security Specialist" during normal sends.
-  if (key === 'main' || key.includes(':main')) return false
-  if (friendlyId === 'main') return false
-  if (kind === 'cron' || key.includes('cron')) return false
-  // Normal chat sessions can have agent-like generated titles and can be
-  // transiently active while streaming, but they are not delegated workers.
-  // Never show them in the agent sidebar.
-  if (kind === 'chat') return false
-
-  return ['agent', 'worker', 'delegate', 'swarm', 'subagent'].includes(kind)
-}
-
-function readTaskText(session: GatewaySession): string {
-  const explicitTask = readString(session.task)
-  if (explicitTask.length > 0) return explicitTask
-
-  const initialMessage = readString(session.initialMessage)
-  if (initialMessage.length > 0) return initialMessage
-
-  const lastMessage = session.lastMessage
-  if (lastMessage && typeof lastMessage === 'object') {
-    const directText = readString((lastMessage as { text?: unknown }).text)
-    if (directText.length > 0) return directText
-
-    const content = (lastMessage as { content?: unknown }).content
-    if (Array.isArray(content)) {
-      const text = content
-        .map(function mapPart(part) {
-          if (!part || typeof part !== 'object') return ''
-          return readString((part as { text?: unknown }).text)
-        })
-        .join(' ')
-        .trim()
-      if (text.length > 0) return text
-    }
-  }
-
-  return 'Agent session in progress'
-}
-
-function readTokenCount(
-  session: GatewaySession,
-  status: GatewaySessionStatusResponse | null,
-): number {
-  const statusTokenCount = readNumber(status?.tokenCount)
-  if (statusTokenCount > 0) return statusTokenCount
-
-  const statusTotalTokens = readNumber(status?.totalTokens)
-  if (statusTotalTokens > 0) return statusTotalTokens
-
-  const statusUsageTokens = readNumber(status?.usage?.tokens)
-  if (statusUsageTokens > 0) return statusUsageTokens
-
-  const statusUsageTotal = readNumber(status?.usage?.totalTokens)
-  if (statusUsageTotal > 0) return statusUsageTotal
-
-  const sessionTokenCount = readNumber(session.tokenCount)
-  if (sessionTokenCount > 0) return sessionTokenCount
-
-  const sessionTotalTokens = readNumber(session.totalTokens)
-  if (sessionTotalTokens > 0) return sessionTotalTokens
-
-  const sessionUsageTokens = readNumber(session.usage?.tokens)
-  if (sessionUsageTokens > 0) return sessionUsageTokens
-
-  return readNumber(session.usage?.totalTokens)
-}
-
-function readEstimatedCost(
-  session: GatewaySession,
-  status: GatewaySessionStatusResponse | null,
-  tokenCount: number,
-): number {
-  const statusCost = readNumber(status?.usage?.cost)
-  if (statusCost > 0) return statusCost
-
-  const sessionCost = readNumber(session.cost)
-  if (sessionCost > 0) return sessionCost
-
-  const usageCost = readNumber(session.usage?.cost)
-  if (usageCost > 0) return usageCost
-
-  return Number((tokenCount * 0.000004).toFixed(3))
-}
-
-function readProgress(
-  session: GatewaySession,
-  status: GatewaySessionStatusResponse | null,
-): number {
-  const statusProgress = readNumber(status?.progress)
-  if (statusProgress > 0)
-    return Math.max(1, Math.min(99, Math.round(statusProgress)))
-
-  const sessionProgress = readNumber(session.progress)
-  if (sessionProgress > 0)
-    return Math.max(1, Math.min(99, Math.round(sessionProgress)))
-
-  const sessionStatus = readStatus(session, status)
-  if (isQueuedStatus(sessionStatus)) return 5
-  if (isFailedStatus(sessionStatus)) return 100
-  if (isCompletedStatus(sessionStatus)) return 100
-  return 35
-}
-
-function readStatus(
-  session: GatewaySession,
-  status: GatewaySessionStatusResponse | null,
-): string {
-  const statusText = readString(status?.status)
-  if (statusText.length > 0) return statusText.toLowerCase()
-
-  const sessionStatus = readString(session.status)
-  if (sessionStatus.length > 0) return sessionStatus.toLowerCase()
-
-  // Heuristic: detect completion from staleness when gateway has no explicit status
-  const updatedAt = readTimestamp(session.updatedAt)
-  if (updatedAt) {
-    const staleness = Date.now() - updatedAt
-    const tokens =
-      readNumber(session.totalTokens) || readNumber(session.tokenCount)
-    if (tokens > 0 && staleness > 120_000) return 'complete'
-    if (tokens === 0 && staleness > 120_000) return 'idle'
-  }
-
-  return 'running'
-}
-
-function readModel(
-  session: GatewaySession,
-  status: GatewaySessionStatusResponse | null,
-): string {
-  const statusModel = readString(status?.model)
-  if (statusModel.length > 0) return statusModel
-
-  const sessionModel = readString(session.model)
-  if (sessionModel.length > 0) return sessionModel
-
-  return 'unknown'
-}
-
-function readStartTimeMs(session: GatewaySession): number {
-  const startedAt = readTimestamp(session.startedAt)
-  if (startedAt) return startedAt
-
-  const createdAt = readTimestamp(session.createdAt)
-  if (createdAt) return createdAt
-
-  const updatedAt = readTimestamp(session.updatedAt)
-  if (updatedAt) return updatedAt
-
-  return Date.now()
-}
-
-function isQueuedStatus(status: string): boolean {
-  return ['queued', 'pending', 'waiting'].includes(status)
-}
-
-function isRunningStatus(status: string): boolean {
-  return [
-    'running',
-    'active',
-    'started',
-    'streaming',
-    'processing',
-    'in_progress',
-    'thinking',
-  ].includes(status)
-}
-
-function isCompletedStatus(status: string): boolean {
-  return ['complete', 'completed', 'success', 'succeeded', 'done'].includes(
-    status,
-  )
-}
-
-function isFailedStatus(status: string): boolean {
-  return ['failed', 'error', 'cancelled', 'canceled', 'killed'].includes(status)
-}
-
-function mapSessionToActiveAgent(
-  session: GatewaySession,
-  status: GatewaySessionStatusResponse | null,
+function activeAgent(
+  child: SessionCardChild,
+  chatNavigation: AgentCardNavigation,
 ): ActiveAgent {
-  const tokenCount = readTokenCount(session, status)
   return {
-    id: readSessionKey(session) || crypto.randomUUID(),
-    name: readSessionName(session),
-    task: readTaskText(session),
-    model: readModel(session, status),
-    status: readStatus(session, status),
-    progress: readProgress(session, status),
-    startedAtMs: readStartTimeMs(session),
-    tokenCount,
-    estimatedCost: readEstimatedCost(session, status, tokenCount),
-    isLive: true,
+    id: child.cardId,
+    name: child.title,
+    task: childActivityLabel(child),
+    model: 'Session Card',
+    status: child.status,
+    progress: child.status === 'running' ? 35 : 5,
+    startedAtMs: child.updatedAt,
+    tokenCount: 0,
+    estimatedCost: 0,
+    isLive: child.status === 'running',
+    chatNavigation,
   }
 }
 
-function mapSessionToQueuedTask(session: GatewaySession): QueuedAgentTask {
+function queuedAgent(
+  child: SessionCardChild,
+  chatNavigation: AgentCardNavigation,
+): QueuedAgentTask {
   return {
-    id: readSessionKey(session) || `queued-${crypto.randomUUID()}`,
-    name: readSessionName(session),
-    description: readTaskText(session),
+    id: child.cardId,
+    name: child.title,
+    description: childActivityLabel(child),
     priority: 'normal',
+    chatNavigation,
   }
 }
 
-function mapSessionToHistoryItem(
-  session: GatewaySession,
-  status: GatewaySessionStatusResponse | null,
+function historyAgent(
+  child: SessionCardChild,
+  chatNavigation: AgentCardNavigation,
 ): AgentHistoryItem {
-  const startMs = readStartTimeMs(session)
-  const endMs = readTimestamp(session.updatedAt) ?? Date.now()
-  const tokenCount = readTokenCount(session, status)
-  const statusText = readStatus(session, status)
+  return {
+    id: child.cardId,
+    name: child.title,
+    description: childActivityLabel(child),
+    model: 'Session Card',
+    status: child.status === 'error' ? 'failed' : 'success',
+    runtimeSeconds: 0,
+    tokenCount: 0,
+    cost: 0,
+    chatNavigation,
+  }
+}
+
+function projectCardActivities(response: SessionCardListWire): {
+  activeAgents: Array<ActiveAgent>
+  queuedAgents: Array<QueuedAgentTask>
+  historyAgents: Array<AgentHistoryItem>
+  unavailable: boolean
+} {
+  const activeAgents: Array<ActiveAgent> = []
+  const queuedAgents: Array<QueuedAgentTask> = []
+  const historyAgents: Array<AgentHistoryItem> = []
+  response.cards.forEach((parentCard) => {
+    parentCard.childNodes.forEach((child) => {
+      // Delegated worker activity is represented only by direct child Cards.
+      // Branch Cards are ordinary user conversations and do not belong here.
+      if (child.relationshipKind !== 'child') return
+      const navigation = childNavigation(response, parentCard.cardId, child)
+      if (!navigation) {
+        return
+      }
+
+      if (child.status === 'idle') {
+        queuedAgents.push(queuedAgent(child, navigation))
+        return
+      }
+      if (child.status === 'complete' || child.status === 'error') {
+        historyAgents.push(historyAgent(child, navigation))
+        return
+      }
+      activeAgents.push(activeAgent(child, navigation))
+    })
+  })
+
+  const unresolvedActivityExists = response.cards.some((parentCard) =>
+    parentCard.childNodes.some(
+      (child) =>
+        child.relationshipKind === 'child' &&
+        childNavigation(response, parentCard.cardId, child) === null,
+    ),
+  )
 
   return {
-    id: readSessionKey(session) || `history-${crypto.randomUUID()}`,
-    name: readSessionName(session),
-    description: readTaskText(session),
-    model: readModel(session, status),
-    status: isFailedStatus(statusText) ? 'failed' : 'success',
-    runtimeSeconds: Math.max(1, Math.floor((endMs - startMs) / 1000)),
-    tokenCount,
-    cost: readEstimatedCost(session, status, tokenCount),
+    activeAgents,
+    queuedAgents,
+    historyAgents: historyAgents
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .slice(0, 10),
+    unavailable:
+      unresolvedActivityExists ||
+      (response.cardResolutions === undefined &&
+        response.completeness !== 'complete'),
   }
 }
 
@@ -502,8 +256,6 @@ export type AgentViewResult = {
   toggleOpen: () => void
   setQueueOpen: (isOpen: boolean) => void
   setHistoryOpen: (isOpen: boolean) => void
-  killAgent: (agentId: string) => void
-  cancelQueueTask: (taskId: string) => void
 }
 
 export function useAgentView(): AgentViewResult {
@@ -522,16 +274,15 @@ export function useAgentView(): AgentViewResult {
     return window.innerWidth
   })
   const [nowMs, setNowMs] = useState(() => Date.now())
-  const [lastRefreshedMs, setLastRefreshedMs] = useState(() => Date.now())
-  const [activeAgents, setActiveAgents] = useState<Array<ActiveAgent>>([])
-  const [queuedAgents, setQueuedAgents] = useState<Array<QueuedAgentTask>>([])
-  const [historyAgents, setHistoryAgents] = useState<Array<AgentHistoryItem>>(
-    [],
-  )
-  const [isLoading, setIsLoading] = useState(true)
-  const [isDemoMode, setIsDemoMode] = useState(false)
-  const [isLiveConnected, setIsLiveConnected] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
+    retry: 1,
+    staleTime: REFRESH_INTERVAL_MS,
+    refetchInterval: REFRESH_INTERVAL_MS,
+  })
+  const lastRefreshedMs = useMemo(() => Date.now(), [sessionCardsQuery.data])
 
   useEffect(() => {
     function handleResize() {
@@ -548,152 +299,72 @@ export function useAgentView(): AgentViewResult {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now())
-    }, 5000) // Every 5s instead of 1s to reduce re-renders
+    }, REFRESH_INTERVAL_MS)
 
     return function cleanupTimer() {
       window.clearInterval(timer)
     }
   }, [])
 
-  useEffect(() => {
-    let isDisposed = false
+  const projection = useMemo(
+    () =>
+      sessionCardsQuery.data
+        ? projectCardActivities(sessionCardsQuery.data)
+        : {
+            activeAgents: [],
+            queuedAgents: [],
+            historyAgents: [],
+            unavailable: false,
+          },
+    [sessionCardsQuery.data],
+  )
 
-    async function refresh() {
-      try {
-        const sessionsPayload = await fetchSessions()
-        const sessions = Array.isArray(sessionsPayload.sessions)
-          ? sessionsPayload.sessions
-          : []
+  const missionCardIds = useMemo(() => {
+    const ids = new Set<string>()
+    const response = sessionCardsQuery.data
+    if (!response) return ids
+    Object.values(missionSessionMap).forEach((identity) => {
+      const target = resolveAgentSessionCardNavigation(response, {
+        sessionKey: identity,
+      })
+      if (target?.inspectedChildCardId) ids.add(target.inspectedChildCardId)
+    })
+    return ids
+  }, [missionSessionMap, sessionCardsQuery.data])
 
-        // Skip per-session status fetch — /api/sessions/:key/status route
-        // doesn't exist, causing 404 spam. Use session data directly.
-        const statusEntries = sessions.map(function loadStatus(session) {
-          const key = readSessionKey(session)
-          return [key, null] as const
-        })
-
-        const statusMap = new Map<string, GatewaySessionStatusResponse | null>(
-          statusEntries,
-        )
-
-        const nextActiveAgents: Array<ActiveAgent> = []
-        const nextQueuedAgents: Array<QueuedAgentTask> = []
-        const nextHistoryAgents: Array<AgentHistoryItem> = []
-
-        sessions.forEach(function classifySession(session) {
-          if (!isAgentSession(session)) return
-          const key = readSessionKey(session)
-          const status = key ? (statusMap.get(key) ?? null) : null
-          const statusText = readStatus(session, status)
-
-          if (isQueuedStatus(statusText)) {
-            nextQueuedAgents.push(mapSessionToQueuedTask(session))
-            return
-          }
-
-          if (isCompletedStatus(statusText) || isFailedStatus(statusText)) {
-            nextHistoryAgents.push(mapSessionToHistoryItem(session, status))
-            return
-          }
-
-          if (isRunningStatus(statusText) || statusText.length === 0) {
-            nextActiveAgents.push(mapSessionToActiveAgent(session, status))
-          }
-        })
-
-        if (isDisposed) return
-
-        setActiveAgents(dedupeById(nextActiveAgents))
-        setQueuedAgents(dedupeById(nextQueuedAgents))
-        setHistoryAgents(dedupeById(nextHistoryAgents).slice(0, 10))
-        setIsDemoMode(false)
-        setIsLiveConnected(true)
-        setErrorMessage(null)
-      } catch (error) {
-        if (isDisposed) return
-
-        // Gateway unreachable — leave the panel empty rather than show fake
-        // demo agents that look like real spawns. Show error message instead.
-        setActiveAgents([])
-        setQueuedAgents([])
-        setHistoryAgents([])
-        setIsDemoMode(false)
-        setIsLiveConnected(false)
-        setErrorMessage(
-          error instanceof Error ? error.message : 'Gateway unavailable',
-        )
-      } finally {
-        if (!isDisposed) {
-          setLastRefreshedMs(Date.now())
-          setIsLoading(false)
-        }
-      }
-    }
-
-    void refresh()
-    const refreshTimer = window.setInterval(() => {
-      void refresh()
-    }, REFRESH_INTERVAL_MS)
-
-    return function cleanupRefresh() {
-      isDisposed = true
-      window.clearInterval(refreshTimer)
-    }
-  }, [])
-
-  const shouldAutoOpen = false
+  const missionActiveAgents = useMemo(
+    () =>
+      activeMission
+        ? projection.activeAgents.filter((agent) =>
+            missionCardIds.has(agent.id),
+          )
+        : [],
+    [activeMission, missionCardIds, projection.activeAgents],
+  )
+  const nonMissionActiveAgents = useMemo(
+    () =>
+      activeMission
+        ? projection.activeAgents.filter(
+            (agent) => !missionCardIds.has(agent.id),
+          )
+        : projection.activeAgents,
+    [activeMission, missionCardIds, projection.activeAgents],
+  )
 
   const isDesktop = viewportWidth >= MIN_DESKTOP_WIDTH
   const panelVisible = isDesktop && isOpen
   const showFloatingToggle = isDesktop && !isOpen
   const panelOffset = panelVisible ? PANEL_WIDTH_PX : 0
-  const missionSessionKeys = useMemo(
-    () => new Set(Object.values(missionSessionMap)),
-    [missionSessionMap],
-  )
-  const missionActiveAgents = useMemo(
-    () =>
-      activeMission
-        ? activeAgents.filter((agent) => missionSessionKeys.has(agent.id))
-        : [],
-    [activeAgents, activeMission, missionSessionKeys],
-  )
-  const nonMissionActiveAgents = useMemo(
-    () =>
-      activeMission
-        ? activeAgents.filter((agent) => !missionSessionKeys.has(agent.id))
-        : activeAgents,
-    [activeAgents, activeMission, missionSessionKeys],
-  )
-
-  function killAgent(agentId: string) {
-    setActiveAgents((previous) => {
-      const killedAgent = previous.find((agent) => agent.id === agentId)
-      if (!killedAgent) return previous
-
-      const runtimeSeconds = Math.max(
-        1,
-        Math.floor((Date.now() - killedAgent.startedAtMs) / 1000),
-      )
-      const historyEntry: AgentHistoryItem = {
-        id: `history-${crypto.randomUUID()}`,
-        name: killedAgent.name,
-        description: killedAgent.task,
-        model: killedAgent.model,
-        status: 'failed',
-        runtimeSeconds,
-        tokenCount: killedAgent.tokenCount,
-        cost: killedAgent.estimatedCost,
-      }
-
-      setHistoryAgents((current) => [historyEntry, ...current].slice(0, 10))
-      return previous.filter((agent) => agent.id !== agentId)
-    })
-  }
-
-  function cancelQueueTask(taskId: string) {
-    setQueuedAgents((previous) => previous.filter((task) => task.id !== taskId))
-  }
+  const queryError =
+    sessionCardsQuery.error instanceof Error
+      ? sessionCardsQuery.error.message
+      : 'Card activity unavailable'
+  const errorMessage =
+    sessionCardsQuery.status === 'error'
+      ? queryError
+      : projection.unavailable
+        ? 'Card activity unavailable'
+        : null
 
   return useMemo(
     () => ({
@@ -701,57 +372,50 @@ export function useAgentView(): AgentViewResult {
       queueOpen,
       historyOpen,
       isDesktop,
-      shouldAutoOpen,
+      shouldAutoOpen: false,
       panelVisible,
       showFloatingToggle,
       panelWidth: PANEL_WIDTH_PX,
       panelOffset,
       nowMs,
       lastRefreshedMs,
-      activeAgents,
+      activeAgents: projection.activeAgents,
       missionActiveAgents,
       nonMissionActiveAgents,
-      queuedAgents,
-      historyAgents,
+      queuedAgents: projection.queuedAgents,
+      historyAgents: projection.historyAgents,
       activeMissionName: activeMission?.name || '',
       activeMissionState: activeMission?.state ?? null,
-      activeCount: activeAgents.length,
-      isLoading,
-      isDemoMode,
-      isLiveConnected,
+      activeCount: projection.activeAgents.length,
+      isLoading: sessionCardsQuery.status === 'pending',
+      isDemoMode: false,
+      isLiveConnected: sessionCardsQuery.status === 'success',
       errorMessage,
       setOpen,
       toggleOpen,
       setQueueOpen,
       setHistoryOpen,
-      killAgent,
-      cancelQueueTask,
     }),
     [
-      activeAgents,
       activeMission,
+      errorMessage,
+      historyOpen,
+      isDesktop,
+      isOpen,
+      lastRefreshedMs,
       missionActiveAgents,
       nonMissionActiveAgents,
-      cancelQueueTask,
-      errorMessage,
-      historyAgents,
-      historyOpen,
-      isDemoMode,
-      isDesktop,
-      isLiveConnected,
-      isLoading,
-      isOpen,
-      killAgent,
-      lastRefreshedMs,
       nowMs,
       panelOffset,
       panelVisible,
+      projection.activeAgents,
+      projection.historyAgents,
+      projection.queuedAgents,
       queueOpen,
-      queuedAgents,
+      sessionCardsQuery.status,
       setHistoryOpen,
       setOpen,
       setQueueOpen,
-      shouldAutoOpen,
       showFloatingToggle,
       toggleOpen,
     ],
