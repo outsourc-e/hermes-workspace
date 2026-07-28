@@ -7,6 +7,8 @@ const MAX_MESSAGES_PER_SESSION = 500
 
 export type LocalSession = {
   id: string
+  /** Explicit remote identity when this row is a portable cache of that session. */
+  upstreamSessionId?: string
   title: string | null
   model: string | null
   createdAt: number
@@ -119,11 +121,13 @@ export function getLocalSession(sessionId: string): LocalSession | null {
 export function ensureLocalSession(
   sessionId: string,
   model?: string,
+  upstreamSessionId?: string,
 ): LocalSession {
   let session = store.sessions[sessionId]
   if (!session) {
     session = {
       id: sessionId,
+      ...(upstreamSessionId ? { upstreamSessionId } : {}),
       title: null,
       model: model ?? null,
       createdAt: Date.now(),
@@ -133,6 +137,12 @@ export function ensureLocalSession(
     store.sessions[sessionId] = session
     store.messages[sessionId] = []
     store.history[sessionId] = { generation: 0, truncated: false }
+    saveToDisk()
+  } else if (
+    upstreamSessionId &&
+    session.upstreamSessionId !== upstreamSessionId
+  ) {
+    session.upstreamSessionId = upstreamSessionId
     saveToDisk()
   }
   store.history[sessionId] ??= {

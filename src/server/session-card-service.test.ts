@@ -1257,16 +1257,162 @@ describe('SessionCardService collection and resolution', () => {
     ).rejects.toBeInstanceOf(SessionCardNotFoundError)
   })
 
+  it('prefers a complete remote record over a local cache with the same explicit upstream identity', async () => {
+    const remote = {
+      ...session('shared', { source: 'cli' }, 20),
+      backendKey: 'shared',
+      title: 'Remote authoritative title',
+    }
+    const cached = {
+      ...session('cache-shared', { source: 'local' }, 10),
+      backendKey: 'shared',
+      title: 'Cached local title',
+    }
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'hermes',
+        listPage: () =>
+          Promise.resolve({
+            ...page([remote], 0, 1),
+            source: 'gateway',
+          }),
+      },
+      localSource: {
+        source: 'local',
+        listSessions: () => [
+          cached,
+          session('local-only', { source: 'local' }, 5),
+        ],
+      },
+      metadataStore: metadataStore(),
+    })
+
+    const collection = await service.collectSessions()
+    expect(collection.sessions.map((row) => row.key).sort()).toEqual([
+      'local:local-only',
+      'remote:shared',
+    ])
+
+    const listed = await service.listCards()
+    expect(listed.cards).toEqual([
+      expect.objectContaining({
+        cardId: 'remote:shared',
+        canonicalSource: 'remote',
+        title: 'Remote authoritative title',
+      }),
+      expect.objectContaining({
+        cardId: 'local:local-only',
+        canonicalSource: 'local',
+      }),
+    ])
+    await expect(service.resolveCard('remote:shared')).resolves.toMatchObject({
+      sourceBySegmentKey: new Map([['remote:shared', 'gateway']]),
+      upstreamKeyBySegmentKey: new Map([['remote:shared', 'shared']]),
+      collection: { completeness: 'complete', retryable: false },
+    })
+  })
+
+  it.each([
+    {
+      name: 'unavailable',
+      expectedStatus: 'unavailable',
+      listPage: vi.fn().mockRejectedValue(new Error('remote offline')),
+    },
+    {
+      name: 'incomplete',
+      expectedStatus: 'incomplete',
+      listPage: vi.fn().mockResolvedValue({
+        ...page(
+          [
+            {
+              ...session('shared', { source: 'cli' }, 20),
+              backendKey: 'shared',
+            },
+          ],
+          0,
+          2,
+        ),
+        hasMore: true,
+        pagination: 'unsupported' as const,
+      }),
+    },
+  ])(
+    'preserves an explicit local cache fallback when remote collection is $name',
+    async ({ expectedStatus, listPage }) => {
+      const cached = {
+        ...session('cache-shared', { source: 'local' }, 10),
+        backendKey: 'shared',
+      }
+      const service = new SessionCardService({
+        remoteSource: { source: 'remote', listPage },
+        localSource: {
+          source: 'local',
+          listSessions: () => [cached],
+        },
+        metadataStore: metadataStore(),
+        pageSize: 1,
+      })
+
+      const collection = await service.collectSessions()
+      expect(collection.sessions.map((row) => row.key)).toEqual([
+        'local:cache-shared',
+      ])
+      expect(collection.sourceBySessionKey.get('local:cache-shared')).toBe(
+        'local',
+      )
+      expect(
+        collection.sourceStatusBySessionKey.get('local:cache-shared'),
+      ).toMatchObject({
+        status: expectedStatus,
+        retryable: true,
+      })
+
+      await expect(service.listCards()).resolves.toMatchObject({
+        cards: [
+          {
+            cardId: 'local:cache-shared',
+            canonicalSource: 'local',
+          },
+        ],
+        cardResolutions: [
+          {
+            cardId: 'local:cache-shared',
+            completeness: 'incomplete',
+            retryable: true,
+          },
+        ],
+        completeness: 'incomplete',
+        retryable: true,
+      })
+    },
+  )
+
   it('preserves same-key remote and local conversations as independent source-qualified cards', async () => {
     const service = new SessionCardService({
       remoteSource: {
         source: 'remote',
         listPage: () =>
-          Promise.resolve(page([session('main', { source: 'cli' }, 20)], 0, 1)),
+          Promise.resolve(
+            page(
+              [
+                {
+                  ...session('main', { source: 'cli' }, 10),
+                  title: 'Identical display title',
+                },
+              ],
+              0,
+              1,
+            ),
+          ),
       },
       localSource: {
         source: 'local',
-        listSessions: () => [session('main', { source: 'local' }, 10)],
+        listSessions: () => [
+          {
+            ...session('main', { source: 'local' }, 10),
+            title: 'Identical display title',
+          },
+        ],
       },
       metadataStore: metadataStore(),
     })

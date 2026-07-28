@@ -181,6 +181,7 @@ type CollectedSession = {
   session: SessionMeta
   source: string
   origin: 'remote' | 'local'
+  projectionStatus?: SessionCardSourceStatus
 }
 
 const CONTINUATION_RELATIONSHIP_TYPES = new Set([
@@ -321,7 +322,9 @@ function defaultLocalSource(): SessionCardLocalSource {
     listSessions: () =>
       listLocalSessions().map((session) => ({
         key: session.id,
-        backendKey: session.id,
+        ...(session.upstreamSessionId
+          ? { backendKey: session.upstreamSessionId }
+          : {}),
         friendlyId: session.id,
         updatedAt: session.updatedAt,
         title: session.title ?? undefined,
@@ -362,6 +365,60 @@ function collectedIdentity(
   sessionKey: string,
 ): string {
   return JSON.stringify([entry.origin, sessionKey])
+}
+
+function explicitSharedUpstreamIdentity(
+  entry: CollectedSession,
+): string | undefined {
+  const identity =
+    entry.origin === 'remote'
+      ? (entry.session.backendKey ?? entry.session.key)
+      : entry.session.backendKey
+  return identity && isExactIdentity(identity) ? identity : undefined
+}
+
+function applySourcePrecedence(
+  entries: Array<CollectedSession>,
+  remoteStatus: SessionCardSourceStatus | undefined,
+): Array<CollectedSession> {
+  if (!remoteStatus) return entries
+
+  // A local backendKey is the explicit proof that a portable row caches the
+  // matching remote identity. Opaque local keys, titles, and timestamps never
+  // participate. A complete remote inventory owns a proven match; otherwise
+  // the local row remains the retryable history fallback for that identity.
+  const remoteIdentities = new Set(
+    entries
+      .filter((entry) => entry.origin === 'remote')
+      .map(explicitSharedUpstreamIdentity)
+      .filter((identity): identity is string => identity !== undefined),
+  )
+  const localFallbackIdentities = new Set(
+    entries
+      .filter((entry) => entry.origin === 'local')
+      .map(explicitSharedUpstreamIdentity)
+      .filter((identity): identity is string => identity !== undefined),
+  )
+
+  if (remoteStatus.status === 'complete') {
+    return entries.filter((entry) => {
+      if (entry.origin !== 'local') return true
+      const identity = explicitSharedUpstreamIdentity(entry)
+      return !identity || !remoteIdentities.has(identity)
+    })
+  }
+
+  return entries
+    .filter((entry) => {
+      if (entry.origin !== 'remote') return true
+      const identity = explicitSharedUpstreamIdentity(entry)
+      return !identity || !localFallbackIdentities.has(identity)
+    })
+    .map((entry) =>
+      entry.origin === 'local' && explicitSharedUpstreamIdentity(entry)
+        ? { ...entry, projectionStatus: remoteStatus }
+        : entry,
+    )
 }
 
 function strictColdContinuationMissingKeys(
@@ -725,7 +782,7 @@ function projectSourceQualifiedSessions(
     originBySessionKey.set(projectedKey, entry.origin)
     sourceBySessionKey.set(projectedKey, entry.source)
     upstreamKeyBySessionKey.set(projectedKey, entry.session.key)
-    const status = statusByOrigin.get(entry.origin)
+    const status = entry.projectionStatus ?? statusByOrigin.get(entry.origin)
     if (status) sourceStatusBySessionKey.set(projectedKey, status)
   }
 
@@ -1365,7 +1422,11 @@ export class SessionCardService {
       statusByOrigin.set('local', status)
     }
 
-    let authoritativeSessions = collectedSessions
+    const sourcePrecedenceSessions = applySourcePrecedence(
+      collectedSessions,
+      statusByOrigin.get('remote'),
+    )
+    let authoritativeSessions = sourcePrecedenceSessions
     if (this.remoteSource && this.topologySource) {
       let topologyStatus: SessionCardSourceStatus
       try {
@@ -1377,7 +1438,7 @@ export class SessionCardService {
           retryable: false,
         }
         authoritativeSessions = applyRemoteTopology(
-          collectedSessions,
+          sourcePrecedenceSessions,
           topology.sessions,
         )
       } catch {
@@ -1388,7 +1449,7 @@ export class SessionCardService {
           retryable: true,
           error: 'Session topology is unavailable.',
         }
-        authoritativeSessions = stripRemoteTopology(collectedSessions)
+        authoritativeSessions = stripRemoteTopology(sourcePrecedenceSessions)
         statusByOrigin.set('remote', topologyStatus)
       }
       sources.push(topologyStatus)
