@@ -112,11 +112,11 @@ function card(overrides: Partial<SessionCard> = {}): SessionCard {
         relationshipKind: 'child',
         title: 'Delegated research',
         status: 'running',
-        updatedAt: 10,
+        updatedAt: Date.now(),
         continuationCount: 1,
       },
     ],
-    updatedAt: 20,
+    updatedAt: Date.now(),
     archived: false,
     pinned: false,
     ...overrides,
@@ -188,9 +188,50 @@ describe('SidebarSessions Card-only surface', () => {
 
   it('does not project rows when the Card list is empty', () => {
     renderSidebar({ cards: [] })
+    expect(screen.queryByText('Authoritative card title')).toBeNull()
     expect(
       screen.getByText('No sessions yet. Start a conversation →'),
     ).toBeTruthy()
+  })
+
+  it('renders recent sessions first and reveals older sessions ten at a time', () => {
+    const now = Date.now()
+    const recent = card({
+      cardId: 'remote:recent',
+      canonicalSegmentKey: 'remote:recent',
+      continuationSegmentKeys: ['remote:recent'],
+      continuationCount: 1,
+      title: 'Recent conversation',
+      childNodes: [],
+      updatedAt: now,
+    })
+    const older = Array.from({ length: 11 }, (_, index) =>
+      card({
+        cardId: `remote:older-${index + 1}`,
+        canonicalSegmentKey: `remote:older-${index + 1}`,
+        continuationSegmentKeys: [`remote:older-${index + 1}`],
+        continuationCount: 1,
+        title: `Older conversation ${index + 1}`,
+        childNodes: [],
+        updatedAt: now - (3 * 24 * 60 * 60 * 1000 + index),
+      }),
+    )
+
+    renderSidebar({ cards: [recent, ...older] })
+
+    expect(screen.getByText('Recent conversation')).toBeTruthy()
+    expect(screen.queryByText('Older conversation 1')).toBeNull()
+    React.act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'More Sessions…' }))
+    })
+    expect(screen.getByText('Older conversation 1')).toBeTruthy()
+    expect(screen.getByText('Older conversation 10')).toBeTruthy()
+    expect(screen.queryByText('Older conversation 11')).toBeNull()
+    React.act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'More Sessions…' }))
+    })
+    expect(screen.getByText('Older conversation 11')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'More Sessions…' })).toBeNull()
   })
 
   it('preserves complete Cards but replaces incomplete inventory with retry UI and no row actions', () => {
@@ -346,18 +387,19 @@ describe('SidebarSessions Card-only surface', () => {
   })
 
   it('delivers a real recursive API grandchild through parser, sidebar route state, and history', async () => {
+    const now = Date.now()
     const sessions = [
       {
         key: 'root',
         friendlyId: 'root',
         title: 'Root API conversation',
-        updatedAt: 10,
+        updatedAt: now,
       },
       {
         key: 'child',
         friendlyId: 'child',
         title: 'Child API conversation',
-        updatedAt: 20,
+        updatedAt: now + 1,
         lineage: {
           parentSessionId: 'root',
           relationshipKind: 'child' as const,
@@ -368,7 +410,7 @@ describe('SidebarSessions Card-only surface', () => {
         key: 'grandchild',
         friendlyId: 'grandchild',
         title: 'Grandchild API branch',
-        updatedAt: 30,
+        updatedAt: now + 2,
         lineage: {
           parentSessionId: 'child',
           relationshipKind: 'branch' as const,

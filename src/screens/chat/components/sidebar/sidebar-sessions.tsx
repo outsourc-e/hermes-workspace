@@ -53,6 +53,9 @@ type CardRowNode = Pick<
   status?: SessionCardChild['status']
 }
 
+const RECENT_SESSION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000
+const MORE_SESSIONS_CHUNK_SIZE = 10
+
 export const SidebarSessions = memo(function SidebarSessions({
   sessionCards,
   cardResolutions,
@@ -75,6 +78,10 @@ export const SidebarSessions = memo(function SidebarSessions({
   const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(
     () => new Set(),
   )
+  const [recentSessionCutoff] = useState(
+    () => Date.now() - RECENT_SESSION_WINDOW_MS,
+  )
+  const [olderSessionsVisible, setOlderSessionsVisible] = useState(0)
   const resolutionByCardId = useMemo(
     () =>
       new Map(
@@ -91,8 +98,42 @@ export const SidebarSessions = memo(function SidebarSessions({
     [resolutionByCardId, sessionCards],
   )
   const roots = useMemo(
-    () => completeCards.filter((card) => card.parentCardId === undefined),
+    () =>
+      completeCards
+        .filter((card) => card.parentCardId === undefined)
+        .sort((left, right) => right.updatedAt - left.updatedAt),
     [completeCards],
+  )
+  const pinnedRoots = useMemo(
+    () => roots.filter((card) => card.pinned),
+    [roots],
+  )
+  const recentUnpinnedRoots = useMemo(
+    () =>
+      roots.filter(
+        (card) => !card.pinned && card.updatedAt >= recentSessionCutoff,
+      ),
+    [recentSessionCutoff, roots],
+  )
+  const olderUnpinnedRoots = useMemo(
+    () =>
+      roots.filter(
+        (card) => !card.pinned && card.updatedAt < recentSessionCutoff,
+      ),
+    [recentSessionCutoff, roots],
+  )
+  const visibleRoots = useMemo(
+    () => [
+      ...pinnedRoots,
+      ...recentUnpinnedRoots,
+      ...olderUnpinnedRoots.slice(0, olderSessionsVisible),
+    ],
+    [
+      olderSessionsVisible,
+      olderUnpinnedRoots,
+      pinnedRoots,
+      recentUnpinnedRoots,
+    ],
   )
   const inventoryIncomplete =
     completeness !== 'complete' || completeCards.length !== sessionCards.length
@@ -102,9 +143,8 @@ export const SidebarSessions = memo(function SidebarSessions({
   )
 
   const pinnedCardIds = useMemo(
-    () =>
-      new Set(roots.filter((card) => card.pinned).map((card) => card.cardId)),
-    [roots],
+    () => new Set(pinnedRoots.map((card) => card.cardId)),
+    [pinnedRoots],
   )
 
   const cardRows = useMemo(() => {
@@ -171,11 +211,11 @@ export const SidebarSessions = memo(function SidebarSessions({
       }
     }
 
-    const rootRows = roots.map(
+    const rootRows = visibleRoots.map(
       (card) => buildRow(card, 0, new Set<string>()).row,
     )
     return { rootRows, childrenByParent }
-  }, [cardsById, collapsedCardIds, inspectedChildCardId, roots])
+  }, [cardsById, collapsedCardIds, inspectedChildCardId, visibleRoots])
 
   const pinnedRows = cardRows.rootRows.filter((row) =>
     pinnedCardIds.has(row.key),
@@ -183,6 +223,13 @@ export const SidebarSessions = memo(function SidebarSessions({
   const unpinnedRows = cardRows.rootRows.filter(
     (row) => !pinnedCardIds.has(row.key),
   )
+  const hasMoreOlderSessions = olderSessionsVisible < olderUnpinnedRoots.length
+
+  function handleShowMoreSessions() {
+    setOlderSessionsVisible((current) =>
+      Math.min(current + MORE_SESSIONS_CHUNK_SIZE, olderUnpinnedRoots.length),
+    )
+  }
 
   function handleToggleExpanded(cardId: string, expanded: boolean) {
     setCollapsedCardIds((current) => {
@@ -297,16 +344,36 @@ export const SidebarSessions = memo(function SidebarSessions({
                       </section>
                     </>
                   ) : pinnedRows.length > 0 ? (
-                    inventoryIncomplete ? null : (
+                    inventoryIncomplete ? null : hasMoreOlderSessions ? (
+                      <div className="px-2 py-2 text-xs text-primary-500">
+                        No sessions active in the last 2 days.
+                      </div>
+                    ) : (
                       <div className="px-2 py-2 text-xs text-primary-500">
                         All sessions are pinned.
                       </div>
                     )
-                  ) : inventoryIncomplete ? null : (
+                  ) : inventoryIncomplete ? null : hasMoreOlderSessions ? (
+                    <div className="px-2 py-2 text-xs text-primary-500">
+                      No sessions active in the last 2 days.
+                    </div>
+                  ) : (
                     <div className="px-2 py-2 text-xs text-primary-500">
                       No sessions yet. Start a conversation →
                     </div>
                   )}
+                  {hasMoreOlderSessions ? (
+                    <div className="px-2 py-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleShowMoreSessions}
+                      >
+                        More Sessions…
+                      </Button>
+                    </div>
+                  ) : null}
                 </>
               )}
               {fetching && !loading && !error && roots.length > 0 ? (
