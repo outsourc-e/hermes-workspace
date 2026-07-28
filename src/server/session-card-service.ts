@@ -21,6 +21,7 @@ import type {
 import type {
   SessionCard,
   SessionCardCanonicalTransport,
+  SessionCardChild,
   SessionCardChildStatus,
   SessionMeta,
 } from '../screens/chat/types'
@@ -380,8 +381,13 @@ function explicitSharedUpstreamIdentity(
 function applySourcePrecedence(
   entries: Array<CollectedSession>,
   remoteStatus: SessionCardSourceStatus | undefined,
-): Array<CollectedSession> {
-  if (!remoteStatus) return entries
+): {
+  entries: Array<CollectedSession>
+  excludedRemoteTopologyIds: ReadonlySet<string>
+} {
+  if (!remoteStatus) {
+    return { entries, excludedRemoteTopologyIds: new Set<string>() }
+  }
 
   // A local backendKey is the explicit proof that a portable row caches the
   // matching remote identity. Opaque local keys, titles, and timestamps never
@@ -401,24 +407,38 @@ function applySourcePrecedence(
   )
 
   if (remoteStatus.status === 'complete') {
-    return entries.filter((entry) => {
-      if (entry.origin !== 'local') return true
-      const identity = explicitSharedUpstreamIdentity(entry)
-      return !identity || !remoteIdentities.has(identity)
-    })
+    return {
+      entries: entries.filter((entry) => {
+        if (entry.origin !== 'local') return true
+        const identity = explicitSharedUpstreamIdentity(entry)
+        return !identity || !remoteIdentities.has(identity)
+      }),
+      excludedRemoteTopologyIds: new Set<string>(),
+    }
   }
 
-  return entries
-    .filter((entry) => {
-      if (entry.origin !== 'remote') return true
-      const identity = explicitSharedUpstreamIdentity(entry)
-      return !identity || !localFallbackIdentities.has(identity)
-    })
-    .map((entry) =>
+  const excludedRemoteTopologyIds = new Set<string>()
+  const retainedEntries = entries.filter((entry) => {
+    if (entry.origin !== 'remote') return true
+    const identity = explicitSharedUpstreamIdentity(entry)
+    if (!identity || !localFallbackIdentities.has(identity)) return true
+    // Topology closure is allowed to add missing connected records, but it must
+    // never resurrect the exact remote identity already displaced by a proven
+    // local fallback. Track both adapter key forms because topology IDs can use
+    // either the row key or its explicit backend identity.
+    excludedRemoteTopologyIds.add(entry.session.key)
+    excludedRemoteTopologyIds.add(identity)
+    return false
+  })
+
+  return {
+    entries: retainedEntries.map((entry) =>
       entry.origin === 'local' && explicitSharedUpstreamIdentity(entry)
         ? { ...entry, projectionStatus: remoteStatus }
         : entry,
-    )
+    ),
+    excludedRemoteTopologyIds,
+  }
 }
 
 function strictColdContinuationMissingKeys(
@@ -662,21 +682,31 @@ function stripRemoteTopology(
 function applyRemoteTopology(
   entries: Array<CollectedSession>,
   topologySessions: ReadonlyArray<SessionTopologySession>,
+  excludedRemoteTopologyIds: ReadonlySet<string>,
 ): Array<CollectedSession> {
   const remoteEntries = entries.filter((entry) => entry.origin === 'remote')
   const localEntries = entries.filter((entry) => entry.origin === 'local')
   const remoteById = new Map(
     remoteEntries.map((entry) => [entry.session.key, entry]),
   )
+  // Remove proven source-precedence exclusions before computing connectivity or
+  // continuation facts. This preserves topology's fail-closed behavior: loaded
+  // records beyond an excluded node remain independently visible, but cannot
+  // use that node as an authoritative relationship bridge.
+  const eligibleTopologySessions = topologySessions.filter(
+    (session) => !excludedRemoteTopologyIds.has(session.id),
+  )
   const included = remoteTopologyClosure(
-    topologySessions,
+    eligibleTopologySessions,
     new Set(remoteById.keys()),
   )
   const defaultSource = remoteEntries[0]?.source
-  const continuationFacts = continuationFactsBySessionId(topologySessions)
+  const continuationFacts = continuationFactsBySessionId(
+    eligibleTopologySessions,
+  )
   const projectedRemote: Array<CollectedSession> = []
 
-  for (const topology of topologySessions) {
+  for (const topology of eligibleTopologySessions) {
     if (!included.has(topology.id)) continue
     const existing = remoteById.get(topology.id)
     const source = existing?.source ?? defaultSource
@@ -961,6 +991,61 @@ function assertAuthoritativeContinuationAliases(
   }
 }
 
+function authoritativeChildProjection(
+  fresh: FreshProjection,
+  parentCard: SessionCard,
+  childNode: SessionCardChild,
+  canonicalSource: 'local' | 'remote',
+  ancestors: ReadonlySet<string>,
+): SessionCardChild {
+  const childCard = fresh.projection.indexByCardId.get(childNode.cardId)
+  if (
+    !childCard ||
+    childCard.parentCardId !== parentCard.cardId ||
+    childCard.canonicalSegmentKey !== childNode.sessionKey ||
+    (childCard.relationshipKind !== 'branch' &&
+      childCard.relationshipKind !== 'child') ||
+    ancestors.has(childCard.cardId)
+  ) {
+    throw new Error(
+      `Invalid authoritative Session Card child: ${childNode.cardId}`,
+    )
+  }
+  const childSource = canonicalSourceForCard(childCard, fresh.collection)
+  if (childSource !== canonicalSource) {
+    throw new Error(
+      `Invalid authoritative Session Card child source: ${childNode.cardId}`,
+    )
+  }
+  const childContinuationSegmentKeys = expandedContinuationSegmentKeys(
+    childCard,
+    fresh.collection,
+  )
+  assertAuthoritativeContinuationAliases(
+    childCard,
+    childContinuationSegmentKeys,
+    childContinuationSegmentKeys.length,
+    childSource,
+  )
+  const nextAncestors = new Set(ancestors)
+  nextAncestors.add(childCard.cardId)
+  return {
+    ...childNode,
+    sessionKey: childCard.canonicalSegmentKey,
+    continuationSegmentKeys: childContinuationSegmentKeys,
+    continuationCount: childContinuationSegmentKeys.length,
+    childNodes: childCard.childNodes.map((descendant) =>
+      authoritativeChildProjection(
+        fresh,
+        childCard,
+        descendant,
+        canonicalSource,
+        nextAncestors,
+      ),
+    ),
+  }
+}
+
 function authoritativeCardProjection(
   fresh: FreshProjection,
   card: SessionCard,
@@ -971,42 +1056,16 @@ function authoritativeCardProjection(
     card,
     fresh.collection,
   )
-  const childNodes = card.childNodes.map((childNode) => {
-    const childCard = fresh.projection.indexByCardId.get(childNode.cardId)
-    if (
-      !childCard ||
-      childCard.parentCardId !== card.cardId ||
-      childCard.canonicalSegmentKey !== childNode.sessionKey ||
-      (childCard.relationshipKind !== 'branch' &&
-        childCard.relationshipKind !== 'child')
-    ) {
-      throw new Error(
-        `Invalid authoritative Session Card child: ${childNode.cardId}`,
-      )
-    }
-    const childSource = canonicalSourceForCard(childCard, fresh.collection)
-    if (childSource !== canonicalSource) {
-      throw new Error(
-        `Invalid authoritative Session Card child source: ${childNode.cardId}`,
-      )
-    }
-    const childContinuationSegmentKeys = expandedContinuationSegmentKeys(
-      childCard,
-      fresh.collection,
-    )
-    assertAuthoritativeContinuationAliases(
-      childCard,
-      childContinuationSegmentKeys,
-      childContinuationSegmentKeys.length,
-      childSource,
-    )
-    return {
-      ...childNode,
-      sessionKey: childCard.canonicalSegmentKey,
-      continuationSegmentKeys: childContinuationSegmentKeys,
-      continuationCount: childContinuationSegmentKeys.length,
-    }
-  })
+  const ancestors = new Set([card.cardId])
+  const childNodes = card.childNodes.map((childNode) =>
+    authoritativeChildProjection(
+      fresh,
+      card,
+      childNode,
+      canonicalSource,
+      ancestors,
+    ),
+  )
   const projectedCard: SessionCard = {
     ...card,
     canonicalSource,
@@ -1046,6 +1105,18 @@ function authoritativeCardProjections(
     }
     ownerByIdentity.set(identity, owner)
   }
+  const claimChildOwnership = (children: Array<SessionCardChild>): void => {
+    for (const child of children) {
+      for (const identity of [
+        child.cardId,
+        child.sessionKey,
+        ...child.continuationSegmentKeys,
+      ]) {
+        claimIdentity(identity, child)
+      }
+      claimChildOwnership(child.childNodes ?? [])
+    }
+  }
   for (const card of projectedCards) {
     for (const identity of [
       card.cardId,
@@ -1054,15 +1125,7 @@ function authoritativeCardProjections(
     ]) {
       claimIdentity(identity, card)
     }
-    for (const child of card.childNodes) {
-      for (const identity of [
-        child.cardId,
-        child.sessionKey,
-        ...child.continuationSegmentKeys,
-      ]) {
-        claimIdentity(identity, child)
-      }
-    }
+    claimChildOwnership(card.childNodes)
   }
   return projectedCards
 }
@@ -1422,10 +1485,8 @@ export class SessionCardService {
       statusByOrigin.set('local', status)
     }
 
-    const sourcePrecedenceSessions = applySourcePrecedence(
-      collectedSessions,
-      statusByOrigin.get('remote'),
-    )
+    const { entries: sourcePrecedenceSessions, excludedRemoteTopologyIds } =
+      applySourcePrecedence(collectedSessions, statusByOrigin.get('remote'))
     let authoritativeSessions = sourcePrecedenceSessions
     if (this.remoteSource && this.topologySource) {
       let topologyStatus: SessionCardSourceStatus
@@ -1440,6 +1501,7 @@ export class SessionCardService {
         authoritativeSessions = applyRemoteTopology(
           sourcePrecedenceSessions,
           topology.sessions,
+          excludedRemoteTopologyIds,
         )
       } catch {
         topologyStatus = {
@@ -1760,20 +1822,27 @@ export class SessionCardService {
         return aliases.includes(parentCardId)
       },
     )
-    const directChild = parent?.childNodes.find(
-      (candidate) => candidate.cardId === childCardId,
-    )
-    const child = directChild
-      ? fresh.projection.indexByCardId.get(directChild.cardId)
-      : undefined
-    if (
-      !parent ||
-      !directChild ||
-      !child ||
-      child.parentCardId !== parent.cardId ||
-      (child.relationshipKind !== 'branch' &&
-        child.relationshipKind !== 'child')
+    const child = fresh.projection.indexByCardId.get(childCardId)
+    let belongsToParent = false
+    let descendant = child
+    const visited = new Set<string>()
+    while (
+      parent &&
+      descendant &&
+      !visited.has(descendant.cardId) &&
+      (descendant.relationshipKind === 'branch' ||
+        descendant.relationshipKind === 'child')
     ) {
+      visited.add(descendant.cardId)
+      if (descendant.parentCardId === parent.cardId) {
+        belongsToParent = true
+        break
+      }
+      descendant = descendant.parentCardId
+        ? fresh.projection.indexByCardId.get(descendant.parentCardId)
+        : undefined
+    }
+    if (!parent || !child || !belongsToParent) {
       throw new SessionCardNotFoundError(requestedChildCardId)
     }
 

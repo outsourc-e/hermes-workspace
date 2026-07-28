@@ -4,6 +4,10 @@ import {
   reconcileSessionDraft,
 } from '../../screens/chat/chat-queries'
 import { handoffPendingSend } from '../../screens/chat/pending-send'
+import {
+  findSessionCardDescendant,
+  findSessionCardDescendantByIdentity,
+} from '../../screens/chat/session-cards'
 import type { SessionCardListWire } from '../../screens/chat/chat-queries'
 import type { SessionCard } from '../../screens/chat/types'
 import type { QueryClient } from '@tanstack/react-query'
@@ -47,9 +51,7 @@ export function validatedInspectedChildCardId(
   requestedChildCardId: string | undefined,
 ): string | undefined {
   if (!selectedCard || !requestedChildCardId) return undefined
-  return selectedCard.childNodes.find(
-    (child) => child.cardId === requestedChildCardId,
-  )?.cardId
+  return findSessionCardDescendant(selectedCard, requestedChildCardId)?.cardId
 }
 
 export type SessionCardProducerNavigation = {
@@ -87,12 +89,7 @@ export function resolveSessionCardProducerNavigation(
           ? { cardId: card.cardId }
           : undefined
       }
-      const child = card.childNodes.find(
-        (candidate) =>
-          identity === candidate.cardId ||
-          identity === candidate.sessionKey ||
-          candidate.continuationSegmentKeys.includes(identity),
-      )
+      const child = findSessionCardDescendantByIdentity(card, identity)
       if (child) {
         return isCardProjectionComplete(response, card.cardId)
           ? {
@@ -128,12 +125,7 @@ export function resolveSessionCardRoute({
   if (isBootstrapRoute(routeKey)) return { status: 'bootstrap' }
 
   const isChildRoute = response.cards.some((card) =>
-    card.childNodes.some(
-      (child) =>
-        child.cardId === routeKey ||
-        child.sessionKey === routeKey ||
-        child.continuationSegmentKeys.includes(routeKey),
-    ),
+    Boolean(findSessionCardDescendantByIdentity(card, routeKey)),
   )
   if (isChildRoute) return { status: 'rejected', reason: 'child' }
 

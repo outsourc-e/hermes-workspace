@@ -2,6 +2,8 @@ const TOPOLOGY_PATH = '/v1/session-topology'
 const DEFAULT_PAGE_SIZE = 500
 const DEFAULT_MAX_ROWS = 50_000
 const DEFAULT_TIMEOUT_MS = 5_000
+const DEFAULT_RETRY_BACKOFF_MS = 100
+const MAX_BUSY_RETRIES = 2
 const PROFILE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 const RELATIONSHIPS = new Set<SessionTopologyRelationship>([
   'root',
@@ -65,6 +67,7 @@ type SessionTopologyClientOptions = {
   pageSize?: number
   maxRows?: number
   timeoutMs?: number
+  retryBackoffMs?: number
   profile?: string
 }
 
@@ -247,6 +250,10 @@ function positiveInteger(
     : fallback
 }
 
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
 export class SessionTopologyClient implements SessionTopologySource {
   private readonly baseUrl: string | undefined
   private readonly token: string | undefined
@@ -254,6 +261,7 @@ export class SessionTopologyClient implements SessionTopologySource {
   private readonly pageSize: number
   private readonly maxRows: number
   private readonly timeoutMs: number
+  private readonly retryBackoffMs: number
   private readonly profile: string | undefined
   private generation = 0
   private inFlight:
@@ -279,6 +287,11 @@ export class SessionTopologyClient implements SessionTopologySource {
       DEFAULT_TIMEOUT_MS,
       60_000,
     )
+    this.retryBackoffMs = positiveInteger(
+      options.retryBackoffMs,
+      DEFAULT_RETRY_BACKOFF_MS,
+      1_000,
+    )
     this.profile = options.profile
   }
 
@@ -302,6 +315,41 @@ export class SessionTopologyClient implements SessionTopologySource {
   invalidate(): void {
     this.generation += 1
     this.inFlight = undefined
+  }
+
+  private async fetchPage(url: string): Promise<SessionTopologyPage> {
+    for (let attempt = 0; ; attempt += 1) {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs)
+      try {
+        const response = await this.fetchImpl(url, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${this.token}`,
+          },
+          signal: controller.signal,
+        })
+        if (response.status === 503) {
+          if (attempt >= MAX_BUSY_RETRIES) unavailable()
+        } else {
+          if (
+            !response.ok ||
+            !response.headers
+              .get('content-type')
+              ?.toLowerCase()
+              .startsWith('application/json')
+          ) {
+            unavailable()
+          }
+          return parsePage(await response.json())
+        }
+      } finally {
+        clearTimeout(timeout)
+      }
+
+      await delay(this.retryBackoffMs * 2 ** attempt)
+    }
   }
 
   private async collect(): Promise<SessionTopologySnapshot> {
@@ -329,24 +377,7 @@ export class SessionTopologyClient implements SessionTopologySource {
           endpoint.searchParams.set('snapshot', expectedSnapshot!)
         }
 
-        const response = await this.fetchImpl(endpoint.toString(), {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${this.token}`,
-          },
-          signal: AbortSignal.timeout(this.timeoutMs),
-        })
-        if (
-          !response.ok ||
-          !response.headers
-            .get('content-type')
-            ?.toLowerCase()
-            .startsWith('application/json')
-        ) {
-          unavailable()
-        }
-        const page = parsePage(await response.json())
+        const page = await this.fetchPage(endpoint.toString())
         if (expectedSnapshot === undefined) {
           expectedSnapshot = page.snapshot
         } else if (page.snapshot !== expectedSnapshot) {

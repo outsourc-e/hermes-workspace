@@ -1846,10 +1846,7 @@ class ConfigurationAndComposeTests(unittest.TestCase):
         "nousresearch/hermes-agent@"
         "sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56"
     )
-    WORKSPACE_IMAGE = (
-        "ghcr.io/outsourc-e/hermes-workspace@"
-        "sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa"
-    )
+    WORKSPACE_IMAGE = "hermes-workspace:reviewed-candidate"
     ACTION_PINS = {
         "actions/checkout": ("11d5960a326750d5838078e36cf38b85af677262", "v4.4.0"),
         "actions/setup-node": ("49933ea5288caeca8642d1e84afbd3f7d6820020", "v4.4.0"),
@@ -2026,28 +2023,57 @@ class ConfigurationAndComposeTests(unittest.TestCase):
         self.assertNotIn("immutable multi-platform\nimage identity", adapter_readme)
         self.assertIn("selected for the CI runner\nplatform", adapter_readme)
 
-    def test_ci_verifies_the_pinned_workspace_image_before_using_secrets(self):
+    def test_compose_builds_and_ci_verifies_the_reviewed_workspace_source_candidate(self):
         compose = (REPOSITORY_ROOT / "docker-compose.yml").read_text()
+        readme = (REPOSITORY_ROOT / "README.md").read_text()
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text()
-        verifier = ADAPTER_DIR / "tests" / "verify_workspace_image_identity.py"
+        verifier = ADAPTER_DIR / "tests" / "verify_workspace_source_candidate.py"
 
         workspace_start = compose.index("  hermes-workspace:")
         workspace_end = compose.index("\nvolumes:", workspace_start)
         workspace = compose[workspace_start:workspace_end]
         self.assertIn(f"image: {self.WORKSPACE_IMAGE}", workspace)
+        self.assertRegex(workspace, r"build:\s*\n\s+context: \.\s*\n\s+dockerfile: Dockerfile")
+        self.assertIn("pull_policy: build", workspace)
+        self.assertNotIn("ghcr.io/outsourc-e/hermes-workspace", workspace)
         self.assertNotIn("ghcr.io/outsourc-e/hermes-workspace:latest", compose)
         self.assertIn("hermes-agent-data:/home/workspace/.hermes", workspace)
         self.assertIn("SESSION_TOPOLOGY_ADAPTER_TOKEN:", workspace)
+        self.assertIn("docker compose up --build", readme)
+        self.assertIn(self.WORKSPACE_IMAGE, readme)
 
         self.assertTrue(verifier.is_file())
-        step_start = workflow.index("- name: Verify pinned Workspace image identity")
+        step_start = workflow.index("- name: Verify reviewed Workspace source candidate")
         step_end = workflow.find("\n      - name:", step_start + 1)
         step = workflow[step_start:] if step_end == -1 else workflow[step_start:step_end]
         self.assertIn(
-            "python session-topology-adapter/tests/verify_workspace_image_identity.py",
+            "python session-topology-adapter/tests/verify_workspace_source_candidate.py",
             step,
         )
         self.assertNotIn("continue-on-error", step)
+
+        build_start = workflow.index("- name: Build reviewed Workspace candidate image")
+        build_end = workflow.find("\n      - name:", build_start + 1)
+        build_step = workflow[build_start:] if build_end == -1 else workflow[build_start:build_end]
+        self.assertIn("docker compose build hermes-workspace", build_step)
+        self.assertNotIn("continue-on-error", build_step)
+
+    def test_ci_blocks_on_candidate_typescript_check_and_tests(self):
+        workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text()
+
+        typecheck_start = workflow.index("- name: Type check")
+        typecheck_end = workflow.index("\n      - name:", typecheck_start + 1)
+        typecheck_step = workflow[typecheck_start:typecheck_end]
+        self.assertIn("run: pnpm exec tsc --noEmit", typecheck_step)
+        self.assertNotIn("continue-on-error", typecheck_step)
+        self.assertNotIn("||", typecheck_step)
+
+        tests_start = workflow.index("- name: Run tests")
+        tests_end = workflow.find("\n      - name:", tests_start + 1)
+        tests_step = workflow[tests_start:] if tests_end == -1 else workflow[tests_start:tests_end]
+        self.assertIn("run: pnpm test", tests_step)
+        self.assertNotIn("continue-on-error", tests_step)
+        self.assertNotIn("||", tests_step)
 
     def test_all_third_party_ci_actions_are_pinned_to_reviewed_commits(self):
         observed = set()

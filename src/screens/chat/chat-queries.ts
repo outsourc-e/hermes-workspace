@@ -118,7 +118,9 @@ export type SessionCardSourceStatusWire = {
   error?: string
 }
 
-export type SessionCardChildWire = SessionCardChild
+export type SessionCardChildWire = Omit<SessionCardChild, 'childNodes'> & {
+  childNodes?: Array<SessionCardChildWire>
+}
 
 export type SessionCardWire = Omit<SessionCard, 'childNodes'> & {
   childNodes: Array<SessionCardChildWire>
@@ -255,7 +257,10 @@ function invalidSessionCardResponse(): never {
   throw new Error('Invalid Session Card response')
 }
 
-function parseSessionCardChild(value: unknown): SessionCardChildWire {
+function parseSessionCardChild(
+  value: unknown,
+  expectedSource: 'local' | 'remote',
+): SessionCardChildWire {
   if (!isWireRecord(value)) return invalidSessionCardResponse()
   const cardIdentity = sourceQualifiedWireIdentity(value.cardId)
   const sessionIdentity = sourceQualifiedWireIdentity(value.sessionKey)
@@ -272,12 +277,14 @@ function parseSessionCardChild(value: unknown): SessionCardChildWire {
     'complete',
     'error',
   ])
+  const rawChildNodes = value.childNodes
   if (
     !cardIdentity ||
     !sessionIdentity ||
     !title ||
     !relationshipKind ||
     !status ||
+    cardIdentity.source !== expectedSource ||
     typeof value.updatedAt !== 'number' ||
     !Number.isFinite(value.updatedAt) ||
     !Array.isArray(value.continuationSegmentKeys) ||
@@ -293,12 +300,16 @@ function parseSessionCardChild(value: unknown): SessionCardChildWire {
     continuationSegmentIdentities.some(
       (identity) => identity?.source !== cardIdentity.source,
     ) ||
-    sessionIdentity.source !== cardIdentity.source
+    sessionIdentity.source !== cardIdentity.source ||
+    (rawChildNodes !== undefined && !Array.isArray(rawChildNodes))
   ) {
     return invalidSessionCardResponse()
   }
   const continuationSegmentKeys = continuationSegmentIdentities.map(
     (identity) => identity?.identity ?? invalidSessionCardResponse(),
+  )
+  const childNodes = (rawChildNodes ?? []).map((child) =>
+    parseSessionCardChild(child, expectedSource),
   )
   return {
     cardId: cardIdentity.identity,
@@ -309,6 +320,7 @@ function parseSessionCardChild(value: unknown): SessionCardChildWire {
     status,
     updatedAt: value.updatedAt,
     continuationCount: Number(value.continuationCount),
+    ...(rawChildNodes === undefined ? {} : { childNodes }),
   }
 }
 
@@ -380,7 +392,9 @@ function parseSessionCard(value: unknown): SessionCardWire {
   ) {
     return invalidSessionCardResponse()
   }
-  const childNodes = value.childNodes.map(parseSessionCardChild)
+  const childNodes = value.childNodes.map((child) =>
+    parseSessionCardChild(child, canonicalSource),
+  )
   if (
     childNodes.some(
       (child) =>
@@ -437,18 +451,10 @@ function hasUniqueSessionCardOwnership(cards: Array<SessionCardWire>): boolean {
     return true
   }
 
-  for (const card of cards) {
-    const owner = {}
-    const ownAliases = [
-      card.cardId,
-      card.canonicalSegmentKey,
-      ...card.continuationSegmentKeys,
-    ]
-    if (ownAliases.some((alias) => !claimIdentity(alias, owner))) return false
-  }
-
-  for (const card of cards) {
-    for (const child of card.childNodes) {
+  const claimChildOwnership = (
+    children: Array<SessionCardChildWire>,
+  ): boolean => {
+    for (const child of children) {
       const owner = {}
       const childAliases = [
         child.cardId,
@@ -458,7 +464,20 @@ function hasUniqueSessionCardOwnership(cards: Array<SessionCardWire>): boolean {
       if (childAliases.some((alias) => !claimIdentity(alias, owner))) {
         return false
       }
+      if (!claimChildOwnership(child.childNodes ?? [])) return false
     }
+    return true
+  }
+
+  for (const card of cards) {
+    const owner = {}
+    const ownAliases = [
+      card.cardId,
+      card.canonicalSegmentKey,
+      ...card.continuationSegmentKeys,
+    ]
+    if (ownAliases.some((alias) => !claimIdentity(alias, owner))) return false
+    if (!claimChildOwnership(card.childNodes)) return false
   }
 
   return true

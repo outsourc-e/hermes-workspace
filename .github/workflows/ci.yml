@@ -37,8 +37,7 @@ jobs:
         continue-on-error: true
 
       - name: Type check
-        run: pnpm run typecheck || pnpm exec tsc --noEmit || echo "⚠️ Typecheck not configured"
-        continue-on-error: true
+        run: pnpm exec tsc --noEmit
 
       - name: Build
         run: pnpm build
@@ -73,8 +72,8 @@ jobs:
       - name: Verify pinned Hermes Agent persistence compatibility
         run: python session-topology-adapter/tests/verify_producer_compatibility.py
 
-      - name: Verify pinned Workspace image identity
-        run: python session-topology-adapter/tests/verify_workspace_image_identity.py
+      - name: Verify reviewed Workspace source candidate
+        run: python session-topology-adapter/tests/verify_workspace_source_candidate.py
 
       - name: Validate Docker Compose configuration
         env:
@@ -85,6 +84,11 @@ jobs:
 
       - name: Build session topology adapter image
         run: docker build --tag session-topology-adapter:ci ./session-topology-adapter
+
+      - name: Build reviewed Workspace candidate image
+        env:
+          SESSION_TOPOLOGY_ADAPTER_TOKEN: ci-compose-build-placeholder
+        run: docker compose build hermes-workspace
 
       - name: Setup pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
@@ -101,5 +105,4 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Run tests
-        run: pnpm test || echo "⚠️ No tests configured"
-        continue-on-error: true
+        run: pnpm test

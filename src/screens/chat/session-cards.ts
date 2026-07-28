@@ -191,6 +191,45 @@ function compareChildNodes(
   return left.cardId.localeCompare(right.cardId)
 }
 
+export function findSessionCardDescendant(
+  card: Pick<SessionCard, 'childNodes'>,
+  requestedCardId: string | undefined,
+): SessionCardChild | undefined {
+  if (!requestedCardId) return undefined
+  const pending = [...card.childNodes]
+  const visited = new Set<string>()
+  while (pending.length > 0) {
+    const child = pending.shift()!
+    if (visited.has(child.cardId)) continue
+    visited.add(child.cardId)
+    if (child.cardId === requestedCardId) return child
+    pending.push(...(child.childNodes ?? []))
+  }
+  return undefined
+}
+
+export function findSessionCardDescendantByIdentity(
+  card: Pick<SessionCard, 'childNodes'>,
+  requestedIdentity: string,
+): SessionCardChild | undefined {
+  const pending = [...card.childNodes]
+  const visited = new Set<string>()
+  while (pending.length > 0) {
+    const child = pending.shift()!
+    if (visited.has(child.cardId)) continue
+    visited.add(child.cardId)
+    if (
+      child.cardId === requestedIdentity ||
+      child.sessionKey === requestedIdentity ||
+      child.continuationSegmentKeys.includes(requestedIdentity)
+    ) {
+      return child
+    }
+    pending.push(...(child.childNodes ?? []))
+  }
+  return undefined
+}
+
 /**
  * Project normalized backend sessions into stable logical conversation cards.
  * Relationship safety and continuation membership come exclusively from the

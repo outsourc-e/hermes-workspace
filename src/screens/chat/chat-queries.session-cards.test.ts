@@ -252,6 +252,47 @@ describe('Session Card fetchers', () => {
     })
   })
 
+  it('rejects invalid identities at arbitrary recursive child depth', async () => {
+    const child = {
+      cardId: 'remote:child',
+      sessionKey: 'remote:child',
+      continuationSegmentKeys: ['remote:child'],
+      relationshipKind: 'child',
+      title: 'Child',
+      status: 'idle',
+      updatedAt: 2,
+      continuationCount: 1,
+      childNodes: [
+        {
+          cardId: 'local:grandchild',
+          sessionKey: 'local:grandchild',
+          continuationSegmentKeys: ['local:grandchild'],
+          relationshipKind: 'branch',
+          title: 'Spoofed grandchild',
+          status: 'idle',
+          updatedAt: 3,
+          continuationCount: 1,
+          childNodes: [],
+        },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          cards: [{ ...card, childNodes: [child] }],
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        }),
+      ),
+    )
+
+    await expect(fetchSessionCards()).rejects.toThrow(
+      'Invalid Session Card response',
+    )
+  })
+
   it('rejects a Card list without exact per-Card resolution evidence', async () => {
     vi.stubGlobal(
       'fetch',
@@ -1206,7 +1247,9 @@ describe('Session Card fetchers', () => {
       sessionKey: 'remote:tip',
       cardId: 'remote:root',
       canonicalSegmentKey: 'remote:tip',
-      messages: [{ id: 'assistant-1', role: 'assistant' as const, content: [] }],
+      messages: [
+        { id: 'assistant-1', role: 'assistant' as const, content: [] },
+      ],
       completeness: 'complete' as const,
       retryable: false,
       missingSegments: [],

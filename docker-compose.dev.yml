@@ -1,9 +1,7 @@
 # Hermes Workspace — Development Overlay
 #
-# Builds the Workspace image from local source instead of pulling the
-# pre-built GHCR image. Use when iterating on Workspace code (server,
-# routes, UI) and you want changes to land in the container without
-# publishing a release first.
+# The base Compose file already builds Workspace from local source. This
+# optional overlay gives iterative builds a distinct local development tag.
 #
 # The Hermes Agent service still uses the canonical upstream image
 # (the immutable digest pinned in docker-compose.yml) — there is no need to
@@ -15,12 +13,8 @@
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
-# The base docker-compose.yml stays untouched for a regular install-and-run.
-# When this overlay is merged in, `build:` takes priority over `image:` for
-# the workspace service so local source is compiled instead of pulled.
+# The base build context and private topology networking remain unchanged.
 
 services:
   hermes-workspace:
-    build:
-      context: .
-      dockerfile: ./Dockerfile
+    image: hermes-workspace:development

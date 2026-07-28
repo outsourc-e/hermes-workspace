@@ -7,6 +7,13 @@ import { fireEvent, screen, within } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  resolveSessionCardProducerNavigation,
+  validatedInspectedChildCardId,
+} from '../../../../routes/chat/-session-route-state'
+import { fetchSessionCards } from '../../chat-queries'
+import { SessionCardService } from '../../../../server/session-card-service'
+import { SessionCardHistoryService } from '../../../../server/session-card-history'
 import { SidebarSessions } from './sidebar-sessions'
 import type { SessionCard } from '../../types'
 import type { SessionCardListWire } from '../../chat-queries'
@@ -336,6 +343,131 @@ describe('SidebarSessions Card-only surface', () => {
         .closest('[data-card-child-id]')
         ?.getAttribute('data-card-child-id'),
     ).toBe('card:grandchild')
+  })
+
+  it('delivers a real recursive API grandchild through parser, sidebar route state, and history', async () => {
+    const sessions = [
+      {
+        key: 'root',
+        friendlyId: 'root',
+        title: 'Root API conversation',
+        updatedAt: 10,
+      },
+      {
+        key: 'child',
+        friendlyId: 'child',
+        title: 'Child API conversation',
+        updatedAt: 20,
+        lineage: {
+          parentSessionId: 'root',
+          relationshipKind: 'child' as const,
+          source: 'cli',
+        },
+      },
+      {
+        key: 'grandchild',
+        friendlyId: 'grandchild',
+        title: 'Grandchild API branch',
+        updatedAt: 30,
+        lineage: {
+          parentSessionId: 'child',
+          relationshipKind: 'branch' as const,
+          source: 'cli',
+        },
+      },
+    ]
+    const cardService = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () =>
+          Promise.resolve({
+            sessions,
+            offset: 0,
+            limit: sessions.length,
+            total: sessions.length,
+            hasMore: false,
+            pagination: 'supported',
+          }),
+      },
+      localSource: null,
+      metadataStore: {
+        list: () => [],
+        update: () => {
+          throw new Error('not used')
+        },
+        archive: () => {
+          throw new Error('not used')
+        },
+      },
+    })
+    const apiPayload = await cardService.listCards()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(apiPayload), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    )
+
+    const parsed = await fetchSessionCards()
+    const root = parsed.cards[0]!
+    expect(root.childNodes[0]?.childNodes?.[0]).toMatchObject({
+      cardId: 'remote:grandchild',
+      sessionKey: 'remote:grandchild',
+    })
+    expect(
+      resolveSessionCardProducerNavigation(parsed, ['remote:grandchild']),
+    ).toEqual({
+      cardId: 'remote:root',
+      inspectedChildCardId: 'remote:grandchild',
+    })
+    expect(validatedInspectedChildCardId(root, 'remote:grandchild')).toBe(
+      'remote:grandchild',
+    )
+
+    renderSidebar({
+      cards: parsed.cards,
+      cardResolutions: parsed.cardResolutions,
+      inspectedChildCardId: 'remote:grandchild',
+      activeCardId: 'remote:root',
+    })
+    expect(
+      screen
+        .getByText('Grandchild API branch')
+        .closest('a')
+        ?.getAttribute('href'),
+    ).toBe('/chat/remote:root?inspect=remote:grandchild')
+
+    const history = new SessionCardHistoryService({
+      cardService,
+      messageSource: {
+        getMessages: (segmentKey) =>
+          Promise.resolve({
+            messages: [
+              { id: `message-${segmentKey}`, content: `${segmentKey} history` },
+            ],
+            source: 'remote',
+            resolvedSegmentKey: segmentKey,
+          }),
+      },
+      cursorSecret: Buffer.from('recursive-card-history-test'),
+    })
+    await expect(
+      history.fetch({
+        parentCardId: 'remote:root',
+        cardId: 'remote:grandchild',
+      }),
+    ).resolves.toMatchObject({
+      cardId: 'remote:grandchild',
+      canonicalSegmentKey: 'remote:grandchild',
+      messages: [
+        {
+          segmentKey: 'remote:grandchild',
+          message: { content: 'grandchild history' },
+        },
+      ],
+    })
   })
 
   it('exposes Card-keyed actions only on the parent row', () => {

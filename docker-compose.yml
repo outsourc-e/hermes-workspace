@@ -11,19 +11,16 @@
 #   2. Generate a token with `openssl rand -hex 32` and set
 #      SESSION_TOPOLOGY_ADAPTER_TOKEN in .env
 #   3. Add at least one provider key (whichever you use)
-#   4. docker compose up
+#   4. docker compose up --build
 #   5. Open http://localhost:3000
 #
 # Images:
-#   The primary services use pre-built images. The small Python-stdlib session
-#   topology sidecar builds locally from ./session-topology-adapter.
+#   Hermes Agent uses its reviewed immutable upstream image. Workspace and the
+#   small Python-stdlib topology sidecar build from this checkout so the default
+#   deployment runs the source candidate under review.
 #     - nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56
 #       (Hermes Agent v0.19.0, upstream revision fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b)
-#     - ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa
-#       (Workspace revision 1da76ae97a46c7273c5d0835fc2b4777627bd5ec)
-#
-#   To build from source instead (e.g. for development), use:
-#     docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#     - hermes-workspace:reviewed-candidate (built from ./Dockerfile)
 #
 # Persistent data:
 #   `hermes-agent-data` — agent config, sessions, skills, memory, credentials.
@@ -129,9 +126,14 @@ services:
   # The Hermes Workspace Web UI
   # Connects to hermes-agent at http://hermes-agent:8642
   hermes-workspace:
-    # This image receives the adapter bearer token and the shared agent-data
-    # mount, so keep it pinned to the reviewed immutable registry identity.
-    image: ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa
+    # Always rebuild the appropriately tagged local image from this checkout.
+    # This prevents a stale registry or local image from receiving the private
+    # adapter bearer token and shared agent-data mount.
+    image: hermes-workspace:reviewed-candidate
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       hermes-agent:

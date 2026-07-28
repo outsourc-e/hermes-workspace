@@ -464,14 +464,15 @@ Using **Ollama, LM Studio, or another local server**? No key needed — just poi
 ### Step 2: Start the Services
 
 ```bash
-docker compose up
+docker compose up --build
 ```
 
-This pulls two pre-built images, builds the small standard-library adapter, and starts all three services:
+This pulls the reviewed Hermes Agent image, builds the Workspace candidate and
+small standard-library adapter from this checkout, and starts all three services:
 
 - **hermes-agent** → `nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56` on port **8642**
 - **session-topology-adapter** → private-network-only, logically read-only live topology projection
-- **hermes-workspace** → `ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa` (revision `1da76ae97a46c7273c5d0835fc2b4777627bd5ec`) on port **3000**
+- **hermes-workspace** → locally built `hermes-workspace:reviewed-candidate` on port **3000**
 
 The adapter's local build is intentionally minimal and installs no dependencies. Its
 `hermes-agent-data:/data` mount is writable only so SQLite can coordinate live
@@ -484,7 +485,7 @@ The producer pin is Hermes Agent **v0.19.0**, upstream revision
 source directly from that immutable image and verifies schema version 23 and
 the adapter's required session columns; do not replace the digest with a
 mutable tag without updating that compatibility gate.
-First run takes a minute to pull; subsequent starts are fast.
+The first source build takes a minute; subsequent builds reuse Docker's cache.
 Agent state (config, sessions, skills, memory, credentials) persists in the
 `hermes-agent-data` Docker volume, so containers can be recreated without data loss.
 
@@ -545,54 +546,46 @@ docker compose down && docker compose up -d
 | `CLAUDE_DASHBOARD_TOKEN is not set` warning | Set `CLAUDE_DASHBOARD_TOKEN` to the same value as `API_SERVER_KEY` |
 | 500 Internal Server Error on login after setting all the above | Clear browser cookies for the workspace domain, then retry |
 
-### Building from source
+### Development build tag
 
-Want to hack on the workspace and have local changes hot-built into the
-container? Use the dev overlay:
+The default quickstart already builds Workspace from the checked-out source. To
+use a separate `hermes-workspace:development` tag while iterating, add the dev
+overlay:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-The base `docker-compose.yml` stays untouched — the overlay adds a `build:`
-block for the `hermes-workspace` service so the local repo is compiled
-instead of pulled. The Hermes Agent service still uses the compatible v0.19.0
+The Hermes Agent service still uses the compatible v0.19.0
 image at upstream revision `fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b`, pinned as
 `nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56`;
 if you need a custom agent
 build, tag it locally and override `image:` in your own
 `compose.override.yml`.
 
-### Using a Pre-Built Image (Coolify / Easypanel / Dokploy / Unraid)
+### PaaS / home-lab source builds (Coolify / Easypanel / Dokploy / Unraid)
 
-Deploying Hermes Workspace to a PaaS or home-lab stack? Pull the reviewed image
-identity directly from GitHub Container Registry:
+No GHCR digest has been published for this reviewed candidate. Do not substitute
+an older registry image: configure the platform to build this checkout's
+`Dockerfile`, or build and publish the candidate under an identity you control.
+The resulting local Compose image name is:
 
 ```
-ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa
+hermes-workspace:reviewed-candidate
 ```
 
-Available tags:
-
-| Tag | What it is |
-|---|---|
-| `latest` | Latest `main` commit (stable; recommended) |
-| `v2.0.0` | Pinned semver tag |
-| `main-<sha>` | Specific commit |
-
-Minimal Coolify / Easypanel config:
+Minimal config after the platform has built/tagged this checkout:
 
 ```yaml
 service: hermes-workspace
-image: ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa
+image: hermes-workspace:reviewed-candidate
 port: 3000
 env:
   HERMES_API_URL: http://hermes-agent:8642   # point at your gateway
   HERMES_API_TOKEN: ${API_SERVER_KEY}        # if gateway auth is enabled
 ```
 
-The image is built for `linux/amd64` and `linux/arm64`. Pair it with either
-the compatible Hermes Agent v0.19.0 producer at revision
+Pair it with the compatible Hermes Agent v0.19.0 producer at revision
 `fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b`, pinned by `docker-compose.yml` as
 `nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56`,
 or an existing gateway on another host.

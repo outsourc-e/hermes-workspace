@@ -79,6 +79,7 @@ import {
   CHAT_RUN_COMMAND_EVENT,
   CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
+import { findSessionCardDescendant } from './session-cards'
 import type { AuthoritativeCardHandoff } from './hooks/use-streaming-message'
 import type {
   SessionCardHistoryResponse,
@@ -537,9 +538,9 @@ export function ChatScreen({
     !activeCardContainsHandoff
       ? cardHandoff.canonicalSegmentKey
       : activeCard?.canonicalSegmentKey
-  const inspectedChildCard = activeCard?.childNodes.find(
-    (child) => child.cardId === inspectedChildCardId,
-  )
+  const inspectedChildCard = activeCard
+    ? findSessionCardDescendant(activeCard, inspectedChildCardId)
+    : undefined
   useEffect(() => {
     if (
       cardHandoff &&

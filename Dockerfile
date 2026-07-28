@@ -6,9 +6,6 @@
 #   docker build -t hermes-workspace .
 # Run:
 #   docker run -p 3000:3000 -e HERMES_API_URL=http://host.docker.internal:8642 hermes-workspace
-# Or pull pre-built:
-#   docker pull ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa
-#
 FROM tianon/gosu:1.17-bookworm AS gosu_source
 # ─── build stage ─────────────────────────────────────────────────────────
 FROM node:22-slim AS build

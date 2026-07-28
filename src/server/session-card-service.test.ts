@@ -832,7 +832,7 @@ describe('SessionCardService collection and resolution', () => {
     )
   })
 
-  it('resolves a child Card only through its validated direct parent', async () => {
+  it('resolves any validated descendant Card through its owning root', async () => {
     const child = session(
       'child',
       {
@@ -842,15 +842,30 @@ describe('SessionCardService collection and resolution', () => {
       },
       400,
     )
+    const grandchild = session(
+      'grandchild',
+      {
+        parentSessionId: 'child',
+        relationshipType: 'child_session',
+        sessionSource: 'fork',
+        source: 'cli',
+      },
+      500,
+    )
     const service = new SessionCardService({
       remoteSource: {
         source: 'remote',
         listPage: () =>
           Promise.resolve(
             page(
-              [...continuationSessions(), child, session('other-root')],
+              [
+                ...continuationSessions(),
+                child,
+                grandchild,
+                session('other-root'),
+              ],
               0,
-              5,
+              6,
             ),
           ),
       },
@@ -869,6 +884,18 @@ describe('SessionCardService collection and resolution', () => {
       },
       pinEligible: false,
       aliases: ['remote:child'],
+    })
+    await expect(
+      service.resolveChildCard('remote:root', 'remote:grandchild'),
+    ).resolves.toMatchObject({
+      card: {
+        cardId: 'remote:grandchild',
+        parentCardId: 'remote:child',
+        canonicalSegmentKey: 'remote:grandchild',
+        continuationSegmentKeys: ['remote:grandchild'],
+      },
+      pinEligible: false,
+      aliases: ['remote:grandchild'],
     })
 
     await expect(
@@ -1386,6 +1413,115 @@ describe('SessionCardService collection and resolution', () => {
       })
     },
   )
+
+  it.each([
+    {
+      fallback: 'root',
+      local: {
+        ...session('cached-root', { source: 'local' }, 10),
+        backendKey: 'root',
+      },
+      excludedRemoteCardId: 'remote:root',
+      retainedRemoteCardId: 'remote:child',
+    },
+    {
+      fallback: 'child',
+      local: {
+        ...session('cached-child', { source: 'local' }, 10),
+        backendKey: 'child',
+      },
+      excludedRemoteCardId: 'remote:child',
+      retainedRemoteCardId: 'remote:root',
+    },
+  ])(
+    'does not reintroduce an excluded remote $fallback identity during topology closure',
+    async ({ local, excludedRemoteCardId, retainedRemoteCardId }) => {
+      const remoteRows = [
+        { ...session('root', undefined, 20), backendKey: 'root' },
+        { ...session('child', undefined, 30), backendKey: 'child' },
+      ]
+      const service = new SessionCardService({
+        remoteSource: {
+          source: 'remote',
+          listPage: () =>
+            Promise.resolve({
+              ...page(remoteRows, 0, 3),
+              hasMore: true,
+              pagination: 'unsupported',
+            }),
+        },
+        localSource: { source: 'local', listSessions: () => [local] },
+        metadataStore: metadataStore(),
+        pageSize: 2,
+        topologySource: {
+          listAll: () =>
+            Promise.resolve({
+              snapshot: 'topology-source-precedence',
+              sessions: [
+                topologySession('root', 'root'),
+                topologySession('child', 'child', 'root'),
+              ],
+            }),
+          invalidate: vi.fn(),
+        },
+      })
+
+      const collection = await service.collectSessions()
+      const keys = collection.sessions.map((row) => row.key)
+      expect(keys).not.toContain(excludedRemoteCardId)
+      expect(keys).toContain(retainedRemoteCardId)
+      expect(keys).toContain(`local:${local.key}`)
+      expect(
+        keys.filter(
+          (key) => key === excludedRemoteCardId || key === `local:${local.key}`,
+        ),
+      ).toHaveLength(1)
+
+      const listed = await service.listCards()
+      expect(JSON.stringify(listed.cards)).not.toContain(excludedRemoteCardId)
+      expect(listed.cards.map((card) => card.cardId)).toContain(
+        `local:${local.key}`,
+      )
+    },
+  )
+
+  it('preserves remote and local topology members when shared identity is unproven', async () => {
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () =>
+          Promise.resolve({
+            ...page([session('root'), session('child')], 0, 3),
+            hasMore: true,
+            pagination: 'unsupported',
+          }),
+      },
+      localSource: {
+        source: 'local',
+        listSessions: () => [session('root', { source: 'local' })],
+      },
+      metadataStore: metadataStore(),
+      pageSize: 2,
+      topologySource: {
+        listAll: () =>
+          Promise.resolve({
+            snapshot: 'topology-unproven-precedence',
+            sessions: [
+              topologySession('root', 'root'),
+              topologySession('child', 'child', 'root'),
+            ],
+          }),
+        invalidate: vi.fn(),
+      },
+    })
+
+    const collection = await service.collectSessions()
+    expect(collection.sessions.map((row) => row.key).sort()).toEqual([
+      'local:root',
+      'remote:child',
+      'remote:root',
+    ])
+  })
 
   it('preserves same-key remote and local conversations as independent source-qualified cards', async () => {
     const service = new SessionCardService({

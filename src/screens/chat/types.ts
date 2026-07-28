@@ -192,6 +192,8 @@ export type SessionCardChild = {
   status: SessionCardChildStatus
   updatedAt: number
   continuationCount: number
+  /** Recursively validated descendants delivered by the Card list API. */
+  childNodes?: Array<SessionCardChild>
 }
 
 export type SessionCard = {

@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
-- **`docker compose up` now pulls pre-built images by default** (#82) — immutable compatible Hermes Agent v0.19.0 image `nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56` for the gateway and immutable Workspace image `ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa` for the UI. Agent state persists in the `hermes-agent-data` named volume. Adds `docker-compose.dev.yml` overlay for building from source.
+- **`docker compose up --build` runs the reviewed source candidate by default** (#82) — the gateway uses immutable compatible Hermes Agent v0.19.0 image `nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56`, while Workspace builds from the checked-out source as `hermes-workspace:reviewed-candidate`. Agent state persists in the `hermes-agent-data` named volume. `docker-compose.dev.yml` provides a distinct development tag.
 
 ## [2.0.0] — 2026-04-20
 
