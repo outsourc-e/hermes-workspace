@@ -138,7 +138,8 @@ function hasChildRelationshipProvenance(session: SessionMeta): boolean {
     lineage?.relationshipType === 'child_session' ||
     lineage?.isCrossSurfaceChild === true ||
     lineage?.relationshipKind === 'branch' ||
-    lineage?.relationshipKind === 'child'
+    lineage?.relationshipKind === 'child' ||
+    lineage?.relationshipKind === 'orphan'
   )
 }
 

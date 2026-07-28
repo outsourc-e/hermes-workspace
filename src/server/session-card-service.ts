@@ -6,6 +6,12 @@ import {
   listSessionCardMetadata,
   updateSessionCardMetadata,
 } from './session-card-store'
+import { createSessionTopologyClientFromEnv } from './session-topology-client'
+import type {
+  SessionTopologySession,
+  SessionTopologySource,
+  SessionTopologyTimestamp,
+} from './session-topology-client'
 import type { ClaudeSessionPage } from './claude-api'
 import type { SessionCardProjection } from '../screens/chat/session-cards'
 import type {
@@ -138,6 +144,7 @@ type SessionCardServiceOptions = {
   remoteSource?: SessionCardRemoteSource | null
   localSource?: SessionCardLocalSource | null
   metadataStore?: SessionCardMetadataStore
+  topologySource?: SessionTopologySource | null
   pageSize?: number
   maxSessions?: number
   now?: () => number
@@ -442,6 +449,200 @@ function qualifiedSessionKey(
   sessionKey = entry.session.key,
 ): string {
   return `${entry.origin}:${encodeURIComponent(sessionKey)}`
+}
+
+function topologyTimestampMs(
+  timestamp: SessionTopologyTimestamp | null,
+): number | undefined {
+  if (timestamp === null) return undefined
+  if (typeof timestamp === 'number') return timestamp * 1000
+  const parsed = Date.parse(timestamp)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function sessionFromTopology(
+  topology: SessionTopologySession,
+  existing?: SessionMeta,
+  continuationFacts?: {
+    rootId: string
+    tipId: string
+    segmentCount: number
+  },
+): SessionMeta {
+  const relationshipKind =
+    topology.relationship === 'delegate' ? 'child' : topology.relationship
+  const startedAt = topologyTimestampMs(topology.started_at)
+  const endedAt = topologyTimestampMs(topology.ended_at)
+  return {
+    ...(existing ?? { key: topology.id, friendlyId: topology.id }),
+    key: topology.id,
+    ...(!existing && (endedAt ?? startedAt) !== undefined
+      ? { updatedAt: endedAt ?? startedAt }
+      : {}),
+    lineage: {
+      source: topology.source,
+      ...(startedAt === undefined ? {} : { startedAt }),
+      ...(endedAt === undefined ? {} : { endedAt }),
+      ...(topology.end_reason === null
+        ? {}
+        : { endReason: topology.end_reason }),
+      relationshipKind,
+      ...(topology.parent_session_id === null
+        ? {}
+        : { parentSessionId: topology.parent_session_id }),
+      ...(continuationFacts
+        ? {
+            lineageRootId: continuationFacts.rootId,
+            lineageTipId: continuationFacts.tipId,
+            compressionSegmentCount: continuationFacts.segmentCount,
+          }
+        : {}),
+      ...(topology.relationship === 'branch' ? { sessionSource: 'fork' } : {}),
+      ...(topology.relationship === 'delegate' ||
+      topology.relationship === 'child'
+        ? { relationshipType: 'child_session' }
+        : {}),
+    },
+  }
+}
+
+function continuationFactsBySessionId(
+  topologySessions: ReadonlyArray<SessionTopologySession>,
+): Map<string, { rootId: string; tipId: string; segmentCount: number }> {
+  const byId = new Map(topologySessions.map((session) => [session.id, session]))
+  const rootIdBySessionId = new Map<string, string>()
+  for (const session of topologySessions) {
+    let root = session
+    while (
+      root.relationship === 'continuation' &&
+      root.parent_session_id !== null
+    ) {
+      const parent = byId.get(root.parent_session_id)
+      if (!parent) break
+      root = parent
+    }
+    if (root.id !== session.id || session.relationship === 'continuation') {
+      rootIdBySessionId.set(session.id, root.id)
+      rootIdBySessionId.set(root.id, root.id)
+    }
+  }
+
+  const membersByRoot = new Map<string, Array<string>>()
+  for (const [id, rootId] of rootIdBySessionId) {
+    const members = membersByRoot.get(rootId) ?? []
+    members.push(id)
+    membersByRoot.set(rootId, members)
+  }
+  const result = new Map<
+    string,
+    { rootId: string; tipId: string; segmentCount: number }
+  >()
+  for (const [rootId, members] of membersByRoot) {
+    const continuationParents = new Set(
+      members
+        .map((id) => byId.get(id))
+        .filter(
+          (session): session is SessionTopologySession =>
+            session?.relationship === 'continuation' &&
+            session.parent_session_id !== null,
+        )
+        .map((session) => session.parent_session_id!),
+    )
+    const tips = members.filter((id) => !continuationParents.has(id))
+    if (tips.length !== 1) continue
+    const facts = {
+      rootId,
+      tipId: tips[0]!,
+      segmentCount: members.length,
+    }
+    for (const id of members) result.set(id, facts)
+  }
+  return result
+}
+
+function remoteTopologyClosure(
+  topologySessions: ReadonlyArray<SessionTopologySession>,
+  remoteSessionIds: ReadonlySet<string>,
+): Set<string> {
+  const byId = new Map(topologySessions.map((session) => [session.id, session]))
+  const adjacent = new Map<string, Set<string>>()
+  for (const session of topologySessions) {
+    adjacent.set(session.id, adjacent.get(session.id) ?? new Set<string>())
+    if (session.parent_session_id === null) continue
+    adjacent.get(session.id)!.add(session.parent_session_id)
+    const parentAdjacent =
+      adjacent.get(session.parent_session_id) ?? new Set<string>()
+    parentAdjacent.add(session.id)
+    adjacent.set(session.parent_session_id, parentAdjacent)
+  }
+
+  const included = new Set<string>()
+  const pending = [...remoteSessionIds].filter((id) => byId.has(id))
+  while (pending.length > 0) {
+    const id = pending.pop()!
+    if (included.has(id)) continue
+    included.add(id)
+    for (const connectedId of adjacent.get(id) ?? []) {
+      if (!included.has(connectedId)) pending.push(connectedId)
+    }
+  }
+  return included
+}
+
+function stripRemoteTopology(
+  entries: Array<CollectedSession>,
+): Array<CollectedSession> {
+  return entries.map((entry) =>
+    entry.origin === 'remote'
+      ? {
+          ...entry,
+          session: { ...entry.session, lineage: undefined },
+        }
+      : entry,
+  )
+}
+
+function applyRemoteTopology(
+  entries: Array<CollectedSession>,
+  topologySessions: ReadonlyArray<SessionTopologySession>,
+): Array<CollectedSession> {
+  const remoteEntries = entries.filter((entry) => entry.origin === 'remote')
+  const localEntries = entries.filter((entry) => entry.origin === 'local')
+  const remoteById = new Map(
+    remoteEntries.map((entry) => [entry.session.key, entry]),
+  )
+  const included = remoteTopologyClosure(
+    topologySessions,
+    new Set(remoteById.keys()),
+  )
+  const defaultSource = remoteEntries[0]?.source
+  const continuationFacts = continuationFactsBySessionId(topologySessions)
+  const projectedRemote: Array<CollectedSession> = []
+
+  for (const topology of topologySessions) {
+    if (!included.has(topology.id)) continue
+    const existing = remoteById.get(topology.id)
+    const source = existing?.source ?? defaultSource
+    if (!source) continue
+    projectedRemote.push({
+      origin: 'remote',
+      source,
+      session: sessionFromTopology(
+        topology,
+        existing?.session,
+        continuationFacts.get(topology.id),
+      ),
+    })
+    remoteById.delete(topology.id)
+  }
+
+  for (const entry of remoteById.values()) {
+    projectedRemote.push({
+      ...entry,
+      session: { ...entry.session, lineage: undefined },
+    })
+  }
+  return [...projectedRemote, ...localEntries]
 }
 
 function projectSourceQualifiedSessions(
@@ -869,6 +1070,7 @@ export class SessionCardService {
   private readonly remoteSource: SessionCardRemoteSource | null
   private readonly localSource: SessionCardLocalSource | null
   private readonly metadataStore: SessionCardMetadataStore
+  private readonly topologySource: SessionTopologySource | null
   private readonly pageSize: number
   private readonly maxSessions: number
   private readonly allowLegacyRootAliases: boolean
@@ -888,6 +1090,7 @@ export class SessionCardService {
         ? defaultLocalSource()
         : options.localSource
     this.metadataStore = options.metadataStore ?? defaultMetadataStore()
+    this.topologySource = options.topologySource ?? null
     this.pageSize = normalizePositiveInteger(
       options.pageSize,
       DEFAULT_SESSION_CARD_PAGE_SIZE,
@@ -1162,8 +1365,37 @@ export class SessionCardService {
       statusByOrigin.set('local', status)
     }
 
+    let authoritativeSessions = collectedSessions
+    if (this.remoteSource && this.topologySource) {
+      let topologyStatus: SessionCardSourceStatus
+      try {
+        const topology = await this.topologySource.listAll()
+        topologyStatus = {
+          source: 'session-topology-adapter',
+          status: 'complete',
+          fetched: topology.sessions.length,
+          retryable: false,
+        }
+        authoritativeSessions = applyRemoteTopology(
+          collectedSessions,
+          topology.sessions,
+        )
+      } catch {
+        topologyStatus = {
+          source: 'session-topology-adapter',
+          status: 'unavailable',
+          fetched: 0,
+          retryable: true,
+          error: 'Session topology is unavailable.',
+        }
+        authoritativeSessions = stripRemoteTopology(collectedSessions)
+        statusByOrigin.set('remote', topologyStatus)
+      }
+      sources.push(topologyStatus)
+    }
+
     const projected = projectSourceQualifiedSessions(
-      collectedSessions,
+      authoritativeSessions,
       statusByOrigin,
     )
     const incomplete = sources.some((source) => source.status !== 'complete')
@@ -1173,6 +1405,10 @@ export class SessionCardService {
       retryable: sources.some((source) => source.retryable),
       sources,
     }
+  }
+
+  invalidateTopology(): void {
+    this.topologySource?.invalidate()
   }
 
   private validatedChildActivity(
@@ -1506,4 +1742,6 @@ export class SessionCardService {
   }
 }
 
-export const sessionCardService = new SessionCardService()
+export const sessionCardService = new SessionCardService({
+  topologySource: createSessionTopologyClientFromEnv(),
+})

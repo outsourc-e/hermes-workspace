@@ -307,6 +307,7 @@ async function executeBranch(
       authoritativeUpstreamKey,
       title ? { title } : undefined,
     )
+    sessionCardService.invalidateTopology()
     const childUpstreamKey = result.session.id.trim()
     const returnedParent = result.session.parent_session_id
     if (

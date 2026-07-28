@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   resolveCard: vi.fn(),
   updateCardMetadata: vi.fn(),
   archiveCard: vi.fn(),
+  invalidateTopology: vi.fn(),
   getHistory: vi.fn(),
   ensureGatewayProbed: vi.fn(),
   forkSession: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock('../../server/session-card-service', () => ({
     resolveCard: mocks.resolveCard,
     updateCardMetadata: mocks.updateCardMetadata,
     archiveCard: mocks.archiveCard,
+    invalidateTopology: mocks.invalidateTopology,
   },
 }))
 
@@ -1042,6 +1044,10 @@ describe('POST /api/session-cards/$cardId/branch', () => {
     expect(await laterReplay.json()).toEqual(firstPayload)
     expect(mocks.resolveCard).toHaveBeenCalledTimes(2)
     expect(mocks.forkSession).toHaveBeenCalledTimes(1)
+    expect(mocks.invalidateTopology).toHaveBeenCalledTimes(1)
+    expect(mocks.invalidateTopology.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.resolveCard.mock.invocationCallOrder[1]!,
+    )
   })
 
   it('keeps a cross-process reservation loser retryable without a duplicate fork', async () => {

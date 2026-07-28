@@ -125,6 +125,31 @@ function page(
   }
 }
 
+function topologySession(
+  id: string,
+  relationship:
+    | 'root'
+    | 'continuation'
+    | 'branch'
+    | 'delegate'
+    | 'child'
+    | 'orphan',
+  parentSessionId: string | null = null,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    parent_session_id: parentSessionId,
+    source: relationship === 'delegate' ? 'tool' : 'cli',
+    started_at: '2026-07-27T10:00:00+00:00',
+    ended_at: null,
+    end_reason: null,
+    archived: false,
+    relationship,
+    ...overrides,
+  }
+}
+
 describe('SessionCardService collection and resolution', () => {
   it('collects every supported page and reports a complete projection', async () => {
     const all = ['a', 'b', 'c', 'd', 'e'].map((key, index) =>
@@ -1536,5 +1561,209 @@ describe('SessionCardService collection and resolution', () => {
       }),
     ])
     expect(store.list()[0]).not.toHaveProperty('pinned')
+  })
+
+  it('uses adapter topology as the only remote relationship graph, including hidden nodes and orphans', async () => {
+    const topologySource = {
+      listAll: vi.fn().mockResolvedValue({
+        snapshot: 'authoritative-snapshot',
+        sessions: [
+          topologySession('root', 'root', null, {
+            ended_at: '2026-07-27T10:10:00+00:00',
+            end_reason: 'compression',
+            archived: true,
+          }),
+          topologySession('continuation', 'continuation', 'root', {
+            started_at: '2026-07-27T10:09:00+00:00',
+            ended_at: '2026-07-27T10:20:00+00:00',
+            end_reason: 'compression',
+          }),
+          topologySession('tip', 'continuation', 'continuation', {
+            started_at: '2026-07-27T10:20:00+00:00',
+          }),
+          topologySession('branch', 'branch', 'root'),
+          topologySession('delegate', 'delegate', 'root'),
+          topologySession('child-parent', 'root'),
+          topologySession('child', 'child', 'child-parent'),
+          topologySession('orphan', 'orphan'),
+        ],
+      }),
+      invalidate: vi.fn(),
+    }
+    const remoteRows = [
+      session('tip', undefined, 30),
+      session('child-parent', undefined, 20),
+      session('orphan', undefined, 5),
+      session(
+        'projected-fallback-child',
+        { parentSessionId: 'root', relationshipType: 'child_session' },
+        40,
+      ),
+    ]
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'hermes',
+        listPage: () =>
+          Promise.resolve({
+            ...page(remoteRows, 0, remoteRows.length),
+            source: 'gateway',
+          }),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+      topologySource,
+    })
+
+    const listed = await service.listCards({ includeArchived: true })
+
+    expect(topologySource.listAll).toHaveBeenCalledTimes(1)
+    expect(listed.completeness).toBe('complete')
+    expect(listed.sources).toContainEqual(
+      expect.objectContaining({
+        source: 'session-topology-adapter',
+        status: 'complete',
+        fetched: 8,
+      }),
+    )
+    expect(listed.cards).toContainEqual(
+      expect.objectContaining({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:tip',
+        continuationSegmentKeys: [
+          'remote:root',
+          'remote:continuation',
+          'remote:tip',
+        ],
+        childNodes: [
+          expect.objectContaining({
+            cardId: 'remote:branch',
+            relationshipKind: 'branch',
+          }),
+          expect.objectContaining({
+            cardId: 'remote:delegate',
+            relationshipKind: 'child',
+          }),
+        ],
+      }),
+    )
+    expect(listed.cards).toContainEqual(
+      expect.objectContaining({
+        cardId: 'remote:child-parent',
+        childNodes: [
+          expect.objectContaining({
+            cardId: 'remote:child',
+            relationshipKind: 'child',
+          }),
+        ],
+      }),
+    )
+    expect(listed.cards).toContainEqual(
+      expect.objectContaining({
+        cardId: 'remote:orphan',
+        relationshipKind: 'orphan',
+      }),
+    )
+    expect(listed.cards).toContainEqual(
+      expect.objectContaining({
+        cardId: 'remote:projected-fallback-child',
+        relationshipKind: 'root',
+      }),
+    )
+    expect(
+      listed.cards
+        .flatMap((card) => card.childNodes)
+        .map((child) => child.cardId),
+    ).not.toContain('remote:projected-fallback-child')
+  })
+
+  it('fails closed for remote consolidation when topology is unavailable while preserving standalone local cards', async () => {
+    const topologySource = {
+      listAll: vi
+        .fn()
+        .mockRejectedValue(
+          new Error('Bearer private-token at private.internal'),
+        ),
+      invalidate: vi.fn(),
+    }
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'hermes',
+        listPage: () =>
+          Promise.resolve({
+            ...page(
+              [
+                session('root', undefined, 10),
+                session(
+                  'projected-child',
+                  {
+                    parentSessionId: 'root',
+                    relationshipType: 'child_session',
+                  },
+                  20,
+                ),
+              ],
+              0,
+              2,
+            ),
+            source: 'gateway',
+          }),
+      },
+      localSource: {
+        source: 'local',
+        listSessions: () => [session('local-root', { source: 'local' })],
+      },
+      metadataStore: metadataStore(),
+      topologySource,
+    })
+
+    const listed = await service.listCards()
+
+    expect(listed.completeness).toBe('incomplete')
+    expect(listed.retryable).toBe(true)
+    expect(listed.cards.map((card) => card.cardId).sort()).toEqual([
+      'local:local-root',
+      'remote:projected-child',
+      'remote:root',
+    ])
+    expect(listed.cards.every((card) => card.childNodes.length === 0)).toBe(
+      true,
+    )
+    expect(listed.sources).toContainEqual({
+      source: 'session-topology-adapter',
+      status: 'unavailable',
+      fetched: 0,
+      retryable: true,
+      error: 'Session topology is unavailable.',
+    })
+    expect(JSON.stringify(listed.sources)).not.toMatch(
+      /private-token|private\.internal|Bearer/,
+    )
+    expect(listed.cardResolutions).toContainEqual({
+      cardId: 'local:local-root',
+      completeness: 'complete',
+      retryable: false,
+    })
+    expect(listed.cardResolutions).toContainEqual({
+      cardId: 'remote:root',
+      completeness: 'incomplete',
+      retryable: true,
+    })
+  })
+
+  it('forwards topology invalidation to the configured private source', () => {
+    const topologySource = {
+      listAll: vi.fn(),
+      invalidate: vi.fn(),
+    }
+    const service = new SessionCardService({
+      remoteSource: null,
+      localSource: null,
+      metadataStore: metadataStore(),
+      topologySource,
+    })
+
+    service.invalidateTopology()
+
+    expect(topologySource.invalidate).toHaveBeenCalledTimes(1)
   })
 })
