@@ -13,7 +13,11 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   chatScreenProps: [] as Array<Record<string, unknown>>,
   queryOptions: undefined as
-    | { queryFn: () => Promise<SessionCardListWire> }
+    | {
+        queryFn: () => Promise<SessionCardListWire>
+        enabled?: boolean
+        refetchInterval?: number | false
+      }
     | undefined,
   queryState: {} as {
     status: 'pending' | 'error' | 'success'
@@ -40,7 +44,11 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options: { queryFn: () => Promise<SessionCardListWire> }) => {
+  useQuery: (options: {
+    queryFn: () => Promise<SessionCardListWire>
+    enabled?: boolean
+    refetchInterval?: number | false
+  }) => {
     mocks.queryOptions = options
     return mocks.queryState
   },
@@ -222,6 +230,17 @@ afterEach(() => {
 })
 
 describe('ChatPanel Card routing', () => {
+  it('does not poll the Card inventory while the panel is closed', () => {
+    mocks.workspaceState.chatPanelOpen = false
+
+    renderPanel()
+
+    expect(mocks.queryOptions).toMatchObject({
+      enabled: false,
+      refetchInterval: false,
+    })
+  })
+
   it('renders the selected authoritative Card and expands only by cardId', async () => {
     const parent = card()
     const other = card({

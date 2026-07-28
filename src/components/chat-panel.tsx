@@ -102,9 +102,10 @@ export function ChatPanel() {
   const sessionCardsQuery = useQuery({
     queryKey: sessionCardQueryKeys.list(false),
     queryFn: () => fetchSessionCards(),
+    enabled: isOpen,
     retry: 1,
     staleTime: 5_000,
-    refetchInterval: 5_000,
+    refetchInterval: isOpen ? 5_000 : false,
   })
   const cardRouteResolution = resolveChatPanelCardRouteState({
     routeKey: selectedCardId,
