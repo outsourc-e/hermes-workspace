@@ -439,9 +439,18 @@ cd hermes-workspace
 cp .env.example .env
 ```
 
-Edit `.env` and add **at least one** LLM provider key — whichever provider you want hermes-agent to use:
+Generate a unique token for the private session-topology adapter:
+
+```bash
+openssl rand -hex 32
+```
+
+Edit `.env`, set `SESSION_TOPOLOGY_ADAPTER_TOKEN` to that generated value, and
+add **at least one** LLM provider key — whichever provider you want hermes-agent to use:
 
 ```env
+SESSION_TOPOLOGY_ADAPTER_TOKEN=<paste-the-generated-value-here>
+
 # Pick one (or more). You do NOT need all of these.
 # OPENAI_API_KEY=sk-...                # GPT / o-series / OpenAI-compatible
 # OPENROUTER_API_KEY=sk-or-v1-...      # OpenRouter (free models available)
@@ -458,14 +467,26 @@ Using **Ollama, LM Studio, or another local server**? No key needed — just poi
 docker compose up
 ```
 
-This pulls two pre-built images and starts them:
+This pulls two pre-built images, builds the small standard-library adapter, and starts all three services:
 
-- **hermes-agent** → `nousresearch/hermes-agent:latest` on port **8642**
-- **hermes-workspace** → `ghcr.io/outsourc-e/hermes-workspace:latest` on port **3000**
+- **hermes-agent** → `nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56` on port **8642**
+- **session-topology-adapter** → private-network-only, logically read-only live topology projection
+- **hermes-workspace** → `ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa` (revision `1da76ae97a46c7273c5d0835fc2b4777627bd5ec`) on port **3000**
 
-No local build. First run takes a minute to pull; subsequent starts are instant.
+The adapter's local build is intentionally minimal and installs no dependencies. Its
+`hermes-agent-data:/data` mount is writable only so SQLite can coordinate live
+WAL/SHM state; database connections use URI `mode=ro`, enforce
+`PRAGMA query_only=ON`, and execute only bounded read/schema operations. The
+container itself runs as non-root with a read-only root filesystem, no Linux
+capabilities, no new privileges, no host port, and an internal-only network.
+The producer pin is Hermes Agent **v0.19.0**, upstream revision
+`fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b`. CI extracts its persistence
+source directly from that immutable image and verifies schema version 23 and
+the adapter's required session columns; do not replace the digest with a
+mutable tag without updating that compatibility gate.
+First run takes a minute to pull; subsequent starts are fast.
 Agent state (config, sessions, skills, memory, credentials) persists in the
-legacy-named `claude-data` Docker volume, so containers can be recreated without data loss.
+`hermes-agent-data` Docker volume, so containers can be recreated without data loss.
 
 ### Step 3: Access the Workspace
 
@@ -535,18 +556,20 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 The base `docker-compose.yml` stays untouched — the overlay adds a `build:`
 block for the `hermes-workspace` service so the local repo is compiled
-instead of pulled. The Hermes Agent service still uses the canonical
-`nousresearch/hermes-agent:latest` image; if you need a custom agent
+instead of pulled. The Hermes Agent service still uses the compatible v0.19.0
+image at upstream revision `fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b`, pinned as
+`nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56`;
+if you need a custom agent
 build, tag it locally and override `image:` in your own
 `compose.override.yml`.
 
 ### Using a Pre-Built Image (Coolify / Easypanel / Dokploy / Unraid)
 
-Deploying Hermes Workspace to a PaaS or home-lab stack? Pull the image
-directly from GitHub Container Registry:
+Deploying Hermes Workspace to a PaaS or home-lab stack? Pull the reviewed image
+identity directly from GitHub Container Registry:
 
 ```
-ghcr.io/outsourc-e/hermes-workspace:latest
+ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa
 ```
 
 Available tags:
@@ -561,7 +584,7 @@ Minimal Coolify / Easypanel config:
 
 ```yaml
 service: hermes-workspace
-image: ghcr.io/outsourc-e/hermes-workspace:latest
+image: ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa
 port: 3000
 env:
   HERMES_API_URL: http://hermes-agent:8642   # point at your gateway
@@ -569,8 +592,10 @@ env:
 ```
 
 The image is built for `linux/amd64` and `linux/arm64`. Pair it with either
-a `nousresearch/hermes-agent:latest` container (what our `docker-compose.yml`
-does by default) or an existing gateway on another host.
+the compatible Hermes Agent v0.19.0 producer at revision
+`fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b`, pinned by `docker-compose.yml` as
+`nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56`,
+or an existing gateway on another host.
 
 ---
 

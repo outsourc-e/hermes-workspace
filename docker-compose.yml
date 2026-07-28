@@ -8,23 +8,29 @@
 #
 # Quick Start:
 #   1. cp .env.example .env
-#   2. Add at least one provider key (whichever you use)
-#   3. docker compose up
-#   4. Open http://localhost:3000
+#   2. Generate a token with `openssl rand -hex 32` and set
+#      SESSION_TOPOLOGY_ADAPTER_TOKEN in .env
+#   3. Add at least one provider key (whichever you use)
+#   4. docker compose up
+#   5. Open http://localhost:3000
 #
 # Images:
-#   This file pulls pre-built images by default — no local build required.
-#     - nousresearch/hermes-agent:latest  (Hermes Agent, Dockerfile upstream)
-#     - ghcr.io/outsourc-e/hermes-workspace:latest  (this workspace)
+#   The primary services use pre-built images. The small Python-stdlib session
+#   topology sidecar builds locally from ./session-topology-adapter.
+#     - nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56
+#       (Hermes Agent v0.19.0, upstream revision fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b)
+#     - ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa
+#       (Workspace revision 1da76ae97a46c7273c5d0835fc2b4777627bd5ec)
 #
 #   To build from source instead (e.g. for development), use:
 #     docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 #
 # Persistent data:
 #   `hermes-agent-data` — agent config, sessions, skills, memory, credentials.
-#     Mounted at /opt/data in the agent container and /home/workspace/.hermes
-#     in the workspace container (read-write for config reads; the agent is
-#     the primary writer).
+#     Mounted at /opt/data in the agent container, /home/workspace/.hermes in
+#     the workspace container, and writable at /data in the topology adapter.
+#     The adapter needs directory writes only for SQLite WAL/SHM coordination;
+#     it opens database contents with mode=ro and PRAGMA query_only=ON.
 #   `hermes-workspace-files` — files created from the Workspace file browser.
 #   Both volumes survive container recreation and `docker compose down`.
 #   Only `docker compose down -v` removes them.
@@ -39,7 +45,7 @@ services:
   # Gateway runs in the foreground on :8642. Dashboard runs as a background
   # process on :9119 and is reachable only on the private Docker network.
   hermes-agent:
-    image: nousresearch/hermes-agent:latest
+    image: nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56
     restart: unless-stopped
     # The Hermes Agent image entrypoint defaults to the interactive CLI which exits
     # immediately under `docker compose up -d`. We override here to start the
@@ -85,13 +91,52 @@ services:
     ports:
       - '127.0.0.1:8642:8642'
 
+  # Read-only, authenticated projection of persisted session relationships.
+  # This sidecar is private to the Compose network and does not publish a host port.
+  session-topology-adapter:
+    build:
+      context: ./session-topology-adapter
+    restart: unless-stopped
+    user: '10010:10010'
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      hermes-agent:
+        condition: service_healthy
+    environment:
+      SESSION_TOPOLOGY_ADAPTER_TOKEN: ${SESSION_TOPOLOGY_ADAPTER_TOKEN:?SESSION_TOPOLOGY_ADAPTER_TOKEN must be set}
+      SESSION_TOPOLOGY_ADAPTER_SNAPSHOT_TTL_SECONDS: ${SESSION_TOPOLOGY_ADAPTER_SNAPSHOT_TTL_SECONDS:-60}
+      SESSION_TOPOLOGY_ADAPTER_MAX_SNAPSHOTS: ${SESSION_TOPOLOGY_ADAPTER_MAX_SNAPSHOTS:-32}
+      SESSION_TOPOLOGY_ADAPTER_MAX_SNAPSHOT_ROWS: ${SESSION_TOPOLOGY_ADAPTER_MAX_SNAPSHOT_ROWS:-50000}
+      SESSION_TOPOLOGY_ADAPTER_MAX_CONCURRENT_SNAPSHOTS: ${SESSION_TOPOLOGY_ADAPTER_MAX_CONCURRENT_SNAPSHOTS:-1}
+      SESSION_TOPOLOGY_ADAPTER_MAX_CACHED_SNAPSHOT_ROWS: ${SESSION_TOPOLOGY_ADAPTER_MAX_CACHED_SNAPSHOT_ROWS:-100000}
+      SESSION_TOPOLOGY_ADAPTER_MAX_CACHED_SNAPSHOT_BYTES: ${SESSION_TOPOLOGY_ADAPTER_MAX_CACHED_SNAPSHOT_BYTES:-67108864}
+      SESSION_TOPOLOGY_ADAPTER_MAX_SCALAR_BYTES: ${SESSION_TOPOLOGY_ADAPTER_MAX_SCALAR_BYTES:-65536}
+    volumes:
+      - hermes-agent-data:/data
+    networks:
+      - session-topology-private
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
   # The Hermes Workspace Web UI
   # Connects to hermes-agent at http://hermes-agent:8642
   hermes-workspace:
-    image: ghcr.io/outsourc-e/hermes-workspace:latest
+    # This image receives the adapter bearer token and the shared agent-data
+    # mount, so keep it pinned to the reviewed immutable registry identity.
+    image: ghcr.io/outsourc-e/hermes-workspace@sha256:bf0fd5e65c4ec45b7f772630946b60b1b4424b586eeba08ba3afa54da43990fa
     restart: unless-stopped
     depends_on:
       hermes-agent:
+        condition: service_healthy
+      session-topology-adapter:
         condition: service_healthy
     env_file:
       - .env
@@ -101,6 +146,10 @@ services:
       # Internal Docker network URL (not localhost!)
       HERMES_API_URL: http://hermes-agent:8642
       HERMES_DASHBOARD_URL: http://hermes-agent:9119
+      # Fixed private-network endpoint for a future server-side topology consumer.
+      # This is intentionally not a browser-facing VITE_* variable or host override.
+      SESSION_TOPOLOGY_ADAPTER_URL: http://session-topology-adapter:8080
+      SESSION_TOPOLOGY_ADAPTER_TOKEN: ${SESSION_TOPOLOGY_ADAPTER_TOKEN:?SESSION_TOPOLOGY_ADAPTER_TOKEN must be set}
       # Must match API_SERVER_KEY on the hermes-agent side when that is set
       HERMES_API_TOKEN: ${API_SERVER_KEY:-}
       # Workspace session password. REQUIRED when HOST is non-loopback (the
@@ -122,7 +171,15 @@ services:
       - hermes-workspace-files:/workspace
     ports:
       - '127.0.0.1:3000:3000'
+    networks:
+      - default
+      - session-topology-private
 
 volumes:
   hermes-agent-data:
   hermes-workspace-files:
+
+networks:
+  default:
+  session-topology-private:
+    internal: true

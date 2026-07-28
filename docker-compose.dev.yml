@@ -6,7 +6,7 @@
 # publishing a release first.
 #
 # The Hermes Agent service still uses the canonical upstream image
-# (nousresearch/hermes-agent:latest, ~750k pulls) — there is no need to
+# (the immutable digest pinned in docker-compose.yml) — there is no need to
 # rebuild that locally, and doing so just couples the compose stack to
 # whatever vendored Python the workspace happens to ship. If you really
 # need a custom agent image, build/tag it separately and override the
