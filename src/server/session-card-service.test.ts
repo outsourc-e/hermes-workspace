@@ -193,6 +193,28 @@ describe('SessionCardService collection and resolution', () => {
     ])
   })
 
+  it('reuses a bounded projection cache while retaining an explicit refresh boundary', async () => {
+    let now = 10_000
+    const listPage = vi.fn(() =>
+      Promise.resolve(page([session('cached')], 0, 1, 'stable-snapshot')),
+    )
+    const service = new SessionCardService({
+      remoteSource: { source: 'remote', listPage },
+      localSource: null,
+      metadataStore: metadataStore(),
+      now: () => now,
+      projectionCacheTtlMs: 30_000,
+    })
+
+    await service.listCards()
+    await service.listCards()
+    expect(listPage).toHaveBeenCalledTimes(1)
+
+    now += 30_000
+    await service.listCards()
+    expect(listPage).toHaveBeenCalledTimes(2)
+  })
+
   it.each(['gateway', 'dashboard'] as const)(
     'projects the canonical %s transport from the adapter-owned canonical segment',
     async (transport) => {

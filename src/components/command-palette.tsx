@@ -109,15 +109,17 @@ function scoreCommandAction(action: CommandAction, query: string) {
 
 export function CommandPalette({ pathname }: CommandPaletteProps) {
   const navigate = useNavigate()
-  const sessionCardsQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false),
-    queryFn: () => fetchSessionCards(),
-    retry: 1,
-    staleTime: 5_000,
-  })
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false, 50),
+    queryFn: () => fetchSessionCards({ limit: 50 }),
+    enabled: open,
+    retry: 1,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  })
   const [isDesktop, setIsDesktop] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.matchMedia('(min-width: 768px)').matches

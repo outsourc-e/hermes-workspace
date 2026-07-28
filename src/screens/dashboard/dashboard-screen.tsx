@@ -669,8 +669,8 @@ export function DashboardScreen() {
   const navigate = useNavigate()
   const skillsAvailable = useFeatureAvailable('skills')
   const sessionCardsQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false),
-    queryFn: () => fetchSessionCards(),
+    queryKey: sessionCardQueryKeys.list(false, 12),
+    queryFn: () => fetchSessionCards({ limit: 12 }),
     staleTime: 10_000,
     refetchInterval: 30_000,
     retry: 1,
@@ -708,7 +708,7 @@ export function DashboardScreen() {
   )
 
   const stats = {
-    totalSessions: completeCards.length,
+    totalSessions: sessionCardsQuery.data?.totalCards ?? completeCards.length,
     totalMessages: 0,
     totalToolCalls: 0,
     totalTokens: 0,

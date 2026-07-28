@@ -999,7 +999,9 @@ function ChatSidebarComponent({
     queryFn: () => fetchSessionCards(),
     enabled: isChatActive,
     retry: 1,
-    refetchInterval: 5000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
   })
   const sessionForkAvailable = useFeatureAvailable('sessionFork')
 

@@ -32,6 +32,7 @@ export const DEFAULT_SESSION_CARD_SAFE_CAP = 2000
 // request so that a snapshot-less backend remains authoritative up to the safe
 // cap; paging it would correctly (but permanently) be classified as unstable.
 export const DEFAULT_SESSION_CARD_PAGE_SIZE = DEFAULT_SESSION_CARD_SAFE_CAP
+export const DEFAULT_SESSION_CARD_PROJECTION_CACHE_TTL_MS = 30_000
 
 export type SessionCardSessionPage = {
   sessions: Array<SessionMeta>
@@ -98,6 +99,8 @@ export type SessionCardCollection = {
 
 export type SessionCardListResult = {
   cards: Array<SessionCard>
+  /** Number of root Cards before a caller-requested presentation limit. */
+  totalCards: number
   cardResolutions: Array<{
     cardId: string
     completeness: 'complete' | 'incomplete'
@@ -149,6 +152,12 @@ type SessionCardServiceOptions = {
   pageSize?: number
   maxSessions?: number
   now?: () => number
+  /**
+   * Reusing a complete projection prevents every mounted client from
+   * independently rescanning the full gateway/topology inventory. Tests keep
+   * this disabled unless they opt in explicitly.
+   */
+  projectionCacheTtlMs?: number
 }
 
 export type SessionCardChildLifecycleInput = {
@@ -1195,6 +1204,11 @@ export class SessionCardService {
   private readonly maxSessions: number
   private readonly allowLegacyRootAliases: boolean
   private readonly now: () => number
+  private readonly projectionCacheTtlMs: number
+  private projectionCache:
+    | { value: FreshProjection; expiresAt: number }
+    | undefined
+  private projectionInFlight: Promise<FreshProjection> | undefined
   private readonly childLifecycleByBinding = new Map<
     string,
     StoredChildLifecycle
@@ -1220,6 +1234,10 @@ export class SessionCardService {
       DEFAULT_SESSION_CARD_SAFE_CAP,
     )
     this.now = options.now ?? Date.now
+    this.projectionCacheTtlMs = normalizePositiveInteger(
+      options.projectionCacheTtlMs,
+      0,
+    )
     this.allowLegacyRootAliases =
       Number(this.remoteSource !== null) + Number(this.localSource !== null) ===
       1
@@ -1532,6 +1550,11 @@ export class SessionCardService {
 
   invalidateTopology(): void {
     this.topologySource?.invalidate()
+    this.invalidateProjectionCache()
+  }
+
+  private invalidateProjectionCache(): void {
+    this.projectionCache = undefined
   }
 
   private validatedChildActivity(
@@ -1580,6 +1603,29 @@ export class SessionCardService {
   }
 
   private async freshProjection(): Promise<FreshProjection> {
+    const cached = this.projectionCache
+    if (cached && cached.expiresAt > this.now()) return cached.value
+    if (this.projectionInFlight) return this.projectionInFlight
+
+    const pending = this.buildFreshProjection()
+    this.projectionInFlight = pending
+    try {
+      const fresh = await pending
+      if (this.projectionCacheTtlMs > 0) {
+        this.projectionCache = {
+          value: fresh,
+          expiresAt: this.now() + this.projectionCacheTtlMs,
+        }
+      }
+      return fresh
+    } finally {
+      if (this.projectionInFlight === pending) {
+        this.projectionInFlight = undefined
+      }
+    }
+  }
+
+  private async buildFreshProjection(): Promise<FreshProjection> {
     const collection = await this.collectSessions()
     const cardMetadata = metadataProjectionMap(this.metadataStore.list())
     const baseProjection = projectSessionCards(collection.sessions, {
@@ -1608,15 +1654,23 @@ export class SessionCardService {
   }
 
   async listCards(
-    options: { includeArchived?: boolean } = {},
+    options: { includeArchived?: boolean; limit?: number } = {},
   ): Promise<SessionCardListResult> {
     const fresh = await this.freshProjection()
-    const cards = authoritativeCardProjections(
+    const visibleCards = authoritativeCardProjections(
       fresh,
       visibleRootCards(fresh.projection, options.includeArchived === true),
     )
+    const limit = options.limit
+    const cards =
+      Number.isSafeInteger(limit) && limit !== undefined && limit > 0
+        ? [...visibleCards]
+            .sort((left, right) => right.updatedAt - left.updatedAt)
+            .slice(0, limit)
+        : visibleCards
     return {
       cards,
+      totalCards: visibleCards.length,
       cardResolutions: cards.map((card) => {
         const resolved = resolveProjectedCard(
           fresh,
@@ -1860,7 +1914,9 @@ export class SessionCardService {
     if (patch.pinned === true && !resolved.pinEligible) {
       throw new SessionCardPinNotEligibleError(resolved.card.cardId)
     }
-    return this.metadataStore.update(resolved.card.cardId, patch)
+    const updated = this.metadataStore.update(resolved.card.cardId, patch)
+    this.invalidateProjectionCache()
+    return updated
   }
 
   async archiveCard(cardId: string): Promise<PersistedSessionCard> {
@@ -1868,10 +1924,13 @@ export class SessionCardService {
     if (resolved.collection.completeness !== 'complete') {
       throw new SessionCardProjectionIncompleteError(resolved.card.cardId)
     }
-    return this.metadataStore.archive(resolved.card.cardId)
+    const archived = this.metadataStore.archive(resolved.card.cardId)
+    this.invalidateProjectionCache()
+    return archived
   }
 }
 
 export const sessionCardService = new SessionCardService({
   topologySource: createSessionTopologyClientFromEnv(),
+  projectionCacheTtlMs: DEFAULT_SESSION_CARD_PROJECTION_CACHE_TTL_MS,
 })

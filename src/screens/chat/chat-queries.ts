@@ -61,8 +61,14 @@ export const chatQueryKeys = {
 } as const
 
 export const sessionCardQueryKeys = {
-  list: function list(includeArchived = false) {
-    return ['chat', 'session-cards', 'list', includeArchived] as const
+  list: function list(includeArchived = false, limit?: number) {
+    return [
+      'chat',
+      'session-cards',
+      'list',
+      includeArchived,
+      limit ?? 0,
+    ] as const
   },
   history: function history(
     cardId: string,
@@ -128,6 +134,7 @@ export type SessionCardWire = Omit<SessionCard, 'childNodes'> & {
 
 export type SessionCardListWire = {
   cards: Array<SessionCardWire>
+  totalCards?: number
   cardResolutions: Array<{
     cardId: string
     completeness: 'complete' | 'incomplete'
@@ -564,6 +571,7 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
     return invalidSessionCardResponse()
   }
   const cards = value.cards.map(parseSessionCard)
+  const totalCards = value.totalCards
   const sources = value.sources.map(parseSourceStatus)
   const cardResolutions = value.cardResolutions.map(parseCardResolution)
   const hasIncompleteSource = sources.some(
@@ -572,6 +580,10 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
   const sourceRetryable = sources.some((source) => source.retryable)
   if (
     cards.some((card) => !hasTopLevelCardRelationshipSemantics(card)) ||
+    (totalCards !== undefined &&
+      (typeof totalCards !== 'number' ||
+        !Number.isSafeInteger(totalCards) ||
+        totalCards < cards.length)) ||
     new Set(cards.map((card) => card.cardId)).size !== cards.length ||
     !hasUniqueSessionCardOwnership(cards) ||
     cardResolutions.length !== cards.length ||
@@ -589,6 +601,7 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
   }
   return {
     cards,
+    ...(totalCards === undefined ? {} : { totalCards }),
     cardResolutions,
     completeness: value.completeness,
     retryable: value.retryable,
@@ -621,12 +634,22 @@ export async function fetchHistory(payload: {
 export async function fetchSessionCards(
   options: {
     includeArchived?: boolean
+    limit?: number
   } = {},
 ): Promise<SessionCardListWire> {
-  const path = options.includeArchived
-    ? '/api/session-cards?includeArchived=true'
-    : '/api/session-cards'
-  const response = await fetch(path)
+  if (
+    options.limit !== undefined &&
+    (!Number.isSafeInteger(options.limit) ||
+      options.limit < 1 ||
+      options.limit > 100)
+  ) {
+    throw new RangeError('Session Card limit must be an integer from 1 to 100')
+  }
+  const query = new URLSearchParams()
+  if (options.includeArchived) query.set('includeArchived', 'true')
+  if (options.limit !== undefined) query.set('limit', String(options.limit))
+  const suffix = query.size ? `?${query.toString()}` : ''
+  const response = await fetch(`/api/session-cards${suffix}`)
   if (!response.ok) throw new Error(await readError(response))
   return parseSessionCardList((await response.json()) as unknown)
 }

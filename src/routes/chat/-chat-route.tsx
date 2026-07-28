@@ -45,7 +45,9 @@ export function ChatRoute() {
     queryFn: () => fetchSessionCards(),
     enabled: shouldResolveCard,
     retry: 1,
-    refetchInterval: 5000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
   })
   const cardRouteResolution = resolveSessionCardRouteState({
     routeKey: activeFriendlyId,

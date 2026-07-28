@@ -11,6 +11,7 @@ import type { SessionCard } from '@/screens/chat/types'
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
+  useQuery: vi.fn(() => ({ data: mocks.response })),
   response: undefined as SessionCardListWire | undefined,
 }))
 
@@ -19,7 +20,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: mocks.response }),
+  useQuery: mocks.useQuery,
 }))
 
 vi.mock('@hugeicons/react', () => ({
@@ -90,6 +91,8 @@ beforeEach(() => {
     globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true
   mocks.navigate.mockReset()
+  mocks.useQuery.mockReset()
+  mocks.useQuery.mockImplementation(() => ({ data: mocks.response }))
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     value: () => ({
@@ -135,9 +138,20 @@ describe('CommandPalette Session Card inventory', () => {
       container.remove()
     })
 
+    expect(mocks.useQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        enabled: false,
+        queryKey: ['chat', 'session-cards', 'list', false, 50],
+      }),
+    )
+
     React.act(() => {
       fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
     })
+
+    expect(mocks.useQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: true }),
+    )
 
     expect(screen.getByText(complete.title)).toBeTruthy()
     expect(screen.queryByText(incomplete.title)).toBeNull()
