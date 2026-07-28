@@ -61,6 +61,7 @@ export const chatQueryKeys = {
 } as const
 
 export const sessionCardQueryKeys = {
+  lists: ['chat', 'session-cards', 'list'] as const,
   list: function list(includeArchived = false, limit?: number) {
     return [
       'chat',
@@ -69,6 +70,12 @@ export const sessionCardQueryKeys = {
       includeArchived,
       limit ?? 0,
     ] as const
+  },
+  chatInventory: function chatInventory(includeArchived = false) {
+    return ['chat', 'session-cards', 'list', includeArchived, 'chat'] as const
+  },
+  detail: function detail(cardId: string) {
+    return ['chat', 'session-cards', 'detail', cardId] as const
   },
   history: function history(
     cardId: string,
@@ -143,6 +150,27 @@ export type SessionCardListWire = {
   completeness: 'complete' | 'incomplete'
   retryable: boolean
   sources: Array<SessionCardSourceStatusWire>
+  nextCursor?: string
+}
+
+export type SessionCardDetailWire = {
+  card: SessionCardWire
+  resolution: SessionCardListWire['cardResolutions'][number]
+  completeness: SessionCardListWire['completeness']
+  retryable: boolean
+  sources: Array<SessionCardSourceStatusWire>
+}
+
+export class SessionCardLookupError extends Error {
+  readonly status: number
+  readonly retryable: boolean
+
+  constructor(message: string, status: number, retryable: boolean) {
+    super(message)
+    this.name = 'SessionCardLookupError'
+    this.status = status
+    this.retryable = retryable
+  }
 }
 
 /**
@@ -572,6 +600,10 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
   }
   const cards = value.cards.map(parseSessionCard)
   const totalCards = value.totalCards
+  const nextCursor =
+    value.nextCursor === undefined
+      ? undefined
+      : nonblankWireString(value.nextCursor)
   const sources = value.sources.map(parseSourceStatus)
   const cardResolutions = value.cardResolutions.map(parseCardResolution)
   const hasIncompleteSource = sources.some(
@@ -584,6 +616,9 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
       (typeof totalCards !== 'number' ||
         !Number.isSafeInteger(totalCards) ||
         totalCards < cards.length)) ||
+    nextCursor === null ||
+    (nextCursor !== undefined &&
+      (nextCursor.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(nextCursor))) ||
     new Set(cards.map((card) => card.cardId)).size !== cards.length ||
     !hasUniqueSessionCardOwnership(cards) ||
     cardResolutions.length !== cards.length ||
@@ -602,6 +637,7 @@ function parseSessionCardList(value: unknown): SessionCardListWire {
   return {
     cards,
     ...(totalCards === undefined ? {} : { totalCards }),
+    ...(nextCursor === undefined ? {} : { nextCursor }),
     cardResolutions,
     completeness: value.completeness,
     retryable: value.retryable,
@@ -652,6 +688,166 @@ export async function fetchSessionCards(
   const response = await fetch(`/api/session-cards${suffix}`)
   if (!response.ok) throw new Error(await readError(response))
   return parseSessionCardList((await response.json()) as unknown)
+}
+
+export async function fetchChatSessionCardsPage(
+  cursor?: string,
+): Promise<SessionCardListWire> {
+  const query = new URLSearchParams({ view: 'chat' })
+  if (cursor !== undefined) query.set('cursor', cursor)
+  const response = await fetch(`/api/session-cards?${query.toString()}`)
+  if (!response.ok) throw new Error(await readError(response))
+  return parseSessionCardList((await response.json()) as unknown)
+}
+
+function parseSessionCardDetail(value: unknown): SessionCardDetailWire {
+  if (
+    !isWireRecord(value) ||
+    !Array.isArray(value.sources) ||
+    (value.completeness !== 'complete' &&
+      value.completeness !== 'incomplete') ||
+    typeof value.retryable !== 'boolean'
+  ) {
+    return invalidSessionCardResponse()
+  }
+  const card = parseSessionCard(value.card)
+  const resolution = parseCardResolution(value.resolution)
+  const sources = value.sources.map(parseSourceStatus)
+  const hasIncompleteSource = sources.some(
+    (source) => source.status !== 'complete',
+  )
+  const sourceRetryable = sources.some((source) => source.retryable)
+  if (
+    !hasTopLevelCardRelationshipSemantics(card) ||
+    !hasUniqueSessionCardOwnership([card]) ||
+    resolution.cardId !== card.cardId ||
+    (value.completeness === 'complete' &&
+      (value.retryable || hasIncompleteSource)) ||
+    (value.completeness === 'incomplete' && !hasIncompleteSource) ||
+    value.retryable !== sourceRetryable
+  ) {
+    return invalidSessionCardResponse()
+  }
+  return {
+    card,
+    resolution,
+    completeness: value.completeness,
+    retryable: value.retryable,
+    sources,
+  }
+}
+
+export async function fetchSessionCard(
+  cardId: string,
+): Promise<SessionCardDetailWire> {
+  const response = await fetch(
+    `/api/session-cards/${encodeURIComponent(cardId)}`,
+  )
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as unknown
+    const message =
+      isWireRecord(body) && typeof body.error === 'string'
+        ? body.error
+        : 'Unable to load Session Card'
+    throw new SessionCardLookupError(
+      message,
+      response.status,
+      isWireRecord(body) && body.retryable === true,
+    )
+  }
+  return parseSessionCardDetail((await response.json()) as unknown)
+}
+
+function mergeSourceStatuses(
+  pages: ReadonlyArray<SessionCardListWire>,
+): Array<SessionCardSourceStatusWire> {
+  const sources = new Map<string, SessionCardSourceStatusWire>()
+  for (const page of pages) {
+    for (const source of page.sources) {
+      const existing = sources.get(source.source)
+      if (!existing || existing.status === 'complete' || source.retryable) {
+        sources.set(source.source, source)
+      }
+    }
+  }
+  return [...sources.values()]
+}
+
+export function mergeChatSessionCardPages(
+  pages: ReadonlyArray<SessionCardListWire>,
+): SessionCardListWire | undefined {
+  if (pages.length === 0) return undefined
+  const cards: Array<SessionCardWire> = []
+  const cardResolutions: SessionCardListWire['cardResolutions'] = []
+  const seenCardIds = new Set<string>()
+  for (const page of pages) {
+    const resolutionByCardId = new Map(
+      page.cardResolutions.map((resolution) => [resolution.cardId, resolution]),
+    )
+    for (const card of page.cards) {
+      if (seenCardIds.has(card.cardId)) continue
+      seenCardIds.add(card.cardId)
+      cards.push(card)
+      cardResolutions.push(resolutionByCardId.get(card.cardId)!)
+    }
+  }
+  const sources = mergeSourceStatuses(pages)
+  const retryable = pages.some((page) => page.retryable)
+  const completeness = pages.some((page) => page.completeness !== 'complete')
+    ? 'incomplete'
+    : 'complete'
+  const lastPage = pages.at(-1)!
+  return {
+    cards,
+    totalCards: Math.max(
+      cards.length,
+      ...pages.map((page) => page.totalCards ?? page.cards.length),
+    ),
+    cardResolutions,
+    completeness,
+    retryable,
+    sources,
+    ...(lastPage.nextCursor ? { nextCursor: lastPage.nextCursor } : {}),
+  }
+}
+
+export function mergeSessionCardDetail(
+  inventory: SessionCardListWire | undefined,
+  detail: SessionCardDetailWire | undefined,
+): SessionCardListWire | undefined {
+  if (!detail) return inventory
+  if (!inventory) {
+    return {
+      cards: [detail.card],
+      totalCards: 1,
+      cardResolutions: [detail.resolution],
+      completeness: detail.completeness,
+      retryable: detail.retryable,
+      sources: detail.sources,
+    }
+  }
+  const existingIndex = inventory.cards.findIndex(
+    (card) => card.cardId === detail.card.cardId,
+  )
+  const cards = [...inventory.cards]
+  const cardResolutions = [...inventory.cardResolutions]
+  if (existingIndex >= 0) {
+    cards[existingIndex] = detail.card
+    const resolutionIndex = cardResolutions.findIndex(
+      (resolution) => resolution.cardId === detail.card.cardId,
+    )
+    if (resolutionIndex >= 0)
+      cardResolutions[resolutionIndex] = detail.resolution
+  } else {
+    cards.push(detail.card)
+    cardResolutions.push(detail.resolution)
+  }
+  return {
+    ...inventory,
+    cards,
+    totalCards: Math.max(inventory.totalCards ?? cards.length, cards.length),
+    cardResolutions,
+  }
 }
 
 function parseSessionCardHistory(value: unknown): SessionCardHistoryWire {

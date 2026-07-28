@@ -4,17 +4,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   applySessionRouteResolution,
   buildSessionReplaceNavigation,
-  resolveSessionCardRouteState,
+  resolveSessionCardDetailRouteState,
   validatedInspectedChildCardId,
 } from './-session-route-state'
 import { syncLastSessionCardPersistence } from './-last-session-card'
 import type { SessionRouteResolutionPayload } from './-session-route-state'
 import { ErrorBoundary } from '@/components/error-boundary'
 import {
-  fetchSessionCards,
+  fetchSessionCard,
+  mergeSessionCardDetail,
   retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
+import { useChatSessionCardInventory } from '@/screens/chat/hooks/use-chat-session-card-inventory'
 
 const ChatScreen = lazy(async () => {
   const module = await import('../../screens/chat/chat-screen')
@@ -40,27 +42,32 @@ export function ChatRoute() {
     typeof params.sessionKey === 'string' ? params.sessionKey : 'main'
   const isNewChat = activeFriendlyId === 'new'
   const shouldResolveCard = !isNewChat
-  const sessionCardsQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false),
-    queryFn: () => fetchSessionCards(),
+  const sessionCardInventory = useChatSessionCardInventory()
+  const sessionCardDetailQuery = useQuery({
+    queryKey: sessionCardQueryKeys.detail(activeFriendlyId),
+    queryFn: () => fetchSessionCard(activeFriendlyId),
     enabled: shouldResolveCard,
     retry: 1,
     staleTime: 30_000,
-    refetchInterval: 30_000,
     refetchOnWindowFocus: false,
   })
-  const cardRouteResolution = resolveSessionCardRouteState({
+  const cardRouteResolution = resolveSessionCardDetailRouteState({
     routeKey: activeFriendlyId,
-    queryStatus: sessionCardsQuery.status,
-    response: sessionCardsQuery.data,
+    queryStatus: sessionCardDetailQuery.status,
+    response: sessionCardDetailQuery.data,
+    error: sessionCardDetailQuery.error,
   })
   const selectedCard =
     cardRouteResolution?.status === 'selected'
       ? cardRouteResolution.card
       : undefined
   const selectedCardId = selectedCard?.cardId
+  const mergedSessionCardList = mergeSessionCardDetail(
+    sessionCardInventory.sessionCardList,
+    sessionCardDetailQuery.data,
+  )
   const completeSessionCardList = retainCompleteSessionCardProjections(
-    sessionCardsQuery.data,
+    mergedSessionCardList,
   )
   const inspectedChildCardId = validatedInspectedChildCardId(
     selectedCard,
@@ -173,7 +180,7 @@ export function ChatRoute() {
         <button
           type="button"
           className="rounded-lg bg-accent-500 px-4 py-2 text-sm text-white"
-          onClick={() => void sessionCardsQuery.refetch()}
+          onClick={() => void sessionCardDetailQuery.refetch()}
         >
           Retry
         </button>
@@ -195,6 +202,12 @@ export function ChatRoute() {
           activeCard={selectedCard}
           inspectedChildCardId={inspectedChildCardId}
           sessionCardList={completeSessionCardList}
+          hasMoreSessionCards={sessionCardInventory.hasNextPage}
+          loadingMoreSessionCards={sessionCardInventory.isFetchingNextPage}
+          moreSessionCardsError={sessionCardInventory.olderSessionsError}
+          onLoadMoreSessionCards={() =>
+            void sessionCardInventory.loadOlderSessions()
+          }
           isNewChat={isNewChat}
           forcedSessionKey={selectedCard ? undefined : forcedSessionKey}
           onSessionResolved={handleSessionResolved}

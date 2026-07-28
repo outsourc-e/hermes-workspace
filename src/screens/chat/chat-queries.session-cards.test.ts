@@ -6,10 +6,14 @@ import {
   archiveSessionCard,
   branchSessionCard,
   chatQueryKeys,
+  fetchChatSessionCardsPage,
   fetchCompleteSessionCardHistory,
+  fetchSessionCard,
   fetchSessionCardHistory,
   fetchSessionCards,
   isAuthoritativeCompleteSessionCardHistory,
+  mergeChatSessionCardPages,
+  mergeSessionCardDetail,
   mergeSessionCardHistoryResponse,
   moveLegacyHistoryMessagesToSessionCard,
   moveSessionCardHistoryMessages,
@@ -161,6 +165,96 @@ describe('Session Card fetchers', () => {
     await expect(fetchSessionCards()).rejects.toThrow(
       'Invalid Session Card response',
     )
+  })
+
+  it('fetches, validates, and merges bounded chat pages without duplicating roots', async () => {
+    const olderCard = {
+      ...card,
+      cardId: 'remote:older',
+      canonicalSegmentKey: 'remote:older',
+      continuationSegmentKeys: ['remote:older'],
+      continuationCount: 1,
+      updatedAt: 100,
+    }
+    const firstPage = {
+      cards: [card],
+      totalCards: 2,
+      cardResolutions: completeCardResolutions([card]),
+      completeness: 'complete' as const,
+      retryable: false,
+      sources: [],
+      nextCursor: 'cursor_1',
+    }
+    const secondPage = {
+      cards: [card, olderCard],
+      totalCards: 2,
+      cardResolutions: completeCardResolutions([card, olderCard]),
+      completeness: 'complete' as const,
+      retryable: false,
+      sources: [],
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(firstPage))
+      .mockResolvedValueOnce(response(secondPage))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const parsedFirst = await fetchChatSessionCardsPage()
+    const parsedSecond = await fetchChatSessionCardsPage(parsedFirst.nextCursor)
+    expect(fetchMock.mock.calls).toEqual([
+      ['/api/session-cards?view=chat'],
+      ['/api/session-cards?view=chat&cursor=cursor_1'],
+    ])
+    expect(
+      mergeChatSessionCardPages([parsedFirst, parsedSecond]),
+    ).toMatchObject({
+      cards: [card, olderCard],
+      totalCards: 2,
+      cardResolutions: completeCardResolutions([card, olderCard]),
+    })
+  })
+
+  it('validates direct Card responses, preserves targeted detail, and types retryable failures', async () => {
+    const detail = {
+      card,
+      resolution: {
+        cardId: card.cardId,
+        completeness: 'complete' as const,
+        retryable: false,
+      },
+      completeness: 'incomplete' as const,
+      retryable: true,
+      sources: [
+        {
+          source: 'gateway',
+          status: 'unavailable',
+          fetched: 0,
+          retryable: true,
+        },
+      ],
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(detail))
+      .mockResolvedValueOnce(
+        response({ error: 'temporarily unavailable', retryable: true }, 503),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const parsedDetail = await fetchSessionCard('root alias')
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/session-cards/root%20alias',
+    )
+    expect(mergeSessionCardDetail(undefined, parsedDetail)).toMatchObject({
+      cards: [card],
+      cardResolutions: [detail.resolution],
+    })
+    await expect(fetchSessionCard('missing')).rejects.toMatchObject({
+      name: 'SessionCardLookupError',
+      status: 503,
+      retryable: true,
+    })
   })
 
   it('accepts an actual service projection with authoritative child continuation aliases', async () => {

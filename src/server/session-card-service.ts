@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { projectSessionCards } from '../screens/chat/session-cards'
 import { listSessionsPage, toSessionSummary } from './claude-api'
 import { listLocalSessions } from './local-session-store'
@@ -33,6 +34,10 @@ export const DEFAULT_SESSION_CARD_SAFE_CAP = 2000
 // cap; paging it would correctly (but permanently) be classified as unstable.
 export const DEFAULT_SESSION_CARD_PAGE_SIZE = DEFAULT_SESSION_CARD_SAFE_CAP
 export const DEFAULT_SESSION_CARD_PROJECTION_CACHE_TTL_MS = 30_000
+export const CHAT_SESSION_CARD_PAGE_SIZE = 10
+export const CHAT_SESSION_CARD_RECENT_WINDOW_MS = 2 * 24 * 60 * 60 * 1000
+const CHAT_SESSION_CARD_CURSOR_MAX_LENGTH = 2048
+const CHAT_SESSION_CARD_CURSOR_VERSION = 1 as const
 
 export type SessionCardSessionPage = {
   sessions: Array<SessionMeta>
@@ -111,6 +116,26 @@ export type SessionCardListResult = {
   sources: Array<SessionCardSourceStatus>
 }
 
+export type SessionCardChatListResult = SessionCardListResult & {
+  nextCursor?: string
+}
+
+export type SessionCardLookupResult =
+  | {
+      status: 'found'
+      card: SessionCard
+      resolution: SessionCardListResult['cardResolutions'][number]
+      completeness: SessionCardCollection['completeness']
+      retryable: boolean
+      sources: Array<SessionCardSourceStatus>
+    }
+  | {
+      status: 'missing'
+      completeness: SessionCardCollection['completeness']
+      retryable: boolean
+      sources: Array<SessionCardSourceStatus>
+    }
+
 export type ResolvedSessionCard = {
   card: SessionCard
   pinEligible: boolean
@@ -141,6 +166,13 @@ export class SessionCardProjectionIncompleteError extends Error {
   constructor(cardId: string) {
     super(`Session Card projection is incomplete: ${cardId}`)
     this.name = 'SessionCardProjectionIncompleteError'
+  }
+}
+
+export class SessionCardChatCursorError extends Error {
+  constructor() {
+    super('Invalid Session Card chat cursor')
+    this.name = 'SessionCardChatCursorError'
   }
 }
 
@@ -185,6 +217,13 @@ type FreshProjection = {
   projection: SessionCardProjection
   collection: SessionCardCollection
   aliasesByCardId: ReadonlyMap<string, Array<string>>
+}
+
+type SessionCardChatCursor = {
+  v: typeof CHAT_SESSION_CARD_CURSOR_VERSION
+  cutoff: number
+  lastUpdatedAt: number | null
+  lastCardId: string | null
 }
 
 type CollectedSession = {
@@ -1195,6 +1234,82 @@ function resolveProjectedCard(
   }
 }
 
+function compareSessionCards(left: SessionCard, right: SessionCard): number {
+  const updatedDifference = right.updatedAt - left.updatedAt
+  return updatedDifference || left.cardId.localeCompare(right.cardId)
+}
+
+function encodeChatCursor(cursor: SessionCardChatCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url')
+}
+
+function decodeChatCursor(rawCursor: string): SessionCardChatCursor {
+  try {
+    if (
+      !rawCursor ||
+      rawCursor.length > CHAT_SESSION_CARD_CURSOR_MAX_LENGTH ||
+      !/^[A-Za-z0-9_-]+$/.test(rawCursor)
+    ) {
+      throw new SessionCardChatCursorError()
+    }
+    const value = JSON.parse(
+      Buffer.from(rawCursor, 'base64url').toString('utf8'),
+    ) as unknown
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new SessionCardChatCursorError()
+    }
+    const record = value as Record<string, unknown>
+    if (
+      Object.keys(record).sort().join(',') !==
+        'cutoff,lastCardId,lastUpdatedAt,v' ||
+      record.v !== CHAT_SESSION_CARD_CURSOR_VERSION ||
+      typeof record.cutoff !== 'number' ||
+      !Number.isSafeInteger(record.cutoff) ||
+      record.cutoff < 0
+    ) {
+      throw new SessionCardChatCursorError()
+    }
+    const nullBoundary =
+      record.lastUpdatedAt === null && record.lastCardId === null
+    const cardBoundary =
+      typeof record.lastUpdatedAt === 'number' &&
+      Number.isFinite(record.lastUpdatedAt) &&
+      typeof record.lastCardId === 'string' &&
+      record.lastCardId.trim() === record.lastCardId &&
+      record.lastCardId.length > 0 &&
+      record.lastCardId.length <= 256
+    if (!nullBoundary && !cardBoundary) {
+      throw new SessionCardChatCursorError()
+    }
+    return {
+      v: CHAT_SESSION_CARD_CURSOR_VERSION,
+      cutoff: record.cutoff,
+      lastUpdatedAt: record.lastUpdatedAt as number | null,
+      lastCardId: record.lastCardId as string | null,
+    }
+  } catch (error) {
+    if (error instanceof SessionCardChatCursorError) throw error
+    throw new SessionCardChatCursorError()
+  }
+}
+
+function cardResolution(
+  fresh: FreshProjection,
+  card: SessionCard,
+): SessionCardListResult['cardResolutions'][number] {
+  const resolved = resolveProjectedCard(
+    fresh,
+    card,
+    fresh.aliasesByCardId.get(card.cardId) ?? [card.cardId],
+    fresh.projection.pinEligibleCardIds.has(card.cardId),
+  )
+  return {
+    cardId: card.cardId,
+    completeness: resolved.collection.completeness,
+    retryable: resolved.collection.retryable,
+  }
+}
+
 export class SessionCardService {
   private readonly remoteSource: SessionCardRemoteSource | null
   private readonly localSource: SessionCardLocalSource | null
@@ -1671,19 +1786,108 @@ export class SessionCardService {
     return {
       cards,
       totalCards: visibleCards.length,
-      cardResolutions: cards.map((card) => {
-        const resolved = resolveProjectedCard(
-          fresh,
-          card,
-          fresh.aliasesByCardId.get(card.cardId) ?? [card.cardId],
-          fresh.projection.pinEligibleCardIds.has(card.cardId),
-        )
-        return {
-          cardId: card.cardId,
-          completeness: resolved.collection.completeness,
-          retryable: resolved.collection.retryable,
+      cardResolutions: cards.map((card) => cardResolution(fresh, card)),
+      completeness: fresh.collection.completeness,
+      retryable: fresh.collection.retryable,
+      sources: fresh.collection.sources,
+    }
+  }
+
+  async listChatCards(
+    options: { cursor?: string } = {},
+  ): Promise<SessionCardChatListResult> {
+    const cursor = options.cursor ? decodeChatCursor(options.cursor) : null
+    const cutoff = cursor
+      ? cursor.cutoff
+      : Math.max(0, Math.floor(this.now() - CHAT_SESSION_CARD_RECENT_WINDOW_MS))
+    const fresh = await this.freshProjection()
+    const visibleCards = authoritativeCardProjections(
+      fresh,
+      visibleRootCards(fresh.projection, false),
+    ).sort(compareSessionCards)
+
+    let cards: Array<SessionCard>
+    let nextCursor: string | undefined
+    if (!cursor) {
+      cards = visibleCards.filter(
+        (card) => card.pinned || card.updatedAt >= cutoff,
+      )
+      if (
+        visibleCards.some((card) => !card.pinned && card.updatedAt < cutoff)
+      ) {
+        nextCursor = encodeChatCursor({
+          v: CHAT_SESSION_CARD_CURSOR_VERSION,
+          cutoff,
+          lastUpdatedAt: null,
+          lastCardId: null,
+        })
+      }
+    } else {
+      const olderCards = visibleCards.filter((card) => {
+        if (card.pinned || card.updatedAt >= cutoff) return false
+        if (cursor.lastUpdatedAt === null || cursor.lastCardId === null) {
+          return true
         }
-      }),
+        return (
+          card.updatedAt < cursor.lastUpdatedAt ||
+          (card.updatedAt === cursor.lastUpdatedAt &&
+            card.cardId.localeCompare(cursor.lastCardId) > 0)
+        )
+      })
+      cards = olderCards.slice(0, CHAT_SESSION_CARD_PAGE_SIZE)
+      if (olderCards.length > CHAT_SESSION_CARD_PAGE_SIZE) {
+        const lastCard = cards.at(-1)!
+        nextCursor = encodeChatCursor({
+          v: CHAT_SESSION_CARD_CURSOR_VERSION,
+          cutoff,
+          lastUpdatedAt: lastCard.updatedAt,
+          lastCardId: lastCard.cardId,
+        })
+      }
+    }
+
+    return {
+      cards,
+      totalCards: visibleCards.length,
+      cardResolutions: cards.map((card) => cardResolution(fresh, card)),
+      completeness: fresh.collection.completeness,
+      retryable: fresh.collection.retryable,
+      sources: fresh.collection.sources,
+      ...(nextCursor ? { nextCursor } : {}),
+    }
+  }
+
+  async lookupCard(requestedCardId: string): Promise<SessionCardLookupResult> {
+    const cardId = requestedCardId.trim()
+    const fresh = await this.freshProjection()
+    const card = visibleRootCards(fresh.projection, false).find((candidate) => {
+      const aliases = fresh.aliasesByCardId.get(candidate.cardId) ?? [
+        candidate.cardId,
+      ]
+      return aliases.includes(cardId)
+    })
+    if (!card) {
+      return {
+        status: 'missing',
+        completeness: fresh.collection.completeness,
+        retryable: fresh.collection.retryable,
+        sources: fresh.collection.sources,
+      }
+    }
+    const resolved = resolveProjectedCard(
+      fresh,
+      card,
+      fresh.aliasesByCardId.get(card.cardId) ?? [card.cardId],
+      fresh.projection.pinEligibleCardIds.has(card.cardId),
+    )
+    return {
+      status: 'found',
+      card: resolved.card,
+      resolution: {
+        cardId: resolved.card.cardId,
+        completeness: resolved.collection.completeness,
+        retryable: resolved.collection.retryable,
+      },
       completeness: fresh.collection.completeness,
       retryable: fresh.collection.retryable,
       sources: fresh.collection.sources,

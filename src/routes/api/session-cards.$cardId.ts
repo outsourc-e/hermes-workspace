@@ -15,6 +15,7 @@ import {
   parseMetadataUpdate,
   readJsonObject,
   requireSessionCardJsonContentType,
+  sanitizeSourceDiagnostics,
 } from './-session-card-http'
 
 function projectionUnavailable(): Response {
@@ -31,6 +32,45 @@ function projectionUnavailable(): Response {
 export const Route = createFileRoute('/api/session-cards/$cardId')({
   server: {
     handlers: {
+      GET: async ({ request, params }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const cardId = normalizedCardId(params.cardId)
+        if (!cardId) return invalidRequest('Valid cardId required')
+
+        try {
+          const result = await sessionCardService.lookupCard(cardId)
+          if (result.status === 'missing') {
+            if (result.completeness !== 'complete' || result.retryable) {
+              return json(
+                sanitizeSourceDiagnostics({
+                  ok: false,
+                  error: 'Session Card inventory is temporarily unavailable',
+                  retryable: true,
+                  sources: result.sources,
+                }),
+                { status: 503 },
+              )
+            }
+            return json(
+              { ok: false, error: 'Session Card not found', retryable: false },
+              { status: 404 },
+            )
+          }
+          return json(
+            sanitizeSourceDiagnostics({
+              card: result.card,
+              resolution: result.resolution,
+              completeness: result.completeness,
+              retryable: result.retryable,
+              sources: result.sources,
+            }),
+          )
+        } catch {
+          return internalFailure('Unable to load Session Card')
+        }
+      },
       PATCH: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })

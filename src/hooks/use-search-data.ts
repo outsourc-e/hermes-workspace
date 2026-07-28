@@ -241,7 +241,7 @@ async function fetchSkills(
   })
 }
 
-export function useSearchData(scope: SearchQueryScope) {
+export function useSearchData(scope: SearchQueryScope, enabled = true) {
   const sessionsAvailable = useFeatureAvailable('sessions')
   const skillsAvailable = useFeatureAvailable('skills')
 
@@ -249,7 +249,8 @@ export function useSearchData(scope: SearchQueryScope) {
   const sessionsQuery = useQuery({
     queryKey: ['search', 'session-cards'],
     queryFn: fetchSearchSessionCards,
-    enabled: sessionsAvailable && (scope === 'all' || scope === 'chats'),
+    enabled:
+      enabled && sessionsAvailable && (scope === 'all' || scope === 'chats'),
     staleTime: SESSION_CARDS_STALE_TIME_MS,
     gcTime: SEARCH_QUERY_GC_TIME_MS,
     retry: false,
@@ -261,7 +262,7 @@ export function useSearchData(scope: SearchQueryScope) {
   const filesQuery = useQuery({
     queryKey: ['search', 'files'],
     queryFn: ({ signal }) => fetchFiles(signal),
-    enabled: scope === 'all' || scope === 'files',
+    enabled: enabled && (scope === 'all' || scope === 'files'),
     staleTime: FILES_STALE_TIME_MS,
     gcTime: SEARCH_QUERY_GC_TIME_MS,
     retry: false,
@@ -273,7 +274,8 @@ export function useSearchData(scope: SearchQueryScope) {
   const skillsQuery = useQuery({
     queryKey: ['search', 'skills'],
     queryFn: ({ signal }) => fetchSkills(signal),
-    enabled: skillsAvailable && (scope === 'all' || scope === 'skills'),
+    enabled:
+      enabled && skillsAvailable && (scope === 'all' || scope === 'skills'),
     staleTime: SKILLS_STALE_TIME_MS,
     gcTime: SEARCH_QUERY_GC_TIME_MS,
     retry: false,

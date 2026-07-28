@@ -1005,7 +1005,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       await Promise.resolve()
       await Promise.resolve()
     })
-    await waitForAssertion(() => expect(invalidate).toHaveBeenCalledTimes(1))
+    await waitForAssertion(() => expect(invalidate).toHaveBeenCalledTimes(2))
 
     expect(navigate).not.toHaveBeenCalled()
 

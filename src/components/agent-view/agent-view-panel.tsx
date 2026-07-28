@@ -708,7 +708,7 @@ export function AgentViewPanel({
     setOpen,
     setHistoryOpen,
     activeCount,
-  } = useAgentView()
+  } = useAgentView(sessionCardList)
 
   const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
   const cliAgentsQuery = useCliAgents()
@@ -1257,7 +1257,7 @@ export function AgentViewPanel({
                   </section>
                 )}
 
-                <BackgroundRunsSection />
+                <BackgroundRunsSection sessionCardList={sessionCardList} />
 
                 {cliAgentsQuery.isLoading || visibleCliAgents.length > 0 ? (
                   <section className="rounded-2xl bg-primary-200/15 p-2">

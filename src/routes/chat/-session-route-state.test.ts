@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { SessionCardLookupError } from '../../screens/chat/chat-queries'
 import {
   buildSessionReplaceNavigation,
+  resolveSessionCardDetailRouteState,
   resolveSessionCardProducerNavigation,
   resolveSessionCardRoute,
   resolveSessionCardRouteState,
@@ -163,6 +165,43 @@ describe('Session Card route resolution', () => {
         },
       }),
     ).toEqual({ status: 'selected', card: rootCard })
+  })
+
+  it('resolves arbitrary targeted roots and keeps incomplete/error states fail-closed', () => {
+    expect(
+      resolveSessionCardDetailRouteState({
+        routeKey: 'old-alias',
+        queryStatus: 'success',
+        response: {
+          card: rootCard,
+          resolution: cardResolutions([rootCard])[0]!,
+          completeness: 'incomplete',
+          retryable: true,
+          sources: [
+            {
+              source: 'gateway',
+              status: 'unavailable',
+              fetched: 0,
+              retryable: true,
+            },
+          ],
+        },
+      }),
+    ).toEqual({ status: 'selected', card: rootCard })
+    expect(
+      resolveSessionCardDetailRouteState({
+        routeKey: 'missing',
+        queryStatus: 'error',
+        error: new SessionCardLookupError('missing', 404, false),
+      }),
+    ).toEqual({ status: 'rejected', reason: 'missing' })
+    expect(
+      resolveSessionCardDetailRouteState({
+        routeKey: 'missing',
+        queryStatus: 'error',
+        error: new SessionCardLookupError('retry', 503, true),
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'query' })
   })
 
   it('rejects direct navigation to a continuation segment', () => {

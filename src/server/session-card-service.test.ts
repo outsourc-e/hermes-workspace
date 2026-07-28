@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  SessionCardChatCursorError,
   SessionCardNotFoundError,
   SessionCardPinNotEligibleError,
   SessionCardProjectionIncompleteError,
@@ -213,6 +214,104 @@ describe('SessionCardService collection and resolution', () => {
     now += 30_000
     await service.listCards()
     expect(listPage).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns recent and pinned chat roots first, then keyset-pages older roots by ten', async () => {
+    const day = 24 * 60 * 60 * 1_000
+    const now = 10 * day
+    const old = Array.from({ length: 15 }, (_, index) =>
+      session(`old-${index}`, undefined, now - 3 * day - index),
+    )
+    const recent = session('recent', undefined, now - 1_000)
+    const child = session(
+      'recent-child',
+      {
+        parentSessionId: 'recent',
+        relationshipType: 'child_session',
+        sessionSource: 'fork',
+      },
+      now - 500,
+    )
+    const store = metadataStore()
+    store.update('remote:old-0', { pinned: true })
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () =>
+          Promise.resolve(page([...old, recent, child], 0, old.length + 2)),
+      },
+      localSource: null,
+      metadataStore: store,
+      now: () => now,
+    })
+
+    const initial = await service.listChatCards()
+    expect(initial.totalCards).toBe(16)
+    expect(initial.cards.map((card) => card.cardId).sort()).toEqual([
+      'remote:old-0',
+      'remote:recent',
+    ])
+    expect(
+      initial.cards.find((card) => card.cardId === 'remote:recent')?.childNodes,
+    ).toEqual([expect.objectContaining({ cardId: 'remote:recent-child' })])
+    expect(initial.nextCursor).toEqual(expect.any(String))
+
+    const olderPage = await service.listChatCards({
+      cursor: initial.nextCursor,
+    })
+    expect(olderPage.cards).toHaveLength(10)
+    expect(olderPage.cards.every((card) => !card.pinned)).toBe(true)
+    expect(olderPage.nextCursor).toEqual(expect.any(String))
+
+    const finalPage = await service.listChatCards({
+      cursor: olderPage.nextCursor,
+    })
+    expect(finalPage.cards).toHaveLength(4)
+    expect(finalPage.nextCursor).toBeUndefined()
+    expect(
+      new Set([...initial.cards, ...olderPage.cards, ...finalPage.cards]).size,
+    ).toBe(16)
+  })
+
+  it('rejects malformed chat cursors and distinguishes complete misses from retryable ones', async () => {
+    const completeService = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page([session('root')], 0, 1)),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+    })
+
+    await expect(
+      completeService.listChatCards({ cursor: 'not-json' }),
+    ).rejects.toBeInstanceOf(SessionCardChatCursorError)
+    await expect(completeService.lookupCard('root')).resolves.toMatchObject({
+      status: 'found',
+      card: { cardId: 'remote:root' },
+      resolution: { completeness: 'complete', retryable: false },
+    })
+    await expect(completeService.lookupCard('missing')).resolves.toMatchObject({
+      status: 'missing',
+      completeness: 'complete',
+      retryable: false,
+    })
+
+    const incompleteService = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.reject(new Error('temporary outage')),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+    })
+    await expect(
+      incompleteService.lookupCard('missing'),
+    ).resolves.toMatchObject({
+      status: 'missing',
+      completeness: 'incomplete',
+      retryable: true,
+    })
   })
 
   it.each(['gateway', 'dashboard'] as const)(

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
@@ -11,10 +11,6 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import {
-  fetchSessionCards,
-  sessionCardQueryKeys,
-} from '@/screens/chat/chat-queries'
 import { resolveSessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
 
 type BackgroundRun = {
@@ -79,14 +75,12 @@ function statusColor(run: BackgroundRun): string {
   return 'bg-emerald-400 animate-pulse'
 }
 
-export function BackgroundRunsSection() {
+export function BackgroundRunsSection({
+  sessionCardList,
+}: {
+  sessionCardList?: SessionCardListWire
+}) {
   const navigate = useNavigate()
-  const sessionCardsQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false),
-    queryFn: () => fetchSessionCards(),
-    retry: 1,
-    staleTime: 5_000,
-  })
   const [runs, setRuns] = useState<Array<BackgroundRun>>([])
   const [expanded, setExpanded] = useState(false)
   const [busyRunId, setBusyRunId] = useState<string | null>(null)
@@ -150,13 +144,10 @@ export function BackgroundRunsSection() {
   const resolvedRuns = useMemo(
     () =>
       runs.flatMap((run) => {
-        const activity = resolveBackgroundRunCardActivity(
-          sessionCardsQuery.data,
-          run,
-        )
+        const activity = resolveBackgroundRunCardActivity(sessionCardList, run)
         return activity ? [activity] : []
       }),
-    [runs, sessionCardsQuery.data],
+    [runs, sessionCardList],
   )
 
   if (resolvedRuns.length === 0) return null

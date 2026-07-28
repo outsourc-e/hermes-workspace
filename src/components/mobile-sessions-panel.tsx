@@ -30,6 +30,10 @@ type Props = {
   onBranchCard: (cardId: string) => Promise<void> | void
   onArchiveCard: (cardId: string) => Promise<void> | void
   pendingCardIds?: ReadonlySet<string>
+  hasMoreOlderSessions?: boolean
+  loadingOlderSessions?: boolean
+  olderSessionsError?: string | null
+  onLoadOlderSessions?: () => void
 }
 
 function cardOwnsSessionKey(card: SessionCard, sessionKey: string): boolean {
@@ -260,6 +264,10 @@ export function MobileSessionsPanel({
   onBranchCard,
   onArchiveCard,
   pendingCardIds = new Set<string>(),
+  hasMoreOlderSessions = false,
+  loadingOlderSessions = false,
+  olderSessionsError = null,
+  onLoadOlderSessions,
 }: Props) {
   const sessionForkAvailable = useFeatureAvailable('sessionFork')
   const disclosurePrefix = useId().replaceAll(':', '')
@@ -467,7 +475,7 @@ export function MobileSessionsPanel({
           </div>
 
           <div className="flex-1 overflow-y-auto p-2">
-            {roots.length === 0 ? (
+            {roots.length === 0 && !hasMoreOlderSessions ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-primary-500">
                 <HugeiconsIcon icon={Chat01Icon} size={24} strokeWidth={1.6} />
                 <p className="text-sm">No sessions yet.</p>
@@ -589,6 +597,27 @@ export function MobileSessionsPanel({
                 })}
               </div>
             )}
+            {hasMoreOlderSessions ? (
+              <div className="px-2 py-3 text-center">
+                {olderSessionsError ? (
+                  <p className="mb-2 text-xs text-primary-500">
+                    Older sessions could not be loaded.
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={loadingOlderSessions || !onLoadOlderSessions}
+                  onClick={onLoadOlderSessions}
+                  className="rounded-lg px-3 py-2 text-xs font-medium text-accent-600 hover:bg-accent-50 disabled:opacity-50"
+                >
+                  {loadingOlderSessions
+                    ? 'Loading…'
+                    : olderSessionsError
+                      ? 'Retry older sessions'
+                      : 'More Sessions…'}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </aside>

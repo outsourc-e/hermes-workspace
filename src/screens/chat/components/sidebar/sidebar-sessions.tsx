@@ -39,6 +39,10 @@ type SidebarSessionsProps = {
   fetching: boolean
   error: string | null
   onRetry: () => void
+  hasMoreOlderSessions?: boolean
+  loadingOlderSessions?: boolean
+  olderSessionsError?: string | null
+  onLoadOlderSessions?: () => void
 }
 
 type CardRowChild = SessionCardChild & {
@@ -52,9 +56,6 @@ type CardRowNode = Pick<
   childNodes: Array<CardRowChild>
   status?: SessionCardChild['status']
 }
-
-const RECENT_SESSION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000
-const MORE_SESSIONS_CHUNK_SIZE = 10
 
 export const SidebarSessions = memo(function SidebarSessions({
   sessionCards,
@@ -74,14 +75,15 @@ export const SidebarSessions = memo(function SidebarSessions({
   fetching,
   error,
   onRetry,
+  hasMoreOlderSessions = false,
+  loadingOlderSessions = false,
+  olderSessionsError = null,
+  onLoadOlderSessions = () => undefined,
 }: SidebarSessionsProps) {
   const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(
     () => new Set(),
   )
-  const [recentSessionCutoff] = useState(
-    () => Date.now() - RECENT_SESSION_WINDOW_MS,
-  )
-  const [olderSessionsVisible, setOlderSessionsVisible] = useState(0)
+
   const resolutionByCardId = useMemo(
     () =>
       new Map(
@@ -108,33 +110,7 @@ export const SidebarSessions = memo(function SidebarSessions({
     () => roots.filter((card) => card.pinned),
     [roots],
   )
-  const recentUnpinnedRoots = useMemo(
-    () =>
-      roots.filter(
-        (card) => !card.pinned && card.updatedAt >= recentSessionCutoff,
-      ),
-    [recentSessionCutoff, roots],
-  )
-  const olderUnpinnedRoots = useMemo(
-    () =>
-      roots.filter(
-        (card) => !card.pinned && card.updatedAt < recentSessionCutoff,
-      ),
-    [recentSessionCutoff, roots],
-  )
-  const visibleRoots = useMemo(
-    () => [
-      ...pinnedRoots,
-      ...recentUnpinnedRoots,
-      ...olderUnpinnedRoots.slice(0, olderSessionsVisible),
-    ],
-    [
-      olderSessionsVisible,
-      olderUnpinnedRoots,
-      pinnedRoots,
-      recentUnpinnedRoots,
-    ],
-  )
+  const visibleRoots = roots
   const inventoryIncomplete =
     completeness !== 'complete' || completeCards.length !== sessionCards.length
   const cardsById = useMemo(
@@ -223,13 +199,6 @@ export const SidebarSessions = memo(function SidebarSessions({
   const unpinnedRows = cardRows.rootRows.filter(
     (row) => !pinnedCardIds.has(row.key),
   )
-  const hasMoreOlderSessions = olderSessionsVisible < olderUnpinnedRoots.length
-
-  function handleShowMoreSessions() {
-    setOlderSessionsVisible((current) =>
-      Math.min(current + MORE_SESSIONS_CHUNK_SIZE, olderUnpinnedRoots.length),
-    )
-  }
 
   function handleToggleExpanded(cardId: string, expanded: boolean) {
     setExpandedCardIds((current) => {
@@ -368,10 +337,20 @@ export const SidebarSessions = memo(function SidebarSessions({
                         type="button"
                         size="sm"
                         variant="ghost"
-                        onClick={handleShowMoreSessions}
+                        disabled={loadingOlderSessions}
+                        onClick={onLoadOlderSessions}
                       >
-                        More Sessions…
+                        {loadingOlderSessions
+                          ? 'Loading…'
+                          : olderSessionsError
+                            ? 'Retry older sessions'
+                            : 'More Sessions…'}
                       </Button>
+                      {olderSessionsError ? (
+                        <div className="mt-1 text-[11px] text-primary-500">
+                          Older sessions could not be loaded.
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </>
@@ -413,5 +392,9 @@ function areSidebarSessionsEqual(
   if (prev.fetching !== next.fetching) return false
   if (prev.error !== next.error) return false
   if (prev.onRetry !== next.onRetry) return false
+  if (prev.hasMoreOlderSessions !== next.hasMoreOlderSessions) return false
+  if (prev.loadingOlderSessions !== next.loadingOlderSessions) return false
+  if (prev.olderSessionsError !== next.olderSessionsError) return false
+  if (prev.onLoadOlderSessions !== next.onLoadOlderSessions) return false
   return true
 }

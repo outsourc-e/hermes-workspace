@@ -141,6 +141,10 @@ function renderSidebar(
     completeness?: SessionCardListWire['completeness']
     fetching?: boolean
     onRetry?: () => void
+    hasMoreOlderSessions?: boolean
+    loadingOlderSessions?: boolean
+    olderSessionsError?: string | null
+    onLoadOlderSessions?: () => void
   } = {},
 ) {
   const container = document.createElement('div')
@@ -170,6 +174,10 @@ function renderSidebar(
         fetching={options.fetching ?? false}
         error={null}
         onRetry={options.onRetry ?? vi.fn()}
+        hasMoreOlderSessions={options.hasMoreOlderSessions}
+        loadingOlderSessions={options.loadingOlderSessions}
+        olderSessionsError={options.olderSessionsError}
+        onLoadOlderSessions={options.onLoadOlderSessions}
       />,
     )
   })
@@ -200,7 +208,7 @@ describe('SidebarSessions Card-only surface', () => {
     ).toBeTruthy()
   })
 
-  it('renders recent sessions first and reveals older sessions ten at a time', () => {
+  it('renders the bounded inventory and delegates loading older pages', () => {
     const now = Date.now()
     const recent = card({
       cardId: 'remote:recent',
@@ -211,33 +219,18 @@ describe('SidebarSessions Card-only surface', () => {
       childNodes: [],
       updatedAt: now,
     })
-    const older = Array.from({ length: 11 }, (_, index) =>
-      card({
-        cardId: `remote:older-${index + 1}`,
-        canonicalSegmentKey: `remote:older-${index + 1}`,
-        continuationSegmentKeys: [`remote:older-${index + 1}`],
-        continuationCount: 1,
-        title: `Older conversation ${index + 1}`,
-        childNodes: [],
-        updatedAt: now - (3 * 24 * 60 * 60 * 1000 + index),
-      }),
-    )
-
-    renderSidebar({ cards: [recent, ...older] })
+    const onLoadOlderSessions = vi.fn()
+    renderSidebar({
+      cards: [recent],
+      hasMoreOlderSessions: true,
+      onLoadOlderSessions,
+    })
 
     expect(screen.getByText('Recent conversation')).toBeTruthy()
-    expect(screen.queryByText('Older conversation 1')).toBeNull()
     React.act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'More Sessions…' }))
     })
-    expect(screen.getByText('Older conversation 1')).toBeTruthy()
-    expect(screen.getByText('Older conversation 10')).toBeTruthy()
-    expect(screen.queryByText('Older conversation 11')).toBeNull()
-    React.act(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'More Sessions…' }))
-    })
-    expect(screen.getByText('Older conversation 11')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'More Sessions…' })).toBeNull()
+    expect(onLoadOlderSessions).toHaveBeenCalledTimes(1)
   })
 
   it('preserves complete Cards but replaces incomplete inventory with retry UI and no row actions', () => {

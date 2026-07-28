@@ -56,8 +56,14 @@ vi.mock('@tanstack/react-query', async (importOriginal) => ({
   QueryClientProvider: ({ children }: { children: React.ReactNode }) =>
     children,
   useQueryClient: () => queryContext,
-  useQuery: ({ queryFn }: { queryFn?: () => unknown }) => {
-    void queryFn?.()
+  useQuery: ({
+    queryFn,
+    enabled = true,
+  }: {
+    queryFn?: () => unknown
+    enabled?: boolean
+  }) => {
+    if (enabled) void queryFn?.()
     return {
       data: undefined,
       error: null,
@@ -65,6 +71,25 @@ vi.mock('@tanstack/react-query', async (importOriginal) => ({
       isFetching: true,
       isPending: true,
       refetch: vi.fn().mockResolvedValue(undefined),
+    }
+  },
+  useInfiniteQuery: ({
+    queryFn,
+  }: {
+    queryFn?: (context: { pageParam?: string }) => unknown
+  }) => {
+    void queryFn?.({ pageParam: undefined })
+    return {
+      data: undefined,
+      error: null,
+      status: 'pending',
+      isLoading: true,
+      isFetching: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      hasNextPage: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+      fetchNextPage: vi.fn().mockResolvedValue(undefined),
     }
   },
   useMutation: ({
@@ -354,6 +379,18 @@ describe('workspace shell Session Card cutover', () => {
             : input.toString()
       requestedPaths.push(path)
 
+      if (path === '/api/session-cards?view=chat') {
+        return jsonResponse({ ...sessionCardList, totalCards: 1 })
+      }
+      if (path === '/api/session-cards/remote%3Aroot') {
+        return jsonResponse({
+          card: sessionCardList.cards[0],
+          resolution: sessionCardList.cardResolutions[0],
+          completeness: sessionCardList.completeness,
+          retryable: sessionCardList.retryable,
+          sources: sessionCardList.sources,
+        })
+      }
       if (path === '/api/session-cards') return jsonResponse(sessionCardList)
       if (path === '/api/sessions') {
         return jsonResponse({ sessions: [] })
@@ -368,8 +405,9 @@ describe('workspace shell Session Card cutover', () => {
     await mountWorkspaceShell('/chat/remote%3Aroot')
 
     await waitFor(() => {
-      expect(requestedPaths).toContain('/api/session-cards')
+      expect(requestedPaths).toContain('/api/session-cards?view=chat')
     })
+    expect(requestedPaths).not.toContain('/api/session-cards')
     expect(requestedPaths).not.toContain('/api/sessions')
   })
 })

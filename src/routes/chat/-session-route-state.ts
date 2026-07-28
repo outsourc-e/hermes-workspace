@@ -1,4 +1,5 @@
 import {
+  SessionCardLookupError,
   hasExactCompleteSessionCardProjection,
   moveHistoryMessages,
   reconcileSessionDraft,
@@ -8,7 +9,10 @@ import {
   findSessionCardDescendant,
   findSessionCardDescendantByIdentity,
 } from '../../screens/chat/session-cards'
-import type { SessionCardListWire } from '../../screens/chat/chat-queries'
+import type {
+  SessionCardDetailWire,
+  SessionCardListWire,
+} from '../../screens/chat/chat-queries'
 import type { SessionCard } from '../../screens/chat/types'
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -188,6 +192,34 @@ export function resolveSessionCardRouteState({
     return { status: 'unavailable', reason: 'query' }
   }
   return resolveSessionCardRoute({ routeKey, response })
+}
+
+/** Resolve an arbitrary stable Card route through the targeted detail API. */
+export function resolveSessionCardDetailRouteState({
+  routeKey,
+  queryStatus,
+  response,
+  error,
+}: {
+  routeKey: string
+  queryStatus: 'pending' | 'error' | 'success'
+  response?: SessionCardDetailWire
+  error?: unknown
+}): SessionCardRouteResolution | null {
+  if (isBootstrapRoute(routeKey)) return { status: 'bootstrap' }
+  if (queryStatus === 'pending') return null
+  if (queryStatus === 'error' || !response) {
+    return error instanceof SessionCardLookupError &&
+      error.status === 404 &&
+      !error.retryable
+      ? { status: 'rejected', reason: 'missing' }
+      : { status: 'unavailable', reason: 'query' }
+  }
+  return response.resolution.cardId === response.card.cardId &&
+    response.resolution.completeness === 'complete' &&
+    response.resolution.retryable === false
+    ? { status: 'selected', card: response.card }
+    : { status: 'unavailable', reason: 'projection' }
 }
 
 export function applySessionRouteResolution({

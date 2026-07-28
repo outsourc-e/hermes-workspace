@@ -145,6 +145,10 @@ type ChatScreenProps = {
   activeCard?: SessionCard
   inspectedChildCardId?: string
   sessionCardList?: SessionCardListWire
+  hasMoreSessionCards?: boolean
+  loadingMoreSessionCards?: boolean
+  moreSessionCardsError?: string | null
+  onLoadMoreSessionCards?: () => void
   isNewChat?: boolean
   onSessionResolved?: (
     payload:
@@ -504,6 +508,10 @@ export function ChatScreen({
   activeCard,
   inspectedChildCardId,
   sessionCardList,
+  hasMoreSessionCards = false,
+  loadingMoreSessionCards = false,
+  moreSessionCardsError = null,
+  onLoadMoreSessionCards,
   isNewChat = false,
   onSessionResolved,
   forcedSessionKey,
@@ -1472,7 +1480,7 @@ export function ChatScreen({
           canonicalSegmentKey: handoff.canonicalSegmentKey,
         })
         void queryClient.invalidateQueries({
-          queryKey: sessionCardQueryKeys.list(false),
+          queryKey: sessionCardQueryKeys.lists,
         })
       },
       [activeCard, queryClient],
@@ -1518,7 +1526,7 @@ export function ChatScreen({
           // authoritative Card projection. Refresh the route's Card list as
           // the stable Card ID replaces the `new` bootstrap segment.
           void queryClient.invalidateQueries({
-            queryKey: sessionCardQueryKeys.list(false),
+            queryKey: sessionCardQueryKeys.lists,
           })
         }
         onSessionResolved?.({
@@ -3134,9 +3142,14 @@ export function ChatScreen({
       setPendingCardIds((current) => new Set(current).add(cardId))
       try {
         await mutation()
-        await queryClient.invalidateQueries({
-          queryKey: sessionCardQueryKeys.list(false),
-        })
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: sessionCardQueryKeys.lists,
+          }),
+          queryClient.invalidateQueries({
+            queryKey: sessionCardQueryKeys.detail(cardId),
+          }),
+        ])
       } catch (mutationError) {
         const message =
           mutationError instanceof Error
@@ -3224,9 +3237,14 @@ export function ChatScreen({
           await updateSessionCardMetadata(activeCard.cardId, {
             manualTitle: nextTitle,
           })
-          await queryClient.invalidateQueries({
-            queryKey: sessionCardQueryKeys.list(false),
-          })
+          await Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: sessionCardQueryKeys.lists,
+            }),
+            queryClient.invalidateQueries({
+              queryKey: sessionCardQueryKeys.detail(activeCard.cardId),
+            }),
+          ])
         } finally {
           setRenamingCardTitle(false)
         }
@@ -3555,6 +3573,10 @@ export function ChatScreen({
           onBranchCard={handleBranchCard}
           onArchiveCard={handleArchiveCard}
           pendingCardIds={pendingCardIds}
+          hasMoreOlderSessions={hasMoreSessionCards}
+          loadingOlderSessions={loadingMoreSessionCards}
+          olderSessionsError={moreSessionCardsError}
+          onLoadOlderSessions={onLoadMoreSessionCards}
         />
       )}
 

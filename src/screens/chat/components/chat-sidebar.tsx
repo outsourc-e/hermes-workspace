@@ -31,7 +31,8 @@ import { CHAT_OPEN_SETTINGS_EVENT } from '../chat-events'
 import {
   archiveSessionCard,
   branchSessionCard,
-  fetchSessionCards,
+  fetchSessionCard,
+  mergeSessionCardDetail,
   sessionCardQueryKeys,
   updateSessionCardMetadata,
 } from '../chat-queries'
@@ -72,6 +73,7 @@ import {
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
+import { useChatSessionCardInventory } from '@/screens/chat/hooks/use-chat-session-card-inventory'
 
 type WorkspaceStats = Record<string, unknown>
 
@@ -89,7 +91,7 @@ type DesktopCardActionFailure = {
 type DesktopSessionCardActionsOptions = {
   activeCardId: string
   onActiveSessionDelete?: () => void
-  invalidateCards: () => Promise<unknown> | unknown
+  invalidateCards: (cardId: string) => Promise<unknown> | unknown
   navigateToCard: (cardId: string) => Promise<unknown> | unknown
 }
 
@@ -156,7 +158,7 @@ export function useDesktopSessionCardActions({
     } finally {
       setCardPending(card.cardId, false)
       try {
-        await invalidateCards()
+        await invalidateCards(card.cardId)
       } catch {
         // The mutation outcome is already known. A later poll can reconcile the list.
       }
@@ -733,6 +735,10 @@ type DesktopSidebarContentProps = {
   fetching: boolean
   error: string | null
   onRetry: () => void
+  hasMoreOlderSessions: boolean
+  loadingOlderSessions: boolean
+  olderSessionsError: string | null
+  onLoadOlderSessions: () => void
 }
 
 function DesktopSidebarContent({
@@ -764,6 +770,10 @@ function DesktopSidebarContent({
   fetching,
   error,
   onRetry,
+  hasMoreOlderSessions,
+  loadingOlderSessions,
+  olderSessionsError,
+  onLoadOlderSessions,
 }: DesktopSidebarContentProps) {
   return (
     <div className="flex h-full min-w-0 flex-1">
@@ -951,6 +961,10 @@ function DesktopSidebarContent({
                     fetching={fetching}
                     error={error}
                     onRetry={onRetry}
+                    hasMoreOlderSessions={hasMoreOlderSessions}
+                    loadingOlderSessions={loadingOlderSessions}
+                    olderSessionsError={olderSessionsError}
+                    onLoadOlderSessions={onLoadOlderSessions}
                   />
                 </div>
               </div>
@@ -994,15 +1008,21 @@ function ChatSidebarComponent({
       return typeof search.inspect === 'string' ? search.inspect : undefined
     },
   })
-  const sessionCardsQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false),
-    queryFn: () => fetchSessionCards(),
+  const sessionCardInventory = useChatSessionCardInventory({
     enabled: isChatActive,
+  })
+  const sessionCardDetailQuery = useQuery({
+    queryKey: sessionCardQueryKeys.detail(activeFriendlyId),
+    queryFn: () => fetchSessionCard(activeFriendlyId),
+    enabled: isChatActive && activeFriendlyId !== 'new',
     retry: 1,
     staleTime: 30_000,
-    refetchInterval: 30_000,
     refetchOnWindowFocus: false,
   })
+  const sessionCardList = mergeSessionCardDetail(
+    sessionCardInventory.sessionCardList,
+    sessionCardDetailQuery.data,
+  )
   const sessionForkAvailable = useFeatureAvailable('sessionFork')
 
   useEffect(() => {
@@ -1101,10 +1121,15 @@ function ChatSidebarComponent({
   const cardActions = useDesktopSessionCardActions({
     activeCardId: activeFriendlyId,
     onActiveSessionDelete,
-    invalidateCards: () =>
-      queryClient.invalidateQueries({
-        queryKey: sessionCardQueryKeys.list(false),
-      }),
+    invalidateCards: (cardId) =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.lists,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.detail(cardId),
+        }),
+      ]),
     navigateToCard: (cardId) =>
       navigate({
         to: '/chat/$sessionKey',
@@ -1413,9 +1438,9 @@ function ChatSidebarComponent({
           profileAvatarDataUrl={profileAvatarDataUrl}
           handleOpenSettings={handleOpenSettings}
           showSessions={isChatActive}
-          sessionCards={sessionCardsQuery.data?.cards ?? []}
-          cardResolutions={sessionCardsQuery.data?.cardResolutions ?? []}
-          completeness={sessionCardsQuery.data?.completeness ?? 'complete'}
+          sessionCards={sessionCardList?.cards ?? []}
+          cardResolutions={sessionCardList?.cardResolutions ?? []}
+          completeness={sessionCardList?.completeness ?? 'complete'}
           sessionForkAvailable={sessionForkAvailable}
           onTogglePin={handleTogglePin}
           onRename={handleOpenRename}
@@ -1424,14 +1449,21 @@ function ChatSidebarComponent({
           pendingCardIds={cardActions.pendingCardIds}
           cardActionFailure={cardActions.failure}
           onDismissCardActionFailure={cardActions.dismissFailure}
-          loading={sessionCardsQuery.isLoading}
-          fetching={sessionCardsQuery.isFetching}
+          loading={sessionCardInventory.isLoading}
+          fetching={sessionCardInventory.isFetching}
           error={
-            sessionCardsQuery.error instanceof Error
-              ? sessionCardsQuery.error.message
+            !sessionCardInventory.sessionCardList &&
+            sessionCardInventory.error instanceof Error
+              ? sessionCardInventory.error.message
               : null
           }
-          onRetry={() => void sessionCardsQuery.refetch()}
+          onRetry={() => void sessionCardInventory.refetch()}
+          hasMoreOlderSessions={sessionCardInventory.hasNextPage}
+          loadingOlderSessions={sessionCardInventory.isFetchingNextPage}
+          olderSessionsError={sessionCardInventory.olderSessionsError}
+          onLoadOlderSessions={() =>
+            void sessionCardInventory.loadOlderSessions()
+          }
         />
       ) : (
         <>
@@ -1611,12 +1643,12 @@ function ChatSidebarComponent({
                     >
                       <div className="flex-1 min-h-0">
                         <SidebarSessions
-                          sessionCards={sessionCardsQuery.data?.cards ?? []}
+                          sessionCards={sessionCardList?.cards ?? []}
                           cardResolutions={
-                            sessionCardsQuery.data?.cardResolutions ?? []
+                            sessionCardList?.cardResolutions ?? []
                           }
                           completeness={
-                            sessionCardsQuery.data?.completeness ?? 'complete'
+                            sessionCardList?.completeness ?? 'complete'
                           }
                           sessionForkAvailable={sessionForkAvailable}
                           activeCardId={activeFriendlyId}
@@ -1627,14 +1659,27 @@ function ChatSidebarComponent({
                           onArchive={handleOpenArchive}
                           onBranch={handleBranch}
                           pendingCardIds={cardActions.pendingCardIds}
-                          loading={sessionCardsQuery.isLoading}
-                          fetching={sessionCardsQuery.isFetching}
+                          loading={sessionCardInventory.isLoading}
+                          fetching={sessionCardInventory.isFetching}
                           error={
-                            sessionCardsQuery.error instanceof Error
-                              ? sessionCardsQuery.error.message
+                            !sessionCardInventory.sessionCardList &&
+                            sessionCardInventory.error instanceof Error
+                              ? sessionCardInventory.error.message
                               : null
                           }
-                          onRetry={() => void sessionCardsQuery.refetch()}
+                          onRetry={() => void sessionCardInventory.refetch()}
+                          hasMoreOlderSessions={
+                            sessionCardInventory.hasNextPage
+                          }
+                          loadingOlderSessions={
+                            sessionCardInventory.isFetchingNextPage
+                          }
+                          olderSessionsError={
+                            sessionCardInventory.olderSessionsError
+                          }
+                          onLoadOlderSessions={() =>
+                            void sessionCardInventory.loadOlderSessions()
+                          }
                         />
                       </div>
                     </motion.div>

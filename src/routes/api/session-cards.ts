@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { sessionCardService } from '../../server/session-card-service'
+import {
+  SessionCardChatCursorError,
+  sessionCardService,
+} from '../../server/session-card-service'
 import {
   internalFailure,
   invalidRequest,
@@ -10,8 +13,29 @@ import {
 
 function listCardsInput(
   request: Request,
-): { includeArchived: boolean; limit?: number } | null {
+):
+  | { view: 'ordinary'; includeArchived: boolean; limit?: number }
+  | { view: 'chat'; cursor?: string }
+  | null {
   const search = new URL(request.url).searchParams
+  const viewValues = search.getAll('view')
+  if (viewValues.length > 1) return null
+  if (viewValues.length === 1) {
+    if (viewValues[0] !== 'chat') return null
+    if ([...search.keys()].some((key) => key !== 'view' && key !== 'cursor')) {
+      return null
+    }
+    const cursorValues = search.getAll('cursor')
+    if (cursorValues.length > 1) return null
+    const cursor = cursorValues[0]
+    if (
+      cursor !== undefined &&
+      (!cursor || cursor.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(cursor))
+    ) {
+      return null
+    }
+    return { view: 'chat', ...(cursor === undefined ? {} : { cursor }) }
+  }
   if (
     [...search.keys()].some(
       (key) => key !== 'includeArchived' && key !== 'limit',
@@ -31,12 +55,12 @@ function listCardsInput(
           ? false
           : null
   if (includeArchived === null) return null
-  if (limitValues.length === 0) return { includeArchived }
+  if (limitValues.length === 0) return { view: 'ordinary', includeArchived }
   const rawLimit = limitValues[0]
   if (!rawLimit || !/^[1-9][0-9]*$/.test(rawLimit)) return null
   const limit = Number(rawLimit)
   if (!Number.isSafeInteger(limit) || limit > 100) return null
-  return { includeArchived, limit }
+  return { view: 'ordinary', includeArchived, limit }
 }
 
 export const Route = createFileRoute('/api/session-cards')({
@@ -49,15 +73,24 @@ export const Route = createFileRoute('/api/session-cards')({
 
         const input = listCardsInput(request)
         if (input === null) {
-          return invalidRequest(
-            'includeArchived must be true or false and limit must be an integer from 1 to 100',
-          )
+          return invalidRequest('Invalid Session Card list query')
         }
 
         try {
-          const result = await sessionCardService.listCards(input)
+          const result =
+            input.view === 'chat'
+              ? await sessionCardService.listChatCards(
+                  input.cursor === undefined ? {} : { cursor: input.cursor },
+                )
+              : await sessionCardService.listCards({
+                  includeArchived: input.includeArchived,
+                  ...(input.limit === undefined ? {} : { limit: input.limit }),
+                })
           return json(sanitizeSourceDiagnostics(result))
-        } catch {
+        } catch (error) {
+          if (error instanceof SessionCardChatCursorError) {
+            return invalidRequest('Invalid Session Card chat cursor')
+          }
           return internalFailure('Unable to list Session Cards')
         }
       },

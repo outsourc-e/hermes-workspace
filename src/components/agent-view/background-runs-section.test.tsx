@@ -167,14 +167,7 @@ describe('BackgroundRunsSection Card-only mounting', () => {
           }),
         )
       }
-      if (url === '/api/session-cards') {
-        return Promise.resolve(
-          new Response(JSON.stringify(mocks.cardWire), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }),
-        )
-      }
+
       return Promise.resolve(new Response('{}', { status: 404 }))
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -184,7 +177,7 @@ describe('BackgroundRunsSection Card-only mounting', () => {
     const root = createRoot(container)
     roots.push(() => React.act(() => root.unmount()))
     await React.act(async () => {
-      root.render(<BackgroundRunsSection />)
+      root.render(<BackgroundRunsSection sessionCardList={mocks.cardWire} />)
       await Promise.resolve()
     })
 
@@ -208,11 +201,10 @@ describe('BackgroundRunsSection Card-only mounting', () => {
     const queryKeys = new Set(
       mocks.queryOptions.map((options) => JSON.stringify(options.queryKey)),
     )
-    expect(queryKeys).toEqual(
-      new Set([JSON.stringify(['chat', 'session-cards', 'list', false])]),
-    )
+    expect(queryKeys).toEqual(new Set())
     const urls = fetchMock.mock.calls.map(([input]) => String(input))
     expect(urls).not.toContain('/api/sessions')
+    expect(urls).not.toContain('/api/session-cards')
     expect(urls.some((url) => url.startsWith('/api/history'))).toBe(false)
     expect(urls).not.toContain('/api/sessions/send')
   })

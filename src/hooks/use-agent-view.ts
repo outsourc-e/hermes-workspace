@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import type { SessionCardChild } from '@/screens/chat/types'
 import { resolveAgentSessionCardNavigation } from '@/components/agent-view/agent-session-card-navigation'
-import {
-  fetchSessionCards,
-  sessionCardQueryKeys,
-} from '@/screens/chat/chat-queries'
+
 import { useMissionStore } from '@/stores/mission-store'
 
 export type AgentModel = string
@@ -255,7 +252,9 @@ export type AgentViewResult = {
   setHistoryOpen: (isOpen: boolean) => void
 }
 
-export function useAgentView(): AgentViewResult {
+export function useAgentView(
+  sessionCardList: SessionCardListWire | undefined,
+): AgentViewResult {
   const isOpen = useAgentViewStore((state) => state.isOpen)
   const queueOpen = useAgentViewStore((state) => state.queueOpen)
   const historyOpen = useAgentViewStore((state) => state.historyOpen)
@@ -272,14 +271,7 @@ export function useAgentView(): AgentViewResult {
   })
   const [nowMs, setNowMs] = useState(() => Date.now())
 
-  const sessionCardsQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false),
-    queryFn: () => fetchSessionCards(),
-    retry: 1,
-    staleTime: REFRESH_INTERVAL_MS,
-    refetchInterval: REFRESH_INTERVAL_MS,
-  })
-  const lastRefreshedMs = useMemo(() => Date.now(), [sessionCardsQuery.data])
+  const lastRefreshedMs = useMemo(() => Date.now(), [sessionCardList])
 
   useEffect(() => {
     function handleResize() {
@@ -305,20 +297,20 @@ export function useAgentView(): AgentViewResult {
 
   const projection = useMemo(
     () =>
-      sessionCardsQuery.data
-        ? projectCardActivities(sessionCardsQuery.data)
+      sessionCardList
+        ? projectCardActivities(sessionCardList)
         : {
             activeAgents: [],
             queuedAgents: [],
             historyAgents: [],
             unavailable: false,
           },
-    [sessionCardsQuery.data],
+    [sessionCardList],
   )
 
   const missionCardIds = useMemo(() => {
     const ids = new Set<string>()
-    const response = sessionCardsQuery.data
+    const response = sessionCardList
     if (!response) return ids
     Object.values(missionSessionMap).forEach((identity) => {
       const target = resolveAgentSessionCardNavigation(response, {
@@ -327,7 +319,7 @@ export function useAgentView(): AgentViewResult {
       if (target?.inspectedChildCardId) ids.add(target.inspectedChildCardId)
     })
     return ids
-  }, [missionSessionMap, sessionCardsQuery.data])
+  }, [missionSessionMap, sessionCardList])
 
   const missionActiveAgents = useMemo(
     () =>
@@ -352,16 +344,10 @@ export function useAgentView(): AgentViewResult {
   const panelVisible = isDesktop && isOpen
   const showFloatingToggle = isDesktop && !isOpen
   const panelOffset = panelVisible ? PANEL_WIDTH_PX : 0
-  const queryError =
-    sessionCardsQuery.error instanceof Error
-      ? sessionCardsQuery.error.message
-      : 'Card activity unavailable'
   const errorMessage =
-    sessionCardsQuery.status === 'error'
-      ? queryError
-      : projection.unavailable
-        ? 'Card activity unavailable'
-        : null
+    !sessionCardList || projection.unavailable
+      ? 'Card activity unavailable'
+      : null
 
   return useMemo(
     () => ({
@@ -384,9 +370,9 @@ export function useAgentView(): AgentViewResult {
       activeMissionName: activeMission?.name || '',
       activeMissionState: activeMission?.state ?? null,
       activeCount: projection.activeAgents.length,
-      isLoading: sessionCardsQuery.status === 'pending',
+      isLoading: !sessionCardList,
       isDemoMode: false,
-      isLiveConnected: sessionCardsQuery.status === 'success',
+      isLiveConnected: Boolean(sessionCardList),
       errorMessage,
       setOpen,
       toggleOpen,
@@ -409,7 +395,7 @@ export function useAgentView(): AgentViewResult {
       projection.historyAgents,
       projection.queuedAgents,
       queueOpen,
-      sessionCardsQuery.status,
+      sessionCardList,
       setHistoryOpen,
       setOpen,
       setQueueOpen,

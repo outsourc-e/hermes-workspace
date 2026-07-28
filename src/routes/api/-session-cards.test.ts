@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   isAuthenticated: vi.fn(),
   isPasswordProtectionEnabled: vi.fn(),
   listCards: vi.fn(),
+  listChatCards: vi.fn(),
+  lookupCard: vi.fn(),
   resolveCard: vi.fn(),
   updateCardMetadata: vi.fn(),
   archiveCard: vi.fn(),
@@ -49,8 +51,11 @@ vi.mock('../../server/session-card-service', () => ({
   SessionCardNotFoundError: class SessionCardNotFoundError extends Error {},
   SessionCardPinNotEligibleError: class SessionCardPinNotEligibleError extends Error {},
   SessionCardProjectionIncompleteError: class SessionCardProjectionIncompleteError extends Error {},
+  SessionCardChatCursorError: class SessionCardChatCursorError extends Error {},
   sessionCardService: {
     listCards: mocks.listCards,
+    listChatCards: mocks.listChatCards,
+    lookupCard: mocks.lookupCard,
     resolveCard: mocks.resolveCard,
     updateCardMetadata: mocks.updateCardMetadata,
     archiveCard: mocks.archiveCard,
@@ -85,7 +90,9 @@ type GetHandler = (context: {
 type MutationHandler = GetHandler
 
 type ListTestRoute = { server: { handlers: { GET: GetHandler } } }
-type MetadataTestRoute = { server: { handlers: { PATCH: MutationHandler } } }
+type MetadataTestRoute = {
+  server: { handlers: { GET: GetHandler; PATCH: MutationHandler } }
+}
 type ArchiveTestRoute = { server: { handlers: { POST: MutationHandler } } }
 type BranchTestRoute = {
   server: { handlers: { POST: MutationHandler; PATCH: MutationHandler } }
@@ -95,6 +102,8 @@ type HistoryTestRoute = { server: { handlers: { GET: GetHandler } } }
 const listHandler = (ListRoute as unknown as ListTestRoute).server.handlers.GET
 const metadataHandler = (MetadataRoute as unknown as MetadataTestRoute).server
   .handlers.PATCH
+const detailHandler = (MetadataRoute as unknown as MetadataTestRoute).server
+  .handlers.GET
 const archiveHandler = (ArchiveRoute as unknown as ArchiveTestRoute).server
   .handlers.POST
 const branchHandler = (BranchRoute as unknown as BranchTestRoute).server
@@ -265,6 +274,28 @@ beforeEach(() => {
     retryable: false,
     sources: [],
   })
+  mocks.listChatCards.mockResolvedValue({
+    cards: [resolvedCard().card],
+    totalCards: 1,
+    cardResolutions: [
+      { cardId: 'remote:root', completeness: 'complete', retryable: false },
+    ],
+    completeness: 'complete',
+    retryable: false,
+    sources: [],
+  })
+  mocks.lookupCard.mockResolvedValue({
+    status: 'found',
+    card: resolvedCard().card,
+    resolution: {
+      cardId: 'remote:root',
+      completeness: 'complete',
+      retryable: false,
+    },
+    completeness: 'complete',
+    retryable: false,
+    sources: [],
+  })
   mocks.ensureGatewayProbed.mockResolvedValue({ sessionFork: true })
   mocks.readBranchReplay.mockImplementation(
     (_cardId: string, requestKeyHash: string) =>
@@ -404,6 +435,84 @@ describe('GET /api/session-cards', () => {
       'secret upstream URL',
     )
     expect(mocks.listCards).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses the bounded chat view contract and rejects mixed list modes', async () => {
+    const response = await listHandler({
+      request: getRequest('/api/session-cards?view=chat&cursor=cursor_1'),
+      params: {},
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.listChatCards).toHaveBeenCalledWith({ cursor: 'cursor_1' })
+    expect(mocks.listCards).not.toHaveBeenCalled()
+
+    const mixed = await listHandler({
+      request: getRequest('/api/session-cards?view=chat&limit=10'),
+      params: {},
+    })
+    expect(mixed.status).toBe(400)
+  })
+})
+
+describe('GET /api/session-cards/$cardId', () => {
+  it('returns a targeted root Card without aliases or resolver internals', async () => {
+    const response = await detailHandler({
+      request: getRequest('/api/session-cards/root-alias'),
+      params: { cardId: 'root-alias' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.lookupCard).toHaveBeenCalledWith('root-alias')
+    const body = await response.json()
+    expect(body).toMatchObject({
+      card: { cardId: 'remote:root' },
+      resolution: {
+        cardId: 'remote:root',
+        completeness: 'complete',
+        retryable: false,
+      },
+    })
+    expect(body).not.toHaveProperty('aliases')
+    expect(body).not.toHaveProperty('sourceBySegmentKey')
+  })
+
+  it('returns safe 404 only for complete misses and retryable 503 otherwise', async () => {
+    mocks.lookupCard.mockResolvedValueOnce({
+      status: 'missing',
+      completeness: 'complete',
+      retryable: false,
+      sources: [],
+    })
+    const missing = await detailHandler({
+      request: getRequest('/api/session-cards/missing'),
+      params: { cardId: 'missing' },
+    })
+    expect(missing.status).toBe(404)
+    expect(await missing.json()).toMatchObject({ retryable: false })
+
+    mocks.lookupCard.mockResolvedValueOnce({
+      status: 'missing',
+      completeness: 'incomplete',
+      retryable: true,
+      sources: [
+        {
+          source: 'gateway',
+          status: 'unavailable',
+          fetched: 0,
+          retryable: true,
+          error: 'secret upstream detail',
+        },
+      ],
+    })
+    const unavailable = await detailHandler({
+      request: getRequest('/api/session-cards/missing'),
+      params: { cardId: 'missing' },
+    })
+    expect(unavailable.status).toBe(503)
+    const serialized = JSON.stringify(await unavailable.json())
+    expect(serialized).toContain('Session Card source unavailable')
+    expect(serialized).not.toContain('secret upstream detail')
   })
 })
 

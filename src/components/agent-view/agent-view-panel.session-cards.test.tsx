@@ -439,15 +439,7 @@ describe('AgentViewPanel mounted Card cutover', () => {
         .closest('article')
         ?.getAttribute('data-has-control-identity'),
     ).toBe('false')
-    expect(mocks.queryOptions).toHaveLength(1)
-    expect(mocks.queryOptions[0]?.queryKey).toEqual([
-      'chat',
-      'session-cards',
-      'list',
-      false,
-    ])
-
-    await expect(mocks.queryOptions[0]?.queryFn()).resolves.toEqual(body)
+    expect(mocks.queryOptions).toHaveLength(0)
     React.act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'View Output' }))
     })
@@ -458,7 +450,7 @@ describe('AgentViewPanel mounted Card cutover', () => {
       search: { inspect: 'remote:child-card' },
     })
     const urls = fetchMock.mock.calls.map(([input]) => String(input))
-    expect(urls).toContain('/api/session-cards')
+    expect(urls).not.toContain('/api/session-cards')
     expect(urls).not.toContain('/api/sessions')
     expect(urls).not.toContain('/api/gateway/sessions')
     expect(urls.some((url) => url.startsWith('/api/history'))).toBe(false)
@@ -485,7 +477,7 @@ describe('AgentViewPanel mounted Card cutover', () => {
     expect(screen.queryByRole('button', { name: 'View Output' })).toBeNull()
     expect(document.body.textContent).not.toContain('remote:child-tip')
     expect(mocks.navigate).not.toHaveBeenCalled()
-    expect(mocks.queryOptions).toHaveLength(1)
+    expect(mocks.queryOptions).toHaveLength(0)
   })
 
   it('shows a closed unavailable state when the Card request fails', async () => {
