@@ -1,14 +1,29 @@
 import { describe, expect, test } from 'vitest';
+import * as stateModule from './kanban-autonomy-state.mjs';
 import {
-  ACTIVE_EVENT_TYPES, EVENT_PAYLOAD_POLICIES, JSON_LIMITS, RESERVED_EVENT_TYPES, STATE_POLICY_VERSION,
+  ACTIVE_EVENT_TYPES, COORDINATION_STATE_POLICY_VERSION, EVENT_PAYLOAD_POLICIES, JSON_LIMITS, RESERVED_EVENT_TYPES, STATE_POLICY_VERSION,
   SUPPORTED_EVENT_VERSIONS, assertSha256Hash, assertWellFormedUnicodeString, authorityWithinCeiling, canonicalJson,
-  compareStrictUtc, durableTaskId, normalizeBoardSlug, parseStrictBoundedJson, parseStrictUtc, projectTaskStateToKanban,
-  reduceTaskState, replayEvents, validateBoundedJsonValue, validateEventPayload, validateEventVersion,
+  compareStrictUtc, deriveClaimSelectionBasis, durableTaskId, normalizeBoardSlug, parseStrictBoundedJson, parseStrictUtc, projectTaskStateToKanban,
+  projectCoordinationAt, reduceTaskState, replayEvents, replayTask, validateBoundedJsonValue, validateEventPayload, validateEventVersion,
 } from './kanban-autonomy-state.mjs';
 
 const hash = `sha256:${'a'.repeat(64)}`;
 const otherHash = `sha256:${'b'.repeat(64)}`;
 const EVENT_PAYLOADS = Object.freeze({
+  CARD_CLAIMED: {
+    coordination_policy_version: COORDINATION_STATE_POLICY_VERSION,
+    lease_id: `klease_${'c'.repeat(32)}`, claimant_id_hash: hash, worker_session_id: 'kws_fixture1234',
+    lease_started_at: '2026-07-11T00:00:03Z', lease_expires_at: '2026-07-11T00:01:03Z',
+    requested_duration_seconds: 60, claim_reason: 'INITIAL', eligibility_event_id: 'ke_eligibility',
+    score_event_id: 'ke_score', card_snapshot_hash: hash, selection_basis_hash: otherHash,
+  },
+  LEASE_RENEWED: {
+    coordination_policy_version: COORDINATION_STATE_POLICY_VERSION,
+    lease_id: `klease_${'c'.repeat(32)}`, previous_expires_at: '2026-07-11T00:01:03Z',
+    renewed_at: '2026-07-11T00:00:30Z', lease_expires_at: '2026-07-11T00:02:30Z', requested_duration_seconds: 120,
+  },
+  LEASE_RELEASED: { coordination_policy_version: COORDINATION_STATE_POLICY_VERSION,
+    lease_id: `klease_${'c'.repeat(32)}`, released_at: '2026-07-11T00:00:40Z', reason_code: 'HANDOFF' },
   TASK_CREATED: {
     task_id: `kt_${'a'.repeat(24)}`, board_slug_hash: hash, kanban_card_id_hash: otherHash,
     source_identity_hash: hash, initial_card_snapshot_hash: otherHash, authority_ceiling: 'A1',
@@ -49,9 +64,10 @@ const normalFlow = [
 describe('canonical identity and serialization', () => {
   test('exports a versioned bounded registry with reserved types inactive', () => {
     expect(STATE_POLICY_VERSION).toBe('kanban_autonomy_state.v1');
+    expect(COORDINATION_STATE_POLICY_VERSION).toBe('kanban_autonomy_state.v2');
     expect(ACTIVE_EVENT_TYPES).toContain('TASK_CREATED');
-    expect(RESERVED_EVENT_TYPES).toContain('CARD_CLAIMED');
-    expect(ACTIVE_EVENT_TYPES).not.toContain('CARD_CLAIMED');
+    expect(RESERVED_EVENT_TYPES).toContain('BUILD_STARTED');
+    expect(ACTIVE_EVENT_TYPES).toContain('CARD_CLAIMED');
   });
   test('exports one immutable supported version for every and only active event type', () => {
     expect(SUPPORTED_EVENT_VERSIONS).toEqual(Object.fromEntries(ACTIVE_EVENT_TYPES.map((eventType) => [eventType, 1])));
@@ -65,7 +81,7 @@ describe('canonical identity and serialization', () => {
     }
   });
   test('event-version validation distinguishes unknown and reserved types from unsupported versions', () => {
-    expect(() => validateEventVersion('CARD_CLAIMED', 1)).toThrow(/UNKNOWN_EVENT_TYPE/);
+    expect(() => validateEventVersion('BUILD_STARTED', 1)).toThrow(/UNKNOWN_EVENT_TYPE/);
     expect(() => validateEventVersion('INVENTED', 1)).toThrow(/UNKNOWN_EVENT_TYPE/);
   });
   test('canonical JSON sorts nested keys and retains array order', () => {
@@ -172,7 +188,7 @@ describe('versioned state reducer', () => {
   });
   test('unknown and reserved event types fail closed', () => {
     const created = detailsAfter(normalFlow.slice(0, 1));
-    expect(() => reduceTaskState(created, event('CARD_CLAIMED'))).toThrow(/UNKNOWN_EVENT_TYPE/);
+    expect(() => reduceTaskState(created, event('BUILD_STARTED'))).toThrow(/UNKNOWN_EVENT_TYPE/);
     expect(() => reduceTaskState(created, event('INVENTED'))).toThrow(/UNKNOWN_EVENT_TYPE/);
   });
   test('invalid transition fails', () => {
@@ -355,7 +371,9 @@ describe('closed versioned event payload policies', () => {
   ('rejects %s when required field %s is missing', (eventType, key) => {
     const payload = { ...EVENT_PAYLOADS[eventType] };
     delete payload[key];
-    expect(() => validateEventPayload(eventType, 1, payload)).toThrow(/EVENT_PAYLOAD_INVALID/);
+    const expected = key === 'coordination_policy_version'
+      ? /COORDINATION_POLICY_VERSION_MISMATCH/ : /EVENT_PAYLOAD_INVALID/;
+    expect(() => validateEventPayload(eventType, 1, payload)).toThrow(expected);
   });
 
   test.each(ACTIVE_EVENT_TYPES)('rejects extra payload keys for %s', (eventType) => {
@@ -446,7 +464,7 @@ describe('exported reducer and replay validation', () => {
       .toThrow(/UNSUPPORTED_EVENT_VERSION/);
     expect(() => reduceTaskState(null, event('TASK_CREATED', EVENT_PAYLOADS.TASK_CREATED, 2)))
       .toThrow(/UNSUPPORTED_EVENT_VERSION/);
-    expect(() => reduceTaskState(null, { event_type: 'CARD_CLAIMED', event_version: 1, payload: {} }))
+    expect(() => reduceTaskState(null, { event_type: 'BUILD_STARTED', event_version: 1, payload: {} }))
       .toThrow(/UNKNOWN_EVENT_TYPE/);
   });
   test('rejects semantically invalid direct reducer and replay payloads', () => {
@@ -624,5 +642,174 @@ describe('bounded programmatic JSON and canonical numbers', () => {
     expect(canonicalJson({ a: [1, 2] })).not.toBe(canonicalJson({ a: [2, 1] }));
     const parsed = parseStrictBoundedJson('{"b":1,"a":{"d":4,"c":3}}');
     expect(canonicalJson(parsed)).toBe(canonicalJson({ a: { c: 3, d: 4 }, b: 1 }));
+  });
+});
+
+describe('KAN-AUT-4B deterministic coordination replay', () => {
+  const leaseId = `klease_${'c'.repeat(32)}`;
+  const coordEvent = (eventType, occurredAt, fencingToken, payload, overrides = {}) => ({
+    event_id: `ke_${eventType.toLowerCase()}_${occurredAt.replace(/[^0-9]/g, '')}`,
+    event_hash: `sha256:${String(fencingToken).padStart(64, '0')}`,
+    event_type: eventType, event_version: 1, occurred_at: occurredAt,
+    actor_type: 'worker', actor_id_hash: hash, worker_id: 'kws_fixture1234', authority_level: 'A0',
+    fencing_token: fencingToken, lease_id: payload.lease_id, payload, ...overrides,
+  });
+  const workflowPrefix = [
+    { ...event('TASK_CREATED'), event_id: 'ke_created', event_hash: hash, occurred_at: '2026-07-11T00:00:00Z' },
+    { ...event('CARD_ELIGIBILITY_EVALUATED'), event_id: 'ke_eligibility', event_hash: hash, occurred_at: '2026-07-11T00:00:01Z' },
+    { ...event('CARD_SCORED'), event_id: 'ke_score', event_hash: otherHash, occurred_at: '2026-07-11T00:00:02Z' },
+  ];
+  const selectionBasis = deriveClaimSelectionBasis({ taskId: EVENT_PAYLOADS.TASK_CREATED.task_id,
+    creationEvent: workflowPrefix[0], eligibilityEvent: workflowPrefix[1], scoreEvent: workflowPrefix[2] });
+  const claim = coordEvent('CARD_CLAIMED', '2026-07-11T00:00:03Z', 1, {
+    ...EVENT_PAYLOADS.CARD_CLAIMED, lease_id: leaseId, lease_started_at: '2026-07-11T00:00:03Z',
+    lease_expires_at: '2026-07-11T00:00:33Z', requested_duration_seconds: 30,
+    selection_basis_hash: selectionBasis.selection_basis_hash,
+  });
+  const renewal = coordEvent('LEASE_RENEWED', '2026-07-11T00:00:05Z', 1, {
+    ...EVENT_PAYLOADS.LEASE_RENEWED, lease_id: leaseId, previous_expires_at: '2026-07-11T00:00:33Z',
+    renewed_at: '2026-07-11T00:00:05Z', lease_expires_at: '2026-07-11T00:00:35Z', requested_duration_seconds: 30,
+  });
+  const release = coordEvent('LEASE_RELEASED', '2026-07-11T00:00:06Z', 1, {
+    ...EVENT_PAYLOADS.LEASE_RELEASED, lease_id: leaseId, released_at: '2026-07-11T00:00:06Z', reason_code: 'HANDOFF',
+  });
+
+  test('keeps workflow status separate and reconstructs active, renewed, released and historical states', () => {
+    const events = [...workflowPrefix, claim, renewal, release];
+    expect(replayTask(events).status).toBe('triaged');
+    expect(projectCoordinationAt(events, '2026-07-11T00:00:04Z')).toMatchObject({ status: 'active', fencing_token: 1,
+      lease_expires_at: '2026-07-11T00:00:33Z' });
+    expect(projectCoordinationAt(events, '2026-07-11T00:00:05Z')).toMatchObject({ status: 'active',
+      lease_expires_at: '2026-07-11T00:00:35Z' });
+    expect(projectCoordinationAt(events, '2026-07-11T00:00:06Z')).toMatchObject({ status: 'released',
+      release_reason: 'HANDOFF' });
+  });
+
+  test('uses the exact expiry boundary and rejects stale/non-monotonic generations', () => {
+    expect(projectCoordinationAt([...workflowPrefix, claim], '2026-07-11T00:00:32.999Z').status).toBe('active');
+    expect(projectCoordinationAt([...workflowPrefix, claim], '2026-07-11T00:00:33Z').status).toBe('expired');
+    const bad = coordEvent('CARD_CLAIMED', '2026-07-11T00:00:34Z', 1, {
+      ...EVENT_PAYLOADS.CARD_CLAIMED, lease_id: `klease_${'d'.repeat(32)}`,
+      lease_started_at: '2026-07-11T00:00:34Z', lease_expires_at: '2026-07-11T00:01:04Z',
+      requested_duration_seconds: 30, claim_reason: 'EXPIRED_TAKEOVER',
+    });
+    expect(() => replayTask([...workflowPrefix, claim, bad])).toThrow(/COORDINATION_REPLAY_INVALID/);
+  });
+});
+
+describe('KAN-AUT-4B coordination replay semantic evidence', () => {
+  const leaseId = `klease_${'9'.repeat(32)}`;
+  const prefix = [
+    { ...event('TASK_CREATED'), event_id: 'ke_created', event_hash: hash, occurred_at: '2026-07-11T00:00:00Z' },
+    { ...event('CARD_ELIGIBILITY_EVALUATED'), event_id: 'ke_eligibility', event_hash: hash, occurred_at: '2026-07-11T00:00:01Z' },
+    { ...event('CARD_SCORED'), event_id: 'ke_score', event_hash: otherHash, occurred_at: '2026-07-11T00:00:02Z' },
+  ];
+  const validSelectionBasis = deriveClaimSelectionBasis({ taskId: EVENT_PAYLOADS.TASK_CREATED.task_id,
+    creationEvent: prefix[0], eligibilityEvent: prefix[1], scoreEvent: prefix[2] });
+  const claimEvent = (payload = {}, overrides = {}) => ({
+    event_id: 'ke_claim', event_hash: hash, event_type: 'CARD_CLAIMED', event_version: 1,
+    occurred_at: '2026-07-11T00:00:03Z', actor_type: 'worker', actor_id_hash: hash,
+    worker_id: 'kws_fixture1234', authority_level: 'A0', fencing_token: 1, lease_id: leaseId,
+    payload: {
+      ...EVENT_PAYLOADS.CARD_CLAIMED, lease_id: leaseId, claimant_id_hash: hash,
+      worker_session_id: 'kws_fixture1234', lease_started_at: '2026-07-11T00:00:03Z',
+      lease_expires_at: '2026-07-11T00:00:33Z', requested_duration_seconds: 30,
+      eligibility_event_id: 'ke_eligibility', score_event_id: 'ke_score', card_snapshot_hash: hash,
+      selection_basis_hash: validSelectionBasis.selection_basis_hash,
+      ...payload,
+    },
+    ...overrides,
+  });
+
+  test('reported invalid nonexistent evidence and 30-second request backed by 10 seconds fails closed', () => {
+    const invalid = claimEvent({ eligibility_event_id: 'ke_missing_eligibility', score_event_id: 'ke_missing_score',
+      lease_expires_at: '2026-07-11T00:00:13Z', requested_duration_seconds: 30 });
+    expect(() => replayTask([...prefix, invalid])).toThrow();
+  });
+
+  test.each([
+    ['missing eligibility', { eligibility_event_id: 'ke_missing' }, 'CLAIM_EVIDENCE_EVENT_MISSING'],
+    ['missing score', { score_event_id: 'ke_missing' }, 'CLAIM_EVIDENCE_EVENT_MISSING'],
+  ])('rejects %s evidence references', (_label, payload, code) => {
+    expect(() => replayTask([...prefix, claimEvent(payload)])).toThrow(new RegExp(code));
+  });
+
+  test('rejects wrong evidence types and evidence that is not prior', () => {
+    expect(() => replayTask([...prefix, claimEvent({ eligibility_event_id: 'ke_score' })]))
+      .toThrow(/CLAIM_EVIDENCE_EVENT_TYPE_MISMATCH/);
+    expect(() => replayTask([...prefix, claimEvent({ score_event_id: 'ke_eligibility' })]))
+      .toThrow(/CLAIM_EVIDENCE_EVENT_TYPE_MISMATCH/);
+    const futureScore = { ...prefix[2], event_id: 'ke_future_score', occurred_at: '2026-07-11T00:00:04Z' };
+    expect(() => replayTask([...prefix.slice(0, 2), claimEvent({ score_event_id: 'ke_future_score' }), futureScore]))
+      .toThrow(/CLAIM_EVIDENCE_EVENT_NOT_PRIOR|CLAIM_EVIDENCE_EVENT_MISSING/);
+  });
+
+  test('rejects ineligible evidence and every snapshot inconsistency', () => {
+    const ineligible = { ...prefix[1], payload: { ...prefix[1].payload, eligible: false, reason_codes: ['NOT_ELIGIBLE'] } };
+    expect(() => replayTask([prefix[0], ineligible, prefix[2], claimEvent()])).toThrow(/CLAIM_EVIDENCE_INELIGIBLE/);
+    const otherSnapshot = `sha256:${'d'.repeat(64)}`;
+    const scoreOther = { ...prefix[2], payload: { ...prefix[2].payload, card_snapshot_hash: otherSnapshot } };
+    expect(() => replayTask([prefix[0], prefix[1], scoreOther, claimEvent()])).toThrow(/CLAIM_EVIDENCE_SNAPSHOT_MISMATCH/);
+    expect(() => replayTask([...prefix, claimEvent({ card_snapshot_hash: otherSnapshot })]))
+      .toThrow(/CLAIM_EVIDENCE_SNAPSHOT_MISMATCH/);
+  });
+
+  test('derives a stable known selection-basis vector from trusted evidence', () => {
+    expect(deriveClaimSelectionBasis({ taskId: EVENT_PAYLOADS.TASK_CREATED.task_id, creationEvent: prefix[0], eligibilityEvent: prefix[1], scoreEvent: prefix[2] })
+      .selection_basis_hash).toBe('sha256:6f95a21909bc800eb6d96f9de9d0b77b12910dc7dc55a352ddbc4524c9742b53');
+  });
+
+  test('rejects forged selection basis and non-exact lease intervals', () => {
+    expect(() => replayTask([...prefix, claimEvent({ selection_basis_hash: otherHash })]))
+      .toThrow(/CLAIM_SELECTION_BASIS_MISMATCH/);
+    for (const payload of [
+      { lease_expires_at: '2026-07-11T00:00:13Z', requested_duration_seconds: 30 },
+      { lease_expires_at: '2026-07-11T00:00:33.001Z' },
+      { lease_expires_at: '2026-07-11T00:00:03Z' },
+    ]) expect(() => replayTask([...prefix, claimEvent(payload)])).toThrow(/LEASE_DURATION_MISMATCH/);
+  });
+
+  test('rejects historical lease ID reuse after release', () => {
+    const first = claimEvent();
+    const released = {
+      event_id: 'ke_release', event_hash: otherHash, event_type: 'LEASE_RELEASED', event_version: 1,
+      occurred_at: '2026-07-11T00:00:10Z', actor_type: 'worker', actor_id_hash: hash,
+      worker_id: 'kws_fixture1234', authority_level: 'A0', fencing_token: 1, lease_id: leaseId,
+      payload: { ...EVENT_PAYLOADS.LEASE_RELEASED, lease_id: leaseId, released_at: '2026-07-11T00:00:10Z' },
+    };
+    const reused = claimEvent({ claim_reason: 'REACQUIRED_AFTER_RELEASE', lease_started_at: '2026-07-11T00:00:11Z',
+      lease_expires_at: '2026-07-11T00:00:41Z' }, {
+      event_id: 'ke_reused_claim', occurred_at: '2026-07-11T00:00:11Z', fencing_token: 2,
+    });
+    expect(() => replayTask([...prefix, first, released, reused])).toThrow(/LEASE_ID_REUSE_FORBIDDEN/);
+  });
+
+  test.each(['CARD_CLAIMED', 'LEASE_RENEWED', 'LEASE_RELEASED'])(
+    '%s requires the exact coordination policy version', (type) => {
+      const base = type === 'CARD_CLAIMED' ? claimEvent() : {
+        event_type: type,
+        payload: type === 'LEASE_RENEWED'
+          ? { ...EVENT_PAYLOADS.LEASE_RENEWED, lease_id: leaseId, previous_expires_at: '2026-07-11T00:00:33Z',
+            renewed_at: '2026-07-11T00:00:10Z', lease_expires_at: '2026-07-11T00:00:40Z', requested_duration_seconds: 30 }
+          : { ...EVENT_PAYLOADS.LEASE_RELEASED, lease_id: leaseId, released_at: '2026-07-11T00:00:11Z' },
+      };
+      const missingPolicy = { ...base.payload };
+      delete missingPolicy.coordination_policy_version;
+      expect(() => validateEventPayload(type, 1, missingPolicy)).toThrow(/COORDINATION_POLICY_VERSION_MISMATCH/);
+      for (const version of ['unknown.v9', STATE_POLICY_VERSION]) {
+        expect(() => validateEventPayload(type, 1, { ...base.payload, coordination_policy_version: version }))
+          .toThrow(/COORDINATION_POLICY_VERSION_MISMATCH/);
+      }
+    },
+  );
+});
+
+describe('KAN-AUT-4B RED coordination policy', () => {
+  test('activates coordination v1 contracts and exposes deterministic replay', () => {
+    expect(COORDINATION_STATE_POLICY_VERSION).toBe('kanban_autonomy_state.v2');
+    expect(ACTIVE_EVENT_TYPES).toEqual(expect.arrayContaining(['CARD_CLAIMED', 'LEASE_RENEWED', 'LEASE_RELEASED']));
+    expect(RESERVED_EVENT_TYPES).not.toEqual(expect.arrayContaining(['CARD_CLAIMED', 'LEASE_RENEWED', 'LEASE_RELEASED']));
+    expect(typeof stateModule.replayTask).toBe('function');
+    expect(typeof stateModule.projectCoordinationAt).toBe('function');
   });
 });

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import * as storeModule from './kanban-autonomy-store.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import {
   chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fstatSync, linkSync, lstatSync,
@@ -7,18 +8,31 @@ import {
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import {
-  STORE_DATABASE_NAME, STORE_SCHEMA_VERSION, appendEvent, buildCanonicalTaskCreatedEvent, canonicalEventHashMaterial,
-  createTask, initStore, replayTaskState, normalizeSensitiveKeyName, parseStoredPayloadJson, taskStatus,
+  STORE_DATABASE_NAME, STORE_SCHEMA_VERSION, appendEvent, assertCurrentTaskFence, buildCanonicalTaskCreatedEvent,
+  canonicalEventHashMaterial, claimTaskLease, createTask, initStore, readCurrentTaskLease, releaseTaskLease,
+  renewTaskLease, replayTaskState, normalizeSensitiveKeyName, parseStoredPayloadJson, taskStatus,
   validatePayload, validateTempStorePath, verifyStore, verifyTaskChain, verifyTaskChainRows,
 } from './kanban-autonomy-store.mjs';
 import {
-  ACTIVE_EVENT_TYPES, EVENT_PAYLOAD_POLICIES, STATE_POLICY_VERSION, SUPPORTED_EVENT_VERSIONS, canonicalJson, sha256Hex,
+  ACTIVE_EVENT_TYPES, COORDINATION_STATE_POLICY_VERSION, EVENT_PAYLOAD_POLICIES, STATE_POLICY_VERSION, SUPPORTED_EVENT_VERSIONS, canonicalJson, sha256Hex,
   validateEventPayload,
 } from './kanban-autonomy-state.mjs';
 
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const EVENT_PAYLOADS = Object.freeze({
+  CARD_CLAIMED: {
+    coordination_policy_version: COORDINATION_STATE_POLICY_VERSION,
+    lease_id: `klease_${'c'.repeat(32)}`, claimant_id_hash: HASH_A, worker_session_id: 'kws_fixture1234',
+    lease_started_at: '2026-07-11T00:00:03Z', lease_expires_at: '2026-07-11T00:01:03Z',
+    requested_duration_seconds: 60, claim_reason: 'INITIAL', eligibility_event_id: 'ke_eligibility',
+    score_event_id: 'ke_score', card_snapshot_hash: HASH_A, selection_basis_hash: HASH_B,
+  },
+  LEASE_RENEWED: { coordination_policy_version: COORDINATION_STATE_POLICY_VERSION,
+    lease_id: `klease_${'c'.repeat(32)}`, previous_expires_at: '2026-07-11T00:01:03Z',
+    renewed_at: '2026-07-11T00:00:30Z', lease_expires_at: '2026-07-11T00:02:30Z', requested_duration_seconds: 120 },
+  LEASE_RELEASED: { coordination_policy_version: COORDINATION_STATE_POLICY_VERSION,
+    lease_id: `klease_${'c'.repeat(32)}`, released_at: '2026-07-11T00:00:40Z', reason_code: 'HANDOFF' },
   TASK_CREATED: {
     task_id: `kt_${'a'.repeat(24)}`, board_slug_hash: HASH_A, kanban_card_id_hash: HASH_B,
     source_identity_hash: HASH_B, initial_card_snapshot_hash: HASH_A, authority_ceiling: 'A1',
@@ -76,7 +90,7 @@ function eventHashEnvelope(payload = EVENT_PAYLOADS.CARD_SCORED, overrides = {})
     event_id: `ke_${'a'.repeat(24)}`, task_id: `kt_${'b'.repeat(24)}`, sequence: 2,
     event_type: 'CARD_SCORED', event_version: 1, occurred_at: '2026-07-11T00:00:01Z',
     actor_type: 'fixture', actor_id_hash: HASH_A, worker_id: 'fixture-worker', authority_level: 'A1',
-    fencing_token: null, payload_json: validated.payloadJson, payload_hash: validated.payloadHash,
+    fencing_token: null, lease_id: null, payload_json: validated.payloadJson, payload_hash: validated.payloadHash,
     idempotency_key: 'event-envelope-1', previous_event_id: null, previous_event_hash: null,
     policy_version: 'fixture-policy.v1', correlation_id: 'fixture-correlation', redaction_class: 'internal',
     ...overrides,
@@ -88,6 +102,13 @@ function initializedTask(label = 'flow', overrides = {}) {
   initStore({ storePath });
   const result = createTask(baseTask(storePath, overrides));
   return { storePath, taskId: result.task.task_id, task: result.task, event: result.event, result };
+}
+
+function claimableTask(label = 'claimable', overrides = {}) {
+  const initialized = initializedTask(label, overrides);
+  appendEvent(eventInput(initialized.storePath, initialized.taskId, 'CARD_ELIGIBILITY_EVALUATED', 1));
+  appendEvent(eventInput(initialized.storePath, initialized.taskId, 'CARD_SCORED', 2));
+  return initialized;
 }
 
 function storeRows(storePath) {
@@ -145,7 +166,7 @@ function appendNormalSeven(storePath, taskId) {
 
 const EVENT_SECURITY_FIELDS = [
   'event_id', 'task_id', 'sequence', 'event_type', 'event_version', 'occurred_at', 'actor_type', 'actor_id_hash',
-  'worker_id', 'authority_level', 'fencing_token', 'payload_json', 'payload_hash', 'idempotency_key',
+  'worker_id', 'authority_level', 'fencing_token', 'lease_id', 'payload_json', 'payload_hash', 'idempotency_key',
   'previous_event_id', 'previous_event_hash', 'policy_version', 'correlation_id', 'redaction_class',
 ];
 
@@ -163,12 +184,12 @@ function rewriteAndRehashTaskChain(db, taskId, mutate) {
     rows[index].event_hash = attackerRehashEvent(rows[index]);
     db.prepare(`UPDATE durable_events SET
       event_id=?, event_type=?, event_version=?, occurred_at=?, actor_type=?, actor_id_hash=?, worker_id=?,
-      authority_level=?, fencing_token=?, payload_json=?, payload_hash=?, idempotency_key=?, previous_event_id=?,
+      authority_level=?, fencing_token=?, lease_id=?, payload_json=?, payload_hash=?, idempotency_key=?, previous_event_id=?,
       previous_event_hash=?, event_hash=?, policy_version=?, correlation_id=?, redaction_class=?
       WHERE task_id=? AND sequence=?`).run(
       rows[index].event_id, rows[index].event_type, rows[index].event_version, rows[index].occurred_at,
       rows[index].actor_type, rows[index].actor_id_hash, rows[index].worker_id, rows[index].authority_level,
-      rows[index].fencing_token, rows[index].payload_json, rows[index].payload_hash, rows[index].idempotency_key,
+      rows[index].fencing_token, rows[index].lease_id, rows[index].payload_json, rows[index].payload_hash, rows[index].idempotency_key,
       rows[index].previous_event_id, rows[index].previous_event_hash, rows[index].event_hash,
       rows[index].policy_version, rows[index].correlation_id, rows[index].redaction_class,
       taskId, rows[index].sequence,
@@ -189,12 +210,12 @@ function insertRawTask(db, row) {
 function insertRawEvent(db, row) {
   db.prepare(`INSERT INTO durable_events (
     event_id, task_id, sequence, event_type, event_version, occurred_at, actor_type, actor_id_hash,
-    worker_id, authority_level, fencing_token, payload_json, payload_hash, idempotency_key,
+    worker_id, authority_level, fencing_token, lease_id, payload_json, payload_hash, idempotency_key,
     previous_event_id, previous_event_hash, event_hash, policy_version, correlation_id, redaction_class
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    ...EVENT_SECURITY_FIELDS.slice(0, 16).map((key) => row[key]),
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    ...EVENT_SECURITY_FIELDS.slice(0, 17).map((key) => row[key]),
     row.event_hash,
-    ...EVENT_SECURITY_FIELDS.slice(16).map((key) => row[key]),
+    ...EVENT_SECURITY_FIELDS.slice(17).map((key) => row[key]),
   );
 }
 
@@ -299,13 +320,37 @@ describe('schema and SQLite safety', () => {
     const storePath = tempStore('schema'); initStore({ storePath });
     const db = new DatabaseSync(storePath);
     const tables = db.prepare("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name").all().map((row) => row.name);
-    expect(tables).toEqual(['durable_events', 'durable_tasks', 'store_meta']);
+    expect(tables).toEqual(['durable_events', 'durable_task_coordination', 'durable_tasks', 'store_meta']);
     expect(db.prepare("SELECT value FROM store_meta WHERE key='schema_version'").get().value).toBe(STORE_SCHEMA_VERSION);
-    expect(Number(db.prepare('PRAGMA user_version').get().user_version)).toBe(1);
+    expect(Number(db.prepare('PRAGMA user_version').get().user_version)).toBe(2);
     const sql = db.prepare("SELECT sql FROM sqlite_schema WHERE type='table' AND name='durable_events'").get().sql;
     expect(sql).toContain('UNIQUE(task_id, sequence)');
     expect(sql).toContain('UNIQUE(task_id, idempotency_key)');
     db.close();
+  });
+  test.each([
+    ['released_at without release_reason_code', "released_at='2026-07-11T00:00:20Z'"],
+    ['release_reason_code without released_at', "release_reason_code='HANDOFF'"],
+  ])('coordination schema CHECK rejects %s', (_label, assignment) => {
+    const current = claimableTask(`schema-release-coupling-${_label.replaceAll(' ', '-')}`);
+    claimTaskLease({
+      storePath: current.storePath, taskId: current.taskId, claimantIdHash: HASH_A,
+      workerSessionId: 'kws_schema0001', durationSeconds: 30, idempotencyKey: 'schema-claim-1', authorityLevel: 'A0',
+    }, { clock: () => '2026-07-11T00:00:10Z' });
+    const beforeRows = storeRows(current.storePath);
+    const beforeLease = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:20Z',
+    });
+    const db = new DatabaseSync(current.storePath);
+    try {
+      expect(() => db.prepare(`UPDATE durable_task_coordination SET ${assignment} WHERE task_id=?`).run(current.taskId))
+        .toThrow(/CHECK constraint failed/);
+    } finally { db.close(); }
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    expect(readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:20Z',
+    })).toEqual(beforeLease);
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 4 });
   });
   test('foreign keys are active and safety pragmas are configured on runtime connections', () => {
     const { storePath } = initializedTask('pragmas');
@@ -469,6 +514,21 @@ describe('append-only events, versions, idempotency and authority', () => {
     expect(verifyTaskChain({ storePath, taskId })).toMatchObject({ valid: true, checked_events: 1 });
     expect(storeRows(storePath).events[0].event_id).toBe(initialEvent.event_id);
   });
+  test.each(['CARD_CLAIMED', 'LEASE_RENEWED', 'LEASE_RELEASED'])(
+    'generic append rejects coordination event %s before any write',
+    (eventType) => {
+      const { storePath, taskId } = claimableTask(`generic-${eventType.toLowerCase().replaceAll('_', '-')}`);
+      const before = storeRows(storePath);
+      expect(() => appendEvent(eventInput(storePath, taskId, eventType, 3)))
+        .toThrow(/^COORDINATION_EVENT_REQUIRES_ATOMIC_API:/);
+      expect(storeRows(storePath)).toEqual(before);
+      const db = new DatabaseSync(storePath, { readOnly: true });
+      try {
+        expect(Number(db.prepare('SELECT count(*) AS count FROM durable_task_coordination').get().count)).toBe(0);
+      } finally { db.close(); }
+      expect(verifyTaskChain({ storePath, taskId })).toMatchObject({ valid: true, checked_events: 3 });
+    },
+  );
   test('identical event idempotency returns the existing non-initial event without append', () => {
     const { storePath, taskId } = initializedTask('event-idempotent');
     const input = eventInput(storePath, taskId, 'CARD_ELIGIBILITY_EVALUATED', 1, {
@@ -492,7 +552,7 @@ describe('append-only events, versions, idempotency and authority', () => {
   test('invalid transition, terminal append and unknown type fail closed', () => {
     const { storePath, taskId } = initializedTask('invalid-events');
     expect(() => appendEvent(eventInput(storePath, taskId, 'PLAN_CREATED', 1))).toThrow(/INVALID_EVENT_TRANSITION/);
-    expect(() => appendEvent(eventInput(storePath, taskId, 'CARD_CLAIMED', 1))).toThrow(/UNKNOWN_EVENT_TYPE/);
+    expect(() => appendEvent(eventInput(storePath, taskId, 'CARD_CLAIMED', 1))).toThrow(/COORDINATION_EVENT_REQUIRES_ATOMIC_API/);
     appendEvent(eventInput(storePath, taskId, 'CARD_ELIGIBILITY_EVALUATED', 2));
     appendEvent(eventInput(storePath, taskId, 'TASK_COMPLETED', 3));
     expect(() => appendEvent(eventInput(storePath, taskId, 'TASK_BLOCKED', 4))).toThrow(/INVALID_EVENT_TRANSITION/);
@@ -563,7 +623,6 @@ describe('canonical TASK_CREATED envelope trust binding', () => {
     ['actor_id_hash', (row) => { row.actor_id_hash = HASH_A; }],
     ['worker_id', (row) => { row.worker_id = 'forged-worker'; }],
     ['authority_level', (row) => { row.authority_level = 'A1'; }],
-    ['fencing_token', (row) => { row.fencing_token = 7; }],
     ['event_id', (row) => { row.event_id = `ke_${'f'.repeat(24)}`; }],
     ['idempotency_key', (row) => { row.idempotency_key = 'forged-initial-key'; }],
     ['occurred_at', (row) => { row.occurred_at = '2026-07-11T00:00:09Z'; }],
@@ -591,6 +650,16 @@ describe('canonical TASK_CREATED envelope trust binding', () => {
     expect(() => replayTaskState({ storePath, taskId })).toThrow(/TASK_CHAIN_INVALID/);
     expect(() => appendEvent(eventInput(storePath, taskId, 'RESEARCH_STARTED', 4)))
       .toThrow(/EXISTING_EVENT_CHAIN_INVALID/);
+  });
+
+  test('schema rejects non-coordination fencing identity before a forged chain can be stored', () => {
+    const { storePath, taskId } = initializedTask('created-forge-fencing-schema');
+    appendEvent(eventInput(storePath, taskId, 'CARD_ELIGIBILITY_EVALUATED', 2));
+    const db = new DatabaseSync(storePath);
+    expect(() => rewriteAndRehashTaskChain(db, taskId, (rows) => { rows[0].fencing_token = 7; }))
+      .toThrow(/CHECK constraint failed/);
+    db.close();
+    expect(verifyTaskChain({ storePath, taskId })).toMatchObject({ trusted: true, valid: true });
   });
 
   test('rejects forged TASK_CREATED payload identity despite full descendant-chain rehash', () => {
@@ -1564,9 +1633,9 @@ describe('C3B store snapshot, policy marker and initialization authority', () =>
       expect(initialized.filter((value) => !value)).toHaveLength(count - 1);
       const db = new DatabaseSync(storePath, { readOnly: true });
       expect(db.prepare("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name").all().map((row) => row.name))
-        .toEqual(['durable_events', 'durable_tasks', 'store_meta']);
+        .toEqual(['durable_events', 'durable_task_coordination', 'durable_tasks', 'store_meta']);
       expect(db.prepare("SELECT name FROM sqlite_schema WHERE type='index' AND sql IS NOT NULL ORDER BY name").all().map((row) => row.name))
-        .toEqual(['durable_events_task_sequence']);
+        .toEqual(['durable_events_task_sequence', 'durable_events_unique_claim_lease_id']);
       expect(db.prepare('PRAGMA integrity_check').get().integrity_check).toBe('ok');
       expect(db.prepare("SELECT key, count(*) AS count FROM store_meta GROUP BY key ORDER BY key").all())
         .toEqual([{ key: 'schema_version', count: 1 }, { key: 'state_policy_version', count: 1 }]);
@@ -2147,8 +2216,8 @@ describe('strict JSON CLI and static safety', () => {
     expect(fixture.synthetic_only).toBe(true);
     expect(fixture.flows.normal).toHaveLength(7);
     expect(Object.keys(fixture.flows)).toEqual(expect.arrayContaining(['approval_granted', 'approval_rejected', 'blocked_resumed', 'completed']));
-    expect(Object.keys(fixture.event_payloads)).toEqual(ACTIVE_EVENT_TYPES);
-    for (const eventType of ACTIVE_EVENT_TYPES) {
+    expect(Object.keys(fixture.event_payloads)).toEqual(ACTIVE_EVENT_TYPES.filter((type) => !['CARD_CLAIMED', 'LEASE_RENEWED', 'LEASE_RELEASED'].includes(type)));
+    for (const eventType of Object.keys(fixture.event_payloads)) {
       expect(() => validateEventPayload(eventType, 1, fixture.event_payloads[eventType])).not.toThrow();
       expect(EVENT_PAYLOAD_POLICIES[eventType][1]).toBeDefined();
     }
@@ -2165,5 +2234,673 @@ describe('strict JSON CLI and static safety', () => {
       expected_finding: 'PREVIOUS_EVENT_HASH_MISMATCH',
     });
     expect(JSON.stringify(fixture)).not.toMatch(/(?:token|customer|private key|chat_id|\/root\/|[A-Za-z]:\\\\)/i);
+  });
+});
+
+describe('KAN-AUT-4B atomic claim, lease and fencing behavior', () => {
+  const claimant = HASH_A;
+  const clockAt = (value) => () => value;
+  const claimInput = (storePath, taskId, overrides = {}) => ({
+    storePath, taskId, claimantIdHash: claimant, workerSessionId: 'kws_worker0001', durationSeconds: 30,
+    idempotencyKey: 'claim-request-1', authorityLevel: 'A0', ...overrides,
+  });
+  const leaseInput = (current, lease, overrides = {}) => ({
+    storePath: current.storePath, taskId: current.taskId, leaseId: lease.lease_id,
+    claimantIdHash: claimant, workerSessionId: 'kws_worker0001', fencingToken: lease.fencing_token,
+    authorityLevel: 'A0', ...overrides,
+  });
+  const expectStableError = (operation, code) => {
+    let error;
+    try { operation(); } catch (caught) { error = caught; }
+    expect(error).toMatchObject({ code, message: `${code}: ${code}` });
+    expect(error.message).not.toMatch(/(?:sqlite|\/tmp\/|kanban-autonomy-store\.sqlite)/i);
+  };
+
+  test('claims, retries exactly, renews, releases, reacquires and rejects stale fencing', () => {
+    const { storePath, taskId } = claimableTask('coord-lifecycle');
+    const firstClock = vi.fn(clockAt('2026-07-11T00:00:10Z'));
+    const first = claimTaskLease(claimInput(storePath, taskId), { clock: firstClock });
+    expect(first).toMatchObject({ claimed: true, fencing_token: 1, lease_started_at: '2026-07-11T00:00:10Z',
+      lease_expires_at: '2026-07-11T00:00:40.000Z' });
+    expect(first.lease_id).toMatch(/^klease_[a-f0-9]{32}$/);
+    expect(firstClock).toHaveBeenCalledTimes(1);
+
+    const retry = claimTaskLease(claimInput(storePath, taskId), { clock: () => { throw new Error('clock must not run'); } });
+    expect(retry).toMatchObject({ claimed: false, lease_id: first.lease_id, fencing_token: 1,
+      lease_expires_at: first.lease_expires_at, event_id: first.event_id });
+    expect(() => claimTaskLease(claimInput(storePath, taskId, { idempotencyKey: 'claim-request-new' }),
+      { clock: clockAt('2026-07-11T00:00:11Z') })).toThrow(/CLAIM_CONFLICT_ACTIVE_LEASE/);
+
+    const renewed = renewTaskLease({ storePath, taskId, leaseId: first.lease_id, claimantIdHash: claimant,
+      workerSessionId: 'kws_worker0001', fencingToken: 1, durationSeconds: 60,
+      idempotencyKey: 'renew-request-1', authorityLevel: 'A0' }, { clock: clockAt('2026-07-11T00:00:20Z') });
+    expect(renewed).toMatchObject({ renewed: true, fencing_token: 1, lease_expires_at: '2026-07-11T00:01:20.000Z' });
+    const renewRetry = renewTaskLease({ storePath, taskId, leaseId: first.lease_id, claimantIdHash: claimant,
+      workerSessionId: 'kws_worker0001', fencingToken: 1, durationSeconds: 60,
+      idempotencyKey: 'renew-request-1', authorityLevel: 'A0' }, { clock: () => { throw new Error('clock must not run'); } });
+    expect(renewRetry).toMatchObject({ renewed: false, event_id: renewed.event_id,
+      lease_expires_at: renewed.lease_expires_at });
+    expect(assertCurrentTaskFence({ storePath, taskId, leaseId: first.lease_id,
+      workerSessionId: 'kws_worker0001', fencingToken: 1, asOf: '2026-07-11T00:00:21Z' }))
+      .toMatchObject({ valid: true, ownership_only: true, execution_authority_granted: false });
+
+    const released = releaseTaskLease({ storePath, taskId, leaseId: first.lease_id, claimantIdHash: claimant,
+      workerSessionId: 'kws_worker0001', fencingToken: 1, reasonCode: 'HANDOFF',
+      idempotencyKey: 'release-request-1', authorityLevel: 'A0' }, { clock: clockAt('2026-07-11T00:00:25Z') });
+    expect(released).toMatchObject({ released: true, released_at: '2026-07-11T00:00:25Z' });
+    const releaseRetry = releaseTaskLease({ storePath, taskId, leaseId: first.lease_id, claimantIdHash: claimant,
+      workerSessionId: 'kws_worker0001', fencingToken: 1, reasonCode: 'HANDOFF',
+      idempotencyKey: 'release-request-1', authorityLevel: 'A0' }, { clock: () => { throw new Error('clock must not run'); } });
+    expect(releaseRetry).toMatchObject({ released: false, event_id: released.event_id,
+      released_at: released.released_at });
+    expect(() => releaseTaskLease({ storePath, taskId, leaseId: first.lease_id, claimantIdHash: claimant,
+      workerSessionId: 'kws_worker0001', fencingToken: 1, reasonCode: 'WORK_COMPLETE',
+      idempotencyKey: 'release-request-1', authorityLevel: 'A0' }, { clock: () => { throw new Error('clock must not run'); } }))
+      .toThrow(/EVENT_IDEMPOTENCY_CONFLICT/);
+    expect(readCurrentTaskLease({ storePath, taskId, asOf: '2026-07-11T00:00:15Z' })).toMatchObject({ status: 'active' });
+    expect(readCurrentTaskLease({ storePath, taskId, asOf: '2026-07-11T00:00:25Z' })).toMatchObject({ status: 'released' });
+    expect(() => assertCurrentTaskFence({ storePath, taskId, leaseId: first.lease_id,
+      workerSessionId: 'kws_worker0001', fencingToken: 1, asOf: '2026-07-11T00:00:26Z' })).toThrow(/LEASE_NOT_ACTIVE/);
+
+    const second = claimTaskLease(claimInput(storePath, taskId, { workerSessionId: 'kws_worker0002',
+      idempotencyKey: 'claim-request-2' }), { clock: clockAt('2026-07-11T00:00:30Z') });
+    expect(second).toMatchObject({ claimed: true, fencing_token: 2 });
+    expect(second.lease_id).not.toBe(first.lease_id);
+    expect(() => assertCurrentTaskFence({ storePath, taskId, leaseId: second.lease_id,
+      workerSessionId: 'kws_worker0002', fencingToken: 1, asOf: '2026-07-11T00:00:31Z' })).toThrow(/STALE_FENCING_TOKEN/);
+    expect(verifyStore({ storePath })).toMatchObject({ valid: true, checked_events: 7 });
+  });
+
+  test('enforces duration, eligibility, snapshot, owner, lease and exact idempotency boundaries', () => {
+    const unscored = initializedTask('coord-unscored');
+    appendEvent(eventInput(unscored.storePath, unscored.taskId, 'CARD_ELIGIBILITY_EVALUATED', 1));
+    expect(() => claimTaskLease(claimInput(unscored.storePath, unscored.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/CLAIM_EVIDENCE_EVENT_MISSING/);
+    expect(() => claimTaskLease(claimInput(unscored.storePath, unscored.taskId, { durationSeconds: 29 }),
+      { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/LEASE_DURATION_INVALID/);
+
+    const current = claimableTask('coord-errors');
+    const claimed = claimTaskLease(claimInput(current.storePath, current.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    expect(() => renewTaskLease({ storePath: current.storePath, taskId: current.taskId, leaseId: claimed.lease_id,
+      claimantIdHash: HASH_B, workerSessionId: 'kws_worker0001', fencingToken: 1, durationSeconds: 60,
+      idempotencyKey: 'renew-wrong-owner', authorityLevel: 'A0' }, { clock: clockAt('2026-07-11T00:00:20Z') }))
+      .toThrow(/LEASE_OWNER_MISMATCH/);
+    expect(() => renewTaskLease({ storePath: current.storePath, taskId: current.taskId,
+      leaseId: `klease_${'f'.repeat(32)}`, claimantIdHash: claimant, workerSessionId: 'kws_worker0001',
+      fencingToken: 1, durationSeconds: 60, idempotencyKey: 'renew-wrong-lease', authorityLevel: 'A0' },
+    { clock: clockAt('2026-07-11T00:00:20Z') })).toThrow(/LEASE_ID_MISMATCH/);
+    expect(() => assertCurrentTaskFence({ storePath: current.storePath, taskId: current.taskId,
+      leaseId: claimed.lease_id, workerSessionId: 'kws_worker9999', fencingToken: 1,
+      asOf: '2026-07-11T00:00:20Z' })).toThrow(/LEASE_OWNER_MISMATCH/);
+    expect(() => assertCurrentTaskFence({ storePath: current.storePath, taskId: current.taskId,
+      leaseId: claimed.lease_id, workerSessionId: 'kws_worker0001', asOf: '2026-07-11T00:00:20Z' }))
+      .toThrow(/FENCING_TOKEN_REQUIRED/);
+    expect(() => claimTaskLease(claimInput(current.storePath, current.taskId, { durationSeconds: 31 }),
+      { clock: () => { throw new Error('clock must not run'); } })).toThrow(/EVENT_IDEMPOTENCY_CONFLICT/);
+  });
+
+  test('rolls back event and materialization failures and detects projection tampering', () => {
+    for (const hookName of ['afterCoordinationEventInserted', 'afterCoordinationMaterialized']) {
+      const current = claimableTask(`coord-rollback-${hookName}`);
+      expect(() => claimTaskLease(claimInput(current.storePath, current.taskId), {
+        clock: clockAt('2026-07-11T00:00:10Z'), testHooks: { [hookName]() { throw new Error('injected failure'); } },
+      })).toThrow(/COORDINATION_STORE_FAILED/);
+      const db = new DatabaseSync(current.storePath, { readOnly: true });
+      expect(Number(db.prepare('SELECT count(*) AS count FROM durable_task_coordination').get().count)).toBe(0);
+      expect(Number(db.prepare('SELECT count(*) AS count FROM durable_events').get().count)).toBe(3);
+      db.close();
+    }
+    const current = claimableTask('coord-projection-tamper');
+    claimTaskLease(claimInput(current.storePath, current.taskId), { clock: clockAt('2026-07-11T00:00:10Z') });
+    const db = new DatabaseSync(current.storePath);
+    db.prepare("UPDATE durable_task_coordination SET lease_expires_at='2026-07-11T00:09:59Z'").run();
+    db.close();
+    expect(() => readCurrentTaskLease({ storePath: current.storePath, taskId: current.taskId,
+      asOf: '2026-07-11T00:00:20Z' })).toThrow(/COORDINATION_PROJECTION_MISMATCH/);
+  });
+
+  test.each([
+    ['lease_generation', "lease_generation=2"],
+    ['lease_id', `lease_id='klease_${'f'.repeat(32)}'`],
+    ['claimant_id_hash', `claimant_id_hash='${HASH_B}'`],
+    ['worker_session_id', "worker_session_id='kws_tampered1'"],
+    ['lease_started_at', "lease_started_at='2026-07-11T00:00:09Z'"],
+    ['lease_expires_at', "lease_expires_at='2026-07-11T00:09:59Z'"],
+    ['last_coordination_event_id', 'last_coordination_event_id=(SELECT event_id FROM durable_events ORDER BY sequence LIMIT 1)'],
+    ['last_coordination_event_hash', `last_coordination_event_hash='sha256:${'f'.repeat(64)}'`],
+  ])('verifyStore rejects materialized coordination tampering in %s without repairing it', (field, assignment) => {
+    const current = claimableTask(`verify-coordination-${field}`);
+    claimTaskLease(claimInput(current.storePath, current.taskId), { clock: clockAt('2026-07-11T00:00:10Z') });
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, trusted: true });
+    const db = new DatabaseSync(current.storePath);
+    db.exec(`UPDATE durable_task_coordination SET ${assignment} WHERE task_id='${current.taskId}'`);
+    const tampered = db.prepare('SELECT * FROM durable_task_coordination WHERE task_id=?').get(current.taskId);
+    db.close();
+    expect(verifyTaskChain({ storePath: current.storePath, taskId: current.taskId })).toMatchObject({ valid: true });
+    expect(replayTaskState({ storePath: current.storePath, taskId: current.taskId })).toMatchObject({ valid: true });
+    const first = verifyStore({ storePath: current.storePath });
+    const second = verifyStore({ storePath: current.storePath });
+    expect(first).toMatchObject({ valid: false, trusted: false });
+    expect(first.findings.map((item) => item.code)).toContain('COORDINATION_PROJECTION_MISMATCH');
+    expect(second).toEqual(first);
+    const after = new DatabaseSync(current.storePath, { readOnly: true });
+    expect(after.prepare('SELECT * FROM durable_task_coordination WHERE task_id=?').get(current.taskId)).toEqual(tampered);
+    after.close();
+  });
+
+  test('verifyStore rejects a missing coordination row while preserving the valid event chain', () => {
+    const current = claimableTask('verify-coordination-missing');
+    claimTaskLease(claimInput(current.storePath, current.taskId), { clock: clockAt('2026-07-11T00:00:10Z') });
+    const db = new DatabaseSync(current.storePath);
+    db.prepare('DELETE FROM durable_task_coordination WHERE task_id=?').run(current.taskId);
+    db.close();
+    expect(verifyTaskChain({ storePath: current.storePath, taskId: current.taskId })).toMatchObject({ valid: true });
+    const result = verifyStore({ storePath: current.storePath });
+    expect(result).toMatchObject({ valid: false, trusted: false });
+    expect(result.findings.map((item) => item.code)).toContain('COORDINATION_PROJECTION_MISMATCH');
+    const after = new DatabaseSync(current.storePath, { readOnly: true });
+    expect(after.prepare('SELECT * FROM durable_task_coordination WHERE task_id=?').get(current.taskId)).toBeUndefined();
+    after.close();
+  });
+
+  test('verifyStore rejects an extra coordination row for a task with no coordination history', () => {
+    const current = initializedTask('verify-coordination-extra');
+    const db = new DatabaseSync(current.storePath);
+    const firstEvent = db.prepare('SELECT event_id, event_hash FROM durable_events WHERE task_id=? ORDER BY sequence LIMIT 1')
+      .get(current.taskId);
+    db.prepare(`INSERT INTO durable_task_coordination (task_id, lease_generation, lease_id, claimant_id_hash,
+      worker_session_id, lease_started_at, lease_expires_at, released_at, release_reason_code,
+      last_coordination_event_id, last_coordination_event_hash) VALUES (?, 1, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`)
+      .run(current.taskId, `klease_${'f'.repeat(32)}`, HASH_A, 'kws_tampered1', '2026-07-11T00:00:10Z',
+        '2026-07-11T00:00:40Z', firstEvent.event_id, firstEvent.event_hash);
+    db.close();
+    expect(verifyTaskChain({ storePath: current.storePath, taskId: current.taskId })).toMatchObject({ valid: true });
+    const result = verifyStore({ storePath: current.storePath });
+    expect(result).toMatchObject({ valid: false, trusted: false });
+    expect(result.findings.map((item) => item.code)).toContain('COORDINATION_PROJECTION_MISMATCH');
+  });
+
+  test('verifyStore accepts no history with no row and compares released and expired immutable projections', () => {
+    const noHistory = initializedTask('verify-coordination-none');
+    expect(verifyStore({ storePath: noHistory.storePath })).toMatchObject({ valid: true, trusted: true });
+
+    const expired = claimableTask('verify-coordination-expired');
+    claimTaskLease(claimInput(expired.storePath, expired.taskId), { clock: clockAt('2026-07-11T00:00:10Z') });
+    expect(verifyStore({ storePath: expired.storePath })).toMatchObject({ valid: true, trusted: true });
+
+    const released = claimableTask('verify-coordination-released');
+    const claim = claimTaskLease(claimInput(released.storePath, released.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    releaseTaskLease(leaseInput(released, claim, { reasonCode: 'HANDOFF', idempotencyKey: 'release-for-verification' }),
+      { clock: clockAt('2026-07-11T00:00:20Z') });
+    expect(verifyStore({ storePath: released.storePath })).toMatchObject({ valid: true, trusted: true });
+    const db = new DatabaseSync(released.storePath);
+    db.prepare("UPDATE durable_task_coordination SET released_at='2026-07-11T00:00:21Z', release_reason_code='PAUSED'")
+      .run();
+    db.close();
+    const result = verifyStore({ storePath: released.storePath });
+    expect(result).toMatchObject({ valid: false, trusted: false });
+    expect(result.findings.map((item) => item.code)).toContain('COORDINATION_PROJECTION_MISMATCH');
+  });
+
+  test('maps actual native SQLite and forged uppercase failures to one bounded public store error', () => {
+    const expected = { code: 'COORDINATION_STORE_FAILED', message: 'COORDINATION_STORE_FAILED: COORDINATION_STORE_FAILED' };
+    const native = claimableTask('coord-native-sqlite-boundary');
+    let nativeDriverError;
+    try {
+      claimTaskLease(claimInput(native.storePath, native.taskId), {
+        clock: clockAt('2026-07-11T00:00:10Z'),
+        testHooks: { afterCoordinationEventInserted({ db }) { db.prepare('SELECT * FROM no_such_table').all(); } },
+      });
+    } catch (error) { nativeDriverError = error; }
+    expect(nativeDriverError).toMatchObject(expected);
+    expect(nativeDriverError.code).not.toMatch(/^(?:ERR_SQLITE|SQLITE_)/);
+    expect(nativeDriverError.message).not.toMatch(/(?:no_such_table|no such table|select\s|sqlite|\/tmp\/)/i);
+    expect(nativeDriverError.message.length).toBeLessThanOrEqual(96);
+
+    for (const forgedCode of ['TASK_NOT_FOUND', 'SQLITE_ERROR']) {
+      const current = claimableTask(`coord-forged-${forgedCode.toLowerCase()}`);
+      let mapped;
+      try {
+        claimTaskLease(claimInput(current.storePath, current.taskId), {
+          clock: clockAt('2026-07-11T00:00:10Z'), testHooks: {
+            afterCoordinationEventInserted() {
+              const error = new Error('raw column and database path /tmp/private-store.sqlite');
+              error.code = forgedCode;
+              throw error;
+            },
+          },
+        });
+      } catch (error) { mapped = error; }
+      expect(mapped).toMatchObject(expected);
+      expect(mapped.message).not.toMatch(/(?:column|private-store|sqlite|\/tmp\/)/i);
+      expect(storeRows(current.storePath).events).toHaveLength(3);
+    }
+  });
+
+  test('keeps trusted domain errors exact and bounds unexpected native constraint failures', () => {
+    const active = claimableTask('coord-trusted-domain-error');
+    claimTaskLease(claimInput(active.storePath, active.taskId), { clock: clockAt('2026-07-11T00:00:10Z') });
+    expectStableError(() => claimTaskLease(claimInput(active.storePath, active.taskId, {
+      idempotencyKey: 'second-active-claim',
+    }), { clock: clockAt('2026-07-11T00:00:11Z') }), 'CLAIM_CONFLICT_ACTIVE_LEASE');
+
+    const constrained = claimableTask('coord-native-constraint-boundary');
+    let mapped;
+    try {
+      claimTaskLease(claimInput(constrained.storePath, constrained.taskId), {
+        clock: clockAt('2026-07-11T00:00:10Z'), testHooks: {
+          afterCoordinationEventInserted({ db }) { db.exec('INSERT INTO durable_events DEFAULT VALUES'); },
+        },
+      });
+    } catch (error) { mapped = error; }
+    expect(mapped).toMatchObject({
+      code: 'COORDINATION_STORE_FAILED', message: 'COORDINATION_STORE_FAILED: COORDINATION_STORE_FAILED',
+    });
+    expect(mapped.message).not.toMatch(/(?:constraint|durable_events|sqlite|\/tmp\/)/i);
+    expect(mapped.message.length).toBeLessThanOrEqual(96);
+    expect(storeRows(constrained.storePath).events).toHaveLength(3);
+  });
+
+  test.each([2, 4])('serializes true %i-process same-task contention to one owner', async (count) => {
+    const current = claimableTask(`coord-contention-${count}`);
+    const moduleUrl = new URL('./kanban-autonomy-store.mjs', import.meta.url).href;
+    const childSource = `import { claimTaskLease } from ${JSON.stringify(moduleUrl)};
+      const [storePath, taskId, index] = process.argv.slice(1);
+      try { const value = claimTaskLease({ storePath, taskId, claimantIdHash: ${JSON.stringify(HASH_A)},
+        workerSessionId: 'kws_child000' + index, durationSeconds: 30, idempotencyKey: 'child-claim-' + index,
+        authorityLevel: 'A0' }, { clock: () => '2026-07-11T00:00:10Z' });
+        process.stdout.write(JSON.stringify({ ok: true, claimed: value.claimed })); }
+      catch (error) { process.stdout.write(JSON.stringify({ ok: false, code: error.code })); }`;
+    const results = await Promise.all(Array.from({ length: count }, (_, index) => new Promise((resolve) => {
+      const child = spawn(process.execPath, ['--input-type=module', '-e', childSource,
+        current.storePath, current.taskId, String(index + 1)], { env: { ...process.env, NODE_NO_WARNINGS: '1' } });
+      let stdout = '';
+      child.stdout.setEncoding('utf8'); child.stdout.on('data', (chunk) => { stdout += chunk; });
+      child.on('close', () => resolve(JSON.parse(stdout)));
+    })));
+    expect(results.filter((result) => result.ok && result.claimed)).toHaveLength(1);
+    expect(results.filter((result) => !result.ok).every((result) => result.code === 'CLAIM_CONFLICT_ACTIVE_LEASE')).toBe(true);
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 4 });
+  });
+
+  test('reacquires exactly at expiry with the next generation and an expired-takeover reason', () => {
+    const current = claimableTask('coord-expired-takeover');
+    const first = claimTaskLease(claimInput(current.storePath, current.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    expect(() => assertCurrentTaskFence({ storePath: current.storePath, taskId: current.taskId,
+      leaseId: first.lease_id, workerSessionId: 'kws_worker0001', fencingToken: 1,
+      asOf: first.lease_expires_at })).toThrow(/LEASE_EXPIRED/);
+    const second = claimTaskLease(claimInput(current.storePath, current.taskId, { workerSessionId: 'kws_worker0002',
+      idempotencyKey: 'claim-after-expiry' }), { clock: clockAt(first.lease_expires_at) });
+    expect(second).toMatchObject({ claimed: true, fencing_token: 2 });
+    const db = new DatabaseSync(current.storePath, { readOnly: true });
+    const payload = JSON.parse(db.prepare('SELECT payload_json FROM durable_events WHERE event_id=?').get(second.event_id).payload_json);
+    db.close();
+    expect(payload.claim_reason).toBe('EXPIRED_TAKEOVER');
+  });
+
+  test('rejects ineligible, mismatched-snapshot, suspended, pending-approval and caller-forged fields', () => {
+    const ineligible = initializedTask('coord-ineligible');
+    appendEvent(eventInput(ineligible.storePath, ineligible.taskId, 'CARD_ELIGIBILITY_EVALUATED', 1, { eligible: false,
+      reason_codes: ['NOT_ELIGIBLE'] }));
+    appendEvent(eventInput(ineligible.storePath, ineligible.taskId, 'CARD_SCORED', 2));
+    expect(() => claimTaskLease(claimInput(ineligible.storePath, ineligible.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/CLAIM_EVIDENCE_INELIGIBLE/);
+
+    const mismatch = initializedTask('coord-snapshot-mismatch');
+    appendEvent(eventInput(mismatch.storePath, mismatch.taskId, 'CARD_ELIGIBILITY_EVALUATED', 1));
+    appendEvent(eventInput(mismatch.storePath, mismatch.taskId, 'CARD_SCORED', 2, { card_snapshot_hash: HASH_B }));
+    expect(() => claimTaskLease(claimInput(mismatch.storePath, mismatch.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/CLAIM_EVIDENCE_SNAPSHOT_MISMATCH/);
+
+    const suspended = claimableTask('coord-suspended');
+    appendEvent(eventInput(suspended.storePath, suspended.taskId, 'TASK_PAUSED', 3));
+    expect(() => claimTaskLease(claimInput(suspended.storePath, suspended.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/CLAIM_STATE_INVALID/);
+
+    const pending = initializedTask('coord-pending');
+    appendNormalSeven(pending.storePath, pending.taskId);
+    expect(() => claimTaskLease(claimInput(pending.storePath, pending.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/CLAIM_STATE_INVALID/);
+    const safe = claimableTask('coord-forged-input');
+    expect(() => claimTaskLease(claimInput(safe.storePath, safe.taskId, { leaseId: `klease_${'f'.repeat(32)}` }),
+      { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/INVALID_FIELD/);
+    expect(() => claimTaskLease(claimInput(safe.storePath, safe.taskId, { selectionBasisHash: HASH_B }),
+      { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/INVALID_FIELD/);
+    expect(() => claimTaskLease(claimInput(safe.storePath, safe.taskId, { workerSessionId: 'raw/host/path' }),
+      { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/INVALID_FIELD/);
+  });
+
+  test('maps an actual competing immediate transaction to STORE_BUSY without mutation', () => {
+    const current = claimableTask('coord-store-busy');
+    const blocker = new DatabaseSync(current.storePath);
+    blocker.exec('BEGIN IMMEDIATE');
+    try {
+      expect(() => claimTaskLease(claimInput(current.storePath, current.taskId),
+        { clock: clockAt('2026-07-11T00:00:10Z') })).toThrow(/STORE_BUSY/);
+    } finally {
+      blocker.exec('ROLLBACK'); blocker.close();
+    }
+    expect(storeRows(current.storePath).events).toHaveLength(3);
+  });
+
+  test('allows parallel claims for different tasks while preserving both chains', async () => {
+    const first = claimableTask('coord-distinct-tasks');
+    const secondCreated = createTask(baseTask(first.storePath, { kanbanCardId: 'fixture-card-two',
+      idempotencyKey: 'task-create-two' }));
+    const secondId = secondCreated.task.task_id;
+    appendEvent(eventInput(first.storePath, secondId, 'CARD_ELIGIBILITY_EVALUATED', 1));
+    appendEvent(eventInput(first.storePath, secondId, 'CARD_SCORED', 2));
+    const moduleUrl = new URL('./kanban-autonomy-store.mjs', import.meta.url).href;
+    const childSource = `import { claimTaskLease } from ${JSON.stringify(moduleUrl)};
+      const [storePath, taskId, index] = process.argv.slice(1);
+      try { claimTaskLease({ storePath, taskId, claimantIdHash: ${JSON.stringify(HASH_A)},
+        workerSessionId: 'kws_distinct0' + index, durationSeconds: 30, idempotencyKey: 'distinct-claim-' + index,
+        authorityLevel: 'A0' }, { clock: () => '2026-07-11T00:00:10Z' }); process.stdout.write('OK'); }
+      catch (error) { process.stdout.write(error.code || 'ERROR'); }`;
+    const taskIds = [first.taskId, secondId];
+    const results = await Promise.all(taskIds.map((taskId, index) => new Promise((resolve) => {
+      const child = spawn(process.execPath, ['--input-type=module', '-e', childSource, first.storePath, taskId,
+        String(index + 1)], { env: { ...process.env, NODE_NO_WARNINGS: '1' } });
+      let stdout = ''; child.stdout.setEncoding('utf8'); child.stdout.on('data', (chunk) => { stdout += chunk; });
+      child.on('close', () => resolve(stdout));
+    })));
+    expect(results).toEqual(['OK', 'OK']);
+    expect(verifyStore({ storePath: first.storePath })).toMatchObject({ valid: true, checked_tasks: 2, checked_events: 8 });
+  });
+
+  test.each([
+    ['wrong worker session', { workerSessionId: 'kws_worker9999', idempotencyKey: 'renew-wrong-worker' }, 'LEASE_OWNER_MISMATCH'],
+  ])('renewal rejects %s with a stable error and no mutation', (label, overrides, code) => {
+    const current = claimableTask(`renew-negative-${label.replaceAll(' ', '-')}`);
+    const claimed = claimTaskLease(claimInput(current.storePath, current.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    const beforeRows = storeRows(current.storePath);
+    const beforeLease = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:20Z',
+    });
+    expectStableError(() => renewTaskLease(leaseInput(current, claimed, {
+      durationSeconds: 60, ...overrides,
+    }), { clock: clockAt('2026-07-11T00:00:20Z') }), code);
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    expect(readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:20Z',
+    })).toEqual(beforeLease);
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 4 });
+  });
+
+  test('renewal rejects a genuinely stale fence from an earlier lease generation', () => {
+    const current = claimableTask('renew-stale-historical-fence');
+    const first = claimTaskLease(claimInput(current.storePath, current.taskId, {
+      idempotencyKey: 'claim-before-stale-renew',
+    }), { clock: clockAt('2026-07-11T00:00:10Z') });
+    releaseTaskLease(leaseInput(current, first, {
+      reasonCode: 'HANDOFF', idempotencyKey: 'release-before-stale-renew',
+    }), { clock: clockAt('2026-07-11T00:00:11Z') });
+    const second = claimTaskLease(claimInput(current.storePath, current.taskId, {
+      idempotencyKey: 'claim-current-for-stale-renew',
+    }), { clock: clockAt('2026-07-11T00:00:12Z') });
+    expect(second.fencing_token).toBe(2);
+    const beforeRows = storeRows(current.storePath);
+    const beforeLease = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:15Z',
+    });
+    expectStableError(() => renewTaskLease(leaseInput(current, second, {
+      fencingToken: first.fencing_token, durationSeconds: 60, idempotencyKey: 'renew-with-stale-fence',
+    }), { clock: clockAt('2026-07-11T00:00:15Z') }), 'STALE_FENCING_TOKEN');
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    expect(readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:15Z',
+    })).toEqual(beforeLease);
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 6 });
+  });
+
+  test('renewal rejects the exact lease-expiry instant with no mutation', () => {
+    const current = claimableTask('renew-at-exact-expiry');
+    const claimed = claimTaskLease(claimInput(current.storePath, current.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    const beforeRows = storeRows(current.storePath);
+    expectStableError(() => renewTaskLease(leaseInput(current, claimed, {
+      durationSeconds: 60, idempotencyKey: 'renew-at-expiry',
+    }), { clock: clockAt(claimed.lease_expires_at) }), 'LEASE_EXPIRED');
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    expect(readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: claimed.lease_expires_at,
+    })).toMatchObject({ status: 'expired', lease_id: claimed.lease_id, fencing_token: 1 });
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 4 });
+  });
+
+  test.each([
+    ['earlier', '2026-07-11T00:00:20Z'],
+    ['equal', '2026-07-11T00:00:40Z'],
+  ])('renewal rejects a new expiry that is %s to the previous expiry', (label, now) => {
+    const current = claimableTask(`renew-not-extended-${label}`);
+    const claimed = claimTaskLease(claimInput(current.storePath, current.taskId, { durationSeconds: 60 }),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    const beforeRows = storeRows(current.storePath);
+    const beforeLease = readCurrentTaskLease({ storePath: current.storePath, taskId: current.taskId, asOf: now });
+    expectStableError(() => renewTaskLease(leaseInput(current, claimed, {
+      durationSeconds: 30, idempotencyKey: `renew-not-extended-${label}`,
+    }), { clock: clockAt(now) }), 'LEASE_RENEWAL_NOT_EXTENDED');
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    expect(readCurrentTaskLease({ storePath: current.storePath, taskId: current.taskId, asOf: now })).toEqual(beforeLease);
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 4 });
+  });
+
+  test.each([
+    ['wrong claimant', { claimantIdHash: HASH_B, idempotencyKey: 'release-wrong-claimant' }, 'LEASE_OWNER_MISMATCH'],
+    ['wrong worker session', { workerSessionId: 'kws_worker9999', idempotencyKey: 'release-wrong-worker' }, 'LEASE_OWNER_MISMATCH'],
+    ['wrong lease ID', { leaseId: `klease_${'f'.repeat(32)}`, idempotencyKey: 'release-wrong-lease' }, 'LEASE_ID_MISMATCH'],
+  ])('release rejects %s with a stable error and no mutation', (label, overrides, code) => {
+    const current = claimableTask(`release-negative-${label.replaceAll(' ', '-')}`);
+    const claimed = claimTaskLease(claimInput(current.storePath, current.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    const beforeRows = storeRows(current.storePath);
+    const beforeLease = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:20Z',
+    });
+    expectStableError(() => releaseTaskLease(leaseInput(current, claimed, {
+      reasonCode: 'HANDOFF', ...overrides,
+    }), { clock: clockAt('2026-07-11T00:00:20Z') }), code);
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    expect(readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:20Z',
+    })).toEqual(beforeLease);
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 4 });
+  });
+
+  test('release rejects a genuinely stale fence from an earlier lease generation', () => {
+    const current = claimableTask('release-stale-historical-fence');
+    const first = claimTaskLease(claimInput(current.storePath, current.taskId, {
+      idempotencyKey: 'claim-before-stale-release',
+    }), { clock: clockAt('2026-07-11T00:00:10Z') });
+    releaseTaskLease(leaseInput(current, first, {
+      reasonCode: 'HANDOFF', idempotencyKey: 'release-before-stale-release',
+    }), { clock: clockAt('2026-07-11T00:00:11Z') });
+    const second = claimTaskLease(claimInput(current.storePath, current.taskId, {
+      idempotencyKey: 'claim-current-for-stale-release',
+    }), { clock: clockAt('2026-07-11T00:00:12Z') });
+    expect(second.fencing_token).toBe(2);
+    const beforeRows = storeRows(current.storePath);
+    const beforeLease = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:15Z',
+    });
+    expectStableError(() => releaseTaskLease(leaseInput(current, second, {
+      fencingToken: first.fencing_token, reasonCode: 'HANDOFF', idempotencyKey: 'release-with-stale-fence',
+    }), { clock: clockAt('2026-07-11T00:00:15Z') }), 'STALE_FENCING_TOKEN');
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    expect(readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:15Z',
+    })).toEqual(beforeLease);
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 6 });
+  });
+
+  test('exact release retry is clock-free, idempotent and performs no extra write', () => {
+    const current = claimableTask('release-exact-retry-direct');
+    const claimed = claimTaskLease(claimInput(current.storePath, current.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    const input = leaseInput(current, claimed, { reasonCode: 'HANDOFF', idempotencyKey: 'release-exact-retry-direct' });
+    const released = releaseTaskLease(input, { clock: clockAt('2026-07-11T00:00:20Z') });
+    const afterFirst = storeRows(current.storePath);
+    const retry = releaseTaskLease(input, { clock: () => { throw new Error('clock must not run'); } });
+    expect(retry).toMatchObject({ released: false, event_id: released.event_id, released_at: released.released_at });
+    expect(storeRows(current.storePath)).toEqual(afterFirst);
+    expect(readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:21Z',
+    })).toMatchObject({ status: 'released', released_at: released.released_at, release_reason: 'HANDOFF' });
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 5 });
+  });
+
+  test('different-key release after release fails without an extra write', () => {
+    const current = claimableTask('release-different-key-after-release');
+    const claimed = claimTaskLease(claimInput(current.storePath, current.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    releaseTaskLease(leaseInput(current, claimed, {
+      reasonCode: 'HANDOFF', idempotencyKey: 'release-first-key',
+    }), { clock: clockAt('2026-07-11T00:00:20Z') });
+    const beforeRows = storeRows(current.storePath);
+    const beforeLease = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:21Z',
+    });
+    expectStableError(() => releaseTaskLease(leaseInput(current, claimed, {
+      reasonCode: 'HANDOFF', idempotencyKey: 'release-different-key',
+    }), { clock: clockAt('2026-07-11T00:00:21Z') }), 'LEASE_NOT_ACTIVE');
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    expect(readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:21Z',
+    })).toEqual(beforeLease);
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 5 });
+  });
+
+  test.each(['completed', 'rejected'])('claim directly rejects terminal %s state without coordination mutation', (state) => {
+    let current;
+    if (state === 'completed') {
+      current = claimableTask('terminal-completed-direct');
+      appendEvent(eventInput(current.storePath, current.taskId, 'TASK_COMPLETED', 3));
+    } else {
+      current = initializedTask('terminal-rejected-direct');
+      appendNormalSeven(current.storePath, current.taskId);
+      appendEvent(eventInput(current.storePath, current.taskId, 'APPROVAL_REJECTED', 8));
+    }
+    expect(taskStatus({ storePath: current.storePath, taskId: current.taskId }).reconstructed_state).toBe(state);
+    const beforeRows = storeRows(current.storePath);
+    expectStableError(() => claimTaskLease(claimInput(current.storePath, current.taskId, {
+      idempotencyKey: `claim-terminal-${state}`,
+    }), { clock: clockAt('2026-07-11T00:00:10Z') }), 'CLAIM_STATE_INVALID');
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    expect(readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:10Z',
+    })).toMatchObject({ status: 'none' });
+    const db = new DatabaseSync(current.storePath, { readOnly: true });
+    try {
+      expect(Number(db.prepare('SELECT count(*) AS count FROM durable_task_coordination').get().count)).toBe(0);
+    } finally { db.close(); }
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true });
+  });
+
+  test('three sequential claim generations are monotonic and never reuse lease IDs', () => {
+    const current = claimableTask('three-generation-non-reuse');
+    const first = claimTaskLease(claimInput(current.storePath, current.taskId, {
+      idempotencyKey: 'claim-generation-1',
+    }), { clock: clockAt('2026-07-11T00:00:10Z') });
+    const firstGeneration = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:10Z',
+    }).lease_generation;
+    releaseTaskLease(leaseInput(current, first, {
+      reasonCode: 'HANDOFF', idempotencyKey: 'release-generation-1',
+    }), { clock: clockAt('2026-07-11T00:00:11Z') });
+    const second = claimTaskLease(claimInput(current.storePath, current.taskId, {
+      idempotencyKey: 'claim-generation-2',
+    }), { clock: clockAt('2026-07-11T00:00:12Z') });
+    const secondGeneration = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:12Z',
+    }).lease_generation;
+    releaseTaskLease(leaseInput(current, second, {
+      reasonCode: 'HANDOFF', idempotencyKey: 'release-generation-2',
+    }), { clock: clockAt('2026-07-11T00:00:13Z') });
+    const third = claimTaskLease(claimInput(current.storePath, current.taskId, {
+      idempotencyKey: 'claim-generation-3',
+    }), { clock: clockAt('2026-07-11T00:00:14Z') });
+    const thirdGeneration = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:14Z',
+    }).lease_generation;
+    const claims = [first, second, third];
+    expect([firstGeneration, secondGeneration, thirdGeneration]).toEqual([1, 2, 3]);
+    expect(claims.map((item) => item.fencing_token)).toEqual([1, 2, 3]);
+    expect(claims.map((item) => item.lease_id)).toHaveLength(3);
+    expect(new Set(claims.map((item) => item.lease_id)).size).toBe(3);
+    expect(third.lease_id).not.toBe(first.lease_id);
+    expectStableError(() => assertCurrentTaskFence({
+      storePath: current.storePath, taskId: current.taskId, leaseId: third.lease_id,
+      workerSessionId: 'kws_worker0001', fencingToken: first.fencing_token, asOf: '2026-07-11T00:00:15Z',
+    }), 'STALE_FENCING_TOKEN');
+    const db = new DatabaseSync(current.storePath, { readOnly: true });
+    let durableClaims;
+    let materialized;
+    try {
+      durableClaims = db.prepare("SELECT lease_id, fencing_token, payload_json FROM durable_events WHERE task_id=? AND event_type='CARD_CLAIMED' ORDER BY sequence").all(current.taskId);
+      materialized = db.prepare('SELECT * FROM durable_task_coordination WHERE task_id=?').get(current.taskId);
+    } finally { db.close(); }
+    expect(durableClaims.map((item) => item.fencing_token)).toEqual([1, 2, 3]);
+    expect(durableClaims.map((item) => item.lease_id)).toEqual(claims.map((item) => item.lease_id));
+    expect(durableClaims.map((item) => JSON.parse(item.payload_json).claim_reason))
+      .toEqual(['INITIAL', 'REACQUIRED_AFTER_RELEASE', 'REACQUIRED_AFTER_RELEASE']);
+    const replayed = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:15Z',
+    });
+    expect(replayed).toMatchObject({ status: 'active', lease_generation: 3, fencing_token: 3, lease_id: third.lease_id });
+    expect(materialized).toMatchObject({ lease_generation: 3, lease_id: third.lease_id,
+      last_coordination_event_id: replayed.last_coordination_event_id });
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 8 });
+  });
+
+  test.each([
+    ['renewal', 'afterCoordinationEventInserted'],
+    ['renewal', 'afterCoordinationMaterialized'],
+    ['release', 'afterCoordinationEventInserted'],
+    ['release', 'afterCoordinationMaterialized'],
+  ])('%s rolls back an injected %s failure and remains retryable', (kind, hookName) => {
+    const current = claimableTask(`rollback-${kind}-${hookName}`);
+    const claimed = claimTaskLease(claimInput(current.storePath, current.taskId),
+      { clock: clockAt('2026-07-11T00:00:10Z') });
+    const input = leaseInput(current, claimed, kind === 'renewal'
+      ? { durationSeconds: 30, idempotencyKey: `rollback-renew-${hookName}` }
+      : { reasonCode: 'HANDOFF', idempotencyKey: `rollback-release-${hookName}` });
+    const operation = kind === 'renewal' ? renewTaskLease : releaseTaskLease;
+    const beforeRows = storeRows(current.storePath);
+    const beforeLease = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:20Z',
+    });
+    expectStableError(() => operation(input, {
+      clock: clockAt('2026-07-11T00:00:20Z'),
+      testHooks: { [hookName]() { throw new Error('synthetic rollback injection'); } },
+    }), 'COORDINATION_STORE_FAILED');
+    expect(storeRows(current.storePath)).toEqual(beforeRows);
+    const afterFailure = readCurrentTaskLease({
+      storePath: current.storePath, taskId: current.taskId, asOf: '2026-07-11T00:00:20Z',
+    });
+    expect(afterFailure).toEqual(beforeLease);
+    expect(afterFailure).toMatchObject({ status: 'active', lease_expires_at: claimed.lease_expires_at,
+      released_at: null, release_reason: null, last_coordination_event_id: claimed.event_id });
+    expect(assertCurrentTaskFence({
+      storePath: current.storePath, taskId: current.taskId, leaseId: claimed.lease_id,
+      workerSessionId: 'kws_worker0001', fencingToken: claimed.fencing_token, asOf: '2026-07-11T00:00:20Z',
+    })).toMatchObject({ valid: true, ownership_only: true, execution_authority_granted: false });
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 4 });
+    const retried = operation(input, { clock: clockAt('2026-07-11T00:00:20Z') });
+    expect(retried).toMatchObject(kind === 'renewal' ? { renewed: true } : { released: true });
+    expect(verifyStore({ storePath: current.storePath })).toMatchObject({ valid: true, checked_events: 5 });
+  });
+});
+
+describe('KAN-AUT-4B RED atomic coordination store', () => {
+  test('exposes schema v2 and specialized atomic lease APIs', () => {
+    expect(STORE_SCHEMA_VERSION).toBe('kanban_autonomy_store.v2');
+    expect(storeModule.STORE_USER_VERSION).toBe(2);
+    for (const name of ['claimTaskLease', 'renewTaskLease', 'releaseTaskLease', 'readCurrentTaskLease', 'assertCurrentTaskFence']) {
+      expect(typeof storeModule[name], name).toBe('function');
+    }
   });
 });

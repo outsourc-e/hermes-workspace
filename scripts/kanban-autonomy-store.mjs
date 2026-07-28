@@ -7,14 +7,14 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ACTIVE_EVENT_TYPES, JSON_LIMITS, STATE_POLICY_VERSION, SUPPORTED_EVENT_VERSIONS, assertSha256Hash, assertWellFormedUnicodeString,
-  authorityWithinCeiling, canonicalJson, compareStrictUtc, durableTaskId, isActiveEventType, normalizeBoardSlug, normalizeStableId, parseStrictBoundedJson, parseStrictUtc,
-  projectTaskStateToKanban, reduceTaskState, sha256Hex, validateBoundedJsonValue, validateEventPayload,
+  ACTIVE_EVENT_TYPES, COORDINATION_STATE_POLICY_VERSION, JSON_LIMITS, STATE_POLICY_VERSION, SUPPORTED_EVENT_VERSIONS, assertSha256Hash, assertWellFormedUnicodeString,
+  authorityWithinCeiling, canonicalJson, compareStrictUtc, deriveClaimSelectionBasis, durableTaskId, isActiveEventType, normalizeBoardSlug, normalizeStableId, parseStrictBoundedJson, parseStrictUtc,
+  projectTaskStateToKanban, projectCoordinationAt, replayTask, reduceTaskState, sha256Hex, validateBoundedJsonValue, validateEventPayload,
   validateEventVersion,
 } from './kanban-autonomy-state.mjs';
 
-export const STORE_SCHEMA_VERSION = 'kanban_autonomy_store.v1';
-export const STORE_USER_VERSION = 1;
+export const STORE_SCHEMA_VERSION = 'kanban_autonomy_store.v2';
+export const STORE_USER_VERSION = 2;
 export const STORE_DIRECTORY_PREFIX = 'hermes-kan-autonomy-';
 export const STORE_DATABASE_NAME = 'kanban-autonomy.db';
 export const MAX_PAYLOAD_BYTES = JSON_LIMITS.MAX_JSON_INPUT_BYTES;
@@ -39,10 +39,15 @@ const SIDE_EFFECTS = Object.freeze({
   timer_changes: false,
 });
 
+class TrustedDomainError extends Error {
+  constructor(code, message = code) {
+    super(`${code}: ${message}`);
+    this.code = code;
+  }
+}
+
 function codedError(code, message = code) {
-  const error = new Error(`${code}: ${message}`);
-  error.code = code;
-  throw error;
+  throw new TrustedDomainError(code, message);
 }
 
 function boundedText(value, field, maximum, pattern = /^[\x20-\x7e]+$/) {
@@ -420,6 +425,7 @@ CREATE TABLE durable_events (
   worker_id TEXT CHECK(worker_id IS NULL OR length(worker_id) BETWEEN 1 AND 128),
   authority_level TEXT NOT NULL CHECK(authority_level IN ('A0','A1','A2','A3','A4','A5','A6')),
   fencing_token INTEGER CHECK(fencing_token IS NULL OR fencing_token >= 0),
+  lease_id TEXT CHECK(lease_id IS NULL OR (length(lease_id) BETWEEN 8 AND 80 AND lease_id LIKE 'klease_%')),
   payload_json TEXT NOT NULL CHECK(length(payload_json) <= ${MAX_PAYLOAD_BYTES}),
   payload_hash TEXT NOT NULL CHECK(length(payload_hash) = 71),
   idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128),
@@ -429,10 +435,31 @@ CREATE TABLE durable_events (
   policy_version TEXT NOT NULL CHECK(length(policy_version) BETWEEN 1 AND 128),
   correlation_id TEXT CHECK(correlation_id IS NULL OR length(correlation_id) BETWEEN 1 AND 128),
   redaction_class TEXT NOT NULL CHECK(length(redaction_class) BETWEEN 1 AND 64),
+  CHECK((event_type IN ('CARD_CLAIMED','LEASE_RENEWED','LEASE_RELEASED')
+    AND fencing_token IS NOT NULL AND fencing_token >= 1 AND lease_id IS NOT NULL
+    AND actor_id_hash IS NOT NULL AND worker_id IS NOT NULL)
+    OR (event_type NOT IN ('CARD_CLAIMED','LEASE_RENEWED','LEASE_RELEASED')
+      AND fencing_token IS NULL AND lease_id IS NULL)),
   UNIQUE(task_id, sequence),
   UNIQUE(task_id, idempotency_key)
 ) STRICT;
 CREATE INDEX durable_events_task_sequence ON durable_events(task_id, sequence);
+CREATE UNIQUE INDEX durable_events_unique_claim_lease_id ON durable_events(lease_id) WHERE event_type='CARD_CLAIMED';
+CREATE TABLE durable_task_coordination (
+  task_id TEXT PRIMARY KEY REFERENCES durable_tasks(task_id),
+  lease_generation INTEGER NOT NULL CHECK(lease_generation >= 1),
+  lease_id TEXT NOT NULL UNIQUE CHECK(length(lease_id) BETWEEN 8 AND 80 AND lease_id LIKE 'klease_%'),
+  claimant_id_hash TEXT NOT NULL CHECK(length(claimant_id_hash) = 71),
+  worker_session_id TEXT NOT NULL CHECK(length(worker_session_id) BETWEEN 5 AND 80 AND worker_session_id LIKE 'kws_%'),
+  lease_started_at TEXT NOT NULL CHECK(length(lease_started_at) BETWEEN 20 AND 40),
+  lease_expires_at TEXT NOT NULL CHECK(length(lease_expires_at) BETWEEN 20 AND 40),
+  released_at TEXT CHECK(released_at IS NULL OR length(released_at) BETWEEN 20 AND 40),
+  release_reason_code TEXT CHECK(release_reason_code IS NULL OR release_reason_code IN ('WORK_COMPLETE','PAUSED','BLOCKED','HANDOFF','OPERATOR_REQUEST','WORKER_ERROR')),
+  last_coordination_event_id TEXT NOT NULL REFERENCES durable_events(event_id),
+  last_coordination_event_hash TEXT NOT NULL CHECK(length(last_coordination_event_hash) = 71),
+  CHECK((released_at IS NULL AND release_reason_code IS NULL)
+    OR (released_at IS NOT NULL AND release_reason_code IS NOT NULL))
+) STRICT;
 `;
 
 function schemaVersion(db) {
@@ -455,10 +482,16 @@ const EXPECTED_SCHEMA_COLUMNS = Object.freeze({
   durable_events: Object.freeze([
     'event_id:TEXT:1:1', 'task_id:TEXT:1:0', 'sequence:INTEGER:1:0', 'event_type:TEXT:1:0',
     'event_version:INTEGER:1:0', 'occurred_at:TEXT:1:0', 'actor_type:TEXT:1:0', 'actor_id_hash:TEXT:0:0',
-    'worker_id:TEXT:0:0', 'authority_level:TEXT:1:0', 'fencing_token:INTEGER:0:0', 'payload_json:TEXT:1:0',
+    'worker_id:TEXT:0:0', 'authority_level:TEXT:1:0', 'fencing_token:INTEGER:0:0', 'lease_id:TEXT:0:0', 'payload_json:TEXT:1:0',
     'payload_hash:TEXT:1:0', 'idempotency_key:TEXT:1:0', 'previous_event_id:TEXT:0:0',
     'previous_event_hash:TEXT:0:0', 'event_hash:TEXT:1:0', 'policy_version:TEXT:1:0',
     'correlation_id:TEXT:0:0', 'redaction_class:TEXT:1:0',
+  ]),
+  durable_task_coordination: Object.freeze([
+    'task_id:TEXT:1:1', 'lease_generation:INTEGER:1:0', 'lease_id:TEXT:1:0', 'claimant_id_hash:TEXT:1:0',
+    'worker_session_id:TEXT:1:0', 'lease_started_at:TEXT:1:0', 'lease_expires_at:TEXT:1:0',
+    'released_at:TEXT:0:0', 'release_reason_code:TEXT:0:0', 'last_coordination_event_id:TEXT:1:0',
+    'last_coordination_event_hash:TEXT:1:0',
   ]),
 });
 
@@ -473,9 +506,14 @@ const EXPECTED_SCHEMA_INDEXES = Object.freeze({
   }),
   durable_events: Object.freeze({
     durable_events_task_sequence: Object.freeze({ unique: 0, origin: 'c', columns: Object.freeze(['task_id', 'sequence']) }),
+    durable_events_unique_claim_lease_id: Object.freeze({ unique: 1, origin: 'c', partial: 1, columns: Object.freeze(['lease_id']) }),
     sqlite_autoindex_durable_events_1: Object.freeze({ unique: 1, origin: 'pk', columns: Object.freeze(['event_id']) }),
     sqlite_autoindex_durable_events_2: Object.freeze({ unique: 1, origin: 'u', columns: Object.freeze(['task_id', 'sequence']) }),
     sqlite_autoindex_durable_events_3: Object.freeze({ unique: 1, origin: 'u', columns: Object.freeze(['task_id', 'idempotency_key']) }),
+  }),
+  durable_task_coordination: Object.freeze({
+    sqlite_autoindex_durable_task_coordination_1: Object.freeze({ unique: 1, origin: 'pk', columns: Object.freeze(['task_id']) }),
+    sqlite_autoindex_durable_task_coordination_2: Object.freeze({ unique: 1, origin: 'u', columns: Object.freeze(['lease_id']) }),
   }),
 });
 
@@ -485,7 +523,7 @@ function normalizedSchemaSql(value) {
 
 function expectedSchemaDefinitions() {
   return SCHEMA_SQL.split(';').map((statement) => statement.trim()).filter(Boolean).map((statement) => {
-    const match = /^CREATE\s+(TABLE|INDEX)\s+([a-z_][a-z0-9_]*)/i.exec(statement);
+    const match = /^CREATE\s+(?:UNIQUE\s+)?(TABLE|INDEX)\s+([a-z_][a-z0-9_]*)/i.exec(statement);
     if (!match) codedError('STORE_SCHEMA_PARTIAL_INITIALIZATION');
     return { type: match[1].toLowerCase(), name: match[2], sql: normalizedSchemaSql(statement) };
   }).sort((left, right) => `${left.type}:${left.name}`.localeCompare(`${right.type}:${right.name}`));
@@ -500,7 +538,7 @@ function assertSchema(db) {
   }
   const tables = db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
     .all().map((row) => row.name);
-  if (canonicalJson(tables) !== canonicalJson(['durable_events', 'durable_tasks', 'store_meta'])) {
+  if (canonicalJson(tables) !== canonicalJson(['durable_events', 'durable_task_coordination', 'durable_tasks', 'store_meta'])) {
     codedError('STORE_SCHEMA_PARTIAL_INITIALIZATION');
   }
   for (const [table, expectedColumns] of Object.entries(EXPECTED_SCHEMA_COLUMNS)) {
@@ -516,7 +554,8 @@ function assertSchema(db) {
       const expected = expectedIndexes[row.name];
       const columnsForIndex = db.prepare(`PRAGMA index_info(${row.name})`).all()
         .sort((left, right) => Number(left.seqno) - Number(right.seqno)).map((item) => item.name);
-      if (!expected || Number(row.unique) !== expected.unique || row.origin !== expected.origin || Number(row.partial) !== 0
+      if (!expected || Number(row.unique) !== expected.unique || row.origin !== expected.origin
+        || Number(row.partial) !== (expected.partial ?? 0)
         || canonicalJson(columnsForIndex) !== canonicalJson(expected.columns)) {
         codedError('STORE_SCHEMA_PARTIAL_INITIALIZATION');
       }
@@ -529,6 +568,14 @@ function assertSchema(db) {
     table: 'durable_tasks', from: 'task_id', to: 'task_id', on_update: 'NO ACTION', on_delete: 'NO ACTION', match: 'NONE',
   }];
   if (canonicalJson(foreignKeys) !== canonicalJson(expectedForeignKeys)) codedError('STORE_SCHEMA_PARTIAL_INITIALIZATION');
+  const coordinationForeignKeys = db.prepare('PRAGMA foreign_key_list(durable_task_coordination)').all().map((row) => ({
+    table: row.table, from: row.from, to: row.to, on_update: row.on_update, on_delete: row.on_delete, match: row.match,
+  })).sort((left, right) => left.from.localeCompare(right.from));
+  const expectedCoordinationForeignKeys = [
+    { table: 'durable_events', from: 'last_coordination_event_id', to: 'event_id', on_update: 'NO ACTION', on_delete: 'NO ACTION', match: 'NONE' },
+    { table: 'durable_tasks', from: 'task_id', to: 'task_id', on_update: 'NO ACTION', on_delete: 'NO ACTION', match: 'NONE' },
+  ].sort((left, right) => left.from.localeCompare(right.from));
+  if (canonicalJson(coordinationForeignKeys) !== canonicalJson(expectedCoordinationForeignKeys)) codedError('STORE_SCHEMA_PARTIAL_INITIALIZATION');
   const version = schemaVersion(db);
   const userVersion = Number(db.prepare('PRAGMA user_version').get().user_version);
   if (version !== STORE_SCHEMA_VERSION || userVersion !== STORE_USER_VERSION) codedError('UNKNOWN_SCHEMA_VERSION');
@@ -646,6 +693,7 @@ export function buildCanonicalTaskCreatedEvent({ task, eventId, idempotencyKey }
     worker_id: null,
     authority_level: 'A0',
     fencing_token: null,
+    lease_id: null,
     payload_json: payload.payloadJson,
     payload_hash: payload.payloadHash,
     idempotency_key: canonicalIds.idempotencyKey,
@@ -664,11 +712,11 @@ export function buildCanonicalTaskCreatedEvent({ task, eventId, idempotencyKey }
 function insertEventRow(db, event) {
   db.prepare(`INSERT INTO durable_events (
     event_id, task_id, sequence, event_type, event_version, occurred_at, actor_type, actor_id_hash,
-    worker_id, authority_level, fencing_token, payload_json, payload_hash, idempotency_key,
+    worker_id, authority_level, fencing_token, lease_id, payload_json, payload_hash, idempotency_key,
     previous_event_id, previous_event_hash, event_hash, policy_version, correlation_id, redaction_class
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     event.event_id, event.task_id, event.sequence, event.event_type, event.event_version, event.occurred_at,
-    event.actor_type, event.actor_id_hash, event.worker_id, event.authority_level, event.fencing_token,
+    event.actor_type, event.actor_id_hash, event.worker_id, event.authority_level, event.fencing_token, event.lease_id,
     event.payload_json, event.payload_hash, event.idempotency_key, event.previous_event_id,
     event.previous_event_hash, event.event_hash, event.policy_version, event.correlation_id, event.redaction_class,
   );
@@ -730,7 +778,8 @@ function eventFromRow(row) {
     event_id: row.event_id, task_id: row.task_id, sequence: Number(row.sequence), event_type: row.event_type,
     event_version: Number(row.event_version), occurred_at: row.occurred_at, actor_type: row.actor_type,
     actor_id_hash: row.actor_id_hash, worker_id: row.worker_id, authority_level: row.authority_level,
-    fencing_token: row.fencing_token === null ? null : Number(row.fencing_token), payload_json: row.payload_json,
+    fencing_token: row.fencing_token === null ? null : Number(row.fencing_token), lease_id: row.lease_id,
+    payload_json: row.payload_json,
     payload_hash: row.payload_hash, idempotency_key: row.idempotency_key, previous_event_id: row.previous_event_id,
     previous_event_hash: row.previous_event_hash, event_hash: row.event_hash, policy_version: row.policy_version,
     correlation_id: row.correlation_id, redaction_class: row.redaction_class,
@@ -745,7 +794,7 @@ function eventSecurityFields(event) {
 
 const EVENT_HASH_FIELDS = Object.freeze([
   'actor_id_hash', 'actor_type', 'authority_level', 'correlation_id', 'event_id', 'event_type', 'event_version',
-  'fencing_token', 'idempotency_key', 'occurred_at', 'payload_hash', 'payload_json', 'policy_version',
+  'fencing_token', 'idempotency_key', 'lease_id', 'occurred_at', 'payload_hash', 'payload_json', 'policy_version',
   'previous_event_hash', 'previous_event_id', 'redaction_class', 'sequence', 'task_id', 'worker_id',
 ]);
 
@@ -778,6 +827,7 @@ export function canonicalEventHashMaterial(eventWithoutHash) {
   if (eventWithoutHash.worker_id !== null) normalizeStableId(eventWithoutHash.worker_id, 'worker_id');
   authorityWithinCeiling(eventWithoutHash.authority_level, eventWithoutHash.authority_level);
   if (eventWithoutHash.fencing_token !== null && (!Number.isSafeInteger(eventWithoutHash.fencing_token) || eventWithoutHash.fencing_token < 0)) codedError('EVENT_HASH_ENVELOPE_INVALID');
+  if (eventWithoutHash.lease_id !== null) boundedText(eventWithoutHash.lease_id, 'lease_id', 80, /^klease_[a-f0-9]{32}$/);
   if (typeof eventWithoutHash.payload_json !== 'string') codedError('EVENT_HASH_ENVELOPE_INVALID');
   assertWellFormedUnicodeString(eventWithoutHash.payload_json, 'value');
   if (Buffer.byteLength(eventWithoutHash.payload_json, 'utf8') > MAX_PAYLOAD_BYTES) codedError('PAYLOAD_TOO_LARGE');
@@ -800,6 +850,7 @@ function eventComparable(event) {
     task_id: event.task_id, event_type: event.event_type, event_version: event.event_version,
     occurred_at: event.occurred_at, actor_type: event.actor_type, actor_id_hash: event.actor_id_hash,
     worker_id: event.worker_id, authority_level: event.authority_level, fencing_token: event.fencing_token,
+    lease_id: event.lease_id,
     payload_json: event.payload_json, payload_hash: event.payload_hash, idempotency_key: event.idempotency_key,
     policy_version: event.policy_version, correlation_id: event.correlation_id, redaction_class: event.redaction_class,
   };
@@ -823,6 +874,7 @@ function normalizedEventInput(input) {
     worker_id: input.workerId == null ? null : normalizeStableId(input.workerId, 'workerId'),
     authority_level: input.authorityLevel,
     fencing_token: input.fencingToken ?? null,
+    lease_id: input.leaseId ?? null,
     payload: payload.payload,
     payload_json: payload.payloadJson,
     payload_hash: payload.payloadHash,
@@ -838,6 +890,10 @@ function rowsForTask(db, taskId) {
 }
 
 export function appendEvent(input, { testHooks } = {}) {
+  if (['CARD_CLAIMED', 'LEASE_RENEWED', 'LEASE_RELEASED'].includes(input?.eventType)) {
+    codedError('COORDINATION_EVENT_REQUIRES_ATOMIC_API');
+  }
+  if (input?.leaseId !== undefined && input.leaseId !== null) codedError('INVALID_FIELD');
   const normalized = normalizedEventInput(input);
   if (normalized.event_type === 'TASK_CREATED') codedError('DUPLICATE_TASK_CREATED');
   const { payload, ...comparable } = normalized;
@@ -903,7 +959,7 @@ function storedPayloadFindingCode(error) {
 
 const TASK_CREATED_ENVELOPE_FIELDS = Object.freeze([
   'event_id', 'task_id', 'sequence', 'event_type', 'event_version', 'occurred_at', 'actor_type', 'actor_id_hash',
-  'worker_id', 'authority_level', 'fencing_token', 'idempotency_key', 'previous_event_id', 'previous_event_hash',
+  'worker_id', 'authority_level', 'fencing_token', 'lease_id', 'idempotency_key', 'previous_event_id', 'previous_event_hash',
   'policy_version', 'correlation_id', 'redaction_class',
 ]);
 
@@ -957,6 +1013,7 @@ export function verifyTaskChainRows({ task, rows, stopAfterFirstFatal = false })
 
   let state = null;
   let previous = null;
+  const replayRows = [];
   for (let index = 0; index < rows.length; index += 1) {
     const event = rows[index];
     const expectedSequence = index + 1;
@@ -1033,11 +1090,19 @@ export function verifyTaskChainRows({ task, rows, stopAfterFirstFatal = false })
       try {
         state = reduceTaskState(state, {
           event_id: event.event_id,
+          event_hash: event.event_hash,
           occurred_at: event.occurred_at,
           event_type: event.event_type,
           event_version: event.event_version,
+          actor_type: event.actor_type,
+          actor_id_hash: event.actor_id_hash,
+          worker_id: event.worker_id,
+          authority_level: event.authority_level,
+          fencing_token: event.fencing_token,
+          lease_id: event.lease_id,
           payload: stored.payload,
         });
+        replayRows.push({ ...event, payload: stored.payload });
       } catch (error) {
         const code = error?.code === 'EVENT_PAYLOAD_INVALID' ? 'EVENT_PAYLOAD_INVALID'
           : (typeof error?.code === 'string' && /^[A-Z0-9_]+$/.test(error.code) ? error.code : 'INVALID_EVENT_TRANSITION');
@@ -1046,6 +1111,12 @@ export function verifyTaskChainRows({ task, rows, stopAfterFirstFatal = false })
       }
     }
     previous = event;
+  }
+  if (findings.length === 0) {
+    try { replayTask(replayRows); }
+    catch (error) {
+      add(typeof error?.code === 'string' && /^[A-Z0-9_]+$/.test(error.code) ? error.code : 'COORDINATION_REPLAY_INVALID');
+    }
   }
   const valid = findings.length === 0;
   return {
@@ -1144,9 +1215,18 @@ export function verifyStore({ storePath }, { testHooks } = {}) {
         const tips = [];
         const states = {};
         const reducerStates = {};
+        const taskIds = new Set(tasks.map((task) => task.task_id));
+        const coordinationTaskIds = db.prepare('SELECT task_id FROM durable_task_coordination ORDER BY task_id').all();
+        for (const row of coordinationTaskIds) {
+          if (!taskIds.has(row.task_id)) findings.push(finding('COORDINATION_PROJECTION_MISMATCH', row.task_id));
+        }
         for (const task of tasks) {
-          const checked = verifyTaskChainRows({ task, rows: rowsForTask(db, task.task_id) });
+          const rows = rowsForTask(db, task.task_id);
+          const checked = verifyTaskChainRows({ task, rows });
           findings.push(...checked.findings);
+          if (checked.valid && !coordinationProjectionMatches(db, task.task_id, rows)) {
+            findings.push(finding('COORDINATION_PROJECTION_MISMATCH', task.task_id));
+          }
           tips.push({ task_id: task.task_id, chain_tip: checked.chainTip });
           states[task.task_id] = checked.reconstructedState;
           reducerStates[task.task_id] = checked.reducerState;
@@ -1214,6 +1294,368 @@ export function taskStatus({ storePath, taskId }, { testHooks } = {}) {
       ...SIDE_EFFECTS,
     };
   } finally { store.close(); }
+}
+
+const RELEASE_REASONS = new Set(['WORK_COMPLETE', 'PAUSED', 'BLOCKED', 'HANDOFF', 'OPERATOR_REQUEST', 'WORKER_ERROR']);
+
+function coordinationInput(input, { duration = false, fence = false, release = false } = {}) {
+  assertPlainObject(input, 'INVALID_FIELD');
+  const allowed = new Set(['storePath', 'taskId', 'claimantIdHash', 'workerSessionId', 'idempotencyKey', 'authorityLevel']);
+  if (duration) allowed.add('durationSeconds');
+  if (fence) { allowed.add('leaseId'); allowed.add('fencingToken'); }
+  if (release) allowed.add('reasonCode');
+  if (Object.keys(input).some((key) => !allowed.has(key))) codedError('INVALID_FIELD');
+  const result = {
+    storePath: input.storePath,
+    taskId: normalizeStableId(input.taskId, 'taskId'),
+    claimantIdHash: assertSha256Hash(input.claimantIdHash, 'claimantIdHash'),
+    workerSessionId: boundedText(input.workerSessionId, 'workerSessionId', 68, /^kws_[A-Za-z0-9_-]{8,64}$/),
+    idempotencyKey: boundedText(input.idempotencyKey, 'idempotencyKey', 128),
+  };
+  if (input.authorityLevel !== 'A0') codedError('AUTHORITY_CEILING_EXCEEDED');
+  if (duration) {
+    if (!Number.isSafeInteger(input.durationSeconds) || input.durationSeconds < 30 || input.durationSeconds > 900) {
+      codedError('LEASE_DURATION_INVALID');
+    }
+    result.durationSeconds = input.durationSeconds;
+  }
+  if (fence) {
+    result.leaseId = boundedText(input.leaseId, 'leaseId', 80, /^klease_[a-f0-9]{32}$/);
+    if (!Number.isSafeInteger(input.fencingToken) || input.fencingToken < 1) codedError('FENCING_TOKEN_REQUIRED');
+    result.fencingToken = input.fencingToken;
+  }
+  if (release) {
+    if (!RELEASE_REASONS.has(input.reasonCode)) codedError('INVALID_FIELD', 'reasonCode');
+    result.reasonCode = input.reasonCode;
+  }
+  return result;
+}
+
+function eventWithPayload(event) {
+  return { ...event, payload: parseStoredPayloadJson(event.payload_json).payload };
+}
+
+function immutableMaterializedCoordination(row) {
+  if (!row) return null;
+  return {
+    task_id: row.task_id, lease_generation: Number(row.lease_generation), lease_id: row.lease_id,
+    claimant_id_hash: row.claimant_id_hash, worker_session_id: row.worker_session_id,
+    lease_started_at: row.lease_started_at, lease_expires_at: row.lease_expires_at,
+    released_at: row.released_at, release_reason_code: row.release_reason_code,
+    last_coordination_event_id: row.last_coordination_event_id,
+    last_coordination_event_hash: row.last_coordination_event_hash,
+  };
+}
+
+function immutableReplayCoordination(taskId, rows) {
+  const replayRows = rows.map(eventWithPayload);
+  const materializedAsOf = rows.at(-1)?.occurred_at ?? '1970-01-01T00:00:00Z';
+  const materializedProjection = projectCoordinationAt(replayRows, materializedAsOf);
+  if (materializedProjection.status === 'none') return null;
+  return {
+    task_id: taskId, lease_generation: materializedProjection.lease_generation,
+    lease_id: materializedProjection.lease_id, claimant_id_hash: materializedProjection.claimant_id_hash,
+    worker_session_id: materializedProjection.worker_session_id,
+    lease_started_at: materializedProjection.lease_started_at,
+    lease_expires_at: materializedProjection.lease_expires_at,
+    released_at: materializedProjection.released_at,
+    release_reason_code: materializedProjection.release_reason,
+    last_coordination_event_id: materializedProjection.last_coordination_event_id,
+    last_coordination_event_hash: materializedProjection.last_coordination_event_hash,
+  };
+}
+
+function coordinationProjectionMatches(db, taskId, rows) {
+  const expected = immutableReplayCoordination(taskId, rows);
+  const actual = immutableMaterializedCoordination(
+    db.prepare('SELECT * FROM durable_task_coordination WHERE task_id=?').get(taskId),
+  );
+  return sameObject(expected, actual);
+}
+
+function verifyCoordinationProjection(db, taskId, rows, asOf) {
+  if (!coordinationProjectionMatches(db, taskId, rows)) codedError('COORDINATION_PROJECTION_MISMATCH');
+  const replayRows = rows.map(eventWithPayload);
+  return projectCoordinationAt(replayRows, asOf);
+}
+
+function clockOnce(clock) {
+  const value = (clock ?? (() => new Date().toISOString()))();
+  if (!parseStrictUtc(value)) codedError('INVALID_TIMESTAMP');
+  return value;
+}
+
+function addUtcSeconds(instant, seconds) {
+  const milliseconds = Date.parse(instant);
+  if (!Number.isFinite(milliseconds)) codedError('INVALID_TIMESTAMP');
+  return new Date(milliseconds + (seconds * 1000)).toISOString();
+}
+
+function selectionEvidence(rows, task) {
+  let creationEvent = null;
+  let eligibilityEvent = null;
+  let scoreEvent = null;
+  for (const row of rows) {
+    const event = eventWithPayload(row);
+    if (event.event_type === 'TASK_CREATED') creationEvent = event;
+    if (event.event_type === 'CARD_ELIGIBILITY_EVALUATED') eligibilityEvent = event;
+    if (event.event_type === 'CARD_SCORED') scoreEvent = event;
+  }
+  if (!creationEvent || !eligibilityEvent || !scoreEvent) codedError('CLAIM_EVIDENCE_EVENT_MISSING');
+  let derived;
+  try {
+    derived = deriveClaimSelectionBasis({ taskId: task.task_id, creationEvent, eligibilityEvent, scoreEvent });
+  } catch (error) {
+    if (error?.code === 'CLAIM_EVIDENCE_INELIGIBLE') codedError('CLAIM_EVIDENCE_INELIGIBLE');
+    if (error?.code === 'CLAIM_EVIDENCE_SNAPSHOT_MISMATCH') codedError('CLAIM_EVIDENCE_SNAPSHOT_MISMATCH');
+    throw error;
+  }
+  return {
+    eligibilityEventId: eligibilityEvent.event_id,
+    scoreEventId: scoreEvent.event_id,
+    cardSnapshotHash: derived.card_snapshot_hash,
+    selectionBasisHash: derived.selection_basis_hash,
+  };
+}
+
+function coordinationEvent({ task, rows, type, now, claimantIdHash, workerSessionId, fencingToken, leaseId,
+  idempotencyKey, payload }) {
+  const tail = rows.at(-1);
+  if (compareStrictUtc(now, tail.occurred_at) < 0) codedError('EVENT_TIMESTAMP_REGRESSION');
+  const safePayload = validatePayload(validateEventPayload(type, 1, payload));
+  const sequence = tail.sequence + 1;
+  const eventId = `ke_${sha256Hex(canonicalJson({ task_id: task.task_id, idempotency_key: idempotencyKey })).slice(0, 24)}`;
+  const withoutHash = {
+    event_id: eventId, task_id: task.task_id, sequence, event_type: type, event_version: 1,
+    occurred_at: now, actor_type: 'worker', actor_id_hash: claimantIdHash, worker_id: workerSessionId,
+    authority_level: 'A0', fencing_token: fencingToken, lease_id: leaseId,
+    payload_json: safePayload.payloadJson, payload_hash: safePayload.payloadHash, idempotency_key: idempotencyKey,
+    previous_event_id: tail.event_id, previous_event_hash: tail.event_hash, policy_version: COORDINATION_STATE_POLICY_VERSION,
+    correlation_id: null, redaction_class: 'internal',
+  };
+  return { ...withoutHash, event_hash: `sha256:${sha256Hex(canonicalEventHashMaterial(withoutHash))}` };
+}
+
+function exactCoordinationRetry(existing, normalized, type) {
+  if (!existing || existing.event_type !== type || existing.actor_id_hash !== normalized.claimantIdHash
+    || existing.worker_id !== normalized.workerSessionId || existing.authority_level !== 'A0') {
+    codedError('EVENT_IDEMPOTENCY_CONFLICT');
+  }
+  const payload = parseStoredPayloadJson(existing.payload_json).payload;
+  if (normalized.durationSeconds !== undefined && payload.requested_duration_seconds !== normalized.durationSeconds) {
+    codedError('EVENT_IDEMPOTENCY_CONFLICT');
+  }
+  if (normalized.leaseId !== undefined && (existing.lease_id !== normalized.leaseId
+    || existing.fencing_token !== normalized.fencingToken)) codedError('EVENT_IDEMPOTENCY_CONFLICT');
+  if (normalized.reasonCode !== undefined && payload.reason_code !== normalized.reasonCode) codedError('EVENT_IDEMPOTENCY_CONFLICT');
+  return { event: existing, payload };
+}
+
+function currentOwnerOrError(projection, normalized, now) {
+  if (projection.status === 'released') codedError('LEASE_NOT_ACTIVE');
+  if (projection.status === 'expired' || compareStrictUtc(now, projection.lease_expires_at) >= 0) codedError('LEASE_EXPIRED');
+  if (projection.status !== 'active') codedError('LEASE_NOT_ACTIVE');
+  if (projection.lease_id !== normalized.leaseId) codedError('LEASE_ID_MISMATCH');
+  if (projection.claimant_id_hash !== normalized.claimantIdHash || projection.worker_session_id !== normalized.workerSessionId) {
+    codedError('LEASE_OWNER_MISMATCH');
+  }
+  if (projection.fencing_token !== normalized.fencingToken) codedError('STALE_FENCING_TOKEN');
+}
+
+function mapCoordinationError(error) {
+  if (error instanceof TrustedDomainError) throw error;
+  const nativeCode = typeof error?.code === 'string' ? error.code : '';
+  if (/^(?:ERR_SQLITE_)?(?:BUSY|LOCKED)(?:_|$)/.test(nativeCode)
+    || /(?:database|sqlite).*(?:busy|locked)|(?:busy|locked).*(?:database|sqlite)/i.test(String(error?.message ?? ''))) {
+    codedError('STORE_BUSY');
+  }
+  codedError('COORDINATION_STORE_FAILED');
+}
+
+export function claimTaskLease(input, { testHooks, clock } = {}) {
+  const normalized = coordinationInput(input, { duration: true });
+  let store;
+  try {
+    store = openAnchoredTempStore({ storePath: normalized.storePath, accessMode: 'readwrite', initialize: false, testHooks });
+    const { db } = store;
+    store.beginTransaction();
+    try {
+      store.verifyAnchoredStoreIdentity('coordination-transaction');
+      assertSchema(db);
+      const task = taskFromRow(db.prepare('SELECT * FROM durable_tasks WHERE task_id=?').get(normalized.taskId));
+      if (!task) codedError('TASK_NOT_FOUND');
+      const rows = rowsForTask(db, task.task_id);
+      const checked = verifyTaskChainRows({ task, rows, stopAfterFirstFatal: true });
+      if (!checked.valid) codedError('EXISTING_EVENT_CHAIN_INVALID');
+      verifyCoordinationProjection(db, task.task_id, rows, rows.at(-1).occurred_at);
+      const existing = eventFromRow(db.prepare('SELECT * FROM durable_events WHERE task_id=? AND idempotency_key=?').get(task.task_id, normalized.idempotencyKey));
+      if (existing) {
+        const retry = exactCoordinationRetry(existing, normalized, 'CARD_CLAIMED');
+        store.commitTransaction();
+        return { claimed: false, task_id: task.task_id, lease_id: existing.lease_id,
+          fencing_token: existing.fencing_token, lease_started_at: retry.payload.lease_started_at,
+          lease_expires_at: retry.payload.lease_expires_at, event_id: existing.event_id, ...SIDE_EFFECTS };
+      }
+      const now = clockOnce(clock);
+      const prior = verifyCoordinationProjection(db, task.task_id, rows, now);
+      if (!['triaged', 'researching', 'planning'].includes(checked.reconstructedState)
+        || checked.reducerState.pending_approval || checked.reducerState.suspension || checked.reducerState.terminal) {
+        codedError('CLAIM_STATE_INVALID');
+      }
+      if (prior.status === 'active') codedError('CLAIM_CONFLICT_ACTIVE_LEASE');
+      const evidence = selectionEvidence(rows, task);
+      const generation = (prior.lease_generation ?? 0) + 1;
+      if (!Number.isSafeInteger(generation)) codedError('FENCING_TOKEN_EXHAUSTED');
+      const leaseId = `klease_${sha256Hex(canonicalJson({ domain: COORDINATION_STATE_POLICY_VERSION, task_id: task.task_id,
+        generation, claimant_id_hash: normalized.claimantIdHash, worker_session_id: normalized.workerSessionId,
+        claim_request_identity: normalized.idempotencyKey, selection_basis_hash: evidence.selectionBasisHash })).slice(0, 32)}`;
+      const expires = addUtcSeconds(now, normalized.durationSeconds);
+      const reason = prior.status === 'none' ? 'INITIAL' : prior.status === 'released' ? 'REACQUIRED_AFTER_RELEASE' : 'EXPIRED_TAKEOVER';
+      const event = coordinationEvent({ task, rows, type: 'CARD_CLAIMED', now, claimantIdHash: normalized.claimantIdHash,
+        workerSessionId: normalized.workerSessionId, fencingToken: generation, leaseId,
+        idempotencyKey: normalized.idempotencyKey, payload: {
+          coordination_policy_version: COORDINATION_STATE_POLICY_VERSION, lease_id: leaseId,
+          claimant_id_hash: normalized.claimantIdHash, worker_session_id: normalized.workerSessionId,
+          lease_started_at: now, lease_expires_at: expires, requested_duration_seconds: normalized.durationSeconds,
+          claim_reason: reason, eligibility_event_id: evidence.eligibilityEventId, score_event_id: evidence.scoreEventId,
+          card_snapshot_hash: evidence.cardSnapshotHash, selection_basis_hash: evidence.selectionBasisHash } });
+      insertEventRow(db, event);
+      invokeTestHook(testHooks, 'afterCoordinationEventInserted', { db, event });
+      db.prepare(`INSERT INTO durable_task_coordination (task_id, lease_generation, lease_id, claimant_id_hash,
+        worker_session_id, lease_started_at, lease_expires_at, released_at, release_reason_code,
+        last_coordination_event_id, last_coordination_event_hash) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
+        ON CONFLICT(task_id) DO UPDATE SET lease_generation=excluded.lease_generation, lease_id=excluded.lease_id,
+        claimant_id_hash=excluded.claimant_id_hash, worker_session_id=excluded.worker_session_id,
+        lease_started_at=excluded.lease_started_at, lease_expires_at=excluded.lease_expires_at,
+        released_at=NULL, release_reason_code=NULL, last_coordination_event_id=excluded.last_coordination_event_id,
+        last_coordination_event_hash=excluded.last_coordination_event_hash`).run(task.task_id, generation, leaseId,
+        normalized.claimantIdHash, normalized.workerSessionId, now, expires, event.event_id, event.event_hash);
+      invokeTestHook(testHooks, 'afterCoordinationMaterialized', { db, event });
+      verifyCoordinationProjection(db, task.task_id, [...rows, event], now);
+      store.commitTransaction();
+      return { claimed: true, task_id: task.task_id, lease_id: leaseId, fencing_token: generation,
+        lease_started_at: now, lease_expires_at: expires, event_id: event.event_id,
+        ...SIDE_EFFECTS, temp_store_write: true };
+    } catch (error) { store.rollbackTransaction(); throw error; }
+  } catch (error) { mapCoordinationError(error); }
+  finally { store?.close(); }
+}
+
+function mutateCurrentLease(input, options, type) {
+  const normalized = coordinationInput(input, { duration: type === 'LEASE_RENEWED', fence: true, release: type === 'LEASE_RELEASED' });
+  let store;
+  try {
+    store = openAnchoredTempStore({ storePath: normalized.storePath, accessMode: 'readwrite', initialize: false, testHooks: options.testHooks });
+    const { db } = store;
+    store.beginTransaction();
+    try {
+      store.verifyAnchoredStoreIdentity('coordination-transaction');
+      assertSchema(db);
+      const task = taskFromRow(db.prepare('SELECT * FROM durable_tasks WHERE task_id=?').get(normalized.taskId));
+      if (!task) codedError('TASK_NOT_FOUND');
+      const rows = rowsForTask(db, task.task_id);
+      const checked = verifyTaskChainRows({ task, rows, stopAfterFirstFatal: true });
+      if (!checked.valid) codedError('EXISTING_EVENT_CHAIN_INVALID');
+      verifyCoordinationProjection(db, task.task_id, rows, rows.at(-1).occurred_at);
+      const existing = eventFromRow(db.prepare('SELECT * FROM durable_events WHERE task_id=? AND idempotency_key=?').get(task.task_id, normalized.idempotencyKey));
+      if (existing) {
+        const retry = exactCoordinationRetry(existing, normalized, type);
+        store.commitTransaction();
+        return { changed: false, renewed: type === 'LEASE_RENEWED' ? false : undefined,
+          released: type === 'LEASE_RELEASED' ? false : undefined, task_id: task.task_id, lease_id: existing.lease_id,
+          fencing_token: existing.fencing_token, lease_expires_at: retry.payload.lease_expires_at ?? null,
+          released_at: retry.payload.released_at ?? null, event_id: existing.event_id, ...SIDE_EFFECTS };
+      }
+      const now = clockOnce(options.clock);
+      const projection = verifyCoordinationProjection(db, task.task_id, rows, now);
+      currentOwnerOrError(projection, normalized, now);
+      let payload;
+      let expires = projection.lease_expires_at;
+      if (type === 'LEASE_RENEWED') {
+        expires = addUtcSeconds(now, normalized.durationSeconds);
+        if (compareStrictUtc(expires, projection.lease_expires_at) <= 0) codedError('LEASE_RENEWAL_NOT_EXTENDED');
+        payload = { coordination_policy_version: COORDINATION_STATE_POLICY_VERSION,
+          lease_id: normalized.leaseId, previous_expires_at: projection.lease_expires_at,
+          renewed_at: now, lease_expires_at: expires, requested_duration_seconds: normalized.durationSeconds };
+      } else payload = { coordination_policy_version: COORDINATION_STATE_POLICY_VERSION,
+        lease_id: normalized.leaseId, released_at: now, reason_code: normalized.reasonCode };
+      const event = coordinationEvent({ task, rows, type, now, claimantIdHash: normalized.claimantIdHash,
+        workerSessionId: normalized.workerSessionId, fencingToken: normalized.fencingToken,
+        leaseId: normalized.leaseId, idempotencyKey: normalized.idempotencyKey, payload });
+      insertEventRow(db, event);
+      invokeTestHook(options.testHooks, 'afterCoordinationEventInserted', { db, event });
+      let coordinationUpdate;
+      if (type === 'LEASE_RENEWED') {
+        coordinationUpdate = db.prepare(`UPDATE durable_task_coordination SET lease_expires_at=?, last_coordination_event_id=?,
+          last_coordination_event_hash=? WHERE task_id=? AND lease_id=? AND lease_generation=?`)
+          .run(expires, event.event_id, event.event_hash, task.task_id, normalized.leaseId, normalized.fencingToken);
+      } else {
+        coordinationUpdate = db.prepare(`UPDATE durable_task_coordination SET released_at=?, release_reason_code=?, last_coordination_event_id=?,
+          last_coordination_event_hash=? WHERE task_id=? AND lease_id=? AND lease_generation=?`)
+          .run(now, normalized.reasonCode, event.event_id, event.event_hash, task.task_id,
+            normalized.leaseId, normalized.fencingToken);
+      }
+      if (Number(coordinationUpdate.changes) !== 1) codedError('STALE_FENCING_TOKEN');
+      invokeTestHook(options.testHooks, 'afterCoordinationMaterialized', { db, event });
+      verifyCoordinationProjection(db, task.task_id, [...rows, event], now);
+      store.commitTransaction();
+      return { changed: true, renewed: type === 'LEASE_RENEWED' ? true : undefined,
+        released: type === 'LEASE_RELEASED' ? true : undefined, task_id: task.task_id,
+        lease_id: normalized.leaseId, fencing_token: normalized.fencingToken,
+        lease_expires_at: type === 'LEASE_RENEWED' ? expires : null,
+        released_at: type === 'LEASE_RELEASED' ? now : null, event_id: event.event_id,
+        ...SIDE_EFFECTS, temp_store_write: true };
+    } catch (error) { store.rollbackTransaction(); throw error; }
+  } catch (error) { mapCoordinationError(error); }
+  finally { store?.close(); }
+}
+
+export function renewTaskLease(input, options = {}) { return mutateCurrentLease(input, options, 'LEASE_RENEWED'); }
+export function releaseTaskLease(input, options = {}) { return mutateCurrentLease(input, options, 'LEASE_RELEASED'); }
+
+export function readCurrentTaskLease(input, { testHooks, clock } = {}) {
+  assertPlainObject(input, 'INVALID_FIELD');
+  if (Object.keys(input).some((key) => !['storePath', 'taskId', 'asOf'].includes(key))) codedError('INVALID_FIELD');
+  const { storePath, taskId, asOf } = input;
+  const normalizedTaskId = normalizeStableId(taskId, 'taskId');
+  const diagnosticAt = asOf ?? clockOnce(clock);
+  if (!parseStrictUtc(diagnosticAt)) codedError('INVALID_TIMESTAMP');
+  const store = openAnchoredTempStore({ storePath, accessMode: 'readonly', initialize: false, testHooks });
+  const { db } = store;
+  try {
+    store.beginReadTransaction();
+    try {
+      assertSchema(db);
+      const task = taskFromRow(db.prepare('SELECT * FROM durable_tasks WHERE task_id=?').get(normalizedTaskId));
+      if (!task) codedError('TASK_NOT_FOUND');
+      const rows = rowsForTask(db, task.task_id);
+      const checked = verifyTaskChainRows({ task, rows, stopAfterFirstFatal: true });
+      if (!checked.valid) codedError('EXISTING_EVENT_CHAIN_INVALID');
+      const projection = verifyCoordinationProjection(db, task.task_id, rows, diagnosticAt);
+      store.rollbackTransaction();
+      return Object.freeze({ task_id: task.task_id, as_of: diagnosticAt, ...projection, ...SIDE_EFFECTS });
+    } catch (error) { store.rollbackTransaction(); throw error; }
+  } finally { store.close(); }
+}
+
+export function assertCurrentTaskFence(input, { testHooks, clock } = {}) {
+  assertPlainObject(input, 'INVALID_FIELD');
+  if (Object.keys(input).some((key) => !['storePath', 'taskId', 'leaseId', 'workerSessionId', 'fencingToken', 'asOf'].includes(key))) {
+    codedError('INVALID_FIELD');
+  }
+  const taskId = normalizeStableId(input.taskId, 'taskId');
+  const leaseId = boundedText(input.leaseId, 'leaseId', 80, /^klease_[a-f0-9]{32}$/);
+  const workerSessionId = boundedText(input.workerSessionId, 'workerSessionId', 68, /^kws_[A-Za-z0-9_-]{8,64}$/);
+  if (!Number.isSafeInteger(input.fencingToken) || input.fencingToken < 1) codedError('FENCING_TOKEN_REQUIRED');
+  const lease = readCurrentTaskLease({ storePath: input.storePath, taskId, asOf: input.asOf }, { testHooks, clock });
+  if (lease.status === 'released') codedError('LEASE_NOT_ACTIVE');
+  if (lease.status === 'expired') codedError('LEASE_EXPIRED');
+  if (lease.status !== 'active') codedError('LEASE_NOT_ACTIVE');
+  if (lease.lease_id !== leaseId) codedError('LEASE_ID_MISMATCH');
+  if (lease.worker_session_id !== workerSessionId) codedError('LEASE_OWNER_MISMATCH');
+  if (lease.fencing_token !== input.fencingToken) codedError('STALE_FENCING_TOKEN');
+  return Object.freeze({ valid: true, task_id: taskId, lease_id: leaseId, worker_session_id: workerSessionId,
+    fencing_token: input.fencingToken, ownership_only: true, execution_authority_granted: false, ...SIDE_EFFECTS });
 }
 
 function parseCli(argv) {

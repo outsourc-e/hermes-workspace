@@ -1,8 +1,12 @@
 import { createHash } from 'node:crypto';
 
 export const STATE_POLICY_VERSION = 'kanban_autonomy_state.v1';
+export const COORDINATION_STATE_POLICY_VERSION = 'kanban_autonomy_state.v2';
 export const AUTHORITY_LEVELS = Object.freeze(['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6']);
 export const ACTIVE_EVENT_TYPES = Object.freeze([
+  'CARD_CLAIMED',
+  'LEASE_RENEWED',
+  'LEASE_RELEASED',
   'TASK_CREATED',
   'CARD_ELIGIBILITY_EVALUATED',
   'CARD_SCORED',
@@ -18,7 +22,7 @@ export const ACTIVE_EVENT_TYPES = Object.freeze([
   'TASK_COMPLETED',
 ]);
 export const RESERVED_EVENT_TYPES = Object.freeze([
-  'CARD_CLAIMED', 'LEASE_RENEWED', 'LEASE_RELEASED', 'BUILD_STARTED', 'TESTS_STARTED', 'TESTS_PASSED',
+  'BUILD_STARTED', 'TESTS_STARTED', 'TESTS_PASSED',
 ]);
 export const SUPPORTED_EVENT_VERSIONS = Object.freeze(Object.fromEntries(
   ACTIVE_EVENT_TYPES.map((eventType) => [eventType, 1]),
@@ -52,6 +56,46 @@ function payloadPolicy(required, optional, fields, crossFieldRules = []) {
 }
 
 export const EVENT_PAYLOAD_POLICIES = deepFreeze({
+  CARD_CLAIMED: {
+    1: payloadPolicy(
+      ['coordination_policy_version', 'lease_id', 'claimant_id_hash', 'worker_session_id', 'lease_started_at', 'lease_expires_at',
+        'requested_duration_seconds', 'claim_reason', 'eligibility_event_id', 'score_event_id',
+        'card_snapshot_hash', 'selection_basis_hash'],
+      [],
+      {
+        coordination_policy_version: { type: 'literal', value: COORDINATION_STATE_POLICY_VERSION },
+        lease_id: POLICY_FIELD, claimant_id_hash: HASH_FIELD, worker_session_id: POLICY_FIELD,
+        lease_started_at: { type: 'timestamp' }, lease_expires_at: { type: 'timestamp' },
+        requested_duration_seconds: { type: 'integer', minimum: 30, maximum: 900 },
+        claim_reason: { type: 'enum', values: ['INITIAL', 'REACQUIRED_AFTER_RELEASE', 'EXPIRED_TAKEOVER'] },
+        eligibility_event_id: POLICY_FIELD, score_event_id: POLICY_FIELD,
+        card_snapshot_hash: HASH_FIELD, selection_basis_hash: HASH_FIELD,
+      },
+    ),
+  },
+  LEASE_RENEWED: {
+    1: payloadPolicy(
+      ['coordination_policy_version', 'lease_id', 'previous_expires_at', 'renewed_at', 'lease_expires_at', 'requested_duration_seconds'],
+      [],
+      {
+        coordination_policy_version: { type: 'literal', value: COORDINATION_STATE_POLICY_VERSION },
+        lease_id: POLICY_FIELD, previous_expires_at: { type: 'timestamp' }, renewed_at: { type: 'timestamp' },
+        lease_expires_at: { type: 'timestamp' },
+        requested_duration_seconds: { type: 'integer', minimum: 30, maximum: 900 },
+      },
+    ),
+  },
+  LEASE_RELEASED: {
+    1: payloadPolicy(
+      ['coordination_policy_version', 'lease_id', 'released_at', 'reason_code'],
+      [],
+      {
+        coordination_policy_version: { type: 'literal', value: COORDINATION_STATE_POLICY_VERSION },
+        lease_id: POLICY_FIELD, released_at: { type: 'timestamp' },
+        reason_code: { type: 'enum', values: ['WORK_COMPLETE', 'PAUSED', 'BLOCKED', 'HANDOFF', 'OPERATOR_REQUEST', 'WORKER_ERROR'] },
+      },
+    ),
+  },
   TASK_CREATED: {
     1: payloadPolicy(
       ['task_id', 'board_slug_hash', 'kanban_card_id_hash', 'source_identity_hash', 'initial_card_snapshot_hash',
@@ -183,6 +227,7 @@ const ACTIVE = new Set(ACTIVE_EVENT_TYPES);
 const TERMINAL = new Set(['completed', 'rejected']);
 const APPROVAL_REQUEST_ORIGINS = new Set(['created', 'triaged', 'researching', 'planning']);
 const SUSPENSION_EVENT_TYPES = new Set(['TASK_PAUSED', 'TASK_BLOCKED']);
+const COORDINATION_EVENT_TYPES = new Set(['CARD_CLAIMED', 'LEASE_RENEWED', 'LEASE_RELEASED']);
 const TRUSTED_REDUCER_STATES = new WeakSet();
 
 function nextSafeActionFor(status, pendingApproval = null) {
@@ -522,6 +567,68 @@ export function compareStrictUtc(left, right) {
   return 0;
 }
 
+function strictUtcNanoseconds(value) {
+  const parsed = parseStrictUtc(value);
+  if (!parsed) codedError('INVALID_TIMESTAMP');
+  const wholeSecond = `${String(parsed.year).padStart(4, '0')}-${String(parsed.month).padStart(2, '0')}-${String(parsed.day).padStart(2, '0')}T${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}:${String(parsed.second).padStart(2, '0')}Z`;
+  const milliseconds = Date.parse(wholeSecond);
+  if (!Number.isFinite(milliseconds)) codedError('INVALID_TIMESTAMP');
+  return (BigInt(milliseconds) * 1_000_000n) + BigInt(parsed.fractional_nanoseconds);
+}
+
+export function assertExactLeaseDuration(start, end, requestedSeconds) {
+  if (!Number.isSafeInteger(requestedSeconds) || requestedSeconds < 30 || requestedSeconds > 900) {
+    codedError('LEASE_DURATION_MISMATCH');
+  }
+  const interval = strictUtcNanoseconds(end) - strictUtcNanoseconds(start);
+  if (interval <= 0n || interval % 1_000_000_000n !== 0n
+    || interval / 1_000_000_000n !== BigInt(requestedSeconds)) codedError('LEASE_DURATION_MISMATCH');
+  return requestedSeconds;
+}
+
+export function deriveClaimSelectionBasis({ taskId, creationEvent, eligibilityEvent, scoreEvent }) {
+  if (!creationEvent || creationEvent.event_type !== 'TASK_CREATED'
+    || !eligibilityEvent || eligibilityEvent.event_type !== 'CARD_ELIGIBILITY_EVALUATED'
+    || !scoreEvent || scoreEvent.event_type !== 'CARD_SCORED') codedError('CLAIM_EVIDENCE_EVENT_TYPE_MISMATCH');
+  const creation = validateEventPayload('TASK_CREATED', creationEvent.event_version ?? 1, creationEvent.payload);
+  const eligibility = validateEventPayload('CARD_ELIGIBILITY_EVALUATED', eligibilityEvent.event_version ?? 1, eligibilityEvent.payload);
+  const score = validateEventPayload('CARD_SCORED', scoreEvent.event_version ?? 1, scoreEvent.payload);
+  if (creation.task_id !== taskId) codedError('CLAIM_EVIDENCE_IDENTITY_MISMATCH');
+  if (eligibility.eligible !== true) codedError('CLAIM_EVIDENCE_INELIGIBLE');
+  if (eligibility.card_snapshot_hash !== score.card_snapshot_hash) codedError('CLAIM_EVIDENCE_SNAPSHOT_MISMATCH');
+  const material = {
+    domain: 'kanban_autonomy_selection_basis.v2',
+    coordination_policy_version: COORDINATION_STATE_POLICY_VERSION,
+    task_id: taskId,
+    board_slug_hash: creation.board_slug_hash,
+    kanban_card_id_hash: creation.kanban_card_id_hash,
+    source_identity_hash: creation.source_identity_hash,
+    task_policy_version: creation.policy_version,
+    eligibility_event_id: eligibilityEvent.event_id,
+    eligibility_event_hash: eligibilityEvent.event_hash,
+    eligibility_policy_evidence: {
+      eligibility_policy_version: eligibility.eligibility_policy_version,
+      eligible: eligibility.eligible,
+      reason_codes: eligibility.reason_codes,
+      evidence_hashes: eligibility.evidence_hashes ?? [],
+    },
+    scoring_event_id: scoreEvent.event_id,
+    scoring_event_hash: scoreEvent.event_hash,
+    scoring_policy_evidence: {
+      scoring_policy_version: score.scoring_policy_version,
+      score_basis_points: score.score_basis_points,
+      factor_evidence_hash: score.factor_evidence_hash ?? null,
+      explanation_codes: score.explanation_codes ?? [],
+    },
+    card_snapshot_hash: score.card_snapshot_hash,
+  };
+  return Object.freeze({
+    material: deepFreeze(material),
+    selection_basis_hash: `sha256:${sha256Hex(canonicalJson(material))}`,
+    card_snapshot_hash: score.card_snapshot_hash,
+  });
+}
+
 export function normalizeBoardSlug(value) {
   if (typeof value !== 'string') codedError('INVALID_BOARD_SLUG');
   const normalized = value.trim().toLowerCase().replace(/[_\s]+/g, '-');
@@ -606,6 +713,10 @@ export function validateEventPayload(eventType, eventVersion, payload) {
   const policy = EVENT_PAYLOAD_POLICIES[eventType]?.[eventVersion];
   if (!policy) codedError('UNSUPPORTED_EVENT_PAYLOAD_POLICY');
   validateEventVersion(eventType, eventVersion);
+  if (COORDINATION_EVENT_TYPES.has(eventType)
+    && payload?.coordination_policy_version !== COORDINATION_STATE_POLICY_VERSION) {
+    codedError('COORDINATION_POLICY_VERSION_MISMATCH');
+  }
   try {
     validateBoundedJsonValue(payload);
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) semanticPayloadError();
@@ -685,6 +796,25 @@ export function reduceTaskState(currentState, event) {
   const payload = validateEventPayload(event.event_type, event.event_version, event.payload);
   const eventType = event.event_type;
 
+  if (COORDINATION_EVENT_TYPES.has(eventType)) {
+    if (event.actor_type !== 'worker' || event.actor_id_hash !== (payload.claimant_id_hash ?? event.actor_id_hash)
+      || event.worker_id !== (payload.worker_session_id ?? event.worker_id) || event.authority_level !== 'A0'
+      || event.lease_id !== payload.lease_id || !Number.isSafeInteger(event.fencing_token) || event.fencing_token < 1) {
+      codedError('COORDINATION_EVENT_ENVELOPE_INVALID');
+    }
+    const payloadTimestamp = eventType === 'CARD_CLAIMED' ? payload.lease_started_at
+      : eventType === 'LEASE_RENEWED' ? payload.renewed_at : payload.released_at;
+    if (event.occurred_at !== payloadTimestamp) codedError('COORDINATION_EVENT_TIMESTAMP_MISMATCH');
+    if (eventType === 'CARD_CLAIMED') {
+      if (!['triaged', 'researching', 'planning'].includes(state.status) || state.pending_approval || state.suspension) {
+        codedError('CLAIM_STATE_INVALID');
+      }
+      assertExactLeaseDuration(payload.lease_started_at, payload.lease_expires_at,
+        payload.requested_duration_seconds);
+    }
+    return state;
+  }
+
   if (eventType === 'APPROVAL_REQUESTED') {
     if (state.pending_approval) codedError('APPROVAL_ALREADY_PENDING');
     if (state.suspension || !APPROVAL_REQUEST_ORIGINS.has(state.status)) codedError('APPROVAL_REQUEST_INVALID_STATE');
@@ -758,17 +888,122 @@ export function reduceTaskState(currentState, event) {
 }
 
 export function replayEvents(events) {
+  return replayTask(events).status;
+}
+
+function coordinationStatus(coordination, asOf) {
+  if (!coordination) return 'none';
+  if (coordination.released_at !== null) return 'released';
+  return compareStrictUtc(asOf, coordination.lease_expires_at) < 0 ? 'active' : 'expired';
+}
+
+export function replayTask(events, { asOf } = {}) {
+  if (!Array.isArray(events)) codedError('INVALID_REPLAY_INPUT');
+  if (asOf !== undefined) {
+    if (!parseStrictUtc(asOf)) codedError('INVALID_TIMESTAMP');
+    for (const event of events) if (!parseStrictUtc(event?.occurred_at)) codedError('INVALID_TIMESTAMP');
+    const visible = events.filter((event) => compareStrictUtc(event.occurred_at, asOf) <= 0);
+    if (visible.length !== events.length) return replayTask(visible, { asOf });
+  }
   let state = null;
+  let coordination = null;
+  let creationEvent = null;
   let previousOccurredAt = null;
-  for (const event of events) {
+  const priorEventsById = new Map();
+  const allEventPositions = new Map();
+  const usedLeaseIds = new Set();
+  events.forEach((event, index) => {
+    if (typeof event?.event_id === 'string') {
+      if (allEventPositions.has(event.event_id)) codedError('DUPLICATE_EVENT_ID');
+      allEventPositions.set(event.event_id, index);
+    }
+  });
+  for (let eventIndex = 0; eventIndex < events.length; eventIndex += 1) {
+    const event = events[eventIndex];
     if (!parseStrictUtc(event?.occurred_at)) codedError('INVALID_TIMESTAMP');
     if (previousOccurredAt !== null && compareStrictUtc(event.occurred_at, previousOccurredAt) < 0) {
       codedError('EVENT_TIMESTAMP_REGRESSION');
     }
     state = reduceTaskState(state, event);
+    if (event.event_type === 'TASK_CREATED') creationEvent = event;
+    if (event.event_type === 'CARD_CLAIMED') {
+      const priorStatus = coordination ? coordinationStatus(coordination, event.occurred_at) : 'none';
+      const expectedReason = priorStatus === 'none' ? 'INITIAL'
+        : priorStatus === 'released' ? 'REACQUIRED_AFTER_RELEASE' : 'EXPIRED_TAKEOVER';
+      if (priorStatus === 'active' || event.payload.claim_reason !== expectedReason
+        || event.fencing_token !== (coordination?.lease_generation ?? 0) + 1) {
+        codedError('COORDINATION_REPLAY_INVALID');
+      }
+      if (usedLeaseIds.has(event.payload.lease_id)) codedError('LEASE_ID_REUSE_FORBIDDEN');
+      const evidenceEvent = (eventId, expectedType) => {
+        const evidence = priorEventsById.get(eventId);
+        if (!evidence) {
+          if ((allEventPositions.get(eventId) ?? -1) >= eventIndex) codedError('CLAIM_EVIDENCE_EVENT_NOT_PRIOR');
+          codedError('CLAIM_EVIDENCE_EVENT_MISSING');
+        }
+        if (evidence.event_type !== expectedType) codedError('CLAIM_EVIDENCE_EVENT_TYPE_MISMATCH');
+        return evidence;
+      };
+      const eligibilityEvent = evidenceEvent(event.payload.eligibility_event_id, 'CARD_ELIGIBILITY_EVALUATED');
+      const scoreEvent = evidenceEvent(event.payload.score_event_id, 'CARD_SCORED');
+      const selection = deriveClaimSelectionBasis({
+        taskId: creationEvent?.payload?.task_id,
+        creationEvent,
+        eligibilityEvent,
+        scoreEvent,
+      });
+      if (event.payload.card_snapshot_hash !== selection.card_snapshot_hash) {
+        codedError('CLAIM_EVIDENCE_SNAPSHOT_MISMATCH');
+      }
+      if (event.payload.selection_basis_hash !== selection.selection_basis_hash) {
+        codedError('CLAIM_SELECTION_BASIS_MISMATCH');
+      }
+      assertExactLeaseDuration(event.payload.lease_started_at, event.payload.lease_expires_at,
+        event.payload.requested_duration_seconds);
+      usedLeaseIds.add(event.payload.lease_id);
+      coordination = {
+        lease_generation: event.fencing_token, fencing_token: event.fencing_token,
+        lease_id: event.payload.lease_id, claimant_id_hash: event.payload.claimant_id_hash,
+        worker_session_id: event.payload.worker_session_id, lease_started_at: event.payload.lease_started_at,
+        lease_expires_at: event.payload.lease_expires_at, released_at: null, release_reason: null,
+        last_coordination_event_id: event.event_id ?? null, last_coordination_event_hash: event.event_hash ?? null,
+      };
+    } else if (event.event_type === 'LEASE_RENEWED') {
+      assertExactLeaseDuration(event.payload.renewed_at, event.payload.lease_expires_at,
+        event.payload.requested_duration_seconds);
+      if (!coordination || coordinationStatus(coordination, event.occurred_at) !== 'active'
+        || event.payload.lease_id !== coordination.lease_id || event.fencing_token !== coordination.fencing_token
+        || event.actor_id_hash !== coordination.claimant_id_hash || event.worker_id !== coordination.worker_session_id
+        || event.payload.previous_expires_at !== coordination.lease_expires_at
+        || compareStrictUtc(event.payload.lease_expires_at, coordination.lease_expires_at) <= 0) {
+        codedError('COORDINATION_REPLAY_INVALID');
+      }
+      coordination = { ...coordination, lease_expires_at: event.payload.lease_expires_at,
+        last_coordination_event_id: event.event_id ?? null, last_coordination_event_hash: event.event_hash ?? null };
+    } else if (event.event_type === 'LEASE_RELEASED') {
+      if (!coordination || coordinationStatus(coordination, event.occurred_at) !== 'active'
+        || event.payload.lease_id !== coordination.lease_id || event.fencing_token !== coordination.fencing_token
+        || event.actor_id_hash !== coordination.claimant_id_hash || event.worker_id !== coordination.worker_session_id) {
+        codedError('COORDINATION_REPLAY_INVALID');
+      }
+      coordination = { ...coordination, released_at: event.payload.released_at,
+        release_reason: event.payload.reason_code, last_coordination_event_id: event.event_id ?? null,
+        last_coordination_event_hash: event.event_hash ?? null };
+    }
+    if (typeof event.event_id === 'string') priorEventsById.set(event.event_id, event);
     previousOccurredAt = event.occurred_at;
   }
-  return state?.status ?? 'none';
+  const workflow = state ?? initialReducerState();
+  const explicitAsOf = asOf ?? previousOccurredAt;
+  if (explicitAsOf !== null && !parseStrictUtc(explicitAsOf)) codedError('INVALID_TIMESTAMP');
+  const projected = coordination ? Object.freeze({ ...coordination,
+    status: coordinationStatus(coordination, explicitAsOf ?? coordination.lease_started_at) }) : Object.freeze({ status: 'none' });
+  return Object.freeze({ status: workflow.status, workflow, coordination: projected });
+}
+
+export function projectCoordinationAt(events, asOf) {
+  if (!parseStrictUtc(asOf)) codedError('INVALID_TIMESTAMP');
+  return replayTask(events, { asOf }).coordination;
 }
 
 export function projectTaskStateToKanban({ taskState, currentCardStatus }) {
