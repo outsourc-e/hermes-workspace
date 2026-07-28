@@ -245,6 +245,97 @@ function stableMessageId(
   )
 }
 
+type AggregatedCardHistory = {
+  messages: Array<SessionCardHistoryEntry>
+  missingSegments: Array<SessionCardHistoryMissingSegment>
+  retrievedSegments: Array<RetrievedSegmentSnapshot>
+  truncated: boolean
+}
+
+async function aggregateCardSegmentHistory(
+  resolved: ResolvedSessionCard,
+  messageSource: SessionCardHistoryMessageSource,
+): Promise<AggregatedCardHistory> {
+  const messages: Array<SessionCardHistoryEntry> = []
+  const missingSegments: Array<SessionCardHistoryMissingSegment> = []
+  const retrievedSegments: Array<RetrievedSegmentSnapshot> = []
+  let previousLoadedBoundaryId: string | undefined
+  let truncated = false
+
+  // Every Card follows this path. A standalone Card is simply an ordered segment
+  // list of length one; a child Card supplies only its own resolved segment list.
+  // Sequential reads preserve the authoritative continuation order.
+  for (const segmentKey of resolved.card.continuationSegmentKeys) {
+    const source = resolved.sourceBySegmentKey.get(segmentKey)
+    const upstreamKey = resolved.upstreamKeyBySegmentKey.get(segmentKey)
+    if (!source || !upstreamKey) {
+      missingSegments.push({
+        segmentKey,
+        ...(source ? { source } : {}),
+        retryable: true,
+        error: 'Validated segment source is unavailable.',
+      })
+      previousLoadedBoundaryId = undefined
+      continue
+    }
+
+    try {
+      const fetchedBatch = await messageSource.getMessages(upstreamKey, source)
+      if (fetchedBatch.source !== source) {
+        throw new Error(
+          `Session history source mismatch (${source} expected, ${fetchedBatch.source ?? 'missing'} received).`,
+        )
+      }
+      // The source check plus the exact canonical key check is the complete
+      // source-qualified identity. Neither half is safe on its own.
+      if (fetchedBatch.resolvedSegmentKey !== upstreamKey) {
+        throw new Error(
+          `Session history segment mismatch (${upstreamKey} expected, ${fetchedBatch.resolvedSegmentKey ?? 'missing'} received).`,
+        )
+      }
+      const segmentMessages = [...fetchedBatch.messages]
+      const batch = { ...fetchedBatch, messages: segmentMessages }
+      retrievedSegments.push({ segmentKey, source, upstreamKey, batch })
+      truncated ||= batch.truncated === true
+
+      const firstId = segmentMessages[0]
+        ? stableMessageId(segmentMessages[0])
+        : undefined
+      const startsWithBoundaryDuplicate = Boolean(
+        previousLoadedBoundaryId &&
+        firstId &&
+        previousLoadedBoundaryId === firstId,
+      )
+      const retained = startsWithBoundaryDuplicate
+        ? segmentMessages.slice(1)
+        : segmentMessages
+      for (const message of retained) {
+        messages.push({ segmentKey, message })
+      }
+
+      // A successfully loaded empty segment does not create a history gap, so
+      // keep the last stable nonempty boundary for the next available segment.
+      if (segmentMessages.length > 0) {
+        previousLoadedBoundaryId = stableMessageId(
+          segmentMessages[segmentMessages.length - 1]!,
+        )
+      }
+    } catch (error) {
+      missingSegments.push({
+        segmentKey,
+        source,
+        retryable: true,
+        error: errorMessage(error),
+      })
+      // A failed segment makes adjacent-boundary identity unprovable. Never
+      // de-duplicate across that gap or replace the aggregate with the tip.
+      previousLoadedBoundaryId = undefined
+    }
+  }
+
+  return { messages, missingSegments, retrievedSegments, truncated }
+}
+
 export class SessionCardHistoryService {
   private readonly cardService: SessionCardService
   private readonly messageSource: SessionCardHistoryMessageSource
@@ -280,80 +371,12 @@ export class SessionCardHistoryService {
     }
     const offset = cursor?.offset ?? 0
 
-    const assembled: Array<SessionCardHistoryEntry> = []
-    const missingSegments: Array<SessionCardHistoryMissingSegment> = []
-    const retrievedSegments: Array<RetrievedSegmentSnapshot> = []
-    let previousLoadedBoundaryId: string | undefined
-    let historyTruncated = false
-
-    // This is deliberately sequential. It both preserves segment chronology and
-    // makes it impossible for child/delegate fetches to enter via tree traversal.
-    for (const segmentKey of resolved.card.continuationSegmentKeys) {
-      const source = resolved.sourceBySegmentKey.get(segmentKey)
-      const upstreamKey = resolved.upstreamKeyBySegmentKey.get(segmentKey)
-      if (!source || !upstreamKey) {
-        missingSegments.push({
-          segmentKey,
-          ...(source ? { source } : {}),
-          retryable: true,
-          error: 'Validated segment source is unavailable.',
-        })
-        previousLoadedBoundaryId = undefined
-        continue
-      }
-
-      try {
-        const fetchedBatch = await this.messageSource.getMessages(
-          upstreamKey,
-          source,
-        )
-        if (fetchedBatch.source !== source) {
-          throw new Error(
-            `Session history source mismatch (${source} expected, ${fetchedBatch.source ?? 'missing'} received).`,
-          )
-        }
-        // The source check plus the exact canonical key check is the complete
-        // source-qualified identity. Neither half is safe on its own.
-        if (fetchedBatch.resolvedSegmentKey !== upstreamKey) {
-          throw new Error(
-            `Session history segment mismatch (${upstreamKey} expected, ${fetchedBatch.resolvedSegmentKey ?? 'missing'} received).`,
-          )
-        }
-        const messages = [...fetchedBatch.messages]
-        const batch = { ...fetchedBatch, messages }
-        retrievedSegments.push({ segmentKey, source, upstreamKey, batch })
-        historyTruncated ||= batch.truncated === true
-        const firstId = messages[0] ? stableMessageId(messages[0]) : undefined
-        const startsWithBoundaryDuplicate = Boolean(
-          previousLoadedBoundaryId &&
-          firstId &&
-          previousLoadedBoundaryId === firstId,
-        )
-        const retained = startsWithBoundaryDuplicate
-          ? messages.slice(1)
-          : messages
-        for (const message of retained) {
-          assembled.push({ segmentKey, message })
-        }
-        // A successfully loaded empty segment does not create a history gap, so
-        // keep the last stable nonempty boundary for the next available segment.
-        if (messages.length > 0) {
-          previousLoadedBoundaryId = stableMessageId(
-            messages[messages.length - 1]!,
-          )
-        }
-      } catch (error) {
-        missingSegments.push({
-          segmentKey,
-          source,
-          retryable: true,
-          error: errorMessage(error),
-        })
-        // Do not de-duplicate across an unavailable segment because those are no
-        // longer adjacent loaded boundaries.
-        previousLoadedBoundaryId = undefined
-      }
-    }
+    const {
+      messages: assembled,
+      missingSegments,
+      retrievedSegments,
+      truncated: historyTruncated,
+    } = await aggregateCardSegmentHistory(resolved, this.messageSource)
 
     const snapshot = historySnapshotFingerprint(resolved, retrievedSegments)
     const partial =

@@ -139,6 +139,41 @@ describe('SessionCardHistoryService', () => {
     })
   })
 
+  it('loads a nonempty standalone Card through the same one-segment aggregation path', async () => {
+    const messages = source({
+      only: [
+        { id: 'only-user', role: 'user', content: 'standalone question' },
+        {
+          id: 'only-assistant',
+          role: 'assistant',
+          content: 'standalone answer',
+        },
+      ],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => [session('only')]),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'only' })
+
+    expect(messages.getMessages.mock.calls).toEqual([['only', 'remote']])
+    expect(
+      result.messages.map((entry) => [entry.segmentKey, entry.message.id]),
+    ).toEqual([
+      ['remote:only', 'only-user'],
+      ['remote:only', 'only-assistant'],
+    ])
+    expect(result).toMatchObject({
+      cardId: 'remote:only',
+      canonicalSegmentKey: 'remote:only',
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+  })
+
   it('retains equal text with different stable IDs', async () => {
     const messages = source({
       first: [{ id: 'upstream-a', content: 'same text' }],
@@ -381,6 +416,51 @@ describe('SessionCardHistoryService', () => {
         },
       ],
     })
+  })
+
+  it('surfaces every failed segment while retaining only available aggregate rows without a tip fallback', async () => {
+    const messages = source({
+      first: new Error('root unavailable'),
+      second: new Error('middle unavailable'),
+      third: [{ id: 'tip-message', content: 'available tip segment' }],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => chain()),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'first', limit: 1 })
+
+    expect(messages.getMessages.mock.calls.map(([key]) => key)).toEqual([
+      'first',
+      'second',
+      'third',
+    ])
+    expect(result.messages).toEqual([
+      {
+        segmentKey: 'remote:third',
+        message: { id: 'tip-message', content: 'available tip segment' },
+      },
+    ])
+    expect(result).toMatchObject({
+      cardId: 'remote:first',
+      canonicalSegmentKey: 'remote:third',
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        expect.objectContaining({
+          segmentKey: 'remote:first',
+          error: 'root unavailable',
+        }),
+        expect.objectContaining({
+          segmentKey: 'remote:second',
+          error: 'middle unavailable',
+        }),
+      ],
+    })
+    expect(result.nextCursor).toBeUndefined()
+    expect(messages.getMessages).toHaveBeenCalledTimes(3)
   })
 
   it('reports a truncated 100-row remote message page as partial and retryable', async () => {
