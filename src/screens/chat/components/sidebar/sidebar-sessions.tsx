@@ -75,7 +75,7 @@ export const SidebarSessions = memo(function SidebarSessions({
   error,
   onRetry,
 }: SidebarSessionsProps) {
-  const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(
+  const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(
     () => new Set(),
   )
   const [recentSessionCutoff] = useState(
@@ -188,7 +188,7 @@ export const SidebarSessions = memo(function SidebarSessions({
       )
       const isExpanded =
         childRows.length > 0 &&
-        (!collapsedCardIds.has(node.cardId) || hasInspectedDescendant)
+        (expandedCardIds.has(node.cardId) || hasInspectedDescendant)
       const row: SessionCardTreeRow = {
         key: node.cardId,
         title: node.title,
@@ -215,7 +215,7 @@ export const SidebarSessions = memo(function SidebarSessions({
       (card) => buildRow(card, 0, new Set<string>()).row,
     )
     return { rootRows, childrenByParent }
-  }, [cardsById, collapsedCardIds, inspectedChildCardId, visibleRoots])
+  }, [cardsById, expandedCardIds, inspectedChildCardId, visibleRoots])
 
   const pinnedRows = cardRows.rootRows.filter((row) =>
     pinnedCardIds.has(row.key),
@@ -232,10 +232,10 @@ export const SidebarSessions = memo(function SidebarSessions({
   }
 
   function handleToggleExpanded(cardId: string, expanded: boolean) {
-    setCollapsedCardIds((current) => {
+    setExpandedCardIds((current) => {
       const next = new Set(current)
-      if (expanded) next.delete(cardId)
-      else next.add(cardId)
+      if (expanded) next.add(cardId)
+      else next.delete(cardId)
       return next
     })
   }

@@ -263,7 +263,7 @@ export function MobileSessionsPanel({
 }: Props) {
   const sessionForkAvailable = useFeatureAvailable('sessionFork')
   const disclosurePrefix = useId().replaceAll(':', '')
-  const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(
+  const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(
     () => new Set(),
   )
   const [actionCardId, setActionCardId] = useState<string>()
@@ -349,10 +349,10 @@ export function MobileSessionsPanel({
   if (!open) return null
 
   const toggleCard = (cardId: string, expanded: boolean) => {
-    setCollapsedCardIds((current) => {
+    setExpandedCardIds((current) => {
       const next = new Set(current)
-      if (expanded) next.delete(cardId)
-      else next.add(cardId)
+      if (expanded) next.add(cardId)
+      else next.delete(cardId)
       return next
     })
   }
@@ -374,7 +374,7 @@ export function MobileSessionsPanel({
     const fullCard = cardsById.get(child.cardId)
     const inspected = activeCard.childCardId === child.cardId
     const grandchildren = fullCard?.childNodes ?? []
-    const expanded = !collapsedCardIds.has(child.cardId)
+    const expanded = expandedCardIds.has(child.cardId)
     const childrenId = `${disclosurePrefix}-${child.cardId}-children`
 
     return (
@@ -485,7 +485,7 @@ export function MobileSessionsPanel({
                     active && activeCard.childCardId !== undefined
                   const expanded =
                     card.childNodes.length > 0 &&
-                    (!collapsedCardIds.has(card.cardId) || inspectedChild)
+                    (expandedCardIds.has(card.cardId) || inspectedChild)
                   const childrenId = `${disclosurePrefix}-${card.cardId}-children`
                   const actionsOpen = actionCardId === card.cardId
                   const pending = pendingCardIds.has(card.cardId)

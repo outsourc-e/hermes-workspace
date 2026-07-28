@@ -183,6 +183,12 @@ describe('SidebarSessions Card-only surface', () => {
   it('renders entirely from Card data without a raw sessions prop', () => {
     renderSidebar()
     expect(screen.getByText('Authoritative card title')).toBeTruthy()
+    const expandButton = screen.getByRole('button', {
+      name: 'Expand related sessions for Authoritative card title',
+    })
+    expect(expandButton.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('Delegated research')).toBeNull()
+    React.act(() => fireEvent.click(expandButton))
     expect(screen.getByText('Delegated research')).toBeTruthy()
   })
 
@@ -522,6 +528,13 @@ describe('SidebarSessions Card-only surface', () => {
     const parent = screen
       .getByText('Authoritative card title')
       .closest<HTMLElement>('[data-card-id="card:root"]')!
+    React.act(() =>
+      fireEvent.click(
+        within(parent).getByRole('button', {
+          name: 'Expand related sessions for Authoritative card title',
+        }),
+      ),
+    )
     const child = screen
       .getByText('Delegated research')
       .closest<HTMLElement>('[data-card-child-id="card:child"]')!

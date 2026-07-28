@@ -107,6 +107,13 @@ describe('MobileSessionsPanel Card routing', () => {
     expect(screen.getByText('Card title')).toBeTruthy()
     expect(screen.queryByText('Legacy title')).toBeNull()
     expect(screen.getByText('Continued · 2 segments')).toBeTruthy()
+    const expandButton = screen.getByRole('button', {
+      name: 'Expand child activity for Card title',
+    })
+    expect(expandButton.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('Child activity')).toBeNull()
+    React.act(() => fireEvent.click(expandButton))
+    expect(screen.getByText('Child activity')).toBeTruthy()
   })
 
   it('selects the parent by cardId and child activity as inspect state', () => {
