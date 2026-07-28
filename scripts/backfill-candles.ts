@@ -33,6 +33,7 @@ interface Kline {
   close: number
   volume: number
   closeTime: number
+  takerBuyVolume: number
 }
 
 function arg(name: string, fallback: string): string {
@@ -61,7 +62,8 @@ async function fetchKlinesPage(
     `${BINANCE_SPOT_API}/api/v3/klines?symbol=${encodeURIComponent(symbol)}` +
     `&interval=${encodeURIComponent(interval)}&startTime=${startTime}&limit=${PAGE_LIMIT}`
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
-  if (!res.ok) throw new Error(`klines ${symbol} ${interval}: HTTP ${res.status}`)
+  if (!res.ok)
+    throw new Error(`klines ${symbol} ${interval}: HTTP ${res.status}`)
   const rows = (await res.json()) as Array<Array<unknown>>
   return rows.map((k) => ({
     openTime: Number(k[0]),
@@ -71,6 +73,7 @@ async function fetchKlinesPage(
     close: parseFloat(String(k[4])),
     volume: parseFloat(String(k[5])),
     closeTime: Number(k[6]),
+    takerBuyVolume: parseFloat(String(k[9])),
   }))
 }
 
@@ -103,12 +106,21 @@ async function fetchDeepHistory(
 }
 
 async function main() {
-  const symbols = arg('symbols', 'BTCUSDT,ETHUSDT').split(',').map((s) => s.trim().toUpperCase())
-  const intervals = arg('intervals', '1h').split(',').map((s) => s.trim())
+  const symbols = arg('symbols', 'BTCUSDT,ETHUSDT')
+    .split(',')
+    .map((s) => s.trim().toUpperCase())
+  const intervals = arg('intervals', '1h')
+    .split(',')
+    .map((s) => s.trim())
   const days = Number(arg('days', '365'))
   const skipStore = process.argv.includes('--skip-store')
 
-  const cacheDir = path.join(os.homedir(), '.hermes', 'finance', 'candles-cache')
+  const cacheDir = path.join(
+    os.homedir(),
+    '.hermes',
+    'finance',
+    'candles-cache',
+  )
   fs.mkdirSync(cacheDir, { recursive: true })
 
   for (const symbol of symbols) {
@@ -118,14 +130,28 @@ async function main() {
       const cachePath = path.join(cacheDir, `${symbol}-${interval}.json`)
       fs.writeFileSync(
         cachePath,
-        JSON.stringify({ symbol, interval, days, fetchedAt: new Date().toISOString(), candles }),
+        JSON.stringify({
+          symbol,
+          interval,
+          days,
+          fetchedAt: new Date().toISOString(),
+          candles,
+        }),
       )
       console.log(`${candles.length} candles → ${cachePath}`)
 
       if (!skipStore) {
         const recent = candles.slice(-STORE_RETENTION)
-        addBinanceCandles(symbol, interval, recent, 'binance', 'backfill-script')
-        console.log(`  store: upserted newest ${recent.length} candles into finance store`)
+        addBinanceCandles(
+          symbol,
+          interval,
+          recent,
+          'binance',
+          'backfill-script',
+        )
+        console.log(
+          `  store: upserted newest ${recent.length} candles into finance store`,
+        )
       }
       await sleep(PAGE_DELAY_MS)
     }

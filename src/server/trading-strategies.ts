@@ -16,6 +16,13 @@ export interface Candle {
   low: number
   close: number
   volume: number
+  /**
+   * Aggressor buy volume within the bar (Binance kline field index 9,
+   * `takerBuyBaseAssetVolume`) — optional so existing cached candles and
+   * fakes/fixtures without it still satisfy this type; strategies reading
+   * it must treat `undefined` as "unavailable", not zero.
+   */
+  takerBuyVolume?: number
 }
 
 export interface StrategyDecision {
@@ -600,6 +607,62 @@ export const keltnerChannelStrategy: Strategy = {
   },
 }
 
+/**
+ * Taker buy/sell imbalance: rolling fraction of volume from aggressor buys
+ * vs. sells (Binance kline field `takerBuyBaseAssetVolume`), read directly —
+ * "the signal is the order flow" rather than a price-derived indicator.
+ * Coarser than a true tick-by-tick order-book-depth signal (candle-aggregated,
+ * not live book state), but needs no new data collection: Binance already
+ * returns this on every kline, at any interval, back through full history.
+ * Averaged over `period` candles since any single bar's ratio is noisy.
+ */
+export const takerImbalanceStrategy: Strategy = {
+  id: 'taker_imbalance',
+  name: 'Taker Buy/Sell Imbalance',
+  description:
+    'Rolling aggressor buy-volume fraction vs. sell — persistent buy/sell pressure from raw order flow, not a price indicator.',
+  minCandles: 21,
+  evaluate(candles, params) {
+    const period = Math.round(params?.period ?? 20)
+    // Calibrated against real BTC 1h data (2026-07-28): a 20-candle rolling
+    // taker-buy-share deviation from 0.5 has stdev ~0.024 and 90th-percentile
+    // magnitude ~0.043 — 0.08 (the original guess) is close to the observed
+    // max and essentially never fires. 0.02 sits just under 1 stdev.
+    const threshold = params?.threshold ?? 0.02
+    if (candles.length < period + 1) return HOLD('not enough candles')
+    const window = candles.slice(-period)
+    if (window.some((c) => c.takerBuyVolume == null))
+      return HOLD('taker buy volume unavailable for this candle set')
+    const takerBuy = window.reduce((s, c) => s + (c.takerBuyVolume ?? 0), 0)
+    const totalVolume = window.reduce((s, c) => s + c.volume, 0)
+    if (totalVolume <= 0) return HOLD('no volume in window')
+    const deviation = takerBuy / totalVolume - 0.5
+    // Real BTC 1h data: deviation stdev ~0.024, 90th-pct magnitude ~0.043.
+    // Dividing by the theoretical max range (0.5) capped confidence at ~0.3
+    // even at the largest deviations ever observed — a dead formula, same
+    // bug class as sma_crossover's original near-zero-at-the-cross issue.
+    // Scaled instead against the real distribution: confidence clears the
+    // council's 0.6 threshold a bit past 1 stdev, not at a value the data
+    // essentially never reaches.
+    const confidence = Math.min(1, 0.2 + Math.abs(deviation) * 15)
+    if (deviation > threshold) {
+      return {
+        signal: 'BUY',
+        confidence,
+        reason: `taker buy share ${(50 + deviation * 100).toFixed(1)}% over ${period}c (persistent buy pressure)`,
+      }
+    }
+    if (deviation < -threshold) {
+      return {
+        signal: 'SELL',
+        confidence,
+        reason: `taker buy share ${(50 + deviation * 100).toFixed(1)}% over ${period}c (persistent sell pressure)`,
+      }
+    }
+    return HOLD('no persistent taker imbalance')
+  },
+}
+
 export const STRATEGIES: Array<Strategy> = [
   smaCrossoverStrategy,
   rsiReversionStrategy,
@@ -608,6 +671,7 @@ export const STRATEGIES: Array<Strategy> = [
   trendPullbackStrategy,
   chaikinVolumeStrategy,
   keltnerChannelStrategy,
+  takerImbalanceStrategy,
 ]
 
 export function getStrategy(id: string): Strategy | undefined {

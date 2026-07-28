@@ -21,6 +21,7 @@ import {
   scaledQuoteSize,
   sma,
   smaCrossoverStrategy,
+  takerImbalanceStrategy,
   trendIsStrong,
   trendPullbackStrategy,
   trueRange,
@@ -362,7 +363,13 @@ describe('new strategies', () => {
 
 function ohlcv(
   openTime: number,
-  vals: { high: number; low: number; close: number; volume: number },
+  vals: {
+    high: number
+    low: number
+    close: number
+    volume: number
+    takerBuyVolume?: number
+  },
 ): Candle {
   return {
     openTime,
@@ -371,6 +378,7 @@ function ohlcv(
     low: vals.low,
     close: vals.close,
     volume: vals.volume,
+    takerBuyVolume: vals.takerBuyVolume,
   }
 }
 
@@ -468,6 +476,60 @@ describe('keltnerChannelStrategy', () => {
       ohlcv(1, { high: 116, low: 114, close: 115, volume: 1 }),
     ]
     expect(keltnerChannelStrategy.evaluate(candles).signal).toBe('HOLD')
+  })
+})
+
+describe('takerImbalanceStrategy', () => {
+  it('buys on persistent taker buy pressure, with confidence clearing the council threshold', () => {
+    const candles: Array<Candle> = Array.from({ length: 21 }, (_, i) =>
+      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 7 }),
+    )
+    const d = takerImbalanceStrategy.evaluate(candles)
+    expect(d.signal).toBe('BUY')
+    expect(d.reason).toContain('buy pressure')
+    // Regression guard: the original confidence formula (dividing deviation
+    // by the theoretical 0.5 max) capped out around 0.3 even at the largest
+    // deviations ever observed in real data, so it never cleared the
+    // council's default 0.6 vote threshold and the strategy silently never
+    // led a trade in any backtest — same bug class as sma_crossover's
+    // original near-zero-at-the-cross confidence.
+    expect(d.confidence).toBeGreaterThanOrEqual(0.6)
+  })
+
+  it('sells on persistent taker sell pressure', () => {
+    const candles: Array<Candle> = Array.from({ length: 21 }, (_, i) =>
+      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 3 }),
+    )
+    const d = takerImbalanceStrategy.evaluate(candles)
+    expect(d.signal).toBe('SELL')
+    expect(d.reason).toContain('sell pressure')
+    expect(d.confidence).toBeGreaterThanOrEqual(0.6)
+  })
+
+  it('holds when taker volume is balanced', () => {
+    const candles: Array<Candle> = Array.from({ length: 21 }, (_, i) =>
+      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 5 }),
+    )
+    expect(takerImbalanceStrategy.evaluate(candles).signal).toBe('HOLD')
+  })
+
+  it('holds when takerBuyVolume is missing from any candle in the window, rather than treating it as zero', () => {
+    const candles: Array<Candle> = Array.from({ length: 21 }, (_, i) =>
+      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 7 }),
+    )
+    // Drop the field on the most recent candle — guaranteed inside the
+    // rolling window regardless of period, unlike an older out-of-window one.
+    candles[candles.length - 1].takerBuyVolume = undefined
+    const d = takerImbalanceStrategy.evaluate(candles)
+    expect(d.signal).toBe('HOLD')
+    expect(d.reason).toContain('unavailable')
+  })
+
+  it('holds below minCandles regardless of the pattern', () => {
+    const candles: Array<Candle> = Array.from({ length: 10 }, (_, i) =>
+      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 9 }),
+    )
+    expect(takerImbalanceStrategy.evaluate(candles).signal).toBe('HOLD')
   })
 })
 

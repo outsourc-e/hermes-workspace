@@ -365,6 +365,7 @@ export async function fetchBinanceKlines(
     close: number
     volume: number
     closeTime: number
+    takerBuyVolume: number
   }>
 > {
   const cappedLimit = Math.max(1, Math.min(limit, 1000))
@@ -378,6 +379,9 @@ export async function fetchBinanceKlines(
     close: parseFloat(String(k[4])),
     volume: parseFloat(String(k[5])),
     closeTime: Number(k[6]),
+    // Binance kline field index 9 (takerBuyBaseAssetVolume) — aggressor buy
+    // volume within the bar, used by the taker-imbalance strategy.
+    takerBuyVolume: parseFloat(String(k[9])),
   }))
 }
 
