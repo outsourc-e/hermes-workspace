@@ -140,6 +140,79 @@ describe('projectSessionCards', () => {
     },
   )
 
+  it('uses explicit server-authoritative relationship facts without re-inferring lifecycle order', () => {
+    const root = session(
+      'root',
+      {
+        source: 'cli',
+        endReason: 'compression',
+        endedAt: 200,
+        relationshipKind: 'root',
+      },
+      200,
+    )
+    const continuation = session(
+      'continuation',
+      {
+        parentSessionId: 'root',
+        source: 'cli',
+        startedAt: 150,
+        relationshipKind: 'continuation',
+      },
+      300,
+    )
+    const branch = session(
+      'branch',
+      {
+        parentSessionId: 'root',
+        source: 'cli',
+        relationshipKind: 'branch',
+      },
+      400,
+    )
+    const delegate = session(
+      'delegate',
+      {
+        parentSessionId: 'root',
+        source: 'tool',
+        relationshipKind: 'child',
+      },
+      350,
+    )
+    const orphan = session(
+      'orphan',
+      { source: 'cli', relationshipKind: 'orphan' },
+      100,
+    )
+
+    const projection = projectSessionCards([
+      root,
+      continuation,
+      branch,
+      delegate,
+      orphan,
+    ])
+
+    expect(projection.indexByCardId.get('root')).toMatchObject({
+      canonicalSegmentKey: 'continuation',
+      continuationSegmentKeys: ['root', 'continuation'],
+      childNodes: [
+        expect.objectContaining({
+          cardId: 'branch',
+          relationshipKind: 'branch',
+        }),
+        expect.objectContaining({
+          cardId: 'delegate',
+          relationshipKind: 'child',
+        }),
+      ],
+    })
+    expect(projection.indexByCardId.get('orphan')).toMatchObject({
+      relationshipKind: 'orphan',
+      childNodes: [],
+    })
+  })
+
   it('keeps branch and delegate components out of the parent continuation', () => {
     const [root, second, third] = continuationChain()
     const branch = session(
@@ -201,6 +274,76 @@ describe('projectSessionCards', () => {
     })
     expect(parent?.continuationSegmentKeys).not.toContain('branch')
     expect(parent?.continuationSegmentKeys).not.toContain('delegate')
+  })
+
+  it('keeps three Card levels reachable while collapsing each confirmed continuation chain once', () => {
+    const root = session('root', undefined, 10)
+    const rootContinuation = session(
+      'root-tip',
+      {
+        parentSessionId: 'root',
+        relationshipKind: 'continuation',
+        source: 'cli',
+      },
+      20,
+    )
+    const child = session(
+      'child',
+      {
+        parentSessionId: 'root-tip',
+        relationshipKind: 'child',
+      },
+      30,
+    )
+    const childContinuation = session(
+      'child-tip',
+      {
+        parentSessionId: 'child',
+        relationshipKind: 'continuation',
+        source: 'cli',
+      },
+      40,
+    )
+    const grandchild = session(
+      'grandchild',
+      {
+        parentSessionId: 'child-tip',
+        relationshipKind: 'branch',
+      },
+      50,
+    )
+
+    const projection = projectSessionCards([
+      grandchild,
+      childContinuation,
+      rootContinuation,
+      child,
+      root,
+    ])
+
+    expect(projection.roots.map((card) => card.cardId)).toEqual(['root'])
+    expect(projection.cards.map((card) => card.cardId).sort()).toEqual([
+      'child',
+      'grandchild',
+      'root',
+    ])
+    expect(projection.indexByCardId.get('root')).toMatchObject({
+      canonicalSegmentKey: 'root-tip',
+      continuationSegmentKeys: ['root', 'root-tip'],
+      childNodes: [expect.objectContaining({ cardId: 'child' })],
+    })
+    expect(projection.indexByCardId.get('child')).toMatchObject({
+      parentCardId: 'root',
+      canonicalSegmentKey: 'child-tip',
+      continuationSegmentKeys: ['child', 'child-tip'],
+      childNodes: [expect.objectContaining({ cardId: 'grandchild' })],
+    })
+    expect(projection.indexByCardId.get('grandchild')).toMatchObject({
+      parentCardId: 'child',
+      childNodes: [],
+    })
+    expect(projection.cardIdBySessionKey.get('root-tip')).toBe('root')
+    expect(projection.cardIdBySessionKey.get('child-tip')).toBe('child')
   })
 
   it('projects child lifecycle activity only through its validated parent Card', () => {

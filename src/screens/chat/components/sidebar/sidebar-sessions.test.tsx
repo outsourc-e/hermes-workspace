@@ -250,6 +250,94 @@ describe('SidebarSessions Card-only surface', () => {
     expect(screen.getByText(/running/i)).toBeTruthy()
   })
 
+  it('renders a three-level Card tree once and routes every child identity through its root Card', () => {
+    const root = card({
+      cardId: 'card:root',
+      title: 'Root conversation',
+      canonicalSegmentKey: 'remote:root-tip',
+      continuationSegmentKeys: ['card:root', 'remote:root-tip'],
+      childNodes: [
+        {
+          cardId: 'card:child',
+          sessionKey: 'remote:child-tip',
+          continuationSegmentKeys: ['card:child', 'remote:child-tip'],
+          relationshipKind: 'child',
+          title: 'Child conversation',
+          status: 'running',
+          updatedAt: 30,
+          continuationCount: 2,
+        },
+      ],
+    })
+    const child = card({
+      cardId: 'card:child',
+      title: 'Child conversation',
+      canonicalSegmentKey: 'remote:child-tip',
+      continuationSegmentKeys: ['card:child', 'remote:child-tip'],
+      continuationCount: 2,
+      relationshipKind: 'child',
+      parentCardId: 'card:root',
+      childNodes: [
+        {
+          cardId: 'card:grandchild',
+          sessionKey: 'remote:grandchild',
+          continuationSegmentKeys: ['card:grandchild'],
+          relationshipKind: 'branch',
+          title: 'Grandchild branch',
+          status: 'complete',
+          updatedAt: 40,
+          continuationCount: 1,
+        },
+      ],
+    })
+    const grandchild = card({
+      cardId: 'card:grandchild',
+      title: 'Grandchild branch',
+      canonicalSegmentKey: 'card:grandchild',
+      continuationSegmentKeys: ['card:grandchild'],
+      continuationCount: 1,
+      relationshipKind: 'branch',
+      parentCardId: 'card:child',
+      childNodes: [],
+    })
+
+    renderSidebar({
+      cards: [root, child, grandchild],
+      inspectedChildCardId: 'card:grandchild',
+    })
+
+    expect(document.querySelectorAll('[data-card-id]')).toHaveLength(1)
+    expect(document.querySelectorAll('[data-card-child-id]')).toHaveLength(2)
+    expect(screen.getAllByText('Root conversation')).toHaveLength(1)
+    expect(screen.getAllByText('Child conversation')).toHaveLength(1)
+    expect(screen.getAllByText('Grandchild branch')).toHaveLength(1)
+
+    const rootLink = screen.getByText('Root conversation').closest('a')
+    const childLink = screen.getByText('Child conversation').closest('a')
+    const grandchildLink = screen.getByText('Grandchild branch').closest('a')
+    expect(rootLink?.getAttribute('href')).toBe('/chat/card:root')
+    expect(rootLink?.getAttribute('aria-current')).toBe('page')
+    expect(childLink?.getAttribute('href')).toBe(
+      '/chat/card:root?inspect=card:child',
+    )
+    expect(grandchildLink?.getAttribute('href')).toBe(
+      '/chat/card:root?inspect=card:grandchild',
+    )
+    expect(grandchildLink?.getAttribute('data-inspected')).toBe('true')
+    expect(
+      screen
+        .getByText('Child conversation')
+        .closest('[data-card-child-id]')
+        ?.getAttribute('data-card-child-id'),
+    ).toBe('card:child')
+    expect(
+      screen
+        .getByText('Grandchild branch')
+        .closest('[data-card-child-id]')
+        ?.getAttribute('data-card-child-id'),
+    ).toBe('card:grandchild')
+  })
+
   it('exposes Card-keyed actions only on the parent row', () => {
     const onTogglePin = vi.fn()
     const onRename = vi.fn()

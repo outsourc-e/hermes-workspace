@@ -158,11 +158,28 @@ export function classifySessionRelationship(
 
   const lineage = session.lineage
   const parentId = lineage?.parentSessionId
+  const authoritativeKind = lineage?.relationshipKind as string | undefined
+
+  // The topology endpoint can provide an already validated relationship fact.
+  // Preserve that fact without re-inferring lifecycle timing, while retaining
+  // this layer's missing-parent, cycle, and depth fail-closed boundaries.
+  if (authoritativeKind === 'orphan') return 'orphan'
+  if (authoritativeKind === 'root') return parentId ? 'orphan' : 'root'
+  if (
+    authoritativeKind !== undefined &&
+    authoritativeKind !== 'continuation' &&
+    authoritativeKind !== 'branch' &&
+    authoritativeKind !== 'child'
+  ) {
+    return 'orphan'
+  }
+
   if (!parentId) {
     // A backend can retain child/fork context when its parent is absent from
     // this page or surface. Keep that session discoverable as an orphan
     // instead of silently promoting it to an unrelated root.
     if (
+      authoritativeKind !== undefined ||
       lineage?.sessionSource?.trim().toLowerCase() === 'fork' ||
       lineage?.relationshipType === 'child_session' ||
       lineage?.isCrossSurfaceChild === true ||
@@ -179,6 +196,14 @@ export function classifySessionRelationship(
 
   const maxDepth = Math.max(1, options?.maxDepth ?? DEFAULT_MAX_DEPTH)
   if (hasUnsafeAncestorPath(session, sessionsById, maxDepth)) return 'orphan'
+
+  if (
+    authoritativeKind === 'continuation' ||
+    authoritativeKind === 'branch' ||
+    authoritativeKind === 'child'
+  ) {
+    return authoritativeKind
+  }
 
   if (lineage.sessionSource?.trim().toLowerCase() === 'fork') return 'branch'
   if (lineage.relationshipType === 'child_session') return 'child'

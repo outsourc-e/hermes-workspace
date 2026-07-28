@@ -41,15 +41,15 @@ type SidebarSessionsProps = {
   onRetry: () => void
 }
 
+type CardRowChild = SessionCardChild & {
+  childNodes?: Array<CardRowChild>
+}
+
 type CardRowNode = Pick<
   SessionCard,
-  | 'cardId'
-  | 'title'
-  | 'updatedAt'
-  | 'relationshipKind'
-  | 'continuationCount'
-  | 'childNodes'
+  'cardId' | 'title' | 'updatedAt' | 'relationshipKind' | 'continuationCount'
 > & {
+  childNodes: Array<CardRowChild>
   status?: SessionCardChild['status']
 }
 
@@ -82,19 +82,23 @@ export const SidebarSessions = memo(function SidebarSessions({
       ),
     [cardResolutions],
   )
-  const roots = useMemo(
+  const completeCards = useMemo(
     () =>
       sessionCards.filter(
         (card) =>
           resolutionByCardId.get(card.cardId)?.completeness === 'complete',
       ),
-    [completeness, resolutionByCardId, sessionCards],
+    [resolutionByCardId, sessionCards],
+  )
+  const roots = useMemo(
+    () => completeCards.filter((card) => card.parentCardId === undefined),
+    [completeCards],
   )
   const inventoryIncomplete =
-    completeness !== 'complete' || roots.length !== sessionCards.length
+    completeness !== 'complete' || completeCards.length !== sessionCards.length
   const cardsById = useMemo(
-    () => new Map(roots.map((card) => [card.cardId, card])),
-    [roots],
+    () => new Map(completeCards.map((card) => [card.cardId, card])),
+    [completeCards],
   )
 
   const pinnedCardIds = useMemo(
@@ -116,7 +120,11 @@ export const SidebarSessions = memo(function SidebarSessions({
       nextAncestorCardIds.add(node.cardId)
       const childResults = node.childNodes.flatMap((child) => {
         if (nextAncestorCardIds.has(child.cardId)) return []
-        const nestedChildNodes = cardsById.get(child.cardId)?.childNodes ?? []
+        const nestedCard = cardsById.get(child.cardId)
+        const nestedChildNodes =
+          nestedCard?.parentCardId === node.cardId
+            ? nestedCard.childNodes
+            : (child.childNodes ?? [])
         return [
           buildRow(
             {
