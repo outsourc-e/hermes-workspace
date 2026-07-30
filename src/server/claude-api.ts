@@ -18,6 +18,7 @@ import {
   createSession as createDashboardSession,
   deleteSession as deleteDashboardSession,
   getLatestDescendant as getDashboardLatestDescendant,
+  getSessionExport as getDashboardSessionExport,
   getSession as getDashboardSession,
   getSessionMessages as getDashboardSessionMessages,
   listSessions as listDashboardSessions,
@@ -101,6 +102,11 @@ export type ClaudeMessagesResult = {
   resolvedSessionId?: string
   total?: number
   truncated?: boolean
+}
+
+export type GetMessagesOptions = {
+  /** Read the requested persisted segment instead of resolving it to a resume tip. */
+  exact?: boolean
 }
 
 export type ClaudeConfig = {
@@ -272,11 +278,20 @@ export async function deleteSession(sessionId: string): Promise<void> {
 export async function getMessagesResult(
   sessionId: string,
   pinnedSource?: ClaudeSessionSource,
+  options?: GetMessagesOptions,
 ): Promise<ClaudeMessagesResult> {
   const source =
     pinnedSource ??
     (getCapabilities().dashboard.available ? 'dashboard' : 'gateway')
   if (source === 'dashboard') {
+    if (options?.exact) {
+      const resp = await getDashboardSessionExport(sessionId)
+      return {
+        messages: resp.messages as Array<ClaudeMessage>,
+        source: 'dashboard',
+        ...(typeof resp.id === 'string' ? { resolvedSessionId: resp.id } : {}),
+      }
+    }
     const resp = await getDashboardSessionMessages(sessionId)
     const messages = resp.messages as Array<ClaudeMessage>
     return {

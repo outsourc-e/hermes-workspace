@@ -46,6 +46,11 @@ export type DashboardMessage = {
   reasoning?: string | null
 }
 
+/** Exact persisted session row plus its messages from the dashboard export API. */
+export type DashboardSessionExport = DashboardSession & {
+  messages: Array<DashboardMessage>
+}
+
 export type SessionSearchResponse = {
   results: Array<{
     session_id: string
@@ -147,6 +152,16 @@ export async function getSessionMessages(id: string): Promise<{
   model?: string
 }> {
   return dashboardJson(`/api/sessions/${encodeURIComponent(id)}/messages`)
+}
+
+/**
+ * Read one exact persisted segment without the dashboard's resume-to-tip
+ * behavior used by its interactive message route.
+ */
+export async function getSessionExport(
+  id: string,
+): Promise<DashboardSessionExport> {
+  return dashboardJson(`/api/sessions/${encodeURIComponent(id)}/export`)
 }
 
 export async function searchSessions(

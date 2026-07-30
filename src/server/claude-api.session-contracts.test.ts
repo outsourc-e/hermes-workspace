@@ -22,6 +22,7 @@ const dashboardMocks = vi.hoisted(() => ({
   createSession: vi.fn(),
   deleteSession: vi.fn(),
   getSession: vi.fn(),
+  getSessionExport: vi.fn(),
   getSessionMessages: vi.fn(),
   listSessions: vi.fn(),
   searchSessions: vi.fn(),
@@ -257,6 +258,25 @@ describe('Session Card adapter foundations', () => {
     dashboardMocks.getSessionMessages.mockRejectedValue(failure)
     await expect(getMessagesResult('session')).rejects.toBe(failure)
     await expect(getMessages('session')).rejects.toBe(failure)
+  })
+
+  it('reads an exact dashboard segment through the export API', async () => {
+    dashboardMocks.getSessionExport.mockResolvedValue({
+      id: 'persisted-parent',
+      messages: [{ id: 'parent-message', role: 'user', content: 'original' }],
+    })
+
+    await expect(
+      getMessagesResult('persisted-parent', 'dashboard', { exact: true }),
+    ).resolves.toEqual({
+      messages: [{ id: 'parent-message', role: 'user', content: 'original' }],
+      source: 'dashboard',
+      resolvedSessionId: 'persisted-parent',
+    })
+    expect(dashboardMocks.getSessionExport).toHaveBeenCalledWith(
+      'persisted-parent',
+    )
+    expect(dashboardMocks.getSessionMessages).not.toHaveBeenCalled()
   })
 
   it('preserves the gateway canonical session identity without changing the legacy wrapper', async () => {

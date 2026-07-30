@@ -103,7 +103,13 @@ function defaultMessageSource(): SessionCardHistoryMessageSource {
           `Unknown session history source: ${source ?? 'missing'}`,
         )
       }
-      const result = await getMessagesResult(segmentKey, source)
+      // The interactive dashboard history route deliberately follows a
+      // compression continuation to its live tip. A Card needs each exact
+      // persisted segment instead; otherwise every ancestor is indistinguishable
+      // from the tip and the completeness proof correctly fails.
+      const result = await getMessagesResult(segmentKey, source, {
+        exact: true,
+      })
       return {
         messages: result.messages as Array<SessionCardUpstreamMessage>,
         source: result.source,
@@ -245,6 +251,50 @@ function stableMessageId(
   )
 }
 
+function continuationMessageIdentity(
+  message: SessionCardUpstreamMessage,
+): string | undefined {
+  // A matching timestamp makes a content match evidence of a cloned persisted
+  // row, not merely a user repeating the same text in a later turn.
+  if (typeof message.timestamp !== 'number') return undefined
+  // Compression can clone a retained prefix into the child with new database
+  // row IDs. Keep source-visible content and timestamps, but discard only the
+  // transport/session identities that change during that clone.
+  const {
+    id: _id,
+    stableId: _stableId,
+    session_id: _sessionId,
+    ...value
+  } = message
+  return JSON.stringify(value)
+}
+
+function adjacentContinuationOverlap(
+  previous: Array<SessionCardHistoryEntry>,
+  next: Array<SessionCardUpstreamMessage>,
+): number {
+  const max = Math.min(previous.length, next.length)
+  for (let overlap = max; overlap > 0; overlap -= 1) {
+    let matches = true
+    for (let index = 0; index < overlap; index += 1) {
+      const previousIdentity = continuationMessageIdentity(
+        previous[previous.length - overlap + index]!.message,
+      )
+      const nextIdentity = continuationMessageIdentity(next[index]!)
+      if (
+        !previousIdentity ||
+        !nextIdentity ||
+        previousIdentity !== nextIdentity
+      ) {
+        matches = false
+        break
+      }
+    }
+    if (matches) return overlap
+  }
+  return 0
+}
+
 type AggregatedCardHistory = {
   messages: Array<SessionCardHistoryEntry>
   missingSegments: Array<SessionCardHistoryMissingSegment>
@@ -260,6 +310,7 @@ async function aggregateCardSegmentHistory(
   const missingSegments: Array<SessionCardHistoryMissingSegment> = []
   const retrievedSegments: Array<RetrievedSegmentSnapshot> = []
   let previousLoadedBoundaryId: string | undefined
+  let hasContiguousLoadedHistory = false
   let truncated = false
 
   // Every Card follows this path. A standalone Card is simply an ordered segment
@@ -276,6 +327,7 @@ async function aggregateCardSegmentHistory(
         error: 'Validated segment source is unavailable.',
       })
       previousLoadedBoundaryId = undefined
+      hasContiguousLoadedHistory = false
       continue
     }
 
@@ -306,9 +358,15 @@ async function aggregateCardSegmentHistory(
         firstId &&
         previousLoadedBoundaryId === firstId,
       )
-      const retained = startsWithBoundaryDuplicate
-        ? segmentMessages.slice(1)
-        : segmentMessages
+      const overlap = hasContiguousLoadedHistory
+        ? adjacentContinuationOverlap(messages, segmentMessages)
+        : 0
+      const retained =
+        overlap > 0
+          ? segmentMessages.slice(overlap)
+          : startsWithBoundaryDuplicate
+            ? segmentMessages.slice(1)
+            : segmentMessages
       for (const message of retained) {
         messages.push({ segmentKey, message })
       }
@@ -320,6 +378,7 @@ async function aggregateCardSegmentHistory(
           segmentMessages[segmentMessages.length - 1]!,
         )
       }
+      hasContiguousLoadedHistory = true
     } catch (error) {
       missingSegments.push({
         segmentKey,
@@ -330,6 +389,7 @@ async function aggregateCardSegmentHistory(
       // A failed segment makes adjacent-boundary identity unprovable. Never
       // de-duplicate across that gap or replace the aggregate with the tip.
       previousLoadedBoundaryId = undefined
+      hasContiguousLoadedHistory = false
     }
   }
 

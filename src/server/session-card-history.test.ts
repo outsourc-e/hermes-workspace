@@ -220,6 +220,44 @@ describe('SessionCardHistoryService', () => {
     ])
   })
 
+  it('removes a cloned continuation prefix even when persisted row IDs change', async () => {
+    const messages = source({
+      first: [
+        { id: 'parent-1', role: 'user', content: 'first', timestamp: 10 },
+        {
+          id: 'parent-2',
+          role: 'assistant',
+          content: 'second',
+          timestamp: 11,
+        },
+      ],
+      second: [
+        { id: 'child-1', role: 'user', content: 'first', timestamp: 10 },
+        {
+          id: 'child-2',
+          role: 'assistant',
+          content: 'second',
+          timestamp: 11,
+        },
+        { id: 'child-3', role: 'user', content: 'third', timestamp: 12 },
+      ],
+      third: [],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => chain()),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'first' })
+
+    expect(result.messages.map((entry) => entry.message.id)).toEqual([
+      'parent-1',
+      'parent-2',
+      'child-3',
+    ])
+  })
+
   it('deduplicates across successful empty segments using the last nonempty boundary', async () => {
     const messages = source({
       first: [{ id: 'boundary', content: 'original' }],
@@ -263,6 +301,31 @@ describe('SessionCardHistoryService', () => {
     expect(result.messages.map((entry) => entry.message.content)).toEqual([
       'original',
       'must be retained after gap',
+      'retained',
+    ])
+    expect(result).toMatchObject({ completeness: 'partial', retryable: true })
+  })
+
+  it('does not remove cloned-prefix rows across an unavailable segment gap', async () => {
+    const messages = source({
+      first: [{ id: 'parent', content: 'same', timestamp: 10 }],
+      second: new Error('gap unavailable'),
+      third: [
+        { id: 'child', content: 'same', timestamp: 10 },
+        { id: 'retained', content: 'later', timestamp: 11 },
+      ],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => chain()),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'first' })
+
+    expect(result.messages.map((entry) => entry.message.id)).toEqual([
+      'parent',
+      'child',
       'retained',
     ])
     expect(result).toMatchObject({ completeness: 'partial', retryable: true })
