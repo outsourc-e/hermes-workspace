@@ -414,9 +414,16 @@ export class SessionTopologyClient implements SessionTopologySource {
   }
 }
 
-export function createSessionTopologyClientFromEnv(): SessionTopologyClient {
+export function createSessionTopologyClientFromEnv(): SessionTopologyClient | null {
+  const baseUrl = process.env.SESSION_TOPOLOGY_ADAPTER_URL
+  // The standalone launcher sources `.env` for Workspace and gateway settings,
+  // while the topology adapter itself only exists in the Compose deployment.
+  // A token-only `.env` is therefore valid outside Compose and must not make
+  // every Session Card projection retryable/incomplete.
+  if (!isExactNonemptyString(baseUrl)) return null
+
   return new SessionTopologyClient({
-    baseUrl: process.env.SESSION_TOPOLOGY_ADAPTER_URL,
+    baseUrl,
     token: process.env.SESSION_TOPOLOGY_ADAPTER_TOKEN,
   })
 }

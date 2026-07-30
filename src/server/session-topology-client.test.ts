@@ -1,6 +1,25 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { SessionTopologyClient } from './session-topology-client'
+import {
+  SessionTopologyClient,
+  createSessionTopologyClientFromEnv,
+} from './session-topology-client'
+
+const originalTopologyAdapterUrl = process.env.SESSION_TOPOLOGY_ADAPTER_URL
+const originalTopologyAdapterToken = process.env.SESSION_TOPOLOGY_ADAPTER_TOKEN
+
+afterEach(() => {
+  if (originalTopologyAdapterUrl === undefined) {
+    delete process.env.SESSION_TOPOLOGY_ADAPTER_URL
+  } else {
+    process.env.SESSION_TOPOLOGY_ADAPTER_URL = originalTopologyAdapterUrl
+  }
+  if (originalTopologyAdapterToken === undefined) {
+    delete process.env.SESSION_TOPOLOGY_ADAPTER_TOKEN
+  } else {
+    process.env.SESSION_TOPOLOGY_ADAPTER_TOKEN = originalTopologyAdapterToken
+  }
+})
 
 function topologyRow(
   id: string,
@@ -28,6 +47,22 @@ function topologyRow(
 }
 
 describe('SessionTopologyClient', () => {
+  it('disables optional topology enrichment for a token-only standalone environment', () => {
+    delete process.env.SESSION_TOPOLOGY_ADAPTER_URL
+    process.env.SESSION_TOPOLOGY_ADAPTER_TOKEN = 'compose-token'
+
+    expect(createSessionTopologyClientFromEnv()).toBeNull()
+  })
+
+  it('creates topology enrichment only when its adapter URL is configured', () => {
+    process.env.SESSION_TOPOLOGY_ADAPTER_URL = 'http://topology.internal:8080'
+    process.env.SESSION_TOPOLOGY_ADAPTER_TOKEN = 'compose-token'
+
+    expect(createSessionTopologyClientFromEnv()).toBeInstanceOf(
+      SessionTopologyClient,
+    )
+  })
+
   it('uses the private bearer and aggregates one authenticated snapshot across pages, including archives', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
