@@ -33,23 +33,19 @@ import { LogsTailCard } from './components/logs-tail-card'
 import { OperatorTipCard } from './components/operator-tip-card'
 import { OpsStrip } from './components/ops-strip'
 import { ProviderMixCard } from './components/provider-mix-card'
-import { SessionsIntelligenceCard } from './components/sessions-intelligence-card'
+
 import { SkillsUsageCard } from './components/skills-usage-card'
 import { TokenMixHourCard } from './components/token-mix-hour-card'
 import { TopModelsCard } from './components/top-models-card'
 import { VelocityCard } from './components/velocity-card'
 import { WidgetShell } from './components/widget-shell'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
-import type { SessionRowData } from './components/sessions-intelligence-card'
+
 import type { AnalyticsPeriod } from './components/analytics-chart-card'
 import type { ReactNode } from 'react'
 import type { ClaudeSession } from '@/server/claude-api'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
-import {
-  fetchSessionCards,
-  sessionCardQueryKeys,
-} from '@/screens/chat/chat-queries'
-import { isCardProjectionComplete } from '@/routes/chat/-session-route-state'
+
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { cn } from '@/lib/utils'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
@@ -668,51 +664,6 @@ function SessionRow({
 export function DashboardScreen() {
   const navigate = useNavigate()
   const skillsAvailable = useFeatureAvailable('skills')
-  const sessionCardsQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false, 12),
-    queryFn: () => fetchSessionCards({ limit: 12 }),
-    staleTime: 10_000,
-    refetchInterval: 30_000,
-    retry: 1,
-  })
-
-  const completeCards = useMemo(
-    () =>
-      (sessionCardsQuery.data?.cards ?? []).filter((card) =>
-        isCardProjectionComplete(sessionCardsQuery.data!, card.cardId),
-      ),
-    [sessionCardsQuery.data],
-  )
-
-  // Dashboard activity is a logical Card inventory. Continuation segments are
-  // represented once by their owning Card and never become independent rows.
-  const sessionRows: Array<SessionRowData> = useMemo(
-    () =>
-      [...completeCards]
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .slice(0, 12)
-        .map((card) => ({
-          key: card.cardId,
-          title: card.title,
-          kind: 'chat',
-          status: '',
-          source: card.canonicalSource ?? null,
-          model: null,
-          messageCount: 0,
-          toolCallCount: 0,
-          tokenCount: 0,
-          startedAt: card.updatedAt,
-          updatedAt: card.updatedAt,
-        })),
-    [completeCards],
-  )
-
-  const stats = {
-    totalSessions: sessionCardsQuery.data?.totalCards ?? completeCards.length,
-    totalMessages: 0,
-    totalToolCalls: 0,
-    totalTokens: 0,
-  }
 
   // Skills count for the SkillsUsageCard sub-text. Cheap query, used
   // only for the "X of Y used" microcopy.
@@ -770,6 +721,12 @@ export function DashboardScreen() {
     refetchInterval: 30_000,
   })
   const overview = overviewQuery.data ?? null
+  const stats = {
+    totalSessions: overview?.analytics?.totalSessions ?? 0,
+    totalMessages: 0,
+    totalToolCalls: overview?.analytics?.totalApiCalls ?? 0,
+    totalTokens: overview?.analytics?.totalTokens ?? 0,
+  }
 
   const palette = useDashboardPalette()
 
@@ -1113,25 +1070,7 @@ export function DashboardScreen() {
                 <OperatorTipCard overview={overview ?? null} />
               </WidgetShell>
             ) : null}
-            {layout.isVisible('sessions_intelligence') ? (
-              <div className="flex min-h-0 flex-1 flex-col">
-                <WidgetShell id="sessions_intelligence" layout={layout}>
-                  {sessionCardsQuery.isError ||
-                  (sessionCardsQuery.data?.completeness === 'incomplete' &&
-                    completeCards.length === 0) ? (
-                    <UnavailableWidget
-                      title="Recent Sessions"
-                      description="Session Card inventory is unavailable or incomplete."
-                    />
-                  ) : (
-                    <SessionsIntelligenceCard
-                      sessions={sessionRows}
-                      cardResponse={sessionCardsQuery.data}
-                    />
-                  )}
-                </WidgetShell>
-              </div>
-            ) : null}
+
             {layout.isVisible('logs_tail') ? (
               <WidgetShell id="logs_tail" layout={layout}>
                 <LogsTailCard logs={overview?.logs ?? null} />
@@ -1164,7 +1103,7 @@ export function DashboardScreen() {
               <WidgetShell id="mix_rhythm" layout={layout}>
                 <TokenMixHourCard
                   analytics={overview?.analytics ?? null}
-                  sessions={sessionRows}
+                  sessions={[]}
                 />
               </WidgetShell>
             </div>

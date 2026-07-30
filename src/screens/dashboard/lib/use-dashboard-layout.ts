@@ -17,7 +17,6 @@ export type WidgetId =
   | 'cache_efficiency'
   | 'velocity'
   | 'cost_ledger'
-  | 'sessions_intelligence'
   | 'logs_tail'
   | 'operator_tip'
   | 'skills_usage'
@@ -79,13 +78,7 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     column: 'main',
     hideable: true,
   },
-  {
-    id: 'sessions_intelligence',
-    label: 'Sessions intelligence',
-    description: 'Recent sessions with token / tool / status badges.',
-    column: 'main',
-    hideable: true,
-  },
+
   {
     id: 'logs_tail',
     label: 'Live logs',
