@@ -76,14 +76,17 @@ vi.mock('@tanstack/react-query', async (importOriginal) => ({
   },
   useInfiniteQuery: ({
     queryFn,
+    enabled = true,
   }: {
     queryFn?: (context: { pageParam?: string }) => unknown
+    enabled?: boolean
   }) => {
-    void queryFn?.({ pageParam: undefined })
+    if (enabled) void queryFn?.({ pageParam: undefined })
     return {
-      data: queryContext.sessionCardList
-        ? { pages: [queryContext.sessionCardList] }
-        : undefined,
+      data:
+        enabled && queryContext.sessionCardList
+          ? { pages: [queryContext.sessionCardList] }
+          : undefined,
       error: null,
       status: 'pending',
       isLoading: true,
@@ -386,7 +389,7 @@ afterEach(() => {
 })
 
 describe('workspace shell Session Card cutover', () => {
-  it('renders the populated Card session panel on a non-chat route without touching the retired sessions endpoint', async () => {
+  it('limits the Card session panel and its endpoint to Chat routes', async () => {
     installDesktopViewport()
     queryContext.sessionCardList = { ...sessionCardList, totalCards: 1 }
     const requestedPaths: Array<string> = []
@@ -423,6 +426,17 @@ describe('workspace shell Session Card cutover', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await mountWorkspaceShell('/dashboard')
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Session history')).toBeNull()
+      expect(screen.queryByTestId('sidebar-sessions')).toBeNull()
+    })
+    expect(requestedPaths).not.toContain('/api/session-cards?view=chat')
+    expect(requestedPaths).not.toContain('/api/session-cards/remote%3Aroot')
+    expect(requestedPaths).not.toContain('/api/session-cards')
+    expect(requestedPaths).not.toContain('/api/sessions')
+
+    await mountWorkspaceShell('/chat/new')
 
     await waitFor(() => {
       expect(requestedPaths).toContain('/api/session-cards?view=chat')
