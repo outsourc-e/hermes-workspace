@@ -579,15 +579,4 @@ describe('ChatSidebar Card-only integration', () => {
     expect(sidebarInvocation).toBeDefined()
     expect(sidebarInvocation).not.toMatch(/\bsessions=/)
   })
-
-  it('does not poll or render the full Card tree outside Chat routes', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/screens/chat/components/chat-sidebar.tsx'),
-      'utf8',
-    )
-
-    expect(source).toContain('enabled: isChatActive')
-    expect(source).toContain('showSessions={isChatActive}')
-    expect(source).toContain('{isChatActive ? (')
-  })
 })

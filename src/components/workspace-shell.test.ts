@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { waitFor } from '@testing-library/dom'
+import { screen, waitFor, within } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MOBILE_HAMBURGER_NAV_ITEMS } from './mobile-hamburger-menu'
@@ -26,6 +26,7 @@ const routerContext = vi.hoisted(() => ({
 
 const queryContext = vi.hoisted(() => ({
   invalidateQueries: vi.fn().mockResolvedValue(undefined),
+  sessionCardList: undefined as unknown,
 }))
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
@@ -80,7 +81,9 @@ vi.mock('@tanstack/react-query', async (importOriginal) => ({
   }) => {
     void queryFn?.({ pageParam: undefined })
     return {
-      data: undefined,
+      data: queryContext.sessionCardList
+        ? { pages: [queryContext.sessionCardList] }
+        : undefined,
       error: null,
       status: 'pending',
       isLoading: true,
@@ -206,7 +209,22 @@ vi.mock('@/screens/chat/components/sidebar/session-delete-dialog', () => ({
 }))
 
 vi.mock('@/screens/chat/components/sidebar/sidebar-sessions', () => ({
-  SidebarSessions: () => null,
+  SidebarSessions: ({
+    sessionCards,
+  }: {
+    sessionCards: Array<{ cardId: string; title: string }>
+  }) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'sidebar-sessions' },
+      sessionCards.map((card) =>
+        React.createElement(
+          'a',
+          { href: `/chat/${card.cardId}`, key: card.cardId },
+          card.title,
+        ),
+      ),
+    ),
 }))
 
 vi.mock('@/components/ui/button', () => ({
@@ -363,12 +381,14 @@ async function mountWorkspaceShell(path: string) {
 
 afterEach(() => {
   while (mountedRoots.length > 0) mountedRoots.pop()?.()
+  queryContext.sessionCardList = undefined
   vi.unstubAllGlobals()
 })
 
 describe('workspace shell Session Card cutover', () => {
-  it('mounts the Card list on a chat route without touching the retired sessions endpoint', async () => {
+  it('renders the populated Card session panel on a non-chat route without touching the retired sessions endpoint', async () => {
     installDesktopViewport()
+    queryContext.sessionCardList = { ...sessionCardList, totalCards: 1 }
     const requestedPaths: Array<string> = []
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path =
@@ -402,10 +422,12 @@ describe('workspace shell Session Card cutover', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    await mountWorkspaceShell('/chat/remote%3Aroot')
+    await mountWorkspaceShell('/dashboard')
 
     await waitFor(() => {
       expect(requestedPaths).toContain('/api/session-cards?view=chat')
+      const history = screen.getByLabelText('Session history')
+      expect(within(history).getByText('Root Card')).toBeTruthy()
     })
     expect(requestedPaths).not.toContain('/api/session-cards')
     expect(requestedPaths).not.toContain('/api/sessions')

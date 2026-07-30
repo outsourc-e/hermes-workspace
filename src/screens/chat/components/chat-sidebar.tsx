@@ -718,7 +718,7 @@ type DesktopSidebarContentProps = {
   profileDisplayName: string
   profileAvatarDataUrl: string | null
   handleOpenSettings: (section?: 'appearance' | 'claude') => void
-  /** The card tree is only useful on Chat routes and is expensive for large inventories. */
+  /** All normal desktop routes keep the shared session panel enabled. */
   showSessions: boolean
   sessionCards: Array<SessionCard>
   cardResolutions: SessionCardListWire['cardResolutions']
@@ -1008,13 +1008,11 @@ function ChatSidebarComponent({
       return typeof search.inspect === 'string' ? search.inspect : undefined
     },
   })
-  const sessionCardInventory = useChatSessionCardInventory({
-    enabled: isChatActive,
-  })
+  const sessionCardInventory = useChatSessionCardInventory()
   const sessionCardDetailQuery = useQuery({
     queryKey: sessionCardQueryKeys.detail(activeFriendlyId),
     queryFn: () => fetchSessionCard(activeFriendlyId),
-    enabled: isChatActive && activeFriendlyId !== 'new',
+    enabled: activeFriendlyId !== 'new' && isChatActive,
     retry: 1,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
@@ -1437,7 +1435,7 @@ function ChatSidebarComponent({
           profileDisplayName={profileDisplayName}
           profileAvatarDataUrl={profileAvatarDataUrl}
           handleOpenSettings={handleOpenSettings}
-          showSessions={isChatActive}
+          showSessions={true}
           sessionCards={sessionCardList?.cards ?? []}
           cardResolutions={sessionCardList?.cardResolutions ?? []}
           completeness={sessionCardList?.completeness ?? 'complete'}
@@ -1629,64 +1627,58 @@ function ChatSidebarComponent({
             </div>
 
             {/* Sessions list */}
-            {isChatActive ? (
-              <div className="shrink-0 mt-1 order-1">
-                <AnimatePresence initial={false}>
-                  {!isVisuallyCollapsed && (
-                    <motion.div
-                      key="content"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={transition}
-                      className="flex flex-col w-full min-h-0 h-full"
-                    >
-                      <div className="flex-1 min-h-0">
-                        <SidebarSessions
-                          sessionCards={sessionCardList?.cards ?? []}
-                          cardResolutions={
-                            sessionCardList?.cardResolutions ?? []
-                          }
-                          completeness={
-                            sessionCardList?.completeness ?? 'complete'
-                          }
-                          sessionForkAvailable={sessionForkAvailable}
-                          activeCardId={activeFriendlyId}
-                          inspectedChildCardId={inspectedChildCardId}
-                          onSelect={onSelectSession}
-                          onTogglePin={handleTogglePin}
-                          onRename={handleOpenRename}
-                          onArchive={handleOpenArchive}
-                          onBranch={handleBranch}
-                          pendingCardIds={cardActions.pendingCardIds}
-                          loading={sessionCardInventory.isLoading}
-                          fetching={sessionCardInventory.isFetching}
-                          error={
-                            !sessionCardInventory.sessionCardList &&
-                            sessionCardInventory.error instanceof Error
-                              ? sessionCardInventory.error.message
-                              : null
-                          }
-                          onRetry={() => void sessionCardInventory.refetch()}
-                          hasMoreOlderSessions={
-                            sessionCardInventory.hasNextPage
-                          }
-                          loadingOlderSessions={
-                            sessionCardInventory.isFetchingNextPage
-                          }
-                          olderSessionsError={
-                            sessionCardInventory.olderSessionsError
-                          }
-                          onLoadOlderSessions={() =>
-                            void sessionCardInventory.loadOlderSessions()
-                          }
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ) : null}
+            <div className="shrink-0 mt-1 order-1">
+              <AnimatePresence initial={false}>
+                {!isVisuallyCollapsed && (
+                  <motion.div
+                    key="content"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={transition}
+                    className="flex flex-col w-full min-h-0 h-full"
+                  >
+                    <div className="flex-1 min-h-0">
+                      <SidebarSessions
+                        sessionCards={sessionCardList?.cards ?? []}
+                        cardResolutions={sessionCardList?.cardResolutions ?? []}
+                        completeness={
+                          sessionCardList?.completeness ?? 'complete'
+                        }
+                        sessionForkAvailable={sessionForkAvailable}
+                        activeCardId={activeFriendlyId}
+                        inspectedChildCardId={inspectedChildCardId}
+                        onSelect={onSelectSession}
+                        onTogglePin={handleTogglePin}
+                        onRename={handleOpenRename}
+                        onArchive={handleOpenArchive}
+                        onBranch={handleBranch}
+                        pendingCardIds={cardActions.pendingCardIds}
+                        loading={sessionCardInventory.isLoading}
+                        fetching={sessionCardInventory.isFetching}
+                        error={
+                          !sessionCardInventory.sessionCardList &&
+                          sessionCardInventory.error instanceof Error
+                            ? sessionCardInventory.error.message
+                            : null
+                        }
+                        onRetry={() => void sessionCardInventory.refetch()}
+                        hasMoreOlderSessions={sessionCardInventory.hasNextPage}
+                        loadingOlderSessions={
+                          sessionCardInventory.isFetchingNextPage
+                        }
+                        olderSessionsError={
+                          sessionCardInventory.olderSessionsError
+                        }
+                        onLoadOlderSessions={() =>
+                          void sessionCardInventory.loadOlderSessions()
+                        }
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
           {/* end scrollable body */}
 
