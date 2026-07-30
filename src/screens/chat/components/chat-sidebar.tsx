@@ -718,7 +718,7 @@ type DesktopSidebarContentProps = {
   profileDisplayName: string
   profileAvatarDataUrl: string | null
   handleOpenSettings: (section?: 'appearance' | 'claude') => void
-  /** All normal desktop routes keep the shared session panel enabled. */
+  /** Whether the desktop Session Card panel should be visible. */
   showSessions: boolean
   sessionCards: Array<SessionCard>
   cardResolutions: SessionCardListWire['cardResolutions']
@@ -888,38 +888,42 @@ function DesktopSidebarContent({
             </MenuContent>
           </MenuRoot>
           <ThemeToggleMini />
-          <TooltipProvider>
-            <TooltipRoot>
-              <TooltipTrigger
-                onClick={onToggleCollapse}
-                render={
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={
-                      isVisuallyCollapsed
-                        ? 'Open sessions sidebar'
-                        : 'Close sessions sidebar'
-                    }
-                    data-tour="sidebar-collapse-toggle"
-                  >
-                    <HugeiconsIcon
-                      icon={
-                        isVisuallyCollapsed ? ArrowRight01Icon : ArrowLeft01Icon
+          {showSessions ? (
+            <TooltipProvider>
+              <TooltipRoot>
+                <TooltipTrigger
+                  onClick={onToggleCollapse}
+                  render={
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={
+                        isVisuallyCollapsed
+                          ? 'Open sessions sidebar'
+                          : 'Close sessions sidebar'
                       }
-                      size={18}
-                      strokeWidth={1.75}
-                    />
-                  </Button>
-                }
-              />
-              <TooltipContent side="right">
-                {isVisuallyCollapsed
-                  ? 'Open sessions sidebar'
-                  : 'Close sessions sidebar'}
-              </TooltipContent>
-            </TooltipRoot>
-          </TooltipProvider>
+                      data-tour="sidebar-collapse-toggle"
+                    >
+                      <HugeiconsIcon
+                        icon={
+                          isVisuallyCollapsed
+                            ? ArrowRight01Icon
+                            : ArrowLeft01Icon
+                        }
+                        size={18}
+                        strokeWidth={1.75}
+                      />
+                    </Button>
+                  }
+                />
+                <TooltipContent side="right">
+                  {isVisuallyCollapsed
+                    ? 'Open sessions sidebar'
+                    : 'Close sessions sidebar'}
+                </TooltipContent>
+              </TooltipRoot>
+            </TooltipProvider>
+          ) : null}
         </div>
       </nav>
 
@@ -1192,6 +1196,8 @@ function ChatSidebarComponent({
   const isHoverPreviewExpanded =
     sidebarHoverExpand && !isMobile && isCollapsed && isHoverExpanded
   const isVisuallyCollapsed = isCollapsed && !isHoverPreviewExpanded
+  const isDesktopNavigationOnly = !isMobile && !isChatActive
+  const isDesktopSidebarCompact = isVisuallyCollapsed || isDesktopNavigationOnly
 
   function handleSidebarToggle() {
     // In hover-preview mode, a click should dismiss the preview first;
@@ -1397,7 +1403,7 @@ function ChatSidebarComponent({
       }}
       initial={false}
       animate={{
-        width: isVisuallyCollapsed
+        width: isDesktopSidebarCompact
           ? isMobile
             ? 0
             : 48
@@ -1427,7 +1433,7 @@ function ChatSidebarComponent({
         <DesktopSidebarContent
           activeCardId={activeFriendlyId}
           inspectedChildCardId={inspectedChildCardId}
-          isVisuallyCollapsed={isVisuallyCollapsed}
+          isVisuallyCollapsed={isDesktopSidebarCompact}
           transition={transition}
           searchItem={searchItem}
           mainItems={mainItems}

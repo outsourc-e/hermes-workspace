@@ -430,6 +430,9 @@ describe('workspace shell Session Card cutover', () => {
     await waitFor(() => {
       expect(screen.queryByLabelText('Session history')).toBeNull()
       expect(screen.queryByTestId('sidebar-sessions')).toBeNull()
+      expect(
+        document.querySelector('[data-tour="sidebar-collapse-toggle"]'),
+      ).toBeNull()
     })
     expect(requestedPaths).not.toContain('/api/session-cards?view=chat')
     expect(requestedPaths).not.toContain('/api/session-cards/remote%3Aroot')
