@@ -14,6 +14,16 @@ if [[ -f "$ROOT/.env" ]]; then
   set +a
 fi
 
+# Compose injects the adapter's private service URL, but a direct stable launch
+# only receives the shared `.env` token. Reuse a healthy loopback adapter when
+# it is already supervised locally; otherwise leave the optional enrichment
+# disabled so Session Cards remain available without topology data.
+if [[ -z "${SESSION_TOPOLOGY_ADAPTER_URL:-}" ]] && \
+  [[ -n "${SESSION_TOPOLOGY_ADAPTER_TOKEN:-}" ]] && \
+  curl -fsS --max-time 2 http://127.0.0.1:8080/ready >/dev/null 2>&1; then
+  export SESSION_TOPOLOGY_ADAPTER_URL="http://127.0.0.1:8080"
+fi
+
 PORT="${PORT:-3002}"
 RUNTIME_DIR="$ROOT/.runtime"
 PID_FILE="$RUNTIME_DIR/hermes-workspace.pid"
