@@ -6,11 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MOBILE_HAMBURGER_NAV_ITEMS } from './mobile-hamburger-menu'
 import { MOBILE_NAV_TABS } from './mobile-tab-bar'
-import {
-  DESKTOP_SIDEBAR_BACKDROP_CLASS,
-  WorkspaceShell,
-  resolveShellActiveChatCardId,
-} from './workspace-shell'
+import { WorkspaceShell, resolveShellActiveChatCardId } from './workspace-shell'
 import { MOBILE_SWIPE_TAB_ORDER } from '@/hooks/use-swipe-navigation'
 import {
   buildChatCardNavigation,
@@ -433,6 +429,7 @@ describe('workspace shell Session Card cutover', () => {
       expect(
         document.querySelector('[data-tour="sidebar-collapse-toggle"]'),
       ).toBeNull()
+      expect(screen.queryByLabelText('Collapse navigation sidebar')).toBeNull()
     })
     expect(requestedPaths).not.toContain('/api/session-cards?view=chat')
     expect(requestedPaths).not.toContain('/api/session-cards/remote%3Aroot')
@@ -448,13 +445,6 @@ describe('workspace shell Session Card cutover', () => {
     })
     expect(requestedPaths).not.toContain('/api/session-cards')
     expect(requestedPaths).not.toContain('/api/sessions')
-  })
-})
-
-describe('workspace shell sidebar backdrop', () => {
-  it('only spans the desktop sidebar width, not the full viewport', () => {
-    expect(DESKTOP_SIDEBAR_BACKDROP_CLASS).toContain('w-[300px]')
-    expect(DESKTOP_SIDEBAR_BACKDROP_CLASS).not.toContain('inset-0')
   })
 })
 
