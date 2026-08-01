@@ -245,7 +245,7 @@ describe('gateway-capabilities', () => {
           headers: { 'content-type': 'application/json' },
         })
       }
-      if (url === 'http://dashboard.test/api/mcp') {
+      if (url === 'http://dashboard.test/api/mcp/servers' || url === 'http://dashboard.test/api/mcp') {
         return new Response('not found', { status: 404 })
       }
       if (url === 'http://dashboard.test/api/config') {
@@ -259,7 +259,7 @@ describe('gateway-capabilities', () => {
       if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream') {
         return new Response('', { status: 404 })
       }
-      if (url === 'http://gateway.test/api/mcp') {
+      if (url === 'http://gateway.test/api/mcp/servers' || url === 'http://gateway.test/api/mcp') {
         return new Response('', { status: 404 })
       }
       return new Response(JSON.stringify({ ok: true }), {
@@ -308,7 +308,8 @@ describe('gateway-capabilities', () => {
       }
       if (url === 'http://gateway.test/v1/chat/completions') return new Response('', { status: 405 })
       if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream') return new Response('', { status: 404 })
-      if (url.endsWith('/api/mcp')) return new Response('', { status: 404 })
+      if (url.endsWith('/api/mcp/servers') || url.endsWith('/api/mcp'))
+        return new Response('', { status: 404 })
       return new Response(JSON.stringify({ ok: true }), {
         headers: { 'content-type': 'application/json' },
       })
@@ -318,6 +319,55 @@ describe('gateway-capabilities', () => {
     const caps = await mod.probeGateway({ force: true })
 
     expect(caps.conductor).toBe(true)
+  })
+
+  it('marks MCP available when the dashboard only serves /api/mcp/servers', async () => {
+    // Regression for #725: the probe used to request /api/mcp, which the
+    // gateway answers with 404, so the MCP screen reported "Not available"
+    // even though MCP was configured and working.
+    process.env.HERMES_API_URL = 'http://gateway.test'
+    process.env.CLAUDE_DASHBOARD_URL = 'http://dashboard.test'
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === 'http://dashboard.test/api/status') {
+        return new Response(JSON.stringify({ version: '0.19.0' }), {
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      if (url === 'http://dashboard.test/') {
+        return new Response("<script>window.__CLAUDE_SESSION_TOKEN__ = 'test-token'</script>", {
+          headers: { 'content-type': 'text/html' },
+        })
+      }
+      if (url === 'http://dashboard.test/api/mcp/servers') {
+        return new Response(
+          JSON.stringify({
+            servers: [{ name: 'filesystem', transport: 'stdio', enabled: true }],
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        )
+      }
+      // The old path stays absent, exactly as the real gateway behaves.
+      if (url.endsWith('/api/mcp')) {
+        return new Response(JSON.stringify({ detail: 'No such API endpoint: /api/mcp' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const mod = await loadMod()
+    const caps = await mod.probeGateway({ force: true })
+
+    expect(caps.mcp).toBe(true)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://dashboard.test/api/mcp/servers',
+      expect.anything(),
+    )
   })
 
   describe('isLocalhostDeployment', () => {

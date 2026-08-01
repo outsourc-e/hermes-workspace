@@ -497,12 +497,15 @@ async function probeChatCompletions(): Promise<boolean> {
 /**
  * Strict MCP capability probe.
  *
- * Per plan §Open Questions #4: probing `dashboard.available || /api/mcp` is
- * insufficient. The probe must hit `GET /api/mcp` directly and verify both:
+ * Per plan §Open Questions #4: probing `dashboard.available || <list endpoint>`
+ * is insufficient. The probe must fetch the list endpoint directly and verify:
  *   1. 200 OK
  *   2. Body parses through normalizeMcpList (i.e. shape is recognizable)
- * If the dashboard is up but `/api/mcp` is absent (404) or returns a
+ * If the dashboard is up but the endpoint is absent (404) or returns a
  * malformed body, capability is `false`.
+ *
+ * The list lives at `/api/mcp/servers`; `/api/mcp` is tried as a fallback.
+ * See `./mcp-upstream`.
  */
 async function probeMcp(): Promise<boolean> {
   const { normalizeMcpList } = await import('./mcp-normalize')
@@ -519,19 +522,22 @@ async function probeMcp(): Promise<boolean> {
   // Use dashboardFetch so the probe goes through the same authenticated path
   // workspace routes use at runtime — otherwise an auth-protected dashboard
   // /api/mcp would falsely report capability=false (Codex MAJOR finding).
+  const { fetchMcpList } = await import('./mcp-upstream')
   try {
-    const res = await dashboardFetch('/api/mcp', {
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    })
+    const res = await fetchMcpList((path) =>
+      dashboardFetch(path, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) }),
+    )
     if (await validate(res)) return true
   } catch {
     // fall through to gateway path
   }
   try {
-    const res = await fetch(`${CLAUDE_API}/api/mcp`, {
-      headers: authHeaders(),
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    })
+    const res = await fetchMcpList((path) =>
+      fetch(`${CLAUDE_API}${path}`, {
+        headers: authHeaders(),
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      }),
+    )
     return await validate(res)
   } catch {
     return false
