@@ -33,7 +33,11 @@ PROFILE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 DEFAULT_LIMIT = 100
 MIN_LIMIT = 1
 MAX_LIMIT = 500
-SUPPORTED_SCHEMA_VERSION = 23
+# The adapter only projects the stable session-column subset below. Hermes
+# schema v25 retains that contract while adding newer accounting/activity
+# columns, so both reviewed producer schemas are safe to read. Future schema
+# revisions remain fail-closed until explicitly reviewed.
+SUPPORTED_SCHEMA_VERSIONS = frozenset((23, 25))
 DATABASE_READ_ATTEMPTS = 3
 DEFAULT_MAX_CACHED_SNAPSHOT_ROWS = 100_000
 DEFAULT_MAX_CACHED_SNAPSHOT_BYTES = 64 * 1024 * 1024
@@ -622,7 +626,7 @@ class TopologyService:
             if (
                 len(versions) != 1
                 or versions[0]["storage_type"] != "integer"
-                or versions[0]["version"] != SUPPORTED_SCHEMA_VERSION
+                or versions[0]["version"] not in SUPPORTED_SCHEMA_VERSIONS
             ):
                 raise ClientError(HTTPStatus.CONFLICT, "schema_incompatible")
             guarded_columns = []

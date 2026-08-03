@@ -28,11 +28,11 @@ import type {
 } from '../screens/chat/types'
 
 export const DEFAULT_SESSION_CARD_SAFE_CAP = 2000
-// The current Hermes gateway and dashboard return an offset/total contract but
-// do not provide a stable snapshot token. Collect the bounded inventory in one
-// request so that a snapshot-less backend remains authoritative up to the safe
-// cap; paging it would correctly (but permanently) be classified as unstable.
-export const DEFAULT_SESSION_CARD_PAGE_SIZE = DEFAULT_SESSION_CARD_SAFE_CAP
+// Hermes Dashboard rejects session-list requests above 100 rows. Keep the
+// inventory safe cap independent from the transport page size so the collector
+// can page through a larger Dashboard inventory instead of failing before it
+// can project any cards.
+export const DEFAULT_SESSION_CARD_PAGE_SIZE = 100
 export const DEFAULT_SESSION_CARD_PROJECTION_CACHE_TTL_MS = 30_000
 export const CHAT_SESSION_CARD_PAGE_SIZE = 10
 export const CHAT_SESSION_CARD_RECENT_WINDOW_MS = 2 * 24 * 60 * 60 * 1000

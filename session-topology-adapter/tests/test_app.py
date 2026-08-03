@@ -1161,6 +1161,18 @@ class SchemaCompatibilityTests(unittest.TestCase):
         self.assertEqual(status, 200, body)
         self.assertEqual([row["id"] for row in body["sessions"]], ["supported"])
 
+    def test_schema_version_25_is_supported(self):
+        create_database(
+            self.data_dir / "state.db",
+            [{"id": "supported-schema-25"}],
+            schema_version=25,
+        )
+        status, body = self.request()
+        self.assertEqual(status, 200, body)
+        self.assertEqual(
+            [row["id"] for row in body["sessions"]], ["supported-schema-25"]
+        )
+
     def test_blob_scalar_rows_fail_closed_with_safe_persistence_error(self):
         cases = {
             "id": {"id": b"blob-id"},

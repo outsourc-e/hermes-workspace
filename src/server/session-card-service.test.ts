@@ -540,7 +540,7 @@ describe('SessionCardService collection and resolution', () => {
     })
   })
 
-  it('uses the bounded safe cap in one request for a snapshot-less default source', async () => {
+  it('uses the dashboard-supported page size for a snapshot-less default source', async () => {
     const listPage = vi.fn((limit: number, offset: number) =>
       Promise.resolve(
         page(
@@ -571,7 +571,7 @@ describe('SessionCardService collection and resolution', () => {
       ],
     })
     expect(listPage).toHaveBeenCalledTimes(1)
-    expect(listPage).toHaveBeenCalledWith(2000, 0, undefined)
+    expect(listPage).toHaveBeenCalledWith(100, 0, undefined)
   })
 
   it('never declares a same-total mutable offset collection complete without a source snapshot', async () => {
