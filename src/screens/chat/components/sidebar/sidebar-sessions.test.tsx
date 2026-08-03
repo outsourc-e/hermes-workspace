@@ -195,9 +195,9 @@ describe('SidebarSessions Card-only surface', () => {
       name: 'Expand related sessions for Authoritative card title',
     })
     expect(expandButton.getAttribute('aria-expanded')).toBe('false')
-    expect(screen.queryByText('Delegated research')).toBeNull()
+    expect(screen.queryByText('↳ Delegated research')).toBeNull()
     React.act(() => fireEvent.click(expandButton))
-    expect(screen.getByText('Delegated research')).toBeTruthy()
+    expect(screen.getByText('↳ Delegated research')).toBeTruthy()
   })
 
   it('does not project rows when the Card list is empty', () => {
@@ -286,7 +286,7 @@ describe('SidebarSessions Card-only surface', () => {
     renderSidebar({ inspectedChildCardId: 'card:child' })
 
     const parent = screen.getByText('Authoritative card title').closest('a')
-    const child = screen.getByText('Delegated research').closest('a')
+    const child = screen.getByText('↳ Delegated research').closest('a')
     expect(parent?.getAttribute('href')).toBe('/chat/card:root')
     expect(parent?.getAttribute('aria-current')).toBe('page')
     expect(child?.getAttribute('href')).toBe(
@@ -356,12 +356,12 @@ describe('SidebarSessions Card-only surface', () => {
     expect(document.querySelectorAll('[data-card-id]')).toHaveLength(1)
     expect(document.querySelectorAll('[data-card-child-id]')).toHaveLength(2)
     expect(screen.getAllByText('Root conversation')).toHaveLength(1)
-    expect(screen.getAllByText('Child conversation')).toHaveLength(1)
-    expect(screen.getAllByText('Grandchild branch')).toHaveLength(1)
+    expect(screen.getAllByText('↳ Child conversation')).toHaveLength(1)
+    expect(screen.getAllByText('↳ Grandchild branch')).toHaveLength(1)
 
     const rootLink = screen.getByText('Root conversation').closest('a')
-    const childLink = screen.getByText('Child conversation').closest('a')
-    const grandchildLink = screen.getByText('Grandchild branch').closest('a')
+    const childLink = screen.getByText('↳ Child conversation').closest('a')
+    const grandchildLink = screen.getByText('↳ Grandchild branch').closest('a')
     expect(rootLink?.getAttribute('href')).toBe('/chat/card:root')
     expect(rootLink?.getAttribute('aria-current')).toBe('page')
     expect(childLink?.getAttribute('href')).toBe(
@@ -373,13 +373,13 @@ describe('SidebarSessions Card-only surface', () => {
     expect(grandchildLink?.getAttribute('data-inspected')).toBe('true')
     expect(
       screen
-        .getByText('Child conversation')
+        .getByText('↳ Child conversation')
         .closest('[data-card-child-id]')
         ?.getAttribute('data-card-child-id'),
     ).toBe('card:child')
     expect(
       screen
-        .getByText('Grandchild branch')
+        .getByText('↳ Grandchild branch')
         .closest('[data-card-child-id]')
         ?.getAttribute('data-card-child-id'),
     ).toBe('card:grandchild')
@@ -475,7 +475,7 @@ describe('SidebarSessions Card-only surface', () => {
     })
     expect(
       screen
-        .getByText('Grandchild API branch')
+        .getByText('↳ Grandchild API branch')
         .closest('a')
         ?.getAttribute('href'),
     ).toBe('/chat/remote:root?inspect=remote:grandchild')
@@ -529,7 +529,7 @@ describe('SidebarSessions Card-only surface', () => {
       ),
     )
     const child = screen
-      .getByText('Delegated research')
+      .getByText('↳ Delegated research')
       .closest<HTMLElement>('[data-card-child-id="card:child"]')!
     expect(
       within(parent).getAllByRole('button', { name: 'Card options' }),

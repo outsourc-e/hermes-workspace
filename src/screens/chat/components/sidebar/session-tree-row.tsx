@@ -141,7 +141,7 @@ function SessionTreeRow({
             session={{
               key: row.key,
               friendlyId: parentRouteCardId,
-              label: row.title,
+              label: row.depth > 0 ? `↳ ${row.title}` : row.title,
               updatedAt: row.updatedAt,
               titleStatus: 'ready',
               titleError: null,

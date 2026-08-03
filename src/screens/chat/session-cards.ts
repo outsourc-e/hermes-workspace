@@ -10,6 +10,7 @@ import type {
 } from './types'
 
 const DEFAULT_CARD_TITLE = 'New conversation'
+const DEFAULT_DELEGATED_CARD_TITLE = 'Delegated Agent Session'
 
 export type SessionCardMetadata = {
   manualTitle?: string
@@ -151,6 +152,7 @@ function normalizedTitle(value: string | null | undefined): string | undefined {
 function cardTitle(
   metadata: SessionCardMetadata | undefined,
   session: SessionMeta,
+  relationshipKind: SessionCardRelationshipKind,
 ): {
   title: string
   titleSource: SessionCardTitleSource
@@ -172,7 +174,13 @@ function cardTitle(
     normalizedTitle(session.preview)
   if (sessionTitle) return { title: sessionTitle, titleSource: 'auto' }
 
-  return { title: DEFAULT_CARD_TITLE, titleSource: 'default' }
+  return {
+    title:
+      relationshipKind === 'child'
+        ? DEFAULT_DELEGATED_CARD_TITLE
+        : DEFAULT_CARD_TITLE,
+    titleSource: 'default',
+  }
 }
 
 function compareCards(left: SessionCard, right: SessionCard): number {
@@ -266,7 +274,12 @@ export function projectSessionCards(
     const members = orderContinuationMembers(
       membersByVisibleKey.get(row.key) ?? [row.session],
     )
-    const title = cardTitle(metadata, members[0] ?? row.session)
+    const relationshipKind = cardRelationshipKind(row)
+    const title = cardTitle(
+      metadata,
+      members[0] ?? row.session,
+      relationshipKind,
+    )
 
     cardsByVisibleKey.set(row.key, {
       cardId,
@@ -274,7 +287,7 @@ export function projectSessionCards(
       canonicalSegmentKey: row.key,
       continuationSegmentKeys: members.map((member) => member.key),
       continuationCount: row.continuationCount,
-      relationshipKind: cardRelationshipKind(row),
+      relationshipKind,
       childNodes: [],
       updatedAt: members.reduce(
         (latest, member) => Math.max(latest, sessionActivity(member)),

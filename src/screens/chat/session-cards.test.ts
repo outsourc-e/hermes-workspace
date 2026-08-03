@@ -213,6 +213,33 @@ describe('projectSessionCards', () => {
     })
   })
 
+  it('uses a delegated-agent default only for an unnamed delegated child', () => {
+    const parent = session('parent', undefined, 10)
+    const delegated = {
+      ...session(
+        'delegated',
+        {
+          parentSessionId: 'parent',
+          relationshipKind: 'child',
+        },
+        20,
+      ),
+      title: undefined,
+    }
+
+    const projection = projectSessionCards([parent, delegated])
+
+    expect(projection.indexByCardId.get('delegated')).toMatchObject({
+      parentCardId: 'parent',
+      relationshipKind: 'child',
+      title: 'Delegated Agent Session',
+      titleSource: 'default',
+    })
+    expect(projection.indexByCardId.get('parent')?.title).toBe(
+      'legacy title for parent',
+    )
+  })
+
   it('keeps branch and delegate components out of the parent continuation', () => {
     const [root, second, third] = continuationChain()
     const branch = session(

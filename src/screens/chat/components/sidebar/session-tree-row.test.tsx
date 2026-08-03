@@ -157,9 +157,9 @@ describe('SessionTreeRow Card routing', () => {
       name: /Expand related sessions/i,
     })
     expect(disclosure.getAttribute('aria-expanded')).toBe('false')
-    expect(screen.queryByText('Child card')).toBeNull()
+    expect(screen.queryByText('↳ Child card')).toBeNull()
     React.act(() => fireEvent.click(disclosure))
-    expect(screen.getByText('Child card')).toBeTruthy()
+    expect(screen.getByText('↳ Child card')).toBeTruthy()
     expect(disclosure.getAttribute('aria-expanded')).toBe('true')
   })
 
@@ -170,7 +170,7 @@ describe('SessionTreeRow Card routing', () => {
         screen.getByRole('button', { name: /Expand related sessions/i }),
       ),
     )
-    const child = screen.getByText('Child card').closest('a')
+    const child = screen.getByText('↳ Child card').closest('a')
     expect(child?.getAttribute('href')).toBe(
       '/chat/card:root?inspect=card:child',
     )
