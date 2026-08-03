@@ -497,7 +497,7 @@ describe('projectSessionCards', () => {
     })
   })
 
-  it('orders pinned roots first while refusing pin metadata on children', () => {
+  it('orders pinned roots by their original pin time while refusing pin metadata on children', () => {
     const parent = session('parent', undefined, 10)
     const child = session(
       'child',
@@ -506,18 +506,21 @@ describe('projectSessionCards', () => {
     )
     const newest = session('newest', undefined, 200)
     const pinnedOlder = session('pinned-older', undefined, 100)
+    const pinnedNewer = session('pinned-newer', undefined, 300)
     const metadata = new Map([
-      ['pinned-older', { pinned: true }],
+      ['pinned-older', { pinned: true, pinnedAt: 10 }],
+      ['pinned-newer', { pinned: true, pinnedAt: 20 }],
       ['child', { pinned: true }],
     ])
 
     const projection = projectSessionCards(
-      [parent, child, newest, pinnedOlder],
+      [parent, child, newest, pinnedOlder, pinnedNewer],
       { cardMetadata: metadata },
     )
 
     expect(projection.roots.map((card) => card.cardId)).toEqual([
       'pinned-older',
+      'pinned-newer',
       'newest',
       'parent',
     ])

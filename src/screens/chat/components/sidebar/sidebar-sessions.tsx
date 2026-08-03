@@ -103,7 +103,16 @@ export const SidebarSessions = memo(function SidebarSessions({
     () =>
       completeCards
         .filter((card) => card.parentCardId === undefined)
-        .sort((left, right) => right.updatedAt - left.updatedAt),
+        .sort((left, right) => {
+          if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
+          if (left.pinned && right.pinned) {
+            const pinDifference = (left.pinnedAt ?? 0) - (right.pinnedAt ?? 0)
+            if (pinDifference !== 0) return pinDifference
+          }
+          const activityDifference = right.updatedAt - left.updatedAt
+          if (activityDifference !== 0) return activityDifference
+          return left.cardId.localeCompare(right.cardId)
+        }),
     [completeCards],
   )
   const pinnedRoots = useMemo(

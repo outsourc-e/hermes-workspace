@@ -47,6 +47,7 @@ const RECORD_FIELDS = new Set([
   'manualTitle',
   'autoTitle',
   'pinned',
+  'pinnedAt',
   'updatedAt',
   'archivedAt',
   'branchReplays',
@@ -58,6 +59,8 @@ export type PersistedSessionCard = {
   manualTitle?: string
   autoTitle?: string
   pinned?: boolean
+  /** Timestamp of the current pin action; older values appear first. */
+  pinnedAt?: number
   updatedAt: number
   archivedAt?: number
   branchReplays?: Array<PersistedSessionCardBranchReplay>
@@ -381,6 +384,15 @@ function validatePersistedCard(
       if (typeof value.pinned !== 'boolean') return null
       card.pinned = value.pinned
     }
+    if ('pinnedAt' in value) {
+      if (value.pinned !== true || !isTimestamp(value.pinnedAt)) return null
+      card.pinnedAt = value.pinnedAt
+    }
+    // Existing pinned records predate durable pin ordering. Preserve their
+    // relative behavior with their last metadata update as a stable fallback.
+    if (card.pinned === true && card.pinnedAt === undefined) {
+      card.pinnedAt = card.updatedAt
+    }
     if ('archivedAt' in value) {
       if (!isTimestamp(value.archivedAt)) return null
       card.archivedAt = value.archivedAt
@@ -405,7 +417,10 @@ function validatePersistedCard(
     }
     // Pins only apply to visible Cards. Retain archive/title metadata from an
     // older or externally-corrupted record, but fail closed on its pin state.
-    if (card.archivedAt !== undefined) delete card.pinned
+    if (card.archivedAt !== undefined) {
+      delete card.pinned
+      delete card.pinnedAt
+    }
     return card
   } catch {
     return null
@@ -1498,8 +1513,24 @@ export function updateSessionCardMetadata(
       if (normalizedPatch.autoTitle === null) delete next.autoTitle
       else next.autoTitle = normalizedPatch.autoTitle
     }
-    if (next.archivedAt !== undefined) delete next.pinned
-    else if ('pinned' in normalizedPatch) next.pinned = normalizedPatch.pinned
+    if (next.archivedAt !== undefined) {
+      delete next.pinned
+      delete next.pinnedAt
+    } else if ('pinned' in normalizedPatch) {
+      next.pinned = normalizedPatch.pinned
+      if (normalizedPatch.pinned && previous?.pinned !== true) {
+        const latestPinOrder = Object.values(store.cards).reduce(
+          (latest, card) =>
+            card.pinned === true
+              ? Math.max(latest, card.pinnedAt ?? card.updatedAt)
+              : latest,
+          -1,
+        )
+        next.pinnedAt = Math.max(next.updatedAt, latestPinOrder + 1)
+      } else if (!normalizedPatch.pinned) {
+        delete next.pinnedAt
+      }
+    }
 
     store.cards[normalizedCardId] = next
     writeStore(store)
@@ -1521,6 +1552,7 @@ export function archiveSessionCardMetadata(
       archivedAt: now,
     }
     delete next.pinned
+    delete next.pinnedAt
     store.cards[normalizedCardId] = next
     writeStore(store)
     return next

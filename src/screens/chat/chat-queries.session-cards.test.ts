@@ -180,6 +180,26 @@ describe('Session Card fetchers', () => {
     )
   })
 
+  it('retains a pinned Card order timestamp from the session-card wire response', async () => {
+    const pinnedCard = { ...card, pinned: true, pinnedAt: 123 }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          cards: [pinnedCard],
+          cardResolutions: completeCardResolutions([pinnedCard]),
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        }),
+      ),
+    )
+
+    await expect(fetchSessionCards()).resolves.toMatchObject({
+      cards: [expect.objectContaining({ cardId: card.cardId, pinnedAt: 123 })],
+    })
+  })
+
   it('fetches, validates, and merges bounded chat pages without duplicating roots', async () => {
     const olderCard = {
       ...card,

@@ -216,6 +216,8 @@ export type SessionCard = {
   updatedAt: number
   archived: boolean
   pinned: boolean
+  /** Timestamp of the current pin action; earlier pins are listed first. */
+  pinnedAt?: number
 }
 
 /**

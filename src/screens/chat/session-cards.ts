@@ -17,6 +17,7 @@ export type SessionCardMetadata = {
   autoTitle?: string
   archived?: boolean
   pinned?: boolean
+  pinnedAt?: number
 }
 
 export type SessionCardProjectionOptions = {
@@ -185,6 +186,10 @@ function cardTitle(
 
 function compareCards(left: SessionCard, right: SessionCard): number {
   if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
+  if (left.pinned && right.pinned) {
+    const pinDifference = (left.pinnedAt ?? 0) - (right.pinnedAt ?? 0)
+    if (pinDifference !== 0) return pinDifference
+  }
   const activityDifference = right.updatedAt - left.updatedAt
   if (activityDifference !== 0) return activityDifference
   return left.cardId.localeCompare(right.cardId)
@@ -336,8 +341,9 @@ export function projectSessionCards(
       row !== undefined &&
       !hasChildRelationshipProvenance(row.session)
     if (pinEligible) pinEligibleCardIds.add(card.cardId)
-    card.pinned =
-      pinEligible && options.cardMetadata?.get(card.cardId)?.pinned === true
+    const metadata = options.cardMetadata?.get(card.cardId)
+    card.pinned = pinEligible && metadata?.pinned === true
+    if (card.pinned) card.pinnedAt = metadata?.pinnedAt ?? 0
   }
 
   const cards = [...cardsByVisibleKey.values()].sort(compareCards)

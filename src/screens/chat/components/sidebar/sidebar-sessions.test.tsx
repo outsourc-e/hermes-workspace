@@ -566,6 +566,40 @@ describe('SidebarSessions Card-only surface', () => {
     expect(within(pinned).getByText('Authoritative card title')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Unpin card' })).toBeTruthy()
   })
+
+  it('keeps pinned Cards in original pin order despite newer session activity', () => {
+    const firstPinned = card({
+      cardId: 'remote:first-pinned',
+      title: 'First pinned',
+      canonicalSegmentKey: 'remote:first-pinned',
+      continuationSegmentKeys: ['remote:first-pinned'],
+      continuationCount: 1,
+      childNodes: [],
+      updatedAt: 10,
+      pinned: true,
+      pinnedAt: 100,
+    })
+    const lastPinned = card({
+      cardId: 'remote:last-pinned',
+      title: 'Last pinned',
+      canonicalSegmentKey: 'remote:last-pinned',
+      continuationSegmentKeys: ['remote:last-pinned'],
+      continuationCount: 1,
+      childNodes: [],
+      updatedAt: 1_000,
+      pinned: true,
+      pinnedAt: 200,
+    })
+
+    renderSidebar({ cards: [lastPinned, firstPinned] })
+
+    const pinned = screen.getByRole('region', { name: 'Pinned sessions' })
+    expect(
+      Array.from(pinned.querySelectorAll<HTMLElement>('[data-card-id]')).map(
+        (element) => element.dataset.cardId,
+      ),
+    ).toEqual(['remote:first-pinned', 'remote:last-pinned'])
+  })
 })
 
 describe('ChatSidebar Card-only integration', () => {

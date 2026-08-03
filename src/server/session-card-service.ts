@@ -883,6 +883,7 @@ function metadataProjectionMap(
     autoTitle?: string
     archived?: boolean
     pinned?: boolean
+    pinnedAt?: number
   }
 > {
   return new Map(
@@ -893,6 +894,7 @@ function metadataProjectionMap(
         ...(card.autoTitle ? { autoTitle: card.autoTitle } : {}),
         ...(card.archivedAt === undefined ? {} : { archived: true }),
         ...(card.pinned === undefined ? {} : { pinned: card.pinned }),
+        ...(card.pinnedAt === undefined ? {} : { pinnedAt: card.pinnedAt }),
       },
     ]),
   )

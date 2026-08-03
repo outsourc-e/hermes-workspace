@@ -383,6 +383,13 @@ function parseSessionCard(value: unknown): SessionCardWire {
     'child',
     'orphan',
   ])
+  const rawPinnedAt = value.pinnedAt
+  const pinnedAt =
+    typeof rawPinnedAt === 'number' &&
+    Number.isSafeInteger(rawPinnedAt) &&
+    rawPinnedAt >= 0
+      ? rawPinnedAt
+      : undefined
   if (
     !cardIdentity ||
     !canonicalSource ||
@@ -412,6 +419,7 @@ function parseSessionCard(value: unknown): SessionCardWire {
     !Number.isFinite(value.updatedAt) ||
     typeof value.archived !== 'boolean' ||
     typeof value.pinned !== 'boolean' ||
+    (rawPinnedAt !== undefined && (pinnedAt === undefined || !value.pinned)) ||
     (value.archived && value.pinned)
   ) {
     return invalidSessionCardResponse()
@@ -463,6 +471,7 @@ function parseSessionCard(value: unknown): SessionCardWire {
     updatedAt: value.updatedAt,
     archived: value.archived,
     pinned: value.pinned,
+    ...(pinnedAt === undefined ? {} : { pinnedAt }),
   }
 }
 

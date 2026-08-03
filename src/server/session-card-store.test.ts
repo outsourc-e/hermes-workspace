@@ -1285,6 +1285,44 @@ describe('Session Card metadata persistence', () => {
     expect(afterStalePinUpdate).not.toHaveProperty('pinned')
   })
 
+  it('assigns pin order only when pinning and assigns a new order after re-pinning', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-25T12:00:00.000Z'))
+    const firstPin = updateSessionCardMetadata('card-1', { pinned: true })
+    expect(firstPin).toMatchObject({
+      cardId: 'card-1',
+      pinned: true,
+      pinnedAt: Date.now(),
+    })
+
+    vi.setSystemTime(new Date('2026-07-25T12:01:00.000Z'))
+    const stillPinned = updateSessionCardMetadata('card-1', {
+      manualTitle: 'Retains pin order',
+    })
+    expect(stillPinned.pinnedAt).toBe(firstPin.pinnedAt)
+
+    vi.setSystemTime(new Date('2026-07-25T12:02:00.000Z'))
+    const unpinned = updateSessionCardMetadata('card-1', { pinned: false })
+    expect(unpinned).not.toHaveProperty('pinnedAt')
+
+    vi.setSystemTime(new Date('2026-07-25T12:03:00.000Z'))
+    const repinned = updateSessionCardMetadata('card-1', { pinned: true })
+    expect(repinned).toMatchObject({
+      cardId: 'card-1',
+      pinned: true,
+      pinnedAt: Date.now(),
+    })
+    expect(repinned.pinnedAt).toBeGreaterThan(firstPin.pinnedAt!)
+
+    vi.resetModules()
+    const reloaded = await import('./session-card-store')
+    expect(reloaded.readSessionCardMetadata('card-1')).toMatchObject({
+      cardId: 'card-1',
+      pinned: true,
+      pinnedAt: repinned.pinnedAt,
+    })
+  })
+
   it('fails closed for an archived persisted record that still contains a pin', () => {
     writeFileSync(
       sessionCardStorePath(),
