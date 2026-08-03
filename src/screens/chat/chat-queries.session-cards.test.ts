@@ -136,14 +136,16 @@ describe('Session Card fetchers', () => {
         retryable: false,
       },
     ] as const
-    const fetchMock = vi.fn().mockResolvedValue(
-      response({
-        cards: [card],
-        cardResolutions,
-        completeness: 'complete',
-        retryable: false,
-        sources: [],
-      }),
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        response({
+          cards: [card],
+          cardResolutions,
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        }),
+      ),
     )
     vi.stubGlobal('fetch', fetchMock)
 
@@ -162,6 +164,17 @@ describe('Session Card fetchers', () => {
     fetchMock.mockResolvedValueOnce(
       response({ cards: [{ ...card, archived: 'yes' }] }),
     )
+    await expect(fetchSessionCards()).resolves.toEqual({
+      cards: [card],
+      cardResolutions,
+      completeness: 'complete',
+      retryable: false,
+      sources: [],
+    })
+
+    fetchMock
+      .mockResolvedValueOnce(response({ cards: [{ ...card, archived: 'yes' }] }))
+      .mockResolvedValueOnce(response({ cards: [{ ...card, archived: 'yes' }] }))
     await expect(fetchSessionCards()).rejects.toThrow(
       'Invalid Session Card response',
     )
@@ -1053,24 +1066,27 @@ describe('Session Card fetchers', () => {
     )
   })
 
-  it('loads bounded parent history by Card route without a legacy history fallback', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      response({
-        cardId: 'remote:root',
-        canonicalSegmentKey: 'remote:tip',
-        messages: [{ segmentKey: 'remote:root', message: { id: 'message-1' } }],
-        completeness: 'partial',
-        retryable: true,
-        missingSegments: [
-          {
-            segmentKey: 'remote:tip',
-            source: 'gateway',
-            retryable: true,
-            error: 'temporarily unavailable',
-          },
-        ],
-      }),
+  it('retries one invalid parent history response by Card route without a legacy fallback', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        response({
+          cardId: 'remote:root',
+          canonicalSegmentKey: 'remote:tip',
+          messages: [{ segmentKey: 'remote:root', message: { id: 'message-1' } }],
+          completeness: 'partial',
+          retryable: true,
+          missingSegments: [
+            {
+              segmentKey: 'remote:tip',
+              source: 'gateway',
+              retryable: true,
+              error: 'temporarily unavailable',
+            },
+          ],
+        }),
+      ),
     )
+    fetchMock.mockResolvedValueOnce(response({ messages: [null] }))
     vi.stubGlobal('fetch', fetchMock)
 
     const result = await fetchSessionCardHistory({
@@ -1082,6 +1098,7 @@ describe('Session Card fetchers', () => {
 
     expect(result.completeness).toBe('partial')
     expect(result.retryable).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/session-cards/remote%3Aroot/history?limit=25&cursor=signed.cursor',
       { signal: undefined },

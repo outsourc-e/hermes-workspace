@@ -667,6 +667,52 @@ export async function fetchHistory(payload: {
   return (await res.json()) as HistoryResponse
 }
 
+const SESSION_CARD_RESPONSE_ATTEMPTS = 2
+
+function isInvalidSessionCardResponseError(error: unknown): boolean {
+  return (
+    error instanceof Error && error.message === 'Invalid Session Card response'
+  )
+}
+
+/**
+ * Card inventory and history are assembled from mutable upstream sources. Keep
+ * the wire contract strict, but retry a single malformed successful response
+ * before surfacing it to the user; a persistent contract mismatch still fails
+ * closed on the second response.
+ */
+async function fetchAndParseSessionCardResponse<T>(
+  request: () => Promise<Response>,
+  parse: (value: unknown) => T,
+  responseError?: (response: Response) => Promise<Error>,
+): Promise<T> {
+  let priorInvalidResponseError: unknown
+  for (let attempt = 0; attempt < SESSION_CARD_RESPONSE_ATTEMPTS; attempt += 1) {
+    const response = await request()
+    if (!response.ok) {
+      throw responseError
+        ? await responseError(response)
+        : new Error(await readError(response))
+    }
+    const responseWasConsumed = response.bodyUsed
+    try {
+      return parse((await response.json()) as unknown)
+    } catch (error) {
+      if (responseWasConsumed && priorInvalidResponseError !== undefined) {
+        throw priorInvalidResponseError
+      }
+      if (
+        !isInvalidSessionCardResponseError(error) ||
+        attempt === SESSION_CARD_RESPONSE_ATTEMPTS - 1
+      ) {
+        throw error
+      }
+      priorInvalidResponseError = error
+    }
+  }
+  return invalidSessionCardResponse()
+}
+
 export async function fetchSessionCards(
   options: {
     includeArchived?: boolean
@@ -685,9 +731,10 @@ export async function fetchSessionCards(
   if (options.includeArchived) query.set('includeArchived', 'true')
   if (options.limit !== undefined) query.set('limit', String(options.limit))
   const suffix = query.size ? `?${query.toString()}` : ''
-  const response = await fetch(`/api/session-cards${suffix}`)
-  if (!response.ok) throw new Error(await readError(response))
-  return parseSessionCardList((await response.json()) as unknown)
+  return fetchAndParseSessionCardResponse(
+    () => fetch(`/api/session-cards${suffix}`),
+    parseSessionCardList,
+  )
 }
 
 export async function fetchChatSessionCardsPage(
@@ -695,9 +742,10 @@ export async function fetchChatSessionCardsPage(
 ): Promise<SessionCardListWire> {
   const query = new URLSearchParams({ view: 'chat' })
   if (cursor !== undefined) query.set('cursor', cursor)
-  const response = await fetch(`/api/session-cards?${query.toString()}`)
-  if (!response.ok) throw new Error(await readError(response))
-  return parseSessionCardList((await response.json()) as unknown)
+  return fetchAndParseSessionCardResponse(
+    () => fetch(`/api/session-cards?${query.toString()}`),
+    parseSessionCardList,
+  )
 }
 
 function parseSessionCardDetail(value: unknown): SessionCardDetailWire {
@@ -740,22 +788,22 @@ function parseSessionCardDetail(value: unknown): SessionCardDetailWire {
 export async function fetchSessionCard(
   cardId: string,
 ): Promise<SessionCardDetailWire> {
-  const response = await fetch(
-    `/api/session-cards/${encodeURIComponent(cardId)}`,
+  return fetchAndParseSessionCardResponse(
+    () => fetch(`/api/session-cards/${encodeURIComponent(cardId)}`),
+    parseSessionCardDetail,
+    async (response) => {
+      const body = (await response.json().catch(() => null)) as unknown
+      const message =
+        isWireRecord(body) && typeof body.error === 'string'
+          ? body.error
+          : 'Unable to load Session Card'
+      return new SessionCardLookupError(
+        message,
+        response.status,
+        isWireRecord(body) && body.retryable === true,
+      )
+    },
   )
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as unknown
-    const message =
-      isWireRecord(body) && typeof body.error === 'string'
-        ? body.error
-        : 'Unable to load Session Card'
-    throw new SessionCardLookupError(
-      message,
-      response.status,
-      isWireRecord(body) && body.retryable === true,
-    )
-  }
-  return parseSessionCardDetail((await response.json()) as unknown)
 }
 
 function mergeSourceStatuses(
@@ -949,19 +997,22 @@ export async function fetchSessionCardHistory(payload: {
   if (payload.limit !== undefined) query.set('limit', String(payload.limit))
   if (payload.cursor) query.set('cursor', payload.cursor)
   const suffix = query.size ? `?${query.toString()}` : ''
-  const response = await fetch(
-    `/api/session-cards/${encodeURIComponent(payload.cardId)}/history${suffix}`,
-    { signal: payload.signal },
+  return fetchAndParseSessionCardResponse(
+    () =>
+      fetch(`/api/session-cards/${encodeURIComponent(payload.cardId)}/history${suffix}`, {
+        signal: payload.signal,
+      }),
+    (value) => {
+      const history = parseSessionCardHistory(value)
+      if (
+        history.cardId !== payload.cardId ||
+        history.canonicalSegmentKey !== payload.canonicalSegmentKey
+      ) {
+        return invalidSessionCardResponse()
+      }
+      return history
+    },
   )
-  if (!response.ok) throw new Error(await readError(response))
-  const history = parseSessionCardHistory((await response.json()) as unknown)
-  if (
-    history.cardId !== payload.cardId ||
-    history.canonicalSegmentKey !== payload.canonicalSegmentKey
-  ) {
-    return invalidSessionCardResponse()
-  }
-  return history
 }
 
 export type SessionCardHistoryResponse = HistoryResponse & {
