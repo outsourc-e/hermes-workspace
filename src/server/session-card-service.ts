@@ -1358,6 +1358,125 @@ export class SessionCardService {
       1
   }
 
+  /**
+   * Dashboard pagination currently has no server-issued snapshot token. A
+   * single offset walk could therefore combine two mutable inventories. Before
+   * accepting such a walk, repeat it and require the same ordered identities,
+   * total, source, and terminal condition. This preserves fail-closed behavior
+   * for a changing inventory while allowing a quiescent Dashboard inventory to
+   * populate Cards.
+   */
+  private async verifySnapshotlessRemoteScan({
+    expectedSource,
+    expectedTotal,
+    expectedSessionKeys,
+  }: {
+    expectedSource: string
+    expectedTotal: number | undefined
+    expectedSessionKeys: ReadonlyArray<string>
+  }): Promise<SessionCardSourceStatus> {
+    if (!this.remoteSource) {
+      throw new Error('Remote session source disappeared during validation.')
+    }
+
+    let offset = 0
+    let keyIndex = 0
+    for (;;) {
+      const remaining = this.maxSessions - offset
+      if (remaining <= 0) {
+        throw new Error(
+          'Snapshot-less validation reached the session safe cap.',
+        )
+      }
+      const requestedLimit = Math.min(this.pageSize, remaining)
+      const page = await this.remoteSource.listPage(
+        requestedLimit,
+        offset,
+        expectedSource,
+      )
+      const pageSource = page.source?.trim() || this.remoteSource.source.trim()
+      if (pageSource !== expectedSource) {
+        throw new Error(
+          `Session source changed during validation (${expectedSource} -> ${pageSource || 'missing'}).`,
+        )
+      }
+      if (page.snapshot !== undefined) {
+        throw new Error(
+          'Session source changed pagination contracts during validation.',
+        )
+      }
+      if (page.total !== expectedTotal) {
+        throw new Error(
+          `Session page total changed during validation (${expectedTotal ?? 'missing'} -> ${page.total ?? 'missing'}).`,
+        )
+      }
+      if (!Number.isSafeInteger(page.offset) || page.offset !== offset) {
+        throw new Error(
+          `Session validation page offset mismatch (${offset} expected, ${page.offset} received).`,
+        )
+      }
+      if (page.sessions.length > requestedLimit) {
+        throw new Error(
+          `Session validation page exceeded the requested limit (${requestedLimit} requested, ${page.sessions.length} received).`,
+        )
+      }
+      for (const session of page.sessions) {
+        if (!session.key || session.key !== expectedSessionKeys[keyIndex]) {
+          throw new Error('Session page identities changed during validation.')
+        }
+        keyIndex += 1
+      }
+
+      const received = page.sessions.length
+      const nextOffset = offset + received
+      if (expectedTotal !== undefined && nextOffset > expectedTotal) {
+        throw new Error(
+          `Session page total ${expectedTotal} is smaller than the validated offset ${nextOffset}.`,
+        )
+      }
+      const more = hasMoreRows(page, nextOffset, requestedLimit)
+      if (
+        expectedTotal !== undefined &&
+        typeof page.hasMore === 'boolean' &&
+        page.hasMore !== nextOffset < expectedTotal
+      ) {
+        throw new Error(
+          `Session page total ${expectedTotal} conflicts with hasMore=${page.hasMore} at offset ${nextOffset}.`,
+        )
+      }
+      if (more && received < requestedLimit) {
+        throw new Error(
+          `Session validation page shortened unexpectedly (${requestedLimit} requested, ${received} received with more rows reported).`,
+        )
+      }
+      if (!more) {
+        if (
+          keyIndex !== expectedSessionKeys.length ||
+          (expectedTotal !== undefined && nextOffset !== expectedTotal)
+        ) {
+          throw new Error(
+            'Session validation ended with a different inventory.',
+          )
+        }
+        return {
+          source: expectedSource,
+          status: 'complete',
+          fetched: keyIndex,
+          retryable: false,
+        }
+      }
+      if (page.pagination === 'unsupported') {
+        throw new Error(
+          'Session source does not support validation pagination.',
+        )
+      }
+      if (received === 0) {
+        throw new Error('Session validation pagination stalled.')
+      }
+      offset = nextOffset
+    }
+  }
+
   async collectSessions(): Promise<SessionCardCollection> {
     const collectedSessions: Array<CollectedSession> = []
     const collectedIdentities = new Set<string>()
@@ -1384,6 +1503,7 @@ export class SessionCardService {
       let expectedSnapshot: string | undefined
       let snapshotContractInitialized = false
       let fetchedMultiplePages = false
+      const firstScanSessionKeys: Array<string> = []
       let status: SessionCardSourceStatus = {
         source: reportedSource,
         status: 'complete',
@@ -1482,6 +1602,7 @@ export class SessionCardService {
             }
             pageIdentities.add(identity)
             pageEntries.push(entry)
+            firstScanSessionKeys.push(session.key)
           }
 
           const received = pageEntries.length
@@ -1523,13 +1644,11 @@ export class SessionCardService {
           if (!more) {
             status =
               fetchedMultiplePages && expectedSnapshot === undefined
-                ? {
-                    source: reportedSource,
-                    status: 'incomplete',
-                    fetched,
-                    retryable: true,
-                    reason: 'unstable-pagination',
-                  }
+                ? await this.verifySnapshotlessRemoteScan({
+                    expectedSource: reportedSource,
+                    expectedTotal,
+                    expectedSessionKeys: firstScanSessionKeys,
+                  })
                 : {
                     source: reportedSource,
                     status: 'complete',

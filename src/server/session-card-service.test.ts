@@ -574,13 +574,12 @@ describe('SessionCardService collection and resolution', () => {
     expect(listPage).toHaveBeenCalledWith(100, 0, undefined)
   })
 
-  it('never declares a same-total mutable offset collection complete without a source snapshot', async () => {
+  it('accepts a snapshot-less collection only after an identical validation scan', async () => {
     const listPage = vi
       .fn()
       .mockResolvedValueOnce(page([session('a'), session('b')], 0, 4))
-      // The backing collection changed from [A,B,C,D] to [X,A,C,D] while
-      // preserving its total. Offset validation cannot detect that B no longer
-      // belongs to the second source state.
+      .mockResolvedValueOnce(page([session('c'), session('d')], 2, 4))
+      .mockResolvedValueOnce(page([session('a'), session('b')], 0, 4))
       .mockResolvedValueOnce(page([session('c'), session('d')], 2, 4))
     const service = new SessionCardService({
       remoteSource: { source: 'remote', listPage },
@@ -598,16 +597,45 @@ describe('SessionCardService collection and resolution', () => {
       'remote:d',
     ])
     expect(result).toMatchObject({
+      completeness: 'complete',
+      retryable: false,
+    })
+    expect(listPage).toHaveBeenCalledTimes(4)
+    expect(result.sources[0]).toMatchObject({
+      source: 'remote',
+      status: 'complete',
+      fetched: 4,
+      retryable: false,
+    })
+  })
+
+  it('rejects a snapshot-less collection when its validation scan changes identities', async () => {
+    const listPage = vi
+      .fn()
+      .mockResolvedValueOnce(page([session('a'), session('b')], 0, 4))
+      .mockResolvedValueOnce(page([session('c'), session('d')], 2, 4))
+      // Same total but a different first validation page must fail closed.
+      .mockResolvedValueOnce(page([session('x'), session('a')], 0, 4))
+    const service = new SessionCardService({
+      remoteSource: { source: 'remote', listPage },
+      localSource: null,
+      metadataStore: metadataStore(),
+      pageSize: 2,
+    })
+
+    const result = await service.listCards()
+
+    expect(result).toMatchObject({
       completeness: 'incomplete',
       retryable: true,
     })
-    expect(listPage).toHaveBeenCalledTimes(2)
+    expect(listPage).toHaveBeenCalledTimes(3)
     expect(result.sources[0]).toMatchObject({
       source: 'remote',
       status: 'incomplete',
       fetched: 4,
       retryable: true,
-      reason: 'unstable-pagination',
+      error: expect.stringMatching(/identities changed during validation/i),
     })
   })
 
