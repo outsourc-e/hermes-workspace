@@ -191,7 +191,9 @@ type UseStreamingMessageOptions = {
     friendlyId: string,
     clientId: string,
   ) => void
-  onAbort?: () => void
+  /** Called only once a successful response has yielded an actual SSE reader. */
+  onReaderOpened?: (sessionKey: string) => void
+  onAbort?: (sessionKey: string) => void
   onSessionResolved?: (payload: {
     fromSessionKey: string
     sessionKey: string
@@ -214,6 +216,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     onThinking,
     onTool,
     onMessageAccepted,
+    onReaderOpened,
     onAbort,
     onSessionResolved,
     activeCardId,
@@ -1100,6 +1103,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         if (!reader) {
           throw new Error('No response body')
         }
+        // Do not report local ownership until the response has produced a real
+        // SSE reader. A hanging request or body-less success must remain subject
+        // to normal active-run/history fail-closed recovery.
+        onReaderOpened?.(mySessionKey)
 
         const decoder = new TextDecoder()
         let buffer = ''
@@ -1191,7 +1198,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             schedulePostAcceptanceTimeout('handoff')
             return
           }
-          onAbort?.()
+          onAbort?.(mySessionKey)
           return
         }
         const errorMessage = err instanceof Error ? err.message : String(err)
@@ -1206,6 +1213,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       markFailed,
       onAbort,
       onMessageAccepted,
+      onReaderOpened,
       resetActiveStreamState,
       schedulePostAcceptanceTimeout,
     ],

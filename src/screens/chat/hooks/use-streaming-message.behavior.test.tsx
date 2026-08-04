@@ -43,6 +43,7 @@ function StreamingHarness({
   onReady,
   onSessionResolved,
   onAbort,
+  onReaderOpened,
   pinMainSession,
   activeCardId,
   onCardHandoff,
@@ -54,7 +55,8 @@ function StreamingHarness({
     friendlyId: string
     reason: 'bootstrap' | 'stream-handoff'
   }) => void
-  onAbort: () => void
+  onAbort: (_sessionKey: string) => void
+  onReaderOpened?: (sessionKey: string) => void
   pinMainSession: boolean
   activeCardId?: string
   onCardHandoff?: (payload: AuthoritativeCardHandoff) => void
@@ -62,6 +64,7 @@ function StreamingHarness({
   const streaming = useStreamingMessage({
     onSessionResolved,
     onAbort,
+    onReaderOpened,
     pinMainSession,
     activeCardId,
     onCardHandoff,
@@ -657,4 +660,79 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       document.body.removeChild(container)
     },
   )
+
+  it('claims local ownership only after an SSE reader is acquired', async () => {
+    let controller: StreamingController | null = null
+    let resolveFetch: ((response: Response) => void) | undefined
+    const onReaderOpened = vi.fn()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+
+    React.act(() => {
+      root.render(
+        <StreamingHarness
+          onReady={(value) => {
+            controller = value
+          }}
+          onSessionResolved={vi.fn()}
+          onAbort={vi.fn()}
+          onReaderOpened={onReaderOpened}
+          pinMainSession={false}
+        />,
+      )
+    })
+    expect(controller).not.toBeNull()
+
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        body: null,
+        text: () => Promise.resolve(''),
+      } as unknown as Response)
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve
+          }),
+      )
+
+    await React.act(async () => {
+      await controller!.startStreaming({
+        sessionKey: 'backend-parent',
+        friendlyId: 'friendly-route',
+        message: 'body-less response',
+      })
+    })
+    expect(onReaderOpened).not.toHaveBeenCalled()
+
+    let hangingRequest: Promise<void> | undefined
+    React.act(() => {
+      hangingRequest = controller!.startStreaming({
+        sessionKey: 'backend-parent',
+        friendlyId: 'friendly-route',
+        message: 'hanging response',
+      })
+    })
+    await React.act(async () => {
+      await Promise.resolve()
+    })
+    expect(resolveFetch).toBeDefined()
+    expect(onReaderOpened).not.toHaveBeenCalled()
+
+    React.act(() => {
+      controller!.cancelStreaming()
+    })
+    resolveFetch?.({
+      ok: true,
+      body: null,
+      text: () => Promise.resolve(''),
+    } as unknown as Response)
+    await React.act(async () => {
+      await hangingRequest
+    })
+    expect(onReaderOpened).not.toHaveBeenCalled()
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+  })
 })

@@ -55,16 +55,22 @@ export function useActiveRunCheck({
   sessionKey,
   cardId,
   enabled,
+  shouldApplyResult,
   onCheckComplete,
 }: {
   sessionKey: string
   cardId?: string
   enabled: boolean
-  onCheckComplete?: () => void
+  /**
+   * Lets a caller reject a recovery result that became stale while its request
+   * was in flight (for example, when this session gains a local SSE reader).
+   */
+  shouldApplyResult?: (sessionKey: string) => boolean
+  onCheckComplete?: (sessionKey: string) => void
 }): void {
   const hasCheckedRef = useRef(false)
-  const sessionKeyRef = useRef(sessionKey)
-  sessionKeyRef.current = sessionKey
+  const shouldApplyResultRef = useRef(shouldApplyResult)
+  shouldApplyResultRef.current = shouldApplyResult
   const onCompleteRef = useRef(onCheckComplete)
   onCompleteRef.current = onCheckComplete
 
@@ -85,7 +91,7 @@ export function useActiveRunCheck({
     const settle = () => {
       if (settled) return
       settled = true
-      onCompleteRef.current?.()
+      onCompleteRef.current?.(sessionKey)
     }
 
     // Timeout: if the API check doesn't complete in time, assume the run is dead
@@ -97,10 +103,13 @@ export function useActiveRunCheck({
       } catch {
         /* ignore */
       }
-      // Clear stale waiting state — the run is almost certainly dead
+      // Clear stale waiting state — the run is almost certainly dead.
+      // Do not publish a recovery result over an open local stream that began
+      // after this check was dispatched.
+      if (shouldApplyResultRef.current?.(sessionKey) === false) return
       const store = useChatStore.getState()
-      if (store.isSessionWaiting(sessionKeyRef.current)) {
-        store.clearSessionWaiting(sessionKeyRef.current)
+      if (store.isSessionWaiting(sessionKey)) {
+        store.clearSessionWaiting(sessionKey)
       }
     }, ACTIVE_RUN_CHECK_TIMEOUT_MS)
 
@@ -113,6 +122,7 @@ export function useActiveRunCheck({
 
         const data = (await response.json()) as ActiveRunResponse
         if (!data.ok) return finishCheck()
+        if (shouldApplyResultRef.current?.(sessionKey) === false) return
 
         const store = useChatStore.getState()
         if (data.run && ACTIVE_STATUSES.has(data.run.status)) {
