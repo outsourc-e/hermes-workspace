@@ -482,6 +482,65 @@ describe('SessionCardService collection and resolution', () => {
     })
   })
 
+  it('keeps a pinned root Card continuous across a Slack to api_server compression handoff', async () => {
+    const store = metadataStore()
+    store.update('remote:slack-root', { pinned: true })
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'hermes',
+        listPage: () =>
+          Promise.resolve(
+            page(
+              [
+                session('slack-root', { source: 'slack' }, 20),
+                session('api-server-tip', { source: 'api_server' }, 30),
+              ],
+              0,
+              2,
+            ),
+          ),
+      },
+      localSource: null,
+      metadataStore: store,
+      topologySource: {
+        listAll: () =>
+          Promise.resolve({
+            snapshot: 'cross-source-continuation',
+            sessions: [
+              topologySession('slack-root', 'root', null, {
+                source: 'slack',
+                started_at: '2026-07-27T10:00:00+00:00',
+                ended_at: '2026-07-27T10:05:00+00:00',
+                end_reason: 'compression',
+              }),
+              topologySession('api-server-tip', 'continuation', 'slack-root', {
+                source: 'api_server',
+                started_at: '2026-07-27T10:05:00+00:00',
+              }),
+            ],
+          }),
+        invalidate: vi.fn(),
+      },
+    })
+
+    await expect(service.listCards()).resolves.toMatchObject({
+      cards: [
+        {
+          cardId: 'remote:slack-root',
+          pinned: true,
+          relationshipKind: 'root',
+          continuationSegmentKeys: [
+            'remote:slack-root',
+            'remote:api-server-tip',
+          ],
+          continuationCount: 2,
+        },
+      ],
+      completeness: 'complete',
+      retryable: false,
+    })
+  })
+
   it.each([
     {
       name: 'local adapter',

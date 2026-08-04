@@ -71,11 +71,14 @@ describe('SessionTopologyClient', () => {
           JSON.stringify({
             sessions: [
               topologyRow('root', 'root', null, {
+                source: 'slack',
                 archived: true,
                 ended_at: '2026-07-27T10:05:00+00:00',
                 end_reason: 'compression',
               }),
-              topologyRow('continuation', 'continuation', 'root'),
+              topologyRow('continuation', 'continuation', 'root', {
+                source: 'api_server',
+              }),
             ],
             snapshot: 'snapshot-one',
             next_cursor: 'cursor-one',

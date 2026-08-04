@@ -1005,17 +1005,15 @@ def _project_topology(
         ):
             invalid.add(session_id)
 
-        same_source = record["source"] == parent["source"]
+        # The snapshot comes from one selected profile's authoritative state.db.
+        # ``source`` is interaction-surface provenance, not a storage namespace,
+        # so an exact persisted parent edge may legitimately cross sources.
         if branch_marker is not None:
-            if not same_source:
-                invalid.add(session_id)
             relationships[session_id] = "branch"
         elif delegate_marker is not None:
             relationships[session_id] = "delegate"
         elif record["source"] == "tool":
             relationships[session_id] = "delegate"
-        elif not same_source:
-            invalid.add(session_id)
         elif parent["end_reason"] == "branched":
             parent_ended = parent["parsed_ended_at"]
             if parent_ended is None or child_started is None or child_started < parent_ended:

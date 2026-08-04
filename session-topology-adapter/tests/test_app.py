@@ -1394,7 +1394,7 @@ class RelationshipTests(unittest.TestCase):
         self.assertEqual(result["blob-branch"]["relationship"], "orphan")
         self.assertIsNone(result["blob-branch"]["parent_session_id"])
 
-    def test_cross_source_tool_delegates_use_marker_or_persisted_source_facts(self):
+    def test_cross_source_edges_preserve_exact_persisted_relationships(self):
         result = self.fetch(
             [
                 {"id": "cli-parent", "source": "cli"},
@@ -1428,9 +1428,12 @@ class RelationshipTests(unittest.TestCase):
         )
         self.assertEqual(result["marked-tool-delegate"]["relationship"], "delegate")
         self.assertEqual(result["unmarked-tool-delegate"]["relationship"], "delegate")
-        for session_id in ("non-tool-cross-source", "mismatched-tool-marker"):
-            self.assertEqual(result[session_id]["relationship"], "orphan")
-            self.assertIsNone(result[session_id]["parent_session_id"])
+        self.assertEqual(result["non-tool-cross-source"]["relationship"], "child")
+        self.assertEqual(
+            result["non-tool-cross-source"]["parent_session_id"], "cli-parent"
+        )
+        self.assertEqual(result["mismatched-tool-marker"]["relationship"], "orphan")
+        self.assertIsNone(result["mismatched-tool-marker"]["parent_session_id"])
 
     def test_legacy_branched_parent_classifies_compatible_unmarked_child_as_branch(self):
         result = self.fetch(
@@ -1459,9 +1462,12 @@ class RelationshipTests(unittest.TestCase):
             ]
         )
         self.assertEqual(result["legacy-branch"]["relationship"], "branch")
-        for session_id in ("legacy-cross-source", "legacy-too-early"):
-            self.assertEqual(result[session_id]["relationship"], "orphan")
-            self.assertIsNone(result[session_id]["parent_session_id"])
+        self.assertEqual(result["legacy-cross-source"]["relationship"], "branch")
+        self.assertEqual(
+            result["legacy-cross-source"]["parent_session_id"], "legacy-parent"
+        )
+        self.assertEqual(result["legacy-too-early"]["relationship"], "orphan")
+        self.assertIsNone(result["legacy-too-early"]["parent_session_id"])
 
     def test_compression_continuations_require_one_unmarked_candidate(self):
         result = self.fetch(
@@ -1483,12 +1489,14 @@ class RelationshipTests(unittest.TestCase):
                 },
                 {
                     "id": "unique-parent",
+                    "source": "slack",
                     "started_at": "2026-07-27T11:00:00+00:00",
                     "ended_at": "2026-07-27T11:05:00+00:00",
                     "end_reason": "compression",
                 },
                 {
                     "id": "unique-continuation",
+                    "source": "api_server",
                     "parent_session_id": "unique-parent",
                     "started_at": "2026-07-27T11:05:00+00:00",
                 },
@@ -1691,7 +1699,14 @@ class RelationshipTests(unittest.TestCase):
             },
         ]
         result = self.fetch(rows)
-        orphan_ids = set(result) - {"good-root", "late-parent", "compression-parent"}
+        self.assertEqual(result["cross-source"]["relationship"], "child")
+        self.assertEqual(result["cross-source"]["parent_session_id"], "good-root")
+        orphan_ids = set(result) - {
+            "good-root",
+            "cross-source",
+            "late-parent",
+            "compression-parent",
+        }
         for session_id in orphan_ids:
             with self.subTest(session_id=session_id):
                 self.assertEqual(result[session_id]["relationship"], "orphan")

@@ -192,12 +192,9 @@ function validateAggregate(sessions: Array<SessionTopologySession>): void {
     if (parentId === null) continue
     const parent = byId.get(parentId)
     if (!parent || parent.id === session.id) unavailable()
-    if (
-      session.relationship !== 'delegate' &&
-      session.source !== parent.source
-    ) {
-      unavailable()
-    }
+    // The adapter snapshot is scoped to one selected profile/state.db. Source
+    // identifies the interaction surface, so valid persisted parentage may
+    // cross sources such as Slack and web_api.
     if (session.relationship === 'continuation') {
       if (
         parent.end_reason !== 'compression' ||
