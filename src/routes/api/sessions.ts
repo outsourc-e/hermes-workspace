@@ -30,7 +30,7 @@ export const Route = createFileRoute('/api/sessions')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         const capabilities = await ensureGatewayProbed()
-        if (!capabilities.sessions) {
+        if (!capabilities.sessions && !capabilities.dashboard.available) {
           return json({
             ok: true,
             sessions: [],

@@ -97,6 +97,12 @@ const config = defineConfig(({ mode, command }) => {
 
   const startClaudeAgent = async () => {
     if (claudeAgentStarted) return
+    // OCI runs the gateway under hermes-gateway.service. The Workspace must only consume it.
+    if (process.env.HERMES_WORKSPACE_MANAGED_GATEWAY === 'false') {
+      console.log('[hermes-agent] Skipping auto-start — gateway is systemd-managed')
+      claudeAgentStarted = true
+      return
+    }
     // Skip auto-start when CLAUDE_API_URL is explicitly set to a non-local endpoint
     const explicitUrl =
       env.CLAUDE_API_URL || process.env.CLAUDE_API_URL || claudeApiUrl || ''
