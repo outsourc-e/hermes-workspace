@@ -249,6 +249,9 @@ describe('SidebarSessions Card-only surface', () => {
       }),
     ).toBeNull()
     expect(screen.queryByText('↳ Cron child')).toBeNull()
+    expect(
+      screen.queryByText('Some sessions are temporarily unavailable.'),
+    ).toBeNull()
   })
 
   it('renders the bounded inventory and delegates loading older pages', () => {

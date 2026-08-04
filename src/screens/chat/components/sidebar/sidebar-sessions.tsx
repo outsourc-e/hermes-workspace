@@ -101,14 +101,17 @@ export const SidebarSessions = memo(function SidebarSessions({
     () =>
       sessionCards.filter(
         (card) =>
-          !isRemoteCronCard(card.cardId) &&
           resolutionByCardId.get(card.cardId)?.completeness === 'complete',
       ),
     [resolutionByCardId, sessionCards],
   )
+  const visibleCompleteCards = useMemo(
+    () => completeCards.filter((card) => !isRemoteCronCard(card.cardId)),
+    [completeCards],
+  )
   const roots = useMemo(
     () =>
-      completeCards
+      visibleCompleteCards
         .filter((card) => card.parentCardId === undefined)
         .sort((left, right) => {
           if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
@@ -120,7 +123,7 @@ export const SidebarSessions = memo(function SidebarSessions({
           if (activityDifference !== 0) return activityDifference
           return left.cardId.localeCompare(right.cardId)
         }),
-    [completeCards],
+    [visibleCompleteCards],
   )
   const pinnedRoots = useMemo(
     () => roots.filter((card) => card.pinned),
@@ -130,8 +133,8 @@ export const SidebarSessions = memo(function SidebarSessions({
   const inventoryIncomplete =
     completeness !== 'complete' || completeCards.length !== sessionCards.length
   const cardsById = useMemo(
-    () => new Map(completeCards.map((card) => [card.cardId, card])),
-    [completeCards],
+    () => new Map(visibleCompleteCards.map((card) => [card.cardId, card])),
+    [visibleCompleteCards],
   )
 
   const pinnedCardIds = useMemo(
