@@ -57,6 +57,12 @@ type CardRowNode = Pick<
   status?: SessionCardChild['status']
 }
 
+const REMOTE_CRON_CARD_PREFIX = 'remote:cron'
+
+function isRemoteCronCard(cardId: string): boolean {
+  return cardId.startsWith(REMOTE_CRON_CARD_PREFIX)
+}
+
 export const SidebarSessions = memo(function SidebarSessions({
   sessionCards,
   cardResolutions,
@@ -95,6 +101,7 @@ export const SidebarSessions = memo(function SidebarSessions({
     () =>
       sessionCards.filter(
         (card) =>
+          !isRemoteCronCard(card.cardId) &&
           resolutionByCardId.get(card.cardId)?.completeness === 'complete',
       ),
     [resolutionByCardId, sessionCards],
@@ -144,6 +151,7 @@ export const SidebarSessions = memo(function SidebarSessions({
       const nextAncestorCardIds = new Set(ancestorCardIds)
       nextAncestorCardIds.add(node.cardId)
       const childResults = node.childNodes.flatMap((child) => {
+        if (isRemoteCronCard(child.cardId)) return []
         if (nextAncestorCardIds.has(child.cardId)) return []
         const nestedCard = cardsById.get(child.cardId)
         const nestedChildNodes =

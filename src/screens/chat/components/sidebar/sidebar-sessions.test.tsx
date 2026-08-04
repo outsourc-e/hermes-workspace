@@ -208,6 +208,49 @@ describe('SidebarSessions Card-only surface', () => {
     ).toBeTruthy()
   })
 
+  it('excludes remote cron Cards and nested cron children from the Chat sidebar', () => {
+    const interactive = card({
+      cardId: 'remote:interactive',
+      canonicalSegmentKey: 'remote:interactive',
+      continuationSegmentKeys: ['remote:interactive'],
+      continuationCount: 1,
+      title: 'Interactive conversation',
+      childNodes: [
+        {
+          cardId: 'remote:cron-child',
+          sessionKey: 'remote:cron-child',
+          continuationSegmentKeys: ['remote:cron-child'],
+          relationshipKind: 'child',
+          title: 'Cron child',
+          status: 'complete',
+          updatedAt: Date.now(),
+          continuationCount: 1,
+        },
+      ],
+    })
+    const cron = card({
+      cardId: 'remote:cron-job-123',
+      canonicalSegmentKey: 'remote:cron-job-123',
+      continuationSegmentKeys: ['remote:cron-job-123'],
+      continuationCount: 1,
+      title: 'Scheduled cron job',
+      childNodes: [],
+      pinned: true,
+    })
+
+    renderSidebar({ cards: [interactive, cron] })
+
+    expect(screen.getByText('Interactive conversation')).toBeTruthy()
+    expect(screen.queryByText('Scheduled cron job')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Pinned sessions' })).toBeNull()
+    expect(
+      screen.queryByRole('button', {
+        name: 'Expand related sessions for Interactive conversation',
+      }),
+    ).toBeNull()
+    expect(screen.queryByText('↳ Cron child')).toBeNull()
+  })
+
   it('renders the bounded inventory and delegates loading older pages', () => {
     const now = Date.now()
     const recent = card({
