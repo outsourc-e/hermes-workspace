@@ -97,18 +97,6 @@ function getMiniAgentCardStatus(status: string): AgentCardStatus {
   return 'running'
 }
 
-const AGENT_NAME_KEY = 'hermes-workspace-agent-name'
-
-function getStoredAgentName(): string {
-  try {
-    const v = localStorage.getItem(AGENT_NAME_KEY)
-    if (v && v.trim()) return v.trim()
-  } catch {
-    /* noop */
-  }
-  return ''
-}
-
 const STATE_GLOW: Record<string, string> = {
   idle: 'border-primary-200/20',
   reading: 'border-blue-400/50 shadow-[0_0_8px_rgba(59,130,246,0.15)]',
@@ -170,39 +158,40 @@ function ocTextColor(pct: number): string {
   return 'text-emerald-600'
 }
 
-function ocReadNumber(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string') {
-    const p = Number(value)
-    if (Number.isFinite(p)) return p
+type OcCardStatus = {
+  model: string
+  contextPercent: number
+}
+
+function ocParseCardStatus(
+  payload: unknown,
+  cardId: string,
+): OcCardStatus | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null
   }
-  return 0
-}
-
-function ocReadPercent(value: unknown): number {
-  const n = ocReadNumber(value)
-  if (n <= 1 && n > 0) return n * 100
-  return n
-}
-
-function ocParseContextPct(payload: unknown): number {
-  const root =
-    payload && typeof payload === 'object'
-      ? (payload as Record<string, unknown>)
-      : {}
-  const usage =
-    (root.today as Record<string, unknown> | undefined) ??
-    (root.usage as Record<string, unknown> | undefined) ??
-    (root.summary as Record<string, unknown> | undefined) ??
-    (root.totals as Record<string, unknown> | undefined) ??
-    root
-  return ocReadPercent(
-    usage.contextPercent ??
-      usage.context_percent ??
-      usage.context ??
-      root.contextPercent ??
-      root.context_percent,
+  const cards = (payload as Record<string, unknown>).cards
+  if (!Array.isArray(cards)) return null
+  const matches = cards.filter(
+    (card): card is Record<string, unknown> =>
+      Boolean(card) &&
+      typeof card === 'object' &&
+      !Array.isArray(card) &&
+      (card as Record<string, unknown>).cardId === cardId,
   )
+  if (matches.length !== 1) return null
+  const usage = matches[0]!.usage
+  if (!usage || typeof usage !== 'object' || Array.isArray(usage)) return null
+  const record = usage as Record<string, unknown>
+  const contextPercent =
+    typeof record.contextPercent === 'number' &&
+    Number.isFinite(record.contextPercent)
+      ? record.contextPercent
+      : 0
+  return {
+    model: typeof record.model === 'string' ? record.model : '',
+    contextPercent: Math.min(100, Math.max(0, Math.round(contextPercent))),
+  }
 }
 
 // ── OrchestratorCard ────────────────────────────────────────────────────────
@@ -211,22 +200,20 @@ function OrchestratorCard({
   compact = false,
   cardRef,
   activityAvailable,
+  cardId,
+  displayTitle,
 }: {
   compact?: boolean
   cardRef?: (element: HTMLElement | null) => void
   activityAvailable: boolean
+  cardId?: string
+  displayTitle?: string
 }) {
   const { state, label: activityLabel } = useOrchestratorState()
   const visibleState = activityAvailable ? state : 'idle'
   const glowClass = STATE_GLOW[visibleState] ?? STATE_GLOW.idle
 
-  const [agentName, setAgentName] = useState(getStoredAgentName)
-  const [sessionName, setSessionName] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  // Fetch model from gateway
+  // Fetch Card-scoped model usage from the canonical projection.
   const [model, setModel] = useState('')
 
   // Usage state
@@ -310,26 +297,28 @@ function OrchestratorCard({
     let cancelled = false
     const isCancelled = () => cancelled
     async function fetchAll() {
-      try {
-        // session-status: model + context pct
-        const res = await fetch('/api/session-status')
-        if (!res.ok) return
-        const data = await res.json()
-        const payload = data.payload ?? data
-        const m = payload.model ?? payload.currentModel ?? ''
-        if (!cancelled && m) setModel(String(m))
-        const sn = String(
-          payload.sessionLabel ??
-            payload.sessionName ??
-            payload.name ??
-            payload.label ??
-            '',
-        )
-        if (!cancelled && sn) setSessionName(sn)
-        const pct = ocParseContextPct(payload)
-        if (!cancelled) setContextPct(Math.min(100, Math.round(pct)))
-      } catch {
-        /* noop */
+      if (cardId) {
+        try {
+          const res = await fetch(
+            `/api/session-status?cardId=${encodeURIComponent(cardId)}`,
+          )
+          if (res.ok) {
+            const data = (await res.json()) as { payload?: unknown }
+            const status = ocParseCardStatus(data.payload, cardId)
+            if (!cancelled) {
+              setModel(status?.model ?? '')
+              setContextPct(status?.contextPercent ?? null)
+            }
+          }
+        } catch {
+          if (!cancelled) {
+            setModel('')
+            setContextPct(null)
+          }
+        }
+      } else if (!cancelled) {
+        setModel('')
+        setContextPct(null)
       }
 
       try {
@@ -357,26 +346,9 @@ function OrchestratorCard({
       if (flashTimerRefOc.current) clearTimeout(flashTimerRefOc.current)
     }
     // Hook dependencies are intentionally constrained to the explicit array below.
-  }, [preferredProvider])
+  }, [cardId, preferredProvider])
 
-  const displayName = agentName || sessionName || 'Agent'
-
-  function startEdit() {
-    setEditValue(agentName)
-    setIsEditing(true)
-    setTimeout(() => inputRef.current?.focus(), 50)
-  }
-
-  function commitEdit() {
-    const trimmed = editValue.trim()
-    setAgentName(trimmed)
-    setIsEditing(false)
-    try {
-      localStorage.setItem(AGENT_NAME_KEY, trimmed)
-    } catch {
-      /* noop */
-    }
-  }
+  const displayName = displayTitle?.trim() || 'Agent'
 
   // Build usage rows: provider rows if available, else synthetic context row
   const ctxRow: OcUsageRow = {
@@ -455,33 +427,14 @@ function OrchestratorCard({
               !compact && 'justify-center',
             )}
           >
-            {isEditing ? (
-              <input
-                ref={inputRef}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitEdit()
-                  if (e.key === 'Escape') setIsEditing(false)
-                }}
-                placeholder="Agent name..."
-                className="w-24 rounded border border-primary-200/25 bg-primary-50 px-1.5 py-0.5 text-xs font-semibold text-primary-900 outline-none focus:border-accent-400"
-                maxLength={20}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={startEdit}
-                className={cn(
-                  'font-semibold text-primary-900 transition-colors hover:text-accent-600',
-                  compact ? 'text-sm' : 'text-base',
-                )}
-                title="Click to rename"
-              >
-                {displayName}
-              </button>
-            )}
+            <p
+              className={cn(
+                'font-semibold text-primary-900',
+                compact ? 'text-sm' : 'text-base',
+              )}
+            >
+              {displayName}
+            </p>
           </div>
           {/* Activity is shown only for the complete Card owning this chat. */}
           {activityAvailable ? (
@@ -680,11 +633,13 @@ export function AgentViewPanel({
   // Sound notifications for agent events
   useSounds({ autoPlay: true })
 
-  const activeCardActivityAvailable = Boolean(
+  const resolvedActiveCard =
     activeCard &&
     sessionCardList &&
-    hasExactCompleteSessionCardProjection(sessionCardList, activeCard.cardId),
-  )
+    hasExactCompleteSessionCardProjection(sessionCardList, activeCard.cardId)
+      ? sessionCardList.cards.find((card) => card.cardId === activeCard.cardId)
+      : undefined
+  const activeCardActivityAvailable = Boolean(resolvedActiveCard)
 
   const {
     isOpen,
@@ -1012,6 +967,8 @@ export function AgentViewPanel({
                 <OrchestratorCard
                   compact={false}
                   activityAvailable={activeCardActivityAvailable}
+                  cardId={resolvedActiveCard?.cardId}
+                  displayTitle={resolvedActiveCard?.title}
                 />
 
                 {errorMessage &&

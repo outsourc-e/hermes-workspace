@@ -377,6 +377,7 @@ async function renderPanel(
 
 beforeEach(() => {
   window.innerWidth = 1280
+  window.localStorage.clear()
   mocks.navigate.mockReset()
   mocks.queryOptions.length = 0
   useChatActivityStore.setState({
@@ -422,6 +423,7 @@ describe('AgentViewPanel mounted Card cutover', () => {
 
     await renderPanel(card(), body)
 
+    expect(screen.getByText('Parent Card')).toBeTruthy()
     expect(screen.getByText('Responding...')).toBeTruthy()
     expect(
       screen
@@ -464,8 +466,10 @@ describe('AgentViewPanel mounted Card cutover', () => {
     vi.stubGlobal('fetch', fetchMock)
     useChatActivityStore.getState().setLocalActivity('tool-use')
 
-    await renderPanel(card(), body)
+    await renderPanel(card({ title: 'raw-session-secret' }), body)
 
+    expect(screen.getByText('Agent')).toBeTruthy()
+    expect(document.body.textContent).not.toContain('raw-session-secret')
     expect(screen.getByText('Card activity unavailable')).toBeTruthy()
     expect(screen.queryByText('Using tools...')).toBeNull()
     expect(
