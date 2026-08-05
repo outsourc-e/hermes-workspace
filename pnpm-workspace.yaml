@@ -1,5 +1,7 @@
-allowBuilds:
-  electron: true
-  electron-winstaller: true
-  esbuild: true
-  unrs-resolver: true
+# pnpm 10 requires an explicit allowlist for package lifecycle scripts. These
+# packages install reviewed platform binaries used by the Workspace toolchain.
+onlyBuiltDependencies:
+  - electron
+  - electron-winstaller
+  - esbuild
+  - unrs-resolver
