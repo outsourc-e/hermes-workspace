@@ -775,11 +775,12 @@ export function ChatScreen({
     ),
   })
 
+  const cardHistoryQueryKey = sessionCardQueryKeys.history(
+    activeCard?.cardId ?? '',
+    activeCardCanonicalSegmentKey ?? '',
+  )
   const cardHistoryQuery = useQuery({
-    queryKey: sessionCardQueryKeys.history(
-      activeCard?.cardId ?? '',
-      activeCardCanonicalSegmentKey ?? '',
-    ),
+    queryKey: cardHistoryQueryKey,
     queryFn: async ({ signal }) => {
       if (!activeCard || !activeCardCanonicalSegmentKey) {
         throw new Error('Session Card route is not resolved')
@@ -787,9 +788,16 @@ export function ChatScreen({
       const server = await fetchCompleteSessionCardHistory({
         cardId: activeCard.cardId,
         canonicalSegmentKey: activeCardCanonicalSegmentKey,
+        continuationSegmentKeys: activeCard.continuationSegmentKeys,
         signal,
       })
-      return reconcileSessionCardHistoryResponse(server)
+      return reconcileSessionCardHistoryResponse(server, {
+        previous:
+          queryClient.getQueryData<SessionCardHistoryResponse>(
+            cardHistoryQueryKey,
+          ),
+        continuationSegmentKeys: activeCard.continuationSegmentKeys,
+      })
     },
     enabled:
       cardTransportReady &&
@@ -798,21 +806,29 @@ export function ChatScreen({
       !isNewChat,
     refetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
   })
+  const inspectedChildHistoryQueryKey = sessionCardQueryKeys.childHistory(
+    activeCard?.cardId ?? '',
+    inspectedChildCard?.cardId ?? '',
+    inspectedChildCard?.sessionKey ?? '',
+  )
   const inspectedChildHistoryQuery = useQuery({
-    queryKey: sessionCardQueryKeys.childHistory(
-      activeCard?.cardId ?? '',
-      inspectedChildCard?.cardId ?? '',
-      inspectedChildCard?.sessionKey ?? '',
-    ),
-    queryFn: ({ signal }) => {
+    queryKey: inspectedChildHistoryQueryKey,
+    queryFn: async ({ signal }) => {
       if (!activeCard || !inspectedChildCard) {
         throw new Error('Inspected child Card is not validated')
       }
-      return fetchCompleteSessionCardHistory({
+      const server = await fetchCompleteSessionCardHistory({
         parentCardId: activeCard.cardId,
         cardId: inspectedChildCard.cardId,
         canonicalSegmentKey: inspectedChildCard.sessionKey,
+        continuationSegmentKeys: inspectedChildCard.continuationSegmentKeys,
         signal,
+      })
+      return reconcileSessionCardHistoryResponse(server, {
+        previous: queryClient.getQueryData<SessionCardHistoryResponse>(
+          inspectedChildHistoryQueryKey,
+        ),
+        continuationSegmentKeys: inspectedChildCard.continuationSegmentKeys,
       })
     },
     enabled:
@@ -823,18 +839,9 @@ export function ChatScreen({
     retry: 1,
     refetchOnWindowFocus: true,
   })
-  const completeCardHistory = isAuthoritativeCompleteSessionCardHistory(
-    cardHistoryQuery.data,
-  )
-    ? cardHistoryQuery.data
-    : undefined
-  const completeInspectedChildHistory =
-    isAuthoritativeCompleteSessionCardHistory(inspectedChildHistoryQuery.data)
-      ? inspectedChildHistoryQuery.data
-      : undefined
   const historyQuery = activeCard ? cardHistoryQuery : legacyHistoryQuery
   const historyMessages = activeCard
-    ? (completeCardHistory?.messages ?? [])
+    ? (cardHistoryQuery.data?.messages ?? [])
     : legacyHistoryMessages
   const messageCount = activeCard ? historyMessages.length : legacyMessageCount
   const historyError = activeCard
@@ -2016,7 +2023,7 @@ export function ChatScreen({
   ])
 
   const inspectedChildDisplayMessages = useMemo(() => {
-    const messages = completeInspectedChildHistory?.messages ?? []
+    const messages = inspectedChildHistoryQuery.data?.messages ?? []
     return messages
       .filter((message) => {
         if (message.role === 'user') {
@@ -2029,12 +2036,10 @@ export function ChatScreen({
         return content.some((part) => part.type === 'toolCall')
       })
       .map((message) => stripQueuedWrapperFromUserMessage(message))
-  }, [completeInspectedChildHistory?.messages])
-  const finalDisplayMessages = displayedCardHistoryReady
-    ? inspectedChildCard
-      ? inspectedChildDisplayMessages
-      : parentDisplayMessages
-    : []
+  }, [inspectedChildHistoryQuery.data?.messages])
+  const finalDisplayMessages = inspectedChildCard
+    ? inspectedChildDisplayMessages
+    : parentDisplayMessages
 
   const derivedStreamingInfo = useMemo(() => {
     if (activeIsRealtimeStreaming) {
@@ -3147,23 +3152,30 @@ export function ChatScreen({
   const incompleteHistoryNotice =
     displayedCardHistory && !displayedCardHistoryReady ? (
       <div className="mx-4 mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-200">
-        <p role="status">
+        <p role="status" aria-live="polite">
           {inspectedChildCard
-            ? 'Inspected child history is unavailable until the complete transcript can be loaded.'
-            : 'Conversation history is unavailable until the complete transcript can be loaded.'}
+            ? 'History is incomplete for the inspected child Card. Available messages remain visible.'
+            : 'History is incomplete for this Session Card. Available messages remain visible.'}{' '}
+          {displayedCardHistory.missingSegments.length === 0
+            ? 'More history may become available.'
+            : displayedCardHistory.missingSegments.length === 1
+              ? '1 part could not be loaded.'
+              : `${displayedCardHistory.missingSegments.length} parts could not be loaded.`}
         </p>
         {displayedCardHistoryRetryable ? (
           <button
             type="button"
-            className="shrink-0 rounded-md border border-amber-400 px-2.5 py-1 text-xs font-semibold hover:bg-amber-100 dark:border-amber-600 dark:hover:bg-amber-900/40"
+            className="shrink-0 rounded-md border border-amber-400 px-2.5 py-1 text-xs font-semibold hover:bg-amber-100 disabled:cursor-wait disabled:opacity-70 dark:border-amber-600 dark:hover:bg-amber-900/40"
             aria-label={
               inspectedChildCard
                 ? 'Retry inspected child history'
                 : 'Retry parent conversation history'
             }
+            aria-busy={displayedHistoryQuery.isFetching}
+            disabled={displayedHistoryQuery.isFetching}
             onClick={() => void displayedHistoryQuery.refetch()}
           >
-            Retry history
+            {displayedHistoryQuery.isFetching ? 'Retrying…' : 'Retry history'}
           </button>
         ) : null}
       </div>

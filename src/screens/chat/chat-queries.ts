@@ -955,7 +955,10 @@ export function mergeSessionCardDetail(
   }
 }
 
-function parseSessionCardHistory(value: unknown): SessionCardHistoryWire {
+function parseSessionCardHistory(
+  value: unknown,
+  allowedSegmentKeys?: ReadonlySet<string>,
+): SessionCardHistoryWire {
   if (
     !isWireRecord(value) ||
     !nonblankWireString(value.cardId) ||
@@ -969,24 +972,50 @@ function parseSessionCardHistory(value: unknown): SessionCardHistoryWire {
     return invalidSessionCardResponse()
   }
 
+  const cardIdentity = sourceQualifiedWireIdentity(value.cardId)
+  const canonicalSegmentIdentity = sourceQualifiedWireIdentity(
+    value.canonicalSegmentKey,
+  )
+  if (
+    !cardIdentity ||
+    !canonicalSegmentIdentity ||
+    cardIdentity.source !== canonicalSegmentIdentity.source ||
+    (allowedSegmentKeys &&
+      !allowedSegmentKeys.has(canonicalSegmentIdentity.identity))
+  ) {
+    return invalidSessionCardResponse()
+  }
+
   const messages = value.messages.map((entry) => {
+    const segmentIdentity = isWireRecord(entry)
+      ? sourceQualifiedWireIdentity(entry.segmentKey)
+      : null
     if (
       !isWireRecord(entry) ||
-      !nonblankWireString(entry.segmentKey) ||
+      !segmentIdentity ||
+      segmentIdentity.source !== cardIdentity.source ||
+      (allowedSegmentKeys &&
+        !allowedSegmentKeys.has(segmentIdentity.identity)) ||
       !isWireRecord(entry.message)
     ) {
       return invalidSessionCardResponse()
     }
     return {
-      segmentKey: nonblankWireString(entry.segmentKey)!,
+      segmentKey: segmentIdentity.identity,
       message: { ...entry.message },
     }
   })
   const missingSegments = value.missingSegments.map((entry) => {
     const error = isWireRecord(entry) ? nonblankWireString(entry.error) : null
+    const segmentIdentity = isWireRecord(entry)
+      ? sourceQualifiedWireIdentity(entry.segmentKey)
+      : null
     if (
       !isWireRecord(entry) ||
-      !nonblankWireString(entry.segmentKey) ||
+      !segmentIdentity ||
+      segmentIdentity.source !== cardIdentity.source ||
+      (allowedSegmentKeys &&
+        !allowedSegmentKeys.has(segmentIdentity.identity)) ||
       entry.retryable !== true ||
       !error ||
       error.length > 256 ||
@@ -995,7 +1024,7 @@ function parseSessionCardHistory(value: unknown): SessionCardHistoryWire {
       return invalidSessionCardResponse()
     }
     return {
-      segmentKey: nonblankWireString(entry.segmentKey)!,
+      segmentKey: segmentIdentity.identity,
       ...(entry.source === undefined
         ? {}
         : { source: nonblankWireString(entry.source)! }),
@@ -1014,8 +1043,8 @@ function parseSessionCardHistory(value: unknown): SessionCardHistoryWire {
   }
 
   return {
-    cardId: nonblankWireString(value.cardId)!,
-    canonicalSegmentKey: nonblankWireString(value.canonicalSegmentKey)!,
+    cardId: cardIdentity.identity,
+    canonicalSegmentKey: canonicalSegmentIdentity.identity,
     messages,
     completeness: value.completeness,
     retryable: value.retryable,
@@ -1030,16 +1059,46 @@ export async function fetchSessionCardHistory(payload: {
   cardId: string
   canonicalSegmentKey: string
   parentCardId?: string
+  continuationSegmentKeys?: ReadonlyArray<string>
   cursor?: string
   limit?: number
   signal?: AbortSignal
 }): Promise<SessionCardHistoryWire> {
+  const cardIdentity = sourceQualifiedWireIdentity(payload.cardId)
+  const canonicalSegmentIdentity = sourceQualifiedWireIdentity(
+    payload.canonicalSegmentKey,
+  )
+  const parentIdentity =
+    payload.parentCardId === undefined
+      ? undefined
+      : sourceQualifiedWireIdentity(payload.parentCardId)
+  const continuationSegmentIdentities =
+    payload.continuationSegmentKeys === undefined
+      ? undefined
+      : payload.continuationSegmentKeys.map(sourceQualifiedWireIdentity)
+  const allowedSegmentKeys = continuationSegmentIdentities
+    ? new Set(
+        continuationSegmentIdentities.map(
+          (identity) => identity?.identity ?? '',
+        ),
+      )
+    : undefined
   if (
-    !nonblankWireString(payload.cardId) ||
-    !nonblankWireString(payload.canonicalSegmentKey) ||
+    !cardIdentity ||
+    !canonicalSegmentIdentity ||
+    cardIdentity.source !== canonicalSegmentIdentity.source ||
     (payload.parentCardId !== undefined &&
-      (!nonblankWireString(payload.parentCardId) ||
-        payload.parentCardId === payload.cardId)) ||
+      (!parentIdentity ||
+        parentIdentity.source !== cardIdentity.source ||
+        parentIdentity.identity === cardIdentity.identity)) ||
+    (continuationSegmentIdentities !== undefined &&
+      (continuationSegmentIdentities.length === 0 ||
+        continuationSegmentIdentities.some(
+          (identity) => !identity || identity.source !== cardIdentity.source,
+        ) ||
+        allowedSegmentKeys?.size !== continuationSegmentIdentities.length ||
+        !allowedSegmentKeys.has(canonicalSegmentIdentity.identity) ||
+        (parentIdentity && allowedSegmentKeys.has(parentIdentity.identity)))) ||
     (payload.limit !== undefined &&
       (!Number.isSafeInteger(payload.limit) ||
         payload.limit < 1 ||
@@ -1063,7 +1122,7 @@ export async function fetchSessionCardHistory(payload: {
         },
       ),
     (value) => {
-      const history = parseSessionCardHistory(value)
+      const history = parseSessionCardHistory(value, allowedSegmentKeys)
       if (
         history.cardId !== payload.cardId ||
         history.canonicalSegmentKey !== payload.canonicalSegmentKey
@@ -1081,6 +1140,8 @@ export type SessionCardHistoryResponse = HistoryResponse & {
   completeness: 'complete' | 'partial'
   retryable: boolean
   missingSegments: SessionCardHistoryWire['missingSegments']
+  /** Server-persisted rows before exact Card recovery/live overlays. */
+  persistedMessages?: Array<ChatMessage>
 }
 
 /**
@@ -1089,7 +1150,7 @@ export type SessionCardHistoryResponse = HistoryResponse & {
  */
 export function isAuthoritativeCompleteSessionCardHistory(
   history: SessionCardHistoryResponse | undefined,
-): history is SessionCardHistoryResponse {
+): boolean {
   return Boolean(
     history &&
     history.completeness === 'complete' &&
@@ -1124,6 +1185,7 @@ export async function fetchCompleteSessionCardHistory(payload: {
   cardId: string
   canonicalSegmentKey: string
   parentCardId?: string
+  continuationSegmentKeys?: ReadonlyArray<string>
   signal?: AbortSignal
 }): Promise<SessionCardHistoryResponse> {
   const messages: Array<ChatMessage> = []
@@ -1136,6 +1198,7 @@ export async function fetchCompleteSessionCardHistory(payload: {
       cardId: payload.cardId,
       canonicalSegmentKey: payload.canonicalSegmentKey,
       parentCardId: payload.parentCardId,
+      continuationSegmentKeys: payload.continuationSegmentKeys,
       cursor,
       limit: 500,
       signal: payload.signal,
@@ -1156,6 +1219,7 @@ export async function fetchCompleteSessionCardHistory(payload: {
     cardId: finalPage.cardId,
     canonicalSegmentKey: finalPage.canonicalSegmentKey,
     messages,
+    persistedMessages: messages,
     completeness: finalPage.completeness,
     retryable: finalPage.retryable,
     missingSegments: finalPage.missingSegments,
@@ -1169,33 +1233,130 @@ function mergeCardHistoryMessages(
   return mergeCardTranscriptRecoveryMessages(primary, secondary)
 }
 
+function isSameSessionCardHistoryOwner(
+  left: Pick<SessionCardHistoryResponse, 'cardId' | 'canonicalSegmentKey'>,
+  right: Pick<SessionCardHistoryResponse, 'cardId' | 'canonicalSegmentKey'>,
+): boolean {
+  return (
+    left.cardId === right.cardId &&
+    left.canonicalSegmentKey === right.canonicalSegmentKey
+  )
+}
+
+function persistedCardHistoryMessages(
+  history: SessionCardHistoryResponse,
+  fallbackToAllMessages = false,
+): Array<ChatMessage> {
+  if (history.persistedMessages) return history.persistedMessages
+  const segmentRows = history.messages.filter((message) => {
+    const segmentKey = sourceQualifiedWireIdentity(
+      (message as Record<string, unknown>).__segmentKey,
+    )
+    return segmentKey !== null
+  })
+  return fallbackToAllMessages ? history.messages : segmentRows
+}
+
+function mergePartialPersistedCardHistory(
+  server: SessionCardHistoryResponse,
+  previous: SessionCardHistoryResponse | undefined,
+  continuationSegmentKeys: ReadonlyArray<string> | undefined,
+): Array<ChatMessage> {
+  const serverMessages = persistedCardHistoryMessages(server, true)
+  if (
+    server.completeness === 'complete' ||
+    !previous ||
+    !isSameSessionCardHistoryOwner(server, previous)
+  ) {
+    return serverMessages
+  }
+
+  const previousMessages = persistedCardHistoryMessages(previous)
+  if (!continuationSegmentKeys || continuationSegmentKeys.length === 0) {
+    return mergeCardHistoryMessages(serverMessages, previousMessages)
+  }
+
+  const allowedSegmentKeys = new Set(continuationSegmentKeys)
+  const messagesBySegment = (
+    messages: Array<ChatMessage>,
+  ): Map<string, Array<ChatMessage>> => {
+    const grouped = new Map<string, Array<ChatMessage>>()
+    for (const message of messages) {
+      const identity = sourceQualifiedWireIdentity(
+        (message as Record<string, unknown>).__segmentKey,
+      )
+      if (!identity || !allowedSegmentKeys.has(identity.identity)) continue
+      const current = grouped.get(identity.identity) ?? []
+      current.push(message)
+      grouped.set(identity.identity, current)
+    }
+    return grouped
+  }
+  const serverBySegment = messagesBySegment(serverMessages)
+  const previousBySegment = messagesBySegment(previousMessages)
+  const retained: Array<ChatMessage> = []
+  for (const segmentKey of continuationSegmentKeys) {
+    retained.push(
+      ...mergeCardHistoryMessages(
+        serverBySegment.get(segmentKey) ?? [],
+        previousBySegment.get(segmentKey) ?? [],
+      ),
+    )
+  }
+  return mergeCardHistoryMessages([], retained)
+}
+
 export function mergeSessionCardHistoryResponse(
   server: SessionCardHistoryResponse,
   recoveryMessages: Array<ChatMessage>,
 ): SessionCardHistoryResponse {
-  if (recoveryMessages.length === 0) return server
+  const persistedMessages = persistedCardHistoryMessages(server, true)
   return {
     ...server,
-    messages: mergeCardHistoryMessages(server.messages, recoveryMessages),
+    persistedMessages,
+    messages: mergeCardHistoryMessages(persistedMessages, recoveryMessages),
   }
 }
 
+type ReconcileSessionCardHistoryOptions = {
+  previous?: SessionCardHistoryResponse
+  continuationSegmentKeys?: ReadonlyArray<string>
+  /** Focused-test seam; production reads the exact recovery envelope. */
+  recoveryMessages?: Array<ChatMessage>
+}
+
 /**
- * Reconcile one Card-history response with only the exact Card/segment recovery
- * envelope. A complete authoritative response may acknowledge overlays; a
- * partial response can display overlays later but cannot clear them.
+ * Reconcile one Card-history response with only same-owner persisted rows and
+ * the exact Card/segment recovery envelope. Complete history replaces retained
+ * persisted rows and may acknowledge overlays; partial history keeps prior
+ * validated rows visible and cannot clear recovery.
  */
 export function reconcileSessionCardHistoryResponse(
   server: SessionCardHistoryResponse,
+  options: ReconcileSessionCardHistoryOptions = {},
 ): SessionCardHistoryResponse {
   const owner = {
     cardId: server.cardId,
     canonicalSegmentKey: server.canonicalSegmentKey,
   }
-  const recovery = isAuthoritativeCompleteSessionCardHistory(server)
-    ? removeAcknowledgedCardTranscriptRecoveryMessages(owner, server.messages)
-    : readCardTranscriptRecovery(owner)
-  return mergeSessionCardHistoryResponse(server, recovery?.messages ?? [])
+  const persistedMessages = mergePartialPersistedCardHistory(
+    server,
+    options.previous,
+    options.continuationSegmentKeys,
+  )
+  const persistedServer = {
+    ...server,
+    messages: persistedMessages,
+    persistedMessages,
+  }
+  const recoveryMessages =
+    options.recoveryMessages ??
+    (isAuthoritativeCompleteSessionCardHistory(server)
+      ? removeAcknowledgedCardTranscriptRecoveryMessages(owner, server.messages)
+          ?.messages
+      : readCardTranscriptRecovery(owner)?.messages) ??
+    []
+  return mergeSessionCardHistoryResponse(persistedServer, recoveryMessages)
 }
 
 export function updateSessionCardHistoryMessages(

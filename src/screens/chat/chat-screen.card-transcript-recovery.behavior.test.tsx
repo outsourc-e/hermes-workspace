@@ -510,15 +510,18 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     }
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     while (mounted.length > 0) mounted.pop()?.()
+    // ChatContainer schedules ResizeObserver setup in requestAnimationFrame.
+    // Flush that queued callback before removing the test polyfills.
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
 
   it('renders persisted messages from a retryable partial Card response beside incomplete/retry UI without raw fallback', async () => {
     const requests: Array<string> = []
-    const partial: CardHistoryWire = {
+    const initialPartial: CardHistoryWire = {
       ...completeHistory(parentCard, [
         {
           segmentKey: 'remote:a-root',
@@ -541,11 +544,33 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
         },
       ],
     }
+    const subsequentPartial: CardHistoryWire = {
+      ...initialPartial,
+      messages: [],
+      missingSegments: [
+        {
+          segmentKey: 'remote:a-root',
+          source: 'remote',
+          retryable: true,
+          error: 'temporary read failure on retry',
+        },
+        ...initialPartial.missingSegments,
+      ],
+    }
+    let historyRequestCount = 0
+    let resolveRetry: (() => void) | undefined
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = String(input)
       requests.push(url)
-      if (url.startsWith('/api/session-cards/'))
-        return Promise.resolve(jsonResponse(partial))
+      if (url.startsWith('/api/session-cards/')) {
+        historyRequestCount += 1
+        if (historyRequestCount === 1) {
+          return Promise.resolve(jsonResponse(initialPartial))
+        }
+        return new Promise<Response>((resolve) => {
+          resolveRetry = () => resolve(jsonResponse(subsequentPartial))
+        })
+      }
       if (url === '/api/status')
         return Promise.resolve(jsonResponse({ ok: true, status: 200 }))
       if (url === '/api/models')
@@ -558,13 +583,39 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     await waitFor(() => {
       expect(screen.getByText('persisted partial message')).toBeTruthy()
       expect(screen.getByRole('status').textContent).toContain(
-        'Conversation history is unavailable until the complete transcript can be loaded.',
+        'History is incomplete for this Session Card. Available messages remain visible. 1 part could not be loaded.',
       )
       expect(
         screen.getByRole('button', {
           name: 'Retry parent conversation history',
         }),
       ).toBeTruthy()
+    })
+    const statusText = screen.getByRole('status').textContent
+    expect(statusText).not.toContain('remote:')
+    expect(statusText).not.toContain('temporary read failure')
+
+    const retryButton = screen.getByRole('button', {
+      name: 'Retry parent conversation history',
+    })
+    React.act(() => fireEvent.click(retryButton))
+    expect(historyRequestCount).toBe(2)
+    expect(screen.getByText('persisted partial message')).toBeTruthy()
+    expect(retryButton).toHaveProperty('disabled', true)
+    expect(retryButton.textContent).toBe('Retrying…')
+
+    React.act(() => {
+      if (typeof resolveRetry !== 'function') {
+        throw new Error('Retry request did not start')
+      }
+      resolveRetry()
+    })
+    await waitFor(() => {
+      expect(screen.getByText('persisted partial message')).toBeTruthy()
+      expect(screen.getByRole('status').textContent).toContain(
+        '2 parts could not be loaded.',
+      )
+      expect(retryButton).toHaveProperty('disabled', false)
     })
     expectCardOnlyTranscriptBoundary(requests)
   })
@@ -756,18 +807,24 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
   })
 
   it('keeps parent overlay state through parent-child-parent inspection', async () => {
+    const childPartialHistory: CardHistoryWire = {
+      ...completeHistory(childAsSessionCard, [
+        {
+          segmentKey: childCard.sessionKey,
+          message: {
+            id: 'child-message',
+            role: 'assistant',
+            content: 'child transcript',
+          },
+        },
+      ]),
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [],
+    }
     const requests = mockHttp((cardId) =>
       cardId === childCard.cardId
-        ? completeHistory(childAsSessionCard, [
-            {
-              segmentKey: childCard.sessionKey,
-              message: {
-                id: 'child-message',
-                role: 'assistant',
-                content: 'child transcript',
-              },
-            },
-          ])
+        ? childPartialHistory
         : completeHistory(parentWithChild),
     )
     const queryClient = new QueryClient({
@@ -793,9 +850,34 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       ...defaultInput(parentWithChild),
       inspectedChildCardId: childCard.cardId,
     })
-    await waitFor(() =>
-      expect(screen.getByText('child transcript')).toBeTruthy(),
+    await waitFor(() => {
+      expect(screen.getByText('child transcript')).toBeTruthy()
+      expect(screen.getByRole('status').textContent).toContain(
+        'History is incomplete for the inspected child Card.',
+      )
+    })
+    const childHistoryRequestCount = requests.filter((url) =>
+      url.startsWith(
+        `/api/session-cards/${encodeURIComponent(childCard.cardId)}/history`,
+      ),
+    ).length
+    React.act(() =>
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Retry inspected child history',
+        }),
+      ),
     )
+    await waitFor(() => {
+      expect(
+        requests.filter((url) =>
+          url.startsWith(
+            `/api/session-cards/${encodeURIComponent(childCard.cardId)}/history`,
+          ),
+        ).length,
+      ).toBe(childHistoryRequestCount + 1)
+      expect(screen.getByText('child transcript')).toBeTruthy()
+    })
     await mountedScreen.update(defaultInput(parentWithChild))
     await waitFor(() =>
       expect(screen.getByText('parent overlay retained')).toBeTruthy(),

@@ -17,6 +17,7 @@ import {
   mergeSessionCardHistoryResponse,
   moveLegacyHistoryMessagesToSessionCard,
   moveSessionCardHistoryMessages,
+  reconcileSessionCardHistoryResponse,
   sessionCardQueryKeys,
   updateSessionCardMetadata,
 } from './chat-queries'
@@ -1453,6 +1454,143 @@ describe('Session Card fetchers', () => {
       expect.objectContaining({ id: 'server-partial' }),
       expect.objectContaining({ id: 'cached-optimistic' }),
     ])
+  })
+
+  it('retains prior persisted Card rows after a subsequent partial response and keeps recovery last', () => {
+    const prior = {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [
+        {
+          id: 'persisted-root',
+          role: 'user' as const,
+          content: [],
+          __segmentKey: 'remote:root',
+        },
+        {
+          id: 'persisted-tip',
+          role: 'assistant' as const,
+          content: [],
+          __segmentKey: 'remote:tip',
+        },
+        {
+          id: 'recovery-last',
+          role: 'assistant' as const,
+          content: [],
+        },
+      ],
+      persistedMessages: [
+        {
+          id: 'persisted-root',
+          role: 'user' as const,
+          content: [],
+          __segmentKey: 'remote:root',
+        },
+        {
+          id: 'persisted-tip',
+          role: 'assistant' as const,
+          content: [],
+          __segmentKey: 'remote:tip',
+        },
+      ],
+      completeness: 'partial' as const,
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: 'remote:tip',
+          retryable: true as const,
+          error: 'temporarily unavailable',
+        },
+      ],
+    }
+    const subsequent = {
+      ...prior,
+      messages: [prior.messages[0]!],
+      persistedMessages: [prior.persistedMessages[0]!],
+    }
+
+    expect(
+      reconcileSessionCardHistoryResponse(subsequent, {
+        previous: prior,
+        continuationSegmentKeys: ['remote:root', 'remote:tip'],
+        recoveryMessages: [prior.messages[2]!],
+      }).messages,
+    ).toEqual([
+      expect.objectContaining({ id: 'persisted-root' }),
+      expect.objectContaining({ id: 'persisted-tip' }),
+      expect.objectContaining({ id: 'recovery-last' }),
+    ])
+  })
+
+  it('does not reintroduce a local recovery copy after an acknowledged server row', () => {
+    const acknowledged = {
+      id: 'server-acknowledged',
+      client_id: 'client-acknowledged',
+      role: 'user' as const,
+      content: [],
+      __segmentKey: 'remote:tip',
+    }
+    const previousComplete = {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [acknowledged],
+      persistedMessages: [acknowledged],
+      completeness: 'complete' as const,
+      retryable: false,
+      missingSegments: [],
+    }
+    const subsequentPartial = {
+      ...previousComplete,
+      messages: [],
+      persistedMessages: [],
+      completeness: 'partial' as const,
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: 'remote:tip',
+          retryable: true as const,
+          error: 'temporarily unavailable',
+        },
+      ],
+    }
+
+    expect(
+      reconcileSessionCardHistoryResponse(subsequentPartial, {
+        previous: previousComplete,
+        continuationSegmentKeys: ['remote:root', 'remote:tip'],
+        recoveryMessages: [],
+      }).messages,
+    ).toEqual([acknowledged])
+  })
+
+  it.each([
+    ['a cross-source segment', 'local:tip'],
+    ['a same-source segment owned by another Card', 'remote:other-card'],
+  ])('rejects %s from Card history', async (_name, segmentKey) => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:tip',
+        messages: [
+          { segmentKey, message: { id: 'foreign', role: 'assistant' } },
+        ],
+        completeness: 'complete',
+        retryable: false,
+        missingSegments: [],
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      fetchCompleteSessionCardHistory({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:tip',
+        continuationSegmentKeys: ['remote:root', 'remote:tip'],
+      }),
+    ).rejects.toThrow('Invalid Session Card response')
+    expect(fetchMock.mock.calls.flat().join(' ')).not.toContain('/api/history')
   })
 
   it('keeps an accepted local user message while complete Card history catches up', () => {
