@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChatAttachment, ChatMessage } from '../types'
+import { isValidSessionCardHandoffTransition } from '../chat-queries'
+import type { SessionCardHandoffTransition } from '../chat-queries'
+import type { ChatAttachment, ChatMessage, SessionCard } from '../types'
 import { useChatStore } from '@/stores/chat-store'
 import { pushActivity } from '@/components/inspector/activity-store'
 
@@ -89,34 +91,29 @@ export function resolveAuthoritativeSessionHandoffEvent(
 export function resolveAuthoritativeCardHandoffEvent(
   event: string,
   data: unknown,
-): {
-  cardId: string
-  fromSegmentKey: string
-  canonicalSegmentKey: string
-  runId: string | null
-} | null {
+): SessionCardHandoffTransition | null {
   if (event !== 'card_handoff' || !data || typeof data !== 'object') {
     return null
   }
   const payload = data as Record<string, unknown>
   const { cardId, fromSegmentKey, canonicalSegmentKey } = payload
+  const cardSource = sourceQualifiedIdentitySource(cardId)
+  const fromSource = sourceQualifiedIdentitySource(fromSegmentKey)
+  const canonicalSource = sourceQualifiedIdentitySource(canonicalSegmentKey)
   if (
     !isExactNonblankIdentity(cardId) ||
     !isExactNonblankIdentity(fromSegmentKey) ||
     !isExactNonblankIdentity(canonicalSegmentKey) ||
+    !cardSource ||
+    fromSource !== cardSource ||
+    canonicalSource !== cardSource ||
     SESSION_BOOTSTRAP_KEYS.has(canonicalSegmentKey) ||
-    fromSegmentKey === canonicalSegmentKey
-  ) {
-    return null
-  }
-  if (
-    payload.runId !== undefined &&
-    payload.runId !== null &&
+    fromSegmentKey === canonicalSegmentKey ||
     !isExactNonblankIdentity(payload.runId)
   ) {
     return null
   }
-  const runId = typeof payload.runId === 'string' ? payload.runId : null
+  const runId = payload.runId
   return { cardId, fromSegmentKey, canonicalSegmentKey, runId }
 }
 
@@ -126,18 +123,34 @@ export type AuthoritativeCardHandoff = NonNullable<
 
 export function shouldApplyCardHandoff({
   handoff,
-  activeCardId,
+  activeCard,
+  sessionCards,
   currentSegmentKey,
+  activeRunId,
 }: {
   handoff: AuthoritativeCardHandoff
-  activeCardId?: string
+  activeCard?: Pick<
+    SessionCard,
+    | 'cardId'
+    | 'canonicalSource'
+    | 'canonicalSegmentKey'
+    | 'continuationSegmentKeys'
+    | 'relationshipKind'
+    | 'childNodes'
+  >
+  sessionCards?: ReadonlyArray<SessionCard>
   currentSegmentKey: string
+  activeRunId: string | null
 }): boolean {
   return (
-    isExactNonblankIdentity(activeCardId) &&
-    handoff.cardId === activeCardId &&
-    isExactNonblankIdentity(currentSegmentKey) &&
-    handoff.fromSegmentKey === currentSegmentKey
+    Boolean(activeRunId) &&
+    handoff.runId === activeRunId &&
+    isValidSessionCardHandoffTransition({
+      handoff,
+      activeCard,
+      currentSegmentKey,
+      sessionCards,
+    })
   )
 }
 
@@ -200,8 +213,9 @@ type UseStreamingMessageOptions = {
     friendlyId: string
     reason: 'bootstrap' | 'stream-handoff'
   }) => void
-  activeCardId?: string
-  onCardHandoff?: (payload: AuthoritativeCardHandoff) => void
+  activeCard?: SessionCard
+  sessionCards?: ReadonlyArray<SessionCard>
+  onCardHandoff?: (payload: AuthoritativeCardHandoff) => boolean
   acceptedTimeoutMs?: number
   handoffTimeoutMs?: number
 }
@@ -219,7 +233,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     onReaderOpened,
     onAbort,
     onSessionResolved,
-    activeCardId,
+    activeCard,
+    sessionCards,
     onCardHandoff,
     acceptedTimeoutMs,
     handoffTimeoutMs,
@@ -244,12 +259,20 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     typeof setTimeout
   > | null>(null)
   const activeSessionKeyRef = useRef<string>('main')
-  // Stream-owned Card authority. Unlike the render-captured activeCardId, this
+  // Stream-owned Card authority. Unlike the render-captured active Card, this
   // advances synchronously while a coalesced SSE batch is being processed.
   // That lets a bootstrap handoff establish Card ownership before a chained
   // card_handoff in the same reader.read() result, without weakening the exact
   // Card/segment checks for unrelated events.
-  const activeStreamCardIdRef = useRef<string | null>(null)
+  const activeStreamCardRef = useRef<Pick<
+    SessionCard,
+    | 'cardId'
+    | 'canonicalSource'
+    | 'canonicalSegmentKey'
+    | 'continuationSegmentKeys'
+    | 'relationshipKind'
+    | 'childNodes'
+  > | null>(null)
   // Monotonically increasing token. Each call to startStreaming bumps this so
   // any in-flight processStream loop (or pending microtask processing chunks
   // it has already read into the SSE buffer) can detect that it's stale and
@@ -310,7 +333,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         delayedUnregisterTimerRef.current = null
       }
       clearStreamingSession(activeSessionKeyRef.current)
-      activeStreamCardIdRef.current = null
+      activeStreamCardRef.current = null
       if (nextSessionKey) {
         activeSessionKeyRef.current = nextSessionKey
       }
@@ -589,7 +612,14 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         resolvedCardId === resolvedFriendlyId &&
         sourceQualifiedIdentitySource(resolvedSessionKey) === resolvedCardSource
       ) {
-        activeStreamCardIdRef.current = resolvedCardId
+        activeStreamCardRef.current = {
+          cardId: resolvedCardId,
+          canonicalSource: resolvedCardSource,
+          canonicalSegmentKey: resolvedSessionKey,
+          continuationSegmentKeys: [resolvedSessionKey],
+          relationshipKind: 'root',
+          childNodes: [],
+        }
       }
       onSessionResolved?.({
         fromSessionKey,
@@ -661,28 +691,49 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
         case 'card_handoff': {
           const handoff = resolveAuthoritativeCardHandoffEvent(event, data)
+          const streamCard = activeStreamCardRef.current
+          const projectedCard = activeCard
+          const renderCard =
+            projectedCard &&
+            projectedCard.cardId === streamCard?.cardId &&
+            projectedCard.continuationSegmentKeys.includes(
+              activeSessionKeyRef.current,
+            )
+              ? projectedCard
+              : (streamCard ?? undefined)
           if (
             !handoff ||
             !shouldApplyCardHandoff({
               handoff,
-              activeCardId: activeStreamCardIdRef.current ?? undefined,
+              activeCard: renderCard,
+              sessionCards,
               currentSegmentKey: activeSessionKeyRef.current,
+              activeRunId: activeRunIdRef.current,
             })
           ) {
             break
           }
-          if (handoff.runId) {
-            activeRunIdRef.current = handoff.runId
-            registerSendStreamRun(handoff.runId)
-          }
+          // The Card cache/recovery move must agree before the live store and
+          // stream baseline advance. A missing consumer fails closed.
+          if (onCardHandoff?.(handoff) !== true) break
+          activeRunIdRef.current = handoff.runId
+          registerSendStreamRun(handoff.runId)
           handoffSession(handoff.fromSegmentKey, handoff.canonicalSegmentKey)
           activeSessionKeyRef.current = handoff.canonicalSegmentKey
-          activeStreamCardIdRef.current = handoff.cardId
-          onCardHandoff?.(handoff)
+          activeStreamCardRef.current = {
+            ...renderCard!,
+            canonicalSegmentKey: handoff.canonicalSegmentKey,
+            continuationSegmentKeys: Array.from(
+              new Set([
+                ...renderCard!.continuationSegmentKeys,
+                handoff.canonicalSegmentKey,
+              ]),
+            ),
+          }
           break
         }
         case 'session_handoff': {
-          if (activeStreamCardIdRef.current) break
+          if (activeStreamCardRef.current) break
           const handoff = resolveAuthoritativeSessionHandoffEvent(event, data)
           if (!handoff) break
           if (handoff.runId) {
@@ -965,6 +1016,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
     },
     [
+      activeCard,
       applySessionHandoff,
       finishStream,
       handoffSession,
@@ -977,6 +1029,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       processStoreEvent,
       pushTargetText,
       registerSendStreamRun,
+      sessionCards,
       transitionToHandoff,
     ],
   )
@@ -1033,9 +1086,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       eventSourceRef.current = abortController
       finishedRef.current = false
       resetActiveStreamState(params.sessionKey)
-      activeStreamCardIdRef.current = isExactNonblankIdentity(activeCardId)
-        ? activeCardId
-        : null
+      const selectedCard = activeCard
+      activeStreamCardRef.current =
+        selectedCard &&
+        selectedCard.cardId === params.cardId &&
+        selectedCard.continuationSegmentKeys.includes(params.sessionKey)
+          ? selectedCard
+          : null
       lifecyclePhaseRef.current = 'requesting'
       requestedSessionKeyRef.current = params.sessionKey
 
@@ -1206,7 +1263,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
     },
     [
-      activeCardId,
+      activeCard,
       applySessionHandoff,
       finishStream,
       markAccepted,

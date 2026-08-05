@@ -762,9 +762,14 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     }
     moveSessionCardHistoryMessages(
       queryClient,
-      parentCard.cardId,
-      parentCard.canonicalSegmentKey,
-      successorCard.canonicalSegmentKey,
+      {
+        cardId: parentCard.cardId,
+        fromSegmentKey: parentCard.canonicalSegmentKey,
+        canonicalSegmentKey: successorCard.canonicalSegmentKey,
+        runId: 'run-card-handoff',
+      },
+      parentCard,
+      [parentCard],
     )
 
     expect(

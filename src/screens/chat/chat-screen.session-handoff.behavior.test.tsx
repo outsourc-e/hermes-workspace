@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { applySessionRouteResolution } from '../../routes/chat/-session-route-state'
 import { useChatStore } from '../../stores/chat-store'
+import { readCardTranscriptRecovery } from './card-transcript-recovery'
 import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
 import { chatQueryKeys, sessionCardQueryKeys } from './chat-queries'
 import { ChatScreen } from './chat-screen'
@@ -582,6 +583,26 @@ function userMessage(id: string, text: string): ChatMessage {
   }
 }
 
+function expectAcknowledgedUserMessage(
+  messages: Array<ChatMessage> | undefined,
+  optimisticMessage: ChatMessage,
+  runId: string,
+) {
+  const optimistic = optimisticMessage as Record<string, unknown>
+  expect(messages).toHaveLength(1)
+  expect(messages?.[0]).toMatchObject({
+    role: optimisticMessage.role,
+    content: optimisticMessage.content,
+    clientId: optimistic.clientId,
+    client_id: optimistic.client_id,
+    status: 'sent',
+    runId,
+  })
+  expect(
+    (messages?.[0] as Record<string, unknown> | undefined)?.__optimisticId,
+  ).toBeUndefined()
+}
+
 function createRootCard({
   cardId,
   canonicalSegmentKey,
@@ -707,17 +728,20 @@ function createReaderHarness(
         resolve({
           done: false,
           value: encoder.encode(
-            handoffs
-              .flatMap((handoff) => {
+            [
+              'event: started',
+              `data: ${JSON.stringify({ runId: handoffs[0]?.runId })}`,
+              '',
+              ...handoffs.flatMap((handoff) => {
                 const { event = 'session_handoff', ...payload } = handoff
                 return [
                   `event: ${event}`,
                   `data: ${JSON.stringify(payload)}`,
                   '',
                 ]
-              })
-              .concat('')
-              .join('\n'),
+              }),
+              '',
+            ].join('\n'),
           ),
         })
       }
@@ -1120,7 +1144,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
-  it('shows only validated child Card history and restores parent history under the same Card', async () => {
+  it('shows available validated child Card rows and restores parent history under the same Card', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -1200,14 +1224,14 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       const transcript =
         container.querySelector('[data-testid="chat-transcript"]')
           ?.textContent ?? ''
-      expect(transcript).not.toContain('child transcript')
+      expect(transcript).toContain('child transcript')
       expect(transcript).not.toContain('parent transcript')
       expect(
         container.querySelector('[data-testid="chat-header-title"]')
           ?.textContent,
       ).toBe('Parent Card title')
       expect(getByRole(container, 'status').textContent).toContain(
-        'Inspected child history is unavailable until the complete transcript can be loaded',
+        'History is incomplete for the inspected child Card',
       )
     })
     React.act(() => {
@@ -1241,7 +1265,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
-  it('hides retryable incomplete parent Card history and refetches that Card in place', async () => {
+  it('preserves available incomplete parent Card rows and refetches that Card in place', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -1295,9 +1319,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
 
     await waitForAssertion(() => {
-      expect(container.textContent).not.toContain('available transcript')
+      expect(container.textContent).toContain('available transcript')
       expect(getByRole(container, 'status').textContent).toContain(
-        'Conversation history is unavailable until the complete transcript can be loaded',
+        'History is incomplete for this Session Card',
       )
       expect(container.textContent).not.toContain('remote:missing-segment')
     })
@@ -1307,7 +1331,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       }).click()
     })
     expect(retryParentHistory).toHaveBeenCalledTimes(1)
-    expect(container.textContent).not.toContain('available transcript')
+    expect(container.textContent).toContain('available transcript')
 
     React.act(() => root.unmount())
     document.body.removeChild(container)
@@ -1705,9 +1729,11 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       reason: 'stream-handoff',
     })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
-    expect(
+    expectAcknowledgedUserMessage(
       queryClient.getQueryData<HistoryResponse>(targetHistoryKey)?.messages,
-    ).toEqual([optimisticMessage])
+      optimisticMessage,
+      'run-1',
+    )
     expect(
       readPendingMessage('canonical-child', 'child-friendly'),
     ).toMatchObject({
@@ -2033,7 +2059,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
-  it('accepts two consecutive same-Card canonical handoffs without changing the parent route', async () => {
+  it('rejects a chained Card handoff when the active projection is stale without migrating transcript state', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -2043,8 +2069,8 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       canonicalSource: 'remote',
       title: 'Parent Card',
       titleSource: 'manual',
-      canonicalSegmentKey: 'backend-parent',
-      continuationSegmentKeys: ['backend-parent'],
+      canonicalSegmentKey: 'remote:backend-parent',
+      continuationSegmentKeys: ['remote:backend-parent'],
       continuationCount: 1,
       relationshipKind: 'root',
       childNodes: [],
@@ -2053,9 +2079,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       pinned: false,
     }
     queryContext.cardHistories.set('remote:parent', {
-      sessionKey: 'backend-parent',
+      sessionKey: 'remote:backend-parent',
       cardId: 'remote:parent',
-      canonicalSegmentKey: 'backend-parent',
+      canonicalSegmentKey: 'remote:backend-parent',
       messages: [],
       completeness: 'complete',
       retryable: false,
@@ -2065,15 +2091,15 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       {
         event: 'card_handoff',
         cardId: 'remote:parent',
-        fromSegmentKey: 'backend-parent',
-        canonicalSegmentKey: 'backend-a',
+        fromSegmentKey: 'remote:backend-parent',
+        canonicalSegmentKey: 'remote:backend-a',
         runId: 'run-card-chain',
       },
       {
         event: 'card_handoff',
         cardId: 'remote:parent',
-        fromSegmentKey: 'backend-a',
-        canonicalSegmentKey: 'backend-b',
+        fromSegmentKey: 'remote:backend-a',
+        canonicalSegmentKey: 'remote:backend-b',
         runId: 'run-card-chain',
       },
     ])
@@ -2100,7 +2126,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     const sourceKey = sessionCardQueryKeys.history(
       'remote:parent',
-      'backend-parent',
+      'remote:backend-parent',
     )
     await waitForAssertion(() =>
       expect(
@@ -2108,20 +2134,52 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           ?.messages,
       ).toHaveLength(1),
     )
+    useChatStore.getState().processEvent({
+      type: 'message',
+      message: userMessage('chain-live', 'live state stops at accepted tip'),
+      sessionKey: 'remote:backend-parent',
+      transport: 'send-stream',
+    })
     stream.releaseHandoff()
 
-    const finalKey = sessionCardQueryKeys.history('remote:parent', 'backend-b')
+    const acceptedKey = sessionCardQueryKeys.history(
+      'remote:parent',
+      'remote:backend-a',
+    )
+    const finalKey = sessionCardQueryKeys.history(
+      'remote:parent',
+      'remote:backend-b',
+    )
     await waitForAssertion(() =>
       expect(
-        queryClient.getQueryData<SessionCardHistoryResponse>(finalKey)
+        queryClient.getQueryData<SessionCardHistoryResponse>(acceptedKey)
           ?.messages,
       ).toHaveLength(1),
     )
+    expect(queryClient.getQueryData(finalKey)).toBeUndefined()
     expect(
-      queryClient.getQueryData(
-        sessionCardQueryKeys.history('remote:parent', 'backend-a'),
-      ),
-    ).toBeUndefined()
+      readCardTranscriptRecovery({
+        cardId: 'remote:parent',
+        canonicalSegmentKey: 'remote:backend-a',
+      })?.messages,
+    ).toHaveLength(1)
+    expect(
+      readCardTranscriptRecovery({
+        cardId: 'remote:parent',
+        canonicalSegmentKey: 'remote:backend-b',
+      }),
+    ).toBeNull()
+    expect(
+      useChatStore.getState().getRealtimeMessages('remote:backend-parent'),
+    ).toEqual([])
+    expect(
+      useChatStore.getState().getRealtimeMessages('remote:backend-a'),
+    ).toMatchObject([
+      userMessage('chain-live', 'live state stops at accepted tip'),
+    ])
+    expect(
+      useChatStore.getState().getRealtimeMessages('remote:backend-b'),
+    ).toEqual([])
     expect(navigate).not.toHaveBeenCalled()
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)
@@ -2418,6 +2476,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       )
       expect(navigate).not.toHaveBeenCalledWith({ to: '/', replace: true })
     })
+    queryContext.legacySessionsRefetch.mockReset()
     React.act(() => window.dispatchEvent(new Event('claude:health-restored')))
     expect(queryContext.legacySessionsRefetch).not.toHaveBeenCalled()
 
@@ -2509,10 +2568,12 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
     expect(queryClient.getQueryData(intermediateHistoryKey)).toBeUndefined()
-    expect(
+    expectAcknowledgedUserMessage(
       queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
         ?.messages,
-    ).toEqual([optimisticMessage])
+      optimisticMessage,
+      'run-chain',
+    )
     expect(readPendingMessage('backend-b', 'successor-friendly')).toMatchObject(
       {
         sessionKey: 'backend-b',
@@ -2622,10 +2683,12 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       ).toBe('remote:created-segment')
     })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
-    expect(
+    expectAcknowledgedUserMessage(
       queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
         ?.messages,
-    ).toEqual([optimisticMessage])
+      optimisticMessage,
+      'run-bootstrap-card',
+    )
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)
 
@@ -2720,10 +2783,12 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       ).toBe('local:created-segment')
     })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
-    expect(
+    expectAcknowledgedUserMessage(
       queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
         ?.messages,
-    ).toEqual([optimisticMessage])
+      optimisticMessage,
+      'run-portable-bootstrap-card',
+    )
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)
 
@@ -2800,9 +2865,11 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       ).toBe('friendly-route')
     })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
-    expect(
+    expectAcknowledgedUserMessage(
       queryClient.getQueryData<HistoryResponse>(targetHistoryKey)?.messages,
-    ).toEqual([optimisticMessage])
+      optimisticMessage,
+      'run-collision',
+    )
     expect(
       readPendingMessage('friendly-route', 'friendly-route'),
     ).toMatchObject({ sessionKey: 'friendly-route' })

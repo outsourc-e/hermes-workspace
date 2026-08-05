@@ -101,66 +101,102 @@ describe('stream card handoff authority', () => {
   it('accepts a complete server-authoritative card handoff event', () => {
     expect(
       resolveAuthoritativeCardHandoffEvent('card_handoff', {
-        cardId: 'parent-card',
-        fromSegmentKey: 'parent-segment',
-        canonicalSegmentKey: 'continuation-segment',
+        cardId: 'remote:parent-card',
+        fromSegmentKey: 'remote:parent-segment',
+        canonicalSegmentKey: 'remote:continuation-segment',
         runId: 'run-1',
       }),
     ).toEqual({
-      cardId: 'parent-card',
-      fromSegmentKey: 'parent-segment',
-      canonicalSegmentKey: 'continuation-segment',
+      cardId: 'remote:parent-card',
+      fromSegmentKey: 'remote:parent-segment',
+      canonicalSegmentKey: 'remote:continuation-segment',
       runId: 'run-1',
     })
   })
 
   it('advances only the selected Card from its current canonical segment', () => {
     const handoff = resolveAuthoritativeCardHandoffEvent('card_handoff', {
-      cardId: 'parent-card',
-      fromSegmentKey: 'parent-segment',
-      canonicalSegmentKey: 'continuation-segment',
+      cardId: 'remote:parent-card',
+      fromSegmentKey: 'remote:parent-segment',
+      canonicalSegmentKey: 'remote:continuation-segment',
+      runId: 'run-1',
     })!
+    const activeCard = {
+      cardId: 'remote:parent-card',
+      canonicalSource: 'remote' as const,
+      canonicalSegmentKey: 'remote:parent-segment',
+      continuationSegmentKeys: ['remote:parent-segment'],
+      relationshipKind: 'root' as const,
+      childNodes: [],
+    }
 
     expect(
       shouldApplyCardHandoff({
         handoff,
-        activeCardId: 'parent-card',
-        currentSegmentKey: 'parent-segment',
+        activeCard,
+        currentSegmentKey: 'remote:parent-segment',
+        activeRunId: 'run-1',
       }),
     ).toBe(true)
     expect(
       shouldApplyCardHandoff({
         handoff,
-        activeCardId: 'another-card',
-        currentSegmentKey: 'parent-segment',
+        activeCard: {
+          ...activeCard,
+          canonicalSegmentKey: 'remote:continuation-segment',
+          continuationSegmentKeys: [
+            'remote:parent-segment',
+            'remote:continuation-segment',
+          ],
+        },
+        currentSegmentKey: 'remote:parent-segment',
+        activeRunId: 'run-1',
+      }),
+    ).toBe(true)
+    expect(
+      shouldApplyCardHandoff({
+        handoff,
+        activeCard,
+        currentSegmentKey: 'remote:parent-segment',
+        activeRunId: null,
       }),
     ).toBe(false)
     expect(
       shouldApplyCardHandoff({
         handoff,
-        activeCardId: 'parent-card',
-        currentSegmentKey: 'stale-segment',
+        activeCard: { ...activeCard, cardId: 'remote:another-card' },
+        currentSegmentKey: 'remote:parent-segment',
+        activeRunId: 'run-1',
       }),
     ).toBe(false)
     expect(
       shouldApplyCardHandoff({
         handoff,
-        currentSegmentKey: 'parent-segment',
+        activeCard,
+        currentSegmentKey: 'remote:stale-segment',
+        activeRunId: 'run-1',
+      }),
+    ).toBe(false)
+    expect(
+      shouldApplyCardHandoff({
+        handoff,
+        currentSegmentKey: 'remote:parent-segment',
+        activeRunId: 'run-1',
       }),
     ).toBe(false)
   })
 
   it.each([
-    ['cardId', ' parent-card '],
-    ['fromSegmentKey', ' parent-segment '],
-    ['canonicalSegmentKey', ' continuation-segment '],
+    ['cardId', ' remote:parent-card '],
+    ['fromSegmentKey', ' remote:parent-segment '],
+    ['canonicalSegmentKey', ' remote:continuation-segment '],
     ['runId', ' run-1 '],
   ])('rejects whitespace-padded %s identities', (field, value) => {
     expect(
       resolveAuthoritativeCardHandoffEvent('card_handoff', {
-        cardId: 'parent-card',
-        fromSegmentKey: 'parent-segment',
-        canonicalSegmentKey: 'continuation-segment',
+        cardId: 'remote:parent-card',
+        fromSegmentKey: 'remote:parent-segment',
+        canonicalSegmentKey: 'remote:continuation-segment',
         runId: 'run-1',
         [field]: value,
       }),
@@ -169,25 +205,68 @@ describe('stream card handoff authority', () => {
 
   it('requires an exact nonblank active Card identity', () => {
     const handoff = resolveAuthoritativeCardHandoffEvent('card_handoff', {
-      cardId: 'parent-card',
-      fromSegmentKey: 'parent-segment',
-      canonicalSegmentKey: 'continuation-segment',
+      cardId: 'remote:parent-card',
+      fromSegmentKey: 'remote:parent-segment',
+      canonicalSegmentKey: 'remote:continuation-segment',
+      runId: 'run-1',
     })!
+    const activeCard = {
+      cardId: ' remote:parent-card ',
+      canonicalSource: 'remote' as const,
+      canonicalSegmentKey: 'remote:parent-segment',
+      continuationSegmentKeys: ['remote:parent-segment'],
+      relationshipKind: 'root' as const,
+      childNodes: [],
+    }
 
     expect(
       shouldApplyCardHandoff({
         handoff,
-        activeCardId: ' parent-card ',
-        currentSegmentKey: 'parent-segment',
+        activeCard,
+        currentSegmentKey: 'remote:parent-segment',
+        activeRunId: 'run-1',
       }),
     ).toBe(false)
     expect(
       shouldApplyCardHandoff({
         handoff,
-        activeCardId: '',
-        currentSegmentKey: 'parent-segment',
+        currentSegmentKey: 'remote:parent-segment',
+        activeRunId: 'run-1',
       }),
     ).toBe(false)
+  })
+
+  it.each([
+    [
+      'cross-source successor',
+      {
+        cardId: 'remote:parent-card',
+        fromSegmentKey: 'remote:parent-segment',
+        canonicalSegmentKey: 'local:continuation-segment',
+        runId: 'run-1',
+      },
+    ],
+    [
+      'raw successor identity',
+      {
+        cardId: 'remote:parent-card',
+        fromSegmentKey: 'remote:parent-segment',
+        canonicalSegmentKey: 'raw-successor',
+        runId: 'run-1',
+      },
+    ],
+    [
+      'missing run relationship',
+      {
+        cardId: 'remote:parent-card',
+        fromSegmentKey: 'remote:parent-segment',
+        canonicalSegmentKey: 'remote:continuation-segment',
+      },
+    ],
+  ])('rejects $0', (_name, payload) => {
+    expect(
+      resolveAuthoritativeCardHandoffEvent('card_handoff', payload),
+    ).toBeNull()
   })
 
   it.each([
@@ -197,17 +276,19 @@ describe('stream card handoff authority', () => {
     [
       'card_handoff',
       {
-        cardId: 'card',
-        fromSegmentKey: 'parent',
-        canonicalSegmentKey: 'parent',
+        cardId: 'remote:card',
+        fromSegmentKey: 'remote:parent',
+        canonicalSegmentKey: 'remote:parent',
+        runId: 'run-1',
       },
     ],
     [
       'card_handoff',
       {
-        cardId: 'card',
-        fromSegmentKey: 'parent',
+        cardId: 'remote:card',
+        fromSegmentKey: 'remote:parent',
         canonicalSegmentKey: 'main',
+        runId: 'run-1',
       },
     ],
   ])('rejects stale or malformed %s payloads', (event, data) => {

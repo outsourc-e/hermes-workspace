@@ -288,6 +288,130 @@ function sourceQualifiedWireIdentity(
   return null
 }
 
+function exactSourceQualifiedIdentity(
+  value: unknown,
+): { identity: string; source: 'local' | 'remote' } | null {
+  if (typeof value !== 'string' || value.trim() !== value) return null
+  return sourceQualifiedWireIdentity(value)
+}
+
+export type SessionCardHandoffTransition = {
+  cardId: string
+  fromSegmentKey: string
+  canonicalSegmentKey: string
+  runId: string
+}
+
+export type SessionCardHandoffAuthority = Pick<
+  SessionCard,
+  | 'cardId'
+  | 'canonicalSource'
+  | 'canonicalSegmentKey'
+  | 'continuationSegmentKeys'
+  | 'relationshipKind'
+  | 'childNodes'
+>
+
+function sessionCardChildOwnsIdentity(
+  child: SessionCardChild,
+  identity: string,
+): boolean {
+  if (
+    child.cardId === identity ||
+    child.sessionKey === identity ||
+    child.continuationSegmentKeys.includes(identity)
+  ) {
+    return true
+  }
+  return (child.childNodes ?? []).some((descendant) =>
+    sessionCardChildOwnsIdentity(descendant, identity),
+  )
+}
+
+function sessionCardOwnsIdentity(card: SessionCard, identity: string): boolean {
+  return (
+    card.cardId === identity ||
+    card.canonicalSegmentKey === identity ||
+    card.continuationSegmentKeys.includes(identity) ||
+    card.childNodes.some((child) =>
+      sessionCardChildOwnsIdentity(child, identity),
+    )
+  )
+}
+
+/**
+ * Validate the browser-side half of a server-authoritative Card transition.
+ * The successor may be absent from a lagging active projection, but it must be
+ * source-qualified and cannot cross into any known Card or child boundary.
+ */
+export function isValidSessionCardHandoffTransition({
+  handoff,
+  activeCard,
+  currentSegmentKey,
+  sessionCards = [],
+}: {
+  handoff: SessionCardHandoffTransition
+  activeCard?: SessionCardHandoffAuthority
+  currentSegmentKey: string
+  sessionCards?: ReadonlyArray<SessionCard>
+}): boolean {
+  if (!activeCard || activeCard.relationshipKind !== 'root') return false
+  const card = exactSourceQualifiedIdentity(activeCard.cardId)
+  const projectedCanonical = exactSourceQualifiedIdentity(
+    activeCard.canonicalSegmentKey,
+  )
+  const from = exactSourceQualifiedIdentity(handoff.fromSegmentKey)
+  const successor = exactSourceQualifiedIdentity(handoff.canonicalSegmentKey)
+  const eventCard = exactSourceQualifiedIdentity(handoff.cardId)
+  if (
+    !card ||
+    !projectedCanonical ||
+    !from ||
+    !successor ||
+    !eventCard ||
+    activeCard.canonicalSource !== card.source ||
+    projectedCanonical.source !== card.source ||
+    from.source !== card.source ||
+    successor.source !== card.source ||
+    eventCard.source !== card.source ||
+    eventCard.identity !== card.identity ||
+    handoff.fromSegmentKey !== currentSegmentKey ||
+    !activeCard.continuationSegmentKeys.includes(handoff.fromSegmentKey)
+  ) {
+    return false
+  }
+
+  // A newer projection makes an older event stale. An already-acknowledged
+  // successor remains valid only when it is the projection's canonical tip.
+  if (
+    activeCard.canonicalSegmentKey !== handoff.fromSegmentKey &&
+    activeCard.canonicalSegmentKey !== handoff.canonicalSegmentKey
+  ) {
+    return false
+  }
+  if (
+    activeCard.continuationSegmentKeys.includes(handoff.canonicalSegmentKey) &&
+    activeCard.canonicalSegmentKey !== handoff.canonicalSegmentKey
+  ) {
+    return false
+  }
+
+  if (
+    activeCard.childNodes.some((child) =>
+      sessionCardChildOwnsIdentity(child, handoff.canonicalSegmentKey),
+    )
+  ) {
+    return false
+  }
+  return !sessionCards.some((cardCandidate) =>
+    cardCandidate.cardId === activeCard.cardId
+      ? cardCandidate.childNodes.some((child) =>
+          sessionCardChildOwnsIdentity(child, handoff.canonicalSegmentKey),
+        )
+      : sessionCardOwnsIdentity(cardCandidate, handoff.canonicalSegmentKey),
+  )
+}
+
 function wireEnum<const T extends string>(
   value: unknown,
   allowedValues: ReadonlyArray<T>,
@@ -1430,32 +1554,43 @@ export function appendSessionCardTransientMessage(
 
 export function moveSessionCardHistoryMessages(
   queryClient: QueryClient,
-  cardId: string,
-  fromCanonicalSegmentKey: string,
-  toCanonicalSegmentKey: string,
-) {
-  if (fromCanonicalSegmentKey === toCanonicalSegmentKey) return
+  handoff: SessionCardHandoffTransition,
+  activeCard: SessionCardHandoffAuthority,
+  sessionCards: ReadonlyArray<SessionCard> = [],
+): boolean {
+  const { cardId, fromSegmentKey, canonicalSegmentKey } = handoff
+  if (
+    !isValidSessionCardHandoffTransition({
+      handoff,
+      activeCard,
+      currentSegmentKey: fromSegmentKey,
+      sessionCards,
+    })
+  ) {
+    return false
+  }
   moveCardTranscriptRecovery(
-    { cardId, canonicalSegmentKey: fromCanonicalSegmentKey },
-    { cardId, canonicalSegmentKey: toCanonicalSegmentKey },
+    { cardId, canonicalSegmentKey: fromSegmentKey },
+    { cardId, canonicalSegmentKey },
   )
-  const fromKey = sessionCardQueryKeys.history(cardId, fromCanonicalSegmentKey)
-  const toKey = sessionCardQueryKeys.history(cardId, toCanonicalSegmentKey)
+  const fromKey = sessionCardQueryKeys.history(cardId, fromSegmentKey)
+  const toKey = sessionCardQueryKeys.history(cardId, canonicalSegmentKey)
   const fromData = queryClient.getQueryData<SessionCardHistoryResponse>(fromKey)
-  if (!fromData) return
+  if (!fromData) return true
   const toData = queryClient.getQueryData<SessionCardHistoryResponse>(toKey)
   queryClient.setQueryData(toKey, {
     ...fromData,
     ...toData,
-    sessionKey: toCanonicalSegmentKey,
+    sessionKey: canonicalSegmentKey,
     cardId,
-    canonicalSegmentKey: toCanonicalSegmentKey,
+    canonicalSegmentKey,
     messages: mergeCardHistoryMessages(
       fromData.messages,
       toData?.messages ?? [],
     ),
   } satisfies SessionCardHistoryResponse)
   queryClient.removeQueries({ queryKey: fromKey, exact: true })
+  return true
 }
 
 export async function updateSessionCardMetadata(

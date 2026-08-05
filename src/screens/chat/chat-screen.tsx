@@ -1495,42 +1495,52 @@ export function ChatScreen({
       portableMode: isPortableMode,
       sessionSource,
     }),
-    activeCardId: activeCard?.cardId,
+    activeCard,
+    sessionCards,
     onCardHandoff: useCallback(
       (handoff: AuthoritativeCardHandoff) => {
-        if (!activeCard || handoff.cardId !== activeCard.cardId) {
-          return
+        const activeSend = activeSendRef.current
+        if (
+          !activeSend ||
+          !activeCard ||
+          activeCard.cardId !== handoff.cardId ||
+          activeSend.cardId !== handoff.cardId ||
+          activeSend.sessionKey !== handoff.fromSegmentKey
+        ) {
+          return false
+        }
+        if (
+          !moveSessionCardHistoryMessages(
+            queryClient,
+            handoff,
+            activeCard,
+            sessionCards,
+          )
+        ) {
+          return false
         }
         streamHandoffRouteRef.current = {
           sessionKey: handoff.canonicalSegmentKey,
-          friendlyId: activeCard.cardId,
+          friendlyId: handoff.cardId,
         }
-        const activeSend = activeSendRef.current
-        if (activeSend) {
-          activeSendRef.current = {
-            ...activeSend,
-            sessionKey: handoff.canonicalSegmentKey,
-            friendlyId: activeCard.cardId,
-            cardId: activeCard.cardId,
-          }
-          sessionKeyForWaiting.current = handoff.canonicalSegmentKey
-          liveStreamSessionKeyRef.current = handoff.canonicalSegmentKey
+        activeSendRef.current = {
+          ...activeSend,
+          sessionKey: handoff.canonicalSegmentKey,
+          friendlyId: handoff.cardId,
+          cardId: handoff.cardId,
         }
-        moveSessionCardHistoryMessages(
-          queryClient,
-          activeCard.cardId,
-          handoff.fromSegmentKey,
-          handoff.canonicalSegmentKey,
-        )
+        sessionKeyForWaiting.current = handoff.canonicalSegmentKey
+        liveStreamSessionKeyRef.current = handoff.canonicalSegmentKey
         setCardHandoff({
-          cardId: activeCard.cardId,
+          cardId: handoff.cardId,
           canonicalSegmentKey: handoff.canonicalSegmentKey,
         })
         void queryClient.invalidateQueries({
           queryKey: sessionCardQueryKeys.lists,
         })
+        return true
       },
-      [activeCard, queryClient],
+      [activeCard, queryClient, sessionCards],
     ),
     onSessionResolved: useCallback(
       ({

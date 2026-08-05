@@ -38,7 +38,7 @@ const card = {
   updatedAt: 123,
   archived: false,
   pinned: false,
-}
+} satisfies SessionCard
 
 function response(body: unknown, status = 200) {
   const responseBody =
@@ -1741,9 +1741,18 @@ describe('Session Card fetchers', () => {
 
     moveSessionCardHistoryMessages(
       queryClient,
-      'remote:root',
-      'remote:tip',
-      'remote:next',
+      {
+        cardId: 'remote:root',
+        fromSegmentKey: 'remote:tip',
+        canonicalSegmentKey: 'remote:next',
+        runId: 'run-1',
+      },
+      {
+        ...card,
+        canonicalSegmentKey: 'remote:tip',
+        continuationSegmentKeys: ['remote:tip'],
+      },
+      [card],
     )
 
     expect(queryClient.getQueryData(sourceKey)).toBeUndefined()

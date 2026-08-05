@@ -14,7 +14,7 @@ import {
   stashPendingSend,
 } from '../pending-send'
 import { useStreamingMessage } from './use-streaming-message'
-import type { ChatMessage, HistoryResponse } from '../types'
+import type { ChatMessage, HistoryResponse, SessionCard } from '../types'
 import type { AuthoritativeCardHandoff } from './use-streaming-message'
 
 type ChatStoreState = ReturnType<typeof useChatStore.getState>
@@ -45,7 +45,8 @@ function StreamingHarness({
   onAbort,
   onReaderOpened,
   pinMainSession,
-  activeCardId,
+  activeCard,
+  sessionCards,
   onCardHandoff,
 }: {
   onReady: (controller: StreamingController) => void
@@ -58,15 +59,17 @@ function StreamingHarness({
   onAbort: (_sessionKey: string) => void
   onReaderOpened?: (sessionKey: string) => void
   pinMainSession: boolean
-  activeCardId?: string
-  onCardHandoff?: (payload: AuthoritativeCardHandoff) => void
+  activeCard?: SessionCard
+  sessionCards?: ReadonlyArray<SessionCard>
+  onCardHandoff?: (payload: AuthoritativeCardHandoff) => boolean
 }) {
   const streaming = useStreamingMessage({
     onSessionResolved,
     onAbort,
     onReaderOpened,
     pinMainSession,
-    activeCardId,
+    activeCard,
+    sessionCards,
     onCardHandoff,
   })
   useEffect(() => onReady(streaming), [onReady, streaming])
@@ -79,6 +82,24 @@ function userMessage(id: string, text: string): ChatMessage {
     role: 'user',
     content: [{ type: 'text', text }],
     timestamp: 1,
+  }
+}
+
+function rootCard(cardId: string, canonicalSegmentKey: string): SessionCard {
+  return {
+    cardId,
+    canonicalSource: cardId.startsWith('remote:') ? 'remote' : 'local',
+    canonicalTransport: cardId.startsWith('remote:') ? 'gateway' : 'dashboard',
+    title: 'Card',
+    titleSource: 'manual',
+    canonicalSegmentKey,
+    continuationSegmentKeys: [canonicalSegmentKey],
+    continuationCount: 1,
+    relationshipKind: 'root',
+    childNodes: [],
+    updatedAt: 1,
+    archived: false,
+    pinned: false,
   }
 }
 
@@ -454,13 +475,13 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
               `data: ${JSON.stringify({ fromSessionKey: 'new', sessionKey: 'remote:created-segment', friendlyId: 'remote:created-card', runId: 'run-bootstrap' })}`,
               '',
               'event: card_handoff',
-              `data: ${JSON.stringify({ cardId: 'remote:created-card', fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-continuation' })}`,
+              `data: ${JSON.stringify({ cardId: 'remote:created-card', fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-bootstrap' })}`,
               '',
               'event: chunk',
               'data: {"delta":"content after the chained handoff"}',
               '',
               'event: done',
-              'data: {"state":"complete","sessionKey":"remote:continuation-segment","runId":"run-continuation"}',
+              'data: {"state":"complete","sessionKey":"remote:continuation-segment","runId":"run-bootstrap"}',
               '',
               '',
             ].join('\n'),
@@ -476,7 +497,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
     } as unknown as Response)
 
     const onSessionResolved = vi.fn()
-    const onCardHandoff = vi.fn()
+    const onCardHandoff = vi.fn(() => true)
     const onAbort = vi.fn()
     let controller: StreamingController | null = null
     const container = document.createElement('div')
@@ -516,7 +537,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       cardId: 'remote:created-card',
       fromSegmentKey: 'remote:created-segment',
       canonicalSegmentKey: 'remote:continuation-segment',
-      runId: 'run-continuation',
+      runId: 'run-bootstrap',
     })
     expect(
       useChatStore
@@ -586,7 +607,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       } as unknown as Response)
 
       const onSessionResolved = vi.fn()
-      const onCardHandoff = vi.fn()
+      const onCardHandoff = vi.fn(() => true)
       const onAbort = vi.fn()
       let controller: StreamingController | null = null
       const onReady = (next: StreamingController) => {
@@ -595,13 +616,14 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       const container = document.createElement('div')
       document.body.appendChild(container)
       const root = createRoot(container)
-      const renderHarness = (activeCardId?: string) => (
+      const renderHarness = (activeCard?: SessionCard) => (
         <StreamingHarness
           onReady={onReady}
           onSessionResolved={onSessionResolved}
           onAbort={onAbort}
           pinMainSession={false}
-          activeCardId={activeCardId}
+          activeCard={activeCard}
+          sessionCards={activeCard ? [activeCard] : []}
           onCardHandoff={onCardHandoff}
         />
       )
@@ -627,7 +649,13 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
           reason: 'bootstrap',
         })
       })
-      React.act(() => root.render(renderHarness('remote:created-card')))
+      React.act(() =>
+        root.render(
+          renderHarness(
+            rootCard('remote:created-card', 'remote:created-segment'),
+          ),
+        ),
+      )
 
       await React.act(async () => {
         resolveCardHandoffRead({
@@ -635,7 +663,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
           value: encoder.encode(
             [
               'event: card_handoff',
-              `data: ${JSON.stringify({ cardId: handoffCardId, fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-continuation' })}`,
+              `data: ${JSON.stringify({ cardId: handoffCardId, fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-bootstrap' })}`,
               '',
               '',
             ].join('\n'),
@@ -650,11 +678,152 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
           cardId: 'remote:created-card',
           fromSegmentKey: 'remote:created-segment',
           canonicalSegmentKey: 'remote:continuation-segment',
-          runId: 'run-continuation',
+          runId: 'run-bootstrap',
         })
       }
       expect(reader.cancel).not.toHaveBeenCalled()
       expect(onAbort).not.toHaveBeenCalled()
+
+      React.act(() => root.unmount())
+      document.body.removeChild(container)
+    },
+  )
+
+  it.each([
+    {
+      name: 'cross-source successor',
+      payload: {
+        cardId: 'remote:parent-card',
+        fromSegmentKey: 'remote:parent-segment',
+        canonicalSegmentKey: 'local:successor',
+        runId: 'run-current',
+      },
+    },
+    {
+      name: 'another Card successor',
+      payload: {
+        cardId: 'remote:parent-card',
+        fromSegmentKey: 'remote:parent-segment',
+        canonicalSegmentKey: 'remote:other-segment',
+        runId: 'run-current',
+      },
+    },
+    {
+      name: 'child-boundary successor',
+      payload: {
+        cardId: 'remote:parent-card',
+        fromSegmentKey: 'remote:parent-segment',
+        canonicalSegmentKey: 'remote:child-segment',
+        runId: 'run-current',
+      },
+    },
+    {
+      name: 'stale run relationship',
+      payload: {
+        cardId: 'remote:parent-card',
+        fromSegmentKey: 'remote:parent-segment',
+        canonicalSegmentKey: 'remote:successor',
+        runId: 'run-stale',
+      },
+    },
+  ])(
+    'keeps live state on the origin for an invalid $name',
+    async ({ payload }) => {
+      const activeCard: SessionCard = {
+        ...rootCard('remote:parent-card', 'remote:parent-segment'),
+        childNodes: [
+          {
+            cardId: 'remote:child-card',
+            sessionKey: 'remote:child-segment',
+            continuationSegmentKeys: ['remote:child-segment'],
+            relationshipKind: 'child',
+            title: 'Child',
+            status: 'running',
+            updatedAt: 1,
+            continuationCount: 1,
+          },
+        ],
+      }
+      const otherCard = rootCard('remote:other-card', 'remote:other-segment')
+      const encoder = new TextEncoder()
+      const reader = {
+        read: vi
+          .fn()
+          .mockResolvedValueOnce({
+            done: false,
+            value: encoder.encode(
+              [
+                'event: started',
+                'data: {"runId":"run-current"}',
+                '',
+                'event: card_handoff',
+                `data: ${JSON.stringify(payload)}`,
+                '',
+                'event: chunk',
+                'data: {"delta":"stays on the origin Card"}',
+                '',
+                'event: done',
+                'data: {"state":"complete","runId":"run-current"}',
+                '',
+                '',
+              ].join('\n'),
+            ),
+          })
+          .mockResolvedValueOnce({ done: true, value: undefined }),
+        cancel: vi.fn().mockResolvedValue(undefined),
+      }
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        body: { getReader: () => reader },
+        text: () => Promise.resolve(''),
+      } as unknown as Response)
+
+      useChatStore.getState().clearSession('remote:parent-segment')
+      useChatStore.getState().clearSession(payload.canonicalSegmentKey)
+      const onCardHandoff = vi.fn(() => true)
+      let controller: StreamingController | null = null
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+      React.act(() => {
+        root.render(
+          <StreamingHarness
+            onReady={(next) => {
+              controller = next
+            }}
+            onSessionResolved={vi.fn()}
+            onAbort={vi.fn()}
+            pinMainSession={false}
+            activeCard={activeCard}
+            sessionCards={[activeCard, otherCard]}
+            onCardHandoff={onCardHandoff}
+          />,
+        )
+      })
+
+      await React.act(async () => {
+        await controller!.startStreaming({
+          sessionKey: 'remote:parent-segment',
+          friendlyId: activeCard.cardId,
+          cardId: activeCard.cardId,
+          message: 'keep this Card native',
+        })
+      })
+
+      expect(onCardHandoff).not.toHaveBeenCalled()
+      expect(
+        useChatStore.getState().getRealtimeMessages('remote:parent-segment'),
+      ).toMatchObject([
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'stays on the origin Card' }],
+        },
+      ])
+      expect(
+        useChatStore
+          .getState()
+          .getRealtimeMessages(payload.canonicalSegmentKey),
+      ).toEqual([])
 
       React.act(() => root.unmount())
       document.body.removeChild(container)
