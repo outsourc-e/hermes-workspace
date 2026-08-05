@@ -7,6 +7,7 @@ import { isWholeCardBranchAvailable } from '../../types'
 import { SessionItem } from './session-item'
 import type {
   SessionCard,
+  SessionCardActivity,
   SessionCardChildStatus,
   SessionCardRelationshipKind,
 } from '../../types'
@@ -25,6 +26,8 @@ type SessionCardTreeRow = {
   continuationCount: number
   parentKey?: string
   isOrphan: boolean
+  activity?: SessionCardActivity
+  hasAttention?: boolean
 }
 
 type SessionTreeRowProps = {
@@ -38,6 +41,7 @@ type SessionTreeRowProps = {
   sessionForkAvailable: boolean
   onToggleExpanded: (cardId: string, expanded: boolean) => void
   onSelect?: () => void
+  onViewCard?: (cardId: string) => void
   onTogglePin: (card: SessionCard) => void
   onBranch: (card: SessionCard) => void
   onRename: (card: SessionCard) => void
@@ -81,6 +85,7 @@ function SessionTreeRow({
   sessionForkAvailable,
   onToggleExpanded,
   onSelect,
+  onViewCard,
   onTogglePin,
   onBranch,
   onRename,
@@ -98,6 +103,11 @@ function SessionTreeRow({
   const isActionableCard =
     row.relationshipKind === 'root' && card?.relationshipKind === 'root'
   const parentRouteCardId = rootCardId ?? row.key
+  const isRootRow = row.depth === 0
+  const isActiveRoot = isRootRow && row.key === activeCardId
+  const rootIsBusy = isRootRow && row.activity?.state === 'running'
+  const rootNeedsAttention =
+    isRootRow && !isActiveRoot && row.hasAttention === true
 
   return (
     <div
@@ -148,12 +158,17 @@ function SessionTreeRow({
             }}
             routeKey={parentRouteCardId}
             inspectChildCardId={row.depth > 0 ? row.key : undefined}
-            active={row.depth === 0 && row.key === activeCardId}
+            active={isActiveRoot}
             isPinned={isActionableCard && pinnedSessionKeys.has(row.key)}
             contextLabel={relationshipLabel}
             showActions={isActionableCard}
             inspected={row.depth > 0 && row.key === inspectedChildCardId}
-            onSelect={onSelect}
+            busy={rootIsBusy}
+            attention={rootNeedsAttention}
+            onSelect={() => {
+              onViewCard?.(parentRouteCardId)
+              onSelect?.()
+            }}
             onTogglePin={isActionableCard ? () => onTogglePin(card) : undefined}
             canBranch={
               isActionableCard &&
@@ -188,6 +203,7 @@ function SessionTreeRow({
                     sessionForkAvailable={sessionForkAvailable}
                     onToggleExpanded={onToggleExpanded}
                     onSelect={onSelect}
+                    onViewCard={onViewCard}
                     onTogglePin={onTogglePin}
                     onBranch={onBranch}
                     onRename={onRename}

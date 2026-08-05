@@ -4,6 +4,7 @@ import type {
   ChatMessage,
   HistoryResponse,
   SessionCard,
+  SessionCardActivity,
   SessionCardChild,
   SessionListResponse,
   SessionMeta,
@@ -359,8 +360,30 @@ function parseSessionCardChild(
   }
 }
 
+function parseSessionCardActivity(
+  value: unknown,
+): SessionCardActivity | null | undefined {
+  if (value === undefined) return undefined
+  if (!isWireRecord(value)) return null
+  const state = wireEnum(value.state, [
+    'running',
+    'completed',
+    'error',
+    'pending_approval',
+  ])
+  if (
+    !state ||
+    !Number.isSafeInteger(value.updatedAt) ||
+    (value.updatedAt as number) < 0
+  ) {
+    return null
+  }
+  return { state, updatedAt: value.updatedAt as number }
+}
+
 function parseSessionCard(value: unknown): SessionCardWire {
   if (!isWireRecord(value)) return invalidSessionCardResponse()
+  const activity = parseSessionCardActivity(value.activity)
   const cardIdentity = sourceQualifiedWireIdentity(value.cardId)
   const canonicalSource = wireEnum(value.canonicalSource, ['local', 'remote'])
   const canonicalTransport =
@@ -391,6 +414,7 @@ function parseSessionCard(value: unknown): SessionCardWire {
       ? rawPinnedAt
       : undefined
   if (
+    activity === null ||
     !cardIdentity ||
     !canonicalSource ||
     canonicalTransport === null ||
@@ -456,6 +480,7 @@ function parseSessionCard(value: unknown): SessionCardWire {
   )
   return {
     cardId: cardIdentity.identity,
+    ...(activity === undefined ? {} : { activity }),
     canonicalSource,
     ...(canonicalTransport === undefined ? {} : { canonicalTransport }),
     title,
@@ -696,7 +721,11 @@ async function fetchAndParseSessionCardResponse<T>(
   responseError?: (response: Response) => Promise<Error>,
 ): Promise<T> {
   let priorInvalidResponseError: unknown
-  for (let attempt = 0; attempt < SESSION_CARD_RESPONSE_ATTEMPTS; attempt += 1) {
+  for (
+    let attempt = 0;
+    attempt < SESSION_CARD_RESPONSE_ATTEMPTS;
+    attempt += 1
+  ) {
     const response = await request()
     if (!response.ok) {
       throw responseError
@@ -889,7 +918,19 @@ export function mergeSessionCardDetail(
   const cards = [...inventory.cards]
   const cardResolutions = [...inventory.cardResolutions]
   if (existingIndex >= 0) {
-    cards[existingIndex] = detail.card
+    const inventoryCard = cards[existingIndex]!
+    const inventoryActivity = inventoryCard.activity
+    const detailActivity = detail.card.activity
+    const activity =
+      inventoryActivity &&
+      (!detailActivity ||
+        inventoryActivity.updatedAt > detailActivity.updatedAt)
+        ? inventoryActivity
+        : detailActivity
+    cards[existingIndex] = {
+      ...detail.card,
+      ...(activity === undefined ? {} : { activity }),
+    }
     const resolutionIndex = cardResolutions.findIndex(
       (resolution) => resolution.cardId === detail.card.cardId,
     )
@@ -1008,9 +1049,12 @@ export async function fetchSessionCardHistory(payload: {
   const suffix = query.size ? `?${query.toString()}` : ''
   return fetchAndParseSessionCardResponse(
     () =>
-      fetch(`/api/session-cards/${encodeURIComponent(payload.cardId)}/history${suffix}`, {
-        signal: payload.signal,
-      }),
+      fetch(
+        `/api/session-cards/${encodeURIComponent(payload.cardId)}/history${suffix}`,
+        {
+          signal: payload.signal,
+        },
+      ),
     (value) => {
       const history = parseSessionCardHistory(value)
       if (

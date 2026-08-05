@@ -1,6 +1,7 @@
 import { buildSessionTree } from './session-lineage'
 import type {
   SessionCard,
+  SessionCardActivity,
   SessionCardChild,
   SessionCardChildStatus,
   SessionCardRelationshipKind,
@@ -28,6 +29,7 @@ export type SessionCardProjectionOptions = {
     string,
     ReadonlyMap<string, { status: SessionCardChildStatus; updatedAt: number }>
   >
+  activityByCardId?: ReadonlyMap<string, SessionCardActivity>
 }
 
 export type SessionCardProjection = {
@@ -204,6 +206,22 @@ function compareChildNodes(
   return left.cardId.localeCompare(right.cardId)
 }
 
+function validCardActivity(
+  activity: SessionCardActivity | undefined,
+): SessionCardActivity | undefined {
+  if (
+    !activity ||
+    !['running', 'completed', 'error', 'pending_approval'].includes(
+      activity.state,
+    ) ||
+    !Number.isSafeInteger(activity.updatedAt) ||
+    activity.updatedAt < 0
+  ) {
+    return undefined
+  }
+  return { ...activity }
+}
+
 export function findSessionCardDescendant(
   card: Pick<SessionCard, 'childNodes'>,
   requestedCardId: string | undefined,
@@ -341,6 +359,12 @@ export function projectSessionCards(
       row !== undefined &&
       !hasChildRelationshipProvenance(row.session)
     if (pinEligible) pinEligibleCardIds.add(card.cardId)
+    if (card.parentCardId === undefined) {
+      const activity = validCardActivity(
+        options.activityByCardId?.get(card.cardId),
+      )
+      if (activity) card.activity = activity
+    }
     const metadata = options.cardMetadata?.get(card.cardId)
     card.pinned = pinEligible && metadata?.pinned === true
     if (card.pinned) card.pinnedAt = metadata?.pinnedAt ?? 0

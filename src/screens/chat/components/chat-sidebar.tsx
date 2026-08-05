@@ -42,6 +42,10 @@ import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react'
 import type { SessionCardListWire } from '../chat-queries'
 import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionCard, SessionMeta } from '../types'
@@ -59,8 +63,12 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { AgentIdentityAvatar, UserAvatar } from '@/components/avatars'
 import { SEARCH_MODAL_EVENTS, useSearchModal } from '@/hooks/use-search-modal'
 import {
+  MAX_DESKTOP_SIDEBAR_WIDTH,
+  MIN_DESKTOP_SIDEBAR_WIDTH,
+  normalizeDesktopSidebarWidth,
   selectChatProfileAvatarDataUrl,
   selectChatProfileDisplayName,
+  selectDesktopSidebarWidth,
   selectSidebarHoverExpand,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
@@ -74,8 +82,11 @@ import {
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { useChatSessionCardInventory } from '@/screens/chat/hooks/use-chat-session-card-inventory'
+import { useSessionCardAttention } from '@/screens/chat/hooks/use-session-card-attention'
 
 type WorkspaceStats = Record<string, unknown>
+
+const EMPTY_SESSION_CARDS: ReadonlyArray<SessionCard> = []
 
 type DesktopCardAction = 'rename' | 'pin' | 'branch' | 'archive'
 
@@ -705,6 +716,128 @@ function usePersistedBool(key: string, defaultValue: boolean) {
   return [value, toggle] as const
 }
 
+const DESKTOP_SIDEBAR_KEYBOARD_STEP = 16
+
+type DesktopSidebarResizeHandleProps = {
+  enabled: boolean
+  width: number
+  onWidthChange: (width: number) => void
+  onResizingChange: (resizing: boolean) => void
+}
+
+export function DesktopSidebarResizeHandle({
+  enabled,
+  width,
+  onWidthChange,
+  onResizingChange,
+}: DesktopSidebarResizeHandleProps) {
+  const cleanupRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    return () => cleanupRef.current?.()
+  }, [])
+
+  useEffect(() => {
+    if (!enabled) cleanupRef.current?.()
+  }, [enabled])
+
+  if (!enabled) return null
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    event.preventDefault()
+    event.currentTarget.focus()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // Window listeners below keep the drag active when capture is unavailable.
+    }
+
+    cleanupRef.current?.()
+    const sidebarLeft =
+      event.currentTarget.parentElement?.getBoundingClientRect().left ?? 0
+    const previousUserSelect = document.body.style.userSelect
+    const previousCursor = document.body.style.cursor
+    const pointerId = event.pointerId
+    let active = true
+
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+    onResizingChange(true)
+
+    function cleanup() {
+      if (!active) return
+      active = false
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerEnd)
+      window.removeEventListener('pointercancel', handlePointerEnd)
+      window.removeEventListener('blur', handleWindowBlur)
+      document.body.style.userSelect = previousUserSelect
+      document.body.style.cursor = previousCursor
+      cleanupRef.current = null
+    }
+
+    function handlePointerMove(pointerEvent: PointerEvent) {
+      if (pointerEvent.pointerId !== pointerId) return
+      pointerEvent.preventDefault()
+      onWidthChange(
+        normalizeDesktopSidebarWidth(pointerEvent.clientX - sidebarLeft),
+      )
+    }
+
+    function handlePointerEnd(pointerEvent: PointerEvent) {
+      if (pointerEvent.pointerId !== pointerId) return
+      cleanup()
+      onResizingChange(false)
+    }
+
+    function handleWindowBlur() {
+      cleanup()
+      onResizingChange(false)
+    }
+
+    cleanupRef.current = () => {
+      cleanup()
+      onResizingChange(false)
+    }
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerEnd)
+    window.addEventListener('pointercancel', handlePointerEnd)
+    window.addEventListener('blur', handleWindowBlur)
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    let nextWidth: number | null = null
+    if (event.key === 'ArrowLeft') {
+      nextWidth = width - DESKTOP_SIDEBAR_KEYBOARD_STEP
+    } else if (event.key === 'ArrowRight') {
+      nextWidth = width + DESKTOP_SIDEBAR_KEYBOARD_STEP
+    } else if (event.key === 'Home') {
+      nextWidth = MIN_DESKTOP_SIDEBAR_WIDTH
+    } else if (event.key === 'End') {
+      nextWidth = MAX_DESKTOP_SIDEBAR_WIDTH
+    }
+    if (nextWidth === null) return
+    event.preventDefault()
+    onWidthChange(normalizeDesktopSidebarWidth(nextWidth))
+  }
+
+  return (
+    <div
+      role="separator"
+      aria-label="Resize sessions sidebar"
+      aria-orientation="vertical"
+      aria-valuemin={MIN_DESKTOP_SIDEBAR_WIDTH}
+      aria-valuemax={MAX_DESKTOP_SIDEBAR_WIDTH}
+      aria-valuenow={width}
+      tabIndex={0}
+      onPointerDown={handlePointerDown}
+      onKeyDown={handleKeyDown}
+      className="absolute inset-y-0 right-0 z-10 w-1 touch-none cursor-col-resize select-none bg-transparent transition-colors hover:bg-accent-500/20 focus-visible:bg-accent-500/30 focus-visible:outline-none"
+    />
+  )
+}
+
 type DesktopSidebarContentProps = {
   activeCardId: string
   inspectedChildCardId?: string
@@ -723,6 +856,8 @@ type DesktopSidebarContentProps = {
   sessionCards: Array<SessionCard>
   cardResolutions: SessionCardListWire['cardResolutions']
   completeness: SessionCardListWire['completeness']
+  attentionCardIds: ReadonlySet<string>
+  onViewCard: (cardId: string) => void
   sessionForkAvailable: boolean
   onTogglePin: (card: SessionCard) => void
   onRename: (card: SessionCard) => void
@@ -758,6 +893,8 @@ function DesktopSidebarContent({
   sessionCards,
   cardResolutions,
   completeness,
+  attentionCardIds,
+  onViewCard,
   sessionForkAvailable,
   onTogglePin,
   onRename,
@@ -939,7 +1076,7 @@ function DesktopSidebarContent({
               aria-label="Session history"
               className="flex min-w-0 flex-1 flex-col"
             >
-              <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 {cardActionFailure ? (
                   <DesktopCardActionFailureNotice
                     failure={cardActionFailure}
@@ -947,7 +1084,7 @@ function DesktopSidebarContent({
                     onDismiss={onDismissCardActionFailure}
                   />
                 ) : null}
-                <div className="flex min-h-0 flex-1">
+                <div className="flex min-h-0 min-w-0 flex-1">
                   <SidebarSessions
                     sessionCards={sessionCards}
                     cardResolutions={cardResolutions}
@@ -955,6 +1092,8 @@ function DesktopSidebarContent({
                     sessionForkAvailable={sessionForkAvailable}
                     activeCardId={activeCardId}
                     inspectedChildCardId={inspectedChildCardId}
+                    attentionCardIds={attentionCardIds}
+                    onViewCard={onViewCard}
                     onSelect={onSelectSession}
                     onTogglePin={onTogglePin}
                     onRename={onRename}
@@ -1027,6 +1166,10 @@ function ChatSidebarComponent({
     sessionCardInventory.sessionCardList,
     sessionCardDetailQuery.data,
   )
+  const sessionCardAttention = useSessionCardAttention({
+    cards: sessionCardList?.cards ?? EMPTY_SESSION_CARDS,
+    activeCardId: activeFriendlyId,
+  })
   const sessionForkAvailable = useFeatureAvailable('sessionFork')
 
   useEffect(() => {
@@ -1118,7 +1261,12 @@ function ChatSidebarComponent({
   const [providersOpen, setProvidersOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isHoverExpanded, setIsHoverExpanded] = useState(false)
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false)
   const sidebarHoverExpand = useChatSettingsStore(selectSidebarHoverExpand)
+  const desktopSidebarWidth = useChatSettingsStore(selectDesktopSidebarWidth)
+  const updateChatSettings = useChatSettingsStore(
+    (state) => state.updateSettings,
+  )
   const sidebarRef = useRef<HTMLElement | null>(null)
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -1211,7 +1359,7 @@ function ChatSidebarComponent({
 
   const asideProps = {
     className: cn(
-      'border-r h-full overflow-hidden flex flex-col theme-sidebar theme-border',
+      'relative shrink-0 border-r h-full overflow-hidden flex flex-col theme-sidebar theme-border',
       isMobile && 'fixed inset-y-0 left-0 z-50 shadow-2xl',
       isMobile && isCollapsed && 'pointer-events-none',
     ),
@@ -1409,12 +1557,17 @@ function ChatSidebarComponent({
             : 48
           : isMobile
             ? '85vw'
-            : 300,
+            : desktopSidebarWidth,
       }}
-      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      transition={
+        isSidebarResizing
+          ? { duration: 0 }
+          : { type: 'spring', stiffness: 400, damping: 30 }
+      }
       className={cn(
         asideProps.className,
         isMobile && isCollapsed && 'pointer-events-none overflow-hidden',
+        isSidebarResizing && 'select-none',
       )}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
@@ -1447,6 +1600,8 @@ function ChatSidebarComponent({
           sessionCards={sessionCardList?.cards ?? []}
           cardResolutions={sessionCardList?.cardResolutions ?? []}
           completeness={sessionCardList?.completeness ?? 'complete'}
+          attentionCardIds={sessionCardAttention.attentionCardIds}
+          onViewCard={sessionCardAttention.markCardForViewing}
           sessionForkAvailable={sessionForkAvailable}
           onTogglePin={handleTogglePin}
           onRename={handleOpenRename}
@@ -1659,6 +1814,10 @@ function ChatSidebarComponent({
                           sessionForkAvailable={sessionForkAvailable}
                           activeCardId={activeFriendlyId}
                           inspectedChildCardId={inspectedChildCardId}
+                          attentionCardIds={
+                            sessionCardAttention.attentionCardIds
+                          }
+                          onViewCard={sessionCardAttention.markCardForViewing}
                           onSelect={onSelectSession}
                           onTogglePin={handleTogglePin}
                           onRename={handleOpenRename}
@@ -1779,6 +1938,15 @@ function ChatSidebarComponent({
           </div>
         </>
       )}
+
+      <DesktopSidebarResizeHandle
+        enabled={!isMobile && isChatActive && !isCollapsed}
+        width={desktopSidebarWidth}
+        onWidthChange={(nextDesktopSidebarWidth) =>
+          updateChatSettings({ desktopSidebarWidth: nextDesktopSidebarWidth })
+        }
+        onResizingChange={setIsSidebarResizing}
+      />
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
       <SettingsDialog

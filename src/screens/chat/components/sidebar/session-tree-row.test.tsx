@@ -89,14 +89,20 @@ function row(
 
 function Harness({
   card = rootCard,
+  activeCardId = 'card:root',
+  hasAttention = false,
   sessionForkAvailable = true,
+  onViewCard = vi.fn(),
   onTogglePin = vi.fn(),
   onBranch = vi.fn(),
   onRename = vi.fn(),
   onArchive = vi.fn(),
 }: {
   card?: SessionCard
+  activeCardId?: string
+  hasAttention?: boolean
   sessionForkAvailable?: boolean
+  onViewCard?: (cardId: string) => void
   onTogglePin?: (card: SessionCard) => void
   onBranch?: (card: SessionCard) => void
   onRename?: (card: SessionCard) => void
@@ -109,6 +115,8 @@ function Harness({
     isExpanded: expanded,
     childCount: 1,
     isOrphan: card.relationshipKind === 'orphan',
+    activity: card.activity,
+    hasAttention,
   })
   const child = row('card:child', 'Child card', {
     relationshipKind: 'child',
@@ -120,13 +128,14 @@ function Harness({
     <SessionTreeRow
       row={root}
       childrenByParent={childrenByParent}
-      activeCardId="card:root"
+      activeCardId={activeCardId}
       inspectedChildCardId="card:child"
       pinnedSessionKeys={new Set()}
       cardsById={new Map([['card:root', card]])}
       pendingCardIds={new Set()}
       sessionForkAvailable={sessionForkAvailable}
       onToggleExpanded={(_key, next) => setExpanded(next)}
+      onViewCard={onViewCard}
       onTogglePin={onTogglePin}
       onBranch={onBranch}
       onRename={onRename}
@@ -256,6 +265,64 @@ describe('SessionTreeRow Card routing', () => {
       expect(screen.getByRole('button', { name: 'Archive' })).toBeTruthy()
     },
   )
+
+  it('renders root running activity as a compact accessible busy indicator only on the root', () => {
+    render({
+      card: {
+        ...rootCard,
+        activity: { state: 'running', updatedAt: 20 },
+      },
+    })
+
+    const rootLink = screen.getByText('Root card').closest('a')
+    expect(rootLink?.getAttribute('aria-busy')).toBe('true')
+    expect(screen.getByText('Card is working')).toBeTruthy()
+    expect(
+      rootLink?.querySelector('[data-card-working-indicator]'),
+    ).toBeTruthy()
+
+    React.act(() =>
+      fireEvent.click(
+        screen.getByRole('button', { name: /Expand related sessions/i }),
+      ),
+    )
+    const childLink = screen.getByText('↳ Child card').closest('a')
+    expect(childLink?.hasAttribute('aria-busy')).toBe(false)
+  })
+
+  it('applies attention pulse only to an inactive root and keeps active colors authoritative', () => {
+    render({ activeCardId: 'card:other', hasAttention: true })
+    const inactiveRoot = screen.getByText('Root card').closest('a')
+    expect(inactiveRoot?.className).toContain(
+      'animate-[pulse_3s_ease-in-out_infinite]',
+    )
+
+    mountedRoots.pop()?.()
+    render({ activeCardId: 'card:root', hasAttention: true })
+    const activeRoot = screen.getByText('Root card').closest('a')
+    expect(activeRoot?.className).toContain('bg-primary-200')
+    expect(activeRoot?.className).not.toContain(
+      'animate-[pulse_3s_ease-in-out_infinite]',
+    )
+  })
+
+  it('marks the routed root for acknowledgement on row navigation but not action menu clicks', () => {
+    const onViewCard = vi.fn()
+    render({ activeCardId: 'card:other', onViewCard })
+
+    React.act(() =>
+      fireEvent.click(screen.getByRole('button', { name: 'Card options' })),
+    )
+    React.act(() =>
+      fireEvent.click(screen.getByRole('button', { name: 'Pin card' })),
+    )
+    expect(onViewCard).not.toHaveBeenCalled()
+
+    React.act(() =>
+      fireEvent.click(screen.getByText('Root card').closest('a')!),
+    )
+    expect(onViewCard).toHaveBeenCalledWith('card:root')
+  })
 
   it.each([
     ['dashboard-backed', 'dashboard'],

@@ -4,7 +4,10 @@ import { buildWorkspaceScopedTextMessage } from '../../lib/workspace-message-sco
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
-import { publishChatEvent } from '../../server/chat-event-bus'
+import {
+  publishCardActivityEvent,
+  publishChatEvent,
+} from '../../server/chat-event-bus'
 import { isSafeRunId } from '../../server/run-id'
 import {
   registerActiveSendRun,
@@ -57,6 +60,7 @@ import {
   finalizeRunTerminalStream,
 } from './-send-stream-terminal'
 import {
+  cardActivityStateForEvent,
   childLifecycleStatusForEvent,
   classifyStreamTerminalEvent,
   createStreamEventProvenanceTracker,
@@ -696,6 +700,43 @@ export const Route = createFileRoute('/api/send-stream')({
         const publicFriendlyId =
           activeCardId ?? portableBootstrapSessionKey ?? resolvedFriendlyId
 
+        let emitCardActivityToStream = (
+          _payload: Record<string, unknown>,
+        ): void => undefined
+        const observeAndPublishCardActivity = async (
+          activity: string,
+          activityRunId: string | undefined = activeRunId ?? undefined,
+          upstreamSessionKey: string = sessionKey,
+        ): Promise<void> => {
+          const state = cardActivityStateForEvent(activity)
+          if (!state || !activeCardId || !activityRunId) return
+          const observed = await sessionCardService
+            .observeCardActivity({
+              cardId: activeCardId,
+              upstreamSessionKey,
+              runId: activityRunId,
+              state,
+            })
+            .catch(() => null)
+          if (!observed) return
+          const payload = { ...observed, activity }
+          emitCardActivityToStream(payload)
+          publishCardActivityEvent(payload)
+        }
+        const withRouteOwnedCardError = (
+          terminalPersistence: Promise<void>,
+          endingRunId: string | undefined = activeRunId ?? undefined,
+          endingUpstreamSessionKey: string = sessionKey,
+        ): Promise<void> =>
+          Promise.all([
+            terminalPersistence,
+            observeAndPublishCardActivity(
+              'error',
+              endingRunId,
+              endingUpstreamSessionKey,
+            ),
+          ]).then(() => undefined)
+
         let workspaceScope: Awaited<
           ReturnType<typeof loadWorkspaceCatalog>
         > | null = null
@@ -738,9 +779,14 @@ export const Route = createFileRoute('/api/send-stream')({
         // observe terminal persistence without allowing seal rejection to leak.
         function handleAbort() {
           if (!streamClosed) {
-            const terminalPersistence = persistedRunId
-              ? persistTerminalRun('handoff')
-              : Promise.resolve()
+            const endingRunId = activeRunId ?? undefined
+            const terminalPersistence = withRouteOwnedCardError(
+              persistedRunId
+                ? persistTerminalRun('handoff')
+                : Promise.resolve(),
+              endingRunId,
+              sessionKey,
+            )
             if (activeRunId) {
               unregisterActiveSendRun(activeRunId)
               activeRunId = null
@@ -966,6 +1012,8 @@ export const Route = createFileRoute('/api/send-stream')({
               const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
               enqueueRaw(payload)
             }
+            emitCardActivityToStream = (payload) =>
+              sendEvent('card_activity', payload)
 
             heartbeatLifecycle = createSseHeartbeatLifecycle({
               intervalMs: 10_000,
@@ -1018,9 +1066,13 @@ export const Route = createFileRoute('/api/send-stream')({
 
             handleStreamDeadline = () => {
               if (streamClosed) return
-              const terminalPersistence = persistedRunId
-                ? persistTerminalRun('error', streamTimeoutError.message)
-                : Promise.resolve()
+              const terminalPersistence = withRouteOwnedCardError(
+                persistedRunId
+                  ? persistTerminalRun('error', streamTimeoutError.message)
+                  : Promise.resolve(),
+                activeRunId ?? undefined,
+                sessionKey,
+              )
               void terminalPersistence.catch(() => undefined)
               sendEvent('error', {
                 message: streamTimeoutError.message,
@@ -1125,6 +1177,11 @@ export const Route = createFileRoute('/api/send-stream')({
                   friendlyId: portableClientFriendlyId,
                 })
                 lastActivity = 'Processing your message...'
+                await observeAndPublishCardActivity(
+                  'run.started',
+                  runId,
+                  portableSessionKey,
+                )
 
                 try {
                   const userContent = buildMultimodalContent(
@@ -1301,6 +1358,11 @@ export const Route = createFileRoute('/api/send-stream')({
                         timestamp: Date.now(),
                       })
                       touchLocalSession(portableSessionKey)
+                      await observeAndPublishCardActivity(
+                        'run.completed',
+                        runId,
+                        portableSessionKey,
+                      )
                       await finalizeTerminalPersistence(
                         persistTerminalRun('complete'),
                         () => {
@@ -1414,6 +1476,11 @@ export const Route = createFileRoute('/api/send-stream')({
                   })
                   touchLocalSession(portableSessionKey)
 
+                  await observeAndPublishCardActivity(
+                    'run.completed',
+                    runId,
+                    portableSessionKey,
+                  )
                   await finalizeTerminalPersistence(
                     persistTerminalRun('complete'),
                     () => {
@@ -1437,7 +1504,11 @@ export const Route = createFileRoute('/api/send-stream')({
                   if (!streamClosed) {
                     const errorMessage = normalizeClaudeErrorMessage(err)
                     await finalizeTerminalPersistence(
-                      persistTerminalRun('error', errorMessage),
+                      withRouteOwnedCardError(
+                        persistTerminalRun('error', errorMessage),
+                        runId,
+                        portableSessionKey,
+                      ),
                       () => {
                         sendEvent('error', {
                           message: errorMessage,
@@ -2054,6 +2125,12 @@ export const Route = createFileRoute('/api/send-stream')({
                         lastActivity = 'Processing your message...'
                       }
 
+                      await observeAndPublishCardActivity(
+                        event,
+                        runId,
+                        sessionKey,
+                      )
+
                       if (event === 'run.started') {
                         return
                       }
@@ -2485,7 +2562,11 @@ export const Route = createFileRoute('/api/send-stream')({
               if (!streamClosed) {
                 const errorMsg = normalizeClaudeErrorMessage(err)
                 await finalizeTerminalPersistence(
-                  persistTerminalRun('error', errorMsg),
+                  withRouteOwnedCardError(
+                    persistTerminalRun('error', errorMsg),
+                    activeRunId ?? undefined,
+                    sessionKey,
+                  ),
                   () => {
                     sendEvent('error', {
                       message: errorMsg,
@@ -2500,10 +2581,15 @@ export const Route = createFileRoute('/api/send-stream')({
             // User clicked Stop, navigated away, or browser closed the tab.
             // Stop transport work immediately, then observe bounded sealing
             // without allowing exhaustion to reject stream cancellation.
-            const terminalPersistence =
-              persistedRunId && !streamClosed
-                ? persistTerminalRun('handoff')
-                : Promise.resolve()
+            const terminalPersistence = !streamClosed
+              ? withRouteOwnedCardError(
+                  persistedRunId
+                    ? persistTerminalRun('handoff')
+                    : Promise.resolve(),
+                  activeRunId ?? undefined,
+                  sessionKey,
+                )
+              : Promise.resolve()
             await finalizeTerminalPersistence(
               terminalPersistence,
               undefined,

@@ -1,3 +1,5 @@
+import type { SessionCardActivityState } from '../../screens/chat/types'
+
 export type AuthoritativeStreamHandoff = {
   fromSessionKey: string
   sessionKey: string
@@ -32,6 +34,22 @@ export function classifyStreamTerminalEvent(
   if (SUCCESS_TERMINAL_EVENTS.has(event)) return 'success'
   if (ERROR_TERMINAL_EVENTS.has(event)) return 'error'
   if (CANCELLED_TERMINAL_EVENTS.has(event)) return 'cancelled'
+  return null
+}
+
+/**
+ * Exact Hermes stream contract mapping. `approval.request` is emitted by the
+ * authoritative `/v1/runs` transport; the legacy session-chat transport does
+ * not currently forward it, so callers must never infer approval from text.
+ */
+export function cardActivityStateForEvent(
+  event: string,
+): SessionCardActivityState | null {
+  if (event === 'run.started') return 'running'
+  if (event === 'approval.request') return 'pending_approval'
+  const terminalKind = classifyStreamTerminalEvent(event)
+  if (terminalKind === 'success') return 'completed'
+  if (terminalKind) return 'error'
   return null
 }
 

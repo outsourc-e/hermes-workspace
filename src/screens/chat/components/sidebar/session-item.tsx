@@ -29,6 +29,8 @@ type SessionItemProps = {
   contextLabel?: string
   showActions?: boolean
   inspected?: boolean
+  busy?: boolean
+  attention?: boolean
   onSelect?: () => void
   onTogglePin?: () => void
   canBranch: boolean
@@ -114,6 +116,8 @@ function SessionItemComponent({
   contextLabel,
   showActions = true,
   inspected = false,
+  busy = false,
+  attention = false,
   onSelect,
   onTogglePin,
   canBranch,
@@ -149,6 +153,7 @@ function SessionItemComponent({
       params={{ sessionKey: routeKey }}
       search={inspectChildCardId ? { inspect: inspectChildCardId } : {}}
       aria-current={active ? 'page' : undefined}
+      aria-busy={busy ? true : undefined}
       data-inspected={inspected ? 'true' : undefined}
       onClick={() => {
         try {
@@ -162,19 +167,33 @@ function SessionItemComponent({
         'select-none',
         active
           ? 'bg-primary-200 text-primary-950'
-          : 'bg-transparent text-primary-950 [&:hover:not(:has(button:hover))]:bg-primary-200',
+          : attention
+            ? 'animate-[pulse_3s_ease-in-out_infinite] bg-accent-500/10 text-primary-950 [&:hover:not(:has(button:hover))]:bg-primary-200'
+            : 'bg-transparent text-primary-950 [&:hover:not(:has(button:hover))]:bg-primary-200',
       )}
     >
       <div className="flex-1 min-w-0 py-1.5">
-        <div
-          className={cn(
-            'truncate text-sm font-[500]',
-            isGenerating ? 'text-primary-700' : '',
-          )}
-        >
-          <span className={cn(isGenerating ? 'animate-pulse' : undefined)}>
-            {baseTitle}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span
+            className={cn(
+              'min-w-0 truncate text-sm font-[500]',
+              isGenerating ? 'text-primary-700' : '',
+            )}
+          >
+            <span className={cn(isGenerating ? 'animate-pulse' : undefined)}>
+              {baseTitle}
+            </span>
           </span>
+          {busy ? (
+            <span className="inline-flex shrink-0 items-center">
+              <span
+                aria-hidden="true"
+                data-card-working-indicator="true"
+                className="size-3 animate-spin rounded-full border border-primary-400 border-t-primary-800"
+              />
+              <span className="sr-only">Card is working</span>
+            </span>
+          ) : null}
         </div>
         <div
           className={cn(
@@ -276,6 +295,8 @@ function areSessionItemsEqual(prev: SessionItemProps, next: SessionItemProps) {
   if (prev.contextLabel !== next.contextLabel) return false
   if (prev.showActions !== next.showActions) return false
   if (prev.inspected !== next.inspected) return false
+  if (prev.busy !== next.busy) return false
+  if (prev.attention !== next.attention) return false
   if (prev.onSelect !== next.onSelect) return false
   if (prev.onTogglePin !== next.onTogglePin) return false
   if (prev.canBranch !== next.canBranch) return false

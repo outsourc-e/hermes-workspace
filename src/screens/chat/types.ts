@@ -180,6 +180,16 @@ export type SessionCardRelationshipKind = Exclude<
 >
 export type SessionCardTitleSource = 'default' | 'auto' | 'manual'
 export type SessionCardChildStatus = 'idle' | 'running' | 'complete' | 'error'
+export type SessionCardActivityState =
+  | 'running'
+  | 'completed'
+  | 'error'
+  | 'pending_approval'
+export type SessionCardActivity = {
+  state: SessionCardActivityState
+  /** Server-observed epoch in milliseconds for this authoritative transition. */
+  updatedAt: number
+}
 export type SessionCardCanonicalSource = 'local' | 'remote'
 export type SessionCardCanonicalTransport = 'dashboard' | 'gateway'
 
@@ -213,6 +223,8 @@ export type SessionCard = {
   relationshipKind: SessionCardRelationshipKind
   parentCardId?: string
   childNodes: Array<SessionCardChild>
+  /** Present only after a server-validated root Card/run stream transition. */
+  activity?: SessionCardActivity
   updatedAt: number
   archived: boolean
   pinned: boolean

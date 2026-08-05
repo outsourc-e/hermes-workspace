@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   STREAM_PROVENANCE_ID_LIMIT,
+  cardActivityStateForEvent,
   childLifecycleStatusForEvent,
   classifyStreamTerminalEvent,
   createStreamEventProvenanceTracker,
@@ -36,6 +37,32 @@ describe('childLifecycleStatusForEvent', () => {
   ])('maps %s to error', (event) =>
     expect(childLifecycleStatusForEvent(event)).toBe('error'),
   )
+})
+
+describe('cardActivityStateForEvent', () => {
+  it.each([
+    ['run.started', 'running'],
+    ['approval.request', 'pending_approval'],
+    ['run.completed', 'completed'],
+    ['run.succeeded', 'completed'],
+    ['error', 'error'],
+    ['run.failed', 'error'],
+    ['run.error', 'error'],
+    ['run.cancelled', 'error'],
+    ['run.canceled', 'error'],
+  ] as const)('maps the authoritative %s event to %s', (event, expected) => {
+    expect(cardActivityStateForEvent(event)).toBe(expected)
+  })
+
+  it.each([
+    'assistant.delta',
+    'tool.pending',
+    'command approval required',
+    'approval.requested',
+    'approval_request',
+  ])('does not infer Card activity from %s', (event) => {
+    expect(cardActivityStateForEvent(event)).toBeNull()
+  })
 })
 
 describe('classifyStreamTerminalEvent', () => {

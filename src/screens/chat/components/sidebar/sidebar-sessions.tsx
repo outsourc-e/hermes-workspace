@@ -29,6 +29,8 @@ type SidebarSessionsProps = {
   inspectedChildCardId?: string
   defaultOpen?: boolean
   onSelect?: () => void
+  attentionCardIds?: ReadonlySet<string>
+  onViewCard?: (cardId: string) => void
   onTogglePin: (card: SessionCard) => void
   onRename: (card: SessionCard) => void
   onArchive: (card: SessionCard) => void
@@ -51,7 +53,12 @@ type CardRowChild = SessionCardChild & {
 
 type CardRowNode = Pick<
   SessionCard,
-  'cardId' | 'title' | 'updatedAt' | 'relationshipKind' | 'continuationCount'
+  | 'cardId'
+  | 'title'
+  | 'updatedAt'
+  | 'relationshipKind'
+  | 'continuationCount'
+  | 'activity'
 > & {
   childNodes: Array<CardRowChild>
   status?: SessionCardChild['status']
@@ -71,6 +78,8 @@ export const SidebarSessions = memo(function SidebarSessions({
   inspectedChildCardId,
   defaultOpen = true,
   onSelect,
+  attentionCardIds = new Set<string>(),
+  onViewCard,
   onTogglePin,
   onRename,
   onArchive,
@@ -198,6 +207,10 @@ export const SidebarSessions = memo(function SidebarSessions({
         continuationCount: node.continuationCount,
         ...(parentKey ? { parentKey } : {}),
         isOrphan: node.relationshipKind === 'orphan',
+        ...(depth === 0 && node.activity ? { activity: node.activity } : {}),
+        ...(depth === 0 && attentionCardIds.has(node.cardId)
+          ? { hasAttention: true }
+          : {}),
       }
       if (childRows.length > 0) childrenByParent.set(node.cardId, childRows)
       return {
@@ -211,7 +224,13 @@ export const SidebarSessions = memo(function SidebarSessions({
       (card) => buildRow(card, 0, new Set<string>()).row,
     )
     return { rootRows, childrenByParent }
-  }, [cardsById, expandedCardIds, inspectedChildCardId, visibleRoots])
+  }, [
+    attentionCardIds,
+    cardsById,
+    expandedCardIds,
+    inspectedChildCardId,
+    visibleRoots,
+  ])
 
   const pinnedRows = cardRows.rootRows.filter((row) =>
     pinnedCardIds.has(row.key),
@@ -243,6 +262,7 @@ export const SidebarSessions = memo(function SidebarSessions({
         sessionForkAvailable={sessionForkAvailable}
         onToggleExpanded={handleToggleExpanded}
         onSelect={onSelect}
+        onViewCard={onViewCard}
         onTogglePin={onTogglePin}
         onBranch={onBranch}
         onRename={onRename}
@@ -402,6 +422,8 @@ function areSidebarSessionsEqual(
   if (prev.inspectedChildCardId !== next.inspectedChildCardId) return false
   if (prev.defaultOpen !== next.defaultOpen) return false
   if (prev.onSelect !== next.onSelect) return false
+  if (prev.attentionCardIds !== next.attentionCardIds) return false
+  if (prev.onViewCard !== next.onViewCard) return false
   if (prev.onRename !== next.onRename) return false
   if (prev.onTogglePin !== next.onTogglePin) return false
   if (prev.onArchive !== next.onArchive) return false

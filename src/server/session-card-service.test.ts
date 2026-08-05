@@ -1269,6 +1269,184 @@ describe('SessionCardService collection and resolution', () => {
     })
   })
 
+  it('projects validated authoritative root Card activity through list and detail responses', async () => {
+    const rows = [session('root', { source: 'cli' }, 10)]
+    let now = 100
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page(rows, 0, rows.length)),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+      now: () => now,
+    })
+
+    await expect(
+      service.observeCardActivity({
+        cardId: 'remote:root',
+        upstreamSessionKey: 'root',
+        runId: 'run-1',
+        state: 'running',
+      }),
+    ).resolves.toEqual({
+      cardId: 'remote:root',
+      sessionKey: 'remote:root',
+      runId: 'run-1',
+      state: 'running',
+      updatedAt: 100,
+    })
+    await expect(service.listCards()).resolves.toMatchObject({
+      cards: [
+        expect.objectContaining({
+          cardId: 'remote:root',
+          activity: { state: 'running', updatedAt: 100 },
+        }),
+      ],
+    })
+
+    now = 200
+    await expect(
+      service.observeCardActivity({
+        cardId: 'remote:root',
+        upstreamSessionKey: 'root',
+        runId: 'run-1',
+        state: 'pending_approval',
+      }),
+    ).resolves.toMatchObject({ state: 'pending_approval', updatedAt: 200 })
+    const lookup = await service.lookupCard('remote:root')
+    expect(lookup.status).toBe('found')
+    if (lookup.status === 'found') {
+      expect(lookup.card.activity).toEqual({
+        state: 'pending_approval',
+        updatedAt: 200,
+      })
+    }
+    await expect(service.resolveCard('remote:root')).resolves.toMatchObject({
+      card: {
+        activity: { state: 'pending_approval', updatedAt: 200 },
+      },
+    })
+
+    now = 300
+    await service.observeCardActivity({
+      cardId: 'remote:root',
+      upstreamSessionKey: 'root',
+      runId: 'run-1',
+      state: 'running',
+    })
+    now = 400
+    await service.observeCardActivity({
+      cardId: 'remote:root',
+      upstreamSessionKey: 'root',
+      runId: 'run-1',
+      state: 'completed',
+    })
+    expect((await service.listChatCards()).cards[0]?.activity).toEqual({
+      state: 'completed',
+      updatedAt: 400,
+    })
+  })
+
+  it('fails closed for malformed, stale, superseded, incomplete, and archived root activity', async () => {
+    const incompleteRows = [
+      session('root', { source: 'cli' }, 10),
+      session('other', { source: 'cli' }, 20),
+    ]
+    let now = 100
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: (limit, offset) =>
+          Promise.resolve(
+            page(
+              incompleteRows.slice(offset, offset + limit),
+              offset,
+              incompleteRows.length,
+            ),
+          ),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+      pageSize: 1,
+      maxSessions: 1,
+      now: () => now,
+    })
+
+    await expect(
+      service.observeCardActivity({
+        cardId: 'remote:root',
+        upstreamSessionKey: 'root',
+        runId: 'run-incomplete',
+        state: 'running',
+      }),
+    ).resolves.toBeNull()
+    await expect(
+      service.observeCardActivity({
+        cardId: ' remote:root',
+        upstreamSessionKey: 'root',
+        runId: 'run-valid',
+        state: 'running',
+      }),
+    ).resolves.toBeNull()
+    await expect(
+      service.observeCardActivity({
+        cardId: 'remote:root',
+        upstreamSessionKey: 'root',
+        runId: '../bad-run',
+        state: 'running',
+      }),
+    ).resolves.toBeNull()
+
+    const rootRows = [session('root', { source: 'cli' }, 10)]
+    const rootService = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page(rootRows, 0, rootRows.length)),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+      now: () => now,
+    })
+    const observe = (
+      runId: string,
+      state: 'running' | 'completed' | 'error' | 'pending_approval',
+    ) =>
+      rootService.observeCardActivity({
+        cardId: 'remote:root',
+        upstreamSessionKey: 'root',
+        runId,
+        state,
+      })
+
+    await expect(observe('run-a', 'running')).resolves.toMatchObject({
+      runId: 'run-a',
+    })
+    await expect(observe('run-b', 'running')).resolves.toMatchObject({
+      runId: 'run-b',
+    })
+    await expect(observe('run-a', 'completed')).resolves.toBeNull()
+    await expect(observe('run-a', 'pending_approval')).resolves.toBeNull()
+    await expect(observe('run-b', 'error')).resolves.toMatchObject({
+      state: 'error',
+    })
+    await expect(observe('run-b', 'running')).resolves.toBeNull()
+
+    now += 24 * 60 * 60 * 1000 + 1
+    expect((await rootService.listCards()).cards[0]?.activity).toBeUndefined()
+    await expect(observe('run-b', 'completed')).resolves.toBeNull()
+
+    await expect(observe('run-c', 'running')).resolves.toMatchObject({
+      state: 'running',
+    })
+    now += 30 * 60 * 1000 + 1
+    expect((await rootService.listCards()).cards[0]?.activity).toBeUndefined()
+    await expect(observe('run-c', 'completed')).resolves.toBeNull()
+
+    await rootService.archiveCard('remote:root')
+    await expect(observe('run-d', 'running')).resolves.toBeNull()
+  })
+
   it('fails closed and clears stale child activity when the validated relationship changes', async () => {
     let rows = [
       session('parent', { source: 'cli' }, 10),

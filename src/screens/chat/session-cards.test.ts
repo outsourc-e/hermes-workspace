@@ -412,6 +412,33 @@ describe('projectSessionCards', () => {
     ])
   })
 
+  it('projects explicit root activity without inferring it from session timestamps', () => {
+    const parent = session('parent', undefined, 500)
+    const child = session(
+      'child',
+      { parentSessionId: 'parent', relationshipType: 'child_session' },
+      600,
+    )
+
+    const withoutActivity = projectSessionCards([parent, child])
+    expect(
+      withoutActivity.indexByCardId.get('parent')?.activity,
+    ).toBeUndefined()
+
+    const projection = projectSessionCards([parent, child], {
+      activityByCardId: new Map([
+        ['parent', { state: 'completed' as const, updatedAt: 700 }],
+        ['child', { state: 'error' as const, updatedAt: 800 }],
+      ]),
+    })
+
+    expect(projection.indexByCardId.get('parent')?.activity).toEqual({
+      state: 'completed',
+      updatedAt: 700,
+    })
+    expect(projection.indexByCardId.get('child')?.activity).toBeUndefined()
+  })
+
   it('promotes invalid, cyclic, and missing relationships to safe orphan cards', () => {
     const missing = session(
       'missing',

@@ -47,6 +47,15 @@ export function publishChatEvent(
   broadcast(event, data)
 }
 
+/**
+ * Root Card activity is projection state, not a chat bubble. It must reach the
+ * shared events feed even while the originating send stream owns message
+ * delivery for the same run.
+ */
+export function publishCardActivityEvent(data: Record<string, unknown>): void {
+  broadcast('card_activity', data)
+}
+
 export async function ensureBusStarted(): Promise<void> {
   const bus = getBus()
   if (bus.started) return
@@ -66,13 +75,13 @@ export function subscribeToChatEvents(
         if (eventSessionKey && eventSessionKey !== sessionKeyFilter) return
         const runId =
           typeof event.data.runId === 'string' ? event.data.runId : undefined
-        if (hasActiveSendRun(runId)) return
+        if (event.event !== 'card_activity' && hasActiveSendRun(runId)) return
         subscriber(event)
       }
     : (event) => {
         const runId =
           typeof event.data.runId === 'string' ? event.data.runId : undefined
-        if (hasActiveSendRun(runId)) return
+        if (event.event !== 'card_activity' && hasActiveSendRun(runId)) return
         subscriber(event)
       }
 

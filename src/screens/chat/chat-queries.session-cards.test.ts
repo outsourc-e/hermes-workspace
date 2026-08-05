@@ -21,6 +21,7 @@ import {
   updateSessionCardMetadata,
 } from './chat-queries'
 import { isWholeCardBranchAvailable } from './types'
+import type { SessionCard } from './types'
 
 const card = {
   cardId: 'remote:root',
@@ -173,8 +174,51 @@ describe('Session Card fetchers', () => {
     })
 
     fetchMock
-      .mockResolvedValueOnce(response({ cards: [{ ...card, archived: 'yes' }] }))
-      .mockResolvedValueOnce(response({ cards: [{ ...card, archived: 'yes' }] }))
+      .mockResolvedValueOnce(
+        response({ cards: [{ ...card, archived: 'yes' }] }),
+      )
+      .mockResolvedValueOnce(
+        response({ cards: [{ ...card, archived: 'yes' }] }),
+      )
+    await expect(fetchSessionCards()).rejects.toThrow(
+      'Invalid Session Card response',
+    )
+  })
+
+  it('retains only validated authoritative Card activity from the wire', async () => {
+    const activeCard = {
+      ...card,
+      activity: { state: 'pending_approval', updatedAt: 456 },
+    }
+    const validResponse = {
+      cards: [activeCard],
+      cardResolutions: completeCardResolutions([activeCard]),
+      completeness: 'complete' as const,
+      retryable: false,
+      sources: [],
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(validResponse)))
+
+    await expect(fetchSessionCards()).resolves.toMatchObject({
+      cards: [
+        expect.objectContaining({
+          cardId: card.cardId,
+          activity: { state: 'pending_approval', updatedAt: 456 },
+        }),
+      ],
+    })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          ...validResponse,
+          cards: [
+            { ...activeCard, activity: { state: 'unknown', updatedAt: 456 } },
+          ],
+        }),
+      ),
+    )
     await expect(fetchSessionCards()).rejects.toThrow(
       'Invalid Session Card response',
     )
@@ -288,6 +332,50 @@ describe('Session Card fetchers', () => {
       status: 503,
       retryable: true,
     })
+  })
+
+  it('keeps newer inventory activity when a detail response is stale', () => {
+    const inventoryCard: SessionCard = {
+      ...card,
+      canonicalSource: 'remote',
+      canonicalTransport: 'gateway',
+      titleSource: 'manual',
+      relationshipKind: 'root',
+      activity: { state: 'completed', updatedAt: 600 },
+    }
+    const detailCard: SessionCard = {
+      ...card,
+      canonicalSource: 'remote',
+      canonicalTransport: 'gateway',
+      titleSource: 'manual',
+      relationshipKind: 'root',
+      title: 'Stale detail title',
+      activity: { state: 'running', updatedAt: 500 },
+    }
+    const merged = mergeSessionCardDetail(
+      {
+        cards: [inventoryCard],
+        totalCards: 1,
+        cardResolutions: completeCardResolutions([inventoryCard]),
+        completeness: 'complete',
+        retryable: false,
+        sources: [],
+      },
+      {
+        card: detailCard,
+        resolution: completeCardResolutions([detailCard])[0]!,
+        completeness: 'complete',
+        retryable: false,
+        sources: [],
+      },
+    )
+
+    expect(merged?.cards).toEqual([
+      expect.objectContaining({
+        title: 'Stale detail title',
+        activity: { state: 'completed', updatedAt: 600 },
+      }),
+    ])
   })
 
   it('accepts an actual service projection with authoritative child continuation aliases', async () => {
@@ -1092,7 +1180,9 @@ describe('Session Card fetchers', () => {
         response({
           cardId: 'remote:root',
           canonicalSegmentKey: 'remote:tip',
-          messages: [{ segmentKey: 'remote:root', message: { id: 'message-1' } }],
+          messages: [
+            { segmentKey: 'remote:root', message: { id: 'message-1' } },
+          ],
           completeness: 'partial',
           retryable: true,
           missingSegments: [

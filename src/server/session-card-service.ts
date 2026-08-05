@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 import { projectSessionCards } from '../screens/chat/session-cards'
 import { listSessionsPage, toSessionSummary } from './claude-api'
 import { listLocalSessions } from './local-session-store'
+import { isSafeRunId } from './run-id'
 import {
   archiveSessionCardMetadata,
   listSessionCardMetadata,
@@ -21,6 +22,8 @@ import type {
 } from './session-card-store'
 import type {
   SessionCard,
+  SessionCardActivity,
+  SessionCardActivityState,
   SessionCardCanonicalTransport,
   SessionCardChild,
   SessionCardChildStatus,
@@ -208,7 +211,28 @@ export type SessionCardChildLifecycleObservation = {
   updatedAt: number
 }
 
+export type SessionCardActivityInput = {
+  cardId: string
+  upstreamSessionKey: string
+  runId: string
+  state: SessionCardActivityState
+}
+
+export type SessionCardActivityObservation = {
+  cardId: string
+  sessionKey: string
+  runId: string
+  state: SessionCardActivityState
+  updatedAt: number
+}
+
 type StoredChildLifecycle = SessionCardChildLifecycleObservation & {
+  binding: string
+  supersededRunIds: Array<string>
+}
+
+type StoredCardActivity = SessionCardActivityObservation & {
+  upstreamSessionKey: string
   binding: string
   supersededRunIds: Array<string>
 }
@@ -241,6 +265,9 @@ const LOCAL_LINEAGE_SOURCES = new Set(['local', 'portable'])
 const MAX_CHILD_LIFECYCLE_ENTRIES = 512
 const RUNNING_CHILD_LIFECYCLE_TTL_MS = 30 * 60 * 1000
 const TERMINAL_CHILD_LIFECYCLE_TTL_MS = 24 * 60 * 60 * 1000
+const MAX_CARD_ACTIVITY_ENTRIES = 512
+const RUNNING_CARD_ACTIVITY_TTL_MS = 30 * 60 * 1000
+const TERMINAL_CARD_ACTIVITY_TTL_MS = 24 * 60 * 60 * 1000
 const LINEAGE_ID_FIELDS = [
   'parentSessionId',
   'lineageRootId',
@@ -265,6 +292,93 @@ function childLifecycleTtl(status: StoredChildLifecycle['status']): number {
   return status === 'running'
     ? RUNNING_CHILD_LIFECYCLE_TTL_MS
     : TERMINAL_CHILD_LIFECYCLE_TTL_MS
+}
+
+const CARD_ACTIVITY_STATES = new Set<SessionCardActivityState>([
+  'running',
+  'completed',
+  'error',
+  'pending_approval',
+])
+
+function cardActivityTtl(state: SessionCardActivityState): number {
+  return state === 'running' || state === 'pending_approval'
+    ? RUNNING_CARD_ACTIVITY_TTL_MS
+    : TERMINAL_CARD_ACTIVITY_TTL_MS
+}
+
+function rootCardActivityBinding(
+  card: SessionCard,
+  collection: SessionCardCollection,
+): string | null {
+  if (
+    card.parentCardId !== undefined ||
+    card.archived ||
+    (card.relationshipKind !== 'root' && card.relationshipKind !== 'orphan') ||
+    !isExactIdentity(card.cardId) ||
+    !isExactIdentity(card.canonicalSegmentKey) ||
+    card.continuationSegmentKeys.length === 0 ||
+    card.continuationSegmentKeys[0] !== card.cardId ||
+    !card.continuationSegmentKeys.includes(card.canonicalSegmentKey) ||
+    new Set(card.continuationSegmentKeys).size !==
+      card.continuationSegmentKeys.length
+  ) {
+    return null
+  }
+
+  const canonicalOrigin = collection.originBySessionKey.get(
+    card.canonicalSegmentKey,
+  )
+  const canonicalSource = collection.sourceBySessionKey.get(
+    card.canonicalSegmentKey,
+  )
+  const anchorSegmentKey = card.continuationSegmentKeys[0]
+  const anchorUpstreamKey =
+    collection.upstreamKeyBySessionKey.get(anchorSegmentKey)
+  if (
+    !canonicalOrigin ||
+    !canonicalSource ||
+    !anchorUpstreamKey ||
+    !isExactIdentity(canonicalSource) ||
+    !isExactIdentity(anchorUpstreamKey)
+  ) {
+    return null
+  }
+
+  for (const segmentKey of card.continuationSegmentKeys) {
+    const upstreamKey = collection.upstreamKeyBySessionKey.get(segmentKey)
+    if (
+      !isExactIdentity(segmentKey) ||
+      collection.originBySessionKey.get(segmentKey) !== canonicalOrigin ||
+      collection.sourceBySessionKey.get(segmentKey) !== canonicalSource ||
+      !upstreamKey ||
+      !isExactIdentity(upstreamKey) ||
+      collection.sourceStatusBySessionKey.get(segmentKey)?.status !== 'complete'
+    ) {
+      return null
+    }
+  }
+
+  return JSON.stringify([
+    card.cardId,
+    card.relationshipKind,
+    canonicalOrigin,
+    canonicalSource,
+    anchorSegmentKey,
+    anchorUpstreamKey,
+  ])
+}
+
+function projectedRootSegmentForUpstream(
+  card: SessionCard,
+  collection: SessionCardCollection,
+  upstreamSessionKey: string,
+): string | null {
+  const matches = card.continuationSegmentKeys.filter(
+    (segmentKey) =>
+      collection.upstreamKeyBySessionKey.get(segmentKey) === upstreamSessionKey,
+  )
+  return matches.length === 1 ? (matches[0] ?? null) : null
 }
 
 function childRelationshipBinding(
@@ -1330,6 +1444,7 @@ export class SessionCardService {
     string,
     StoredChildLifecycle
   >()
+  private readonly cardActivityByCardId = new Map<string, StoredCardActivity>()
 
   constructor(options: SessionCardServiceOptions = {}) {
     this.remoteSource =
@@ -1838,6 +1953,46 @@ export class SessionCardService {
     return activityByParentCardId
   }
 
+  private validatedCardActivity(
+    projection: SessionCardProjection,
+    collection: SessionCardCollection,
+  ): ReadonlyMap<string, SessionCardActivity> {
+    const now = this.now()
+    const activityByCardId = new Map<string, SessionCardActivity>()
+
+    for (const [key, stored] of this.cardActivityByCardId) {
+      const card = projection.roots.find(
+        (candidate) =>
+          candidate.cardId === stored.cardId && !candidate.archived,
+      )
+      const binding = card ? rootCardActivityBinding(card, collection) : null
+      const sessionKey = card
+        ? projectedRootSegmentForUpstream(
+            card,
+            collection,
+            stored.upstreamSessionKey,
+          )
+        : null
+      const expired = now - stored.updatedAt > cardActivityTtl(stored.state)
+      if (
+        !card ||
+        !binding ||
+        binding !== stored.binding ||
+        sessionKey !== stored.sessionKey ||
+        expired
+      ) {
+        this.cardActivityByCardId.delete(key)
+        continue
+      }
+      activityByCardId.set(card.cardId, {
+        state: stored.state,
+        updatedAt: stored.updatedAt,
+      })
+    }
+
+    return activityByCardId
+  }
+
   private async freshProjection(): Promise<FreshProjection> {
     const cached = this.projectionCache
     if (cached && cached.expiresAt > this.now()) return cached.value
@@ -1871,12 +2026,18 @@ export class SessionCardService {
       baseProjection,
       collection,
     )
-    const projection = childActivityByParentCardId.size
-      ? projectSessionCards(collection.sessions, {
-          cardMetadata,
-          childActivityByParentCardId,
-        })
-      : baseProjection
+    const activityByCardId = this.validatedCardActivity(
+      baseProjection,
+      collection,
+    )
+    const projection =
+      childActivityByParentCardId.size || activityByCardId.size
+        ? projectSessionCards(collection.sessions, {
+            cardMetadata,
+            childActivityByParentCardId,
+            activityByCardId,
+          })
+        : baseProjection
     return {
       projection,
       collection,
@@ -2013,6 +2174,82 @@ export class SessionCardService {
       retryable: fresh.collection.retryable,
       sources: fresh.collection.sources,
     }
+  }
+
+  async observeCardActivity(
+    input: SessionCardActivityInput,
+  ): Promise<SessionCardActivityObservation | null> {
+    if (
+      !isExactIdentity(input.cardId) ||
+      !isExactIdentity(input.upstreamSessionKey) ||
+      !isSafeRunId(input.runId) ||
+      !CARD_ACTIVITY_STATES.has(input.state)
+    ) {
+      return null
+    }
+
+    const fresh = await this.freshProjection()
+    const card = fresh.projection.roots.find(
+      (candidate) => candidate.cardId === input.cardId && !candidate.archived,
+    )
+    if (!card) return null
+    const binding = rootCardActivityBinding(card, fresh.collection)
+    const sessionKey = projectedRootSegmentForUpstream(
+      card,
+      fresh.collection,
+      input.upstreamSessionKey,
+    )
+    if (!binding || !sessionKey) return null
+
+    const existing = this.cardActivityByCardId.get(card.cardId)
+    let current = existing?.binding === binding ? existing : null
+    if (
+      current &&
+      this.now() - current.updatedAt > cardActivityTtl(current.state)
+    ) {
+      this.cardActivityByCardId.delete(card.cardId)
+      current = null
+    }
+    if (current?.supersededRunIds.includes(input.runId)) return null
+
+    const currentIsActive =
+      current?.state === 'running' || current?.state === 'pending_approval'
+    if (input.state === 'running') {
+      if (current?.runId === input.runId && !currentIsActive) return null
+    } else if (!current || current.runId !== input.runId || !currentIsActive) {
+      return null
+    }
+
+    const supersededRunIds = current
+      ? [
+          ...current.supersededRunIds,
+          ...(input.state === 'running' && current.runId !== input.runId
+            ? [current.runId]
+            : []),
+        ].slice(-32)
+      : []
+    const observation: SessionCardActivityObservation = {
+      cardId: card.cardId,
+      sessionKey,
+      runId: input.runId,
+      state: input.state,
+      updatedAt: this.now(),
+    }
+
+    this.cardActivityByCardId.delete(card.cardId)
+    while (this.cardActivityByCardId.size >= MAX_CARD_ACTIVITY_ENTRIES) {
+      const oldestCardId = this.cardActivityByCardId.keys().next().value
+      if (typeof oldestCardId !== 'string') break
+      this.cardActivityByCardId.delete(oldestCardId)
+    }
+    this.cardActivityByCardId.set(card.cardId, {
+      ...observation,
+      upstreamSessionKey: input.upstreamSessionKey,
+      binding,
+      supersededRunIds,
+    })
+    this.invalidateProjectionCache()
+    return observation
   }
 
   async observeChildLifecycle(

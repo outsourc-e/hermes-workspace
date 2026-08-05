@@ -133,6 +133,8 @@ function renderSidebar(
     cards?: Array<SessionCard>
     activeCardId?: string
     inspectedChildCardId?: string
+    attentionCardIds?: ReadonlySet<string>
+    onViewCard?: (cardId: string) => void
     onTogglePin?: (value: SessionCard) => void
     onRename?: (value: SessionCard) => void
     onArchive?: (value: SessionCard) => void
@@ -157,6 +159,8 @@ function renderSidebar(
         sessionForkAvailable
         activeCardId={options.activeCardId ?? 'card:root'}
         inspectedChildCardId={options.inspectedChildCardId}
+        attentionCardIds={options.attentionCardIds}
+        onViewCard={options.onViewCard}
         onTogglePin={options.onTogglePin ?? vi.fn()}
         onRename={options.onRename ?? vi.fn()}
         onArchive={options.onArchive ?? vi.fn()}
@@ -252,6 +256,45 @@ describe('SidebarSessions Card-only surface', () => {
     expect(
       screen.queryByText('Some sessions are temporarily unavailable.'),
     ).toBeNull()
+  })
+
+  it('carries attention and running activity to pinned roots without affecting child rows', () => {
+    const pinned = card({
+      pinned: true,
+      pinnedAt: 1,
+      activity: { state: 'running', updatedAt: 20 },
+    })
+    renderSidebar({
+      cards: [pinned],
+      activeCardId: 'card:other',
+      attentionCardIds: new Set(['card:root', 'card:child']),
+    })
+
+    const pinnedSection = screen.getByRole('region', {
+      name: 'Pinned sessions',
+    })
+    const rootLink = within(pinnedSection)
+      .getByText('Authoritative card title')
+      .closest('a')
+    expect(rootLink?.getAttribute('aria-busy')).toBe('true')
+    expect(rootLink?.className).toContain(
+      'animate-[pulse_3s_ease-in-out_infinite]',
+    )
+
+    React.act(() =>
+      fireEvent.click(
+        within(pinnedSection).getByRole('button', {
+          name: /Expand related sessions/i,
+        }),
+      ),
+    )
+    const childLink = within(pinnedSection)
+      .getByText('↳ Delegated research')
+      .closest('a')
+    expect(childLink?.hasAttribute('aria-busy')).toBe(false)
+    expect(childLink?.className).not.toContain(
+      'animate-[pulse_3s_ease-in-out_infinite]',
+    )
   })
 
   it('renders the bounded inventory and delegates loading older pages', () => {

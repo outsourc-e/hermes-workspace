@@ -28,7 +28,9 @@ const mocks = vi.hoisted(() => ({
   getDiscoveredModels: vi.fn(),
   getLocalProviderDef: vi.fn(),
   getChatMode: vi.fn(),
+  observeCardActivity: vi.fn(),
   observeChildLifecycle: vi.fn(),
+  publishCardActivityEvent: vi.fn(),
   publishChatEvent: vi.fn(),
 }))
 
@@ -57,6 +59,7 @@ vi.mock('../../server/rate-limit', () => ({
 }))
 
 vi.mock('../../server/chat-event-bus', () => ({
+  publishCardActivityEvent: mocks.publishCardActivityEvent,
   publishChatEvent: mocks.publishChatEvent,
 }))
 
@@ -89,6 +92,7 @@ vi.mock('../../server/session-card-service', () => ({
     resolveRemoteCardByUpstreamSession:
       mocks.resolveRemoteCardByUpstreamSession,
     resolveLocalCardByUpstreamSession: mocks.resolveLocalCardByUpstreamSession,
+    observeCardActivity: mocks.observeCardActivity,
     observeChildLifecycle: mocks.observeChildLifecycle,
   },
 }))
@@ -177,6 +181,25 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
+function observeRootCardActivityOn(sessionKey: string) {
+  let observedAt = 100
+  mocks.observeCardActivity.mockImplementation(
+    (input: {
+      cardId: string
+      upstreamSessionKey: string
+      runId: string
+      state: 'running' | 'completed' | 'error' | 'pending_approval'
+    }) =>
+      Promise.resolve({
+        cardId: input.cardId,
+        sessionKey,
+        runId: input.runId,
+        state: input.state,
+        updatedAt: observedAt++,
+      }),
+  )
+}
+
 describe('send-stream bootstrap session handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -211,6 +234,7 @@ describe('send-stream bootstrap session handoff', () => {
     mocks.resolveLocalCardByUpstreamSession.mockRejectedValue(
       new Error('card unavailable'),
     )
+    mocks.observeCardActivity.mockResolvedValue(null)
     mocks.observeChildLifecycle.mockResolvedValue(null)
     mocks.getMessages.mockResolvedValue([])
     mocks.getChatMode.mockReturnValue('enhanced')
@@ -653,6 +677,239 @@ describe('send-stream bootstrap session handoff', () => {
       'complete',
       undefined,
     )
+  })
+
+  it('publishes only verified root Card activity to the stream and app event bus', async () => {
+    mocks.resolveSessionCard.mockResolvedValue({
+      card: {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey: 'remote:parent',
+        continuationSegmentKeys: ['remote:parent'],
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['remote:parent', 'gateway']]),
+      upstreamKeyBySegmentKey: new Map([['remote:parent', 'parent-session']]),
+    })
+    let observedAt = 100
+    mocks.observeCardActivity.mockImplementation(
+      (input: {
+        cardId: string
+        upstreamSessionKey: string
+        runId: string
+        state: 'running' | 'completed' | 'error' | 'pending_approval'
+      }) =>
+        Promise.resolve({
+          cardId: input.cardId,
+          sessionKey: 'remote:parent',
+          runId: input.runId,
+          state: input.state,
+          updatedAt: observedAt++,
+        }),
+    )
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        expect(sessionKey).toBe('parent-session')
+        for (const event of [
+          'run.started',
+          'approval.request',
+          'run.completed',
+        ]) {
+          await options.onEvent({
+            event,
+            data: { run_id: 'parent-run', session_id: 'parent-session' },
+          })
+        }
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'remote:parent-card',
+          sessionKey: 'remote:parent',
+          friendlyId: 'remote:parent-card',
+          message: 'run safely',
+        }),
+      }),
+    })
+
+    const activityEvents = parseEvents(await response.text()).filter(
+      ({ event }) => event === 'card_activity',
+    )
+    expect(
+      activityEvents.map(({ data }) => ({
+        state: data.state,
+        activity: data.activity,
+      })),
+    ).toEqual([
+      { state: 'running', activity: 'run.started' },
+      { state: 'pending_approval', activity: 'approval.request' },
+      { state: 'completed', activity: 'run.completed' },
+    ])
+    expect(mocks.observeCardActivity).toHaveBeenCalledTimes(3)
+    expect(mocks.publishCardActivityEvent.mock.calls).toEqual(
+      activityEvents.map(({ data }) => [data]),
+    )
+  })
+
+  it.each([
+    'timeout',
+    'producer failure',
+    'request abort',
+    'consumer cancel',
+  ] as const)(
+    'projects a validated root Card error on route-owned %s',
+    async (termination) => {
+      vi.useFakeTimers()
+      try {
+        mocks.resolveSessionCard.mockResolvedValue({
+          card: {
+            cardId: 'remote:parent-card',
+            canonicalSegmentKey: 'remote:parent',
+            continuationSegmentKeys: ['remote:parent'],
+            relationshipKind: 'root',
+          },
+          collection: { completeness: 'complete' },
+          sourceBySegmentKey: new Map([['remote:parent', 'gateway']]),
+          upstreamKeyBySegmentKey: new Map([
+            ['remote:parent', 'parent-session'],
+          ]),
+        })
+        observeRootCardActivityOn('remote:parent')
+        const producerStarted = deferred<void>()
+        mocks.streamChat.mockImplementationOnce(
+          async (
+            _sessionKey: string,
+            _request: unknown,
+            options: {
+              onEvent: (payload: {
+                event: string
+                data: Record<string, unknown>
+              }) => Promise<void>
+            },
+          ) => {
+            await options.onEvent({
+              event: 'run.started',
+              data: {
+                run_id: 'route-owned-run',
+                session_id: 'parent-session',
+              },
+            })
+            producerStarted.resolve(undefined)
+            if (termination === 'producer failure') {
+              throw new Error('producer failed')
+            }
+            return new Promise<void>(() => undefined)
+          },
+        )
+        const requestAbort = new AbortController()
+        const response = await handler({
+          request: new Request('http://workspace.test/api/send-stream', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              cardId: 'remote:parent-card',
+              sessionKey: 'remote:parent',
+              friendlyId: 'remote:parent-card',
+              message: 'run until route termination',
+            }),
+            signal: requestAbort.signal,
+          }),
+        })
+        let responseClosed: Promise<unknown>
+        if (termination === 'consumer cancel') {
+          responseClosed = Promise.resolve()
+        } else {
+          responseClosed = response.text()
+        }
+        await producerStarted.promise
+
+        if (termination === 'timeout') {
+          await vi.advanceTimersByTimeAsync(600_000)
+        } else if (termination === 'request abort') {
+          requestAbort.abort()
+        } else if (termination === 'consumer cancel') {
+          responseClosed = response.body!.cancel()
+        }
+        await responseClosed
+        await Promise.resolve()
+
+        expect(mocks.observeCardActivity.mock.calls).toEqual([
+          [
+            {
+              cardId: 'remote:parent-card',
+              upstreamSessionKey: 'parent-session',
+              runId: 'route-owned-run',
+              state: 'running',
+            },
+          ],
+          [
+            {
+              cardId: 'remote:parent-card',
+              upstreamSessionKey: 'parent-session',
+              runId: 'route-owned-run',
+              state: 'error',
+            },
+          ],
+        ])
+        expect(
+          mocks.publishCardActivityEvent.mock.calls.map(([payload]) => ({
+            state: payload.state,
+            activity: payload.activity,
+          })),
+        ).toEqual([
+          { state: 'running', activity: 'run.started' },
+          { state: 'error', activity: 'error' },
+        ])
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
+
+  it('does not manufacture route-owned Card errors before a parent run is proven', async () => {
+    mocks.resolveSessionCard.mockResolvedValue({
+      card: {
+        cardId: 'remote:parent-card',
+        canonicalSegmentKey: 'remote:parent',
+        continuationSegmentKeys: ['remote:parent'],
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['remote:parent', 'gateway']]),
+      upstreamKeyBySegmentKey: new Map([['remote:parent', 'parent-session']]),
+    })
+    observeRootCardActivityOn('remote:parent')
+    mocks.streamChat.mockRejectedValueOnce(new Error('producer failed early'))
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'remote:parent-card',
+          sessionKey: 'remote:parent',
+          friendlyId: 'remote:parent-card',
+          message: 'fail before run identity',
+        }),
+      }),
+    })
+    await response.text()
+
+    expect(mocks.observeCardActivity).not.toHaveBeenCalled()
+    expect(mocks.publishCardActivityEvent).not.toHaveBeenCalled()
   })
 
   it('publishes validated child lifecycle while preserving the parent Card stream', async () => {
@@ -4228,6 +4485,117 @@ describe('send-stream bootstrap session handoff', () => {
       cardId: 'local:parent-card',
       canonicalSegmentKey: 'local:main',
     })
+  })
+
+  it('projects selected local Card start and completion activity', async () => {
+    mocks.resolveSessionCard.mockResolvedValue({
+      card: {
+        cardId: 'local:parent-card',
+        canonicalSegmentKey: 'local:main',
+        continuationSegmentKeys: ['local:main'],
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['local:main', 'local']]),
+      upstreamKeyBySegmentKey: new Map([['local:main', 'main']]),
+    })
+    observeRootCardActivityOn('local:main')
+    mocks.openaiChat.mockResolvedValueOnce([
+      { type: 'text', text: 'local response' },
+    ])
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'local:parent-card',
+          sessionKey: 'local:main',
+          friendlyId: 'local:parent-card',
+          message: 'observe local success',
+        }),
+      }),
+    })
+    const activities = parseEvents(await response.text()).filter(
+      ({ event }) => event === 'card_activity',
+    )
+
+    expect(
+      activities.map(({ data }) => ({
+        state: data.state,
+        activity: data.activity,
+      })),
+    ).toEqual([
+      { state: 'running', activity: 'run.started' },
+      { state: 'completed', activity: 'run.completed' },
+    ])
+    const runId = activities[0]?.data.runId
+    expect(mocks.observeCardActivity.mock.calls).toEqual([
+      [
+        {
+          cardId: 'local:parent-card',
+          upstreamSessionKey: 'main',
+          runId,
+          state: 'running',
+        },
+      ],
+      [
+        {
+          cardId: 'local:parent-card',
+          upstreamSessionKey: 'main',
+          runId,
+          state: 'completed',
+        },
+      ],
+    ])
+    expect(mocks.publishCardActivityEvent.mock.calls).toEqual(
+      activities.map(({ data }) => [data]),
+    )
+  })
+
+  it('projects a selected local Card error after an authoritative start', async () => {
+    mocks.resolveSessionCard.mockResolvedValue({
+      card: {
+        cardId: 'local:parent-card',
+        canonicalSegmentKey: 'local:main',
+        continuationSegmentKeys: ['local:main'],
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete' },
+      sourceBySegmentKey: new Map([['local:main', 'local']]),
+      upstreamKeyBySegmentKey: new Map([['local:main', 'main']]),
+    })
+    observeRootCardActivityOn('local:main')
+    mocks.openaiChat.mockRejectedValueOnce(new Error('local producer failed'))
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId: 'local:parent-card',
+          sessionKey: 'local:main',
+          friendlyId: 'local:parent-card',
+          message: 'observe local failure',
+        }),
+      }),
+    })
+    const activities = parseEvents(await response.text()).filter(
+      ({ event }) => event === 'card_activity',
+    )
+
+    expect(
+      activities.map(({ data }) => ({
+        state: data.state,
+        activity: data.activity,
+      })),
+    ).toEqual([
+      { state: 'running', activity: 'run.started' },
+      { state: 'error', activity: 'error' },
+    ])
+    expect(mocks.publishCardActivityEvent.mock.calls).toEqual(
+      activities.map(({ data }) => [data]),
+    )
   })
 
   it('qualifies every Card-owned portable main identity while retaining raw main only for the backend call', async () => {
