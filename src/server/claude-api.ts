@@ -18,8 +18,8 @@ import {
   createSession as createDashboardSession,
   deleteSession as deleteDashboardSession,
   getLatestDescendant as getDashboardLatestDescendant,
-  getSessionExport as getDashboardSessionExport,
   getSession as getDashboardSession,
+  getSessionExport as getDashboardSessionExport,
   getSessionMessages as getDashboardSessionMessages,
   listSessions as listDashboardSessions,
   searchSessions as searchDashboardSessions,
@@ -107,6 +107,15 @@ export type ClaudeMessagesResult = {
 export type GetMessagesOptions = {
   /** Read the requested persisted segment instead of resolving it to a resume tip. */
   exact?: boolean
+}
+
+export class ClaudeMessageIdentityError extends Error {
+  constructor(requestedSessionId: string, returnedSessionId: string) {
+    super(
+      `Gateway history segment mismatch (${requestedSessionId} requested, ${returnedSessionId} returned).`,
+    )
+    this.name = 'ClaudeMessageIdentityError'
+  }
 }
 
 export type ClaudeConfig = {
@@ -317,13 +326,37 @@ export async function getMessagesResult(
   // shape uses { items: [...] }; some message endpoints use { messages: [...] }.
   // Accept any, and never return undefined (callers read .length / .map / .slice).
   const messages = resp.items ?? resp.data ?? resp.messages ?? []
+  const hasReturnedSessionId = Object.prototype.hasOwnProperty.call(
+    resp,
+    'session_id',
+  )
+  if (
+    options?.exact &&
+    hasReturnedSessionId &&
+    (typeof resp.session_id !== 'string' || resp.session_id !== sessionId)
+  ) {
+    const returned =
+      typeof resp.session_id === 'string' && resp.session_id.length > 0
+        ? resp.session_id
+        : 'invalid'
+    throw new ClaudeMessageIdentityError(sessionId, returned)
+  }
+  const metadata = messagePageMetadata(resp, messages.length)
   return {
     messages,
     source: 'gateway',
     ...(typeof resp.session_id === 'string'
       ? { resolvedSessionId: resp.session_id }
+      : options?.exact
+        ? { resolvedSessionId: sessionId }
+        : {}),
+    ...metadata,
+    // Exact Card-history reads are authoritative only with positive source
+    // evidence that the response was not silently bounded. Interactive legacy
+    // reads retain their prior best-effort metadata shape.
+    ...(options?.exact && metadata.truncated === undefined
+      ? { truncated: true }
       : {}),
-    ...messagePageMetadata(resp, messages.length),
   }
 }
 
@@ -452,7 +485,9 @@ function messagePageMetadata(
           ? value.hasMore
           : undefined
   const truncated =
-    total !== undefined && total > messageCount ? true : explicitTruncated
+    total === undefined
+      ? explicitTruncated
+      : total !== messageCount || explicitTruncated === true
   return {
     ...(total === undefined ? {} : { total }),
     ...(truncated === undefined ? {} : { truncated }),

@@ -4,8 +4,9 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 
-import { getMessagesResult } from './claude-api'
+import { ClaudeMessageIdentityError, getMessagesResult } from './claude-api'
 import { getLocalMessagesResult } from './local-session-store'
 import { sessionCardService } from './session-card-service'
 import type {
@@ -48,6 +49,12 @@ export type SessionCardHistoryMissingSegment = {
   segmentKey: string
   source?: string
   retryable: true
+  reason:
+    | 'source-unavailable'
+    | 'source-mismatch'
+    | 'identity-mismatch'
+    | 'source-incomplete'
+    | 'read-failed'
   error: string
 }
 
@@ -133,10 +140,6 @@ function normalizeLimit(limit: number | undefined): number {
     )
   }
   return Math.min(limit, MAX_HISTORY_LIMIT)
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
 
 type RetrievedSegmentSnapshot = {
@@ -251,22 +254,50 @@ function stableMessageId(
   )
 }
 
-function continuationMessageIdentity(
+function continuationMessageEvidence(
   message: SessionCardUpstreamMessage,
-): string | undefined {
-  // A matching timestamp makes a content match evidence of a cloned persisted
-  // row, not merely a user repeating the same text in a later turn.
-  if (typeof message.timestamp !== 'number') return undefined
+): Record<string, unknown> {
   // Compression can clone a retained prefix into the child with new database
-  // row IDs. Keep source-visible content and timestamps, but discard only the
-  // transport/session identities that change during that clone.
+  // row IDs. Discard only transport/session identities that change during the
+  // clone; role, content, timestamp, tool, and client identity remain evidence.
   const {
     id: _id,
     stableId: _stableId,
     session_id: _sessionId,
     ...value
   } = message
-  return JSON.stringify(value)
+  return value
+}
+
+function continuationMessagesMatch(
+  previous: SessionCardUpstreamMessage,
+  next: SessionCardUpstreamMessage,
+): boolean {
+  const previousEvidence = continuationMessageEvidence(previous)
+  const nextEvidence = continuationMessageEvidence(next)
+  if (!isDeepStrictEqual(previousEvidence, nextEvidence)) return false
+
+  const previousId = stableMessageId(previous)
+  const nextId = stableMessageId(next)
+  if (previousId && nextId && previousId === nextId) {
+    // An ID collision alone proves nothing. Require at least one independently
+    // matching message fact after transport identities are removed.
+    return Object.keys(previousEvidence).length > 0
+  }
+
+  const previousStableId = normalizedMessageId(previous.stableId)
+  const nextStableId = normalizedMessageId(next.stableId)
+  if (previousStableId || nextStableId) return false
+
+  // Persisted row IDs may change when a continuation clones its retained
+  // prefix. In that case require the full role/content/timestamp tuple.
+  return (
+    typeof previous.role === 'string' &&
+    previous.role.length > 0 &&
+    Object.prototype.hasOwnProperty.call(previous, 'content') &&
+    typeof previous.timestamp === 'number' &&
+    Number.isFinite(previous.timestamp)
+  )
 }
 
 function adjacentContinuationOverlap(
@@ -277,14 +308,11 @@ function adjacentContinuationOverlap(
   for (let overlap = max; overlap > 0; overlap -= 1) {
     let matches = true
     for (let index = 0; index < overlap; index += 1) {
-      const previousIdentity = continuationMessageIdentity(
-        previous[previous.length - overlap + index]!.message,
-      )
-      const nextIdentity = continuationMessageIdentity(next[index]!)
       if (
-        !previousIdentity ||
-        !nextIdentity ||
-        previousIdentity !== nextIdentity
+        !continuationMessagesMatch(
+          previous[previous.length - overlap + index]!.message,
+          next[index]!,
+        )
       ) {
         matches = false
         break
@@ -309,7 +337,6 @@ async function aggregateCardSegmentHistory(
   const messages: Array<SessionCardHistoryEntry> = []
   const missingSegments: Array<SessionCardHistoryMissingSegment> = []
   const retrievedSegments: Array<RetrievedSegmentSnapshot> = []
-  let previousLoadedBoundaryId: string | undefined
   let hasContiguousLoadedHistory = false
   let truncated = false
 
@@ -324,9 +351,9 @@ async function aggregateCardSegmentHistory(
         segmentKey,
         ...(source ? { source } : {}),
         retryable: true,
+        reason: 'source-unavailable',
         error: 'Validated segment source is unavailable.',
       })
-      previousLoadedBoundaryId = undefined
       hasContiguousLoadedHistory = false
       continue
     }
@@ -334,61 +361,71 @@ async function aggregateCardSegmentHistory(
     try {
       const fetchedBatch = await messageSource.getMessages(upstreamKey, source)
       if (fetchedBatch.source !== source) {
-        throw new Error(
-          `Session history source mismatch (${source} expected, ${fetchedBatch.source ?? 'missing'} received).`,
-        )
+        missingSegments.push({
+          segmentKey,
+          source,
+          retryable: true,
+          reason: 'source-mismatch',
+          error: 'Session history source did not match the requested segment.',
+        })
+        hasContiguousLoadedHistory = false
+        continue
       }
       // The source check plus the exact canonical key check is the complete
       // source-qualified identity. Neither half is safe on its own.
       if (fetchedBatch.resolvedSegmentKey !== upstreamKey) {
-        throw new Error(
-          `Session history segment mismatch (${upstreamKey} expected, ${fetchedBatch.resolvedSegmentKey ?? 'missing'} received).`,
-        )
+        missingSegments.push({
+          segmentKey,
+          source,
+          retryable: true,
+          reason: 'identity-mismatch',
+          error:
+            'Session history source returned a different segment identity.',
+        })
+        hasContiguousLoadedHistory = false
+        continue
       }
       const segmentMessages = [...fetchedBatch.messages]
       const batch = { ...fetchedBatch, messages: segmentMessages }
       retrievedSegments.push({ segmentKey, source, upstreamKey, batch })
       truncated ||= batch.truncated === true
 
-      const firstId = segmentMessages[0]
-        ? stableMessageId(segmentMessages[0])
-        : undefined
-      const startsWithBoundaryDuplicate = Boolean(
-        previousLoadedBoundaryId &&
-        firstId &&
-        previousLoadedBoundaryId === firstId,
-      )
       const overlap = hasContiguousLoadedHistory
         ? adjacentContinuationOverlap(messages, segmentMessages)
         : 0
-      const retained =
-        overlap > 0
-          ? segmentMessages.slice(overlap)
-          : startsWithBoundaryDuplicate
-            ? segmentMessages.slice(1)
-            : segmentMessages
+      const retained = segmentMessages.slice(overlap)
       for (const message of retained) {
         messages.push({ segmentKey, message })
       }
 
-      // A successfully loaded empty segment does not create a history gap, so
-      // keep the last stable nonempty boundary for the next available segment.
-      if (segmentMessages.length > 0) {
-        previousLoadedBoundaryId = stableMessageId(
-          segmentMessages[segmentMessages.length - 1]!,
-        )
+      if (batch.truncated === true) {
+        missingSegments.push({
+          segmentKey,
+          source,
+          retryable: true,
+          reason: 'source-incomplete',
+          error: 'Session history segment is incomplete at its source.',
+        })
+        // The retained rows are still useful, but their final boundary is not
+        // authoritative and cannot be used to collapse the next continuation.
+        hasContiguousLoadedHistory = false
+      } else {
+        // A successfully loaded empty segment does not create a history gap.
+        hasContiguousLoadedHistory = true
       }
-      hasContiguousLoadedHistory = true
     } catch (error) {
+      const identityMismatch = error instanceof ClaudeMessageIdentityError
       missingSegments.push({
         segmentKey,
         source,
         retryable: true,
-        error: errorMessage(error),
+        reason: identityMismatch ? 'identity-mismatch' : 'read-failed',
+        error: identityMismatch
+          ? 'Session history source returned a different segment identity.'
+          : 'Session history segment could not be read.',
       })
       // A failed segment makes adjacent-boundary identity unprovable. Never
       // de-duplicate across that gap or replace the aggregate with the tip.
-      previousLoadedBoundaryId = undefined
       hasContiguousLoadedHistory = false
     }
   }

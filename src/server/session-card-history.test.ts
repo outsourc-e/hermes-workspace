@@ -194,12 +194,12 @@ describe('SessionCardHistoryService', () => {
     ])
   })
 
-  it('removes exactly one adjacent boundary message when its nonempty stable ID matches', async () => {
+  it('retains colliding boundary IDs when role or content evidence differs', async () => {
     const messages = source({
-      first: [{ id: 'boundary', content: 'original' }],
+      first: [{ id: 'boundary', role: 'user', content: 'original' }],
       second: [
-        { id: 'boundary', content: 'repeated boundary' },
-        { id: 'boundary', content: 'same ID again inside segment' },
+        { id: 'boundary', role: 'user', content: 'different content' },
+        { id: 'boundary', role: 'assistant', content: 'original' },
         { id: '', content: 'empty ID text' },
       ],
       third: [{ id: '', content: 'empty ID text' }],
@@ -214,9 +214,102 @@ describe('SessionCardHistoryService', () => {
 
     expect(result.messages.map((entry) => entry.message.content)).toEqual([
       'original',
-      'same ID again inside segment',
+      'different content',
+      'original',
       'empty ID text',
       'empty ID text',
+    ])
+  })
+
+  it('removes an exact adjacent boundary duplicate with matching evidence', async () => {
+    const messages = source({
+      first: [
+        {
+          id: 'boundary',
+          role: 'assistant',
+          content: 'same response',
+          timestamp: 10,
+        },
+      ],
+      second: [
+        {
+          id: 'boundary',
+          role: 'assistant',
+          content: 'same response',
+          timestamp: 10,
+        },
+        { id: 'retained', role: 'user', content: 'next', timestamp: 11 },
+      ],
+      third: [],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => chain()),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'first' })
+
+    expect(result.messages.map((entry) => entry.message.id)).toEqual([
+      'boundary',
+      'retained',
+    ])
+  })
+
+  it('retains a colliding ID when the timestamp differs', async () => {
+    const messages = source({
+      first: [{ id: 'boundary', role: 'user', content: 'same', timestamp: 10 }],
+      second: [
+        { id: 'boundary', role: 'user', content: 'same', timestamp: 11 },
+      ],
+      third: [],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => chain()),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'first' })
+
+    expect(result.messages.map((entry) => entry.message.timestamp)).toEqual([
+      10, 11,
+    ])
+  })
+
+  it('retains otherwise matching boundary rows when client identity differs', async () => {
+    const messages = source({
+      first: [
+        {
+          id: 'boundary',
+          clientId: 'client-a',
+          role: 'user',
+          content: 'same',
+          timestamp: 10,
+        },
+      ],
+      second: [
+        {
+          id: 'boundary',
+          clientId: 'client-b',
+          role: 'user',
+          content: 'same',
+          timestamp: 10,
+        },
+      ],
+      third: [],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => chain()),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'first' })
+
+    expect(result.messages.map((entry) => entry.message.clientId)).toEqual([
+      'client-a',
+      'client-b',
     ])
   })
 
@@ -258,13 +351,20 @@ describe('SessionCardHistoryService', () => {
     ])
   })
 
-  it('deduplicates across successful empty segments using the last nonempty boundary', async () => {
+  it('deduplicates exact overlap across successful empty continuation segments', async () => {
     const messages = source({
-      first: [{ id: 'boundary', content: 'original' }],
+      first: [
+        { id: 'boundary', role: 'user', content: 'original', timestamp: 10 },
+      ],
       second: [],
       third: [
-        { id: 'boundary', content: 'repeated boundary' },
-        { id: 'retained', content: 'retained' },
+        { id: 'boundary', role: 'user', content: 'original', timestamp: 10 },
+        {
+          id: 'retained',
+          role: 'assistant',
+          content: 'retained',
+          timestamp: 11,
+        },
       ],
     })
     const history = new SessionCardHistoryService({
@@ -331,11 +431,25 @@ describe('SessionCardHistoryService', () => {
     expect(result).toMatchObject({ completeness: 'partial', retryable: true })
   })
 
-  it('falls back to a nonempty id when stableId is blank at a segment boundary', async () => {
+  it('falls back to a nonempty id when stableId is blank and all boundary evidence matches', async () => {
     const messages = source({
-      first: [{ stableId: 'boundary', id: 'first-id', content: 'original' }],
+      first: [
+        {
+          stableId: 'boundary',
+          id: 'first-id',
+          role: 'user',
+          content: 'original',
+          timestamp: 10,
+        },
+      ],
       second: [
-        { stableId: ' ', id: 'boundary', content: 'repeated boundary' },
+        {
+          stableId: ' ',
+          id: 'boundary',
+          role: 'user',
+          content: 'original',
+          timestamp: 10,
+        },
         { id: 'second-message', content: 'retained' },
       ],
       third: [],
@@ -475,7 +589,8 @@ describe('SessionCardHistoryService', () => {
           segmentKey: 'remote:second',
           source: 'remote',
           retryable: true,
-          error: 'temporarily unavailable',
+          reason: 'read-failed',
+          error: 'Session history segment could not be read.',
         },
       ],
     })
@@ -514,11 +629,11 @@ describe('SessionCardHistoryService', () => {
       missingSegments: [
         expect.objectContaining({
           segmentKey: 'remote:first',
-          error: 'root unavailable',
+          reason: 'read-failed',
         }),
         expect.objectContaining({
           segmentKey: 'remote:second',
-          error: 'middle unavailable',
+          reason: 'read-failed',
         }),
       ],
     })
@@ -554,6 +669,15 @@ describe('SessionCardHistoryService', () => {
     expect(result.messages[0]?.message.id).toBe('message-1')
     expect(result.messages[99]?.message.id).toBe('message-100')
     expect(result).toMatchObject({ completeness: 'partial', retryable: true })
+    expect(result.missingSegments).toEqual([
+      {
+        segmentKey: 'remote:only',
+        source: 'remote',
+        retryable: true,
+        reason: 'source-incomplete',
+        error: 'Session history segment is incomplete at its source.',
+      },
+    ])
     expect(result.nextCursor).toBeUndefined()
   })
 
@@ -920,7 +1044,10 @@ describe('SessionCardHistoryService', () => {
     expect(result.messages).toEqual([])
     expect(result).toMatchObject({ completeness: 'partial', retryable: true })
     expect(result.missingSegments).toHaveLength(3)
-    expect(result.missingSegments[0]?.error).toMatch(/segment.*missing/i)
+    expect(result.missingSegments[0]).toMatchObject({
+      reason: 'identity-mismatch',
+      error: 'Session history source returned a different segment identity.',
+    })
     expect(result.nextCursor).toBeUndefined()
   })
 

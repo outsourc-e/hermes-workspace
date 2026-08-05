@@ -3,7 +3,8 @@ import { join } from 'node:path'
 
 const DATA_DIR = join(process.cwd(), '.runtime')
 const SESSIONS_FILE = join(DATA_DIR, 'local-sessions.json')
-const MAX_MESSAGES_PER_SESSION = 500
+const MAX_HOT_MESSAGES_PER_SESSION = 500
+const MAX_RETAINED_MESSAGES_PER_SESSION = 5_000
 
 export type LocalSession = {
   id: string
@@ -41,11 +42,13 @@ export type LocalMessagesResult = {
 
 type StoreData = {
   sessions: Partial<Record<string, LocalSession>>
+  /** Older retained rows, ordered before the bounded hot message window. */
+  archive: Record<string, Array<LocalMessage>>
   messages: Record<string, Array<LocalMessage>>
   history: Record<string, LocalHistoryState>
 }
 
-let store: StoreData = { sessions: {}, messages: {}, history: {} }
+let store: StoreData = { sessions: {}, archive: {}, messages: {}, history: {} }
 
 function loadFromDisk(): void {
   try {
@@ -60,32 +63,65 @@ function loadFromDisk(): void {
           candidate.messages &&
           typeof candidate.messages === 'object'
         ) {
-          const messages = candidate.messages
+          const persistedMessages = candidate.messages
+          const persistedArchive =
+            candidate.archive && typeof candidate.archive === 'object'
+              ? candidate.archive
+              : {}
           const persistedHistory =
             candidate.history && typeof candidate.history === 'object'
               ? candidate.history
               : {}
+          const archive: StoreData['archive'] = {}
+          const messages: StoreData['messages'] = {}
           const history: StoreData['history'] = {}
-          for (const [sessionId, retainedMessages] of Object.entries(
-            messages,
-          )) {
+          const sessionIds = new Set([
+            ...Object.keys(persistedMessages),
+            ...Object.keys(persistedArchive),
+          ])
+          for (const sessionId of sessionIds) {
+            const hotMessages = Array.isArray(persistedMessages[sessionId])
+              ? persistedMessages[sessionId]
+              : []
+            const archivedMessages = Array.isArray(persistedArchive[sessionId])
+              ? persistedArchive[sessionId]
+              : []
+            const allRetained = [...archivedMessages, ...hotMessages]
+            const exceededRetentionLimit =
+              allRetained.length > MAX_RETAINED_MESSAGES_PER_SESSION
+            const retainedMessages = exceededRetentionLimit
+              ? allRetained.slice(-MAX_RETAINED_MESSAGES_PER_SESSION)
+              : allRetained
+            const hotStart = Math.max(
+              0,
+              retainedMessages.length - MAX_HOT_MESSAGES_PER_SESSION,
+            )
+            archive[sessionId] = retainedMessages.slice(0, hotStart)
+            messages[sessionId] = retainedMessages.slice(hotStart)
             const persisted = persistedHistory[sessionId]
-            history[sessionId] =
+            const hasValidPersistedHistory = Boolean(
               persisted &&
               Number.isSafeInteger(persisted.generation) &&
               persisted.generation >= 0 &&
-              typeof persisted.truncated === 'boolean'
-                ? persisted
-                : {
-                    generation: retainedMessages.length,
-                    // A legacy full window cannot prove that no older row was
-                    // evicted, so migrate it conservatively as truncated.
-                    truncated:
-                      retainedMessages.length >= MAX_MESSAGES_PER_SESSION,
-                  }
+              typeof persisted.truncated === 'boolean',
+            )
+            history[sessionId] = {
+              generation: hasValidPersistedHistory
+                ? Math.max(persisted!.generation, allRetained.length)
+                : allRetained.length,
+              // A legacy full hot window cannot prove that no older row was
+              // evicted. Preserve every row but migrate it fail-closed.
+              truncated:
+                exceededRetentionLimit ||
+                (hasValidPersistedHistory
+                  ? persisted!.truncated
+                  : archivedMessages.length === 0 &&
+                    hotMessages.length >= MAX_HOT_MESSAGES_PER_SESSION),
+            }
           }
           store = {
             sessions: candidate.sessions,
+            archive,
             messages,
             history,
           }
@@ -135,6 +171,7 @@ export function ensureLocalSession(
       messageCount: 0,
     }
     store.sessions[sessionId] = session
+    store.archive[sessionId] = []
     store.messages[sessionId] = []
     store.history[sessionId] = { generation: 0, truncated: false }
     saveToDisk()
@@ -146,10 +183,12 @@ export function ensureLocalSession(
     saveToDisk()
   }
   store.history[sessionId] ??= {
-    generation: store.messages[sessionId]?.length ?? 0,
-    truncated:
-      (store.messages[sessionId]?.length ?? 0) >= MAX_MESSAGES_PER_SESSION,
+    generation:
+      (store.archive[sessionId]?.length ?? 0) +
+      (store.messages[sessionId]?.length ?? 0),
+    truncated: false,
   }
+  store.archive[sessionId] ??= []
   return session
 }
 
@@ -172,20 +211,24 @@ export function touchLocalSession(sessionId: string): void {
 
 export function deleteLocalSession(sessionId: string): void {
   delete store.sessions[sessionId]
+  delete store.archive[sessionId]
   delete store.messages[sessionId]
   delete store.history[sessionId]
   saveToDisk()
 }
 
 export function getLocalMessages(sessionId: string): Array<LocalMessage> {
-  return store.messages[sessionId] ?? []
+  return [
+    ...(store.archive[sessionId] ?? []),
+    ...(store.messages[sessionId] ?? []),
+  ]
 }
 
 export function getLocalMessagesResult(sessionId: string): LocalMessagesResult {
-  const messages = [...(store.messages[sessionId] ?? [])]
+  const messages = getLocalMessages(sessionId)
   const state = store.history[sessionId] ?? {
     generation: messages.length,
-    truncated: messages.length >= MAX_MESSAGES_PER_SESSION,
+    truncated: false,
   }
   return {
     messages,
@@ -214,7 +257,7 @@ export function searchLocalSessions(
 
   for (const session of sessions) {
     const title = session.title || ''
-    const messages = store.messages[session.id] ?? []
+    const messages = getLocalMessages(session.id)
     const matchingMessage = messages.find((message) =>
       message.content.toLowerCase().includes(normalized),
     )
@@ -240,20 +283,25 @@ export function appendLocalMessage(
 ): void {
   const session = ensureLocalSession(sessionId)
   const messages = store.messages[sessionId] ?? []
+  const archive = (store.archive[sessionId] ??= [])
   store.messages[sessionId] = messages
   messages.push(message)
   const history = (store.history[sessionId] ??= {
-    generation: messages.length - 1,
+    generation: archive.length + messages.length - 1,
     truncated: false,
   })
   history.generation += 1
-  if (store.messages[sessionId].length > MAX_MESSAGES_PER_SESSION) {
-    history.truncated = true
-    store.messages[sessionId] = store.messages[sessionId].slice(
-      -MAX_MESSAGES_PER_SESSION,
+  if (messages.length > MAX_HOT_MESSAGES_PER_SESSION) {
+    archive.push(
+      ...messages.splice(0, messages.length - MAX_HOT_MESSAGES_PER_SESSION),
     )
   }
-  session.messageCount = store.messages[sessionId].length
+  const retainedCount = archive.length + messages.length
+  if (retainedCount > MAX_RETAINED_MESSAGES_PER_SESSION) {
+    history.truncated = true
+    archive.splice(0, retainedCount - MAX_RETAINED_MESSAGES_PER_SESSION)
+  }
+  session.messageCount = history.generation
   session.updatedAt = Date.now()
   scheduleSave()
 }

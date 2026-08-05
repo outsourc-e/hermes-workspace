@@ -309,6 +309,92 @@ describe('Session Card adapter foundations', () => {
     ])
   })
 
+  it('binds an omitted gateway session_id only for an exact requested-segment read', async () => {
+    gatewayMocks.getCapabilities.mockReturnValue(
+      capabilities({ dashboard: { available: false, url: 'offline' } }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              object: 'list',
+              data: [{ id: 'persisted-message', role: 'user' }],
+              truncated: false,
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+        ),
+      ),
+    )
+
+    await expect(
+      getMessagesResult('requested-segment', 'gateway', { exact: true }),
+    ).resolves.toEqual({
+      messages: [{ id: 'persisted-message', role: 'user' }],
+      source: 'gateway',
+      resolvedSessionId: 'requested-segment',
+      truncated: false,
+    })
+    await expect(
+      getMessagesResult('requested-segment', 'gateway'),
+    ).resolves.toEqual({
+      messages: [{ id: 'persisted-message', role: 'user' }],
+      source: 'gateway',
+      truncated: false,
+    })
+  })
+
+  it('rejects an explicitly conflicting gateway session_id for an exact segment read', async () => {
+    gatewayMocks.getCapabilities.mockReturnValue(
+      capabilities({ dashboard: { available: false, url: 'offline' } }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            object: 'list',
+            session_id: 'different-segment',
+            data: [{ id: 'wrong-message', role: 'assistant' }],
+            truncated: false,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    )
+
+    await expect(
+      getMessagesResult('requested-segment', 'gateway', { exact: true }),
+    ).rejects.toThrow(/requested-segment.*different-segment/)
+  })
+
+  it('marks an exact gateway response partial when the source gives no completeness evidence', async () => {
+    gatewayMocks.getCapabilities.mockReturnValue(
+      capabilities({ dashboard: { available: false, url: 'offline' } }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            object: 'list',
+            data: [{ id: 'bounded-message', role: 'assistant' }],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    )
+
+    await expect(
+      getMessagesResult('requested-segment', 'gateway', { exact: true }),
+    ).resolves.toMatchObject({
+      resolvedSessionId: 'requested-segment',
+      truncated: true,
+    })
+  })
+
   it('marks a 100-row gateway message page incomplete when the returned total is 150', async () => {
     gatewayMocks.getCapabilities.mockReturnValue(
       capabilities({ dashboard: { available: false, url: 'offline' } }),
