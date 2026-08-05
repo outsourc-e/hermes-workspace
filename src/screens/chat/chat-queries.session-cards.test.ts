@@ -22,6 +22,11 @@ import {
   updateSessionCardMetadata,
 } from './chat-queries'
 import { isWholeCardBranchAvailable } from './types'
+import {
+  readCardTranscriptRecovery,
+  replaceCardTranscriptRecoveryMessages,
+} from './card-transcript-recovery'
+import type { SessionCardHistoryResponse } from './chat-queries'
 import type { SessionCard } from './types'
 
 const card = {
@@ -1762,6 +1767,164 @@ describe('Session Card fetchers', () => {
       canonicalSegmentKey: 'remote:next',
       messages: [{ id: 'optimistic' }, { id: 'server' }],
     })
+    queryClient.clear()
+  })
+
+  it('moves the persisted baseline so a partial successor refetch keeps prior segments', () => {
+    const queryClient = new QueryClient()
+    const sourceKey = sessionCardQueryKeys.history('remote:root', 'remote:tip')
+    const targetKey = sessionCardQueryKeys.history('remote:root', 'remote:next')
+    const sourcePersisted = {
+      id: 'source-persisted',
+      role: 'assistant' as const,
+      content: [{ type: 'text' as const, text: 'source history' }],
+      __segmentKey: 'remote:tip',
+    }
+    const targetPersisted = {
+      id: 'target-persisted',
+      role: 'assistant' as const,
+      content: [{ type: 'text' as const, text: 'target history' }],
+      __segmentKey: 'remote:next',
+    }
+    queryClient.setQueryData(sourceKey, {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [sourcePersisted],
+      persistedMessages: [sourcePersisted],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    } satisfies SessionCardHistoryResponse)
+    queryClient.setQueryData(targetKey, {
+      sessionKey: 'remote:next',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:next',
+      messages: [targetPersisted],
+      persistedMessages: [targetPersisted],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: 'remote:tip',
+          retryable: true,
+          error: 'temporarily unavailable',
+        },
+      ],
+    } satisfies SessionCardHistoryResponse)
+
+    expect(
+      moveSessionCardHistoryMessages(
+        queryClient,
+        {
+          cardId: 'remote:root',
+          fromSegmentKey: 'remote:tip',
+          canonicalSegmentKey: 'remote:next',
+          runId: 'run-1',
+        },
+        card,
+        [card],
+      ),
+    ).toBe(true)
+
+    const moved =
+      queryClient.getQueryData<SessionCardHistoryResponse>(targetKey)!
+    expect(moved.persistedMessages).toEqual([sourcePersisted, targetPersisted])
+    const partialRefetch = reconcileSessionCardHistoryResponse(
+      {
+        sessionKey: 'remote:next',
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:next',
+        messages: [targetPersisted],
+        persistedMessages: [targetPersisted],
+        completeness: 'partial',
+        retryable: true,
+        missingSegments: [
+          {
+            segmentKey: 'remote:tip',
+            retryable: true,
+            error: 'temporarily unavailable',
+          },
+        ],
+      },
+      {
+        previous: moved,
+        continuationSegmentKeys: ['remote:tip', 'remote:next'],
+        recoveryMessages: [],
+      },
+    )
+    expect(partialRefetch.persistedMessages).toEqual([
+      sourcePersisted,
+      targetPersisted,
+    ])
+    expect(partialRefetch.messages).toEqual([sourcePersisted, targetPersisted])
+    queryClient.clear()
+  })
+
+  it('does not advance Card history when recovery persistence cannot move', () => {
+    const queryClient = new QueryClient()
+    const sourceKey = sessionCardQueryKeys.history('remote:root', 'remote:tip')
+    const targetKey = sessionCardQueryKeys.history('remote:root', 'remote:next')
+    const records = new Map<string, string>()
+    const storage: Storage = {
+      get length() {
+        return records.size
+      },
+      clear: () => records.clear(),
+      getItem: (key) => records.get(key) ?? null,
+      key: (index) => [...records.keys()][index] ?? null,
+      removeItem: (key) => {
+        records.delete(key)
+      },
+      setItem: (key, value) => {
+        if (key.includes(encodeURIComponent('remote:next'))) {
+          throw new DOMException('Quota exceeded', 'QuotaExceededError')
+        }
+        records.set(key, value)
+      },
+    }
+    const overlay = {
+      role: 'user' as const,
+      content: [{ type: 'text' as const, text: 'must survive' }],
+      clientId: 'client-recovery',
+    }
+    replaceCardTranscriptRecoveryMessages(
+      { cardId: 'remote:root', canonicalSegmentKey: 'remote:tip' },
+      [overlay],
+      { storage, now: 100 },
+    )
+    queryClient.setQueryData(sourceKey, {
+      sessionKey: 'remote:tip',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [overlay],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [],
+    } satisfies SessionCardHistoryResponse)
+
+    expect(
+      moveSessionCardHistoryMessages(
+        queryClient,
+        {
+          cardId: 'remote:root',
+          fromSegmentKey: 'remote:tip',
+          canonicalSegmentKey: 'remote:next',
+          runId: 'run-1',
+        },
+        card,
+        [card],
+        { recoveryStorage: storage, now: 100 },
+      ),
+    ).toBe(false)
+    expect(queryClient.getQueryData(sourceKey)).toBeDefined()
+    expect(queryClient.getQueryData(targetKey)).toBeUndefined()
+    expect(
+      readCardTranscriptRecovery(
+        { cardId: 'remote:root', canonicalSegmentKey: 'remote:tip' },
+        { storage, now: 100 },
+      )?.messages,
+    ).toEqual([overlay])
     queryClient.clear()
   })
 

@@ -25,11 +25,11 @@
 ### 1.1 Chat Screen (`/chat`, `/chat/$sessionKey`)
 
 - **Real-time SSE streaming** with tool call rendering
-- **Multi-session management** — create, rename, delete, fork sessions
+- **Session Card management** — create, rename, archive, and branch stable Cards while backend continuation segments remain internal
 - **Dual chat backend modes:**
   - **Enhanced Claude** — full session API with persistent history via Hermes Agent gateway
   - **Portable** — OpenAI-compatible `/v1/chat/completions` (works with Ollama, LM Studio, vLLM, etc.)
-- **Chat sidebar** — session list with search, pin, rename, delete dialogs
+- **Chat sidebar** — Session Card list with search, pin, rename, and archive dialogs
 - **Message rendering:**
   - Markdown with GFM support (`react-markdown` + `remark-gfm` + `remark-breaks`)
   - Syntax highlighting via Shiki
@@ -42,13 +42,13 @@
   - File attachment support (images via base64, multimodal content)
   - Voice input (Web Speech API)
   - Context meter showing token usage percentage
-- **Session management features:**
-  - Auto-generated session titles
-  - Session forking
-  - Session search across history
-  - Pinned sessions
-  - Session tombstones for deleted session cleanup
-- **Inspector panel** — sidebar showing session activity, memory, and skills
+- **Session Card management features:**
+  - Auto-generated Card titles
+  - Card branching
+  - Card search across history
+  - Pinned Cards
+  - Card archive metadata
+- **Inspector panel** — sidebar showing Card activity, memory, and skills
 - **Research card** — embedded research display
 - **Connection status messaging** — real-time gateway connectivity indicators
 - **Scroll-to-bottom button** for long conversations
@@ -136,17 +136,17 @@
 | `/api/events`        | GET    | Global SSE event bus (keepalive, real-time updates)                              |
 | `/api/history`       | GET    | Chat history retrieval                                                           |
 
-### 2.2 Sessions
+### 2.2 Session Cards and internal session controls
 
-| Endpoint                               | Method | Description                           |
-| -------------------------------------- | ------ | ------------------------------------- |
-| `/api/sessions`                        | GET    | List all sessions (paginated, max 50) |
-| `/api/sessions`                        | POST   | Create new session                    |
-| `/api/sessions`                        | PATCH  | Update session (rename)               |
-| `/api/sessions`                        | DELETE | Delete session                        |
-| `/api/sessions/$sessionKey/status`     | GET    | Session status                        |
-| `/api/sessions/$sessionKey/active-run` | GET    | Active run for session                |
-| `/api/session-status`                  | GET    | Session connection status             |
+| Endpoint                               | Method | Description                                                         |
+| -------------------------------------- | ------ | ------------------------------------------------------------------- |
+| `/api/sessions`                        | GET    | List all sessions (paginated, max 50)                               |
+| `/api/sessions`                        | POST   | Create new session                                                  |
+| `/api/sessions`                        | PATCH  | Update session (rename)                                             |
+| `/api/sessions`                        | DELETE | Delete session                                                      |
+| `/api/sessions/$sessionKey/status`     | GET    | Session status                                                      |
+| `/api/sessions/$sessionKey/active-run` | GET    | Active run for session                                              |
+| `/api/session-status?cardId=...`       | GET    | Validated Card-scoped state and usage projection in `payload.cards` |
 
 ### 2.3 Files
 
@@ -160,13 +160,13 @@
 
 ### 2.4 Memory
 
-| Endpoint             | Method | Description                      |
-| -------------------- | ------ | -------------------------------- |
-| `/api/memory`        | GET    | Get memory from Hermes Agent gateway   |
-| `/api/memory/list`   | GET    | List local memory markdown files |
-| `/api/memory/read`   | GET    | Read specific memory file        |
-| `/api/memory/search` | GET    | Search across memory files       |
-| `/api/memory/write`  | POST   | Write/update memory file         |
+| Endpoint             | Method | Description                          |
+| -------------------- | ------ | ------------------------------------ |
+| `/api/memory`        | GET    | Get memory from Hermes Agent gateway |
+| `/api/memory/list`   | GET    | List local memory markdown files     |
+| `/api/memory/read`   | GET    | Read specific memory file            |
+| `/api/memory/search` | GET    | Search across memory files           |
+| `/api/memory/write`  | POST   | Write/update memory file             |
 
 ### 2.5 Skills
 
@@ -211,7 +211,7 @@
 | `/api/connection-status` | GET    | Gateway connection status with capabilities   |
 | `/api/gateway-status`    | GET    | Detailed gateway capabilities                 |
 | `/api/start-agent`       | POST   | Auto-start Claude agent process               |
-| `/api/start-claude`      | POST   | Start Hermes Agent gateway                          |
+| `/api/start-claude`      | POST   | Start Hermes Agent gateway                    |
 | `/api/workspace`         | GET    | Workspace auto-detection                      |
 
 ### 2.10 OAuth
@@ -326,7 +326,7 @@
 
 | Setting                   | Type                            | Default  | Description                 |
 | ------------------------- | ------------------------------- | -------- | --------------------------- |
-| `claudeUrl`               | string                          | `''`     | Hermes Agent API URL              |
+| `claudeUrl`               | string                          | `''`     | Hermes Agent API URL        |
 | `claudeToken`             | string                          | `''`     | Bearer token                |
 | `theme`                   | `system\|light\|dark`           | `system` | Color mode                  |
 | `accentColor`             | `orange\|purple\|blue\|green`   | `blue`   | Accent color                |

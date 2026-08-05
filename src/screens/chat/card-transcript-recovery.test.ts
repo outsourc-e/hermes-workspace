@@ -186,6 +186,24 @@ describe('Card transcript recovery storage contract', () => {
     ).toBe(false)
   })
 
+  it('retains repeated terminal messages with conflicting stable identities', () => {
+    const first = message('assistant', 'Done.', {
+      id: 'server-assistant-1',
+      timestamp: now,
+    })
+    const second = message('assistant', 'Done.', {
+      id: 'server-assistant-2',
+      timestamp: now + 1_000,
+    })
+
+    expect(cardTranscriptMessagesMatch(first, second)).toBe(false)
+    replaceCardTranscriptRecoveryMessages(owner, [first, second], { now })
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      first,
+      second,
+    ])
+  })
+
   it('merges persisted history first and removes only authoritative echoes', () => {
     const persisted = message('assistant', 'persisted', { id: 'server-1' })
     const acknowledged = message('user', 'accepted locally', {

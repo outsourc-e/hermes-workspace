@@ -1405,6 +1405,8 @@ export function AgentViewPanel({
                   <OrchestratorCard
                     compact={false}
                     activityAvailable={activeCardActivityAvailable}
+                    cardId={resolvedActiveCard?.cardId}
+                    displayTitle={resolvedActiveCard?.title}
                   />
 
                   <section className="rounded-2xl bg-primary-200/15 p-1">

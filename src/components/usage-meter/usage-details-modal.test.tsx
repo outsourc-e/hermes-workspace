@@ -84,7 +84,7 @@ describe('UsageDetailsModal Card projection', () => {
     })
 
     expect(screen.getByText('Customer launch plan')).toBeTruthy()
-    expect(screen.getByText('Card ID: card:operator-17')).toBeTruthy()
+    expect(document.body.textContent).not.toContain('card:operator-17')
     expect(screen.getByText('Remote · Running')).toBeTruthy()
     expect(document.body.textContent).not.toContain('Session history')
     expect(document.body.textContent).not.toContain('raw-session-secret')
@@ -105,4 +105,19 @@ describe('UsageDetailsModal Card projection', () => {
     expect(csv).not.toContain('Segment')
     expect(csv).not.toContain('raw-session-secret')
   })
+
+  it.each(['=1+1', '+SUM(1,2)', '-2+3', '@HYPERLINK("https://bad")'])(
+    'neutralizes spreadsheet formulas that start with %s',
+    (formula) => {
+      const csv = buildUsageCsv({
+        ...usage,
+        models: [{ ...usage.models[0]!, model: formula }],
+        cards: [{ ...usage.cards[0]!, title: `  ${formula}`, model: formula }],
+      })
+
+      expect(csv).toContain(`'${formula.replaceAll('"', '""')}`)
+      expect(csv).toContain(`'  ${formula.replaceAll('"', '""')}`)
+      expect(csv).not.toMatch(/(?:^|,)[ \t]*[=+\-@]/m)
+    },
+  )
 })

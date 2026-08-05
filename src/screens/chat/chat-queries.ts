@@ -1557,6 +1557,7 @@ export function moveSessionCardHistoryMessages(
   handoff: SessionCardHandoffTransition,
   activeCard: SessionCardHandoffAuthority,
   sessionCards: ReadonlyArray<SessionCard> = [],
+  options: { recoveryStorage?: Storage; now?: number } = {},
 ): boolean {
   const { cardId, fromSegmentKey, canonicalSegmentKey } = handoff
   if (
@@ -1569,10 +1570,24 @@ export function moveSessionCardHistoryMessages(
   ) {
     return false
   }
-  moveCardTranscriptRecovery(
-    { cardId, canonicalSegmentKey: fromSegmentKey },
-    { cardId, canonicalSegmentKey },
-  )
+  const fromRecoveryOwner = {
+    cardId,
+    canonicalSegmentKey: fromSegmentKey,
+  }
+  const toRecoveryOwner = { cardId, canonicalSegmentKey }
+  const sourceRecovery = readCardTranscriptRecovery(fromRecoveryOwner, {
+    storage: options.recoveryStorage,
+    now: options.now,
+  })
+  if (
+    sourceRecovery &&
+    !moveCardTranscriptRecovery(fromRecoveryOwner, toRecoveryOwner, {
+      storage: options.recoveryStorage,
+      now: options.now,
+    })
+  ) {
+    return false
+  }
   const fromKey = sessionCardQueryKeys.history(cardId, fromSegmentKey)
   const toKey = sessionCardQueryKeys.history(cardId, canonicalSegmentKey)
   const fromData = queryClient.getQueryData<SessionCardHistoryResponse>(fromKey)
@@ -1587,6 +1602,10 @@ export function moveSessionCardHistoryMessages(
     messages: mergeCardHistoryMessages(
       fromData.messages,
       toData?.messages ?? [],
+    ),
+    persistedMessages: mergeCardHistoryMessages(
+      persistedCardHistoryMessages(fromData),
+      toData ? persistedCardHistoryMessages(toData) : [],
     ),
   } satisfies SessionCardHistoryResponse)
   queryClient.removeQueries({ queryKey: fromKey, exact: true })

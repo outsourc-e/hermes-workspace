@@ -49,17 +49,6 @@ export type GatewaySessionsResponse = {
   sessions?: Array<GatewaySession>
 }
 
-export type GatewaySessionStatusResponse = {
-  status?: string
-  progress?: number
-  model?: string
-  tokenCount?: number
-  totalTokens?: number
-  usage?: GatewaySessionUsage
-  error?: string
-  [key: string]: unknown
-}
-
 export type GatewayModelCatalogEntry =
   | string
   | {
@@ -229,29 +218,6 @@ export async function fetchSessions(): Promise<GatewaySessionsResponse> {
     throw new Error('Session API returned an unexpected response shape')
   }
   return payload
-}
-
-export async function fetchSessionStatus(
-  key: string,
-): Promise<GatewaySessionStatusResponse> {
-  const response = await fetch(
-    makeEndpoint(`/api/session-status?key=${encodeURIComponent(key)}`),
-  )
-  if (!response.ok) {
-    throw new Error(await readError(response))
-  }
-
-  const payload: unknown = await response.json()
-  const normalized =
-    payload &&
-    typeof payload === 'object' &&
-    'payload' in payload &&
-    payload.payload &&
-    typeof payload.payload === 'object'
-      ? payload.payload
-      : payload
-
-  return normalized as GatewaySessionStatusResponse
 }
 
 export async function fetchModels(): Promise<GatewayModelsResponse> {

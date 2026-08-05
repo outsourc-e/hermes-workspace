@@ -41,8 +41,8 @@ type Message = {
   [key: string]: unknown
 }
 
-type SessionDismissal = {
-  sessionKey: string
+type CardDismissal = {
+  cardId: string
   timestamp: number
 }
 
@@ -131,21 +131,22 @@ function setLastShownTimestamp() {
   }
 }
 
-function getSessionDismissals(): Array<SessionDismissal> {
+function getCardDismissals(): Array<CardDismissal> {
   try {
-    const stored = localStorage.getItem('modelSuggestionSessionDismissals')
+    localStorage.removeItem('modelSuggestionSessionDismissals')
+    const stored = localStorage.getItem('modelSuggestionCardDismissals')
     return stored ? JSON.parse(stored) : []
   } catch {
     return []
   }
 }
 
-function addSessionDismissal(sessionKey: string) {
+function addCardDismissal(cardId: string) {
   try {
-    const dismissals = getSessionDismissals()
-    dismissals.push({ sessionKey, timestamp: Date.now() })
+    const dismissals = getCardDismissals()
+    dismissals.push({ cardId, timestamp: Date.now() })
     localStorage.setItem(
-      'modelSuggestionSessionDismissals',
+      'modelSuggestionCardDismissals',
       JSON.stringify(dismissals),
     )
   } catch {
@@ -153,14 +154,14 @@ function addSessionDismissal(sessionKey: string) {
   }
 }
 
-function isSessionDismissed(sessionKey: string): boolean {
-  const dismissals = getSessionDismissals()
-  return dismissals.some((d) => d.sessionKey === sessionKey)
+function isCardDismissed(cardId: string): boolean {
+  const dismissals = getCardDismissals()
+  return dismissals.some((d) => d.cardId === cardId)
 }
 
 export function useModelSuggestions(_opts: {
   currentModel: string
-  sessionKey: string
+  cardId: string
   messages: Array<Message>
   availableModels: Array<string>
 }) {
@@ -177,12 +178,12 @@ export function useModelSuggestions(_opts: {
 
 function _useModelSuggestionsDisabled({
   currentModel,
-  sessionKey,
+  cardId,
   messages,
   availableModels,
 }: {
   currentModel: string
-  sessionKey: string
+  cardId: string
   messages: Array<Message>
   availableModels: Array<string>
 }) {
@@ -209,7 +210,7 @@ function _useModelSuggestionsDisabled({
     }
 
     // Session dismissed
-    if (isSessionDismissed(sessionKey)) {
+    if (isCardDismissed(cardId)) {
       return
     }
 
@@ -296,7 +297,7 @@ function _useModelSuggestionsDisabled({
     // Hook dependencies are intentionally constrained to the explicit array below. -- messages.length as stable proxy
   }, [
     currentModel,
-    sessionKey,
+    cardId,
     messages.length,
     availableModels.length,
     settings.smartSuggestionsEnabled,
@@ -310,7 +311,7 @@ function _useModelSuggestionsDisabled({
   }
 
   const dismissForSession = () => {
-    addSessionDismissal(sessionKey)
+    addCardDismissal(cardId)
     setSuggestion(null)
   }
 

@@ -240,8 +240,9 @@ function statusBadge(status: ProviderUsage['status']) {
 }
 
 function csvCell(value: string | number): string {
-  const text = String(value)
-  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+  const raw = String(value)
+  const text = /^[\t\r\n ]*[=+\-@]/.test(raw) ? `'${raw}` : raw
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
 }
 
 export function buildUsageCsv(usage: UsageSummary): string {
@@ -457,9 +458,6 @@ export function UsageDetailsModal({
                       <div>
                         <div className="font-medium text-primary-800">
                           {card.title}
-                        </div>
-                        <div className="text-xs text-primary-500">
-                          Card ID: {card.cardId}
                         </div>
                         <div className="text-xs text-primary-500">
                           {card.canonicalSource === 'remote'

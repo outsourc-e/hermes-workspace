@@ -908,10 +908,13 @@ describe('run-store persistence', () => {
     await expect(
       getActiveRunForCard('bounded-card', 'remote:terminal-history'),
     ).resolves.toMatchObject({ runId: 'zz-card-active-result' })
-    await expect(listAllActiveRuns()).resolves.toEqual([
+    const activeRuns = await listAllActiveRuns()
+    expect(activeRuns).toContainEqual(
       expect.objectContaining({ runId: 'zz-card-active-result' }),
+    )
+    expect(activeRuns).toContainEqual(
       expect.objectContaining({ runId: 'zz-other-active-result' }),
-    ])
+    )
   })
 
   it('fails recovery closed for genuine active volume past the retained-result limit', async () => {

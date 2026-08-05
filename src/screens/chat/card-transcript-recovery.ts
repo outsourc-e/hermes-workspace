@@ -163,12 +163,9 @@ export function cardTranscriptMessagesMatch(
   if (!compatibleTimestamp(left, right)) return false
 
   const stableKeys = ['stableId', 'id', 'messageId', 'message_id'] as const
-  if (
-    intersects(
-      identifierSet(left, stableKeys),
-      identifierSet(right, stableKeys),
-    )
-  ) {
+  const leftStableIdentifiers = identifierSet(left, stableKeys)
+  const rightStableIdentifiers = identifierSet(right, stableKeys)
+  if (intersects(leftStableIdentifiers, rightStableIdentifiers)) {
     return true
   }
 
@@ -179,13 +176,16 @@ export function cardTranscriptMessagesMatch(
     'nonce',
     '__optimisticId',
   ] as const
-  if (
-    intersects(
-      identifierSet(left, clientKeys),
-      identifierSet(right, clientKeys),
-    )
-  ) {
+  const leftClientIdentifiers = identifierSet(left, clientKeys)
+  const rightClientIdentifiers = identifierSet(right, clientKeys)
+  if (intersects(leftClientIdentifiers, rightClientIdentifiers)) {
     return true
+  }
+  if (leftStableIdentifiers.size > 0 && rightStableIdentifiers.size > 0) {
+    return false
+  }
+  if (leftClientIdentifiers.size > 0 && rightClientIdentifiers.size > 0) {
+    return false
   }
 
   return timestamp(left) !== null && timestamp(right) !== null

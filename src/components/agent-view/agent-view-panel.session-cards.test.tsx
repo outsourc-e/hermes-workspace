@@ -484,6 +484,44 @@ describe('AgentViewPanel mounted Card cutover', () => {
     expect(mocks.queryOptions).toHaveLength(0)
   })
 
+  it('passes the exact active Card identity and title to the mobile agent card', async () => {
+    window.innerWidth = 390
+    const body = wire()
+    mocks.queryState = { status: 'success', data: body }
+    const fetchMock = vi.fn<typeof fetch>((input) => {
+      const url = String(input)
+      if (url === '/api/session-status?cardId=remote%3Aparent-card') {
+        return Promise.resolve(
+          response({
+            ok: true,
+            payload: {
+              cards: [
+                {
+                  cardId: 'remote:parent-card',
+                  usage: { model: 'provider/model', contextPercent: 25 },
+                },
+              ],
+            },
+          }),
+        )
+      }
+      if (url === '/api/provider-usage') {
+        return Promise.resolve(response({ providers: [] }))
+      }
+      return Promise.resolve(response({}, 404))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await renderPanel(card(), body)
+
+    expect(screen.getByText('Parent Card')).toBeTruthy()
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toContain(
+      '/api/session-status?cardId=remote%3Aparent-card',
+    )
+    expect(document.body.textContent).not.toContain('remote:parent-card')
+    expect(document.body.textContent).not.toContain('remote:parent-tip')
+  })
+
   it('shows a closed unavailable state when the Card request fails', async () => {
     mocks.queryState = {
       status: 'error',

@@ -129,6 +129,11 @@ import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 // ContextMeter removed — ContextBar (PR #32) replaces it
 import { useChatStore } from '@/stores/chat-store'
 import { useSessionModelStore } from '@/stores/session-model-store'
+import { fetchSessionCardStatusModel } from '@/screens/chat/session-card-status'
+import {
+  cardThinkingStorageKey,
+  removeLegacySegmentUiStorage,
+} from '@/screens/chat/session-card-ui-state'
 import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
@@ -615,10 +620,10 @@ export function ChatScreen({
   >([])
   const [isCompacting, setIsCompacting] = useState(false)
   const [researchResetKey, setResearchResetKey] = useState(0)
-  // Per-session thinking level — stored in sessionStorage keyed by session
+  // Per-Card thinking level. Backend continuation segments never own UI state.
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
     if (typeof window === 'undefined') return 'low'
-    const key = `claude-thinking-${activeFriendlyId || 'new'}`
+    const key = cardThinkingStorageKey(activeCard?.cardId)
     const stored = window.sessionStorage.getItem(key)
     if (
       stored === 'off' ||
@@ -630,15 +635,27 @@ export function ChatScreen({
       return stored
     return 'low'
   })
-  // Tracks whether the user has explicitly picked a thinking level for this session.
+  // Tracks whether the user has explicitly picked a thinking level for this Card.
   // A missing/absent sessionStorage key means we should fall back to the Hermes config default.
   const thinkingInitializedByUserRef = useRef(false)
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const key = `claude-thinking-${activeFriendlyId || 'new'}`
-    thinkingInitializedByUserRef.current =
-      window.sessionStorage.getItem(key) !== null
-  }, [activeFriendlyId])
+    const key = cardThinkingStorageKey(activeCard?.cardId)
+    const stored = window.sessionStorage.getItem(key)
+    thinkingInitializedByUserRef.current = stored !== null
+    if (
+      stored === 'off' ||
+      stored === 'low' ||
+      stored === 'medium' ||
+      stored === 'high' ||
+      stored === 'adaptive'
+    ) {
+      setThinkingLevel(stored)
+    } else {
+      setThinkingLevel('low')
+    }
+    removeLegacySegmentUiStorage(activeCard?.continuationSegmentKeys ?? [])
+  }, [activeCard?.cardId, activeCard?.continuationSegmentKeys])
   const { alertOpen, alertThreshold, alertPercent, dismissAlert } =
     useContextAlert()
 
@@ -1352,32 +1369,11 @@ export function ChatScreen({
   const currentModelQuery = useQuery({
     queryKey: [
       'claude',
-      'session-status-model',
-      resolvedSessionKey || activeFriendlyId || 'main',
+      'session-card-status-model',
+      activeCard?.cardId || 'new',
     ],
-    queryFn: async () => {
-      try {
-        const statusSessionKey =
-          resolvedSessionKey || activeFriendlyId || 'main'
-        const query = statusSessionKey
-          ? `?sessionKey=${encodeURIComponent(statusSessionKey)}`
-          : ''
-        const res = await fetch(`/api/session-status${query}`)
-        if (!res.ok) return ''
-        const data = await res.json()
-        const payload = data.payload ?? data
-        // Same logic as chat-composer: read model from status payload
-        if (payload.model) return String(payload.model)
-        if (payload.currentModel) return String(payload.currentModel)
-        if (payload.modelAlias) return String(payload.modelAlias)
-        if (payload.resolved?.modelProvider && payload.resolved?.model) {
-          return `${payload.resolved.modelProvider}/${payload.resolved.model}`
-        }
-        return ''
-      } catch {
-        return ''
-      }
-    },
+    queryFn: () => fetchSessionCardStatusModel(activeCard?.cardId),
+    enabled: Boolean(activeCard?.cardId),
     refetchInterval: 30_000,
     retry: false,
   })
@@ -1422,7 +1418,15 @@ export function ChatScreen({
   }, [modelsQuery.data])
 
   const gatewayModel = currentModelQuery.data || ''
-  const currentModel = _localModelOverride || gatewayModel
+  // The Card model is persisted only as Card-owned browser state. Read the
+  // current snapshot here rather than subscribing to Zustand: this screen is
+  // also rendered by isolated route/handoff harnesses that intentionally
+  // replace React's dispatcher. A model selection still causes a local render
+  // through the composer/suggestion interaction that performed the change.
+  const persistedCardModel = useSessionModelStore
+    .getState()
+    .getModel(activeCard?.cardId)
+  const currentModel = persistedCardModel || _localModelOverride || gatewayModel
 
   // Ref so sendMessage can always read latest thinkingLevel without being in deps
   const thinkingLevelRef = useRef<ThinkingLevel>(thinkingLevel)
@@ -1440,7 +1444,7 @@ export function ChatScreen({
       currentModel.toLowerCase().includes('4-6') ||
       currentModel.toLowerCase().includes('claude-4.6')
     if (is46) {
-      const key = `claude-thinking-${activeFriendlyId || 'new'}`
+      const key = cardThinkingStorageKey(activeCard?.cardId)
       const stored =
         typeof window !== 'undefined'
           ? window.sessionStorage.getItem(key)
@@ -1450,9 +1454,9 @@ export function ChatScreen({
         setThinkingLevel('adaptive')
       }
     }
-  }, [currentModel, activeFriendlyId])
+  }, [currentModel, activeCard?.cardId])
 
-  // If no per-session thinking level override exists, inherit from Hermes config
+  // If no per-Card thinking level override exists, inherit from Hermes config.
   useEffect(() => {
     if (thinkingInitializedByUserRef.current) return
     const configEffort = reasoningEffortQuery.data
@@ -1460,21 +1464,21 @@ export function ChatScreen({
     setThinkingLevel(configEffort)
   }, [reasoningEffortQuery.data])
 
-  // Persist thinking level changes to sessionStorage
+  // Persist thinking level changes to Card-keyed sessionStorage.
   const handleThinkingLevelChange = useCallback(
     (level: ThinkingLevel) => {
       setThinkingLevel(level)
       if (typeof window !== 'undefined') {
-        const key = `claude-thinking-${activeFriendlyId || 'new'}`
+        const key = cardThinkingStorageKey(activeCard?.cardId)
         window.sessionStorage.setItem(key, level)
       }
     },
-    [activeFriendlyId],
+    [activeCard?.cardId],
   )
 
   const { suggestion, dismiss, dismissForSession } = useModelSuggestions({
-    currentModel, // Real model from session-status (fail closed if empty)
-    sessionKey: resolvedSessionKey || 'main',
+    currentModel, // Card-scoped status or Card-owned preference.
+    cardId: activeCard?.cardId ?? '',
     messages: historyMessages.map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: textFromMessage(m),
@@ -2137,29 +2141,13 @@ export function ChatScreen({
     }
   }, [activeIsRealtimeStreaming, waitingForResponse, streamFinish])
 
-  const handleSwitchModel = useCallback(async () => {
-    if (!suggestion) return
-
-    try {
-      const res = await fetch('/api/model-switch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionKey: resolvedSessionKey || 'main',
-          model: suggestion.suggestedModel,
-        }),
-      })
-
-      if (res.ok) {
-        dismiss()
-        // Optionally show success toast or update UI
-      }
-    } catch (err) {
-      setError(
-        `Failed to switch model. ${err instanceof Error ? err.message : String(err)}`,
-      )
-    }
-  }, [suggestion, resolvedSessionKey, dismiss])
+  const handleSwitchModel = useCallback(() => {
+    if (!suggestion || !activeCard?.cardId) return
+    useSessionModelStore
+      .getState()
+      .setModel(activeCard.cardId, suggestion.suggestedModel)
+    dismiss()
+  }, [activeCard?.cardId, dismiss, suggestion])
 
   // Sync chat activity to global store for sidebar orchestrator avatar
   const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity) as (
@@ -3510,16 +3498,7 @@ export function ChatScreen({
             </div>
           )}
 
-          {hideUi ? null : (
-            <ContextBar
-              sessionId={
-                resolvedSessionKey ||
-                activeCanonicalKey ||
-                activeSession?.key ||
-                activeSessionKey
-              }
-            />
-          )}
+          {hideUi ? null : <ContextBar cardId={activeCard?.cardId} />}
 
           {hideUi ? null : (
             <ChatMessageList
@@ -3614,14 +3593,7 @@ export function ChatScreen({
               onAbort={handleAbortStreaming}
               isLoading={sending || waitingForResponse}
               disabled={sending || hideUi || !cardTransportReady}
-              sessionKey={
-                isNewChat
-                  ? undefined
-                  : forcedSessionKey ||
-                    resolvedSessionKey ||
-                    activeCanonicalKey ||
-                    activeSessionKey
-              }
+              cardId={activeCard?.cardId}
               wrapperRef={composerRef}
               composerRef={composerHandleRef}
               embedded={embedded}
