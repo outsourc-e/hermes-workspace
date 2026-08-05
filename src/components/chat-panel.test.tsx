@@ -648,7 +648,7 @@ describe('ChatPanel Card routing', () => {
     )
     expect(mocks.chatScreenProps.at(-1)?.activeCard).toEqual(created)
     expect(mocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['chat', 'session-cards', 'list', false],
+      queryKey: ['chat', 'session-cards', 'list', false, 0],
     })
     expect(mocks.navigate).not.toHaveBeenCalled()
   })

@@ -21,7 +21,16 @@ const mocks = vi.hoisted(() => ({
   queryOptions: undefined as
     | {
         enabled?: boolean
-        queryFn: () => Promise<SessionCardListWire>
+        queryFn: () => Promise<unknown>
+      }
+    | undefined,
+  infiniteQueryOptions: undefined as
+    | {
+        enabled?: boolean
+        queryKey: ReadonlyArray<unknown>
+        queryFn: (context: {
+          pageParam: string | null
+        }) => Promise<SessionCardListWire>
       }
     | undefined,
   queryClient: {
@@ -40,10 +49,52 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: {
     enabled?: boolean
-    queryFn: () => Promise<SessionCardListWire>
+    queryFn: () => Promise<unknown>
   }) => {
     mocks.queryOptions = options
-    return mocks.queryState
+    const selectedCard = mocks.queryState.data.cards.find(
+      (candidate) => candidate.cardId === mocks.params.sessionKey,
+    )
+    const resolution = mocks.queryState.data.cardResolutions.find(
+      (candidate) => candidate.cardId === selectedCard?.cardId,
+    )
+    return {
+      status: mocks.queryState.status,
+      data:
+        selectedCard && resolution
+          ? {
+              card: selectedCard,
+              resolution,
+              completeness: mocks.queryState.data.completeness,
+              retryable: mocks.queryState.data.retryable,
+              sources: mocks.queryState.data.sources,
+            }
+          : undefined,
+      error: null,
+      refetch: mocks.queryState.refetch,
+    }
+  },
+  useInfiniteQuery: (options: {
+    enabled?: boolean
+    queryKey: ReadonlyArray<unknown>
+    queryFn: (context: {
+      pageParam: string | null
+    }) => Promise<SessionCardListWire>
+  }) => {
+    mocks.infiniteQueryOptions = options
+    return {
+      status: mocks.queryState.status,
+      data: { pages: [mocks.queryState.data], pageParams: [null] },
+      error: null,
+      isPending: false,
+      isLoading: false,
+      isFetching: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      hasNextPage: Boolean(mocks.queryState.data.nextCursor),
+      refetch: mocks.queryState.refetch,
+      fetchNextPage: vi.fn().mockResolvedValue(undefined),
+    }
   },
   useQueryClient: () => mocks.queryClient,
 }))
@@ -84,6 +135,7 @@ beforeEach(() => {
   ).IS_REACT_ACT_ENVIRONMENT = true
   mocks.chatScreenProps.length = 0
   mocks.queryOptions = undefined
+  mocks.infiniteQueryOptions = undefined
   mocks.navigate.mockReset()
   mocks.queryClient.invalidateQueries.mockReset()
   mocks.queryClient.removeQueries.mockReset()
@@ -108,7 +160,9 @@ describe('ChatRoute Session Card inventory', () => {
       },
       refetch: vi.fn(),
     }
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json(mocks.queryState.data))
     vi.stubGlobal('fetch', fetchMock)
     const container = document.createElement('div')
     document.body.appendChild(container)
@@ -129,7 +183,22 @@ describe('ChatRoute Session Card inventory', () => {
       activeCard: undefined,
       isNewChat: true,
     })
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(mocks.infiniteQueryOptions?.queryKey).toEqual([
+      'chat',
+      'session-cards',
+      'list',
+      false,
+      'chat',
+    ])
+    await expect(
+      mocks.infiniteQueryOptions?.queryFn({ pageParam: null }),
+    ).resolves.toEqual(mocks.queryState.data)
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
+      '/api/session-cards?view=chat',
+    ])
+    expect(fetchMock.mock.calls.flat().join(' ')).not.toMatch(
+      /\/api\/(sessions|history)/,
+    )
   })
 
   it('mounts one complete and one incomplete Card but fans out only the complete Card', async () => {
@@ -175,5 +244,12 @@ describe('ChatRoute Session Card inventory', () => {
       activeCard: complete,
       sessionCardList: expect.objectContaining({ cards: [complete] }),
     })
+    expect(mocks.infiniteQueryOptions?.queryKey).toEqual([
+      'chat',
+      'session-cards',
+      'list',
+      false,
+      'chat',
+    ])
   })
 })

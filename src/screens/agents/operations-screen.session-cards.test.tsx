@@ -422,9 +422,9 @@ describe('mounted Operations Session Card activity', () => {
       friendlyId: 'remote:worker-card',
       message: 'hello Card',
     })
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['chat', 'session-cards', 'list', false],
-    })
+    expect(mocks.invalidateQueries.mock.calls).toContainEqual([
+      { queryKey: ['chat', 'session-cards', 'list', false, 0] },
+    ])
   })
 
   it('hides incomplete and unresolved Card activity', async () => {

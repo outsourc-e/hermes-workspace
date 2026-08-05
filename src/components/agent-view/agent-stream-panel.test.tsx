@@ -182,6 +182,7 @@ describe('AgentStreamPanel Card-only activity', () => {
       'session-cards',
       'list',
       false,
+      0,
     ])
     await expect(mocks.queryOptions[0]?.queryFn()).resolves.toEqual(body)
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
