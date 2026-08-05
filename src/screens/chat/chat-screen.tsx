@@ -23,7 +23,7 @@ import {
 } from './chat-screen-utils'
 import {
   appendHistoryMessage,
-  appendSessionCardHistoryMessage,
+  appendSessionCardTransientMessage,
   archiveSessionCard,
   branchSessionCard,
   chatQueryKeys,
@@ -31,10 +31,10 @@ import {
   fetchCompleteSessionCardHistory,
   fetchStatus,
   isAuthoritativeCompleteSessionCardHistory,
-  mergeSessionCardHistoryResponse,
   moveLegacyHistoryMessagesToSessionCard,
   moveSessionCardHistoryMessages,
   moveSessionCardHistoryToCard,
+  reconcileSessionCardHistoryResponse,
   retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
   updateHistoryMessageByClientId,
@@ -127,7 +127,7 @@ import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 // ContextMeter removed — ContextBar (PR #32) replaces it
-import { persistRecoveryMessage, useChatStore } from '@/stores/chat-store'
+import { useChatStore } from '@/stores/chat-store'
 import { useSessionModelStore } from '@/stores/session-model-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
@@ -650,6 +650,7 @@ export function ChatScreen({
   const activeSendRef = useRef<{
     sessionKey: string
     friendlyId: string
+    cardId?: string
     clientId: string
   } | null>(null)
   // A live send-stream reader is authoritative over its waiting state. Keep
@@ -783,18 +784,12 @@ export function ChatScreen({
       if (!activeCard || !activeCardCanonicalSegmentKey) {
         throw new Error('Session Card route is not resolved')
       }
-      const queryKey = sessionCardQueryKeys.history(
-        activeCard.cardId,
-        activeCardCanonicalSegmentKey,
-      )
-      const cached =
-        queryClient.getQueryData<SessionCardHistoryResponse>(queryKey)
       const server = await fetchCompleteSessionCardHistory({
         cardId: activeCard.cardId,
         canonicalSegmentKey: activeCardCanonicalSegmentKey,
         signal,
       })
-      return mergeSessionCardHistoryResponse(server, cached)
+      return reconcileSessionCardHistoryResponse(server)
     },
     enabled:
       cardTransportReady &&
@@ -1012,6 +1007,7 @@ export function ChatScreen({
             activeCanonicalKey ||
             'main',
     friendlyId: transportFriendlyId,
+    cardId: activeCard?.cardId,
     historyMessages,
     // Do not let the legacy portable hook coerce a local Card to `main`.
     portableMode: isPortableMainSession,
@@ -1246,27 +1242,23 @@ export function ChatScreen({
   refreshHistoryRef.current = function refreshHistory() {
     if (historyQuery.isFetching) return
 
-    // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
-    // The refetch replaces the query cache with server data — if the server
-    // hasn't processed the user's POST yet, the optimistic message vanishes.
-    const historySessionKey = activeCard
-      ? activeCardCanonicalSegmentKey || ''
-      : isPortableMainSession
-        ? 'main'
-        : activeSessionKey ||
-          sessionKeyForHistory ||
-          resolvedSessionKey ||
-          'main'
+    if (activeCard) {
+      // Card query reconciliation reloads the exact persisted recovery envelope;
+      // never snapshot or re-inject a legacy history cache for a Card.
+      void historyQuery.refetch()
+      return
+    }
+
+    const historySessionKey = isPortableMainSession
+      ? 'main'
+      : activeSessionKey || sessionKeyForHistory || resolvedSessionKey || 'main'
     const reInjectOptimistic = snapshotOptimisticUserMessages(
       queryClient,
       transportFriendlyId,
       historySessionKey,
     )
 
-    void historyQuery.refetch().then(() => {
-      // Re-inject optimistic messages that weren't in the server response
-      reInjectOptimistic()
-    })
+    void historyQuery.refetch().then(reInjectOptimistic)
   }
 
   const clearTimerRef = useRef<number | null>(null)
@@ -1512,6 +1504,7 @@ export function ChatScreen({
             ...activeSend,
             sessionKey: handoff.canonicalSegmentKey,
             friendlyId: activeCard.cardId,
+            cardId: activeCard.cardId,
           }
           sessionKeyForWaiting.current = handoff.canonicalSegmentKey
           liveStreamSessionKeyRef.current = handoff.canonicalSegmentKey
@@ -1563,6 +1556,10 @@ export function ChatScreen({
             ...activeSend,
             sessionKey,
             friendlyId,
+            ...(friendlyId.startsWith('remote:') ||
+            friendlyId.startsWith('local:')
+              ? { cardId: friendlyId }
+              : {}),
           }
           sessionKeyForWaiting.current = sessionKey
           liveStreamSessionKeyRef.current = sessionKey
@@ -1637,21 +1634,28 @@ export function ChatScreen({
       [queryClient],
     ),
     onComplete: useCallback(
-      (message: ChatMessage) => {
+      (completedMessage: ChatMessage) => {
         const activeSend = activeSendRef.current
         const completedSessionKey = activeSend?.sessionKey
         if (activeSend?.clientId) {
           updateHistoryMessageByClientIdEverywhere(
             queryClient,
             activeSend.clientId,
-            (message) => ({
-              ...message,
+            (historyMessage) => ({
+              ...historyMessage,
               status: 'done',
             }),
           )
         }
         if (activeSend?.sessionKey) {
-          persistRecoveryMessage(activeSend.sessionKey, message)
+          if (activeSend.cardId) {
+            appendSessionCardTransientMessage(
+              queryClient,
+              activeSend.cardId,
+              activeSend.sessionKey,
+              completedMessage,
+            )
+          }
           clearPendingSendForSession(
             activeSend.sessionKey,
             activeSend.friendlyId,
@@ -2499,7 +2503,7 @@ export function ChatScreen({
         )
         optimisticClientId = clientId
         if (activeCard && activeCardCanonicalSegmentKey) {
-          appendSessionCardHistoryMessage(
+          appendSessionCardTransientMessage(
             queryClient,
             activeCard.cardId,
             activeCardCanonicalSegmentKey,
@@ -2532,6 +2536,7 @@ export function ChatScreen({
       activeSendRef.current = {
         sessionKey,
         friendlyId,
+        ...(activeCard ? { cardId: activeCard.cardId } : {}),
         clientId: optimisticClientId,
       }
 
@@ -2638,10 +2643,12 @@ export function ChatScreen({
     )
     if (!pending) return
     pendingStartRef.current = true
-    const historyKey = chatQueryKeys.history(
-      pending.friendlyId,
-      pending.sessionKey,
-    )
+    const historyKey = activeCard
+      ? sessionCardQueryKeys.history(
+          activeCard.cardId,
+          activeCardCanonicalSegmentKey || '',
+        )
+      : chatQueryKeys.history(pending.friendlyId, pending.sessionKey)
     const cached = queryClient.getQueryData(historyKey)
     const cachedMessages = Array.isArray((cached as any)?.messages)
       ? (cached as any).messages
@@ -2659,12 +2666,21 @@ export function ChatScreen({
       return false
     })
     if (!alreadyHasOptimistic) {
-      appendHistoryMessage(
-        queryClient,
-        pending.friendlyId,
-        pending.sessionKey,
-        pending.optimisticMessage,
-      )
+      if (activeCard && activeCardCanonicalSegmentKey) {
+        appendSessionCardTransientMessage(
+          queryClient,
+          activeCard.cardId,
+          activeCardCanonicalSegmentKey,
+          pending.optimisticMessage,
+        )
+      } else {
+        appendHistoryMessage(
+          queryClient,
+          pending.friendlyId,
+          pending.sessionKey,
+          pending.optimisticMessage,
+        )
+      }
     }
     setWaitingForResponse(true)
     sendMessage(

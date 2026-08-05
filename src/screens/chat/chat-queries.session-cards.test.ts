@@ -1416,7 +1416,7 @@ describe('Session Card fetchers', () => {
     ).toBe(false)
   })
 
-  it('does not reuse cached optimistic messages when server history is partial', () => {
+  it('merges only an explicit Card recovery overlay when server history is partial', () => {
     const server = {
       sessionKey: 'remote:tip',
       cardId: 'remote:root',
@@ -1438,29 +1438,21 @@ describe('Session Card fetchers', () => {
         },
       ],
     }
-    const cached = {
-      sessionKey: 'remote:tip',
-      cardId: 'remote:root',
-      canonicalSegmentKey: 'remote:tip',
-      messages: [
-        {
-          id: 'cached-optimistic',
-          role: 'user',
-          content: [],
-          __optimistic: true,
-        },
-      ],
-      completeness: 'complete' as const,
-      retryable: false,
-      missingSegments: [],
-    }
+    const recoveryMessages = [
+      {
+        id: 'cached-optimistic',
+        role: 'user' as const,
+        content: [],
+        __optimistic: true,
+      },
+    ]
 
-    expect(mergeSessionCardHistoryResponse(server as any, cached as any)).toBe(
-      server,
-    )
     expect(
-      mergeSessionCardHistoryResponse(server as any, cached as any).messages,
-    ).toEqual([expect.objectContaining({ id: 'server-partial' })])
+      mergeSessionCardHistoryResponse(server as any, recoveryMessages).messages,
+    ).toEqual([
+      expect.objectContaining({ id: 'server-partial' }),
+      expect.objectContaining({ id: 'cached-optimistic' }),
+    ])
   })
 
   it('keeps an accepted local user message while complete Card history catches up', () => {
@@ -1475,24 +1467,18 @@ describe('Session Card fetchers', () => {
       retryable: false,
       missingSegments: [],
     }
-    const cached = {
-      sessionKey: 'remote:tip',
-      cardId: 'remote:root',
-      canonicalSegmentKey: 'remote:tip',
-      messages: [
-        {
-          role: 'user' as const,
-          content: [{ type: 'text' as const, text: 'still here' }],
-          clientId: 'client-1',
-          status: 'done',
-        },
-      ],
-      completeness: 'partial' as const,
-      retryable: true,
-      missingSegments: [],
-    }
+    const recoveryMessages = [
+      {
+        role: 'user' as const,
+        content: [{ type: 'text' as const, text: 'still here' }],
+        clientId: 'client-1',
+        status: 'done',
+      },
+    ]
 
-    expect(mergeSessionCardHistoryResponse(server, cached)).toMatchObject({
+    expect(
+      mergeSessionCardHistoryResponse(server, recoveryMessages),
+    ).toMatchObject({
       completeness: 'complete',
       messages: [
         { id: 'assistant-1' },

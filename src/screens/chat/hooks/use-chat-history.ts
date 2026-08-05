@@ -9,10 +9,6 @@ import {
   persistPendingMessage,
   readPendingMessage,
 } from '../pending-send'
-import {
-  clearRecoveryMessage,
-  readRecoveryMessage,
-} from '../../../stores/chat-store'
 import { useChatSettingsStore } from '../../../hooks/use-chat-settings'
 import { resolveLatestDescendant } from '../latest-descendant'
 import type { PendingSendPayload } from '../pending-send'
@@ -256,38 +252,6 @@ function hasConfirmedPendingMessage(
   })
 }
 
-/**
- * Extract the best available string ID from a ChatMessage without type-unsafe
- * `as any` casts. ChatMessage carries `[key: string]: unknown` so bracket
- * access is perfectly legal and keeps TypeScript's narrowing intact.
- */
-function extractMsgId(msg: ChatMessage): string {
-  const id =
-    msg['id'] ?? msg['message_id'] ?? msg['clientId'] ?? msg['client_id']
-  return typeof id === 'string' ? id : ''
-}
-
-/** Check whether a history array already contains an equivalent message. */
-function historyContainsMessage(
-  messages: Array<ChatMessage>,
-  candidate: ChatMessage,
-): boolean {
-  if (!candidate.role) return false
-  const candidateText = textFromMessage(candidate).trim()
-  const candidateId = extractMsgId(candidate)
-
-  return messages.some((msg) => {
-    if (msg.role !== candidate.role) return false
-    const msgId = extractMsgId(msg)
-    if (candidateId && msgId && candidateId === msgId) return true
-    if (candidateText) {
-      const msgText = textFromMessage(msg).trim()
-      if (msgText === candidateText) return true
-    }
-    return false
-  })
-}
-
 export function useChatHistory({
   activeFriendlyId,
   activeSessionKey,
@@ -416,35 +380,15 @@ export function useChatHistory({
         signal,
       })
 
-      let dataWithRecovery = serverData
-
-      // Merge recovery buffer: if the backend history hasn't caught up with a
-      // recently-streamed assistant message (e.g. after dev refresh), inject it
-      // so the message doesn't vanish from the UI.
-      if (typeof window !== 'undefined') {
-        const recoveryMessage = readRecoveryMessage(sessionKeyForHistory)
-        if (recoveryMessage) {
-          if (historyContainsMessage(serverData.messages, recoveryMessage)) {
-            clearRecoveryMessage(sessionKeyForHistory)
-          } else {
-            const mergedMessages = [...serverData.messages, recoveryMessage]
-            mergedMessages.sort(
-              (a, b) => getMessageTimestamp(a) - getMessageTimestamp(b),
-            )
-            dataWithRecovery = { ...serverData, messages: mergedMessages }
-          }
-        }
-      }
-
-      if (!optimisticMessages.length) return dataWithRecovery
+      if (!optimisticMessages.length) return serverData
 
       const merged = mergeOptimisticHistoryMessages(
-        dataWithRecovery.messages,
+        serverData.messages,
         optimisticMessages,
       )
 
       return {
-        ...dataWithRecovery,
+        ...serverData,
         messages: merged,
       }
     },

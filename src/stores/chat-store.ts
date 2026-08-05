@@ -201,54 +201,6 @@ export function restoreStreamingState(
   }
 }
 
-const RECOVERY_MSG_PREFIX = 'claude_recovery_msg_'
-const RECOVERY_MSG_TTL_MS = 5 * 60 * 1000
-
-export function persistRecoveryMessage(
-  sessionKey: string,
-  message: ChatMessage,
-): void {
-  if (typeof sessionStorage === 'undefined') return
-  try {
-    sessionStorage.setItem(
-      `${RECOVERY_MSG_PREFIX}${sessionKey}`,
-      JSON.stringify({ message, storedAt: Date.now() }),
-    )
-  } catch {
-    // Ignore storage write failures (quota, private mode, etc.).
-  }
-}
-
-export function readRecoveryMessage(sessionKey: string): ChatMessage | null {
-  if (typeof sessionStorage === 'undefined') return null
-  const key = `${RECOVERY_MSG_PREFIX}${sessionKey}`
-  const raw = sessionStorage.getItem(key)
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as {
-      message?: ChatMessage
-      storedAt?: number
-    }
-    if (!parsed.message) return null
-    if (
-      typeof parsed.storedAt !== 'number' ||
-      Date.now() - parsed.storedAt > RECOVERY_MSG_TTL_MS
-    ) {
-      sessionStorage.removeItem(key)
-      return null
-    }
-    return parsed.message
-  } catch {
-    sessionStorage.removeItem(key)
-    return null
-  }
-}
-
-export function clearRecoveryMessage(sessionKey: string): void {
-  if (typeof sessionStorage === 'undefined') return
-  sessionStorage.removeItem(`${RECOVERY_MSG_PREFIX}${sessionKey}`)
-}
-
 const WAITING_TTL_MS = 120_000
 const WAITING_STORAGE_PREFIX = 'claude_waiting_'
 
@@ -1174,10 +1126,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
               set({ realtimeMessages: messages })
             }
           }
-
-          // Persist the final assistant message to sessionStorage so it survives
-          // dev refresh / tab navigation until backend history catches up.
-          persistRecoveryMessage(sessionKey, completeMessage)
         }
 
         // Clear streaming state immediately — tool calls are preserved via
@@ -1292,12 +1240,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const nextWaitingMeta = waitingSessionMeta[toSessionKey]
       if (nextWaitingMeta) persistWaitingState(toSessionKey, nextWaitingMeta)
     }
-
-    const recoveryMessage = readRecoveryMessage(fromSessionKey)
-    if (recoveryMessage && !readRecoveryMessage(toSessionKey)) {
-      persistRecoveryMessage(toSessionKey, recoveryMessage)
-    }
-    clearRecoveryMessage(fromSessionKey)
 
     set({
       realtimeMessages: messages,

@@ -1,4 +1,11 @@
 import { normalizeSessions, readError } from './utils'
+import {
+  appendCardTranscriptRecoveryMessage,
+  mergeCardTranscriptRecoveryMessages,
+  moveCardTranscriptRecovery,
+  readCardTranscriptRecovery,
+  removeAcknowledgedCardTranscriptRecoveryMessages,
+} from './card-transcript-recovery'
 import type { QueryClient } from '@tanstack/react-query'
 import type {
   ChatMessage,
@@ -1155,66 +1162,40 @@ export async function fetchCompleteSessionCardHistory(payload: {
   }
 }
 
-function messageCacheIdentity(message: ChatMessage): string {
-  const raw = message as Record<string, unknown>
-  for (const key of [
-    'stableId',
-    'id',
-    'messageId',
-    'clientId',
-    'client_id',
-    '__optimisticId',
-  ]) {
-    const value = nonblankWireString(raw[key])
-    if (value) return `${message.role ?? ''}:${key}:${value}`
-  }
-  return `${message.role ?? ''}:content:${JSON.stringify(message.content ?? [])}`
-}
-
 function mergeCardHistoryMessages(
   primary: Array<ChatMessage>,
   secondary: Array<ChatMessage>,
 ): Array<ChatMessage> {
-  const messages = [...primary]
-  const seen = new Set(primary.map(messageCacheIdentity))
-  for (const message of secondary) {
-    const identity = messageCacheIdentity(message)
-    if (seen.has(identity)) continue
-    seen.add(identity)
-    messages.push(message)
-  }
-  return messages
-}
-
-function isUnechoedLocalUserMessage(message: ChatMessage): boolean {
-  const raw = message as Record<string, unknown>
-  if (message.role !== 'user') return false
-  if (nonblankWireString(raw.__optimisticId) !== null) return true
-  if (raw.status === 'sending' || raw.status === 'queued') return true
-
-  // Hermes accepts user messages before its history endpoint necessarily
-  // echoes them. Once stream lifecycle events mark that message sent/done, its
-  // client ID is the only durable identity until the server assigns one.
-  if (raw.status !== 'sent' && raw.status !== 'done') return false
-  const clientId =
-    nonblankWireString(raw.clientId) ?? nonblankWireString(raw.client_id)
-  const serverId =
-    nonblankWireString(raw.id) ?? nonblankWireString(raw.messageId)
-  return clientId !== null && serverId === null
+  return mergeCardTranscriptRecoveryMessages(primary, secondary)
 }
 
 export function mergeSessionCardHistoryResponse(
   server: SessionCardHistoryResponse,
-  cached: SessionCardHistoryResponse | undefined,
+  recoveryMessages: Array<ChatMessage>,
 ): SessionCardHistoryResponse {
-  if (!cached || !isAuthoritativeCompleteSessionCardHistory(server)) {
-    return server
-  }
-  const optimistic = cached.messages.filter(isUnechoedLocalUserMessage)
+  if (recoveryMessages.length === 0) return server
   return {
     ...server,
-    messages: mergeCardHistoryMessages(server.messages, optimistic),
+    messages: mergeCardHistoryMessages(server.messages, recoveryMessages),
   }
+}
+
+/**
+ * Reconcile one Card-history response with only the exact Card/segment recovery
+ * envelope. A complete authoritative response may acknowledge overlays; a
+ * partial response can display overlays later but cannot clear them.
+ */
+export function reconcileSessionCardHistoryResponse(
+  server: SessionCardHistoryResponse,
+): SessionCardHistoryResponse {
+  const owner = {
+    cardId: server.cardId,
+    canonicalSegmentKey: server.canonicalSegmentKey,
+  }
+  const recovery = isAuthoritativeCompleteSessionCardHistory(server)
+    ? removeAcknowledgedCardTranscriptRecoveryMessages(owner, server.messages)
+    : readCardTranscriptRecovery(owner)
+  return mergeSessionCardHistoryResponse(server, recovery?.messages ?? [])
 }
 
 export function updateSessionCardHistoryMessages(
@@ -1255,12 +1236,34 @@ export function appendSessionCardHistoryMessage(
   cardId: string,
   canonicalSegmentKey: string,
   message: ChatMessage,
+  options: { persistRecovery?: boolean } = {},
 ) {
+  if (options.persistRecovery ?? true) {
+    appendCardTranscriptRecoveryMessage(
+      { cardId, canonicalSegmentKey },
+      message,
+    )
+  }
   updateSessionCardHistoryMessages(
     queryClient,
     cardId,
     canonicalSegmentKey,
     (messages) => mergeCardHistoryMessages(messages, [message]),
+  )
+}
+
+/** Persist and cache one explicit local Card overlay synchronously. */
+export function appendSessionCardTransientMessage(
+  queryClient: QueryClient,
+  cardId: string,
+  canonicalSegmentKey: string,
+  message: ChatMessage,
+) {
+  appendSessionCardHistoryMessage(
+    queryClient,
+    cardId,
+    canonicalSegmentKey,
+    message,
   )
 }
 
@@ -1271,6 +1274,10 @@ export function moveSessionCardHistoryMessages(
   toCanonicalSegmentKey: string,
 ) {
   if (fromCanonicalSegmentKey === toCanonicalSegmentKey) return
+  moveCardTranscriptRecovery(
+    { cardId, canonicalSegmentKey: fromCanonicalSegmentKey },
+    { cardId, canonicalSegmentKey: toCanonicalSegmentKey },
+  )
   const fromKey = sessionCardQueryKeys.history(cardId, fromCanonicalSegmentKey)
   const toKey = sessionCardQueryKeys.history(cardId, toCanonicalSegmentKey)
   const fromData = queryClient.getQueryData<SessionCardHistoryResponse>(fromKey)
@@ -1882,10 +1889,27 @@ export function moveLegacyHistoryMessagesToSessionCard(
   const fromKey = chatQueryKeys.history(friendlyId, sessionKey)
   const fromData = queryClient.getQueryData<HistoryResponse>(fromKey)
   if (!fromData) return
-  const transient = fromData.messages.filter(isUnechoedLocalUserMessage)
+  const transient = fromData.messages.filter((message) => {
+    if (message.role !== 'user') return false
+    const raw = message as Record<string, unknown>
+    return Boolean(
+      nonblankWireString(raw.__optimisticId) ||
+      nonblankWireString(raw.clientId) ||
+      nonblankWireString(raw.client_id) ||
+      raw.status === 'sending' ||
+      raw.status === 'queued' ||
+      raw.status === 'sent',
+    )
+  })
   queryClient.removeQueries({ queryKey: fromKey, exact: true })
   if (transient.length === 0) return
 
+  for (const message of transient) {
+    appendCardTranscriptRecoveryMessage(
+      { cardId, canonicalSegmentKey: sessionKey },
+      message,
+    )
+  }
   updateSessionCardHistoryMessages(
     queryClient,
     cardId,
