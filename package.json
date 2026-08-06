@@ -5,6 +5,7 @@
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
   "private": true,
+  "packageManager": "pnpm@10.15.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {

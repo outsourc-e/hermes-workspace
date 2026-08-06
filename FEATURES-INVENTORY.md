@@ -293,7 +293,7 @@
 
 - **mobile-tab-bar** — bottom navigation for mobile
 - **mobile-hamburger-menu** — hamburger menu for mobile
-- **mobile-sessions-panel** — mobile session browser
+- **mobile-sessions-panel** — mobile Session Card browser
 - **mobile-page-header** — mobile header bar
 - **mobile-prompt** — MobileSetupModal, MobilePromptTrigger
 
@@ -538,7 +538,7 @@ Web Audio API synthesized sounds (no audio files):
 - **⌘K** — Command palette
 - **Global shortcuts** via `global-shortcut-listener`
 - **Terminal shortcuts** via `terminal-shortcut-listener`
-- **Session shortcuts** — navigate between sessions
+- **Session Card shortcuts** — switch between Cards
 - **Keyboard shortcuts modal** — discoverable reference
 
 ### 7.3 Voice Input
@@ -558,7 +558,7 @@ Web Audio API synthesized sounds (no audio files):
 - **Global search modal** with quick actions
 - **Search input** with keyboard navigation
 - **Search results** with highlighted matches
-- **Session search** across all chat history
+- **Session Card search** across Card-owned chat history
 
 ### 7.6 Onboarding
 
@@ -571,13 +571,13 @@ Web Audio API synthesized sounds (no audio files):
 
 - Export conversations as Markdown, JSON, or Plain Text
 
-### 7.8 Auto-Generated Session Titles
+### 7.8 Auto-Generated Session Card Titles
 
-- Automatic title generation from conversation content
+- Automatic Card title generation from Card-owned conversation content
 
-### 7.9 Pinned Sessions & Models
+### 7.9 Pinned Session Cards & Models
 
-- Pin frequently used sessions for quick access
+- Pin frequently used Cards for quick access
 - Pin preferred models
 
 ### 7.10 Smart Model Suggestions
@@ -640,7 +640,7 @@ Web Audio API synthesized sounds (no audio files):
 
 - Mobile tab bar (bottom navigation)
 - Mobile hamburger menu
-- Mobile sessions panel
+- Mobile Session Card panel
 - Mobile page header
 - Mobile terminal input
 - Mobile setup modal & prompt trigger

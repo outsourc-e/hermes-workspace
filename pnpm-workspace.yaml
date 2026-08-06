@@ -1,5 +1,6 @@
-# pnpm 10 requires an explicit allowlist for package lifecycle scripts. These
-# packages install reviewed platform binaries used by the Workspace toolchain.
+# pnpm 10.15.0 blocks dependency lifecycle scripts unless they are explicitly
+# approved. These packages install reviewed platform binaries used by the
+# Workspace toolchain.
 onlyBuiltDependencies:
   - electron
   - electron-winstaller
