@@ -12,9 +12,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 let tempRoot: string
 
-async function loadModule() {
+async function loadModule(options?: { failStoreWrites?: boolean }) {
   vi.resetModules()
-  tempRoot = mkdtempSync(join(tmpdir(), 'swarm-missions-test-'))
+  if (options?.failStoreWrites) {
+    vi.doMock('node:fs', async (importOriginal) => {
+      const actual = await importOriginal<Record<string, unknown>>()
+      return {
+        ...actual,
+        writeFileSync: (path: Parameters<typeof writeFileSync>[0]) => {
+          if (String(path).endsWith('.tmp')) {
+            throw new Error('simulated mission store write failure')
+          }
+          throw new Error(`Unexpected write to ${String(path)}`)
+        },
+      }
+    })
+  } else {
+    vi.doUnmock('node:fs')
+  }
   vi.doMock('./swarm-environment', () => ({
     SWARM_CANONICAL_REPO: tempRoot,
   }))
@@ -28,6 +43,7 @@ describe('swarm-missions', () => {
 
   afterEach(() => {
     vi.resetModules()
+    vi.doUnmock('node:fs')
     vi.doUnmock('./swarm-environment')
     try {
       rmSync(tempRoot, { recursive: true, force: true })
@@ -95,6 +111,141 @@ describe('swarm-missions', () => {
     expect(mod.getSwarmMissionCardAuthorityBindings('mission-a')).toEqual([
       continuedBinding,
     ])
+  })
+
+  it('commits a new mission with its complete multiworker authority set', async () => {
+    const mod = await loadModule()
+    const mission = mod.createSwarmMissionWithCardAuthorities({
+      missionId: 'mission-atomic-success',
+      title: 'Atomic multiworker mission',
+      assignments: [
+        { workerId: 'builder', task: 'Implement the patch' },
+        { workerId: 'reviewer', task: 'Review the patch' },
+      ],
+      authorities: [
+        {
+          anchorSource: 'local',
+          anchorKey: 'builder',
+          binding: {
+            kind: 'session-card-owner',
+            cardId: 'local:builder-card',
+            parentCardId: null,
+            canonicalSource: 'local',
+            canonicalSegmentKey: 'local:builder',
+            canonicalTransport: 'tmux',
+          },
+        },
+        {
+          anchorSource: 'local',
+          anchorKey: 'reviewer',
+          binding: {
+            kind: 'session-card-owner',
+            cardId: 'local:reviewer-card',
+            parentCardId: null,
+            canonicalSource: 'local',
+            canonicalSegmentKey: 'local:reviewer',
+            canonicalTransport: 'tmux',
+          },
+        },
+      ],
+    })
+
+    expect(mission?._created).toBe(true)
+    expect(
+      mission?.assignments.map((assignment) => assignment.workerId),
+    ).toEqual(['builder', 'reviewer'])
+    expect(
+      mod
+        .getSwarmMissionCardAuthorityBindings('mission-atomic-success')
+        .map((binding) => binding.cardId),
+    ).toEqual(['local:builder-card', 'local:reviewer-card'])
+    const persisted = JSON.parse(
+      readFileSync(mod.SWARM_MISSIONS_PATH, 'utf8'),
+    ) as {
+      missions: Array<unknown>
+      missionCardAuthorities: Array<{ anchors: Array<unknown> }>
+    }
+    expect(persisted.missions).toHaveLength(1)
+    expect(persisted.missionCardAuthorities[0]?.anchors).toHaveLength(2)
+  })
+
+  it('does not persist an incomplete authority set when a later mission anchor conflicts', async () => {
+    const mod = await loadModule()
+    const firstBinding = {
+      kind: 'session-card-owner' as const,
+      cardId: 'local:builder-card',
+      parentCardId: null,
+      canonicalSource: 'local' as const,
+      canonicalSegmentKey: 'local:builder',
+      canonicalTransport: 'tmux' as const,
+    }
+
+    const mission = mod.createSwarmMissionWithCardAuthorities({
+      missionId: 'mission-atomic-conflict',
+      title: 'Atomic authority conflict',
+      assignments: [
+        { workerId: 'builder', task: 'First task' },
+        { workerId: 'builder', task: 'Second task' },
+      ],
+      authorities: [
+        {
+          anchorSource: 'local',
+          anchorKey: 'builder',
+          binding: firstBinding,
+        },
+        {
+          anchorSource: 'local',
+          anchorKey: 'builder',
+          binding: {
+            ...firstBinding,
+            cardId: 'local:unrelated-card',
+          },
+        },
+      ],
+    })
+
+    expect(mission).toBeNull()
+    expect(mod.getSwarmMission('mission-atomic-conflict')).toBeNull()
+    expect(
+      mod.getSwarmMissionCardAuthorityBindings('mission-atomic-conflict'),
+    ).toEqual([])
+    expect(existsSync(mod.SWARM_MISSIONS_PATH)).toBe(false)
+  })
+
+  it('leaves the durable store unchanged when the atomic mission commit fails', async () => {
+    const runtimeDir = join(tempRoot, '.runtime')
+    const storePath = join(runtimeDir, 'swarm-missions.json')
+    const baseline = {
+      version: 1,
+      missions: [],
+      missionCardAuthorities: [],
+    }
+    mkdirSync(runtimeDir, { recursive: true })
+    writeFileSync(storePath, JSON.stringify(baseline, null, 2) + '\n')
+    const mod = await loadModule({ failStoreWrites: true })
+
+    expect(() =>
+      mod.createSwarmMissionWithCardAuthorities({
+        missionId: 'mission-atomic-write-failure',
+        title: 'Atomic write failure',
+        assignments: [{ workerId: 'builder', task: 'Atomic task' }],
+        authorities: [
+          {
+            anchorSource: 'local',
+            anchorKey: 'builder',
+            binding: {
+              kind: 'session-card-owner',
+              cardId: 'local:builder-card',
+              parentCardId: null,
+              canonicalSource: 'local',
+              canonicalSegmentKey: 'local:builder',
+              canonicalTransport: 'tmux',
+            },
+          },
+        ],
+      }),
+    ).toThrow('simulated mission store write failure')
+    expect(JSON.parse(readFileSync(storePath, 'utf8'))).toEqual(baseline)
   })
 
   it('records checkpoints by assignment id, stores report metadata, and exposes flattened reports', async () => {

@@ -15,9 +15,9 @@ import {
 } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import {
-  bindSwarmMissionCardAuthority,
   createOrUpdateMission,
   createSwarmMissionId,
+  createSwarmMissionWithCardAuthorities,
   getSwarmMission,
   markMissionAssignmentDispatched,
   recordMissionAssignmentBlocked,
@@ -31,6 +31,7 @@ import {
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import type { CreateOrUpdateMissionResult } from '../../server/swarm-missions'
 import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 import type { SwarmRosterWorker } from '../../server/swarm-roster'
 import type { ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
@@ -1466,6 +1467,7 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
         : `${assignments.length} assigned tasks`
   const missionId = requestedMissionId || createSwarmMissionId()
   const existingMission = getSwarmMission(missionId)
+  let mission: CreateOrUpdateMissionResult
   if (existingMission) {
     if (
       !assignments.every((assignment) =>
@@ -1474,29 +1476,27 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     ) {
       throw new SwarmDispatchError('Swarm mission Card authority changed', 409)
     }
+    mission = createOrUpdateMission({
+      missionId,
+      title: missionTitle,
+      assignments,
+    })
   } else {
-    for (const assignment of assignments) {
-      if (
-        !bindSwarmMissionCardAuthority({
-          missionId,
-          anchorSource: 'local',
-          anchorKey: assignment.workerId,
-          binding: assignment.cardBinding,
-        })
-      ) {
-        throw new SwarmDispatchError(
-          'Swarm mission Card authority changed',
-          409,
-        )
-      }
+    const createdMission = createSwarmMissionWithCardAuthorities({
+      missionId,
+      title: missionTitle,
+      assignments,
+      authorities: assignments.map((assignment) => ({
+        anchorSource: 'local',
+        anchorKey: assignment.workerId,
+        binding: assignment.cardBinding,
+      })),
+    })
+    if (!createdMission) {
+      throw new SwarmDispatchError('Swarm mission Card authority changed', 409)
     }
+    mission = createdMission
   }
-
-  const mission = createOrUpdateMission({
-    missionId,
-    title: missionTitle,
-    assignments,
-  })
   if (mission._created) {
     const seenWorkers = new Set<string>()
     for (const assignment of assignments) {

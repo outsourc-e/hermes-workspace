@@ -1,13 +1,13 @@
 # Phase 2.5-002: Build + lint workflow
-# Runs on all PRs and pushes to main
+# Runs on PRs and pushes to main, production, and picknik-fixes
 
 name: CI
 
 on:
   push:
-    branches: [main, production]
+    branches: [main, production, picknik-fixes]
   pull_request:
-    branches: [main, production]
+    branches: [main, production, picknik-fixes]
 
 jobs:
   build:

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   appendMissionContinuation: vi.fn(),
   bindMissionAuthority: vi.fn(),
   createOrUpdateMission: vi.fn(),
+  createMissionWithAuthorities: vi.fn(),
   getMission: vi.fn(),
   hasMissionAuthority: vi.fn(),
   markMissionAssignmentDispatched: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('../../server/swarm-missions', () => ({
   appendMissionContinuation: mocks.appendMissionContinuation,
   bindSwarmMissionCardAuthority: mocks.bindMissionAuthority,
   createOrUpdateMission: mocks.createOrUpdateMission,
+  createSwarmMissionWithCardAuthorities: mocks.createMissionWithAuthorities,
   createSwarmMissionId: () => 'mission-generated',
   getSwarmMission: mocks.getMission,
   markMissionAssignmentDispatched: mocks.markMissionAssignmentDispatched,
@@ -73,6 +75,7 @@ beforeEach(() => {
   mocks.getMission.mockReturnValue({ id: 'mission-victim' })
   mocks.hasMissionAuthority.mockReturnValue(false)
   mocks.bindMissionAuthority.mockReturnValue(true)
+  mocks.createMissionWithAuthorities.mockReturnValue(null)
 })
 
 describe('Swarm mission identity authority', () => {
@@ -102,9 +105,8 @@ describe('Swarm mission identity authority', () => {
     expect(mocks.markMissionAssignmentDispatched).not.toHaveBeenCalled()
   })
 
-  it('does not create a new mission unless its Card authority is bound first', async () => {
+  it('atomically rejects a new mission when its complete Card authority set cannot be persisted', async () => {
     mocks.getMission.mockReturnValue(null)
-    mocks.bindMissionAuthority.mockReturnValue(false)
 
     const response = await dispatchHandler({
       request: post('/api/swarm-dispatch', {
@@ -119,12 +121,25 @@ describe('Swarm mission identity authority', () => {
     })
 
     expect(response.status).toBe(409)
-    expect(mocks.bindMissionAuthority).toHaveBeenCalledWith({
+    expect(mocks.createMissionWithAuthorities).toHaveBeenCalledWith({
       missionId: 'mission-generated',
-      anchorSource: 'local',
-      anchorKey: 'builder',
-      binding,
+      title: 'create an authorized mission',
+      assignments: [
+        {
+          workerId: 'builder',
+          task: 'create an authorized mission',
+          cardBinding: binding,
+        },
+      ],
+      authorities: [
+        {
+          anchorSource: 'local',
+          anchorKey: 'builder',
+          binding,
+        },
+      ],
     })
+    expect(mocks.bindMissionAuthority).not.toHaveBeenCalled()
     expect(mocks.createOrUpdateMission).not.toHaveBeenCalled()
   })
 

@@ -3,6 +3,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -144,8 +145,17 @@ function readStore(): SwarmMissionStore {
 function writeStore(store: SwarmMissionStore): void {
   mkdirSync(dirname(SWARM_MISSIONS_PATH), { recursive: true })
   const tmp = `${SWARM_MISSIONS_PATH}.${process.pid}.${Date.now()}.tmp`
-  writeFileSync(tmp, JSON.stringify(store, null, 2) + '\n')
-  renameSync(tmp, SWARM_MISSIONS_PATH)
+  try {
+    writeFileSync(tmp, JSON.stringify(store, null, 2) + '\n')
+    renameSync(tmp, SWARM_MISSIONS_PATH)
+  } catch (error) {
+    try {
+      rmSync(tmp, { force: true })
+    } catch {
+      // Preserve the commit failure; a best-effort temp cleanup must not mask it.
+    }
+    throw error
+  }
 }
 
 function event(
@@ -273,17 +283,17 @@ function sameExactCardBinding(
   )
 }
 
-/**
- * Persist a server-resolved mission/Card association. An upstream anchor may
- * advance within the same durable Card, but it can never be reassigned to a
- * different Card owner. That makes a recycled worker/session alias fail closed.
- */
-export function bindSwarmMissionCardAuthority(input: {
+export type SwarmMissionCardAuthorityInput = {
   missionId: string
   anchorSource: 'local' | 'remote'
   anchorKey: string
   binding: SessionCardOperationBinding
-}): boolean {
+}
+
+function bindSwarmMissionCardAuthorityInStore(
+  store: SwarmMissionStore,
+  input: SwarmMissionCardAuthorityInput,
+): boolean {
   const missionId = input.missionId.trim()
   const anchorKey = input.anchorKey.trim()
   if (
@@ -294,7 +304,6 @@ export function bindSwarmMissionCardAuthority(input: {
     return false
   }
 
-  const store = readStore()
   let authority = store.missionCardAuthorities.find(
     (candidate) => candidate.missionId === missionId,
   )
@@ -320,6 +329,19 @@ export function bindSwarmMissionCardAuthority(input: {
       boundAt,
     })
   }
+  return true
+}
+
+/**
+ * Persist a server-resolved mission/Card association. An upstream anchor may
+ * advance within the same durable Card, but it can never be reassigned to a
+ * different Card owner. That makes a recycled worker/session alias fail closed.
+ */
+export function bindSwarmMissionCardAuthority(
+  input: SwarmMissionCardAuthorityInput,
+): boolean {
+  const store = readStore()
+  if (!bindSwarmMissionCardAuthorityInStore(store, input)) return false
   writeStore(store)
   return true
 }
@@ -386,7 +408,7 @@ export function archiveStaleMissions(staleMs: number = 6 * 60 * 60 * 1000): {
 
 export type CreateOrUpdateMissionResult = SwarmMission & { _created?: boolean }
 
-export function createOrUpdateMission(input: {
+type CreateOrUpdateMissionInput = {
   missionId?: string | null
   title: string
   assignments: Array<{
@@ -396,12 +418,16 @@ export function createOrUpdateMission(input: {
     dependsOn?: Array<string>
     reviewRequired?: boolean
   }>
-}): CreateOrUpdateMissionResult {
-  const store = readStore()
+}
+
+function createOrUpdateMissionInStore(
+  store: SwarmMissionStore,
+  input: CreateOrUpdateMissionInput,
+): { mission: SwarmMission; created: boolean } {
   const createdAt = now()
   const missionId = input.missionId?.trim() || createSwarmMissionId()
   let mission = store.missions.find((item) => item.id === missionId)
-  let createdMission = false
+  let created = false
   if (!mission) {
     mission = {
       id: missionId,
@@ -415,7 +441,7 @@ export function createOrUpdateMission(input: {
       ],
     }
     store.missions.push(mission)
-    createdMission = true
+    created = true
   }
 
   mission.title = input.title || mission.title
@@ -445,8 +471,49 @@ export function createOrUpdateMission(input: {
   }
   mission.updatedAt = now()
   mission.state = deriveMissionState(mission.assignments)
+  return { mission, created }
+}
+
+export function createOrUpdateMission(
+  input: CreateOrUpdateMissionInput,
+): CreateOrUpdateMissionResult {
+  const store = readStore()
+  const result = createOrUpdateMissionInStore(store, input)
   writeStore(store)
-  return Object.assign(mission, { _created: createdMission })
+  return Object.assign(result.mission, { _created: result.created })
+}
+
+/**
+ * Create a mission and its complete authority set in one durable store commit.
+ * Validation happens against an in-memory snapshot first, so a rejected later
+ * anchor or a failed store write cannot leave newly persisted partial bindings.
+ */
+export function createSwarmMissionWithCardAuthorities(
+  input: CreateOrUpdateMissionInput & {
+    missionId: string
+    authorities: Array<Omit<SwarmMissionCardAuthorityInput, 'missionId'>>
+  },
+): CreateOrUpdateMissionResult | null {
+  const missionId = input.missionId.trim()
+  if (!missionId || input.authorities.length === 0) return null
+
+  const store = readStore()
+  if (store.missions.some((mission) => mission.id === missionId)) return null
+  for (const authority of input.authorities) {
+    if (
+      !bindSwarmMissionCardAuthorityInStore(store, {
+        ...authority,
+        missionId,
+      })
+    ) {
+      return null
+    }
+  }
+
+  const result = createOrUpdateMissionInStore(store, { ...input, missionId })
+  if (!result.created) return null
+  writeStore(store)
+  return Object.assign(result.mission, { _created: true })
 }
 
 export function markMissionAssignmentDispatched(input: {
