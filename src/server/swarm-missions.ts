@@ -117,6 +117,10 @@ function shortId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+export function createSwarmMissionId(): string {
+  return shortId('mission')
+}
+
 function readStore(): SwarmMissionStore {
   if (!existsSync(SWARM_MISSIONS_PATH)) {
     return { version: 1, missions: [], missionCardAuthorities: [] }
@@ -395,7 +399,7 @@ export function createOrUpdateMission(input: {
 }): CreateOrUpdateMissionResult {
   const store = readStore()
   const createdAt = now()
-  const missionId = input.missionId?.trim() || shortId('mission')
+  const missionId = input.missionId?.trim() || createSwarmMissionId()
   let mission = store.missions.find((item) => item.id === missionId)
   let createdMission = false
   if (!mission) {

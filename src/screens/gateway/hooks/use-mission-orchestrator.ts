@@ -15,6 +15,7 @@ import type { GatewayAgentCardBinding } from '@/lib/gateway-api'
 import { useMissionStore } from '@/stores/mission-store'
 import {
   killAgentSession,
+  sendToSession,
   steerAgent,
   toggleAgentPause,
 } from '@/lib/gateway-api'
@@ -28,14 +29,6 @@ type SessionRecord = Record<string, unknown>
 type RetryPayload = {
   tasks: Array<HubTask>
   messageText: string
-}
-
-type DispatchResponse = {
-  ok?: boolean
-  error?: string
-  message?: string
-  sessionKey?: string
-  runId?: string | null
 }
 
 type AuthoritativeCardOwner = {
@@ -830,35 +823,21 @@ export function useMissionOrchestrator() {
 
   const dispatchAgentTasks = useCallback(
     async (params: {
-      sessionKey: string
       agentId: string
       agentTasks: Array<HubTask>
       messageText: string
       member?: TeamMember
     }) => {
       const { agentId, agentTasks, messageText, member } = params
-      const sessionKey = await refreshAgentTransport(agentId)
-      const model = member ? resolveGatewayModelId(member.modelId) : ''
-
-      const response = await fetch('/api/agent-dispatch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          sessionKey,
-          message: messageText,
-          missionId: missionRef.current?.id,
-          agentId,
-          ...(model ? { model } : {}),
-          idempotencyKey: createId('dispatch'),
-        }),
-      })
-
-      const payload = (await response
-        .json()
-        .catch(() => ({}))) as DispatchResponse
-      if (!response.ok || payload.ok === false) {
+      try {
+        // Dispatch through the exact Card capability rather than the mutable
+        // gateway session alias. The server re-resolves this binding at the
+        // delivery edge and fails closed if the Card rolls over meanwhile.
+        const { cardBinding } = await refreshAgentControl(agentId)
+        await sendToSession(cardBinding, messageText)
+      } catch (error) {
         const errorMessage =
-          payload.error || payload.message || `HTTP ${response.status}`
+          error instanceof Error ? error.message : 'Mission dispatch failed'
         setAgentStatus(agentId, {
           status: 'error',
           lastSeen: Date.now(),
@@ -899,7 +878,7 @@ export function useMissionOrchestrator() {
       })
     },
     [
-      refreshAgentTransport,
+      refreshAgentControl,
       setAgentStatus,
       setDispatchedTaskIdsByAgent,
       setMissionTasks,
@@ -1067,7 +1046,6 @@ export function useMissionOrchestrator() {
             })
             try {
               await dispatchAgentTasks({
-                sessionKey: leadSessionKey,
                 agentId: leadMember.id,
                 agentTasks: leadTasks,
                 messageText: leadMessage,
@@ -1114,7 +1092,6 @@ export function useMissionOrchestrator() {
             })
             try {
               await dispatchAgentTasks({
-                sessionKey: workerSessionKey,
                 agentId: worker.id,
                 agentTasks: workerTasks,
                 messageText: workerMessage,
@@ -1162,7 +1139,6 @@ export function useMissionOrchestrator() {
           })
           try {
             await dispatchAgentTasks({
-              sessionKey,
               agentId,
               agentTasks,
               messageText,
@@ -1222,13 +1198,12 @@ export function useMissionOrchestrator() {
         lastMessage: 'Retrying agent',
       })
 
-      const newSessionKey = await spawnAgentSession(member, {
+      await spawnAgentSession(member, {
         reuseExisting: false,
         labelSuffix: 'retry',
       })
 
       await dispatchAgentTasks({
-        sessionKey: newSessionKey,
         agentId,
         agentTasks: payload.tasks,
         messageText: payload.messageText,

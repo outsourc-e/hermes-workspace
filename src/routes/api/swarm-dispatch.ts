@@ -15,11 +15,14 @@ import {
 } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import {
+  bindSwarmMissionCardAuthority,
   createOrUpdateMission,
+  createSwarmMissionId,
   getSwarmMission,
   markMissionAssignmentDispatched,
   recordMissionAssignmentBlocked,
   recordMissionCheckpoint,
+  swarmMissionHasExactCardAuthority,
 } from '../../server/swarm-missions'
 import {
   appendSwarmMemoryEvent,
@@ -1461,19 +1464,36 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
       : assignments.length === 1
         ? (assignments.at(0)?.task.slice(0, 120) ?? '')
         : `${assignments.length} assigned tasks`
-  const missionBindingsCurrent = await Promise.all(
-    assignments.map((assignment) =>
-      resolveExactSessionCardOperationBinding(assignment.cardBinding),
-    ),
-  )
-  if (missionBindingsCurrent.some((owner) => !owner)) {
-    throw new SwarmDispatchError(
-      'Session Card dispatch binding changed before mission mutation',
-      409,
-    )
+  const missionId = requestedMissionId || createSwarmMissionId()
+  const existingMission = getSwarmMission(missionId)
+  if (existingMission) {
+    if (
+      !assignments.every((assignment) =>
+        swarmMissionHasExactCardAuthority(missionId, assignment.cardBinding),
+      )
+    ) {
+      throw new SwarmDispatchError('Swarm mission Card authority changed', 409)
+    }
+  } else {
+    for (const assignment of assignments) {
+      if (
+        !bindSwarmMissionCardAuthority({
+          missionId,
+          anchorSource: 'local',
+          anchorKey: assignment.workerId,
+          binding: assignment.cardBinding,
+        })
+      ) {
+        throw new SwarmDispatchError(
+          'Swarm mission Card authority changed',
+          409,
+        )
+      }
+    }
   }
+
   const mission = createOrUpdateMission({
-    missionId: requestedMissionId || null,
+    missionId,
     title: missionTitle,
     assignments,
   })

@@ -20,6 +20,7 @@ reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const gatewayMocks = vi.hoisted(() => ({
   killAgentSession: vi.fn(),
+  sendToSession: vi.fn(),
   steerAgent: vi.fn(),
   toggleAgentPause: vi.fn(),
 }))
@@ -41,6 +42,7 @@ vi.mock('@/stores/mission-store', async (importOriginal) => {
 
 vi.mock('@/lib/gateway-api', () => ({
   killAgentSession: gatewayMocks.killAgentSession,
+  sendToSession: gatewayMocks.sendToSession,
   steerAgent: gatewayMocks.steerAgent,
   toggleAgentPause: gatewayMocks.toggleAgentPause,
 }))
@@ -204,6 +206,7 @@ beforeEach(() => {
   localStorage.clear()
   useMissionStore.setState(useMissionStore.getInitialState(), true)
   gatewayMocks.killAgentSession.mockReset()
+  gatewayMocks.sendToSession.mockReset()
   gatewayMocks.steerAgent.mockReset()
   gatewayMocks.toggleAgentPause.mockReset()
   vi.stubGlobal('EventSource', FakeEventSource)
@@ -273,6 +276,56 @@ describe('authoritative Mission gateway transport', () => {
     )
 
     expect(transports).toEqual(['root-a', 'root-b', 'root-c'])
+  })
+
+  it('dispatches mission work through the exact Card capability rather than a raw session alias', async () => {
+    startStoreMission()
+    const cards = projection('remote:root-a')
+    useMissionStore
+      .getState()
+      .setAgentCardOwner(
+        'agent-1',
+        { cardId: ROOT_CARD_ID, title: 'Root' },
+        cards,
+      )
+    useMissionStore.getState().setMissionState('paused')
+    const activeMission = useMissionStore.getState().activeMission!
+
+    const fetchMock = vi.fn<typeof fetch>((input) => {
+      const url = String(input)
+      if (url === '/api/session-cards') {
+        return Promise.resolve(Response.json(cards))
+      }
+      return Promise.resolve(Response.json({}, { status: 404 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    gatewayMocks.sendToSession.mockResolvedValue({ ok: true })
+
+    const harness = await renderMissionOrchestrator()
+    await React.act(async () => {
+      await harness.current.reconnectMission(activeMission)
+      await harness.current.dispatchMission(activeMission)
+    })
+
+    expect(gatewayMocks.sendToSession).toHaveBeenCalledTimes(1)
+    expect(gatewayMocks.sendToSession).toHaveBeenCalledWith(
+      {
+        kind: 'session-card-owner',
+        cardId: ROOT_CARD_ID,
+        parentCardId: null,
+        canonicalSource: 'remote',
+        canonicalSegmentKey: 'remote:root-a',
+        canonicalTransport: 'gateway',
+      },
+      expect.stringContaining('Verify transport'),
+    )
+    expect(
+      fetchMock.mock.calls.some(
+        ([input]) => String(input) === '/api/agent-dispatch',
+      ),
+    ).toBe(false)
+
+    harness.unmount()
   })
 
   it('refreshes successor transport before steer, pause, and kill while preserving ownership on kill failure', async () => {

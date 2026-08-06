@@ -17,6 +17,7 @@ import {
   appendMissionContinuation,
   markMissionAssignmentsReviewedByWorker,
   recordMissionCheckpoint,
+  swarmMissionHasExactCardAuthority,
 } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import {
@@ -211,13 +212,27 @@ async function recordCheckpoint(input: {
       missionRecorded: false,
     }
   }
-  const mission = recordMissionCheckpoint({
-    missionId,
-    assignmentId,
-    workerId: input.workerId,
-    checkpoint: input.checkpoint,
-    source: 'swarm-orchestrator-loop',
-  })
+  if (
+    missionId &&
+    !swarmMissionHasExactCardAuthority(missionId, input.binding)
+  ) {
+    return {
+      notification: {
+        published: false,
+        sessionKey: notifySessionKey ?? 'main',
+      },
+      missionRecorded: false,
+    }
+  }
+  const mission = missionId
+    ? recordMissionCheckpoint({
+        missionId,
+        assignmentId,
+        workerId: input.workerId,
+        checkpoint: input.checkpoint,
+        source: 'swarm-orchestrator-loop',
+      })
+    : null
 
   if (!(await resolveExactSessionCardOperationBinding(input.binding))) {
     return {
@@ -584,7 +599,14 @@ async function dispatchAssignments(
     if (!(await resolveExactSessionCardOperationBinding(binding))) {
       return { ok: false, status: 409, error: 'Session Card ownership changed' }
     }
-    appendMissionContinuation({ missionId, ...assignment })
+    if (missionId && !swarmMissionHasExactCardAuthority(missionId, binding)) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'Swarm mission Card authority changed',
+      }
+    }
+    if (missionId) appendMissionContinuation({ missionId, ...assignment })
   }
   const res = await fetch(new URL('/api/swarm-dispatch', request.url), {
     method: 'POST',
@@ -673,6 +695,17 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
           typeof body.missionId === 'string' && body.missionId.trim()
             ? body.missionId.trim()
             : null
+        if (
+          missionId &&
+          !boundWorkers.every((worker) =>
+            swarmMissionHasExactCardAuthority(missionId, worker.binding),
+          )
+        ) {
+          return json(
+            { ok: false, error: 'Swarm mission Card authority changed' },
+            { status: 409 },
+          )
+        }
         const results = await Promise.all(
           boundWorkers.map((worker) =>
             runWorkerLoop(worker, staleMinutes * 60_000, dryRun),
@@ -711,7 +744,14 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
                 ),
               )
             ).every(Boolean)
-          if (promptAuthorized)
+          const promptMissionAuthorized =
+            !missionId ||
+            promptBindings.every(
+              (binding) =>
+                !!binding &&
+                swarmMissionHasExactCardAuthority(missionId, binding),
+            )
+          if (promptAuthorized && promptMissionAuthorized)
             orchestrationPrompt = publishSwarmActionPrompt({
               missionId,
               title: 'Worker updates ready',
