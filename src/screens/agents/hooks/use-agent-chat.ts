@@ -80,6 +80,16 @@ function completeSnapshotStorageKey(cardId: string) {
   return `${OPERATIONS_CHAT_COMPLETE_PREFIX}${encodeURIComponent(cardId)}`
 }
 
+function removeStoredValue(key: string) {
+  if (typeof window === 'undefined') return false
+  try {
+    window.localStorage.removeItem(key)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
   if (typeof window === 'undefined' || !cardId) return []
   const key = completeSnapshotStorageKey(cardId)
@@ -88,7 +98,7 @@ function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
     if (!raw) return []
     const parsedValue = JSON.parse(raw) as unknown
     if (!parsedValue || typeof parsedValue !== 'object') {
-      window.localStorage.removeItem(key)
+      removeStoredValue(key)
       return []
     }
     const parsed = parsedValue as Record<string, unknown>
@@ -102,7 +112,7 @@ function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
       !Array.isArray(parsed.messages) ||
       parsed.messages.length > MAX_COMPLETE_MESSAGES
     ) {
-      window.localStorage.removeItem(key)
+      removeStoredValue(key)
       return []
     }
 
@@ -113,7 +123,7 @@ function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
         typeof candidateValue !== 'object' ||
         Array.isArray(candidateValue)
       ) {
-        window.localStorage.removeItem(key)
+        removeStoredValue(key)
         return []
       }
       const candidate = candidateValue as Record<string, unknown>
@@ -126,7 +136,7 @@ function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
         typeof candidate.content !== 'string' ||
         !candidate.content.trim()
       ) {
-        window.localStorage.removeItem(key)
+        removeStoredValue(key)
         return []
       }
       messages.push({
@@ -141,7 +151,7 @@ function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
     }
     return messages
   } catch {
-    window.localStorage.removeItem(key)
+    removeStoredValue(key)
     return []
   }
 }
@@ -150,28 +160,31 @@ function writeCompleteSnapshot(
   cardId: string,
   messages: Array<OperationsChatMessage>,
 ) {
-  if (typeof window === 'undefined' || !cardId) return
+  if (typeof window === 'undefined' || !cardId) return false
   const key = completeSnapshotStorageKey(cardId)
-  if (messages.length === 0) {
-    window.localStorage.removeItem(key)
-    return
-  }
+  if (messages.length === 0) return removeStoredValue(key)
   const envelope: OperationsChatCompleteSnapshot = {
     version: 1,
     owner: { cardId },
     messages: messages.slice(-MAX_COMPLETE_MESSAGES),
   }
-  window.localStorage.setItem(key, JSON.stringify(envelope))
+  try {
+    window.localStorage.setItem(key, JSON.stringify(envelope))
+    return true
+  } catch {
+    return false
+  }
 }
 
 function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
   if (typeof window === 'undefined' || !cardId) return []
+  const key = overlayStorageKey(cardId)
   try {
-    const raw = window.localStorage.getItem(overlayStorageKey(cardId))
+    const raw = window.localStorage.getItem(key)
     if (!raw) return []
     const parsedValue = JSON.parse(raw) as unknown
     if (!parsedValue || typeof parsedValue !== 'object') {
-      window.localStorage.removeItem(overlayStorageKey(cardId))
+      removeStoredValue(key)
       return []
     }
     const parsed = parsedValue as Record<string, unknown>
@@ -185,7 +198,7 @@ function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
       !Array.isArray(parsed.messages) ||
       parsed.messages.length > MAX_OVERLAY_MESSAGES
     ) {
-      window.localStorage.removeItem(overlayStorageKey(cardId))
+      removeStoredValue(key)
       return []
     }
 
@@ -196,7 +209,7 @@ function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
         typeof candidateValue !== 'object' ||
         Array.isArray(candidateValue)
       ) {
-        window.localStorage.removeItem(overlayStorageKey(cardId))
+        removeStoredValue(key)
         return []
       }
       const candidate = candidateValue as Record<string, unknown>
@@ -210,7 +223,7 @@ function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
         !Number.isSafeInteger(candidate.acknowledgementOrdinal) ||
         candidate.acknowledgementOrdinal < 1
       ) {
-        window.localStorage.removeItem(overlayStorageKey(cardId))
+        removeStoredValue(key)
         return []
       }
       messages.push({
@@ -226,7 +239,7 @@ function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
     }
     return messages
   } catch {
-    window.localStorage.removeItem(overlayStorageKey(cardId))
+    removeStoredValue(key)
     return []
   }
 }
@@ -235,18 +248,20 @@ function writeOverlay(
   cardId: string,
   messages: Array<OperationsChatOverlayMessage>,
 ) {
-  if (typeof window === 'undefined' || !cardId) return
+  if (typeof window === 'undefined' || !cardId) return false
   const key = overlayStorageKey(cardId)
-  if (messages.length === 0) {
-    window.localStorage.removeItem(key)
-    return
-  }
+  if (messages.length === 0) return removeStoredValue(key)
   const envelope: OperationsChatOverlayEnvelope = {
     version: 1,
     owner: { cardId },
     messages: messages.slice(-MAX_OVERLAY_MESSAGES),
   }
-  window.localStorage.setItem(key, JSON.stringify(envelope))
+  try {
+    window.localStorage.setItem(key, JSON.stringify(envelope))
+    return true
+  } catch {
+    return false
+  }
 }
 
 function messageSignature(
@@ -484,12 +499,13 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     nextMessages: Array<OperationsChatOverlayMessage>,
     expectedOwner = ownerCardId,
   ) => {
-    if (!expectedOwner) return
+    if (!expectedOwner) return false
     const bounded = nextMessages.slice(-MAX_OVERLAY_MESSAGES)
-    writeOverlay(expectedOwner, bounded)
-    if (overlayOwnerRef.current !== expectedOwner) return
-    overlayRef.current = bounded
-    setOverlayMessages(bounded)
+    if (overlayOwnerRef.current === expectedOwner) {
+      overlayRef.current = bounded
+      setOverlayMessages(bounded)
+    }
+    return writeOverlay(expectedOwner, bounded)
   }
 
   useEffect(() => {
@@ -501,11 +517,11 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
 
   useEffect(() => {
     if (!completeHistory || !cardId) return
-    writeCompleteSnapshot(cardId, currentAuthoritativeMessages)
     setCompleteSnapshot({
       ownerCardId: cardId,
       messages: currentAuthoritativeMessages,
     })
+    writeCompleteSnapshot(cardId, currentAuthoritativeMessages)
   }, [cardId, completeHistory, currentAuthoritativeMessages])
 
   useEffect(() => {
@@ -602,7 +618,16 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
         ),
       }
       let activeSendOverlay = [...overlayRef.current, optimisticUser]
-      commitOverlay(activeSendOverlay, ownerCardId)
+      const overlayBeforeSend = overlayRef.current
+      if (!commitOverlay(activeSendOverlay, ownerCardId)) {
+        if (overlayOwnerRef.current === ownerCardId) {
+          overlayRef.current = overlayBeforeSend
+          setOverlayMessages(overlayBeforeSend)
+        }
+        throw new Error(
+          'Operations chat recovery storage is unavailable. Message was not sent.',
+        )
+      }
 
       const response = await fetch('/api/send-stream', {
         method: 'POST',
