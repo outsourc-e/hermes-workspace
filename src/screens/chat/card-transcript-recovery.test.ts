@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES,
   CARD_TRANSCRIPT_RECOVERY_MAX_TEXT_CHARS,
+  acknowledgeDeliveredCardTranscriptRecoveryMessage,
   appendCardTranscriptRecoveryMessage,
   cardTranscriptMessagesMatch,
   cardTranscriptRecoveryStorageKey,
@@ -634,6 +635,8 @@ describe('Card transcript recovery storage contract', () => {
       contentType: 'text/plain',
       size: 5,
       dataUrl: 'data:text/plain;base64,aGVsbG8=',
+      contentDigest:
+        'sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
     }
     const optimistic = message('user', 'Review the evidence', {
       clientId: 'swarm-client-1',
@@ -641,10 +644,19 @@ describe('Card transcript recovery storage contract', () => {
       status: 'sent',
       attachments: [attachment],
       __swarmDeliveryAcknowledgement: {
-        version: 1,
+        version: 2,
         clientId: 'swarm-client-1',
         observedAt: now,
         contentDigest: swarmDirectChatContentDigest(deliveredContent),
+        attachments: [
+          {
+            id: attachment.id,
+            name: attachment.name,
+            contentType: attachment.contentType,
+            size: attachment.size,
+            contentDigest: attachment.contentDigest,
+          },
+        ],
       },
     })
     const authoritative = message('user', deliveredContent, {
@@ -670,9 +682,7 @@ describe('Card transcript recovery storage contract', () => {
       attachments: [attachment],
       __swarmDeliveryAcknowledgement: optimistic.__swarmDeliveryAcknowledgement,
     })
-    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
-      optimistic,
-    ])
+    expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
 
     const partial = reconcileSessionCardHistoryResponse({
       sessionKey: 'remote:segment-a',
@@ -695,6 +705,132 @@ describe('Card transcript recovery storage contract', () => {
       content: optimistic.content,
       attachments: [attachment],
     })
+  })
+
+  it('keeps attachment recovery when the server acknowledgement digest does not match the durable bytes', () => {
+    const attachment = {
+      id: 'swarm-attachment-integrity',
+      name: 'evidence.txt',
+      contentType: 'text/plain',
+      size: 5,
+      dataUrl: 'data:text/plain;base64,aGVsbG8=',
+      contentDigest:
+        'sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+    }
+    const deliveredContent =
+      '[User attached file: /tmp/swarm/evidence.txt]\nReview the evidence'
+    const optimistic = message('user', 'Review the evidence', {
+      clientId: 'swarm-client-integrity',
+      status: 'sending',
+      attachments: [attachment],
+    })
+    appendCardTranscriptRecoveryMessage(owner, optimistic, { now })
+
+    expect(
+      acknowledgeDeliveredCardTranscriptRecoveryMessage(
+        owner,
+        'swarm-client-integrity',
+        {
+          version: 2,
+          clientId: 'swarm-client-integrity',
+          observedAt: now,
+          contentDigest: swarmDirectChatContentDigest(deliveredContent),
+          attachments: [
+            {
+              id: attachment.id,
+              name: attachment.name,
+              contentType: attachment.contentType,
+              size: attachment.size,
+              contentDigest: `sha256:${'0'.repeat(64)}`,
+            },
+          ],
+        },
+        { now },
+      ),
+    ).toBeNull()
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      optimistic,
+    ])
+  })
+
+  it('retires 50 exactly acknowledged attachment turns so a text followup remains admissible', () => {
+    const attachmentDigest =
+      'sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
+    for (
+      let index = 0;
+      index < CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES;
+      index += 1
+    ) {
+      const clientId = `swarm-capacity-${index}`
+      const attachmentId = `attachment-${index}`
+      const deliveredContent =
+        `[User attached file: /tmp/swarm/evidence-${index}.txt]\n` +
+        `Review evidence ${index}`
+      const optimistic = message('user', `Review evidence ${index}`, {
+        clientId,
+        status: 'sending',
+        attachments: [
+          {
+            id: attachmentId,
+            name: `evidence-${index}.txt`,
+            contentType: 'text/plain',
+            size: 5,
+            dataUrl: 'data:text/plain;base64,aGVsbG8=',
+            contentDigest: attachmentDigest,
+          },
+        ],
+      })
+      expect(
+        appendCardTranscriptRecoveryMessage(owner, optimistic, {
+          now: now + index,
+        }),
+      ).not.toBeNull()
+      const acknowledgement = {
+        version: 2,
+        clientId,
+        observedAt: now + index,
+        contentDigest: swarmDirectChatContentDigest(deliveredContent),
+        attachments: [
+          {
+            id: attachmentId,
+            name: `evidence-${index}.txt`,
+            contentType: 'text/plain',
+            size: 5,
+            contentDigest: attachmentDigest,
+          },
+        ],
+      }
+      expect(
+        acknowledgeDeliveredCardTranscriptRecoveryMessage(
+          owner,
+          clientId,
+          acknowledgement,
+          { now: now + index },
+        ),
+      ).not.toBeNull()
+      expect(
+        removeAcknowledgedCardTranscriptRecoveryMessages(
+          owner,
+          [
+            message('user', deliveredContent, {
+              id: `server-${index}`,
+              timestamp: now + index,
+            }),
+          ],
+          { now: now + index },
+        ),
+      ).toBeNull()
+    }
+
+    expect(
+      appendCardTranscriptRecoveryMessage(
+        owner,
+        message('user', 'Text followup after attachments', {
+          clientId: 'swarm-text-followup',
+        }),
+        { now: now + CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES },
+      ),
+    ).not.toBeNull()
   })
 
   it('removes a Swarm text-only recovery row only after its exact observed echo is complete and durable', () => {

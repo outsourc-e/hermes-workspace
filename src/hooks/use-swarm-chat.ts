@@ -27,7 +27,10 @@ import {
   removeRejectedCardTranscriptRecoveryMessage,
 } from '@/screens/chat/card-transcript-recovery'
 import { parsePortableAttachmentDataUrl } from '@/screens/chat/attachment-envelope'
-import { parseSwarmDirectChatUserAcknowledgement } from '@/lib/swarm-direct-chat-delivery'
+import {
+  parseSwarmDirectChatUserAcknowledgement,
+  swarmDirectChatAttachmentContentDigest,
+} from '@/lib/swarm-direct-chat-delivery'
 
 export type SwarmChatMessage = {
   id: string
@@ -395,9 +398,9 @@ function normalizeCardMessage(
   }
 }
 
-function portableOutgoingAttachments(
+async function portableOutgoingAttachments(
   attachments: ReadonlyArray<ChatAttachment>,
-): Array<ChatAttachment> | null {
+): Promise<Array<ChatAttachment> | null> {
   const portable: Array<ChatAttachment> = []
   for (const attachment of attachments) {
     const parsed = parsePortableAttachmentDataUrl(
@@ -405,15 +408,38 @@ function portableOutgoingAttachments(
       attachment.contentType,
     )
     if (!parsed) return null
+    const id =
+      typeof attachment.id === 'string' && attachment.id.trim()
+        ? attachment.id.trim()
+        : crypto.randomUUID()
+    const name =
+      typeof attachment.name === 'string' ? attachment.name.trim() : ''
+    const size = attachment.size
+    const padding = parsed.base64.endsWith('==')
+      ? 2
+      : parsed.base64.endsWith('=')
+        ? 1
+        : 0
+    const decodedSize = Math.floor((parsed.base64.length * 3) / 4) - padding
+    const contentDigest = await swarmDirectChatAttachmentContentDigest(
+      parsed.base64,
+    )
+    if (
+      !name ||
+      typeof size !== 'number' ||
+      !Number.isSafeInteger(size) ||
+      size !== decodedSize ||
+      !contentDigest
+    ) {
+      return null
+    }
     portable.push({
-      id:
-        typeof attachment.id === 'string' && attachment.id.trim()
-          ? attachment.id
-          : crypto.randomUUID(),
-      name: attachment.name,
+      id,
+      name,
       contentType: parsed.contentType,
-      size: attachment.size,
+      size,
       dataUrl: `data:${parsed.contentType};base64,${parsed.base64}`,
+      contentDigest,
     })
   }
   return portable
@@ -686,7 +712,7 @@ export function useSwarmChat({
     },
   })
 
-  function sendMessage(
+  async function sendMessage(
     prompt: string,
     attachments: ReadonlyArray<ChatAttachment> = [],
   ): Promise<SwarmDirectChatOutcome> {
@@ -694,7 +720,7 @@ export function useSwarmChat({
     if (!activeOwner || !target || (!body && attachments.length === 0)) {
       throw new Error(SAFE_SEND_ERROR)
     }
-    const portableAttachments = portableOutgoingAttachments(attachments)
+    const portableAttachments = await portableOutgoingAttachments(attachments)
     if (!portableAttachments) throw new Error(SAFE_RECOVERY_ERROR)
 
     const optimistic = createOptimisticMessage(body, portableAttachments)

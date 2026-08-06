@@ -392,13 +392,19 @@ export function Swarm2LiveChat({
                 setAdmissionError(null)
                 try {
                   const pending = sendMessage(text, attachments)
-                  void pending.catch(() => {
-                    setAdmissionError(
-                      'Unable to save or deliver this Session Card message',
-                    )
-                    helpers.setValue(text)
-                    helpers.setAttachments(attachments)
-                  })
+                  void pending
+                    .then(() => {
+                      // The hook admits the exact Card-owned recovery row before
+                      // transport. Clear only after delivery is confirmed.
+                      helpers.reset()
+                    })
+                    .catch(() => {
+                      setAdmissionError(
+                        'Unable to save or deliver this Session Card message',
+                      )
+                      helpers.setValue(text)
+                      helpers.setAttachments(attachments)
+                    })
                 } catch {
                   setAdmissionError(
                     'Unable to save or deliver this Session Card message',

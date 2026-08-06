@@ -8,6 +8,7 @@ import { parsePortableAttachmentDataUrl } from './attachment-envelope'
 import type { ChatAttachment, ChatMessage } from './types'
 import type { SwarmDirectChatUserAcknowledgement } from '@/lib/swarm-direct-chat-delivery'
 import {
+  SWARM_DIRECT_CHAT_ACKNOWLEDGEMENT_VERSION,
   parseSwarmDirectChatUserAcknowledgement,
   swarmDirectChatContentDigest,
 } from '@/lib/swarm-direct-chat-delivery'
@@ -428,6 +429,38 @@ function swarmDeliveryAcknowledgement(
   )
 }
 
+function swarmAcknowledgementAttachmentsMatchRecovery(
+  recoveryMessage: ChatMessage,
+  acknowledgement: SwarmDirectChatUserAcknowledgement,
+): boolean {
+  const recoveryAttachments = recoveryMessage.attachments ?? []
+  if (acknowledgement.version !== SWARM_DIRECT_CHAT_ACKNOWLEDGEMENT_VERSION) {
+    return recoveryAttachments.length === 0
+  }
+  if (acknowledgement.attachments.length !== recoveryAttachments.length) {
+    return false
+  }
+  const recoveryByIdentity = new Map<string, ChatAttachment>()
+  for (const attachment of recoveryAttachments) {
+    const identity = normalizedString(attachment.id)
+    if (!identity || recoveryByIdentity.has(identity)) return false
+    recoveryByIdentity.set(identity, attachment)
+  }
+  return acknowledgement.attachments.every((acknowledgedAttachment) => {
+    const recoveryAttachment = recoveryByIdentity.get(acknowledgedAttachment.id)
+    return Boolean(
+      recoveryAttachment &&
+      normalizedString(recoveryAttachment.name) ===
+        acknowledgedAttachment.name &&
+      normalizedString(recoveryAttachment.contentType) ===
+        acknowledgedAttachment.contentType &&
+      recoveryAttachment.size === acknowledgedAttachment.size &&
+      normalizedString(recoveryAttachment.contentDigest) ===
+        acknowledgedAttachment.contentDigest,
+    )
+  })
+}
+
 function swarmDeliveryAcknowledgementMatches(
   recoveryMessage: ChatMessage,
   authoritativeMessage: ChatMessage,
@@ -445,6 +478,14 @@ function swarmDeliveryAcknowledgementMatches(
     '__optimisticId',
   ])
   if (!recoveryClientIdentifiers.has(acknowledgement.clientId)) return false
+  if (
+    !swarmAcknowledgementAttachmentsMatchRecovery(
+      recoveryMessage,
+      acknowledgement,
+    )
+  ) {
+    return false
+  }
 
   const projectedAcknowledgement =
     swarmDeliveryAcknowledgement(authoritativeMessage)
@@ -452,7 +493,10 @@ function swarmDeliveryAcknowledgementMatches(
     return (
       projectedAcknowledgement.clientId === acknowledgement.clientId &&
       projectedAcknowledgement.observedAt === acknowledgement.observedAt &&
-      projectedAcknowledgement.contentDigest === acknowledgement.contentDigest
+      projectedAcknowledgement.contentDigest ===
+        acknowledgement.contentDigest &&
+      JSON.stringify(projectedAcknowledgement) ===
+        JSON.stringify(acknowledgement)
     )
   }
   return (
@@ -535,6 +579,13 @@ function hasOversizedString(value: unknown): boolean {
 
 function validAttachment(value: unknown): boolean {
   if (!record(value)) return false
+  if (
+    value.contentDigest !== undefined &&
+    (typeof value.contentDigest !== 'string' ||
+      !/^sha256:[0-9a-f]{64}$/u.test(value.contentDigest))
+  ) {
+    return false
+  }
   if (
     value.dataUrl !== undefined &&
     !parsePortableAttachmentDataUrl(value.dataUrl, value.contentType)
@@ -950,14 +1001,21 @@ export function acknowledgeDeliveredCardTranscriptRecoveryMessage(
   const existing = readCardTranscriptRecovery(owner, options)
   if (!existing) return null
   if (
-    !existing.messages.some((message) =>
-      hasRecoveryClientIdentity(message, normalizedClientId),
+    !existing.messages.some(
+      (message) =>
+        hasRecoveryClientIdentity(message, normalizedClientId) &&
+        swarmAcknowledgementAttachmentsMatchRecovery(message, acknowledgement),
     )
   ) {
     return null
   }
   const messages = existing.messages.map((message) => {
-    if (!hasRecoveryClientIdentity(message, normalizedClientId)) return message
+    if (
+      !hasRecoveryClientIdentity(message, normalizedClientId) ||
+      !swarmAcknowledgementAttachmentsMatchRecovery(message, acknowledgement)
+    ) {
+      return message
+    }
     return {
       ...message,
       status: 'sent',
@@ -1285,6 +1343,11 @@ function authoritativeAttachmentFidelityAcknowledges(
   authoritativeMessage: ChatMessage,
   recoveryMessage: ChatMessage,
 ): boolean {
+  if (
+    swarmDeliveryAcknowledgementMatches(recoveryMessage, authoritativeMessage)
+  ) {
+    return true
+  }
   const authoritativeAttachments = authoritativeMessage.attachments ?? []
   const recoveryAttachments = recoveryMessage.attachments ?? []
   if (

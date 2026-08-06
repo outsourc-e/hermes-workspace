@@ -41,6 +41,9 @@ const mocks = vi.hoisted(() => ({
   queryOptions: [] as Array<QueryOptions>,
   queryData: undefined as SanitizedTranscript | undefined,
   mutationResults: [] as Array<unknown>,
+  composerReset: vi.fn(),
+  composerSetValue: vi.fn(),
+  composerSetAttachments: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -48,7 +51,10 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 vi.mock('@hugeicons/react', () => ({ HugeiconsIcon: () => null }))
 vi.mock('@/screens/chat/components/chat-composer', async () => {
-  type ReactActual = { createElement: typeof React.createElement }
+  type ReactActual = {
+    createElement: typeof React.createElement
+    useState: typeof React.useState
+  }
   const ReactModule = await vi.importActual<ReactActual>('react')
   const attachment = {
     id: 'swarm-attachment-1',
@@ -71,21 +77,43 @@ vi.mock('@/screens/chat/components/chat-composer', async () => {
     ) => void
   }
   return {
-    ChatComposer: ({ disabled, onSubmit }: ComposerProps) =>
-      ReactModule.createElement(
+    ChatComposer: ({ disabled, onSubmit }: ComposerProps) => {
+      const [value, setValue] = ReactModule.useState('Review the evidence')
+      const [attachments, setAttachments] = ReactModule.useState([attachment])
+      const helpers = {
+        reset: () => {
+          mocks.composerReset()
+          setValue('')
+          setAttachments([])
+        },
+        setValue: (nextValue: string) => {
+          mocks.composerSetValue(nextValue)
+          setValue(nextValue)
+        },
+        setAttachments: (nextAttachments: Array<typeof attachment>) => {
+          mocks.composerSetAttachments(nextAttachments)
+          setAttachments(nextAttachments)
+        },
+      }
+      return ReactModule.createElement(
         'div',
         null,
+        ReactModule.createElement(
+          'output',
+          { 'aria-label': 'Swarm composer draft' },
+          value,
+        ),
+        ReactModule.createElement(
+          'output',
+          { 'aria-label': 'Swarm composer attachment count' },
+          String(attachments.length),
+        ),
         ReactModule.createElement(
           'button',
           {
             type: 'button',
             disabled,
-            onClick: () =>
-              onSubmit('Review the evidence', [attachment], false, {
-                reset: () => undefined,
-                setValue: () => undefined,
-                setAttachments: () => undefined,
-              }),
+            onClick: () => onSubmit(value, attachments, false, helpers),
           },
           'Send attachment',
         ),
@@ -94,16 +122,12 @@ vi.mock('@/screens/chat/components/chat-composer', async () => {
           {
             type: 'button',
             disabled,
-            onClick: () =>
-              onSubmit('', [attachment], false, {
-                reset: () => undefined,
-                setValue: () => undefined,
-                setAttachments: () => undefined,
-              }),
+            onClick: () => onSubmit('', attachments, false, helpers),
           },
           'Send attachment only',
         ),
-      ),
+      )
+    },
   }
 })
 vi.mock('@tanstack/react-query', () => ({
@@ -337,6 +361,9 @@ beforeEach(() => {
   mocks.queryOptions.length = 0
   mocks.queryData = readyTranscript()
   mocks.mutationResults.length = 0
+  mocks.composerReset.mockReset()
+  mocks.composerSetValue.mockReset()
+  mocks.composerSetAttachments.mockReset()
 })
 
 afterEach(() => {
@@ -346,6 +373,7 @@ afterEach(() => {
     mounted.container.remove()
   }
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 describe.each(['/swarm', '/swarm2'] as const)(
@@ -630,6 +658,9 @@ it('binds a valid send to the current local Card and refreshes only that owner h
 })
 
 it('delivers attachment-only submissions after admitting them into Card recovery', async () => {
+  vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+    '00000000-0000-4000-8000-000000000002',
+  )
   const sendCardResponse = cardResponse({
     canonicalSegmentKey: 'local:builder',
   })
@@ -645,6 +676,24 @@ it('delivers attachment-only submissions after admitting them into Card recovery
           cardOwner: rootOwner,
           delivered: true,
           delivery: 'tmux',
+          userAcknowledgement: {
+            version: 2,
+            clientId: '00000000-0000-4000-8000-000000000002',
+            observedAt: 500,
+            contentDigest: swarmDirectChatContentDigest(
+              '[User attached file: /tmp/evidence.txt]\nPlease review the attached content.',
+            ),
+            attachments: [
+              {
+                id: 'swarm-attachment-1',
+                name: 'evidence.txt',
+                contentType: 'text/plain',
+                size: 5,
+                contentDigest:
+                  'sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+              },
+            ],
+          },
           fetchedAt: 123,
         }),
       )
@@ -700,8 +749,16 @@ it('delivers attachment-only submissions after admitting them into Card recovery
       contentType: 'text/plain',
       size: 5,
       dataUrl: 'data:text/plain;base64,aGVsbG8=',
+      contentDigest:
+        'sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
     },
   ])
+  await waitFor(() => {
+    expect(screen.getByLabelText('Swarm composer draft').textContent).toBe('')
+    expect(
+      screen.getByLabelText('Swarm composer attachment count').textContent,
+    ).toBe('0')
+  })
 })
 
 it('fails closed before transport when Card recovery storage cannot admit the attachment', async () => {
@@ -729,19 +786,97 @@ it('fails closed before transport when Card recovery storage cannot admit the at
     })
   await React.act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send attachment' }))
-    await Promise.resolve()
+    await vi.waitFor(() =>
+      expect(mocks.composerSetValue).toHaveBeenCalledWith(
+        'Review the evidence',
+      ),
+    )
   })
 
+  await waitFor(() =>
+    expect(
+      screen.getByText('Unable to save or deliver this Session Card message'),
+    ).toBeTruthy(),
+  )
   expect(
     fetchMock.mock.calls.some(
       ([input]) => String(input) === '/api/swarm-direct-chat',
     ),
   ).toBe(false)
   expect(readCardTranscriptRecovery({ cardId: rootOwner.cardId })).toBeNull()
+  expect(screen.getByLabelText('Swarm composer draft').textContent).toBe(
+    'Review the evidence',
+  )
   expect(
-    screen.getByText('Unable to save or deliver this Session Card message'),
-  ).toBeTruthy()
+    screen.getByLabelText('Swarm composer attachment count').textContent,
+  ).toBe('1')
   storageWrite.mockRestore()
+})
+
+it('preserves the mounted Swarm draft and attachments when delivery fails after durable admission', async () => {
+  vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+    '00000000-0000-4000-8000-000000000003',
+  )
+  const fetchMock = vi.fn<typeof fetch>((input, init) => {
+    const url = String(input)
+    if (url === '/api/session-cards') {
+      return Promise.resolve(
+        Response.json(cardResponse({ canonicalSegmentKey: 'local:builder' })),
+      )
+    }
+    if (url === '/api/swarm-direct-chat' && init?.method === 'POST') {
+      return Promise.resolve(
+        Response.json(
+          { error: 'Unable to deliver the worker message' },
+          { status: 500 },
+        ),
+      )
+    }
+    return Promise.reject(new Error(`Unexpected request: ${url}`))
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  await mountViewer(rootOwner, '/swarm2', true)
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Send attachment' }),
+    ).toBeTruthy(),
+  )
+  await React.act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Send attachment' }))
+    await vi.waitFor(() =>
+      expect(mocks.composerSetValue).toHaveBeenCalledWith(
+        'Review the evidence',
+      ),
+    )
+  })
+
+  await waitFor(() =>
+    expect(
+      screen.getByText('Unable to save or deliver this Session Card message'),
+    ).toBeTruthy(),
+  )
+  expect(screen.getByLabelText('Swarm composer draft').textContent).toBe(
+    'Review the evidence',
+  )
+  expect(
+    screen.getByLabelText('Swarm composer attachment count').textContent,
+  ).toBe('1')
+  await waitFor(() =>
+    expect(
+      readCardTranscriptRecovery({ cardId: rootOwner.cardId })?.messages.at(-1),
+    ).toMatchObject({
+      clientId: '00000000-0000-4000-8000-000000000003',
+      status: 'sending',
+      attachments: [
+        {
+          id: 'swarm-attachment-1',
+          contentDigest:
+            'sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+        },
+      ],
+    }),
+  )
 })
 
 it('uses parent/child Card IDs for child history and rejects a nonmatching parent', async () => {

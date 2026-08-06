@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import {
   existsSync,
   mkdirSync,
@@ -69,9 +70,11 @@ const MAX_AGGREGATE_ATTACHMENT_DECODED_BYTES = 2 * 1024 * 1024
 const ATTACHMENT_DIRECTORY = 'workspace-attachments'
 
 type DirectChatAttachment = {
+  id: string
   name: string
   contentType: string
   bytes: Buffer
+  contentDigest: string
 }
 
 type PersistedDirectChatAttachment = DirectChatAttachment & {
@@ -133,9 +136,11 @@ function normalizeDirectChatAttachments(
   if (value === undefined) return []
   if (!Array.isArray(value) || value.length > MAX_ATTACHMENT_COUNT) return null
   const normalized: Array<DirectChatAttachment> = []
+  const attachmentIds = new Set<string>()
   let aggregateBytes = 0
   for (const attachment of value) {
     if (!record(attachment)) return null
+    const id = typeof attachment.id === 'string' ? attachment.id.trim() : ''
     const name =
       typeof attachment.name === 'string' ? attachment.name.trim() : ''
     const contentType =
@@ -145,6 +150,9 @@ function normalizeDirectChatAttachments(
     const declaredSize = attachment.size
     const dataUrl = attachment.dataUrl
     if (
+      !id ||
+      id.length > 128 ||
+      attachmentIds.has(id) ||
       !name ||
       name.length > 255 ||
       name.includes('\0') ||
@@ -172,9 +180,17 @@ function normalizeDirectChatAttachments(
     ) {
       return null
     }
+    const contentDigest = `sha256:${createHash('sha256').update(bytes).digest('hex')}`
+    if (
+      attachment.contentDigest !== undefined &&
+      attachment.contentDigest !== contentDigest
+    ) {
+      return null
+    }
     aggregateBytes += bytes.byteLength
     if (aggregateBytes > MAX_AGGREGATE_ATTACHMENT_DECODED_BYTES) return null
-    normalized.push({ name, contentType, bytes })
+    attachmentIds.add(id)
+    normalized.push({ id, name, contentType, bytes, contentDigest })
   }
   return normalized
 }
@@ -509,6 +525,7 @@ function userAcknowledgementForMessages(
   messages: ReadonlyArray<SwarmChatMessage>,
   clientId: string,
   prompt: string,
+  attachments: ReadonlyArray<DirectChatAttachment>,
 ): SwarmDirectChatUserAcknowledgement | undefined {
   const echo = messages.find(
     (message) =>
@@ -520,6 +537,13 @@ function userAcknowledgementForMessages(
     clientId,
     observedAt: echo.timestamp!,
     contentDigest: swarmDirectChatContentDigest(echo.content),
+    attachments: attachments.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      contentType: attachment.contentType,
+      size: attachment.bytes.byteLength,
+      contentDigest: attachment.contentDigest,
+    })),
   }
 }
 
@@ -529,6 +553,7 @@ async function waitForReply(
   baselineLastId: string | null,
   clientId: string,
   prompt: string,
+  attachments: ReadonlyArray<DirectChatAttachment>,
   limit: number,
   timeoutMs: number,
 ): Promise<DirectChatResponse> {
@@ -561,6 +586,7 @@ async function waitForReply(
           newMessages,
           clientId,
           prompt,
+          attachments,
         )
         return response
       }
@@ -582,6 +608,7 @@ async function waitForReply(
       finalMessages,
       clientId,
       prompt,
+      attachments,
     ),
     error: finalChat.ok ? null : 'Worker reply is unavailable',
     fetchedAt: Date.now(),
@@ -703,6 +730,7 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
           baselineLastId,
           clientId,
           deliveredPrompt,
+          persistedAttachments,
           limit,
           timeoutMs,
         )

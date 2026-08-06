@@ -167,10 +167,11 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
       delivered: true,
       delivery: 'tmux',
       userAcknowledgement: {
-        version: 1,
+        version: 2,
         clientId: 'swarm-client-default',
         observedAt: 2,
         contentDigest: swarmDirectChatContentDigest('Run the focused checks'),
+        attachments: [],
       },
     })
     expect(body).not.toHaveProperty('workerId')
@@ -257,12 +258,46 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
       cardOwner: owner,
       delivered: true,
       userAcknowledgement: {
-        version: 1,
+        version: 2,
         clientId: 'swarm-client-attachment',
         observedAt: 1_800_000_000_000,
         contentDigest: swarmDirectChatContentDigest(deliveredPrompt),
+        attachments: [
+          {
+            id: 'attachment-1',
+            name: 'evidence.txt',
+            contentType: 'text/plain',
+            size: 5,
+            contentDigest:
+              'sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+          },
+        ],
       },
     })
+  })
+
+  it('rejects a mismatched attachment integrity digest before profile or terminal mutation', async () => {
+    const response = await handler({
+      request: request({
+        attachments: [
+          {
+            id: 'attachment-integrity',
+            name: 'evidence.txt',
+            contentType: 'text/plain',
+            size: 5,
+            dataUrl: 'data:text/plain;base64,aGVsbG8=',
+            contentDigest: `sha256:${'0'.repeat(64)}`,
+          },
+        ],
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'Invalid attachments' })
+    expect(mocks.mkdirSync).not.toHaveBeenCalled()
+    expect(mocks.writeFileSync).not.toHaveBeenCalled()
+    expect(mocks.readWorkerMessages).not.toHaveBeenCalled()
+    expect(mocks.execFile).not.toHaveBeenCalled()
   })
 
   it('rejects malformed attachment bytes before profile or terminal mutation', async () => {

@@ -53,6 +53,8 @@ export type ChatAttachment = {
   name?: string
   contentType?: string
   size?: number
+  /** Server-verifiable digest of the decoded attachment bytes. */
+  contentDigest?: string
   url?: string
   dataUrl?: string
   previewUrl?: string
