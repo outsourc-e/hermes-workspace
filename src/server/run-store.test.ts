@@ -467,6 +467,7 @@ describe('run-store persistence', () => {
         runId: 'card-abandon-race',
         cardId: 'remote:card',
         ownedSegmentKeys: ['remote:card-segment'],
+        revalidateCardOwner: () => Promise.resolve(true),
       }),
     ).resolves.toMatchObject({
       outcome: 'terminal',
@@ -513,6 +514,7 @@ describe('run-store persistence', () => {
         runId: 'card-owner-mismatch',
         cardId: 'remote:requested-card',
         ownedSegmentKeys: ['remote:shared-segment'],
+        revalidateCardOwner: () => Promise.resolve(true),
       }),
     ).resolves.toEqual({ outcome: 'not-found' })
     await expect(
@@ -528,6 +530,7 @@ describe('run-store persistence', () => {
         runId: 'card-owner-mismatch',
         cardId: 'remote:other-card',
         ownedSegmentKeys: ['remote:shared-segment'],
+        revalidateCardOwner: () => Promise.resolve(true),
       }),
     ).resolves.toMatchObject({
       outcome: 'abandoned',
@@ -540,6 +543,41 @@ describe('run-store persistence', () => {
       cardId: 'remote:other-card',
       errorMessage: 'Abandoned by user',
     })
+  })
+
+  it('does not mutate when Card ownership rolls over beneath the abandonment lock', async () => {
+    const {
+      abandonActiveCardRun,
+      createPersistedRun,
+      getPersistedRun,
+      markRunStatus,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'card-owner-rollover',
+      sessionKey: 'remote:child-segment',
+      friendlyId: 'remote:child-card',
+      cardId: 'remote:child-card',
+      canonicalSegmentKey: 'remote:child-segment',
+    })
+    await markRunStatus('remote:child-segment', 'card-owner-rollover', 'active')
+    const revalidateCardOwner = vi
+      .fn<() => Promise<boolean>>()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+
+    await expect(
+      abandonActiveCardRun({
+        sessionKey: 'remote:child-segment',
+        runId: 'card-owner-rollover',
+        cardId: 'remote:child-card',
+        ownedSegmentKeys: ['remote:child-segment'],
+        revalidateCardOwner,
+      }),
+    ).resolves.toEqual({ outcome: 'not-found' })
+    expect(revalidateCardOwner).toHaveBeenCalledTimes(2)
+    await expect(
+      getPersistedRun('remote:child-segment', 'card-owner-rollover'),
+    ).resolves.toMatchObject({ status: 'active' })
   })
 
   it('bounds tool count and fields while allowing retained tools to terminalize', async () => {

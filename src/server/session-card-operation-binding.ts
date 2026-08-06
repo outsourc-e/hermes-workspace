@@ -14,6 +14,10 @@ export type SessionCardOperationOwner = Pick<
   'kind' | 'cardId' | 'parentCardId'
 >
 
+export type SessionCardOperationProjection = SessionCardOperationOwner & {
+  continuationSegmentKeys: Array<string>
+}
+
 function isExactSourceIdentity(
   value: unknown,
   source: 'local' | 'remote',
@@ -68,9 +72,9 @@ export function parseSessionCardOperationBinding(
   }
 }
 
-export async function resolveExactSessionCardOperationBinding(
+export async function resolveExactSessionCardOperationProjection(
   binding: SessionCardOperationBinding,
-): Promise<SessionCardOperationOwner | null> {
+): Promise<SessionCardOperationProjection | null> {
   try {
     const resolved = binding.parentCardId
       ? await sessionCardService.resolveChildCard(
@@ -110,10 +114,24 @@ export async function resolveExactSessionCardOperationBinding(
       kind: 'session-card-owner',
       cardId: card.cardId,
       parentCardId: binding.parentCardId,
+      continuationSegmentKeys: [...continuations],
     }
   } catch {
     return null
   }
+}
+
+export async function resolveExactSessionCardOperationBinding(
+  binding: SessionCardOperationBinding,
+): Promise<SessionCardOperationOwner | null> {
+  const projection = await resolveExactSessionCardOperationProjection(binding)
+  return projection
+    ? {
+        kind: projection.kind,
+        cardId: projection.cardId,
+        parentCardId: projection.parentCardId,
+      }
+    : null
 }
 
 /**

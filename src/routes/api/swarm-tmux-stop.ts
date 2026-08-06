@@ -152,10 +152,22 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
           )
         }
 
-        // Reconcile runtime.json so the Swarm UI doesn't show a 'stuck'
-        // worker (tmux gone, lifecycle still says running/blocked). Best
-        // effort — the kill already succeeded, so a write failure here
-        // should NOT fail the stop request. Reported in #235.
+        // Reconcile runtime.json only if the killed alias still belongs to the
+        // same Card. kill-session is awaitable and cannot authorize this file
+        // mutation on its own.
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            {
+              error: 'Session Card stop binding changed after tmux termination',
+              workerId,
+              sessionName,
+              wasRunning: true,
+              killed: true,
+              runtimePatched: false,
+            },
+            { status: 409 },
+          )
+        }
         const profilePath = getSwarmProfilePath(workerId)
         const stoppedAt = Date.now()
         const patchResult = patchSwarmRuntimeFile(profilePath, workerId, {

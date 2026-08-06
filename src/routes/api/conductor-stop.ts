@@ -185,11 +185,26 @@ export const Route = createFileRoute('/api/conductor-stop')({
                     ),
                   ),
                 )) {
+                  const workerBinding = cardBindings.find(
+                    (binding) =>
+                      binding.canonicalSource === 'local' &&
+                      binding.canonicalSegmentKey === `local:${workerId}`,
+                  )
+                  if (!workerBinding) continue
                   try {
-                    resetSwarmWorkerRuntime(workerId, {
-                      actor: 'conductor-stop',
-                      reason: `Cancelled native Conductor mission ${missionId}`,
-                    })
+                    // Native mission cancellation does not authorize a later
+                    // worker runtime reset. Re-resolve each local worker Card
+                    // independently at the file mutation edge.
+                    if (
+                      await resolveExactSessionCardOperationBinding(
+                        workerBinding,
+                      )
+                    ) {
+                      resetSwarmWorkerRuntime(workerId, {
+                        actor: 'conductor-stop',
+                        reason: `Cancelled native Conductor mission ${missionId}`,
+                      })
+                    }
                   } catch {
                     // Runtime reset is best-effort; cancellation state is durable.
                   }

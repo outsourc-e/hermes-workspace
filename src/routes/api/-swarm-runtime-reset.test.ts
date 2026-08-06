@@ -15,6 +15,26 @@ vi.mock('../../server/rate-limit', () => ({
   requireJsonContentType: () => null,
 }))
 
+vi.mock('../../server/session-card-service', () => ({
+  sessionCardService: {
+    resolveCard: (cardId: string) => {
+      const workerId = cardId.slice('local:'.length, -'-card'.length)
+      return Promise.resolve({
+        card: {
+          cardId,
+          canonicalSource: 'local',
+          canonicalSegmentKey: `local:${workerId}`,
+          continuationSegmentKeys: [cardId, `local:${workerId}`],
+          continuationCount: 2,
+          relationshipKind: 'root',
+          childNodes: [],
+        },
+        collection: { completeness: 'complete', retryable: false },
+      })
+    },
+  },
+}))
+
 let tmpHome = ''
 const originalEnv: Record<string, string | undefined> = {}
 
@@ -27,7 +47,22 @@ function setEnv(key: string, value: string | undefined) {
 function writeRuntime(workerId: string, runtime: Record<string, unknown>) {
   const profilePath = path.join(tmpHome, 'profiles', workerId)
   fs.mkdirSync(profilePath, { recursive: true })
-  fs.writeFileSync(path.join(profilePath, 'runtime.json'), JSON.stringify(runtime, null, 2) + '\n', 'utf-8')
+  fs.writeFileSync(
+    path.join(profilePath, 'runtime.json'),
+    JSON.stringify(runtime, null, 2) + '\n',
+    'utf-8',
+  )
+}
+
+function cardBinding(workerId: string) {
+  return {
+    kind: 'session-card-owner',
+    cardId: `local:${workerId}-card`,
+    parentCardId: null,
+    canonicalSource: 'local',
+    canonicalSegmentKey: `local:${workerId}`,
+    canonicalTransport: 'tmux',
+  }
 }
 
 beforeEach(() => {
@@ -73,7 +108,11 @@ describe('/api/swarm-runtime/reset', () => {
       request: new Request('http://localhost/api/swarm-runtime/reset', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workerIds: ['augur'], actor: 'test-suite', reason: 'manual cleanup' }),
+        body: JSON.stringify({
+          cardBindings: [cardBinding('augur')],
+          actor: 'test-suite',
+          reason: 'manual cleanup',
+        }),
       }),
     })
     const body = await res.json()
@@ -83,8 +122,18 @@ describe('/api/swarm-runtime/reset', () => {
     expect(body.workerIds).toEqual(['augur'])
     expect(body.resetCount).toBe(1)
 
-    const augurRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'augur', 'runtime.json'), 'utf-8'))
-    const consulRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'consul', 'runtime.json'), 'utf-8'))
+    const augurRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'augur', 'runtime.json'),
+        'utf-8',
+      ),
+    )
+    const consulRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'consul', 'runtime.json'),
+        'utf-8',
+      ),
+    )
 
     expect(augurRuntime.state).toBe('idle')
     expect(augurRuntime.phase).toBe('cancelled')
@@ -96,16 +145,30 @@ describe('/api/swarm-runtime/reset', () => {
   })
 
   it('resets all worker profiles but skips the synthetic workspace profile', async () => {
-    writeRuntime('builder', { workerId: 'builder', state: 'blocked', phase: 'stalled' })
-    writeRuntime('reviewer', { workerId: 'reviewer', state: 'executing', phase: 'running' })
-    writeRuntime('workspace', { workerId: 'workspace', state: 'blocked', phase: 'stalled' })
+    writeRuntime('builder', {
+      workerId: 'builder',
+      state: 'blocked',
+      phase: 'stalled',
+    })
+    writeRuntime('reviewer', {
+      workerId: 'reviewer',
+      state: 'executing',
+      phase: 'running',
+    })
+    writeRuntime('workspace', {
+      workerId: 'workspace',
+      state: 'blocked',
+      phase: 'stalled',
+    })
 
     const handlers = await loadHandlers()
     const res = await handlers.POST({
       request: new Request('http://localhost/api/swarm-runtime/reset', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          cardBindings: [cardBinding('builder'), cardBinding('reviewer')],
+        }),
       }),
     })
     const body = await res.json()
@@ -113,30 +176,75 @@ describe('/api/swarm-runtime/reset', () => {
     expect(res.status).toBe(200)
     expect(body.workerIds).toEqual(['builder', 'reviewer'])
 
-    const builderRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'builder', 'runtime.json'), 'utf-8'))
-    const reviewerRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'reviewer', 'runtime.json'), 'utf-8'))
-    const workspaceRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'workspace', 'runtime.json'), 'utf-8'))
+    const builderRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'builder', 'runtime.json'),
+        'utf-8',
+      ),
+    )
+    const reviewerRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'reviewer', 'runtime.json'),
+        'utf-8',
+      ),
+    )
+    const workspaceRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'workspace', 'runtime.json'),
+        'utf-8',
+      ),
+    )
 
     expect(builderRuntime.state).toBe('idle')
     expect(reviewerRuntime.state).toBe('idle')
     expect(workspaceRuntime.state).toBe('blocked')
   })
 
-  it('rejects unknown worker ids', async () => {
-    writeRuntime('builder', { workerId: 'builder', state: 'blocked', phase: 'stalled' })
+  it('rejects unknown Card-bound worker ids', async () => {
+    writeRuntime('builder', {
+      workerId: 'builder',
+      state: 'blocked',
+      phase: 'stalled',
+    })
 
     const handlers = await loadHandlers()
     const res = await handlers.POST({
       request: new Request('http://localhost/api/swarm-runtime/reset', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workerIds: ['ghost-worker'] }),
+        body: JSON.stringify({
+          cardBindings: [cardBinding('ghost-worker')],
+        }),
       }),
     })
     const body = await res.json()
 
     expect(res.status).toBe(400)
     expect(body.ok).toBe(false)
-    expect(body.error).toContain('unknown worker ids')
+    expect(body.error).toContain('Exact Session Card reset bindings required')
+  })
+
+  it('rejects legacy raw worker ids', async () => {
+    writeRuntime('builder', {
+      workerId: 'builder',
+      state: 'blocked',
+      phase: 'stalled',
+    })
+
+    const handlers = await loadHandlers()
+    const res = await handlers.POST({
+      request: new Request('http://localhost/api/swarm-runtime/reset', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workerIds: ['builder'] }),
+      }),
+    })
+    const body = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(body).toEqual({
+      ok: false,
+      error: 'Raw workerIds reset is unsupported',
+    })
   })
 })

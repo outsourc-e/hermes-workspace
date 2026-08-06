@@ -2,7 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { abandonActiveCardRun, listAllActiveRuns } from '../../server/run-store'
-import { sessionCardService } from '../../server/session-card-service'
+import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationProjection,
+} from '../../server/session-card-operation-binding'
 import { normalizedCardId } from './-session-card-http'
 
 function unavailable(): Response {
@@ -51,42 +54,58 @@ export const Route = createFileRoute(
           body && typeof body === 'object' && !Array.isArray(body)
             ? exactRunId((body as Record<string, unknown>).runId)
             : null
+        const rawBinding =
+          body && typeof body === 'object' && !Array.isArray(body)
+            ? (body as Record<string, unknown>).cardBinding
+            : null
+        const rawSource =
+          rawBinding &&
+          typeof rawBinding === 'object' &&
+          !Array.isArray(rawBinding)
+            ? (rawBinding as Record<string, unknown>).canonicalSource
+            : null
+        const cardBinding =
+          rawSource === 'local' || rawSource === 'remote'
+            ? parseSessionCardOperationBinding(rawBinding, {
+                source: rawSource,
+                transport: rawSource === 'local' ? 'tmux' : 'gateway',
+              })
+            : null
         if (!runId) {
           return json(
             { ok: false, error: 'Valid runId required' },
             { status: 400 },
           )
         }
+        if (!cardBinding || cardBinding.cardId !== cardId) {
+          return json(
+            { ok: false, error: 'Valid Session Card run binding required' },
+            { status: 400 },
+          )
+        }
 
         try {
-          // Resolve after reading the mutable run set so the destructive write
-          // is authorized against the freshest complete Card projection.
-          const runs = await listAllActiveRuns()
-          const resolved = await sessionCardService.resolveCard(cardId)
-          if (resolved.collection.completeness !== 'complete') {
+          let owner =
+            await resolveExactSessionCardOperationProjection(cardBinding)
+          if (!owner) {
             return unavailable()
           }
-          if (resolved.card.cardId !== cardId) {
-            return json(
-              { ok: false, error: 'Active Card run not found' },
-              { status: 404 },
-            )
+          const runs = await listAllActiveRuns()
+          // The active-run scan is awaitable. Re-resolve the exact parent/child
+          // binding before using its continuation set as authority.
+          owner = await resolveExactSessionCardOperationProjection(cardBinding)
+          if (!owner) {
+            return unavailable()
           }
-
-          const ownedSegments = new Set(resolved.card.continuationSegmentKeys)
+          const ownedSegments = new Set(owner.continuationSegmentKeys)
           const candidates = runs.filter((run) => {
             if (run.runId !== runId) return false
-            const hasPersistedCardOwner =
-              run.cardId !== undefined || run.canonicalSegmentKey !== undefined
-            if (hasPersistedCardOwner) {
-              return (
-                run.cardId === cardId &&
-                typeof run.canonicalSegmentKey === 'string' &&
-                ownedSegments.has(run.canonicalSegmentKey) &&
-                ownedSegments.has(run.sessionKey)
-              )
-            }
-            return ownedSegments.has(run.sessionKey)
+            return (
+              run.cardId === cardId &&
+              typeof run.canonicalSegmentKey === 'string' &&
+              ownedSegments.has(run.canonicalSegmentKey) &&
+              ownedSegments.has(run.sessionKey)
+            )
           })
           if (candidates.length !== 1) {
             return json(
@@ -100,7 +119,19 @@ export const Route = createFileRoute(
             sessionKey: run.sessionKey,
             runId: run.runId,
             cardId,
-            ownedSegmentKeys: resolved.card.continuationSegmentKeys,
+            ownedSegmentKeys: owner.continuationSegmentKeys,
+            revalidateCardOwner: async () => {
+              const freshOwner =
+                await resolveExactSessionCardOperationProjection(cardBinding)
+              return Boolean(
+                freshOwner &&
+                typeof run.canonicalSegmentKey === 'string' &&
+                freshOwner.continuationSegmentKeys.includes(run.sessionKey) &&
+                freshOwner.continuationSegmentKeys.includes(
+                  run.canonicalSegmentKey,
+                ),
+              )
+            },
           })
           if (result.outcome === 'not-found') {
             return json(

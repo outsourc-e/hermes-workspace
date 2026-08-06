@@ -15,12 +15,17 @@ import { isSwarmWorkerId } from '../../server/swarm-roster'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
+import {
   checkpointFromRuntimeSnapshot,
   readRuntimeCheckpointSnapshot,
 } from './swarm-dispatch'
 
 type CheckpointRequest = {
   workerId?: unknown
+  cardBinding?: unknown
   state?: unknown
   phase?: unknown
   currentTask?: unknown
@@ -156,6 +161,22 @@ export const Route = createFileRoute('/api/swarm-checkpoint')({
         }
         const input = parsed.data
         const workerId = input.workerId
+        const cardBinding = parseSessionCardOperationBinding(body.cardBinding, {
+          source: 'local',
+          transport: 'tmux',
+          canonicalSegmentKey: `local:${workerId}`,
+        })
+        if (!cardBinding) {
+          return json(
+            {
+              ok: false,
+              error: 'Valid Session Card checkpoint binding required',
+            },
+            { status: 400 },
+          )
+        }
+        const bindingIsCurrent = async () =>
+          Boolean(await resolveExactSessionCardOperationBinding(cardBinding))
 
         const patch: Record<string, unknown> = {
           workerId,
@@ -181,10 +202,28 @@ export const Route = createFileRoute('/api/swarm-checkpoint')({
         }
 
         const profilePath = getSwarmProfilePath(workerId)
+        if (!(await bindingIsCurrent())) {
+          return json(
+            {
+              ok: false,
+              error: 'Session Card ownership changed before checkpoint',
+            },
+            { status: 409 },
+          )
+        }
         mkdirSync(profilePath, { recursive: true })
         const runtimePath = join(profilePath, 'runtime.json')
         const current = readCurrent(runtimePath)
         const next = { ...current, ...patch }
+        if (!(await bindingIsCurrent())) {
+          return json(
+            {
+              ok: false,
+              error: 'Session Card ownership changed before checkpoint',
+            },
+            { status: 409 },
+          )
+        }
         writeJsonAtomic(runtimePath, next)
 
         const missionId =
@@ -195,6 +234,15 @@ export const Route = createFileRoute('/api/swarm-checkpoint')({
           typeof next.currentAssignmentId === 'string'
             ? next.currentAssignmentId
             : null
+        if (!(await bindingIsCurrent())) {
+          return json(
+            {
+              ok: false,
+              error: 'Session Card ownership changed after checkpoint write',
+            },
+            { status: 409 },
+          )
+        }
         appendSwarmMemoryEvent({
           workerId,
           missionId,
@@ -219,24 +267,34 @@ export const Route = createFileRoute('/api/swarm-checkpoint')({
 
         const runtimeSnapshot = readRuntimeCheckpointSnapshot(profilePath)
         const parsedCheckpoint = checkpointFromRuntimeSnapshot(runtimeSnapshot)
-        const notification = parsedCheckpoint
-          ? publishSwarmCheckpointNotification({
-              workerId,
-              missionId,
-              assignmentId,
-              checkpoint: parsedCheckpoint,
-              notifySessionKey:
-                typeof next.notifySessionKey === 'string'
-                  ? next.notifySessionKey
-                  : null,
-            })
-          : {
-              published: false,
-              sessionKey:
-                typeof next.notifySessionKey === 'string'
-                  ? next.notifySessionKey
-                  : 'main',
-            }
+        let notification = {
+          published: false,
+          sessionKey:
+            typeof next.notifySessionKey === 'string'
+              ? next.notifySessionKey
+              : 'main',
+        }
+        if (parsedCheckpoint) {
+          if (!(await bindingIsCurrent())) {
+            return json(
+              {
+                ok: false,
+                error: 'Session Card ownership changed after checkpoint write',
+              },
+              { status: 409 },
+            )
+          }
+          notification = publishSwarmCheckpointNotification({
+            workerId,
+            missionId,
+            assignmentId,
+            checkpoint: parsedCheckpoint,
+            notifySessionKey:
+              typeof next.notifySessionKey === 'string'
+                ? next.notifySessionKey
+                : null,
+          })
+        }
 
         return json({
           ok: true,

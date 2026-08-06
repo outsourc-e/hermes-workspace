@@ -3,7 +3,7 @@ import { Route as AbandonCardRunRoute } from './session-cards.$cardId.active-run
 
 const mocks = vi.hoisted(() => ({
   isAuthenticated: vi.fn(),
-  resolveCard: vi.fn(),
+  resolveChildCard: vi.fn(),
   listAllActiveRuns: vi.fn(),
   abandonActiveCardRun: vi.fn(),
 }))
@@ -17,7 +17,7 @@ vi.mock('../../server/auth-middleware', () => ({
 }))
 
 vi.mock('../../server/session-card-service', () => ({
-  sessionCardService: { resolveCard: mocks.resolveCard },
+  sessionCardService: { resolveChildCard: mocks.resolveChildCard },
 }))
 
 vi.mock('../../server/run-store', () => ({
@@ -36,13 +36,22 @@ const handler = (
   }
 ).server.handlers.POST
 
-function abandonRequest(runId = 'internal-run-id') {
+const childBinding = {
+  kind: 'session-card-owner',
+  cardId: 'remote:child-card',
+  parentCardId: 'remote:parent-card',
+  canonicalSource: 'remote',
+  canonicalSegmentKey: 'remote:child-tip',
+  canonicalTransport: 'gateway',
+} as const
+
+function abandonRequest(runId = 'internal-run-id', body = {}) {
   return new Request(
     'http://workspace.test/api/session-cards/remote%3Achild-card/active-run/abandon',
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ runId }),
+      body: JSON.stringify({ runId, cardBinding: childBinding, ...body }),
     },
   )
 }
@@ -51,13 +60,16 @@ function resolvedChildCard() {
   return {
     card: {
       cardId: 'remote:child-card',
+      parentCardId: 'remote:parent-card',
       canonicalSource: 'remote',
       canonicalSegmentKey: 'remote:child-tip',
+      canonicalTransport: 'gateway',
       continuationSegmentKeys: [
         'remote:child-card',
         'remote:child-old',
         'remote:child-tip',
       ],
+      continuationCount: 3,
       relationshipKind: 'child',
       childNodes: [],
     },
@@ -67,12 +79,14 @@ function resolvedChildCard() {
 
 beforeEach(() => {
   mocks.isAuthenticated.mockReset().mockReturnValue(true)
-  mocks.resolveCard.mockReset().mockResolvedValue(resolvedChildCard())
+  mocks.resolveChildCard.mockReset().mockResolvedValue(resolvedChildCard())
   mocks.listAllActiveRuns.mockReset().mockResolvedValue([
     {
       runId: 'internal-run-id',
       sessionKey: 'remote:child-old',
       friendlyId: 'internal-friendly-id',
+      cardId: 'remote:child-card',
+      canonicalSegmentKey: 'remote:child-old',
       status: 'active',
     },
   ])
@@ -83,23 +97,29 @@ beforeEach(() => {
 })
 
 describe('Card-owned active-run abandonment', () => {
-  it('resolves fresh Card ownership before mutating and returns no raw identity', async () => {
+  it('validates the parent-qualified child binding before the locked mutation', async () => {
     const response = await handler({
       request: abandonRequest(),
       params: { cardId: 'remote:child-card' },
     })
 
-    expect(mocks.resolveCard).toHaveBeenCalledWith('remote:child-card')
-    expect(mocks.abandonActiveCardRun).toHaveBeenCalledWith({
-      sessionKey: 'remote:child-old',
-      runId: 'internal-run-id',
-      cardId: 'remote:child-card',
-      ownedSegmentKeys: [
-        'remote:child-card',
-        'remote:child-old',
-        'remote:child-tip',
-      ],
-    })
+    expect(mocks.resolveChildCard).toHaveBeenCalledWith(
+      'remote:parent-card',
+      'remote:child-card',
+    )
+    expect(mocks.abandonActiveCardRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionKey: 'remote:child-old',
+        runId: 'internal-run-id',
+        cardId: 'remote:child-card',
+        ownedSegmentKeys: [
+          'remote:child-card',
+          'remote:child-old',
+          'remote:child-tip',
+        ],
+        revalidateCardOwner: expect.any(Function),
+      }),
+    )
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
       ok: true,
@@ -108,7 +128,19 @@ describe('Card-owned active-run abandonment', () => {
     })
   })
 
-  it('fails closed when the active run is outside the freshly resolved Card', async () => {
+  it('rejects a child request without its parent binding', async () => {
+    const response = await handler({
+      request: abandonRequest('internal-run-id', {
+        cardBinding: { ...childBinding, parentCardId: null },
+      }),
+      params: { cardId: 'remote:child-card' },
+    })
+
+    expect(response.status).toBe(503)
+    expect(mocks.abandonActiveCardRun).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the active run is outside the fresh child projection', async () => {
     mocks.listAllActiveRuns.mockResolvedValue([
       {
         runId: 'other-run',
@@ -140,7 +172,7 @@ describe('Card-owned active-run abandonment', () => {
   })
 
   it('fails closed when fresh Card ownership is incomplete', async () => {
-    mocks.resolveCard.mockResolvedValue({
+    mocks.resolveChildCard.mockResolvedValue({
       ...resolvedChildCard(),
       collection: { completeness: 'incomplete', retryable: true, sources: [] },
     })
@@ -174,8 +206,20 @@ describe('Card-owned active-run abandonment', () => {
     })
   })
 
-  it('fails closed when ownership changes before the locked mutation', async () => {
-    mocks.abandonActiveCardRun.mockResolvedValue({ outcome: 'not-found' })
+  it('fails closed when ownership changes beneath the locked mutation', async () => {
+    mocks.abandonActiveCardRun.mockImplementation(async (input) => {
+      mocks.resolveChildCard.mockResolvedValueOnce({
+        ...resolvedChildCard(),
+        card: {
+          ...resolvedChildCard().card,
+          continuationSegmentKeys: ['remote:child-card', 'remote:child-tip'],
+          continuationCount: 2,
+        },
+      })
+      return (await input.revalidateCardOwner())
+        ? { outcome: 'abandoned', run: { status: 'error' } }
+        : { outcome: 'not-found' }
+    })
 
     const response = await handler({
       request: abandonRequest(),

@@ -3,8 +3,9 @@ import { useNavigate } from '@tanstack/react-router'
 
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
-import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import { fetchSessionCards } from '@/screens/chat/chat-queries'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import { resolveSessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
+import { resolveMutableSessionCardBinding } from '@/lib/swarm-card-bindings'
 
 type BackgroundRun = {
   runId: string
@@ -121,12 +123,22 @@ export function BackgroundRunsSection({
       activity.navigation.inspectedChildCardId ?? activity.navigation.cardId
     setBusyRunId(activity.run.runId)
     try {
+      const cardBinding = resolveMutableSessionCardBinding(
+        await fetchSessionCards(),
+        {
+          cardId,
+          parentCardId: activity.navigation.inspectedChildCardId
+            ? activity.navigation.cardId
+            : null,
+        },
+      )
+      if (!cardBinding) return
       const response = await fetch(
         `/api/session-cards/${encodeURIComponent(cardId)}/active-run/abandon`,
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ runId: activity.run.runId }),
+          body: JSON.stringify({ runId: activity.run.runId, cardBinding }),
         },
       )
       if (!response.ok) return

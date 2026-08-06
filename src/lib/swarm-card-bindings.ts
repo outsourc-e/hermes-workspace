@@ -20,6 +20,12 @@ export type SwarmWorkerCardBinding = SwarmWorkerCardOwner & {
   canonicalTransport: 'tmux'
 }
 
+export type MutableSessionCardBinding = SwarmWorkerCardOwner & {
+  canonicalSource: 'local' | 'remote'
+  canonicalSegmentKey: string
+  canonicalTransport: 'tmux' | 'gateway'
+}
+
 function exactSourceQualifiedIdentity(
   value: unknown,
   source: 'local' | 'remote',
@@ -83,6 +89,69 @@ function childHasAuthoritativeProjection(
     },
     source,
   )
+}
+
+function findChild(
+  children: ReadonlyArray<SessionCardChildWire>,
+  cardId: string,
+): SessionCardChildWire | null {
+  for (const child of children) {
+    if (child.cardId === cardId) return child
+    const descendant = findChild(child.childNodes ?? [], cardId)
+    if (descendant) return descendant
+  }
+  return null
+}
+
+/** Resolve a mounted mutation target to an exact source-qualified Card binding. */
+export function resolveMutableSessionCardBinding(
+  response: SessionCardListWire | undefined,
+  input: { cardId: string; parentCardId?: string | null },
+): MutableSessionCardBinding | null {
+  if (!response || !Array.isArray(response.cards)) return null
+  const parentCardId = input.parentCardId ?? null
+  const root = response.cards.find((card) =>
+    parentCardId ? card.cardId === parentCardId : card.cardId === input.cardId,
+  )
+  if (!root || !hasExactCompleteSessionCardProjection(response, root.cardId)) {
+    return null
+  }
+  const source = root.canonicalSource
+  if (source !== 'local' && source !== 'remote') return null
+  if (!hasSourceCompleteContinuationProjection(root, source)) return null
+
+  const owner = parentCardId ? findChild(root.childNodes, input.cardId) : root
+  if (!owner) return null
+  const canonicalSegmentKey =
+    'sessionKey' in owner ? owner.sessionKey : owner.canonicalSegmentKey
+  if (
+    !hasSourceCompleteContinuationProjection(
+      {
+        cardId: owner.cardId,
+        canonicalSegmentKey,
+        continuationSegmentKeys: owner.continuationSegmentKeys,
+        continuationCount: owner.continuationCount,
+      },
+      source,
+    )
+  ) {
+    return null
+  }
+  const transport =
+    source === 'local'
+      ? 'tmux'
+      : root.canonicalTransport === 'gateway'
+        ? 'gateway'
+        : null
+  if (!transport) return null
+  return {
+    kind: 'session-card-owner',
+    cardId: owner.cardId,
+    parentCardId,
+    canonicalSource: source,
+    canonicalSegmentKey,
+    canonicalTransport: transport,
+  }
 }
 
 function ownsCurrentLocalWorkerAlias(

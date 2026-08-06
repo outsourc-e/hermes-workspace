@@ -290,20 +290,24 @@ export function RouterChat({
               `${member.role} ${member.specialty ?? ''}`,
             ),
           )
+        const followWorkerIds = [
+          ...new Set([
+            ...plan.map((item) => item.workerId),
+            ...(reviewer ? [reviewer.id] : []),
+          ]),
+        ]
+        const followBindings =
+          await fetchExactSwarmWorkerCardBindings(followWorkerIds)
         const follow = await fetch('/api/swarm-orchestrator-loop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            workerIds: [
-              ...new Set([
-                ...plan.map((item) => item.workerId),
-                ...(reviewer ? [reviewer.id] : []),
-              ]),
-            ],
+            cardBindings: followWorkerIds.map((workerId) =>
+              followBindings.get(workerId),
+            ),
             staleMinutes: 3,
             autoContinue: true,
             allowExecution: false,
-            reviewWorkerId: reviewer?.id,
           }),
         })
         const followData = (await follow

@@ -15,6 +15,7 @@ import {
   parseSessionCardOperationBinding,
   resolveExactSessionCardOperationBinding,
 } from '../../server/session-card-operation-binding'
+import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 
 type CancelPostBody = {
   action?: unknown
@@ -25,16 +26,36 @@ type CancelPostBody = {
   actor?: unknown
   resetWorkers?: unknown
   cardBinding?: unknown
+  workerCardBindings?: unknown
 }
 
 function cleanString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
+function parseWorkerCardBindings(
+  value: unknown,
+): ReadonlyMap<string, SessionCardOperationBinding> | null {
+  if (!Array.isArray(value)) return null
+  const bindings = new Map<string, SessionCardOperationBinding>()
+  for (const candidate of value) {
+    const binding = parseSessionCardOperationBinding(candidate, {
+      source: 'local',
+      transport: 'tmux',
+    })
+    if (!binding || !binding.canonicalSegmentKey.startsWith('local:'))
+      return null
+    const workerId = binding.canonicalSegmentKey.slice('local:'.length)
+    if (!workerId || bindings.has(workerId)) return null
+    bindings.set(workerId, binding)
+  }
+  return bindings
+}
+
 export const Route = createFileRoute('/api/swarm-missions')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -121,17 +142,21 @@ export const Route = createFileRoute('/api/swarm-missions')({
         const reason =
           cleanString(body.reason) ?? 'Cancelled from Workspace Swarm'
         const assignmentId = cleanString(body.assignmentId)
-        const workerId = cleanString(body.workerId)
-        const result =
-          assignmentId || workerId
-            ? cancelSwarmAssignment({
-                missionId,
-                assignmentId,
-                workerId,
-                actor,
-                reason,
-              })
-            : cancelSwarmMission({ missionId, actor, reason })
+        if (Object.prototype.hasOwnProperty.call(body, 'workerId')) {
+          return json(
+            { ok: false, error: 'Raw workerId cancellation is unsupported' },
+            { status: 400 },
+          )
+        }
+        const result = assignmentId
+          ? cancelSwarmAssignment({
+              missionId,
+              assignmentId,
+              workerId: null,
+              actor,
+              reason,
+            })
+          : cancelSwarmMission({ missionId, actor, reason })
         if (!result)
           return json(
             { ok: false, error: 'Mission or assignment not found' },
@@ -147,13 +172,37 @@ export const Route = createFileRoute('/api/swarm-missions')({
               workerIds.add(assignment.workerId)
           }
         }
-        if (workerId) workerIds.add(workerId)
-        const runtimeResets =
-          body.resetWorkers !== false
-            ? Array.from(workerIds).map((id) =>
-                resetSwarmWorkerRuntime(id, { actor, reason }),
-              )
-            : []
+        const runtimeResets = []
+        if (body.resetWorkers !== false && workerIds.size > 0) {
+          const workerBindings = parseWorkerCardBindings(
+            body.workerCardBindings,
+          )
+          if (!workerBindings) {
+            return json(
+              {
+                ok: false,
+                error: 'Exact worker Card reset bindings required',
+                result,
+              },
+              { status: 409 },
+            )
+          }
+          for (const id of workerIds) {
+            const binding = workerBindings.get(id)
+            if (
+              !binding ||
+              !(await resolveExactSessionCardOperationBinding(binding))
+            ) {
+              runtimeResets.push({
+                workerId: id,
+                ok: false,
+                error: 'Session Card reset binding is unavailable',
+              })
+              continue
+            }
+            runtimeResets.push(resetSwarmWorkerRuntime(id, { actor, reason }))
+          }
+        }
 
         return json({
           ok: true,

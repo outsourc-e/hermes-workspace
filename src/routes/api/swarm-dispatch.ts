@@ -629,21 +629,28 @@ export function dispatchBlockReason(
   return null
 }
 
-function recordDispatchBlock(
+async function recordDispatchBlock(
   workerId: string,
   assignment: AssignmentRequest,
   result: WorkerResult,
   options?: { missionId?: string | null },
-): void {
+): Promise<void> {
   const reason = dispatchBlockReason(result)
   if (!reason) return
-  recordMissionAssignmentBlocked({
-    missionId: options?.missionId,
-    assignmentId: assignment.assignmentId ?? null,
-    workerId,
-    reason,
-    source: 'swarm-dispatch',
-  })
+  if (await resolveExactSessionCardOperationBinding(assignment.cardBinding)) {
+    recordMissionAssignmentBlocked({
+      missionId: options?.missionId,
+      assignmentId: assignment.assignmentId ?? null,
+      workerId,
+      reason,
+      source: 'swarm-dispatch',
+    })
+  }
+  if (
+    !(await resolveExactSessionCardOperationBinding(assignment.cardBinding))
+  ) {
+    return
+  }
   writeRuntimePatch(workerId, {
     state: 'blocked',
     phase: 'blocked',
@@ -776,6 +783,9 @@ export async function ensureLiveTmuxSession(
   }
 
   const profilePath = getProfilePath(workerId)
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'Session Card dispatch binding is unavailable' }
+  }
   ensureSwarmProfileConfig(profilePath)
   const cwd = resolveWorkerCwd(workerId)
   const hermesBin = resolveHermesBin()
@@ -832,8 +842,20 @@ export async function ensureLiveTmuxSession(
   if (exitedPattern.test(startupOutput)) {
     const sanitizedOutput = redactStartupOutput(startupOutput).slice(-4_000)
     const logsDir = join(profilePath, 'logs')
+    if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+      return {
+        ok: false,
+        error: 'Session Card dispatch binding is unavailable',
+      }
+    }
     mkdirSync(logsDir, { recursive: true })
     const startupLogPath = join(logsDir, 'swarm-dispatch-startup.log')
+    if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+      return {
+        ok: false,
+        error: 'Session Card dispatch binding is unavailable',
+      }
+    }
     writeFileSync(
       startupLogPath,
       `${new Date().toISOString()} ${sanitizedOutput}
@@ -1022,6 +1044,19 @@ function runWorker(
   return new Promise((resolve) => {
     void (async () => {
       const workerId = assignment.workerId
+      const bindingIsCurrent = async () =>
+        Boolean(
+          await resolveExactSessionCardOperationBinding(assignment.cardBinding),
+        )
+      const unavailableResult = (): WorkerResult => ({
+        workerId,
+        ok: false,
+        output: '',
+        error: 'Session Card dispatch binding is unavailable',
+        durationMs: 0,
+        exitCode: null,
+        delivery: 'oneshot',
+      })
       const prompt = buildWorkerPrompt({
         workerId,
         task: assignment.task,
@@ -1037,6 +1072,10 @@ function runWorker(
       const baselineRuntimeSignature = runtimeCheckpointSignature(
         runtimeBeforeDispatch,
       )
+      if (!(await bindingIsCurrent())) {
+        resolve(unavailableResult())
+        return
+      }
       markDispatchStarted(
         workerId,
         assignment.task,
@@ -1045,6 +1084,10 @@ function runWorker(
         options?.notifySessionKey ?? 'main',
       )
       if (options?.missionId) {
+        if (!(await bindingIsCurrent())) {
+          resolve(unavailableResult())
+          return
+        }
         markMissionAssignmentDispatched({
           missionId: options.missionId,
           workerId,
@@ -1052,6 +1095,10 @@ function runWorker(
           source: 'swarm-dispatch',
           author: 'aurora',
         })
+      }
+      if (!(await bindingIsCurrent())) {
+        resolve(unavailableResult())
+        return
       }
       appendSwarmMemoryEvent({
         workerId,
@@ -1076,6 +1123,10 @@ function runWorker(
         assignment.cardBinding,
       )
       if (liveResult) {
+        if (!(await bindingIsCurrent())) {
+          resolve(unavailableResult())
+          return
+        }
         markDispatchResult(workerId, liveResult)
         if (options?.waitForCheckpoint && liveResult.ok) {
           const checkpoint = await waitForFreshCheckpoint(
@@ -1086,34 +1137,29 @@ function runWorker(
             options.checkpointPollMs ?? 90_000,
           )
           if (checkpoint) {
+            if (!(await bindingIsCurrent())) {
+              resolve(unavailableResult())
+              return
+            }
             markCheckpointResult(
               workerId,
               checkpoint,
               options.notifySessionKey ?? 'main',
             )
-            const updatedMission = recordMissionCheckpoint({
+            if (!(await bindingIsCurrent())) {
+              resolve(unavailableResult())
+              return
+            }
+            recordMissionCheckpoint({
               missionId: options.missionId,
               assignmentId: assignment.assignmentId ?? null,
               workerId,
               checkpoint,
               source: 'swarm-dispatch',
             })
-            if (updatedMission?._completed) {
-              try {
-                for (const wId of new Set(
-                  updatedMission.assignments.map((a) => a.workerId),
-                )) {
-                  appendSwarmMemoryEvent({
-                    workerId: wId,
-                    missionId: updatedMission.id,
-                    type: 'complete',
-                    title: updatedMission.title,
-                    summary: `Mission complete: ${updatedMission.title}`,
-                  })
-                }
-              } catch {
-                /* memory write best-effort */
-              }
+            if (!(await bindingIsCurrent())) {
+              resolve(unavailableResult())
+              return
             }
             appendSwarmMemoryEvent({
               workerId,
@@ -1131,6 +1177,10 @@ function runWorker(
                 nextAction: checkpoint.nextAction,
               },
             })
+            if (!(await bindingIsCurrent())) {
+              resolve(unavailableResult())
+              return
+            }
             publishSwarmCheckpointNotification({
               workerId,
               missionId: options.missionId ?? null,
@@ -1149,7 +1199,7 @@ function runWorker(
         } else {
           liveResult.checkpointStatus = 'not-requested'
         }
-        recordDispatchBlock(workerId, assignment, liveResult, options)
+        await recordDispatchBlock(workerId, assignment, liveResult, options)
         resolve(liveResult)
         return
       }
@@ -1164,8 +1214,8 @@ function runWorker(
           exitCode: null,
           delivery: 'oneshot',
         }
-        markDispatchResult(workerId, result)
-        recordDispatchBlock(workerId, assignment, result, options)
+        if (await bindingIsCurrent()) markDispatchResult(workerId, result)
+        await recordDispatchBlock(workerId, assignment, result, options)
         resolve(result)
         return
       }
@@ -1195,7 +1245,6 @@ function runWorker(
           exitCode: null,
           delivery: 'oneshot',
         }
-        markDispatchResult(workerId, result)
         resolve(result)
         return
       }
@@ -1209,7 +1258,7 @@ function runWorker(
           maxBuffer: MAX_OUTPUT_CHARS,
           killSignal: 'SIGTERM',
         },
-        (error, stdout, stderr) => {
+        async (error, stdout, stderr) => {
           const durationMs = Date.now() - startedAt
           const stdoutStr = (stdout || '').toString()
           const stderrStr = (stderr || '').toString()
@@ -1229,8 +1278,8 @@ function runWorker(
               exitCode: typeof code === 'number' ? code : null,
               delivery: 'oneshot',
             }
-            markDispatchResult(workerId, result)
-            recordDispatchBlock(workerId, assignment, result, options)
+            if (await bindingIsCurrent()) markDispatchResult(workerId, result)
+            await recordDispatchBlock(workerId, assignment, result, options)
             resolve(result)
             return
           }
@@ -1247,11 +1296,19 @@ function runWorker(
           if (options?.waitForCheckpoint) {
             const checkpoint = parseSwarmCheckpoint(out)
             if (checkpoint) {
+              if (!(await bindingIsCurrent())) {
+                resolve(unavailableResult())
+                return
+              }
               markCheckpointResult(
                 workerId,
                 checkpoint,
                 options.notifySessionKey ?? 'main',
               )
+              if (!(await bindingIsCurrent())) {
+                resolve(unavailableResult())
+                return
+              }
               recordMissionCheckpoint({
                 missionId: options.missionId,
                 assignmentId: assignment.assignmentId ?? null,
@@ -1259,6 +1316,10 @@ function runWorker(
                 checkpoint,
                 source: 'swarm-dispatch',
               })
+              if (!(await bindingIsCurrent())) {
+                resolve(unavailableResult())
+                return
+              }
               appendSwarmMemoryEvent({
                 workerId,
                 missionId: options.missionId ?? null,
@@ -1275,6 +1336,10 @@ function runWorker(
                   nextAction: checkpoint.nextAction,
                 },
               })
+              if (!(await bindingIsCurrent())) {
+                resolve(unavailableResult())
+                return
+              }
               publishSwarmCheckpointNotification({
                 workerId,
                 missionId: options.missionId ?? null,
@@ -1291,13 +1356,13 @@ function runWorker(
           } else {
             result.checkpointStatus = 'not-requested'
           }
-          markDispatchResult(workerId, result)
-          recordDispatchBlock(workerId, assignment, result, options)
+          if (await bindingIsCurrent()) markDispatchResult(workerId, result)
+          await recordDispatchBlock(workerId, assignment, result, options)
           resolve(result)
         },
       )
 
-      proc.on('error', (error) => {
+      proc.on('error', async (error) => {
         const result: WorkerResult = {
           workerId,
           ok: false,
@@ -1307,8 +1372,8 @@ function runWorker(
           exitCode: null,
           delivery: 'oneshot',
         }
-        markDispatchResult(workerId, result)
-        recordDispatchBlock(workerId, assignment, result, options)
+        if (await bindingIsCurrent()) markDispatchResult(workerId, result)
+        await recordDispatchBlock(workerId, assignment, result, options)
         resolve(result)
       })
     })()
@@ -1396,16 +1461,37 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
       : assignments.length === 1
         ? (assignments.at(0)?.task.slice(0, 120) ?? '')
         : `${assignments.length} assigned tasks`
+  const missionBindingsCurrent = await Promise.all(
+    assignments.map((assignment) =>
+      resolveExactSessionCardOperationBinding(assignment.cardBinding),
+    ),
+  )
+  if (missionBindingsCurrent.some((owner) => !owner)) {
+    throw new SwarmDispatchError(
+      'Session Card dispatch binding changed before mission mutation',
+      409,
+    )
+  }
   const mission = createOrUpdateMission({
     missionId: requestedMissionId || null,
     title: missionTitle,
     assignments,
   })
   if (mission._created) {
-    for (const workerId of new Set(assignments.map((a) => a.workerId))) {
+    const seenWorkers = new Set<string>()
+    for (const assignment of assignments) {
+      if (seenWorkers.has(assignment.workerId)) continue
+      seenWorkers.add(assignment.workerId)
       try {
+        if (
+          !(await resolveExactSessionCardOperationBinding(
+            assignment.cardBinding,
+          ))
+        ) {
+          continue
+        }
         appendSwarmMemoryEvent({
-          workerId,
+          workerId: assignment.workerId,
           missionId: mission.id,
           type: 'mission-start',
           title: mission.title,

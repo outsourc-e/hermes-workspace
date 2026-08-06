@@ -130,7 +130,7 @@ describe('swarm dispatch tmux mutation authority', () => {
 
   it.each([
     ['new-session', 1, 0],
-    ['launch send-keys', 2, 1],
+    ['launch send-keys', 2, 0],
   ])(
     'rejects exact Card rollover before %s',
     async (_label, staleAt, expectedMutations) => {

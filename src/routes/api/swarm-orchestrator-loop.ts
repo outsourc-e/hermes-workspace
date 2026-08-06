@@ -19,7 +19,10 @@ import {
   recordMissionCheckpoint,
 } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
-import { resolveSessionCardOperationBindingByUpstream } from '../../server/session-card-operation-binding'
+import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
 import {
   publishSwarmActionPrompt,
   publishSwarmCheckpointNotification,
@@ -30,9 +33,11 @@ import {
 } from '../../server/swarm-mode'
 import { isSwarmWorkerId, readSwarmRoster } from '../../server/swarm-roster'
 import type { ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
+import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 
 type LoopRequest = {
   workerIds?: unknown
+  cardBindings?: unknown
   staleMinutes?: unknown
   dryRun?: unknown
   autoContinue?: unknown
@@ -54,6 +59,33 @@ type WorkerLoopResult = {
   runtimePath: string
   notification?: { published: boolean; sessionKey: string }
   error?: string
+}
+
+type BoundWorker = {
+  workerId: string
+  binding: SessionCardOperationBinding
+}
+
+function parseBoundWorkers(value: unknown): Array<BoundWorker> | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+  const workers: Array<BoundWorker> = []
+  for (const candidate of value) {
+    const binding = parseSessionCardOperationBinding(candidate, {
+      source: 'local',
+      transport: 'tmux',
+    })
+    if (!binding || !binding.canonicalSegmentKey.startsWith('local:'))
+      return null
+    const workerId = binding.canonicalSegmentKey.slice('local:'.length)
+    if (
+      !isSwarmWorkerId(workerId) ||
+      workers.some((worker) => worker.workerId === workerId)
+    ) {
+      return null
+    }
+    workers.push({ workerId, binding })
+  }
+  return workers
 }
 
 function validWorkerIds(value: unknown): Array<string> {
@@ -118,16 +150,19 @@ function runtimePatchFromCheckpoint(
   }
 }
 
-function writeRuntimePatch(
+async function writeRuntimePatch(
   workerId: string,
+  binding: SessionCardOperationBinding,
   patch: Record<string, unknown>,
   dryRun: boolean,
-): string {
+): Promise<string | null> {
   const profilePath = getSwarmProfilePath(workerId)
   const runtimePath = join(profilePath, 'runtime.json')
   if (dryRun) return runtimePath
+  if (!(await resolveExactSessionCardOperationBinding(binding))) return null
   mkdirSync(profilePath, { recursive: true })
   const current = readRuntimeJson(runtimePath)
+  if (!(await resolveExactSessionCardOperationBinding(binding))) return null
   writeFileSync(
     runtimePath,
     JSON.stringify({ ...current, ...patch }, null, 2) + '\n',
@@ -143,15 +178,16 @@ function runtimeString(
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
-function recordCheckpoint(input: {
+async function recordCheckpoint(input: {
   workerId: string
+  binding: SessionCardOperationBinding
   checkpoint: ParsedSwarmCheckpoint
   current: Record<string, unknown>
   dryRun: boolean
-}): {
+}): Promise<{
   notification: { published: boolean; sessionKey: string }
   missionRecorded: boolean
-} {
+}> {
   const missionId = runtimeString(input.current, 'currentMissionId')
   const assignmentId = runtimeString(input.current, 'currentAssignmentId')
   const notifySessionKey = runtimeString(input.current, 'notifySessionKey')
@@ -166,6 +202,15 @@ function recordCheckpoint(input: {
     }
   }
 
+  if (!(await resolveExactSessionCardOperationBinding(input.binding))) {
+    return {
+      notification: {
+        published: false,
+        sessionKey: notifySessionKey ?? 'main',
+      },
+      missionRecorded: false,
+    }
+  }
   const mission = recordMissionCheckpoint({
     missionId,
     assignmentId,
@@ -174,6 +219,15 @@ function recordCheckpoint(input: {
     source: 'swarm-orchestrator-loop',
   })
 
+  if (!(await resolveExactSessionCardOperationBinding(input.binding))) {
+    return {
+      notification: {
+        published: false,
+        sessionKey: notifySessionKey ?? 'main',
+      },
+      missionRecorded: Boolean(mission),
+    }
+  }
   appendSwarmMemoryEvent({
     workerId: input.workerId,
     missionId,
@@ -197,6 +251,15 @@ function recordCheckpoint(input: {
     },
   })
 
+  if (!(await resolveExactSessionCardOperationBinding(input.binding))) {
+    return {
+      notification: {
+        published: false,
+        sessionKey: notifySessionKey ?? 'main',
+      },
+      missionRecorded: Boolean(mission),
+    }
+  }
   const notification = publishSwarmCheckpointNotification({
     workerId: input.workerId,
     checkpoint: input.checkpoint,
@@ -207,11 +270,12 @@ function recordCheckpoint(input: {
   return { notification, missionRecorded: Boolean(mission) }
 }
 
-function runWorkerLoop(
-  workerId: string,
+async function runWorkerLoop(
+  worker: BoundWorker,
   staleMs: number,
   dryRun: boolean,
-): WorkerLoopResult {
+): Promise<WorkerLoopResult> {
+  const { workerId, binding } = worker
   const profilePath = join(getProfilesDir(), workerId)
   const runtimePath = join(profilePath, 'runtime.json')
   const current = readRuntimeJson(runtimePath)
@@ -239,12 +303,28 @@ function runWorkerLoop(
         runtimePath,
       }
     }
-    const savedPath = writeRuntimePatch(
+    const savedPath = await writeRuntimePatch(
       workerId,
+      binding,
       runtimePatchFromCheckpoint(workerId, checkpoint),
       dryRun,
     )
-    const recorded = recordCheckpoint({ workerId, checkpoint, current, dryRun })
+    if (!savedPath) {
+      return {
+        workerId,
+        status: 'unavailable',
+        checkpoint,
+        action: 'Session Card ownership changed before runtime update.',
+        runtimePath,
+      }
+    }
+    const recorded = await recordCheckpoint({
+      workerId,
+      binding,
+      checkpoint,
+      current,
+      dryRun,
+    })
     return {
       workerId,
       status: 'checkpointed',
@@ -273,8 +353,17 @@ function runWorkerLoop(
       }
     : {}
   const savedPath = Object.keys(patch).length
-    ? writeRuntimePatch(workerId, patch, dryRun)
+    ? await writeRuntimePatch(workerId, binding, patch, dryRun)
     : runtimePath
+  if (!savedPath) {
+    return {
+      workerId,
+      status: 'unavailable',
+      checkpoint: null,
+      action: 'Session Card ownership changed before runtime update.',
+      runtimePath,
+    }
+  }
   return {
     workerId,
     status: stale ? 'stale' : 'waiting',
@@ -478,23 +567,25 @@ function buildMainSessionPrompt(
 async function dispatchAssignments(
   request: Request,
   assignments: Array<{ workerId: string; task: string; rationale: string }>,
+  bindingsByWorker: ReadonlyMap<string, SessionCardOperationBinding>,
   missionId?: string | null,
 ): Promise<unknown | null> {
   const merged = mergeAssignments(assignments)
   if (merged.length === 0) return null
-  const bindings = await Promise.all(
-    merged.map((assignment) =>
-      resolveSessionCardOperationBindingByUpstream({
-        source: 'local',
-        upstreamKey: assignment.workerId,
-      }),
-    ),
+  const bindings = merged.map((assignment) =>
+    bindingsByWorker.get(assignment.workerId),
   )
   if (bindings.some((binding) => !binding)) {
     return { ok: false, status: 409, error: 'Session Card ownership changed' }
   }
-  for (const assignment of merged)
+  for (let index = 0; index < merged.length; index += 1) {
+    const assignment = merged[index]!
+    const binding = bindings[index]!
+    if (!(await resolveExactSessionCardOperationBinding(binding))) {
+      return { ok: false, status: 409, error: 'Session Card ownership changed' }
+    }
     appendMissionContinuation({ missionId, ...assignment })
+  }
   const res = await fetch(new URL('/api/swarm-dispatch', request.url), {
     method: 'POST',
     headers: {
@@ -536,8 +627,32 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
           )
         }
 
-        const requested = validWorkerIds(body.workerIds)
-        const workerIds = requested.length ? requested : listSwarmWorkerIds()
+        if (Object.prototype.hasOwnProperty.call(body, 'workerIds')) {
+          return json(
+            { ok: false, error: 'Raw workerIds orchestration is unsupported' },
+            { status: 400 },
+          )
+        }
+        const boundWorkers = parseBoundWorkers(body.cardBindings)
+        if (!boundWorkers) {
+          return json(
+            { ok: false, error: 'Exact Session Card loop bindings required' },
+            { status: 400 },
+          )
+        }
+        const workerIds = boundWorkers.map((worker) => worker.workerId)
+        const bindingsByWorker = new Map(
+          boundWorkers.map((worker) => [worker.workerId, worker.binding]),
+        )
+        if (Object.prototype.hasOwnProperty.call(body, 'reviewWorkerId')) {
+          return json(
+            {
+              ok: false,
+              error: 'Raw reviewWorkerId orchestration is unsupported',
+            },
+            { status: 400 },
+          )
+        }
         const staleMinutes =
           typeof body.staleMinutes === 'number' &&
           Number.isFinite(body.staleMinutes)
@@ -558,8 +673,10 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
           typeof body.missionId === 'string' && body.missionId.trim()
             ? body.missionId.trim()
             : null
-        const results = workerIds.map((workerId) =>
-          runWorkerLoop(workerId, staleMinutes * 60_000, dryRun),
+        const results = await Promise.all(
+          boundWorkers.map((worker) =>
+            runWorkerLoop(worker, staleMinutes * 60_000, dryRun),
+          ),
         )
 
         const summary = {
@@ -580,20 +697,35 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
         } | null = null
         const promptText = !dryRun ? buildMainSessionPrompt(results) : null
         if (promptText) {
-          orchestrationPrompt = publishSwarmActionPrompt({
-            missionId,
-            title: 'Worker updates ready',
-            text: promptText,
-            details: {
-              source: 'swarm-orchestrator-loop',
-              checkpointed: summary.checkpointed,
-              stale: summary.stale,
-              waiting: summary.waiting,
-              workerIds: results
-                .filter((item) => item.status === 'checkpointed')
-                .map((item) => item.workerId),
-            },
-          })
+          const promptBindings = results
+            .filter((item) => item.status === 'checkpointed')
+            .map((item) => bindingsByWorker.get(item.workerId))
+          const promptAuthorized =
+            promptBindings.length > 0 &&
+            (
+              await Promise.all(
+                promptBindings.map((binding) =>
+                  binding
+                    ? resolveExactSessionCardOperationBinding(binding)
+                    : null,
+                ),
+              )
+            ).every(Boolean)
+          if (promptAuthorized)
+            orchestrationPrompt = publishSwarmActionPrompt({
+              missionId,
+              title: 'Worker updates ready',
+              text: promptText,
+              details: {
+                source: 'swarm-orchestrator-loop',
+                checkpointed: summary.checkpointed,
+                stale: summary.stale,
+                waiting: summary.waiting,
+                workerIds: results
+                  .filter((item) => item.status === 'checkpointed')
+                  .map((item) => item.workerId),
+              },
+            })
         }
 
         let continuation: unknown | null = null
@@ -602,7 +734,7 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
           assignments.push(
             ...buildNextActionAssignments(results, workerIds, allowExecution),
           )
-          const reviewerId = chooseReviewer(workerIds, body.reviewWorkerId)
+          const reviewerId = chooseReviewer(workerIds, undefined)
           const hasReviewerDone = results.some(
             (item) =>
               item.status === 'checkpointed' &&
@@ -625,6 +757,7 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
           continuation = await dispatchAssignments(
             request,
             assignments,
+            bindingsByWorker,
             missionId,
           )
         }

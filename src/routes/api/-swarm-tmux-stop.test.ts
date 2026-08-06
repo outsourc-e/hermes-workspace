@@ -99,7 +99,7 @@ describe('POST /api/swarm-tmux-stop Card authority', () => {
       wasRunning: true,
       killed: true,
     })
-    expect(mocks.resolveCard).toHaveBeenCalledTimes(2)
+    expect(mocks.resolveCard).toHaveBeenCalledTimes(3)
     expect(mocks.execFile).toHaveBeenCalledWith(
       expect.any(String),
       ['kill-session', '-t', 'swarm-builder'],

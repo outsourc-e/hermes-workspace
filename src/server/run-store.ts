@@ -1462,6 +1462,7 @@ export async function abandonActiveCardRun(input: {
   runId: string
   cardId: string
   ownedSegmentKeys: Array<string>
+  revalidateCardOwner: () => Promise<boolean>
 }): Promise<AbandonActiveCardRunResult> {
   const sessionKey = input.sessionKey
   const cardId = input.cardId
@@ -1485,6 +1486,10 @@ export async function abandonActiveCardRun(input: {
     withRunLocks(
       [{ sessionKey, runId: input.runId }],
       async (assertLocksOwned) => {
+        // Card projection ownership is mutable independently of this run file.
+        // Re-resolve only after the cross-process run lock has been acquired.
+        if (!(await input.revalidateCardOwner()))
+          return { outcome: 'not-found' }
         const current = await getPersistedRun(sessionKey, input.runId)
         if (!current) return { outcome: 'not-found' }
 
@@ -1506,6 +1511,10 @@ export async function abandonActiveCardRun(input: {
         if (!ABANDONABLE_RUN_STATUSES.has(current.status)) {
           return { outcome: 'terminal', run: current }
         }
+
+        // Reading the run is awaitable. Revalidate again at the final write edge.
+        if (!(await input.revalidateCardOwner()))
+          return { outcome: 'not-found' }
 
         const now = Date.now()
         const abandoned = normalizePersistedRun({
