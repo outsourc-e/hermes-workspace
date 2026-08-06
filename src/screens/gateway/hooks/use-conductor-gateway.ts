@@ -862,6 +862,40 @@ export function buildConductorStopCardBindings(
     }))
 }
 
+export function retainConductorOwnersAfterStopFailure(
+  owners: ReadonlyArray<PersistedConductorCardOwner>,
+  bindings: ReadonlyArray<
+    ReturnType<typeof buildConductorStopCardBindings>[number]
+  >,
+  failures: ReadonlyArray<{ operation?: string; id?: string }>,
+): Array<PersistedConductorCardOwner> {
+  const retainedCardIds = new Set<string>()
+  for (const failure of failures) {
+    if (failure.operation === 'stop-mission' || !failure.operation) {
+      return [...owners]
+    }
+    let cardId: string | undefined
+    if (failure.operation === 'delete-session') {
+      cardId = failure.id
+    } else if (failure.operation === 'reset-worker' && failure.id) {
+      cardId = bindings.find(
+        (binding) =>
+          binding.canonicalSource === 'local' &&
+          binding.canonicalSegmentKey === `local:${failure.id}`,
+      )?.cardId
+    } else {
+      // Unknown cleanup categories are unresolved authority, not proof that any
+      // Card owner can be discarded.
+      return [...owners]
+    }
+    if (!cardId || !owners.some((owner) => owner.cardId === cardId)) {
+      return [...owners]
+    }
+    retainedCardIds.add(cardId)
+  }
+  return owners.filter((owner) => retainedCardIds.has(owner.cardId))
+}
+
 function projectUniqueActivityForIdentity(
   activities: ReadonlyArray<ConductorCardActivity>,
   identity: string,
@@ -2520,14 +2554,10 @@ export function useConductorGateway() {
       if (!response.ok || payload.ok !== true) {
         const failures = payload.failures ?? []
         if (failures.length > 0) {
-          const failedCardIds = new Set(
-            failures
-              .filter((failure) => failure.operation === 'delete-session')
-              .map((failure) => failure.id)
-              .filter((id): id is string => Boolean(id)),
-          )
-          const retainedOwners = missionCardOwners.filter((owner) =>
-            failedCardIds.has(owner.cardId),
+          const retainedOwners = retainConductorOwnersAfterStopFailure(
+            missionCardOwners,
+            cardBindings,
+            failures,
           )
           setMissionCardOwners(retainedOwners)
           setOrchestratorCardId((current) =>

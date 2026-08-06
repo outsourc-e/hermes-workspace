@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildConductorStopCardBindings,
   resolveAuthoritativeConductorCardOwner,
+  retainConductorOwnersAfterStopFailure,
   shouldPersistActiveConductorMission,
 } from './use-conductor-gateway'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
@@ -131,5 +132,52 @@ describe('Conductor active mission persistence', () => {
   it('does not persist terminal or idle phases as the active mission', () => {
     expect(shouldPersistActiveConductorMission('idle')).toBe(false)
     expect(shouldPersistActiveConductorMission('complete')).toBe(false)
+  })
+})
+
+describe('Conductor failed cleanup authority retention', () => {
+  const owners = [
+    { cardId: 'remote:mission-card' },
+    { cardId: 'local:builder-card' },
+  ]
+  const bindings = [
+    {
+      kind: 'session-card-owner' as const,
+      cardId: 'remote:mission-card',
+      parentCardId: null,
+      canonicalSource: 'remote' as const,
+      canonicalSegmentKey: 'remote:mission-successor',
+      canonicalTransport: 'gateway' as const,
+    },
+    {
+      kind: 'session-card-owner' as const,
+      cardId: 'local:builder-card',
+      parentCardId: null,
+      canonicalSource: 'local' as const,
+      canonicalSegmentKey: 'local:builder',
+      canonicalTransport: 'tmux' as const,
+    },
+  ]
+
+  it('retains exact owners for remote deletion and worker reset failures', () => {
+    expect(
+      retainConductorOwnersAfterStopFailure(owners, bindings, [
+        { operation: 'delete-session', id: 'remote:mission-card' },
+        { operation: 'reset-worker', id: 'builder' },
+      ]),
+    ).toEqual(owners)
+  })
+
+  it('retains all authority for mission-stop and unknown cleanup failures', () => {
+    expect(
+      retainConductorOwnersAfterStopFailure(owners, bindings, [
+        { operation: 'stop-mission', id: 'mission-1' },
+      ]),
+    ).toEqual(owners)
+    expect(
+      retainConductorOwnersAfterStopFailure(owners, bindings, [
+        { operation: 'future-cleanup', id: 'opaque' },
+      ]),
+    ).toEqual(owners)
   })
 })

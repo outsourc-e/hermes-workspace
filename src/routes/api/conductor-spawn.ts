@@ -12,8 +12,7 @@ import {
 import { sanitizeConductorMissionGoal } from '../../server/conductor-mission-sanitize'
 import {
   bindSwarmMissionCardAuthority,
-  cancelSwarmMission,
-  createOrUpdateMission,
+  createSwarmMissionWithCardAuthorities,
   getSwarmMission,
   recordMissionCheckpoint,
 } from '../../server/swarm-missions'
@@ -54,14 +53,26 @@ class ConductorAdmissionError extends Error {
   }
 }
 
-async function establishMissionCardAuthority(input: {
+async function resolveMissionCardAuthority(input: {
   missionId: string
   source: 'local' | 'remote'
   upstreamKey: string
 }): Promise<SessionCardOperationBinding | null> {
   try {
-    const binding = await resolveSessionCardOperationBindingByUpstream(input)
-    if (!binding) return null
+    return await resolveSessionCardOperationBindingByUpstream(input)
+  } catch {
+    return null
+  }
+}
+
+async function establishMissionCardAuthority(input: {
+  missionId: string
+  source: 'local' | 'remote'
+  upstreamKey: string
+}): Promise<SessionCardOperationBinding | null> {
+  const binding = await resolveMissionCardAuthority(input)
+  if (!binding) return null
+  try {
     return bindSwarmMissionCardAuthority({
       missionId: input.missionId,
       anchorSource: input.source,
@@ -478,14 +489,9 @@ async function createNativeConductorMission(input: {
     supervised: input.supervised,
   })
   const missionTitle = `Conductor: ${clipText(input.goal, 120)}`
-  createOrUpdateMission({
-    missionId: input.missionName,
-    title: missionTitle,
-    assignments,
-  })
   const cardBindings = await Promise.all(
     assignments.map((assignment) =>
-      establishMissionCardAuthority({
+      resolveMissionCardAuthority({
         missionId: input.missionName,
         source: 'local',
         upstreamKey: assignment.workerId,
@@ -493,13 +499,24 @@ async function createNativeConductorMission(input: {
     ),
   )
   if (cardBindings.some((binding) => !binding)) {
-    cancelSwarmMission({
-      missionId: input.missionName,
-      actor: 'conductor-spawn',
-      reason: 'Native Conductor worker Session Card binding unavailable',
-    })
     throw new ConductorAdmissionError(
       'Session Card ownership unavailable for native dispatch',
+      409,
+    )
+  }
+  const mission = createSwarmMissionWithCardAuthorities({
+    missionId: input.missionName,
+    title: missionTitle,
+    assignments,
+    authorities: assignments.map((assignment, index) => ({
+      anchorSource: 'local',
+      anchorKey: assignment.workerId,
+      binding: cardBindings[index]!,
+    })),
+  })
+  if (!mission) {
+    throw new ConductorAdmissionError(
+      'Native Conductor mission authority could not be committed',
       409,
     )
   }
@@ -575,11 +592,12 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           if (nativeMission.state === 'executing') {
             for (const assignment of nativeMission.assignments) {
               if (assignment.state === 'dispatched' && assignment.workerId) {
+                let checkpoint: ReturnType<typeof checkpointFromRuntimeSnapshot>
                 try {
                   const profilePath = getSwarmProfilePath(assignment.workerId)
                   // Check runtime.json first
                   const snapshot = readRuntimeCheckpointSnapshot(profilePath)
-                  let checkpoint = checkpointFromRuntimeSnapshot(snapshot)
+                  checkpoint = checkpointFromRuntimeSnapshot(snapshot)
 
                   // Also check the worker's chat SQLite DB for checkpoint messages
                   // (tmux workers write checkpoints there)
@@ -597,44 +615,63 @@ export const Route = createFileRoute('/api/conductor-spawn')({
                       }
                     }
                   }
+                } catch {
+                  // Runtime/chat checkpoint reads race their writers. A read
+                  // failure is not evidence that a durable checkpoint failed.
+                  continue
+                }
 
+                if (
+                  checkpoint &&
+                  (checkpoint.stateLabel === 'DONE' ||
+                    checkpoint.stateLabel === 'BLOCKED' ||
+                    checkpoint.stateLabel === 'HANDOFF' ||
+                    checkpoint.stateLabel === 'NEEDS_INPUT')
+                ) {
+                  // Re-resolve and bind the exact worker Card at the mutation
+                  // edge. A successful admission-time binding cannot authorize
+                  // a checkpoint after the upstream worker identity rolls.
                   if (
-                    checkpoint &&
-                    (checkpoint.stateLabel === 'DONE' ||
-                      checkpoint.stateLabel === 'BLOCKED' ||
-                      checkpoint.stateLabel === 'HANDOFF' ||
-                      checkpoint.stateLabel === 'NEEDS_INPUT')
+                    !(await bindMissionCardAuthority({
+                      missionId,
+                      source: 'local',
+                      upstreamKey: assignment.workerId,
+                    }))
                   ) {
-                    // Re-resolve and bind the exact worker Card at the mutation
-                    // edge. A successful admission-time binding cannot authorize
-                    // a checkpoint after the upstream worker identity rolls.
-                    if (
-                      !(await bindMissionCardAuthority({
-                        missionId,
-                        source: 'local',
-                        upstreamKey: assignment.workerId,
-                      }))
-                    ) {
-                      return json(
-                        {
-                          ok: false,
-                          error:
-                            'Native Conductor worker Session Card binding is unavailable',
-                          workerId: assignment.workerId,
-                        },
-                        { status: 409 },
-                      )
-                    }
-                    recordMissionCheckpoint({
+                    return json(
+                      {
+                        ok: false,
+                        error:
+                          'Native Conductor worker Session Card binding is unavailable',
+                        workerId: assignment.workerId,
+                      },
+                      { status: 409 },
+                    )
+                  }
+                  try {
+                    const persisted = recordMissionCheckpoint({
                       missionId: nativeMission.id,
                       assignmentId: assignment.id,
                       workerId: assignment.workerId,
                       checkpoint,
                       source: 'conductor-poll',
                     })
+                    if (!persisted) {
+                      throw new Error(
+                        'Mission checkpoint target is unavailable',
+                      )
+                    }
+                  } catch {
+                    return json(
+                      {
+                        ok: false,
+                        retryable: true,
+                        error: 'Unable to persist native Conductor checkpoint',
+                        workerId: assignment.workerId,
+                      },
+                      { status: 503 },
+                    )
                   }
-                } catch {
-                  // runtime.json might not exist yet or be temporarily unreadable
                 }
               }
             }

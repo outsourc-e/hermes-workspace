@@ -4,11 +4,15 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import type { openSync } from 'node:fs'
 
 let tempRoot: string
 
@@ -19,11 +23,23 @@ async function loadModule(options?: { failStoreWrites?: boolean }) {
       const actual = await importOriginal<Record<string, unknown>>()
       return {
         ...actual,
-        writeFileSync: (path: Parameters<typeof writeFileSync>[0]) => {
+        openSync: (...args: Parameters<typeof openSync>) => {
+          const [path] = args
           if (String(path).endsWith('.tmp')) {
             throw new Error('simulated mission store write failure')
           }
-          throw new Error(`Unexpected write to ${String(path)}`)
+          return Reflect.apply(actual.openSync as typeof openSync, actual, args)
+        },
+        writeFileSync: (...args: Parameters<typeof writeFileSync>) => {
+          const [path] = args
+          if (String(path).endsWith('.tmp')) {
+            throw new Error('simulated mission store write failure')
+          }
+          return Reflect.apply(
+            actual.writeFileSync as typeof writeFileSync,
+            actual,
+            args,
+          )
         },
       }
     })
@@ -247,6 +263,88 @@ describe('swarm-missions', () => {
     ).toThrow('simulated mission store write failure')
     expect(JSON.parse(readFileSync(storePath, 'utf8'))).toEqual(baseline)
   })
+
+  it('fails closed without replacing malformed durable mission bytes', async () => {
+    const runtimeDir = join(tempRoot, '.runtime')
+    const storePath = join(runtimeDir, 'swarm-missions.json')
+    const malformed = '{"version":1,"missions":['
+    mkdirSync(runtimeDir, { recursive: true })
+    writeFileSync(storePath, malformed)
+    const mod = await loadModule()
+
+    expect(() =>
+      mod.createOrUpdateMission({
+        missionId: 'must-not-be-admitted',
+        title: 'Malformed-store admission',
+        assignments: [{ workerId: 'builder', task: 'Do not persist' }],
+      }),
+    ).toThrow()
+    expect(readFileSync(storePath, 'utf8')).toBe(malformed)
+  })
+
+  it('fails closed on durable store read errors', async () => {
+    const storePath = join(tempRoot, '.runtime', 'swarm-missions.json')
+    mkdirSync(storePath, { recursive: true })
+    const mod = await loadModule()
+
+    expect(() =>
+      mod.createOrUpdateMission({
+        missionId: 'must-not-replace-unreadable-store',
+        title: 'Unreadable-store admission',
+        assignments: [{ workerId: 'builder', task: 'Do not persist' }],
+      }),
+    ).toThrow()
+    expect(statSync(storePath).isDirectory()).toBe(true)
+  })
+
+  it('serializes independent processes updating the same explicit mission id', async () => {
+    const modulePath = new URL('./swarm-missions.ts', import.meta.url).pathname
+    const tsxPath = join(process.cwd(), 'node_modules', '.bin', 'tsx')
+    const workerCount = 12
+    const children = Array.from({ length: workerCount }, (_, index) => {
+      const script = [
+        `import { createOrUpdateMission } from ${JSON.stringify(modulePath)};`,
+        `createOrUpdateMission({ missionId: 'shared-explicit-id', title: 'Concurrent mission', assignments: [{ workerId: 'worker-${index}', task: 'task-${index}' }] });`,
+      ].join('\n')
+      return new Promise<void>((resolve, reject) => {
+        const child = spawn(tsxPath, ['--eval', script], {
+          cwd: tempRoot,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+        let stderr = ''
+        child.stderr.on('data', (chunk) => {
+          stderr += String(chunk)
+        })
+        child.on('error', reject)
+        child.on('exit', (code) => {
+          if (code === 0) resolve()
+          else reject(new Error(`concurrent writer exited ${code}: ${stderr}`))
+        })
+      })
+    })
+
+    await Promise.all(children)
+    const store = JSON.parse(
+      readFileSync(join(tempRoot, '.runtime', 'swarm-missions.json'), 'utf8'),
+    ) as {
+      missions: Array<{
+        id: string
+        assignments: Array<{ workerId: string; task: string }>
+      }>
+    }
+    const mission = store.missions.find(
+      (candidate) => candidate.id === 'shared-explicit-id',
+    )
+    expect(
+      mission?.assignments
+        .map((assignment) => assignment.workerId)
+        .sort((a, b) => a.localeCompare(b)),
+    ).toEqual(
+      Array.from({ length: workerCount }, (_, index) => `worker-${index}`).sort(
+        (a, b) => a.localeCompare(b),
+      ),
+    )
+  }, 20_000)
 
   it('records checkpoints by assignment id, stores report metadata, and exposes flattened reports', async () => {
     const mod = await loadModule()

@@ -337,6 +337,68 @@ describe('POST /api/conductor-stop Card authority', () => {
     })
   })
 
+  it('rejects a worker reset when that exact worker Card lacks mission authority', async () => {
+    mocks.cancelSwarmMission.mockReturnValue({
+      mission: {
+        assignments: [{ workerId: 'builder' }],
+      },
+      changed: true,
+    })
+    mocks.resolveCard.mockResolvedValue(resolvedLocalCard())
+    mocks.swarmMissionHasExactCardAuthority
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false)
+
+    const response = await handler({
+      request: request({
+        cardBindings: [localBinding],
+        missionIds: ['mission-1'],
+        missionCardId: localBinding.cardId,
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      failures: [
+        {
+          operation: 'reset-worker',
+          id: 'builder',
+          error: 'Session Card worker is not authorized for this mission',
+        },
+      ],
+    })
+    expect(mocks.resetSwarmWorkerRuntime).not.toHaveBeenCalled()
+  })
+
+  it('rejects remote cleanup when the exact worker Card lacks requested mission authority', async () => {
+    mocks.swarmMissionHasExactCardAuthority
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false)
+
+    const response = await handler({
+      request: request({
+        cardBindings: [binding],
+        missionIds: ['mission-1'],
+        missionCardId: binding.cardId,
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      deleted: 0,
+      failures: [
+        {
+          operation: 'delete-session',
+          id: binding.cardId,
+          error: 'Session Card worker is not authorized for this mission',
+        },
+      ],
+    })
+    expect(mocks.deleteSession).not.toHaveBeenCalled()
+  })
+
   it('reports a worker binding that rolls after durable native cancellation', async () => {
     mocks.cancelSwarmMission.mockReturnValue({
       mission: {

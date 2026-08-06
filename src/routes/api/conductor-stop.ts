@@ -215,6 +215,18 @@ export const Route = createFileRoute('/api/conductor-stop')({
                     })
                     continue
                   }
+                  if (
+                    !swarmMissionHasExactCardAuthority(missionId, workerBinding)
+                  ) {
+                    staleAuthority = true
+                    failures.push({
+                      operation: 'reset-worker',
+                      id: workerId,
+                      error:
+                        'Session Card worker is not authorized for this mission',
+                    })
+                    continue
+                  }
                   try {
                     const reset = resetSwarmWorkerRuntime(workerId, {
                       actor: 'conductor-stop',
@@ -290,6 +302,20 @@ export const Route = createFileRoute('/api/conductor-stop')({
                 operation: 'delete-session',
                 id: binding.cardId,
                 error: 'Session Card stop binding is unavailable',
+              })
+              continue
+            }
+            if (
+              missionIds.length > 0 &&
+              !missionIds.some((missionId) =>
+                swarmMissionHasExactCardAuthority(missionId, binding),
+              )
+            ) {
+              staleAuthority = true
+              failures.push({
+                operation: 'delete-session',
+                id: binding.cardId,
+                error: 'Session Card worker is not authorized for this mission',
               })
               continue
             }

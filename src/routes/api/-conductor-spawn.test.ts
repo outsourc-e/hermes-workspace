@@ -10,6 +10,7 @@ import type { SwarmMission } from '../../server/swarm-missions'
 const mocks = vi.hoisted(() => ({
   bindAuthority: vi.fn(),
   cancelMission: vi.fn(),
+  createAtomicMission: vi.fn(),
   createMission: vi.fn(),
   dashboardFetch: vi.fn(),
   dispatchAssignments: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock('../../server/session-card-operation-binding', () => ({
 vi.mock('../../server/swarm-missions', () => ({
   bindSwarmMissionCardAuthority: mocks.bindAuthority,
   cancelSwarmMission: mocks.cancelMission,
+  createSwarmMissionWithCardAuthorities: mocks.createAtomicMission,
   createOrUpdateMission: mocks.createMission,
   getSwarmMission: mocks.getMission,
   recordMissionCheckpoint: mocks.recordCheckpoint,
@@ -120,6 +122,14 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.bindAuthority.mockReturnValue(true)
   mocks.cancelMission.mockReturnValue(null)
+  mocks.createAtomicMission.mockImplementation((input) => ({
+    id: input.missionId,
+    title: input.title,
+    state: 'planning',
+    assignments: input.assignments,
+    events: [],
+    _created: true,
+  }))
   mocks.createMission.mockImplementation((input) => ({
     id: input.missionId,
     title: input.title,
@@ -253,6 +263,58 @@ describe('Conductor mission Card admission', () => {
     expect(mocks.recordCheckpoint).not.toHaveBeenCalled()
   })
 
+  it('returns a retryable non-success when a polled checkpoint cannot be persisted', async () => {
+    const mission = nativeMission()
+    mocks.getMission.mockReturnValue(mission)
+    mocks.readRuntimeSnapshot.mockReturnValue({ checkpointRaw: null })
+    mocks.checkpointFromSnapshot.mockReturnValue({
+      stateLabel: 'DONE',
+      checkpointStatus: 'checkpointed',
+      runtimeState: 'idle',
+      filesChanged: 'none',
+      commandsRun: 'pnpm test',
+      result: 'passed',
+      blocker: null,
+      nextAction: null,
+      raw: 'STATE: DONE',
+    })
+    mocks.recordCheckpoint.mockImplementation(() => {
+      throw new Error('disk full')
+    })
+
+    const response = await handlers.GET({
+      request: new Request(
+        'http://workspace.test/api/conductor-spawn?missionId=conductor-test',
+      ),
+    })
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      retryable: true,
+      error: 'Unable to persist native Conductor checkpoint',
+      workerId: 'builder',
+    })
+  })
+
+  it('does not misreport a checkpoint read exception as a persistence failure', async () => {
+    const mission = nativeMission()
+    mocks.getMission.mockReturnValue(mission)
+    mocks.readRuntimeSnapshot.mockImplementation(() => {
+      throw new Error('runtime file is being replaced')
+    })
+
+    const response = await handlers.GET({
+      request: new Request(
+        'http://workspace.test/api/conductor-spawn?missionId=conductor-test',
+      ),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ ok: true })
+    expect(mocks.recordCheckpoint).not.toHaveBeenCalled()
+  })
+
   it('rejects dashboard polling when the mission Card binding cannot be refreshed', async () => {
     mocks.dashboardFetch.mockResolvedValue(
       new Response(
@@ -326,13 +388,46 @@ describe('Conductor mission Card admission', () => {
     expect(mocks.dispatchAssignments).not.toHaveBeenCalled()
   })
 
-  it('durably cancels native mission creation when a worker binding cannot be established', async () => {
+  it('creates native mission authority and assignments in one atomic commit', async () => {
     mocks.ensureGatewayProbed.mockResolvedValue({
       conductor: false,
       dashboard: { available: false },
     })
-    mocks.bindAuthority.mockReturnValue(false)
-    mocks.cancelMission.mockReturnValue({ changed: true })
+
+    const response = await handlers.POST({
+      request: post({ goal: 'Fix runtime', maxParallel: 2 }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.createAtomicMission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assignments: expect.arrayContaining([
+          expect.objectContaining({ workerId: 'ops-watch' }),
+          expect.objectContaining({ workerId: 'builder' }),
+        ]),
+        authorities: expect.arrayContaining([
+          expect.objectContaining({
+            anchorSource: 'local',
+            anchorKey: 'ops-watch',
+          }),
+          expect.objectContaining({
+            anchorSource: 'local',
+            anchorKey: 'builder',
+          }),
+        ]),
+      }),
+    )
+    expect(mocks.createMission).not.toHaveBeenCalled()
+    expect(mocks.bindAuthority).not.toHaveBeenCalled()
+    expect(mocks.dispatchAssignments).toHaveBeenCalledTimes(1)
+  })
+
+  it('persists nothing when any native worker binding cannot be resolved', async () => {
+    mocks.ensureGatewayProbed.mockResolvedValue({
+      conductor: false,
+      dashboard: { available: false },
+    })
+    mocks.resolveBinding.mockResolvedValue(null)
 
     const response = await handlers.POST({
       request: post({ goal: 'Fix runtime' }),
@@ -343,13 +438,10 @@ describe('Conductor mission Card admission', () => {
       ok: false,
       error: 'Session Card ownership unavailable for native dispatch',
     })
-    expect(mocks.createMission).toHaveBeenCalled()
-    expect(mocks.cancelMission).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actor: 'conductor-spawn',
-        reason: 'Native Conductor worker Session Card binding unavailable',
-      }),
-    )
+    expect(mocks.createAtomicMission).not.toHaveBeenCalled()
+    expect(mocks.createMission).not.toHaveBeenCalled()
+    expect(mocks.bindAuthority).not.toHaveBeenCalled()
+    expect(mocks.cancelMission).not.toHaveBeenCalled()
     expect(mocks.dispatchAssignments).not.toHaveBeenCalled()
   })
 })
