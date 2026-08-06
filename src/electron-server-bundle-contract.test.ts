@@ -4,11 +4,17 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 function bundledRoute(bundle: string, route: string): string {
-  const marker = `createFileRoute("${route}")`
-  const start = bundle.indexOf(marker)
+  const escapedRoute = route.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+  const marker = new RegExp(
+    `createFileRoute\\(\\s*"${escapedRoute}"`,
+    'u',
+  ).exec(bundle)
+  const start = marker?.index ?? -1
   expect(start, `missing bundled route ${route}`).toBeGreaterThanOrEqual(0)
-  const nextRoute = bundle.indexOf('createFileRoute("', start + marker.length)
-  return bundle.slice(start, nextRoute < 0 ? bundle.length : nextRoute)
+  const nextRoute = /createFileRoute\(\s*"/gu
+  nextRoute.lastIndex = start + (marker?.[0].length ?? 0)
+  const end = nextRoute.exec(bundle)?.index ?? bundle.length
+  return bundle.slice(start, end)
 }
 
 function bundledDirectChatDelivery(bundle: string): string {
@@ -50,11 +56,11 @@ function bundledDirectChatRuntimeSetup(bundle: string): string {
 
 function bundledExactCardBindingResolver(bundle: string): string {
   const marker =
-    'async function resolveExactSessionCardOperationBinding(binding)'
+    'async function resolveExactSessionCardOperationProjection(binding)'
   const start = bundle.indexOf(marker)
   expect(
     start,
-    'missing bundled exact Card binding resolver',
+    'missing bundled exact Card binding projection',
   ).toBeGreaterThanOrEqual(0)
   const end = bundle.indexOf(
     '\nasync function resolveSessionCardOperationBindingByUpstream',
@@ -76,6 +82,15 @@ function bundledSwarmDispatcher(bundle: string): string {
   return bundle.slice(start, end)
 }
 
+function bundledSwarmWorker(bundle: string): string {
+  const marker = 'function runWorker('
+  const start = bundle.indexOf(marker)
+  expect(start, 'missing bundled Swarm worker').toBeGreaterThanOrEqual(0)
+  const end = bundle.indexOf('\nasync function dispatchSwarmAssignments', start)
+  expect(end, 'missing end of bundled Swarm worker').toBeGreaterThan(start)
+  return bundle.slice(start, end)
+}
+
 describe('checked-in Electron production server bundle', () => {
   const bundle = readFileSync(
     resolve(process.cwd(), 'electron/server-bundle.cjs'),
@@ -83,21 +98,46 @@ describe('checked-in Electron production server bundle', () => {
   )
 
   it('ships only the Card-owned active-run abandonment route', () => {
+    const route = bundledRoute(
+      bundle,
+      '/api/session-cards/$cardId/active-run/abandon',
+    )
+
     expect(
       /createFileRoute\(\s*"\/api\/session-cards\/\$cardId\/active-run\/abandon"\s*\)/u.test(
         bundle,
       ),
     ).toBe(true)
-    expect(bundle.includes('const result = await abandonActiveCardRun({')).toBe(
-      true,
+    expect(route).toContain('parseSessionCardOperationBinding(rawBinding')
+    expect(route).toMatch(
+      /resolveExactSessionCardOperationProjection\(cardBinding\)/u,
     )
-    expect(bundle.includes('Active Card run is already terminal')).toBe(true)
+    expect(route).toContain('const result = await abandonActiveCardRun({')
+    expect(route).toContain('revalidateCardOwner: async () =>')
+    expect(route).toContain('Active Card run is already terminal')
     expect(bundle.includes('/api/runs/$sessionKey/$runId/abandon')).toBe(false)
     expect(
       /`\/api\/runs\/\$\{encodeURIComponent\([^)]*\.sessionKey\)\}\/\$\{encodeURIComponent\([^)]*\.runId\)\}\/abandon`/u.test(
         bundle,
       ),
     ).toBe(false)
+  })
+
+  it('ships per-tab New Chat recovery owners and durable acknowledgement isolation', () => {
+    expect(bundle).toContain('function getNewChatProvisionalOwnerId()')
+    expect(bundle).toContain(
+      'const provisionalOwnerId = isNewChat ? getNewChatProvisionalOwnerId() : ""',
+    )
+    expect(bundle).toContain(
+      'if (activeSend.provisionalOwnerId && !activeSend.cardId)',
+    )
+    expect(bundle).toMatch(
+      /checkpointPendingRecoveryMessage\(\s*"new",\s*"new",\s*completedMessage,\s*activeSend\.provisionalOwnerId/u,
+    )
+    expect(bundle).toContain('if (isNewChat) return;')
+    expect(bundle).toMatch(
+      /recoveryMessage\.role === "user"[\s\S]{0,180}!intersects\(recoveryClientIdentifiers, authoritativeClientIdentifiers\)/u,
+    )
   })
 
   it('ships the Card-owned pause route with mutation-edge binding validation', () => {
@@ -135,31 +175,41 @@ describe('checked-in Electron production server bundle', () => {
 
   it('revalidates the exact Card binding at every bundled send-stream mutation edge', () => {
     const route = bundledRoute(bundle, '/api/send-stream')
-
-    const edgeRevalidations = [
-      ...route.matchAll(
-        /resolveExactSessionCardOperationBinding\(binding\d*\)/gu,
-      ),
+    const revalidations = [
+      ...route.matchAll(/await revalidateCardMutationAuthority\(\)/gu),
     ]
-    expect(edgeRevalidations).toHaveLength(4)
-    for (const mutationPattern of [
-      /const responsesStream(?:\$\d+)? = streamResponses\(/u,
-      /const streamPending(?:\$\d+)? = openaiChat\(/u,
-      /const upstreamStream(?:\$\d+)? = streamChat\(/u,
-    ]) {
-      const mutationEdge = mutationPattern.exec(route)?.index ?? -1
-      const revalidation =
-        edgeRevalidations.filter((match) => match.index < mutationEdge).at(-1)
-          ?.index ?? -1
-      const immediatelyBeforeMutation = route.slice(revalidation, mutationEdge)
 
-      expect(mutationEdge).toBeGreaterThanOrEqual(0)
-      expect(revalidation).toBeGreaterThanOrEqual(0)
-      expect(immediatelyBeforeMutation.length).toBeLessThan(800)
-      expect(immediatelyBeforeMutation).toContain(
-        'settleCardMutationEdge("stale")',
-      )
-      expect(immediatelyBeforeMutation).not.toMatch(/\n\s*await\s/u)
+    expect(route).toContain(
+      'const revalidateCardMutationAuthority = async () =>',
+    )
+    expect(route).toMatch(/resolveExactSessionCardOperationBinding\(binding\)/u)
+    expect(revalidations.length).toBeGreaterThanOrEqual(12)
+
+    const mutationPatterns: Array<[RegExp, number]> = [
+      [/ensureLocalSession\(/gu, 1],
+      [/appendLocalMessage\(/gu, 3],
+      [/touchLocalSession\(/gu, 2],
+      [/streamResponses\(/gu, 1],
+      [/openaiChat\(/gu, 1],
+      [/streamChat\(/gu, 1],
+    ]
+    for (const [mutationPattern, minimumCount] of mutationPatterns) {
+      const mutationEdges = [...route.matchAll(mutationPattern)]
+      expect(
+        mutationEdges.length,
+        `missing bundled send mutation ${mutationPattern.source}`,
+      ).toBeGreaterThanOrEqual(minimumCount)
+      for (const mutation of mutationEdges) {
+        const mutationEdge = mutation.index
+        const revalidation = revalidations
+          .filter((match) => match.index < mutationEdge)
+          .at(-1)?.index
+        expect(
+          revalidation,
+          `missing authority before ${mutationPattern.source}`,
+        ).toBeTypeOf('number')
+        expect(mutationEdge - revalidation!).toBeLessThan(500)
+      }
     }
     expect(route).toContain('Session Card ownership changed before send')
   })
@@ -200,6 +250,58 @@ describe('checked-in Electron production server bundle', () => {
     expect(initialExactResolution).toBeLessThan(firstProviderMutation)
     expect(attachmentFailure).toBeLessThan(firstProviderMutation)
     expect(invalidCardFailure).toBeLessThan(firstProviderMutation)
+  })
+
+  it('rejects raw checkpoint, reset, and orchestrator loop identities in the bundled routes', () => {
+    const checkpoint = bundledRoute(bundle, '/api/swarm-checkpoint')
+    expect(checkpoint).toContain(
+      'Valid Session Card checkpoint binding required',
+    )
+    expect(checkpoint).toMatch(
+      /parseSessionCardOperationBinding\(body\d*\.cardBinding/u,
+    )
+    expect(checkpoint).toMatch(
+      /resolveExactSessionCardOperationBinding\(cardBinding\)/u,
+    )
+
+    const reset = bundledRoute(bundle, '/api/swarm-runtime/reset')
+    expect(reset).toContain('Raw workerIds reset is unsupported')
+    expect(reset).toContain('Exact Session Card reset bindings required')
+    expect(reset).toMatch(/parseWorkerBindings\(body\d*\.cardBindings\)/u)
+
+    const loop = bundledRoute(bundle, '/api/swarm-orchestrator-loop')
+    expect(loop).toContain('Raw workerIds orchestration is unsupported')
+    expect(loop).toContain('Raw reviewWorkerId orchestration is unsupported')
+    expect(loop).toContain('Exact Session Card loop bindings required')
+    expect(loop).toMatch(/parseBoundWorkers\(body\d*\.cardBindings\)/u)
+  })
+
+  it('revalidates bundled dispatch authority after waits and before checkpoint state changes', () => {
+    const worker = bundledSwarmWorker(bundle)
+
+    const checkpointStart = worker.indexOf('markCheckpointResult(')
+    for (const marker of [
+      'markCheckpointResult(',
+      'recordMissionCheckpoint({',
+      'appendSwarmMemoryEvent({',
+      'publishSwarmCheckpointNotification({',
+    ]) {
+      const mutationEdge = worker.indexOf(marker, checkpointStart)
+      const revalidation = worker.lastIndexOf(
+        'await bindingIsCurrent()',
+        mutationEdge,
+      )
+
+      expect(
+        mutationEdge,
+        `missing bundled mutation ${marker}`,
+      ).toBeGreaterThanOrEqual(0)
+      expect(
+        revalidation,
+        `missing authority before ${marker}`,
+      ).toBeGreaterThanOrEqual(0)
+      expect(mutationEdge - revalidation).toBeLessThan(240)
+    }
   })
 
   it('revalidates exact bundled Card authority immediately before every direct-chat mutation', () => {
