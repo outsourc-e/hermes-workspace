@@ -2,12 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route } from './session-cards.$cardId.pause'
 
 const mocks = vi.hoisted(() => ({
+  isAuthenticated: vi.fn(),
   ensureGatewayProbed: vi.fn(),
   dashboardFetch: vi.fn(),
   resolveByCardOwner: vi.fn(),
   resolveExact: vi.fn(),
 }))
 
+vi.mock('../../server/auth-middleware', () => ({
+  isAuthenticated: mocks.isAuthenticated,
+}))
 vi.mock('../../server/gateway-capabilities', () => ({
   ensureGatewayProbed: mocks.ensureGatewayProbed,
   dashboardFetch: mocks.dashboardFetch,
@@ -45,6 +49,7 @@ function request(body: unknown): Request {
 describe('POST /api/session-cards/$cardId/pause Card authority', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.isAuthenticated.mockReturnValue(true)
     mocks.resolveByCardOwner.mockResolvedValue(binding)
     mocks.resolveExact.mockResolvedValue({
       kind: 'session-card-owner',
@@ -60,6 +65,29 @@ describe('POST /api/session-cards/$cardId/pause Card authority', () => {
         headers: { 'Content-Type': 'application/json' },
       }),
     )
+  })
+
+  it('rejects unauthenticated requests before parsing or resolving the body', async () => {
+    mocks.isAuthenticated.mockReturnValue(false)
+    const unauthenticated = new Request(
+      'http://localhost/api/session-cards/remote%3Amission-card/pause',
+      {
+        method: 'POST',
+        body: 'not json',
+      },
+    )
+
+    const response = await handler({
+      params: { cardId: binding.cardId },
+      request: unauthenticated,
+    })
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ ok: false, error: 'Unauthorized' })
+    expect(mocks.resolveByCardOwner).not.toHaveBeenCalled()
+    expect(mocks.resolveExact).not.toHaveBeenCalled()
+    expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
+    expect(mocks.dashboardFetch).not.toHaveBeenCalled()
   })
 
   it('derives the raw agent key on the server and returns only safe Card identity', async () => {

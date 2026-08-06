@@ -28,6 +28,13 @@ function bundledDirectChatDelivery(bundle: string): string {
   return bundle.slice(start, nextFunction)
 }
 
+function sourceRoute(fileName: string): string {
+  return readFileSync(
+    resolve(process.cwd(), 'src/routes/api', fileName),
+    'utf8',
+  )
+}
+
 describe('checked-in Electron production server bundle', () => {
   const bundle = readFileSync(
     resolve(process.cwd(), 'electron/server-bundle.cjs'),
@@ -67,6 +74,50 @@ describe('checked-in Electron production server bundle', () => {
     expect(route).toMatch(
       /session_key:\s*binding\.canonicalSegmentKey,\s*pause:\s*body\d*\.pause/u,
     )
+  })
+
+  it('authenticates the pause source route before body validation or resolution', () => {
+    const route = sourceRoute('session-cards.$cardId.pause.ts')
+    const authCheck = route.indexOf('if (!isAuthenticated(request))')
+    const contentTypeCheck = route.indexOf('requireJsonContentType(request)')
+    const bodyParse = route.indexOf('.json()')
+    const cardResolution = route.indexOf(
+      'resolveSessionCardOperationBindingByCardOwner({',
+    )
+
+    expect(authCheck).toBeGreaterThanOrEqual(0)
+    expect(authCheck).toBeLessThan(contentTypeCheck)
+    expect(authCheck).toBeLessThan(bodyParse)
+    expect(authCheck).toBeLessThan(cardResolution)
+  })
+
+  it('revalidates the exact Card source binding at every send-stream mutation edge', () => {
+    const route = sourceRoute('send-stream.ts')
+
+    expect(
+      route.match(/resolveExactSessionCardOperationBinding\(binding\)/gu),
+    ).toHaveLength(3)
+    for (const mutation of [
+      'const responsesStream = streamResponses(',
+      'const streamPending = openaiChat(',
+      'const upstreamStream = streamChat(',
+    ]) {
+      const mutationEdge = route.indexOf(mutation)
+      const revalidation = route.lastIndexOf(
+        'resolveExactSessionCardOperationBinding(binding)',
+        mutationEdge,
+      )
+      const immediatelyBeforeMutation = route.slice(revalidation, mutationEdge)
+
+      expect(mutationEdge).toBeGreaterThanOrEqual(0)
+      expect(revalidation).toBeGreaterThanOrEqual(0)
+      expect(immediatelyBeforeMutation.length).toBeLessThan(800)
+      expect(immediatelyBeforeMutation).toContain(
+        "settleCardMutationEdge('stale')",
+      )
+      expect(immediatelyBeforeMutation).not.toMatch(/\n\s*await\s/u)
+    }
+    expect(route).toContain('Session Card ownership changed before send')
   })
 
   it('requires exact Card binding and revalidation at every direct chat mutation edge', () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route } from './send-stream'
 import { STREAM_PROVENANCE_ID_LIMIT } from './-send-stream-session-handoff'
 import type * as RunStore from '../../server/run-store'
@@ -22,9 +22,11 @@ const mocks = vi.hoisted(() => ({
   resolveSessionCard: vi.fn(),
   resolveRemoteCardByUpstreamSession: vi.fn(),
   resolveLocalCardByUpstreamSession: vi.fn(),
+  resolveExactSessionCardOperationBinding: vi.fn(),
   ensureLocalSession: vi.fn(),
   buildResolvedSessionHeaders: vi.fn(() => ({})),
   openaiChat: vi.fn(),
+  streamResponses: vi.fn(),
   getDiscoveredModels: vi.fn(),
   getLocalProviderDef: vi.fn(),
   getChatMode: vi.fn(),
@@ -97,6 +99,11 @@ vi.mock('../../server/session-card-service', () => ({
   },
 }))
 
+vi.mock('../../server/session-card-operation-binding', () => ({
+  resolveExactSessionCardOperationBinding:
+    mocks.resolveExactSessionCardOperationBinding,
+}))
+
 vi.mock('../../server/local-session-store', () => ({
   appendLocalMessage: vi.fn(),
   ensureLocalSession: mocks.ensureLocalSession,
@@ -114,7 +121,7 @@ vi.mock('../../server/openai-compat-api', () => ({
 }))
 
 vi.mock('../../server/responses-api', () => ({
-  streamResponses: vi.fn(),
+  streamResponses: mocks.streamResponses,
 }))
 
 vi.mock('../../server/portable-history', () => ({
@@ -200,6 +207,10 @@ function observeRootCardActivityOn(sessionKey: string) {
   )
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 describe('send-stream bootstrap session handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -233,6 +244,14 @@ describe('send-stream bootstrap session handoff', () => {
     )
     mocks.resolveLocalCardByUpstreamSession.mockRejectedValue(
       new Error('card unavailable'),
+    )
+    mocks.resolveExactSessionCardOperationBinding.mockImplementation(
+      (binding: { cardId: string; parentCardId: string | null }) =>
+        Promise.resolve({
+          kind: 'session-card-owner',
+          cardId: binding.cardId,
+          parentCardId: binding.parentCardId,
+        }),
     )
     mocks.observeCardActivity.mockResolvedValue(null)
     mocks.observeChildLifecycle.mockResolvedValue(null)
@@ -275,6 +294,90 @@ describe('send-stream bootstrap session handoff', () => {
       },
     )
   })
+
+  it.each([
+    {
+      label: 'gateway streamChat',
+      source: 'remote' as const,
+      responses: false,
+      upstream: () => mocks.streamChat,
+    },
+    {
+      label: 'local Responses',
+      source: 'local' as const,
+      responses: true,
+      upstream: () => mocks.streamResponses,
+    },
+    {
+      label: 'local openaiChat',
+      source: 'local' as const,
+      responses: false,
+      upstream: () => mocks.openaiChat,
+    },
+  ])(
+    'revalidates a delayed Card rollover at the $label mutation edge and returns 409',
+    async ({ source, responses, upstream }) => {
+      vi.stubEnv('HERMES_USE_RESPONSES', responses ? '1' : '0')
+      const cardId = `${source}:mutation-card`
+      const segmentKey = `${source}:mutation-segment`
+      const upstreamKey = `${source}-upstream-session`
+      mocks.resolveSessionCard.mockResolvedValueOnce({
+        card: {
+          cardId,
+          canonicalSegmentKey: segmentKey,
+          canonicalSource: source,
+          canonicalTransport: source === 'remote' ? 'gateway' : undefined,
+          continuationSegmentKeys: [cardId, segmentKey],
+          continuationCount: 2,
+          relationshipKind: 'root',
+        },
+        sourceBySegmentKey: new Map([[segmentKey, source]]),
+        upstreamKeyBySegmentKey: new Map([[segmentKey, upstreamKey]]),
+        collection: { completeness: 'complete', retryable: false },
+      })
+      const rollover = deferred<null>()
+      mocks.resolveExactSessionCardOperationBinding.mockReturnValueOnce(
+        rollover.promise,
+      )
+
+      const responsePending = handler({
+        request: new Request('http://workspace.test/api/send-stream', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            cardId,
+            sessionKey: segmentKey,
+            friendlyId: cardId,
+            message: 'do not send after rollover',
+          }),
+        }),
+      })
+
+      await vi.waitFor(() => {
+        expect(
+          mocks.resolveExactSessionCardOperationBinding,
+        ).toHaveBeenCalledWith({
+          kind: 'session-card-owner',
+          cardId,
+          parentCardId: null,
+          canonicalSource: source,
+          canonicalSegmentKey: segmentKey,
+          canonicalTransport: source === 'remote' ? 'gateway' : 'tmux',
+        })
+      })
+      expect(upstream()).not.toHaveBeenCalled()
+
+      rollover.resolve(null)
+      const response = await responsePending
+
+      expect(response.status).toBe(409)
+      expect(await response.json()).toEqual({
+        ok: false,
+        error: 'Session Card ownership changed before send',
+      })
+      expect(upstream()).not.toHaveBeenCalled()
+    },
+  )
 
   it.each(['new', 'main'])(
     'emits the pre-stream %s-to-concrete handoff before ordinary stream events',

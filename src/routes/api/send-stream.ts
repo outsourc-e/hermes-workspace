@@ -25,6 +25,7 @@ import {
 } from '../../server/run-store'
 import { getChatMode } from '../../server/gateway-capabilities'
 import { sessionCardService } from '../../server/session-card-service'
+import { resolveExactSessionCardOperationBinding } from '../../server/session-card-operation-binding'
 import {
   appendLocalMessage,
   ensureLocalSession,
@@ -74,6 +75,7 @@ import type {
   OpenAICompatContentPart,
   OpenAICompatMessage,
 } from '../../server/openai-compat-api'
+import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 // Claude agent runs can take 5+ minutes with complex tool chains
 const SEND_STREAM_RUN_TIMEOUT_MS = 600_000
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
@@ -502,6 +504,8 @@ export const Route = createFileRoute('/api/send-stream')({
         let activeCardId: string | null = null
         let activeCardCanonicalSegmentKey: string | null = null
         let activeCardCanonicalSource: string | null = null
+        let requestedCardMutationBinding: SessionCardOperationBinding | null =
+          null
         try {
           if (requestedCardId) {
             const resolved = await waitWithinStreamLifetime(
@@ -536,6 +540,17 @@ export const Route = createFileRoute('/api/send-stream')({
             activeCardId = requestedCardId
             activeCardCanonicalSegmentKey = canonicalSegmentKey
             activeCardCanonicalSource = canonicalSource
+            const canonicalOperationSource =
+              canonicalSource === 'local' ? 'local' : 'remote'
+            requestedCardMutationBinding = {
+              kind: 'session-card-owner',
+              cardId: requestedCardId,
+              parentCardId: null,
+              canonicalSource: canonicalOperationSource,
+              canonicalSegmentKey,
+              canonicalTransport:
+                canonicalOperationSource === 'local' ? 'tmux' : 'gateway',
+            }
             sessionKey = upstreamKey
             resolvedFriendlyId = requestedCardId
           } else {
@@ -784,6 +799,24 @@ export const Route = createFileRoute('/api/send-stream')({
         const scopedMessage = buildWorkspaceScopedTextMessage(
           getChatMessage(message, attachments),
           workspaceScope,
+        )
+
+        type CardMutationEdgeStatus = 'authorized' | 'stale' | 'not-reached'
+        let settleCardMutationEdge: (
+          status: CardMutationEdgeStatus,
+        ) => void = () => undefined
+        let cardMutationEdgeSettled = !requestedCardMutationBinding
+        const cardMutationEdgeStatus = requestedCardMutationBinding
+          ? new Promise<CardMutationEdgeStatus>((resolve) => {
+              settleCardMutationEdge = (status) => {
+                if (cardMutationEdgeSettled) return
+                cardMutationEdgeSettled = true
+                resolve(status)
+              }
+            })
+          : null
+        const staleCardMutationError = new Error(
+          'Session Card ownership changed before send',
         )
 
         // Create streaming response using the SHARED server connection
@@ -1287,6 +1320,21 @@ export const Route = createFileRoute('/api/send-stream')({
                       }
                     >()
                     try {
+                      const binding = requestedCardMutationBinding
+                      if (binding) {
+                        const owner = await waitWithinStreamLifetime(
+                          resolveExactSessionCardOperationBinding(binding),
+                        )
+                        ensureStreamTransportAvailable()
+                        if (
+                          !owner ||
+                          owner.cardId !== binding.cardId ||
+                          owner.parentCardId !== binding.parentCardId
+                        ) {
+                          settleCardMutationEdge('stale')
+                          throw staleCardMutationError
+                        }
+                      }
                       const responsesStream = streamResponses({
                         input: scopedMessage,
                         conversationHistory: effectiveHistory,
@@ -1297,6 +1345,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         sessionId: portableSessionKey,
                         signal: abortController.signal,
                       })
+                      settleCardMutationEdge('authorized')
                       for await (const ev of responsesStream) {
                         if (ev.kind === 'text.delta') {
                           accumulated += ev.delta
@@ -1410,6 +1459,9 @@ export const Route = createFileRoute('/api/send-stream')({
                       )
                       return
                     } catch (err) {
+                      // A Card-bound retry would cross a second mutation edge
+                      // after its HTTP status is committed. Fail closed instead.
+                      if (requestedCardMutationBinding) throw err
                       // Log and fall through to the openaiChat path so a
                       // misconfigured /v1/responses surface (older agent,
                       // CORS issue, network blip) doesn't break the chat.
@@ -1422,7 +1474,22 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   }
 
-                  const stream = await openaiChat(portableMessages, {
+                  const binding = requestedCardMutationBinding
+                  if (binding) {
+                    const owner = await waitWithinStreamLifetime(
+                      resolveExactSessionCardOperationBinding(binding),
+                    )
+                    ensureStreamTransportAvailable()
+                    if (
+                      !owner ||
+                      owner.cardId !== binding.cardId ||
+                      owner.parentCardId !== binding.parentCardId
+                    ) {
+                      settleCardMutationEdge('stale')
+                      throw staleCardMutationError
+                    }
+                  }
+                  const streamPending = openaiChat(portableMessages, {
                     model: localBaseUrl
                       ? bareModel
                       : typeof body.model === 'string'
@@ -1437,6 +1504,8 @@ export const Route = createFileRoute('/api/send-stream')({
                     sessionId: portableSessionKey,
                     baseUrl: localBaseUrl,
                   })
+                  settleCardMutationEdge('authorized')
+                  const stream = await streamPending
 
                   let thinking = ''
                   let toolEventCount = 0
@@ -1532,6 +1601,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     },
                   )
                 } catch (err) {
+                  settleCardMutationEdge('not-reached')
                   if (!streamClosed) {
                     const errorMessage = normalizeClaudeErrorMessage(err)
                     await finalizeTerminalPersistence(
@@ -1840,6 +1910,21 @@ export const Route = createFileRoute('/api/send-stream')({
               })()
 
               try {
+                const binding = requestedCardMutationBinding
+                if (binding) {
+                  const owner = await waitWithinStreamLifetime(
+                    resolveExactSessionCardOperationBinding(binding),
+                  )
+                  ensureStreamTransportAvailable()
+                  if (
+                    !owner ||
+                    owner.cardId !== binding.cardId ||
+                    owner.parentCardId !== binding.parentCardId
+                  ) {
+                    settleCardMutationEdge('stale')
+                    throw staleCardMutationError
+                  }
+                }
                 const upstreamStream = streamChat(
                   sessionKey,
                   {
@@ -2571,6 +2656,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     },
                   },
                 )
+                settleCardMutationEdge('authorized')
                 // A producer may ignore abort and remain pending forever. Keep
                 // its eventual rejection observed, but let the bounded race own
                 // this HTTP stream's lifetime.
@@ -2589,6 +2675,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 void livePollerPromise.catch(() => undefined)
               }
             } catch (err) {
+              settleCardMutationEdge('not-reached')
               // Only send error if stream hasn't already completed successfully.
               // Finalization consumes a sealing failure so this catch cannot loop
               // by requesting the already-rejected terminal transition again.
@@ -2631,7 +2718,7 @@ export const Route = createFileRoute('/api/send-stream')({
           },
         })
 
-        return new Response(stream, {
+        const response = new Response(stream, {
           headers: {
             'Content-Type': 'text/event-stream; charset=utf-8',
             'Cache-Control': 'no-cache, no-transform',
@@ -2643,6 +2730,24 @@ export const Route = createFileRoute('/api/send-stream')({
             }),
           },
         })
+        if (cardMutationEdgeStatus) {
+          const mutationEdgeStatus = await cardMutationEdgeStatus
+          if (mutationEdgeStatus === 'stale') {
+            return finishPreStreamResponse(
+              new Response(
+                JSON.stringify({
+                  ok: false,
+                  error: staleCardMutationError.message,
+                }),
+                {
+                  status: 409,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              ),
+            )
+          }
+        }
+        return response
       },
     },
   },

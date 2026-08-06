@@ -8,6 +8,7 @@ import {
   resolveExactSessionCardOperationBinding,
   resolveSessionCardOperationBindingByCardOwner,
 } from '../../server/session-card-operation-binding'
+import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 
 const SAFE_HEADERS = { 'Cache-Control': 'no-store' }
@@ -30,6 +31,12 @@ export const Route = createFileRoute('/api/session-cards/$cardId/pause')({
     handlers: {
       POST: async ({ params, request }) => {
         try {
+          if (!isAuthenticated(request)) {
+            return json(
+              { ok: false, error: 'Unauthorized' },
+              { status: 401, headers: SAFE_HEADERS },
+            )
+          }
           const contentTypeError = requireJsonContentType(request)
           if (contentTypeError) return contentTypeError
           const body = (await request
