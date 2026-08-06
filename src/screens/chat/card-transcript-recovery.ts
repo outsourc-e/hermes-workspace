@@ -482,7 +482,7 @@ function dedupeMessages(messages: Array<ChatMessage>): Array<ChatMessage> {
     if (matchingIndex >= 0) deduped[matchingIndex] = message
     else deduped.push(message)
   }
-  return deduped.slice(-CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES)
+  return deduped
 }
 
 export function parseCardTranscriptRecovery(
@@ -641,6 +641,10 @@ export function replaceCardTranscriptRecoveryMessages(
   const sanitizedMessages = messages.map(sanitizeCardOwnedMessage)
   if (sanitizedMessages.some((message) => !validMessage(message))) return null
   const deduped = dedupeMessages(sanitizedMessages)
+  // Capacity is an admission boundary, never an eviction policy. Silently
+  // dropping the oldest unacknowledged turn would make an accepted send
+  // unrecoverable, so callers must fail closed before transport instead.
+  if (deduped.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES) return null
   if (deduped.length === 0) {
     clearCardTranscriptRecovery(owner, { storage: options.storage })
     return null
@@ -759,17 +763,21 @@ export function mergeCardTranscriptRecoveryMessages(
   recoveryMessages: Array<ChatMessage>,
 ): Array<ChatMessage> {
   const merged = [...persistedMessages]
+  const consumedPersistedIndexes = new Set<number>()
   for (const recoveryMessage of recoveryMessages) {
     const matchingIndex = merged.findIndex(
-      (persistedMessage) =>
-        cardTranscriptMessagesMatch(persistedMessage, recoveryMessage) ||
-        (!conflictingRunIdentity(recoveryMessage, persistedMessage) &&
-          ordinaryServerAcknowledgementMatches(
-            recoveryMessage,
-            persistedMessage,
-          )),
+      (persistedMessage, index) =>
+        index < persistedMessages.length &&
+        !consumedPersistedIndexes.has(index) &&
+        (cardTranscriptMessagesMatch(persistedMessage, recoveryMessage) ||
+          (!conflictingRunIdentity(recoveryMessage, persistedMessage) &&
+            ordinaryServerAcknowledgementMatches(
+              recoveryMessage,
+              persistedMessage,
+            ))),
     )
     if (matchingIndex >= 0) {
+      consumedPersistedIndexes.add(matchingIndex)
       if ((recoveryMessage.attachments?.length ?? 0) > 0) {
         const persistedMessage = merged[matchingIndex]!
         merged[matchingIndex] = {

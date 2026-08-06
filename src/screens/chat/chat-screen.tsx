@@ -1069,6 +1069,7 @@ export function ChatScreen({
     clearCompletedStreaming,
     streamingRunId,
     activeToolCalls,
+    realtimeStreamingStates = [],
   } = useRealtimeChatHistory({
     sessionKey: activeCard
       ? activeCardCanonicalSegmentKey || ''
@@ -2006,6 +2007,45 @@ export function ChatScreen({
       activeRealtimeStreamingText ||
       stickyStreamingTextRef.current.text
     : ''
+  const activeStreamingStates = useMemo(
+    () =>
+      isPortableMode
+        ? localIsStreaming
+          ? [
+              {
+                runId: streamingRunId ?? null,
+                text: stableActiveStreamingText,
+                thinking: realtimeStreamingThinking,
+                lifecycleEvents: realtimeLifecycleEvents,
+                toolCalls: activeToolCalls,
+              },
+            ]
+          : []
+        : realtimeStreamingStates.length > 0
+          ? realtimeStreamingStates
+          : activeIsRealtimeStreaming
+            ? [
+                {
+                  runId: streamingRunId,
+                  text: stableActiveStreamingText,
+                  thinking: realtimeStreamingThinking,
+                  lifecycleEvents: realtimeLifecycleEvents,
+                  toolCalls: activeToolCalls,
+                },
+              ]
+            : [],
+    [
+      activeToolCalls,
+      activeIsRealtimeStreaming,
+      isPortableMode,
+      localIsStreaming,
+      realtimeLifecycleEvents,
+      realtimeStreamingStates,
+      realtimeStreamingThinking,
+      stableActiveStreamingText,
+      streamingRunId,
+    ],
+  )
 
   // Use realtime-merged messages for display (SSE + history)
   // Re-apply display filter to realtime messages
@@ -2098,119 +2138,43 @@ export function ChatScreen({
       .filter((msg) => dedupedSet.has(msg))
       .map((msg) => stripQueuedWrapperFromUserMessage(msg))
 
-    if (!activeIsRealtimeStreaming) {
-      return deduped
-    }
+    if (activeStreamingStates.length === 0) return deduped
 
-    let nextMessages = [...deduped]
-    const streamToolCalls = activeToolCalls.map((toolCall) => ({
-      ...toolCall,
-      phase: toolCall.phase,
-    }))
-
-    const streamingMsg = {
-      role: 'assistant',
-      content: [],
-      __optimisticId: 'streaming-current',
-      __streamingStatus: 'streaming',
-      __streamingText: stableActiveStreamingText,
-      __streamingThinking: realtimeStreamingThinking,
-      __streamToolCalls: streamToolCalls,
-      ...(streamingRunId
-        ? {
-            runId: streamingRunId,
-            stableId: `stream-run:${streamingRunId}`,
-          }
-        : {}),
-    } as ChatMessage
-
-    // Check if the server has already returned a completed assistant message
-    // that overlaps with the streaming text. If so, drop the streaming
-    // placeholder to avoid showing the same response twice.
-    const streamingText = stableActiveStreamingText.trim()
-    const lastUserIdx = nextMessages.reduce(
-      (lastIdx, msg, idx) => (msg.role === 'user' ? idx : lastIdx),
-      -1,
+    const nextMessages = deduped.filter(
+      (message) => message.__streamingStatus !== 'streaming',
     )
-    const activeTurnMessages = nextMessages.slice(lastUserIdx + 1)
-    const hasServerAssistantVersion = activeTurnMessages.some((msg) => {
-      if (msg.role !== 'assistant') return false
-      if (msg.__streamingStatus === 'streaming') return false
-      const messageRunId =
-        typeof msg.runId === 'string' && msg.runId.trim() ? msg.runId : null
-      // Suppression requires a shared immutable run identity. Prefix text or
-      // matching tool names alone cannot hide an authoritative transcript row.
-      if (!streamingRunId || !messageRunId || streamingRunId !== messageRunId) {
-        return false
-      }
-      // Only a same-run assistant in the active user turn can acknowledge the
-      // live stream. An identical answer from an older turn is unrelated.
-      if (streamingText.length > 0) {
-        const msgText = textFromMessage(msg).trim()
-        if (
-          msgText.length > 0 &&
-          (msgText === streamingText ||
-            msgText.startsWith(streamingText) ||
-            streamingText.startsWith(msgText))
-        ) {
-          return true
-        }
-      }
-      // Also match by tool calls: if the server message has the same tool
-      // calls as the streaming placeholder, it's the same response
-      if (streamToolCalls.length > 0) {
-        const msgContent = Array.isArray(msg.content) ? msg.content : []
-        const msgToolCalls = msgContent.filter(
-          (p: any) => p.type === 'toolCall',
-        )
-        if (
-          msgToolCalls.length > 0 &&
-          msgToolCalls.length === streamToolCalls.length
-        ) {
-          return streamToolCalls.every((stc: any) =>
-            msgToolCalls.some((mtc: any) => mtc.name === stc.name),
-          )
-        }
-      }
-      return false
-    })
-    if (hasServerAssistantVersion) {
-      return nextMessages
-    }
-
-    const existingStreamIdx = nextMessages.findIndex(
-      (message) => message.__streamingStatus === 'streaming',
-    )
-
-    if (existingStreamIdx >= 0) {
-      nextMessages[existingStreamIdx] = {
-        ...nextMessages[existingStreamIdx],
-        ...streamingMsg,
-      }
-      // Remove any other streaming messages (e.g. from mergeHistoryMessages
-      // appending a realtime message after finalDisplayMessages already
-      // injected a placeholder). Keep only one streaming placeholder.
-      const keepIdx = existingStreamIdx
-      nextMessages = nextMessages.filter(
-        (m, i) => i === keepIdx || m.__streamingStatus !== 'streaming',
+    for (const stream of activeStreamingStates) {
+      const runId = stream.runId?.trim() || null
+      const streamingText =
+        runId && runId === streamingRunId
+          ? stableActiveStreamingText || stream.text
+          : stream.text
+      const hasServerAssistantVersion = nextMessages.some(
+        (message) =>
+          message.role === 'assistant' &&
+          message.__streamingStatus !== 'streaming' &&
+          Boolean(runId && message.runId === runId),
       )
-      return nextMessages
-    }
-
-    if (lastUserIdx >= 0 && lastUserIdx === nextMessages.length - 1) {
-      nextMessages.push(streamingMsg)
-    } else if (lastUserIdx >= 0) {
-      nextMessages.splice(lastUserIdx + 1, 0, streamingMsg)
-    } else {
-      nextMessages.push(streamingMsg)
+      if (hasServerAssistantVersion) continue
+      nextMessages.push({
+        role: 'assistant',
+        content: [],
+        __optimisticId:
+          activeStreamingStates.length === 1
+            ? 'streaming-current'
+            : `streaming-${runId ?? 'pending'}`,
+        __streamingStatus: 'streaming',
+        __streamingText: streamingText,
+        __streamingThinking: stream.thinking,
+        __streamToolCalls: stream.toolCalls,
+        ...(runId ? { runId, stableId: `stream-run:${runId}` } : {}),
+      } as ChatMessage)
     }
     return nextMessages
   }, [
-    activeToolCalls,
-    activeIsRealtimeStreaming,
-    activeRealtimeStreamingText,
+    activeStreamingStates,
     realtimeMessages,
-    realtimeStreamingThinking,
+    stableActiveStreamingText,
     streamingRunId,
   ])
 

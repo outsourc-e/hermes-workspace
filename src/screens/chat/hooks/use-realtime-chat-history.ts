@@ -330,11 +330,13 @@ export function useRealtimeChatHistory({
         eventSessionKey: string,
         streamingSnapshot: StreamingState | null,
       ) => {
-        const currentState = effectiveCardId
-          ? useChatStore.getState().getCardStreamingState(effectiveCardId)
-          : eventSessionKey === effectiveSessionKey
-            ? streamingSnapshot
-            : null
+        const currentState =
+          streamingSnapshot ??
+          (effectiveCardId
+            ? useChatStore.getState().getCardStreamingState(effectiveCardId)
+            : eventSessionKey === effectiveSessionKey
+              ? streamingSnapshot
+              : null)
         if (currentState?.text) {
           completedStreamingTextRef.current = currentState.text
         }
@@ -516,13 +518,36 @@ export function useRealtimeChatHistory({
         : s.realtimeMessages.get(effectiveSessionKey)) ?? EMPTY_MESSAGES,
   )
 
-  // Subscribe directly to streaming state — useMemo with stable fn ref was stale (bug #1)
-  const streamingState = useChatStore(
-    (s) =>
-      (effectiveCardId
-        ? s.streamingState.get(effectiveCardId)
-        : s.streamingState.get(effectiveSessionKey)) ?? null,
+  const cardStreamingRunMap = useChatStore((s) =>
+    effectiveCardId ? s.cardStreamingRuns.get(effectiveCardId) : undefined,
   )
+  const cardStreamingProjection = useChatStore((s) =>
+    effectiveCardId ? (s.streamingState.get(effectiveCardId) ?? null) : null,
+  )
+  const legacyStreamingState = useChatStore((s) =>
+    effectiveCardId
+      ? null
+      : (s.streamingState.get(effectiveSessionKey) ?? null),
+  )
+  const streamingStates = useMemo(
+    () =>
+      effectiveCardId
+        ? cardStreamingRunMap && cardStreamingRunMap.size > 0
+          ? Array.from(cardStreamingRunMap.values())
+          : cardStreamingProjection
+            ? [cardStreamingProjection]
+            : []
+        : legacyStreamingState
+          ? [legacyStreamingState]
+          : [],
+    [
+      cardStreamingProjection,
+      cardStreamingRunMap,
+      effectiveCardId,
+      legacyStreamingState,
+    ],
+  )
+  const streamingState = streamingStates.at(-1) ?? null
   const streamingStateRef = useRef(streamingState)
   const lastStreamClearTimeRef = useRef<number>(0)
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -689,6 +714,7 @@ export function useRealtimeChatHistory({
     clearCompletedStreaming,
     streamingRunId: streamingState?.runId ?? null,
     activeToolCalls: streamingState?.toolCalls ?? EMPTY_TOOL_CALLS,
+    realtimeStreamingStates: streamingStates,
     lastCompletedRunAt, // Parent watches this to clear waitingForResponse
   }
 }

@@ -226,6 +226,64 @@ describe('chat-store Card ownership', () => {
     expect(restoreCardStreamingState('remote:card-owner')).toBeNull()
   })
 
+  it('retains concurrent same-Card runs and clears only the terminal run', () => {
+    const store = useChatStore.getState()
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'first independent stream',
+      fullReplace: true,
+      runId: 'run-concurrent-a',
+      sessionKey: 'remote:segment-a',
+      transport: 'chat-events',
+    })
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'second independent stream',
+      fullReplace: true,
+      runId: 'run-concurrent-b',
+      sessionKey: 'remote:segment-b',
+      transport: 'chat-events',
+    })
+    store.processCardEvent('remote:card-owner', {
+      type: 'lifecycle',
+      text: 'still running B',
+      runId: 'run-concurrent-b',
+      sessionKey: 'remote:segment-b',
+      transport: 'chat-events',
+    })
+
+    expect(store.getCardStreamingStates('remote:card-owner')).toMatchObject([
+      { runId: 'run-concurrent-a', text: 'first independent stream' },
+      {
+        runId: 'run-concurrent-b',
+        text: 'second independent stream',
+        lifecycleEvents: [{ text: 'still running B' }],
+      },
+    ])
+
+    store.processCardEvent('remote:card-owner', {
+      type: 'done',
+      state: 'complete',
+      runId: 'run-concurrent-a',
+      sessionKey: 'remote:segment-a',
+      transport: 'chat-events',
+    })
+
+    expect(store.getCardStreamingStates('remote:card-owner')).toMatchObject([
+      {
+        runId: 'run-concurrent-b',
+        text: 'second independent stream',
+        lifecycleEvents: [{ text: 'still running B' }],
+      },
+    ])
+    expect(store.getCardRealtimeMessages('remote:card-owner')).toEqual([
+      expect.objectContaining({
+        runId: 'run-concurrent-a',
+        stableId: 'stream-run:run-concurrent-a',
+      }),
+    ])
+  })
+
   it('scrubs raw transport identity from live Card messages and tool state', () => {
     const store = useChatStore.getState()
     store.processCardEvent('remote:card-owner', {

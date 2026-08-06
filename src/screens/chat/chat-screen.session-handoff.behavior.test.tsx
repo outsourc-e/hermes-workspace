@@ -54,6 +54,13 @@ const queryContext = vi.hoisted(() => ({
   realtimeStreamingText: '',
   realtimeStreamingThinking: '',
   realtimeStreamingRunId: null as string | null,
+  realtimeStreamingStates: [] as Array<{
+    runId: string
+    text: string
+    thinking: string
+    lifecycleEvents: Array<unknown>
+    toolCalls: Array<unknown>
+  }>,
   realtimeLifecycleEvents: [] as Array<unknown>,
   realtimeToolCalls: [] as Array<{ name: string }>,
   realtimeInput: null as null | {
@@ -571,6 +578,7 @@ vi.mock('./hooks/use-realtime-chat-history', () => ({
       clearCompletedStreaming: vi.fn(),
       streamingRunId: queryContext.realtimeStreamingRunId,
       activeToolCalls: queryContext.realtimeToolCalls,
+      realtimeStreamingStates: queryContext.realtimeStreamingStates,
     }
   },
 }))
@@ -931,6 +939,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryContext.realtimeStreamingText = ''
     queryContext.realtimeStreamingThinking = ''
     queryContext.realtimeStreamingRunId = null
+    queryContext.realtimeStreamingStates = []
     queryContext.realtimeLifecycleEvents = []
     queryContext.realtimeToolCalls = []
     queryContext.realtimeInput = null
@@ -3492,6 +3501,72 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       queryClient.clear()
     },
   )
+
+  it('mounts independent streaming rows for concurrent runs on the same Card', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard = createRootCard({
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:tip',
+    })
+    queryContext.cardHistories.set(activeCard.cardId, {
+      sessionKey: 'remote:tip',
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: 'remote:tip',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    queryContext.realtimeStreaming = true
+    queryContext.realtimeStreamingText = 'beta independent content'
+    queryContext.realtimeStreamingRunId = 'run-beta'
+    queryContext.realtimeStreamingStates = [
+      {
+        runId: 'run-alpha',
+        text: 'alpha independent content',
+        thinking: '',
+        lifecycleEvents: [],
+        toolCalls: [],
+      },
+      {
+        runId: 'run-beta',
+        text: 'beta independent content',
+        thinking: '',
+        lifecycleEvents: [],
+        toolCalls: [],
+      },
+    ]
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCardList={cardList([activeCard])}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    const transcript = container.querySelector(
+      '[data-testid="chat-transcript"]',
+    )?.textContent
+    expect(transcript).toContain('stream-run:run-alpha')
+    expect(transcript).toContain('alpha independent content')
+    expect(transcript).toContain('stream-run:run-beta')
+    expect(transcript).toContain('beta independent content')
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
 
   it('persists a safe attachment under the Card before transport starts', async () => {
     const queryClient = new QueryClient({

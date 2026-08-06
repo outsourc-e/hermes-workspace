@@ -1,4 +1,5 @@
 import {
+  CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES,
   cardTranscriptMessagesMatch,
   isCardTranscriptRecoveryMessagePortable,
   replaceCardTranscriptRecoveryMessages,
@@ -67,10 +68,17 @@ function toPendingSendPayload(
     return null
   }
   const recoveryMessages = Array.isArray(parsed.recoveryMessages)
-    ? parsed.recoveryMessages
-        .map((message) => sanitizeCardOwnedMessage(message as ChatMessage))
-        .filter(isCardTranscriptRecoveryMessagePortable)
+    ? parsed.recoveryMessages.map((message) =>
+        sanitizeCardOwnedMessage(message as ChatMessage),
+      )
     : [sanitizedOptimisticMessage]
+  if (
+    recoveryMessages.some(
+      (message) => !isCardTranscriptRecoveryMessagePortable(message),
+    )
+  ) {
+    return null
+  }
 
   return {
     sessionKey: parsed.sessionKey,
@@ -105,13 +113,47 @@ export function getPendingRecoveryMessages(
   return messages
 }
 
-function writePendingSendToStorage(payload: PendingSendPayload): boolean {
+function writePendingSendToStorage(
+  payload: PendingSendPayload,
+  reserveTerminal = false,
+): boolean {
   if (!canUseLocalStorage()) return false
 
   cleanupExpiredPendingSends()
 
-  const recoveryMessages = getPendingRecoveryMessages(payload)
-  if (recoveryMessages.length === 0) return false
+  // A provisional `new` owner can accept another turn before a Card handoff.
+  // Preserve every prior admitted row and append the candidate. setItem is
+  // atomic, so quota failure leaves the old envelope intact and lets the caller
+  // fail admission before transport instead of evicting recovery data.
+  let existing: PendingSendPayload | null = null
+  try {
+    const raw = window.localStorage.getItem(
+      getPendingStorageKey(payload.sessionKey),
+    )
+    existing = raw
+      ? toPendingSendPayload(JSON.parse(raw) as Record<string, unknown>)
+      : null
+  } catch {
+    existing = null
+  }
+  const recoveryMessages = getPendingRecoveryMessages({
+    ...payload,
+    recoveryMessages: [
+      ...(existing ? getPendingRecoveryMessages(existing) : []),
+      ...getPendingRecoveryMessages(payload),
+    ],
+  })
+  // Reserve one row for the terminal assistant before admitting the user send.
+  // The follow-up terminal append may consume that row, but neither path may
+  // evict a previously accepted recovery turn.
+  if (
+    recoveryMessages.length === 0 ||
+    recoveryMessages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES ||
+    (reserveTerminal &&
+      recoveryMessages.length >= CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES)
+  ) {
+    return false
+  }
   const optimisticClientId = pendingMessageClientId(payload.optimisticMessage)
   const optimisticMessage = recoveryMessages.find(
     (message) => pendingMessageClientId(message) === optimisticClientId,
@@ -195,7 +237,7 @@ export function cleanupExpiredPendingSends() {
 }
 
 export function persistPendingMessage(payload: PendingSendPayload): boolean {
-  return writePendingSendToStorage(payload)
+  return writePendingSendToStorage(payload, true)
 }
 
 /** Append terminal bootstrap output without relinquishing provisional ownership. */

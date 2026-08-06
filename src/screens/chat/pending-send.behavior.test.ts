@@ -27,6 +27,22 @@ function bootstrapUser(): ChatMessage {
   }
 }
 
+function provisionalUser(
+  clientId: string,
+  text: string,
+  timestamp: number,
+): ChatMessage {
+  return {
+    role: 'user',
+    content: [{ type: 'text', text }],
+    timestamp,
+    clientId,
+    client_id: clientId,
+    __optimisticId: `opt-${clientId}`,
+    status: 'sent',
+  }
+}
+
 function persistBootstrap(): void {
   const optimisticMessage = bootstrapUser()
   expect(
@@ -81,6 +97,105 @@ describe('bootstrap pending-send recovery ownership', () => {
     expect(serialized).toContain('durable answer')
     expect(serialized).not.toContain('remote:raw-session')
     expect(serialized).not.toContain('remote:raw-segment')
+  })
+
+  it('retains every accepted provisional turn across multiple no-handoff sends', () => {
+    persistBootstrap()
+    expect(
+      appendPendingRecoveryMessage('new', 'new', {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'first answer' }],
+        timestamp: 2,
+        runId: 'run-first',
+      }),
+    ).toBe(true)
+
+    const second = provisionalUser('client-second', 'second question', 3)
+    expect(
+      persistPendingMessage({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'second question',
+        attachments: [],
+        optimisticMessage: second,
+      }),
+    ).toBe(true)
+    expect(
+      appendPendingRecoveryMessage('new', 'new', {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'second answer' }],
+        timestamp: 4,
+        runId: 'run-second',
+      }),
+    ).toBe(true)
+
+    expect(
+      getPendingRecoveryMessages(readPendingMessage('new', 'new')!).map(
+        (entry) => entry.content?.[0],
+      ),
+    ).toMatchObject([
+      { text: 'bootstrap question' },
+      { text: 'first answer' },
+      { text: 'second question' },
+      { text: 'second answer' },
+    ])
+  })
+
+  it('fails admission before transport instead of evicting retryable recovery rows', () => {
+    persistBootstrap()
+    for (let index = 1; index < 48; index += 1) {
+      const appended = appendPendingRecoveryMessage('new', 'new', {
+        role: 'assistant',
+        content: [{ type: 'text', text: `retained-${index}` }],
+        timestamp: index + 1,
+        runId: `run-retained-${index}`,
+      })
+      if (!appended) throw new Error(`recovery append failed at ${index}`)
+    }
+    expect(
+      getPendingRecoveryMessages(readPendingMessage('new', 'new')!),
+    ).toHaveLength(48)
+
+    const admitted = provisionalUser(
+      'client-last-admitted',
+      'last admitted',
+      500,
+    )
+    expect(
+      persistPendingMessage({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'last admitted',
+        attachments: [],
+        optimisticMessage: admitted,
+      }),
+    ).toBe(true)
+    expect(
+      appendPendingRecoveryMessage('new', 'new', {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'reserved terminal' }],
+        timestamp: 501,
+        runId: 'run-reserved-terminal',
+      }),
+    ).toBe(true)
+    const beforeRejectedSend = getPendingRecoveryMessages(
+      readPendingMessage('new', 'new')!,
+    )
+    expect(beforeRejectedSend).toHaveLength(50)
+
+    const rejected = provisionalUser('client-rejected', 'must not send', 502)
+    expect(
+      persistPendingMessage({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'must not send',
+        attachments: [],
+        optimisticMessage: rejected,
+      }),
+    ).toBe(false)
+    expect(
+      getPendingRecoveryMessages(readPendingMessage('new', 'new')!),
+    ).toEqual(beforeRejectedSend)
   })
 
   it('retains provisional recovery for an unverified or legacy destination', () => {

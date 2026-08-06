@@ -104,6 +104,8 @@ type ChatState = {
   realtimeMessages: Map<string, Array<ChatMessage>>
   /** Current streaming state per session */
   streamingState: Map<string, StreamingState>
+  /** Independent immutable-run streams nested under the stable Card owner. */
+  cardStreamingRuns: Map<string, Map<string, StreamingState>>
   /** Timestamp of last received event */
   lastEventAt: number
   /**
@@ -119,10 +121,11 @@ type ChatState = {
   processCardEvent: (cardId: string, event: ChatStreamEvent) => void
   getCardRealtimeMessages: (cardId: string) => Array<ChatMessage>
   getCardStreamingState: (cardId: string) => StreamingState | null
+  getCardStreamingStates: (cardId: string) => Array<StreamingState>
   hydrateCardStreamingState: (cardId: string) => void
   clearCard: (cardId: string) => void
   clearCardRealtimeBuffer: (cardId: string) => void
-  clearCardStreaming: (cardId: string) => void
+  clearCardStreaming: (cardId: string, runId?: string) => void
   mergeCardHistoryMessages: (
     cardId: string,
     historyMessages: Array<ChatMessage>,
@@ -766,6 +769,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   lastError: null,
   realtimeMessages: new Map(),
   streamingState: new Map(),
+  cardStreamingRuns: new Map(),
   lastEventAt: 0,
   sendStreamRunIds: new Set(),
   waitingSessionKeys: _restoredWaiting.keys,
@@ -852,6 +856,62 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const state = get()
     const sessionKey = ownerCardId ?? event.sessionKey
     const now = Date.now()
+    const cardRuns = ownerCardId
+      ? new Map(state.cardStreamingRuns.get(ownerCardId) ?? [])
+      : null
+    const explicitRunId =
+      normalizeString(event.runId) ||
+      (event.type === 'message' ||
+      event.type === 'user_message' ||
+      event.type === 'done'
+        ? getMessageRunId(event.message)
+        : '')
+    const cardRunId = ownerCardId
+      ? explicitRunId ||
+        (cardRuns?.size === 1 ? (cardRuns.keys().next().value ?? '') : '')
+      : ''
+    const previousStreamingState = (
+      streamingMap: Map<string, StreamingState>,
+    ) => {
+      if (ownerCardId && cardRuns && cardRunId) {
+        const exactRun = cardRuns.get(cardRunId)
+        if (exactRun) return exactRun
+        // A legacy owner-only projection may acquire its first immutable run.
+        // Once any immutable sibling exists, a new run starts empty.
+        if (cardRuns.size > 0) return createEmptyStreamingState()
+      }
+      return streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+    }
+    const commitStreamingState = (
+      streamingMap: Map<string, StreamingState>,
+      next: StreamingState,
+    ) => {
+      if (!ownerCardId || !cardRuns || !cardRunId) {
+        streamingMap.set(sessionKey, next)
+        set({ streamingState: streamingMap, lastEventAt: now })
+        return
+      }
+      const normalizedNext = sanitizeCardStreamingState({
+        ...next,
+        runId: cardRunId,
+      })
+      cardRuns.delete(cardRunId)
+      cardRuns.set(cardRunId, normalizedNext)
+      const nextCardRuns = new Map(state.cardStreamingRuns)
+      nextCardRuns.set(ownerCardId, cardRuns)
+      streamingMap.set(sessionKey, normalizedNext)
+      set({
+        streamingState: streamingMap,
+        cardStreamingRuns: nextCardRuns,
+        lastEventAt: now,
+      })
+      persistCardStreamingState(ownerCardId, normalizedNext)
+    }
+
+    // An owner-only event is admissible while there is at most one candidate
+    // run. Once a Card has concurrent runs, immutable run identity is required;
+    // guessing would overwrite the wrong lifecycle/content row.
+    if (ownerCardId && cardRuns && cardRuns.size > 1 && !cardRunId) return
 
     // Skip ALL events for runs being handled by send-stream.
     // send-stream is the authoritative handler for active sends — chat-events
@@ -1121,7 +1181,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       case 'chunk': {
         const streamingMap = new Map(state.streamingState)
-        const prev = streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const prev = previousStreamingState(streamingMap)
 
         // Server sends full accumulated text with fullReplace=true
         // Replace entire text (default), or append if fullReplace is explicitly false
@@ -1133,32 +1193,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
           runId: event.runId ?? prev.runId,
         }
 
-        streamingMap.set(sessionKey, next)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        if (ownerCardId) persistCardStreamingState(ownerCardId, next)
+        commitStreamingState(streamingMap, next)
 
         break
       }
 
       case 'thinking': {
         const streamingMap = new Map(state.streamingState)
-        const prev = streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const prev = previousStreamingState(streamingMap)
         const next: StreamingState = {
           ...prev,
           thinking: event.text,
           runId: event.runId ?? prev.runId,
         }
 
-        streamingMap.set(sessionKey, next)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        if (ownerCardId) persistCardStreamingState(ownerCardId, next)
+        commitStreamingState(streamingMap, next)
         break
       }
 
       case 'status':
       case 'lifecycle': {
         const streamingMap = new Map(state.streamingState)
-        const prev = streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const prev = previousStreamingState(streamingMap)
         const next: StreamingState = {
           ...prev,
           runId: event.runId ?? prev.runId,
@@ -1168,15 +1224,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ],
         }
 
-        streamingMap.set(sessionKey, next)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        if (ownerCardId) persistCardStreamingState(ownerCardId, next)
+        commitStreamingState(streamingMap, next)
         break
       }
 
       case 'tool': {
         const streamingMap = new Map(state.streamingState)
-        const prev = streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const prev = previousStreamingState(streamingMap)
 
         const toolCallId =
           event.toolCallId ??
@@ -1221,15 +1275,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ? sanitizeCardStreamingState(next)
           : next
 
-        streamingMap.set(sessionKey, browserNext)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        if (ownerCardId) persistCardStreamingState(ownerCardId, browserNext)
+        commitStreamingState(streamingMap, browserNext)
         break
       }
 
       case 'done': {
         const streamingMap = new Map(state.streamingState)
-        const streaming = streamingMap.get(sessionKey)
+        const streaming = ownerCardId
+          ? cardRuns?.get(cardRunId)
+          : streamingMap.get(sessionKey)
 
         // Build the complete message — prefer authoritative final payload (bug #8 fix)
         let completeMessage: ChatMessage | null = null
@@ -1395,14 +1449,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         }
 
-        // Clear streaming state immediately — tool calls are preserved via
-        // __streamToolCalls embedded on completeMessage above, so pills survive
-        // in the history message without needing streaming state alive.
-        // DO NOT keep a stub here — it keeps isRealtimeStreaming=true which
-        // injects an invisible streaming placeholder that causes a blank gap.
-        streamingMap.delete(sessionKey)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        if (ownerCardId) removePersistedCardStreamingState(ownerCardId)
+        // Clear only the immutable run named by this terminal event. A sibling
+        // stream on the same Card remains independently visible and recoverable.
+        if (ownerCardId && cardRuns && cardRunId) {
+          cardRuns.delete(cardRunId)
+          const nextCardRuns = new Map(state.cardStreamingRuns)
+          if (cardRuns.size > 0) nextCardRuns.set(ownerCardId, cardRuns)
+          else nextCardRuns.delete(ownerCardId)
+          const remaining = Array.from(cardRuns.values()).at(-1)
+          if (remaining) streamingMap.set(sessionKey, remaining)
+          else streamingMap.delete(sessionKey)
+          set({
+            streamingState: streamingMap,
+            cardStreamingRuns: nextCardRuns,
+            lastEventAt: now,
+          })
+          if (remaining) persistCardStreamingState(ownerCardId, remaining)
+          else removePersistedCardStreamingState(ownerCardId)
+        } else {
+          streamingMap.delete(sessionKey)
+          set({ streamingState: streamingMap, lastEventAt: now })
+          if (ownerCardId) removePersistedCardStreamingState(ownerCardId)
+        }
         break
       }
     }
@@ -1420,7 +1488,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   getCardStreamingState: (cardId) => {
     if (!isAuthoritativeCardId(cardId)) return null
-    return get().streamingState.get(cardId) ?? restoreCardStreamingState(cardId)
+    return (
+      Array.from(get().cardStreamingRuns.get(cardId)?.values() ?? []).at(-1) ??
+      get().streamingState.get(cardId) ??
+      restoreCardStreamingState(cardId)
+    )
+  },
+
+  getCardStreamingStates: (cardId) => {
+    if (!isAuthoritativeCardId(cardId)) return []
+    const active = Array.from(
+      get().cardStreamingRuns.get(cardId)?.values() ?? [],
+    )
+    if (active.length > 0) return active
+    const projected =
+      get().streamingState.get(cardId) ?? restoreCardStreamingState(cardId)
+    return projected ? [projected] : []
   },
 
   hydrateCardStreamingState: (cardId) => {
@@ -1430,7 +1513,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!restored) return
     const streamingState = new Map(get().streamingState)
     streamingState.set(cardId, restored)
-    set({ streamingState, lastEventAt: Date.now() })
+    const cardStreamingRuns = new Map(get().cardStreamingRuns)
+    if (restored.runId) {
+      cardStreamingRuns.set(cardId, new Map([[restored.runId, restored]]))
+    }
+    set({ streamingState, cardStreamingRuns, lastEventAt: Date.now() })
   },
 
   clearCard: (cardId) => {
@@ -1445,10 +1532,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
     get().clearRealtimeBuffer(cardId)
   },
 
-  clearCardStreaming: (cardId) => {
+  clearCardStreaming: (cardId, runId) => {
     if (!isAuthoritativeCardId(cardId)) return
-    get().clearStreamingSession(cardId)
-    removePersistedCardStreamingState(cardId)
+    if (!runId) {
+      get().clearStreamingSession(cardId)
+      const cardStreamingRuns = new Map(get().cardStreamingRuns)
+      cardStreamingRuns.delete(cardId)
+      set({ cardStreamingRuns })
+      removePersistedCardStreamingState(cardId)
+      return
+    }
+    const runs = new Map(get().cardStreamingRuns.get(cardId) ?? [])
+    if (!runs.delete(runId)) return
+    const cardStreamingRuns = new Map(get().cardStreamingRuns)
+    const streamingState = new Map(get().streamingState)
+    const remaining = Array.from(runs.values()).at(-1)
+    if (remaining) {
+      cardStreamingRuns.set(cardId, runs)
+      streamingState.set(cardId, remaining)
+      persistCardStreamingState(cardId, remaining)
+    } else {
+      cardStreamingRuns.delete(cardId)
+      streamingState.delete(cardId)
+      removePersistedCardStreamingState(cardId)
+    }
+    set({ cardStreamingRuns, streamingState })
   },
 
   mergeCardHistoryMessages: (cardId, historyMessages) => {
@@ -1485,9 +1593,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearSession: (sessionKey) => {
     const messages = new Map(get().realtimeMessages)
     const streaming = new Map(get().streamingState)
+    const cardStreamingRuns = new Map(get().cardStreamingRuns)
     messages.delete(sessionKey)
     streaming.delete(sessionKey)
-    set({ realtimeMessages: messages, streamingState: streaming })
+    cardStreamingRuns.delete(sessionKey)
+    set({
+      realtimeMessages: messages,
+      streamingState: streaming,
+      cardStreamingRuns,
+    })
   },
 
   handoffSession: (fromSessionKey, toSessionKey) => {
@@ -1587,8 +1701,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   clearAllStreaming: () => {
-    if (get().streamingState.size === 0) return
-    set({ streamingState: new Map() })
+    if (get().streamingState.size === 0 && get().cardStreamingRuns.size === 0)
+      return
+    set({ streamingState: new Map(), cardStreamingRuns: new Map() })
   },
 
   mergeHistoryMessages: (sessionKey, historyMessages) => {

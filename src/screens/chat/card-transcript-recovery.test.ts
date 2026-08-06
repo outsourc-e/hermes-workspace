@@ -189,7 +189,7 @@ describe('Card transcript recovery storage contract', () => {
     expect(window.sessionStorage.getItem(legacyKey)).toBeNull()
   })
 
-  it('bounds text size and message count while retaining the newest messages', () => {
+  it('rejects over-capacity admission without evicting any durable recovery turn', () => {
     expect(
       appendCardTranscriptRecoveryMessage(
         owner,
@@ -209,13 +209,21 @@ describe('Card transcript recovery storage contract', () => {
           timestamp: now + index,
         }),
     )
-    const written = replaceCardTranscriptRecoveryMessages(owner, messages, {
+    const baseline = messages.slice(0, CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES)
+    const written = replaceCardTranscriptRecoveryMessages(owner, baseline, {
       now,
     })
-    expect(written?.messages).toHaveLength(
-      CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES,
+    expect(written?.messages).toEqual(baseline)
+    expect(
+      appendCardTranscriptRecoveryMessage(
+        owner,
+        messages[CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES]!,
+        { now },
+      ),
+    ).toBeNull()
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual(
+      baseline,
     )
-    expect(written?.messages[0]).toMatchObject({ clientId: 'client-3' })
   })
 
   it('appends, replaces, and deduplicates only evidence-backed matches', () => {
@@ -368,6 +376,16 @@ describe('Card transcript recovery storage contract', () => {
     )
 
     expect(reconciled?.messages).toEqual([second])
+    expect(
+      mergeCardTranscriptRecoveryMessages(
+        [
+          message('user', 'repeat this exact turn', {
+            id: 'server-repeat',
+          }),
+        ],
+        [first, second],
+      ),
+    ).toEqual([expect.objectContaining({ id: 'server-repeat' }), second])
   })
 
   it('acknowledges repeated equal paired turns in order without duplicate overlays', () => {
