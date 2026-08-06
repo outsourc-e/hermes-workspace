@@ -24,11 +24,21 @@ export type SwarmChatMessage = {
 
 type DirectChatResponse = {
   ok: boolean
-  workerId: string
+  cardOwner: SwarmSessionCardOwner
   delivered: boolean
   delivery?: 'tmux'
   error?: string | null
   fetchedAt: number
+}
+
+type SwarmDirectChatBinding = SwarmSessionCardOwner & {
+  canonicalSource: 'local'
+  canonicalSegmentKey: string
+  canonicalTransport: 'tmux'
+}
+
+type SwarmDirectChatOutcome = {
+  cardOwner: SwarmSessionCardOwner
 }
 
 /**
@@ -130,10 +140,10 @@ function hasExactContinuationProjection(
 function isExactRootProjection(
   response: SessionCardListWire,
   card: SessionCardWire,
-): card is SessionCardWire & { canonicalSource: 'local' | 'remote' } {
+): card is SessionCardWire & { canonicalSource: 'local' } {
   const source = card.canonicalSource
   return (
-    (source === 'local' || source === 'remote') &&
+    source === 'local' &&
     card.parentCardId === undefined &&
     (card.relationshipKind === 'root' || card.relationshipKind === 'orphan') &&
     hasExactCompleteSessionCardProjection(response, card.cardId) &&
@@ -161,7 +171,7 @@ function isRuntimeCardOwner(value: unknown): value is SwarmSessionCardOwner {
   const owner = value as Partial<SwarmSessionCardOwner>
   if (owner.kind !== 'session-card-owner') return false
   const cardId = exactSourceQualifiedIdentity(owner.cardId)
-  if (!cardId) return false
+  if (!cardId || cardId.source !== 'local') return false
   if (owner.parentCardId === null) return true
   const parentCardId = exactSourceQualifiedIdentity(owner.parentCardId)
   return Boolean(
@@ -264,18 +274,52 @@ async function sendDirectChat(
   workerId: string,
   prompt: string,
   limit: number,
-): Promise<void> {
+  cardBinding: SwarmDirectChatBinding,
+): Promise<SwarmDirectChatOutcome> {
   const res = await fetch('/api/swarm-direct-chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ workerId, prompt, limit, timeoutMs: 120_000 }),
+    body: JSON.stringify({
+      workerId,
+      prompt,
+      cardBinding,
+      limit,
+      timeoutMs: 120_000,
+    }),
   })
   const data = (await res.json().catch(() => null)) as
     | DirectChatResponse
     | { error?: string }
     | null
-  if (!res.ok || !data || !('delivered' in data) || !data.delivered) {
+  if (
+    !res.ok ||
+    !data ||
+    !('delivered' in data) ||
+    !data.delivered ||
+    !('cardOwner' in data) ||
+    !isRuntimeCardOwner(data.cardOwner) ||
+    data.cardOwner.cardId !== cardBinding.cardId ||
+    data.cardOwner.parentCardId !== cardBinding.parentCardId
+  ) {
     throw new Error(SAFE_SEND_ERROR)
+  }
+  return { cardOwner: data.cardOwner }
+}
+
+function directChatBindingForMapping(
+  mapping: ResolvedSwarmSessionCardMapping | undefined,
+  workerId: string,
+): SwarmDirectChatBinding | undefined {
+  if (!mapping || mapping.canonicalSegmentKey !== `local:${workerId}`) {
+    return undefined
+  }
+  return {
+    kind: 'session-card-owner',
+    cardId: mapping.target.cardId,
+    parentCardId: mapping.target.parentCardId,
+    canonicalSource: 'local',
+    canonicalSegmentKey: mapping.canonicalSegmentKey,
+    canonicalTransport: 'tmux',
   }
 }
 
@@ -319,6 +363,12 @@ function cardHistoryQueryKey(target: SwarmSessionCardTarget | undefined) {
   return target.parentCardId
     ? sessionCardQueryKeys.childHistory(target.parentCardId, target.cardId)
     : sessionCardQueryKeys.history(target.cardId)
+}
+
+function cardOwnerHistoryQueryKey(owner: SwarmSessionCardOwner) {
+  return owner.parentCardId
+    ? sessionCardQueryKeys.childHistory(owner.parentCardId, owner.cardId)
+    : sessionCardQueryKeys.history(owner.cardId)
 }
 
 async function fetchSanitizedSwarmCardTranscript(
@@ -480,7 +530,13 @@ export function useSwarmChat({
     : historyQuery.isPending
       ? 'loading'
       : (transcript?.status ?? 'loading')
-  const target = transcript ? (transcript.target ?? undefined) : verifiedTarget
+  const transcriptTarget = targetMatchesOwner(
+    transcript?.target ?? undefined,
+    cardOwner,
+  )
+    ? (transcript?.target ?? undefined)
+    : undefined
+  const target = transcript ? transcriptTarget : verifiedTarget
   const activeOwner: SwarmSessionCardOwner | undefined = target
     ? {
         kind: 'session-card-owner',
@@ -499,17 +555,25 @@ export function useSwarmChat({
     mutationFn: async (prompt: string) => {
       if (!activeOwner) throw new Error(SAFE_SEND_ERROR)
       try {
-        return await sendDirectChat(workerId, prompt, limit)
+        const mapping = resolveSwarmSessionCardMapping(
+          await fetchSessionCards(),
+          activeOwner,
+        )
+        const cardBinding = directChatBindingForMapping(mapping, workerId)
+        if (!cardBinding) throw new Error(SAFE_SEND_ERROR)
+        return await sendDirectChat(workerId, prompt, limit, cardBinding)
       } catch {
         throw new Error(SAFE_SEND_ERROR)
       }
     },
-    onSuccess: async () => {
+    onSuccess: async (outcome) => {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: sessionCardQueryKeys.list(false),
         }),
-        queryClient.invalidateQueries({ queryKey: historyQueryKey }),
+        queryClient.invalidateQueries({
+          queryKey: cardOwnerHistoryQueryKey(outcome.cardOwner),
+        }),
       ])
     },
   })

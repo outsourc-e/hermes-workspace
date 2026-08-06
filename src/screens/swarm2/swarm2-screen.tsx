@@ -459,10 +459,10 @@ function hasSourceCompleteContinuationProjection(
 function rootHasAuthoritativeProjection(
   response: SessionCardListWire,
   card: SessionCardWire,
-): card is SessionCardWire & { canonicalSource: 'local' | 'remote' } {
+): card is SessionCardWire & { canonicalSource: 'local' } {
   const source = card.canonicalSource
   return (
-    (source === 'local' || source === 'remote') &&
+    source === 'local' &&
     card.parentCardId === undefined &&
     (card.relationshipKind === 'root' || card.relationshipKind === 'orphan') &&
     hasExactCompleteSessionCardProjection(response, card.cardId) &&
@@ -485,13 +485,15 @@ function childHasAuthoritativeProjection(
   )
 }
 
-function ownsExactWorkerAlias(
+function ownsCurrentLocalWorkerAlias(
   workerId: string,
-  source: 'local' | 'remote',
-  identities: ReadonlyArray<string>,
+  canonicalSegmentKey: string,
 ): boolean {
-  if (!workerId || workerId.trim() !== workerId) return false
-  return identities.includes(`${source}:${workerId}`)
+  return (
+    Boolean(workerId) &&
+    workerId.trim() === workerId &&
+    canonicalSegmentKey === `local:${workerId}`
+  )
 }
 
 /**
@@ -515,13 +517,7 @@ export function resolveSwarmWorkerCardOwner(
   for (const card of response.cards) {
     if (!rootHasAuthoritativeProjection(response, card)) continue
     const source = card.canonicalSource
-    if (
-      ownsExactWorkerAlias(workerId, source, [
-        card.cardId,
-        card.canonicalSegmentKey,
-        ...card.continuationSegmentKeys,
-      ])
-    ) {
+    if (ownsCurrentLocalWorkerAlias(workerId, card.canonicalSegmentKey)) {
       candidates.push({
         kind: 'session-card-owner',
         cardId: card.cardId,
@@ -531,13 +527,7 @@ export function resolveSwarmWorkerCardOwner(
 
     for (const child of card.childNodes) {
       if (!childHasAuthoritativeProjection(child, source)) continue
-      if (
-        ownsExactWorkerAlias(workerId, source, [
-          child.cardId,
-          child.sessionKey,
-          ...child.continuationSegmentKeys,
-        ])
-      ) {
+      if (ownsCurrentLocalWorkerAlias(workerId, child.sessionKey)) {
         candidates.push({
           kind: 'session-card-owner',
           cardId: child.cardId,

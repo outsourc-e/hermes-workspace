@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { sessionCardService } from '../../server/session-card-service'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import type { SwarmChatMessage } from '../../server/swarm-chat-reader'
@@ -12,13 +13,26 @@ import type { SwarmChatMessage } from '../../server/swarm-chat-reader'
 type DirectChatRequest = {
   workerId?: unknown
   prompt?: unknown
+  cardBinding?: unknown
   limit?: unknown
   timeoutMs?: unknown
 }
 
+type DirectChatCardOwner = {
+  kind: 'session-card-owner'
+  cardId: string
+  parentCardId: string | null
+}
+
+type DirectChatCardBinding = DirectChatCardOwner & {
+  canonicalSource: 'local'
+  canonicalSegmentKey: string
+  canonicalTransport: 'tmux'
+}
+
 type DirectChatResponse = {
   ok: boolean
-  workerId: string
+  cardOwner: DirectChatCardOwner
   delivered: boolean
   delivery?: 'tmux'
   error?: string | null
@@ -39,6 +53,92 @@ const TMUX_BIN_CANDIDATES = [
 
 function validateWorkerId(workerId: string): boolean {
   return /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(workerId)
+}
+
+function isExactLocalIdentity(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.trim() === value &&
+    value.startsWith('local:') &&
+    value.length > 'local:'.length
+  )
+}
+
+function parseDirectChatCardBinding(
+  value: unknown,
+  workerId: string,
+): DirectChatCardBinding | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const binding = value as Partial<Record<keyof DirectChatCardBinding, unknown>>
+  if (
+    binding.kind !== 'session-card-owner' ||
+    !isExactLocalIdentity(binding.cardId) ||
+    !Object.prototype.hasOwnProperty.call(binding, 'parentCardId') ||
+    binding.canonicalSource !== 'local' ||
+    binding.canonicalTransport !== 'tmux' ||
+    binding.canonicalSegmentKey !== `local:${workerId}`
+  ) {
+    return null
+  }
+  const parentCardId = binding.parentCardId
+  if (
+    parentCardId !== null &&
+    (!isExactLocalIdentity(parentCardId) || parentCardId === binding.cardId)
+  ) {
+    return null
+  }
+  return {
+    kind: 'session-card-owner',
+    cardId: binding.cardId,
+    parentCardId,
+    canonicalSource: 'local',
+    canonicalSegmentKey: binding.canonicalSegmentKey,
+    canonicalTransport: 'tmux',
+  }
+}
+
+async function verifyDirectChatCardBinding(
+  binding: DirectChatCardBinding,
+): Promise<DirectChatCardOwner | null> {
+  try {
+    const resolved = binding.parentCardId
+      ? await sessionCardService.resolveChildCard(
+          binding.parentCardId,
+          binding.cardId,
+        )
+      : await sessionCardService.resolveCard(binding.cardId)
+    const card = resolved.card
+    const continuations = card.continuationSegmentKeys
+    const relationshipMatches = binding.parentCardId
+      ? card.parentCardId === binding.parentCardId &&
+        (card.relationshipKind === 'child' ||
+          card.relationshipKind === 'branch')
+      : card.parentCardId === undefined &&
+        (card.relationshipKind === 'root' || card.relationshipKind === 'orphan')
+    if (
+      resolved.collection.completeness !== 'complete' ||
+      resolved.collection.retryable ||
+      card.cardId !== binding.cardId ||
+      card.canonicalSource !== binding.canonicalSource ||
+      card.canonicalTransport !== undefined ||
+      card.canonicalSegmentKey !== binding.canonicalSegmentKey ||
+      continuations.length === 0 ||
+      continuations.length !== card.continuationCount ||
+      continuations[0] !== card.cardId ||
+      continuations.at(-1) !== card.canonicalSegmentKey ||
+      new Set(continuations).size !== continuations.length ||
+      !relationshipMatches
+    ) {
+      return null
+    }
+    return {
+      kind: 'session-card-owner',
+      cardId: card.cardId,
+      parentCardId: binding.parentCardId,
+    }
+  } catch {
+    return null
+  }
 }
 
 function getProfilesDir(): string {
@@ -239,6 +339,7 @@ function promptMatched(content: string, prompt: string): boolean {
 
 async function waitForReply(
   workerId: string,
+  cardOwner: DirectChatCardOwner,
   baselineLastId: string | null,
   prompt: string,
   limit: number,
@@ -251,10 +352,10 @@ async function waitForReply(
     const chat = readWorkerMessages(profilePath, limit)
     const response: DirectChatResponse = {
       ok: chat.ok,
-      workerId,
+      cardOwner,
       delivered: true,
       delivery: 'tmux',
-      error: chat.ok ? null : (chat.error ?? 'Failed to read worker messages'),
+      error: chat.ok ? null : 'Worker reply is unavailable',
       fetchedAt: Date.now(),
     }
     if (chat.ok) {
@@ -276,12 +377,10 @@ async function waitForReply(
   const finalChat = readWorkerMessages(profilePath, limit)
   return {
     ok: finalChat.ok,
-    workerId,
+    cardOwner,
     delivered: true,
     delivery: 'tmux',
-    error: finalChat.ok
-      ? null
-      : (finalChat.error ?? 'Timed out waiting for worker reply'),
+    error: finalChat.ok ? null : 'Worker reply is unavailable',
     fetchedAt: Date.now(),
   }
 }
@@ -302,7 +401,10 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
         }
 
         const workerId =
-          typeof body.workerId === 'string' ? body.workerId.trim() : ''
+          typeof body.workerId === 'string' &&
+          body.workerId.trim() === body.workerId
+            ? body.workerId
+            : ''
         const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
         const limit =
           typeof body.limit === 'number' && Number.isFinite(body.limit)
@@ -323,6 +425,26 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
           return json({ error: 'Missing prompt' }, { status: 400 })
         }
 
+        const cardBinding = parseDirectChatCardBinding(
+          body.cardBinding,
+          workerId,
+        )
+        if (!cardBinding) {
+          return json(
+            { error: 'Invalid Session Card delivery binding' },
+            {
+              status: 400,
+            },
+          )
+        }
+        const cardOwner = await verifyDirectChatCardBinding(cardBinding)
+        if (!cardOwner) {
+          return json(
+            { error: 'Session Card delivery binding is unavailable' },
+            { status: 409 },
+          )
+        }
+
         const profilePath = getProfilePath(workerId)
         const baselineChat = readWorkerMessages(profilePath, limit)
         const baselineLastId = baselineChat.messages.at(-1)?.id ?? null
@@ -332,9 +454,9 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
           return json(
             {
               ok: false,
-              workerId,
+              cardOwner,
               delivered: false,
-              error: delivered.error,
+              error: 'Unable to deliver the worker message',
               fetchedAt: Date.now(),
             } satisfies DirectChatResponse,
             { status: 500 },
@@ -343,6 +465,7 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
 
         const reply = await waitForReply(
           workerId,
+          cardOwner,
           baselineLastId,
           prompt,
           limit,

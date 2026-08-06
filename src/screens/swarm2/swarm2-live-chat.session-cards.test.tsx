@@ -13,8 +13,8 @@ import type {
 } from '@/hooks/use-swarm-chat'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 
-const RAW_SEGMENT_ONE = 'remote:raw-worker-segment-one'
-const RAW_SEGMENT_TWO = 'remote:raw-worker-segment-two'
+const RAW_SEGMENT_ONE = 'local:raw-worker-segment-one'
+const RAW_SEGMENT_TWO = 'local:raw-worker-segment-two'
 const RAW_MESSAGE_ID = 'raw-message-id-must-not-enter-browser-state'
 
 type SanitizedTranscript = {
@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   invalidateQueries: vi.fn(),
   queryOptions: [] as Array<QueryOptions>,
   queryData: undefined as SanitizedTranscript | undefined,
+  mutationResults: [] as Array<unknown>,
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -55,13 +56,14 @@ vi.mock('@tanstack/react-query', () => ({
   },
   useMutation: (options: {
     mutationFn: (input: string) => Promise<unknown>
-    onSuccess?: () => Promise<void> | void
+    onSuccess?: (result: unknown) => Promise<void> | void
   }) => ({
     isPending: false,
     error: null,
     mutateAsync: vi.fn(async (input: string) => {
       const result = await options.mutationFn(input)
-      await options.onSuccess?.()
+      mocks.mutationResults.push(result)
+      await options.onSuccess?.(result)
       return result
     }),
   }),
@@ -70,14 +72,14 @@ vi.mock('@tanstack/react-query', () => ({
 
 const rootOwner: SwarmSessionCardOwner = {
   kind: 'session-card-owner',
-  cardId: 'remote:worker-card',
+  cardId: 'local:worker-card',
   parentCardId: null,
 }
 
 const childOwner: SwarmSessionCardOwner = {
   kind: 'session-card-owner',
-  cardId: 'remote:worker-child-card',
-  parentCardId: 'remote:worker-card',
+  cardId: 'local:worker-child-card',
+  parentCardId: 'local:worker-card',
 }
 
 const rootTarget: SwarmSessionCardTarget = {
@@ -95,7 +97,7 @@ const rootTarget: SwarmSessionCardTarget = {
 function readyTranscript(
   messages: Array<SwarmChatMessage> = [
     {
-      id: 'card-message-remote:worker-card-0',
+      id: 'card-message-local:worker-card-0',
       role: 'assistant',
       content: 'Authoritative Card transcript',
       timestamp: 123,
@@ -121,14 +123,13 @@ function cardResponse({
 } = {}): SessionCardListWire {
   const continuationSegmentKeys =
     canonicalSegmentKey === RAW_SEGMENT_TWO
-      ? ['remote:worker-card', RAW_SEGMENT_ONE, RAW_SEGMENT_TWO]
-      : ['remote:worker-card', canonicalSegmentKey]
+      ? ['local:worker-card', RAW_SEGMENT_ONE, RAW_SEGMENT_TWO]
+      : ['local:worker-card', canonicalSegmentKey]
   return {
     cards: [
       {
         cardId: rootOwner.cardId,
-        canonicalSource: 'remote',
-        canonicalTransport: 'gateway',
+        canonicalSource: 'local',
         title: rootTarget.title,
         titleSource: 'manual',
         canonicalSegmentKey,
@@ -139,10 +140,10 @@ function cardResponse({
           ? [
               {
                 cardId: childOwner.cardId,
-                sessionKey: 'remote:raw-worker-child-segment',
+                sessionKey: 'local:raw-worker-child-segment',
                 continuationSegmentKeys: [
                   childOwner.cardId,
-                  'remote:raw-worker-child-segment',
+                  'local:raw-worker-child-segment',
                 ],
                 continuationCount: 2,
                 relationshipKind: 'child',
@@ -251,6 +252,7 @@ beforeEach(() => {
   mocks.invalidateQueries.mockReset()
   mocks.queryOptions.length = 0
   mocks.queryData = readyTranscript()
+  mocks.mutationResults.length = 0
 })
 
 afterEach(() => {
@@ -272,7 +274,7 @@ describe.each(['/swarm', '/swarm2'] as const)(
           return Promise.resolve(Response.json(cardResponse()))
         }
         if (
-          url === '/api/session-cards/remote%3Aworker-card/history?limit=500'
+          url === '/api/session-cards/local%3Aworker-card/history?limit=500'
         ) {
           return Promise.resolve(Response.json(historyResponse()))
         }
@@ -310,7 +312,7 @@ describe.each(['/swarm', '/swarm2'] as const)(
       expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual(
         expect.arrayContaining([
           '/api/session-cards',
-          '/api/session-cards/remote%3Aworker-card/history?limit=500',
+          '/api/session-cards/local%3Aworker-card/history?limit=500',
         ]),
       )
       expect(
@@ -346,13 +348,13 @@ it('keeps the same Card key and both user/assistant rows through continuation re
   ]
   mocks.queryData = readyTranscript([
     {
-      id: 'card-message-remote:worker-card-0',
+      id: 'card-message-local:worker-card-0',
       role: 'user',
       content: 'Keep this user request',
       timestamp: 100,
     },
     {
-      id: 'card-message-remote:worker-card-1',
+      id: 'card-message-local:worker-card-1',
       role: 'assistant',
       content: 'Keep this assistant response',
       timestamp: 101,
@@ -447,6 +449,78 @@ it('keeps the same Card key and both user/assistant rows through continuation re
   })
 })
 
+it('binds a valid send to the current local Card and refreshes only that owner history', async () => {
+  const sendCardResponse = cardResponse({
+    canonicalSegmentKey: 'local:builder',
+  })
+  const fetchMock = vi.fn<typeof fetch>((input, init) => {
+    const url = String(input)
+    if (url === '/api/session-cards') {
+      return Promise.resolve(Response.json(sendCardResponse))
+    }
+    if (url === '/api/swarm-direct-chat' && init?.method === 'POST') {
+      return Promise.resolve(
+        Response.json({
+          ok: true,
+          cardOwner: rootOwner,
+          delivered: true,
+          delivery: 'tmux',
+          fetchedAt: 123,
+        }),
+      )
+    }
+    return Promise.reject(new Error(`Unexpected request: ${url}`))
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  await mountViewer()
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Send' })).toBeTruthy()
+  })
+  await React.act(async () => {
+    fireEvent.change(screen.getByPlaceholderText('Message builder…'), {
+      target: { value: 'Persist under this Card' },
+    })
+    await Promise.resolve()
+  })
+  await React.act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await Promise.resolve()
+  })
+
+  await waitFor(() => expect(mocks.mutationResults).toHaveLength(1))
+  const sendCall = fetchMock.mock.calls.find(
+    ([input]) => String(input) === '/api/swarm-direct-chat',
+  )
+  expect(sendCall).toBeTruthy()
+  const requestBody = JSON.parse(String(sendCall?.[1]?.body)) as Record<
+    string,
+    unknown
+  >
+  expect(requestBody).toEqual({
+    workerId: 'builder',
+    prompt: 'Persist under this Card',
+    cardBinding: {
+      ...rootOwner,
+      canonicalSource: 'local',
+      canonicalSegmentKey: 'local:builder',
+      canonicalTransport: 'tmux',
+    },
+    limit: 30,
+    timeoutMs: 120_000,
+  })
+  expect(mocks.mutationResults[0]).toEqual({
+    cardOwner: rootOwner,
+  })
+  expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+    queryKey: ['chat', 'session-cards', 'list', false, 0],
+  })
+  expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+    queryKey: ['chat', 'session-cards', 'history', rootOwner.cardId, ''],
+  })
+  expect(JSON.stringify(mocks.mutationResults)).not.toContain('local:builder"')
+})
+
 it('uses parent/child Card IDs for child history and rejects a nonmatching parent', async () => {
   mocks.queryData = {
     target: {
@@ -471,13 +545,13 @@ it('uses parent/child Card IDs for child history and rejects a nonmatching paren
     }
     if (
       url ===
-      '/api/session-cards/remote%3Aworker-child-card/history?parentCardId=remote%3Aworker-card&limit=500'
+      '/api/session-cards/local%3Aworker-child-card/history?parentCardId=local%3Aworker-card&limit=500'
     ) {
       return Promise.resolve(
         Response.json(
           historyResponse({
             cardId: childOwner.cardId,
-            canonicalSegmentKey: 'remote:raw-worker-child-segment',
+            canonicalSegmentKey: 'local:raw-worker-child-segment',
           }),
         ),
       )
@@ -502,7 +576,7 @@ it('uses parent/child Card IDs for child history and rejects a nonmatching paren
   mocks.queryOptions.length = 0
   await mountViewer({
     ...childOwner,
-    parentCardId: 'remote:other-parent',
+    parentCardId: 'local:other-parent',
   })
   await waitFor(() => {
     expect(

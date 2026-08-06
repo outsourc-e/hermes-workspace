@@ -158,18 +158,17 @@ vi.mock('@/components/swarm/swarm-terminal', () => ({
   SwarmTerminal: () => null,
 }))
 
-const ROOT_CARD_ID = 'remote:stable-root-card'
-const CHILD_CARD_ID = 'remote:stable-child-card'
-const ROOT_WORKER_ALIAS = 'remote:root-worker'
-const CHILD_WORKER_ALIAS = 'remote:child-worker'
+const ROOT_CARD_ID = 'local:stable-root-card'
+const CHILD_CARD_ID = 'local:stable-child-card'
+const ROOT_WORKER_ALIAS = 'local:root-worker'
+const CHILD_WORKER_ALIAS = 'local:child-worker'
 
 function completeProjection(): SessionCardListWire {
   return {
     cards: [
       {
         cardId: ROOT_CARD_ID,
-        canonicalSource: 'remote',
-        canonicalTransport: 'gateway',
+        canonicalSource: 'local',
         title: 'Root worker Card',
         titleSource: 'manual',
         canonicalSegmentKey: ROOT_WORKER_ALIAS,
@@ -209,15 +208,15 @@ function failClosedProjection(): SessionCardListWire {
     cards: [
       {
         ...complete.cards[0]!,
-        canonicalSegmentKey: 'remote:different-worker',
-        continuationSegmentKeys: [ROOT_CARD_ID, 'remote:different-worker'],
+        canonicalSegmentKey: 'local:different-worker',
+        continuationSegmentKeys: [ROOT_CARD_ID, 'local:different-worker'],
         childNodes: [
           {
             ...complete.cards[0]!.childNodes[0]!,
-            sessionKey: 'remote:different-child-worker',
+            sessionKey: 'local:different-child-worker',
             continuationSegmentKeys: [
               CHILD_CARD_ID,
-              'remote:different-child-worker',
+              'local:different-child-worker',
             ],
           },
         ],
@@ -366,7 +365,7 @@ it('passes unique complete root/child Card owners through the mounted worker car
 
 it('rejects ambiguous complete Card owners for the same worker alias', () => {
   const projection = completeProjection()
-  const competingCardId = 'remote:competing-root-card'
+  const competingCardId = 'local:competing-root-card'
   const competingCard = {
     ...projection.cards[0]!,
     cardId: competingCardId,
@@ -383,6 +382,71 @@ it('rejects ambiguous complete Card owners for the same worker alias', () => {
           ...projection.cardResolutions,
           {
             cardId: competingCardId,
+            completeness: 'complete',
+            retryable: false,
+          },
+        ],
+      },
+      'root-worker',
+    ),
+  ).toBeNull()
+})
+
+it('rebinds a worker immediately from rolled-over Card A to current Card B and rejects remote Cards', () => {
+  const projection = completeProjection()
+  const cardA = {
+    ...projection.cards[0]!,
+    canonicalSegmentKey: 'local:retired-root-tip',
+    continuationSegmentKeys: [ROOT_CARD_ID, 'local:retired-root-tip'],
+    childNodes: [],
+  }
+  const cardBId = 'local:current-root-card'
+  const cardB = {
+    ...projection.cards[0]!,
+    cardId: cardBId,
+    canonicalSegmentKey: ROOT_WORKER_ALIAS,
+    continuationSegmentKeys: [cardBId, ROOT_WORKER_ALIAS],
+    childNodes: [],
+  }
+
+  expect(
+    resolveSwarmWorkerCardOwner(
+      {
+        ...projection,
+        cards: [cardA, cardB],
+        cardResolutions: [
+          { cardId: ROOT_CARD_ID, completeness: 'complete', retryable: false },
+          { cardId: cardBId, completeness: 'complete', retryable: false },
+        ],
+      },
+      'root-worker',
+    ),
+  ).toEqual({
+    kind: 'session-card-owner',
+    cardId: cardBId,
+    parentCardId: null,
+  })
+
+  expect(
+    resolveSwarmWorkerCardOwner(
+      {
+        ...projection,
+        cards: [
+          {
+            ...cardB,
+            cardId: 'remote:current-root-card',
+            canonicalSource: 'remote',
+            canonicalTransport: 'gateway',
+            canonicalSegmentKey: 'remote:root-worker',
+            continuationSegmentKeys: [
+              'remote:current-root-card',
+              'remote:root-worker',
+            ],
+          },
+        ],
+        cardResolutions: [
+          {
+            cardId: 'remote:current-root-card',
             completeness: 'complete',
             retryable: false,
           },

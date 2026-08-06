@@ -568,6 +568,11 @@ export function OperationalWorkerCard({
             )}
           >
             <Swarm2LiveChat
+              key={
+                chatCardOwner
+                  ? `${chatCardOwner.parentCardId ?? 'root'}:${chatCardOwner.cardId}`
+                  : 'card-owner-unavailable'
+              }
               workerId={member.id}
               cardOwner={chatCardOwner}
               preview={false}
