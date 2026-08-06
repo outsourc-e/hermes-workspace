@@ -31,6 +31,7 @@ module.exports = {
   },
   dmg: {
     title: 'Hermes Workspace',
+    artifactName: 'hermes-workspace-${version}-mac-${arch}.${ext}',
     iconSize: 80,
     contents: [
       { x: 130, y: 220 },
@@ -42,10 +43,14 @@ module.exports = {
     executableName: 'hermes-workspace',
   },
   nsis: {
+    artifactName: 'hermes-workspace-${version}-windows-${arch}-setup.${ext}',
     oneClick: true,
     perMachine: false,
     allowToChangeInstallationDirectory: false,
     deleteAppDataOnUninstall: false,
+  },
+  portable: {
+    artifactName: 'hermes-workspace-${version}-windows-${arch}-portable.${ext}',
   },
   publish: {
     provider: 'github',
@@ -55,5 +60,4 @@ module.exports = {
   },
   asar: false,
   compression: 'maximum',
-  artifactName: 'hermes-workspace-setup-${version}.${ext}',
 }

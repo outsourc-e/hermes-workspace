@@ -23,6 +23,7 @@ import type {
   CardTranscriptRecoveryOwner,
 } from './card-transcript-recovery'
 import type { ChatMessage } from './types'
+import { swarmDirectChatContentDigest } from '@/lib/swarm-direct-chat-delivery'
 
 const now = 1_800_000_000_000
 const owner: CardTranscriptRecoveryOwner = {
@@ -622,6 +623,115 @@ describe('Card transcript recovery storage contract', () => {
     expect(
       mergeCardTranscriptRecoveryMessages([staleAuthoritative], [newer]),
     ).toEqual([staleAuthoritative, newer])
+  })
+
+  it('reconciles a server-observed Swarm delivery without duplicating or losing attachment recovery', () => {
+    const deliveredContent =
+      '[User attached file: /tmp/swarm/evidence.txt]\nReview the evidence'
+    const attachment = {
+      id: 'swarm-attachment-1',
+      name: 'evidence.txt',
+      contentType: 'text/plain',
+      size: 5,
+      dataUrl: 'data:text/plain;base64,aGVsbG8=',
+    }
+    const optimistic = message('user', 'Review the evidence', {
+      clientId: 'swarm-client-1',
+      __optimisticId: 'opt-swarm-client-1',
+      status: 'sent',
+      attachments: [attachment],
+      __swarmDeliveryAcknowledgement: {
+        version: 1,
+        clientId: 'swarm-client-1',
+        observedAt: now,
+        contentDigest: swarmDirectChatContentDigest(deliveredContent),
+      },
+    })
+    const authoritative = message('user', deliveredContent, {
+      id: 'server-swarm-user',
+      timestamp: now,
+    })
+    replaceCardTranscriptRecoveryMessages(owner, [optimistic], { now })
+
+    const first = reconcileSessionCardHistoryResponse({
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [authoritative],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+
+    expect(first.messages).toHaveLength(1)
+    expect(first.messages[0]).toMatchObject({
+      id: 'server-swarm-user',
+      content: optimistic.content,
+      attachments: [attachment],
+      __swarmDeliveryAcknowledgement: optimistic.__swarmDeliveryAcknowledgement,
+    })
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      optimistic,
+    ])
+
+    const partial = reconcileSessionCardHistoryResponse({
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: 'remote:segment-a',
+          retryable: true,
+          error: 'temporarily unavailable',
+        },
+      ],
+    })
+    expect(partial.messages).toHaveLength(1)
+    expect(partial.messages[0]).toMatchObject({
+      id: 'server-swarm-user',
+      content: optimistic.content,
+      attachments: [attachment],
+    })
+  })
+
+  it('removes a Swarm text-only recovery row only after its exact observed echo is complete and durable', () => {
+    const optimistic = message('user', 'Run the focused checks', {
+      clientId: 'swarm-client-text',
+      __optimisticId: 'opt-swarm-client-text',
+      status: 'sent',
+      __swarmDeliveryAcknowledgement: {
+        version: 1,
+        clientId: 'swarm-client-text',
+        observedAt: now,
+        contentDigest: swarmDirectChatContentDigest('Run the focused checks'),
+      },
+    })
+    replaceCardTranscriptRecoveryMessages(owner, [optimistic], { now })
+
+    const staleEqualText = message('user', 'Run the focused checks', {
+      id: 'server-stale-swarm-user',
+      timestamp: now - 1,
+    })
+    expect(
+      removeAcknowledgedCardTranscriptRecoveryMessages(
+        owner,
+        [staleEqualText],
+        { now },
+      )?.messages,
+    ).toEqual([optimistic])
+
+    const observedEcho = message('user', 'Run the focused checks', {
+      id: 'server-observed-swarm-user',
+      timestamp: now,
+    })
+    expect(
+      removeAcknowledgedCardTranscriptRecoveryMessages(owner, [observedEcho], {
+        now,
+      }),
+    ).toBeNull()
   })
 
   it('acknowledges repeated equal paired turns in order without duplicate overlays', () => {

@@ -20,6 +20,7 @@ INSTALL_DIR="${INSTALL_DIR:-$HOME/hermes-workspace}"
 GATEWAY_PORT="${GATEWAY_PORT:-8642}"
 NOUS_INSTALLER_URL="${NOUS_INSTALLER_URL:-https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh}"
 readonly PNPM_VERSION="10.15.0"
+readonly PINNED_PNPM_BIN="$HOME/.local/bin/pnpm"
 
 # ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -52,37 +53,33 @@ ensure_path() {
   esac
 }
 
-pnpm_cmd() {
-  if command -v corepack &>/dev/null; then
-    corepack "pnpm@${PNPM_VERSION}" "$@"
-    return
-  fi
-  npx --yes "pnpm@${PNPM_VERSION}" "$@"
-}
-
 install_pnpm_command() {
-  local pnpm_bin_dir="$HOME/.local/bin"
-  local pnpm_bin="$pnpm_bin_dir/pnpm"
+  local pnpm_bin="$PINNED_PNPM_BIN"
+  local pnpm_bin_dir
   local installed_version
+  local resolved_pnpm
 
+  pnpm_bin_dir="$(dirname "$pnpm_bin")"
   mkdir -p "$pnpm_bin_dir"
   if command -v corepack &>/dev/null; then
-    corepack enable --install-directory "$pnpm_bin_dir" pnpm
+    printf '#!/usr/bin/env bash\nexec corepack "pnpm@%s" "$@"\n' \
+      "$PNPM_VERSION" > "$pnpm_bin"
   else
     printf '#!/usr/bin/env bash\nexec npx --yes "pnpm@%s" "$@"\n' \
       "$PNPM_VERSION" > "$pnpm_bin"
-    chmod 0755 "$pnpm_bin"
   fi
+  chmod 0755 "$pnpm_bin"
 
   ensure_path "$pnpm_bin_dir"
   hash -r
-  if ! command -v pnpm &>/dev/null; then
-    red "Unable to install the pnpm command at $pnpm_bin"
+  resolved_pnpm="$(command -v pnpm || true)"
+  if [[ "$resolved_pnpm" != "$pnpm_bin" ]]; then
+    red "Unable to resolve the pinned pnpm command at $pnpm_bin"
     exit 1
   fi
-  installed_version="$(pnpm --version)"
+  installed_version="$("$pnpm_bin" --version)"
   if [[ "$installed_version" != "$PNPM_VERSION" ]]; then
-    red "pnpm $installed_version resolved from PATH; expected $PNPM_VERSION."
+    red "pnpm $installed_version resolved from $pnpm_bin; expected $PNPM_VERSION."
     exit 1
   fi
 }
@@ -142,7 +139,7 @@ if ! command -v corepack &>/dev/null; then
   need npm "Install npm (included with Node.js) to run pnpm ${PNPM_VERSION}."
 fi
 install_pnpm_command
-green "  pnpm $(pnpm --version) ✓"
+green "  pnpm $("$PINNED_PNPM_BIN" --version) ✓"
 
 # ─── install hermes-agent (delegate to Nous upstream installer) ──────────
 # hermes-agent is NOT on PyPI. It installs from source via Nous's own
@@ -229,7 +226,7 @@ if [[ -f "$HERMES_ENV_PATH" ]]; then
 fi
 
 cyan "→ Installing npm deps (pnpm install --frozen-lockfile)…"
-pnpm_cmd install --frozen-lockfile --silent
+"$PINNED_PNPM_BIN" install --frozen-lockfile --silent
 green "  deps installed ✓"
 
 # ─── seed Hermes skills (Conductor needs workspace-dispatch) ─────────────
@@ -304,8 +301,8 @@ Next steps (two terminals):
        hermes gateway run
      (first run may prompt for hermes setup)
 
-  2) Start the workspace UI:
-       cd $INSTALL_DIR && pnpm dev
+  2) Start the workspace UI with the pinned pnpm executable:
+       cd "$INSTALL_DIR" && "$PINNED_PNPM_BIN" dev
 
   3) Open http://localhost:3000
 

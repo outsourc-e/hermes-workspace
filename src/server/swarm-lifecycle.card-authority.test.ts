@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   killWorkerProcess,
   renewWorker,
+  requestWorkerHandoff,
   sendToWorker,
   startWorkerProcessNative,
 } from './swarm-lifecycle'
@@ -11,6 +12,8 @@ import type { SessionCardOperationBinding } from './session-card-operation-bindi
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   resolveBinding: vi.fn(),
+  appendMemory: vi.fn(),
+  mutateRuntime: vi.fn(),
   spawn: vi.fn(),
 }))
 
@@ -28,7 +31,15 @@ vi.mock('node:fs', () => ({
 }))
 vi.mock('./claude-paths', () => ({ getProfilesDir: () => '/profiles' }))
 vi.mock('./swarm-environment', () => ({ SWARM_MEMORY_ROOT: '/memory' }))
-vi.mock('./swarm-memory', () => ({ appendSwarmMemoryEvent: vi.fn() }))
+vi.mock('./swarm-memory', () => ({
+  appendSwarmMemoryEvent: mocks.appendMemory,
+}))
+vi.mock('./swarm-missions', () => ({
+  swarmMissionAssignmentAcceptsRuntimeMutation: () => true,
+}))
+vi.mock('./swarm-runtime-reset', () => ({
+  mutateSwarmWorkerRuntime: mocks.mutateRuntime,
+}))
 vi.mock('./session-card-operation-binding', () => ({
   resolveExactSessionCardOperationBinding: mocks.resolveBinding,
 }))
@@ -53,6 +64,15 @@ beforeEach(() => {
     return 0 as unknown as ReturnType<typeof setTimeout>
   })
   mocks.resolveBinding.mockResolvedValue({ kind: 'session-card-owner' })
+  mocks.mutateRuntime.mockImplementation(
+    (
+      _profilePath: string,
+      mutation: (current: Record<string, unknown>) => unknown,
+    ) => {
+      const result = mutation({}) as { value: unknown }
+      return result.value
+    },
+  )
   mocks.execFile.mockImplementation(
     (
       _command: string,
@@ -135,5 +155,69 @@ describe('Swarm lifecycle Card authority', () => {
 
     expect(result.ok).toBe(false)
     expect(mutations()).toHaveLength(staleAt - 1)
+  })
+
+  it('rejects runtime cancellation before the next terminal mutation', async () => {
+    mocks.mutateRuntime.mockImplementation(
+      (
+        _profilePath: string,
+        mutation: (current: Record<string, unknown>) => unknown,
+      ) => {
+        const current =
+          mocks.mutateRuntime.mock.calls.length === 4
+            ? { acceptsCheckpoints: false }
+            : {}
+        return (mutation(current) as { value: unknown }).value
+      },
+    )
+
+    const result = await sendToWorker('builder', 'handoff', cardBinding)
+
+    expect(result.ok).toBe(false)
+    expect(mutations()).toEqual(['load-buffer', 'send-keys', 'paste-buffer'])
+  })
+
+  it('does not let renew adopt a replacement runtime generation', async () => {
+    mocks.mutateRuntime.mockImplementation(
+      (
+        _profilePath: string,
+        mutation: (current: Record<string, unknown>) => unknown,
+      ) => {
+        const current =
+          mocks.mutateRuntime.mock.calls.length === 1
+            ? {}
+            : { currentMissionId: 'replacement', currentAssignmentId: 'new' }
+        return (mutation(current) as { value: unknown }).value
+      },
+    )
+
+    const result = await renewWorker('builder', cardBinding)
+
+    expect(result.ok).toBe(false)
+    expect(mutations()).toEqual(['kill-session'])
+  })
+
+  it('does not publish a success-shaped handoff event after failed delivery', async () => {
+    mocks.execFile.mockImplementation(
+      (
+        _command: string,
+        _args: Array<string>,
+        callback: (
+          error: Error | null,
+          stdout?: string,
+          stderr?: string,
+        ) => void,
+      ) => {
+        queueMicrotask(() =>
+          callback(new Error('delivery failed'), '', 'failed'),
+        )
+        return { stdin: { end: vi.fn() } }
+      },
+    )
+
+    const result = await requestWorkerHandoff('builder', cardBinding)
+
+    expect(result.ok).toBe(false)
+    expect(mocks.appendMemory).not.toHaveBeenCalled()
   })
 })

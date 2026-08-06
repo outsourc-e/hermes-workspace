@@ -11,6 +11,8 @@ import { dirname, join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
 import { SWARM_MEMORY_ROOT } from './swarm-environment'
 import { appendSwarmMemoryEvent } from './swarm-memory'
+import { swarmMissionAssignmentAcceptsRuntimeMutation } from './swarm-missions'
+import { mutateSwarmWorkerRuntime } from './swarm-runtime-reset'
 import { resolveExactSessionCardOperationBinding } from './session-card-operation-binding'
 import type { ChildProcess } from 'node:child_process'
 import type { SessionCardOperationBinding } from './session-card-operation-binding'
@@ -193,6 +195,108 @@ export function getSwarmLifecycleStatus(
 // Active worker processes keyed by workerId
 const workerProcesses = new Map<string, ChildProcess>()
 
+type RuntimeMissionContext = {
+  missionId: string | null
+  assignmentId: string | null
+}
+
+function contextFromRuntime(
+  runtime: Record<string, unknown>,
+): RuntimeMissionContext {
+  return {
+    missionId:
+      typeof runtime.currentMissionId === 'string'
+        ? runtime.currentMissionId
+        : null,
+    assignmentId:
+      typeof runtime.currentAssignmentId === 'string'
+        ? runtime.currentAssignmentId
+        : null,
+  }
+}
+
+function sameRuntimeContext(
+  left: RuntimeMissionContext,
+  right: RuntimeMissionContext,
+): boolean {
+  return (
+    left.missionId === right.missionId &&
+    left.assignmentId === right.assignmentId
+  )
+}
+
+function runtimeAllowsLifecycleMutation(
+  workerId: string,
+  cardBinding: SessionCardOperationBinding,
+  expected: RuntimeMissionContext,
+  current: Record<string, unknown>,
+): boolean {
+  const actual = contextFromRuntime(current)
+  if (
+    !sameRuntimeContext(expected, actual) ||
+    current.acceptsCheckpoints === false
+  )
+    return false
+  if (!actual.missionId && !actual.assignmentId) return true
+  if (!actual.missionId || !actual.assignmentId) return false
+  return swarmMissionAssignmentAcceptsRuntimeMutation({
+    missionId: actual.missionId,
+    assignmentId: actual.assignmentId,
+    workerId,
+    binding: cardBinding,
+  })
+}
+
+async function runAuthorizedTerminalMutation<T>(
+  workerId: string,
+  cardBinding: SessionCardOperationBinding,
+  expected: RuntimeMissionContext,
+  mutation: () => T,
+): Promise<T | null> {
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) return null
+  const profilePath = join(getProfilesDir(), workerId)
+  return mutateSwarmWorkerRuntime(profilePath, (current) => ({
+    next: null,
+    value: runtimeAllowsLifecycleMutation(
+      workerId,
+      cardBinding,
+      expected,
+      current,
+    )
+      ? mutation()
+      : null,
+  }))
+}
+
+async function recordLifecycleMemoryIfCurrent(
+  workerId: string,
+  cardBinding: SessionCardOperationBinding,
+  expected: RuntimeMissionContext,
+  write: (context: RuntimeMissionContext) => void,
+): Promise<boolean> {
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding)))
+    return false
+  return mutateSwarmWorkerRuntime(
+    join(getProfilesDir(), workerId),
+    (current) => {
+      if (
+        !runtimeAllowsLifecycleMutation(
+          workerId,
+          cardBinding,
+          expected,
+          current,
+        )
+      ) {
+        return { next: null, value: false }
+      }
+      // The memory publication happens while reset is excluded by the same
+      // runtime lock. A cancellation committed first makes this a no-op.
+      write(contextFromRuntime(current))
+      return { next: null, value: true }
+    },
+  )
+}
+
 function isWindows(): boolean {
   return process.platform === 'win32'
 }
@@ -239,36 +343,44 @@ export function sendToWorker(
   workerId: string,
   prompt: string,
   cardBinding: SessionCardOperationBinding,
+  expectedContext?: RuntimeMissionContext,
 ): Promise<{ ok: boolean; error?: string }> {
   if (useNativeProcess()) {
-    return sendToWorkerProcess(workerId, prompt, cardBinding)
+    return sendToWorkerProcess(workerId, prompt, cardBinding, expectedContext)
   }
-  return sendTmux(workerId, prompt, cardBinding)
+  return sendTmux(workerId, prompt, cardBinding, expectedContext)
 }
 
 async function sendToWorkerProcess(
   workerId: string,
   prompt: string,
   cardBinding: SessionCardOperationBinding,
+  expectedContext?: RuntimeMissionContext,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
-    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
-  }
-  return new Promise((resolve) => {
-    const proc = workerProcesses.get(workerId)
-    if (!proc || !proc.stdin?.writable) {
-      resolve({
-        ok: false,
-        error: `Worker ${workerId} process not running or stdin not writable`,
+  const expected = expectedContext ?? readRuntimeMissionContext(workerId)
+  const started = await runAuthorizedTerminalMutation(
+    workerId,
+    cardBinding,
+    expected,
+    () => {
+      const proc = workerProcesses.get(workerId)
+      if (!proc || !proc.stdin?.writable) return null
+      appendWorkerLog(workerId, `[dispatch] ${prompt}`)
+      return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        proc.stdin!.write(prompt + '\n', (err) => {
+          if (err) resolve({ ok: false, error: err.message })
+          else resolve({ ok: true })
+        })
       })
-      return
+    },
+  )
+  if (!started) {
+    return {
+      ok: false,
+      error: 'Worker process unavailable or lifecycle authority changed',
     }
-    appendWorkerLog(workerId, `[dispatch] ${prompt}`)
-    proc.stdin.write(prompt + '\n', (err) => {
-      if (err) resolve({ ok: false, error: err.message })
-      else resolve({ ok: true })
-    })
-  })
+  }
+  return started
 }
 
 function execTmuxMutation(
@@ -292,6 +404,7 @@ async function sendTmux(
   workerId: string,
   prompt: string,
   cardBinding: SessionCardOperationBinding,
+  expectedContext?: RuntimeMissionContext,
 ): Promise<{ ok: boolean; error?: string }> {
   const session = `swarm-${workerId}`
   const tmux = tmuxBin()
@@ -315,53 +428,87 @@ async function sendTmux(
       ],
     },
   ]
+  const expected = expectedContext ?? readRuntimeMissionContext(workerId)
   for (const mutation of mutations) {
-    if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    const result = await runAuthorizedTerminalMutation(
+      workerId,
+      cardBinding,
+      expected,
+      () => execTmuxMutation(tmux, mutation.args, mutation.input),
+    )
+    if (!result) {
       return {
         ok: false,
-        error: 'Session Card lifecycle binding is unavailable',
+        error: 'Session Card lifecycle or runtime authority changed',
       }
     }
-    const result = await execTmuxMutation(tmux, mutation.args, mutation.input)
     if (!result.ok) return result
   }
   await new Promise((resolve) => setTimeout(resolve, 150))
-  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
-    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
-  }
-  return execTmuxMutation(tmux, ['send-keys', '-t', session, 'Enter'])
+  const submitted = await runAuthorizedTerminalMutation(
+    workerId,
+    cardBinding,
+    expected,
+    () => execTmuxMutation(tmux, ['send-keys', '-t', session, 'Enter']),
+  )
+  return (
+    submitted ?? {
+      ok: false,
+      error: 'Session Card lifecycle or runtime authority changed',
+    }
+  )
 }
 
 export async function killWorkerProcess(
   workerId: string,
   cardBinding: SessionCardOperationBinding,
+  expectedContext?: RuntimeMissionContext,
 ): Promise<{ ok: boolean; error?: string }> {
   const proc = workerProcesses.get(workerId)
   if (!proc) return { ok: false, error: 'No active process' }
-  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
-    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
+  const expected = expectedContext ?? readRuntimeMissionContext(workerId)
+  const termSent = await runAuthorizedTerminalMutation(
+    workerId,
+    cardBinding,
+    expected,
+    () => proc.kill('SIGTERM'),
+  )
+  if (termSent === null) {
+    return {
+      ok: false,
+      error: 'Session Card lifecycle or runtime authority changed',
+    }
   }
   return new Promise((resolve) => {
-    proc.kill('SIGTERM')
     const timeout = setTimeout(async () => {
-      if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+      const killed = await runAuthorizedTerminalMutation(
+        workerId,
+        cardBinding,
+        expected,
+        () => {
+          try {
+            proc.kill('SIGKILL')
+          } catch {
+            /* */
+          }
+          if (workerProcesses.get(workerId) === proc)
+            workerProcesses.delete(workerId)
+          return true
+        },
+      )
+      if (killed === null) {
         resolve({
           ok: false,
-          error: 'Session Card lifecycle binding is unavailable',
+          error: 'Session Card lifecycle or runtime authority changed',
         })
         return
       }
-      try {
-        proc.kill('SIGKILL')
-      } catch {
-        /* */
-      }
-      workerProcesses.delete(workerId)
       resolve({ ok: true })
     }, 2000)
     proc.on('exit', () => {
       clearTimeout(timeout)
-      workerProcesses.delete(workerId)
+      if (workerProcesses.get(workerId) === proc)
+        workerProcesses.delete(workerId)
       resolve({ ok: true })
     })
   })
@@ -370,26 +517,29 @@ export async function killWorkerProcess(
 async function startWorkerProcess(
   workerId: string,
   cardBinding: SessionCardOperationBinding,
+  expectedContext?: RuntimeMissionContext,
 ): Promise<{ ok: boolean; error?: string }> {
   if (useNativeProcess()) {
-    return startWorkerProcessNative(workerId, cardBinding)
+    return startWorkerProcessNative(workerId, cardBinding, expectedContext)
   }
-  return tmuxStart(workerId, cardBinding)
+  return tmuxStart(workerId, cardBinding, expectedContext)
 }
 
 async function stopWorkerProcess(
   workerId: string,
   cardBinding: SessionCardOperationBinding,
+  expectedContext?: RuntimeMissionContext,
 ): Promise<{ ok: boolean; error?: string }> {
   if (useNativeProcess()) {
-    return killWorkerProcess(workerId, cardBinding)
+    return killWorkerProcess(workerId, cardBinding, expectedContext)
   }
-  return tmuxKill(workerId, cardBinding)
+  return tmuxKill(workerId, cardBinding, expectedContext)
 }
 
 export async function startWorkerProcessNative(
   workerId: string,
   cardBinding: SessionCardOperationBinding,
+  expectedContext?: RuntimeMissionContext,
 ): Promise<{ ok: boolean; error?: string }> {
   if (workerProcesses.has(workerId)) {
     return {
@@ -412,19 +562,29 @@ export async function startWorkerProcessNative(
   const logDir = join(profilePath, 'logs')
   if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true })
 
-  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
-    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
+  const expected = expectedContext ?? readRuntimeMissionContext(workerId)
+  const proc = await runAuthorizedTerminalMutation(
+    workerId,
+    cardBinding,
+    expected,
+    () =>
+      spawn(hermesCmd, args, {
+        cwd: profilePath,
+        env: {
+          ...process.env,
+          HERMES_PROFILE: workerId,
+        },
+        detached: isWindows(), // Windows needs detached for independent process tree
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: isWindows(), // Don't show terminal window on Windows
+      }),
+  )
+  if (!proc) {
+    return {
+      ok: false,
+      error: 'Session Card lifecycle or runtime authority changed',
+    }
   }
-  const proc = spawn(hermesCmd, args, {
-    cwd: profilePath,
-    env: {
-      ...process.env,
-      HERMES_PROFILE: workerId,
-    },
-    detached: isWindows(), // Windows needs detached for independent process tree
-    stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: isWindows(), // Don't show terminal window on Windows
-  })
 
   if (!proc.pid) {
     return { ok: false, error: 'Failed to spawn worker process' }
@@ -442,12 +602,12 @@ export async function startWorkerProcessNative(
 
   proc.on('exit', (code, signal) => {
     appendWorkerLog(workerId, `[exit] code=${code} signal=${signal}`)
-    workerProcesses.delete(workerId)
+    if (workerProcesses.get(workerId) === proc) workerProcesses.delete(workerId)
   })
 
   proc.on('error', (err) => {
     appendWorkerLog(workerId, `[error] ${err.message}`)
-    workerProcesses.delete(workerId)
+    if (workerProcesses.get(workerId) === proc) workerProcesses.delete(workerId)
   })
 
   return { ok: true }
@@ -493,23 +653,38 @@ export async function requestWorkerHandoff(
     'latest.md',
   )
   const prompt = `CONTEXT_HANDOFF_REQUIRED. Stop current work and write a durable handoff.\n\nWrite the handoff to BOTH of these exact paths:\n${localHandoff}\n${hp}\n\nUse this template (fill it in, do not just copy):\n# Handoff — ${workerId} — <missionId>\n\nGenerated: <ISO timestamp>\n\n## Current state\n## Objective\n## Completed\n## In progress\n## Files touched\n## Commands run\n## Blockers\n## Next exact action\n## Resume prompt\nWhen this worker restarts, load this handoff and continue from "Next exact action".\n\nThen reply in the required checkpoint format:\nSTATE: HANDOFF\nFILES_CHANGED: exact files or none\nCOMMANDS_RUN: exact commands or none\nRESULT: concise current state and what landed\nBLOCKER: blocker or none\nNEXT_ACTION: exact next action after /new or restart\n\nDo not continue implementation until renewed.`
-  const sent = await sendToWorker(workerId, prompt, cardBinding)
-  const ctx = readRuntimeMissionContext(workerId)
-  try {
-    appendSwarmMemoryEvent({
-      workerId,
-      missionId: ctx.missionId,
-      assignmentId: ctx.assignmentId,
-      type: 'handoff-requested',
-      summary: 'Lifecycle requested durable handoff before compaction',
-      event: {
-        sharedHandoffPath: hp,
-        localHandoffPath: localHandoff,
-        ok: sent.ok,
-      },
-    })
-  } catch {
-    /* memory write best-effort */
+  const expected = readRuntimeMissionContext(workerId)
+  const sent = await sendToWorker(workerId, prompt, cardBinding, expected)
+  if (!sent.ok) return { ...sent, handoffPath: hp }
+  const recorded = await recordLifecycleMemoryIfCurrent(
+    workerId,
+    cardBinding,
+    expected,
+    (ctx) => {
+      try {
+        appendSwarmMemoryEvent({
+          workerId,
+          missionId: ctx.missionId,
+          assignmentId: ctx.assignmentId,
+          type: 'handoff-requested',
+          summary: 'Lifecycle requested durable handoff before compaction',
+          event: {
+            sharedHandoffPath: hp,
+            localHandoffPath: localHandoff,
+            ok: true,
+          },
+        })
+      } catch {
+        // Memory is best effort, but stale/failed delivery is never recorded.
+      }
+    },
+  )
+  if (!recorded) {
+    return {
+      ok: false,
+      error: 'Session Card lifecycle or runtime authority changed',
+      handoffPath: hp,
+    }
   }
   return { ...sent, handoffPath: hp }
 }
@@ -518,22 +693,26 @@ export async function notifyHandoffWritten(
   workerId: string,
   cardBinding: SessionCardOperationBinding,
 ): Promise<boolean> {
-  if (!(await resolveExactSessionCardOperationBinding(cardBinding)))
-    return false
-  const ctx = readRuntimeMissionContext(workerId)
-  try {
-    appendSwarmMemoryEvent({
-      workerId,
-      missionId: ctx.missionId,
-      assignmentId: ctx.assignmentId,
-      type: 'handoff-written',
-      summary: 'Worker confirmed handoff written',
-      event: { sharedHandoffPath: handoffPath(workerId) },
-    })
-  } catch {
-    /* best-effort */
-  }
-  return true
+  const expected = readRuntimeMissionContext(workerId)
+  return recordLifecycleMemoryIfCurrent(
+    workerId,
+    cardBinding,
+    expected,
+    (ctx) => {
+      try {
+        appendSwarmMemoryEvent({
+          workerId,
+          missionId: ctx.missionId,
+          assignmentId: ctx.assignmentId,
+          type: 'handoff-written',
+          summary: 'Worker confirmed handoff written',
+          event: { sharedHandoffPath: handoffPath(workerId) },
+        })
+      } catch {
+        // Preserve the prior best-effort memory contract.
+      }
+    },
+  )
 }
 
 export function lifecycleHandoffPath(workerId: string): string {
@@ -543,6 +722,7 @@ export function lifecycleHandoffPath(workerId: string): string {
 async function tmuxKill(
   workerId: string,
   cardBinding: SessionCardOperationBinding,
+  expectedContext?: RuntimeMissionContext,
 ): Promise<{ ok: boolean; error?: string }> {
   const session = `swarm-${workerId}`
   const tmux = tmuxBin()
@@ -552,15 +732,25 @@ async function tmuxKill(
       error: 'tmux not available on this platform',
     })
   }
-  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
-    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
-  }
-  return execTmuxMutation(tmux, ['kill-session', '-t', session])
+  const expected = expectedContext ?? readRuntimeMissionContext(workerId)
+  const killed = await runAuthorizedTerminalMutation(
+    workerId,
+    cardBinding,
+    expected,
+    () => execTmuxMutation(tmux, ['kill-session', '-t', session]),
+  )
+  return (
+    killed ?? {
+      ok: false,
+      error: 'Session Card lifecycle or runtime authority changed',
+    }
+  )
 }
 
 async function tmuxStart(
   workerId: string,
   cardBinding: SessionCardOperationBinding,
+  expectedContext?: RuntimeMissionContext,
 ): Promise<{ ok: boolean; error?: string }> {
   const session = `swarm-${workerId}`
   const wrapper = join(homedir(), '.local', 'bin', workerId)
@@ -576,10 +766,19 @@ async function tmuxStart(
       error: 'tmux not available on this platform',
     })
   }
-  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
-    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
-  }
-  return execTmuxMutation(tmux, ['new-session', '-d', '-s', session, wrapper])
+  const expected = expectedContext ?? readRuntimeMissionContext(workerId)
+  const started = await runAuthorizedTerminalMutation(
+    workerId,
+    cardBinding,
+    expected,
+    () => execTmuxMutation(tmux, ['new-session', '-d', '-s', session, wrapper]),
+  )
+  return (
+    started ?? {
+      ok: false,
+      error: 'Session Card lifecycle or runtime authority changed',
+    }
+  )
 }
 
 export async function renewWorker(
@@ -602,7 +801,8 @@ export async function renewWorker(
       handoffPath: hp,
     }
   }
-  const killed = await stopWorkerProcess(workerId, cardBinding)
+  const expected = readRuntimeMissionContext(workerId)
+  const killed = await stopWorkerProcess(workerId, cardBinding, expected)
   if (!killed.ok) {
     return {
       ok: false,
@@ -613,7 +813,7 @@ export async function renewWorker(
     }
   }
   await new Promise((resolve) => setTimeout(resolve, 600))
-  const started = await startWorkerProcess(workerId, cardBinding)
+  const started = await startWorkerProcess(workerId, cardBinding, expected)
   if (!started.ok)
     return {
       ok: false,
@@ -625,25 +825,48 @@ export async function renewWorker(
   // Wait for shell prompt to appear before sending the resume message.
   await new Promise((resolve) => setTimeout(resolve, 1500))
   const resumePrompt = `RESUME_AFTER_HANDOFF. Read your latest handoff at ${hp} and the local copy under ~/.hermes/profiles/${workerId}/memory/handoffs/, plus your runtime.json, then continue from "Next exact action". Reply with a fresh checkpoint when you have re-grounded.`
-  const sent = await sendToWorker(workerId, resumePrompt, cardBinding)
-  const ctx = readRuntimeMissionContext(workerId)
-  try {
-    appendSwarmMemoryEvent({
-      workerId,
-      missionId: ctx.missionId,
-      assignmentId: ctx.assignmentId,
-      type: 'resume',
-      summary: 'Worker renewed after handoff and prompted to resume',
-      event: { handoffPath: hp, started: true, resumeSent: sent.ok },
-    })
-  } catch {
-    /* best-effort */
+  const sent = await sendToWorker(workerId, resumePrompt, cardBinding, expected)
+  if (!sent.ok) {
+    return {
+      ok: false,
+      restarted: true,
+      resumeSent: false,
+      error: sent.error,
+      handoffPath: hp,
+    }
+  }
+  const recorded = await recordLifecycleMemoryIfCurrent(
+    workerId,
+    cardBinding,
+    expected,
+    (ctx) => {
+      try {
+        appendSwarmMemoryEvent({
+          workerId,
+          missionId: ctx.missionId,
+          assignmentId: ctx.assignmentId,
+          type: 'resume',
+          summary: 'Worker renewed after handoff and prompted to resume',
+          event: { handoffPath: hp, started: true, resumeSent: true },
+        })
+      } catch {
+        // Preserve the prior best-effort memory contract.
+      }
+    },
+  )
+  if (!recorded) {
+    return {
+      ok: false,
+      restarted: true,
+      resumeSent: true,
+      error: 'Session Card lifecycle or runtime authority changed',
+      handoffPath: hp,
+    }
   }
   return {
-    ok: sent.ok,
+    ok: true,
     restarted: true,
-    resumeSent: sent.ok,
-    error: sent.error,
+    resumeSent: true,
     handoffPath: hp,
   }
 }

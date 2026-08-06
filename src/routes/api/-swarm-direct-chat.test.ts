@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { swarmDirectChatContentDigest } from '../../lib/swarm-direct-chat-delivery'
 import { Route } from './swarm-direct-chat'
 
 const mocks = vi.hoisted(() => ({
@@ -6,12 +7,19 @@ const mocks = vi.hoisted(() => ({
   readWorkerMessages: vi.fn(),
   resolveCard: vi.fn(),
   resolveChildCard: vi.fn(),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  rmSync: vi.fn(),
+  stdinEnd: vi.fn(),
 }))
 
 vi.mock('node:child_process', () => ({ execFile: mocks.execFile }))
 vi.mock('node:fs', () => ({
   existsSync: () => true,
   readFileSync: () => '#!/bin/sh\n',
+  mkdirSync: mocks.mkdirSync,
+  writeFileSync: mocks.writeFileSync,
+  rmSync: mocks.rmSync,
 }))
 vi.mock('../../server/auth-middleware', () => ({
   isAuthenticated: () => true,
@@ -77,6 +85,7 @@ function request(bodyOverrides: Record<string, unknown> = {}): Request {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       workerId: 'builder',
+      clientId: 'swarm-client-default',
       prompt: 'Run the focused checks',
       cardBinding,
       limit: 30,
@@ -106,7 +115,7 @@ beforeEach(() => {
           ? (optionsOrCallback as typeof callback)
           : callback
       queueMicrotask(() => resolvedCallback?.(null, '', ''))
-      return { stdin: { end: vi.fn() } }
+      return { stdin: { end: mocks.stdinEnd } }
     },
   )
   const baseline = {
@@ -157,6 +166,12 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
       cardOwner: owner,
       delivered: true,
       delivery: 'tmux',
+      userAcknowledgement: {
+        version: 1,
+        clientId: 'swarm-client-default',
+        observedAt: 2,
+        contentDigest: swarmDirectChatContentDigest('Run the focused checks'),
+      },
     })
     expect(body).not.toHaveProperty('workerId')
     expect(body).not.toHaveProperty('canonicalSegmentKey')
@@ -168,6 +183,108 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
     expect(JSON.stringify(body)).not.toContain('raw-message-id')
     expect(JSON.stringify(body)).not.toContain('raw-session-id')
     expect(mocks.execFile).toHaveBeenCalled()
+  })
+
+  it('writes bounded portable attachments into the worker profile and acknowledges the exact delivered echo', async () => {
+    const attachmentPath =
+      '/home/hermes/.hermes/profiles/builder/workspace-attachments/swarm-client-attachment-0-evidence.txt'
+    const deliveredPrompt =
+      `[User attached file: ${attachmentPath} (text/plain, 5 bytes)]\n` +
+      'Review the evidence'
+    const baseline = {
+      id: 'raw-message-id',
+      role: 'assistant',
+      content: 'Raw state.db content',
+      timestamp: 1,
+    }
+    mocks.readWorkerMessages
+      .mockReset()
+      .mockReturnValueOnce({
+        sessionId: 'raw-session-id',
+        sessionTitle: 'Raw session title',
+        messages: [baseline],
+        ok: true,
+      })
+      .mockReturnValue({
+        sessionId: 'raw-session-id',
+        sessionTitle: 'Raw session title',
+        messages: [
+          baseline,
+          {
+            id: 'raw-user-attachment-id',
+            role: 'user',
+            content: deliveredPrompt,
+            timestamp: 1_800_000_000_000,
+          },
+          {
+            id: 'raw-assistant-attachment-id',
+            role: 'assistant',
+            content: 'Done',
+            timestamp: 1_800_000_000_001,
+          },
+        ],
+        ok: true,
+      })
+
+    const response = await handler({
+      request: request({
+        clientId: 'swarm-client-attachment',
+        prompt: 'Review the evidence',
+        attachments: [
+          {
+            id: 'attachment-1',
+            name: 'evidence.txt',
+            contentType: 'text/plain',
+            size: 5,
+            dataUrl: 'data:text/plain;base64,aGVsbG8=',
+          },
+        ],
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.mkdirSync).toHaveBeenCalledWith(
+      '/home/hermes/.hermes/profiles/builder/workspace-attachments',
+      { recursive: true },
+    )
+    expect(mocks.writeFileSync).toHaveBeenCalledWith(
+      attachmentPath,
+      Buffer.from('hello'),
+      { flag: 'wx', mode: 0o600 },
+    )
+    expect(mocks.stdinEnd).toHaveBeenCalledWith(deliveredPrompt)
+    expect(await response.json()).toMatchObject({
+      cardOwner: owner,
+      delivered: true,
+      userAcknowledgement: {
+        version: 1,
+        clientId: 'swarm-client-attachment',
+        observedAt: 1_800_000_000_000,
+        contentDigest: swarmDirectChatContentDigest(deliveredPrompt),
+      },
+    })
+  })
+
+  it('rejects malformed attachment bytes before profile or terminal mutation', async () => {
+    const response = await handler({
+      request: request({
+        attachments: [
+          {
+            name: 'evidence.txt',
+            contentType: 'text/plain',
+            size: 6,
+            dataUrl: 'data:text/plain;base64,aGVsbG8=',
+          },
+        ],
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'Invalid attachments' })
+    expect(mocks.mkdirSync).not.toHaveBeenCalled()
+    expect(mocks.writeFileSync).not.toHaveBeenCalled()
+    expect(mocks.readWorkerMessages).not.toHaveBeenCalled()
+    expect(mocks.execFile).not.toHaveBeenCalled()
   })
 
   it('does not leak the Card transport or baseline transcript when delivery fails', async () => {
@@ -193,7 +310,7 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
             '',
           ),
         )
-        return { stdin: { end: vi.fn() } }
+        return { stdin: { end: mocks.stdinEnd } }
       },
     )
 

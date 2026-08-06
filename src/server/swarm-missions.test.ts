@@ -808,6 +808,93 @@ describe('swarm-missions', () => {
     },
   )
 
+  it.each(['cancelled', 'complete'] as const)(
+    'keeps a %s mission absorbing across every late mission helper',
+    async (terminalState) => {
+      const mod = await loadModule()
+      const mission = mod.createOrUpdateMission({
+        missionId: `mission-all-terminal-${terminalState}`,
+        title: 'Absorbing terminal mission',
+        assignments: [
+          { workerId: 'builder', task: 'Original task', reviewRequired: false },
+        ],
+      })
+      const assignmentId = mission.assignments[0]!.id
+      if (terminalState === 'cancelled') {
+        mod.cancelSwarmMission({ missionId: mission.id, actor: 'test' })
+      } else {
+        mod.recordMissionCheckpoint({
+          missionId: mission.id,
+          assignmentId,
+          workerId: 'builder',
+          checkpoint: {
+            stateLabel: 'DONE',
+            runtimeState: 'idle',
+            checkpointStatus: 'done',
+            filesChanged: 'none',
+            commandsRun: 'none',
+            result: 'done',
+            blocker: null,
+            nextAction: 'none',
+            raw: `STATE: DONE ${terminalState}`,
+          },
+        })
+      }
+      const before = JSON.stringify(mod.getSwarmMission(mission.id))
+
+      expect(
+        mod.recordMissionCheckpoint({
+          missionId: mission.id,
+          assignmentId,
+          workerId: 'builder',
+          checkpoint: {
+            stateLabel: 'IN_PROGRESS',
+            runtimeState: 'executing',
+            checkpointStatus: 'in_progress',
+            filesChanged: 'none',
+            commandsRun: 'none',
+            result: 'late',
+            blocker: null,
+            nextAction: 'continue',
+            raw: 'STATE: IN_PROGRESS late',
+          },
+        })?._ignoredReason,
+      ).toBe(`mission ${terminalState}`)
+      expect(
+        mod.appendMissionContinuation({
+          missionId: mission.id,
+          workerId: 'reviewer',
+          task: 'late continuation',
+          rationale: 'stale callback',
+        }),
+      ).toBeNull()
+      expect(
+        mod.cancelSwarmAssignment({
+          missionId: mission.id,
+          assignmentId,
+          actor: 'late-cancel',
+        }),
+      ).toBeNull()
+      expect(
+        mod.markMissionAssignmentReviewed({
+          missionId: mission.id,
+          assignmentId,
+          reviewerId: 'reviewer',
+        }),
+      ).toBeNull()
+      expect(
+        mod.markMissionAssignmentsReviewedByWorker({
+          missionId: mission.id,
+          reviewerId: 'reviewer',
+        }),
+      ).toBeNull()
+      expect(
+        mod.cancelSwarmMission({ missionId: mission.id, actor: 'late-cancel' }),
+      ).toMatchObject({ changed: false, cancelledAssignmentIds: [] })
+      expect(JSON.stringify(mod.getSwarmMission(mission.id))).toBe(before)
+    },
+  )
+
   it('cancels a single assignment and leaves unaffected work active', async () => {
     const mod = await loadModule()
     const mission = mod.createOrUpdateMission({

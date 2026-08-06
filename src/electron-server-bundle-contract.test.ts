@@ -384,10 +384,10 @@ describe('checked-in Electron production server bundle', () => {
       /await resolveExactSessionCardOperationBinding\(cardBinding\)/u,
     )
     expect(route).toMatch(
-      /sendPromptToLiveSession\(\s*workerId,\s*prompt,\s*cardBinding\s*\)/u,
+      /sendPromptToLiveSession\(\s*workerId,\s*deliveredPrompt,\s*cardBinding\s*\)/u,
     )
     expect(route).not.toMatch(
-      /sendPromptToLiveSession\(\s*workerId,\s*prompt\s*\)/u,
+      /sendPromptToLiveSession\(\s*workerId,\s*deliveredPrompt\s*\)/u,
     )
 
     const edgeRevalidations = delivery.match(

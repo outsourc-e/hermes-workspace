@@ -1,4 +1,3 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
@@ -17,8 +16,10 @@ import {
   appendMissionContinuation,
   markMissionAssignmentsReviewedByWorker,
   recordMissionCheckpoint,
+  swarmMissionAssignmentAcceptsRuntimeMutation,
   swarmMissionHasExactCardAuthority,
 } from '../../server/swarm-missions'
+import { mutateSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import {
   parseSessionCardOperationBinding,
@@ -154,6 +155,7 @@ function runtimePatchFromCheckpoint(
 async function writeRuntimePatch(
   workerId: string,
   binding: SessionCardOperationBinding,
+  expected: Record<string, unknown>,
   patch: Record<string, unknown>,
   dryRun: boolean,
 ): Promise<string | null> {
@@ -161,14 +163,38 @@ async function writeRuntimePatch(
   const runtimePath = join(profilePath, 'runtime.json')
   if (dryRun) return runtimePath
   if (!(await resolveExactSessionCardOperationBinding(binding))) return null
-  mkdirSync(profilePath, { recursive: true })
-  const current = readRuntimeJson(runtimePath)
-  if (!(await resolveExactSessionCardOperationBinding(binding))) return null
-  writeFileSync(
-    runtimePath,
-    JSON.stringify({ ...current, ...patch }, null, 2) + '\n',
-  )
-  return runtimePath
+  const expectedMissionId = runtimeString(expected, 'currentMissionId')
+  const expectedAssignmentId = runtimeString(expected, 'currentAssignmentId')
+  return mutateSwarmWorkerRuntime(profilePath, (current) => {
+    const missionId = runtimeString(current, 'currentMissionId')
+    const assignmentId = runtimeString(current, 'currentAssignmentId')
+    const generationMatches =
+      missionId === expectedMissionId && assignmentId === expectedAssignmentId
+    const missionAllowsMutation =
+      !missionId && !assignmentId
+        ? true
+        : Boolean(
+            missionId &&
+            assignmentId &&
+            swarmMissionAssignmentAcceptsRuntimeMutation({
+              missionId,
+              assignmentId,
+              workerId,
+              binding,
+            }),
+          )
+    if (
+      current.acceptsCheckpoints === false ||
+      !generationMatches ||
+      !missionAllowsMutation
+    ) {
+      return { next: null, value: null }
+    }
+    return {
+      next: { ...current, ...patch },
+      value: runtimePath,
+    }
+  })
 }
 
 function runtimeString(
@@ -233,6 +259,18 @@ async function recordCheckpoint(input: {
         source: 'swarm-orchestrator-loop',
       })
     : null
+  const missionRecorded = Boolean(mission && !mission._ignoredReason)
+  const missionCompletedByCheckpoint =
+    missionRecorded && mission?.state === 'complete'
+  if (missionId && !missionRecorded) {
+    return {
+      notification: {
+        published: false,
+        sessionKey: notifySessionKey ?? 'main',
+      },
+      missionRecorded: false,
+    }
+  }
 
   if (!(await resolveExactSessionCardOperationBinding(input.binding))) {
     return {
@@ -240,49 +278,74 @@ async function recordCheckpoint(input: {
         published: false,
         sessionKey: notifySessionKey ?? 'main',
       },
-      missionRecorded: Boolean(mission),
+      missionRecorded,
     }
   }
-  appendSwarmMemoryEvent({
-    workerId: input.workerId,
-    missionId,
-    assignmentId,
-    type:
-      input.checkpoint.checkpointStatus === 'blocked'
-        ? 'blocked'
-        : 'checkpoint',
-    summary:
-      input.checkpoint.result ??
-      input.checkpoint.blocker ??
-      input.checkpoint.nextAction ??
-      'Worker checkpoint processed',
-    checkpoint: input.checkpoint,
-    event: {
-      state: input.checkpoint.stateLabel,
-      filesChanged: input.checkpoint.filesChanged,
-      commandsRun: input.checkpoint.commandsRun,
-      nextAction: input.checkpoint.nextAction,
-      source: 'swarm-orchestrator-loop',
-    },
-  })
 
-  if (!(await resolveExactSessionCardOperationBinding(input.binding))) {
-    return {
-      notification: {
-        published: false,
-        sessionKey: notifySessionKey ?? 'main',
-      },
-      missionRecorded: Boolean(mission),
+  const profilePath = getSwarmProfilePath(input.workerId)
+  const notification = mutateSwarmWorkerRuntime(profilePath, (runtime) => {
+    const currentMissionId = runtimeString(runtime, 'currentMissionId')
+    const currentAssignmentId = runtimeString(runtime, 'currentAssignmentId')
+    const generationMatches =
+      currentMissionId === missionId && currentAssignmentId === assignmentId
+    const missionAllowsMutation =
+      !missionId && !assignmentId
+        ? true
+        : Boolean(
+            missionId &&
+            assignmentId &&
+            swarmMissionHasExactCardAuthority(missionId, input.binding) &&
+            (missionCompletedByCheckpoint ||
+              swarmMissionAssignmentAcceptsRuntimeMutation({
+                missionId,
+                assignmentId,
+                workerId: input.workerId,
+                binding: input.binding,
+              })) &&
+            runtime.acceptsCheckpoints !== false,
+          )
+    if (!generationMatches || !missionAllowsMutation) {
+      return {
+        next: null,
+        value: { published: false, sessionKey: notifySessionKey ?? 'main' },
+      }
     }
-  }
-  const notification = publishSwarmCheckpointNotification({
-    workerId: input.workerId,
-    checkpoint: input.checkpoint,
-    missionId,
-    assignmentId,
-    notifySessionKey,
+
+    appendSwarmMemoryEvent({
+      workerId: input.workerId,
+      missionId,
+      assignmentId,
+      type:
+        input.checkpoint.checkpointStatus === 'blocked'
+          ? 'blocked'
+          : 'checkpoint',
+      summary:
+        input.checkpoint.result ??
+        input.checkpoint.blocker ??
+        input.checkpoint.nextAction ??
+        'Worker checkpoint processed',
+      checkpoint: input.checkpoint,
+      event: {
+        state: input.checkpoint.stateLabel,
+        filesChanged: input.checkpoint.filesChanged,
+        commandsRun: input.checkpoint.commandsRun,
+        nextAction: input.checkpoint.nextAction,
+        source: 'swarm-orchestrator-loop',
+      },
+    })
+
+    return {
+      next: null,
+      value: publishSwarmCheckpointNotification({
+        workerId: input.workerId,
+        checkpoint: input.checkpoint,
+        missionId,
+        assignmentId,
+        notifySessionKey,
+      }),
+    }
   })
-  return { notification, missionRecorded: Boolean(mission) }
+  return { notification, missionRecorded }
 }
 
 async function runWorkerLoop(
@@ -321,6 +384,7 @@ async function runWorkerLoop(
     const savedPath = await writeRuntimePatch(
       workerId,
       binding,
+      current,
       runtimePatchFromCheckpoint(workerId, checkpoint),
       dryRun,
     )
@@ -368,7 +432,7 @@ async function runWorkerLoop(
       }
     : {}
   const savedPath = Object.keys(patch).length
-    ? await writeRuntimePatch(workerId, binding, patch, dryRun)
+    ? await writeRuntimePatch(workerId, binding, current, patch, dryRun)
     : runtimePath
   if (!savedPath) {
     return {

@@ -6,6 +6,11 @@ import {
 } from './durable-message-journal'
 import { parsePortableAttachmentDataUrl } from './attachment-envelope'
 import type { ChatAttachment, ChatMessage } from './types'
+import type { SwarmDirectChatUserAcknowledgement } from '@/lib/swarm-direct-chat-delivery'
+import {
+  parseSwarmDirectChatUserAcknowledgement,
+  swarmDirectChatContentDigest,
+} from '@/lib/swarm-direct-chat-delivery'
 
 export const CARD_TRANSCRIPT_RECOVERY_VERSION = 2 as const
 export const CARD_TRANSCRIPT_RECOVERY_PREFIX =
@@ -395,6 +400,68 @@ function messageTextSignature(message: ChatMessage): string {
   return JSON.stringify({ content, text: topLevelText ?? '' })
 }
 
+function messageText(message: ChatMessage): string {
+  if (Array.isArray(message.content)) {
+    return message.content
+      .map((part) => {
+        if (!record(part)) return ''
+        const contentPart = part as Record<string, unknown>
+        return typeof contentPart.text === 'string' ? contentPart.text : ''
+      })
+      .join('')
+      .trim()
+  }
+  const raw = message as Record<string, unknown>
+  return (
+    ['text', 'body', 'message']
+      .map((key) => (typeof raw[key] === 'string' ? raw[key].trim() : ''))
+      .find(Boolean) ?? ''
+  )
+}
+
+function swarmDeliveryAcknowledgement(
+  message: ChatMessage,
+): SwarmDirectChatUserAcknowledgement | null {
+  const raw = message as Record<string, unknown>
+  return parseSwarmDirectChatUserAcknowledgement(
+    raw.__swarmDeliveryAcknowledgement,
+  )
+}
+
+function swarmDeliveryAcknowledgementMatches(
+  recoveryMessage: ChatMessage,
+  authoritativeMessage: ChatMessage,
+): boolean {
+  if (recoveryMessage.role !== 'user' || authoritativeMessage.role !== 'user') {
+    return false
+  }
+  const acknowledgement = swarmDeliveryAcknowledgement(recoveryMessage)
+  if (!acknowledgement) return false
+  const recoveryClientIdentifiers = identifierSet(recoveryMessage, [
+    'clientId',
+    'client_id',
+    'idempotencyKey',
+    'nonce',
+    '__optimisticId',
+  ])
+  if (!recoveryClientIdentifiers.has(acknowledgement.clientId)) return false
+
+  const projectedAcknowledgement =
+    swarmDeliveryAcknowledgement(authoritativeMessage)
+  if (projectedAcknowledgement) {
+    return (
+      projectedAcknowledgement.clientId === acknowledgement.clientId &&
+      projectedAcknowledgement.observedAt === acknowledgement.observedAt &&
+      projectedAcknowledgement.contentDigest === acknowledgement.contentDigest
+    )
+  }
+  return (
+    timestamp(authoritativeMessage) === acknowledgement.observedAt &&
+    swarmDirectChatContentDigest(messageText(authoritativeMessage)) ===
+      acknowledgement.contentDigest
+  )
+}
+
 function ordinaryServerAcknowledgementMatches(
   recoveryMessage: ChatMessage,
   authoritativeMessage: ChatMessage,
@@ -411,6 +478,18 @@ function ordinaryServerAcknowledgementMatches(
     authoritativeMessage,
     clientKeys,
   )
+  if (
+    recoveryMessage.role !== authoritativeMessage.role ||
+    !isRecoveryOverlay(recoveryMessage) ||
+    !hasAuthoritativeIdentity(authoritativeMessage)
+  ) {
+    return false
+  }
+  if (
+    swarmDeliveryAcknowledgementMatches(recoveryMessage, authoritativeMessage)
+  ) {
+    return true
+  }
   // A browser-identified user turn has no safe text-only fallback. Without a
   // durable server cursor, a stale repeated row could otherwise consume a
   // newer recovery turn before its own authoritative echo arrives.
@@ -422,9 +501,6 @@ function ordinaryServerAcknowledgementMatches(
     return false
   }
   return (
-    recoveryMessage.role === authoritativeMessage.role &&
-    isRecoveryOverlay(recoveryMessage) &&
-    hasAuthoritativeIdentity(authoritativeMessage) &&
     messageTextSignature(recoveryMessage) ===
       messageTextSignature(authoritativeMessage) &&
     compatibleTimestamp(recoveryMessage, authoritativeMessage)
@@ -847,6 +923,64 @@ export function removeRejectedCardTranscriptRecoveryMessage(
   return readCardTranscriptRecovery(owner, options)
 }
 
+/**
+ * Persist the exact server-observed echo for one already delivered Swarm turn.
+ * The recovery row remains until complete Card history proves the echo (and,
+ * for attachments, full attachment fidelity), so this cannot create a
+ * delivery-success durability gap.
+ */
+export function acknowledgeDeliveredCardTranscriptRecoveryMessage(
+  owner: CardTranscriptRecoveryOwner,
+  clientId: string,
+  acknowledgementValue: unknown,
+  options: RecoveryOptions = {},
+): CardTranscriptRecoveryEnvelope | null {
+  const normalizedClientId = normalizedString(clientId)
+  const acknowledgement = parseSwarmDirectChatUserAcknowledgement(
+    acknowledgementValue,
+    normalizedClientId,
+  )
+  if (
+    !isValidCardTranscriptRecoveryOwner(owner) ||
+    !normalizedClientId ||
+    !acknowledgement
+  ) {
+    return null
+  }
+  const existing = readCardTranscriptRecovery(owner, options)
+  if (!existing) return null
+  if (
+    !existing.messages.some((message) =>
+      hasRecoveryClientIdentity(message, normalizedClientId),
+    )
+  ) {
+    return null
+  }
+  const messages = existing.messages.map((message) => {
+    if (!hasRecoveryClientIdentity(message, normalizedClientId)) return message
+    return {
+      ...message,
+      status: 'sent',
+      __swarmDeliveryAcknowledgement: acknowledgement,
+    }
+  })
+  const persisted = replaceCardTranscriptRecoveryMessages(
+    owner,
+    messages,
+    options,
+  )
+  const acknowledged = persisted?.messages.find((message) =>
+    hasRecoveryClientIdentity(message, normalizedClientId),
+  )
+  return parseSwarmDirectChatUserAcknowledgement(
+    (acknowledged as Record<string, unknown> | undefined)
+      ?.__swarmDeliveryAcknowledgement,
+    normalizedClientId,
+  )
+    ? persisted
+    : null
+}
+
 export function replaceCardTranscriptRecoveryMessages(
   owner: CardTranscriptRecoveryOwner,
   messages: Array<ChatMessage>,
@@ -1011,16 +1145,10 @@ export function mergeCardTranscriptRecoveryMessages(
     )
     if (matchingIndex >= 0) {
       consumedPersistedIndexes.add(matchingIndex)
-      if ((recoveryMessage.attachments?.length ?? 0) > 0) {
-        const persistedMessage = merged[matchingIndex]!
-        merged[matchingIndex] = {
-          ...persistedMessage,
-          attachments: mergeAcknowledgedAttachments(
-            persistedMessage,
-            recoveryMessage,
-          ),
-        }
-      }
+      merged[matchingIndex] = mergeAcknowledgedRecoveryProjection(
+        merged[matchingIndex]!,
+        recoveryMessage,
+      )
       continue
     }
     merged.push(recoveryMessage)
@@ -1125,6 +1253,34 @@ function mergeAcknowledgedAttachments(
   return merged
 }
 
+function mergeAcknowledgedRecoveryProjection(
+  authoritativeMessage: ChatMessage,
+  recoveryMessage: ChatMessage,
+): ChatMessage {
+  const acknowledgement = swarmDeliveryAcknowledgement(recoveryMessage)
+  const deliveryMatched = swarmDeliveryAcknowledgementMatches(
+    recoveryMessage,
+    authoritativeMessage,
+  )
+  const enriched: ChatMessage = deliveryMatched
+    ? {
+        ...authoritativeMessage,
+        content: recoveryMessage.content,
+        ...(acknowledgement
+          ? { __swarmDeliveryAcknowledgement: acknowledgement }
+          : {}),
+      }
+    : authoritativeMessage
+  if ((recoveryMessage.attachments?.length ?? 0) === 0) return enriched
+  return {
+    ...enriched,
+    attachments: mergeAcknowledgedAttachments(
+      authoritativeMessage,
+      recoveryMessage,
+    ),
+  }
+}
+
 function authoritativeAttachmentFidelityAcknowledges(
   authoritativeMessage: ChatMessage,
   recoveryMessage: ChatMessage,
@@ -1216,22 +1372,12 @@ export function reconcileAcknowledgedCardTranscriptRecoveryMessages(
 
     const authoritativeMessage =
       enrichedAuthoritativeMessages[authoritativeIndex]!
-    if (
-      Array.isArray(recoveryMessage.attachments) &&
-      recoveryMessage.attachments.length > 0
-    ) {
-      // Ordinary server history may omit portable attachment bytes. Keep the
-      // authoritative row identity/order and hydrate its attachment projection
-      // without rendering a second copy. Recovery remains durable until the
-      // authoritative payload itself contains every attachment content field.
-      enrichedAuthoritativeMessages[authoritativeIndex] = {
-        ...authoritativeMessage,
-        attachments: mergeAcknowledgedAttachments(
-          authoritativeMessage,
-          recoveryMessage,
-        ),
-      }
-    }
+    // Ordinary server history may omit portable attachment bytes. Keep the
+    // authoritative row identity/order and hydrate its attachment projection
+    // without rendering a second copy. A direct Swarm acknowledgement also
+    // replaces the file-path transport prompt with the original user text.
+    enrichedAuthoritativeMessages[authoritativeIndex] =
+      mergeAcknowledgedRecoveryProjection(authoritativeMessage, recoveryMessage)
     if (
       authoritativeAttachmentFidelityAcknowledges(
         authoritativeMessages[authoritativeIndex]!,

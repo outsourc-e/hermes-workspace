@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import {
   closeSync,
+  fsyncSync,
   linkSync,
   lstatSync,
   mkdirSync,
@@ -9,7 +10,6 @@ import {
   renameSync,
   unlinkSync,
   writeFileSync,
-  writeSync,
 } from 'node:fs'
 import { join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
@@ -43,6 +43,17 @@ function writeJsonAtomic(path: string, value: Record<string, unknown>): void {
   renameSync(tmp, path)
 }
 
+type RuntimeLockOwner = {
+  token: string
+  pid: number
+  processIdentity?: string
+}
+
+type RuntimeLock = RuntimeLockOwner & {
+  dev: bigint | number
+  ino: bigint | number
+}
+
 function processIsAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
@@ -52,14 +63,61 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
+function readProcessIdentity(pid: number): string | null {
+  if (process.platform !== 'linux') return null
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+    const fields = stat.slice(stat.lastIndexOf(') ') + 2).split(' ')
+    const startTime = fields[19]
+    return startTime && /^\d+$/u.test(startTime) ? `linux:${startTime}` : null
+  } catch {
+    return null
+  }
+}
+
+function readRuntimeLockOwner(lockPath: string): RuntimeLockOwner | null {
+  try {
+    const owner = JSON.parse(readFileSync(lockPath, 'utf8')) as Record<
+      string,
+      unknown
+    >
+    if (
+      typeof owner.token !== 'string' ||
+      !Number.isSafeInteger(owner.pid) ||
+      Number(owner.pid) < 1 ||
+      (owner.processIdentity !== undefined &&
+        typeof owner.processIdentity !== 'string')
+    ) {
+      return null
+    }
+    return {
+      token: owner.token,
+      pid: Number(owner.pid),
+      ...(typeof owner.processIdentity === 'string'
+        ? { processIdentity: owner.processIdentity }
+        : {}),
+    }
+  } catch {
+    return null
+  }
+}
+
+function runtimeLockIsRecoverable(owner: RuntimeLockOwner | null): boolean {
+  // Malformed metadata is unknown authority. Atomic publication below means it
+  // cannot be a legitimate half-written acquisition, so fail closed.
+  if (!owner) return false
+  if (!processIsAlive(owner.pid)) return true
+  if (!owner.processIdentity) return false
+  const currentIdentity = readProcessIdentity(owner.pid)
+  return currentIdentity !== null && currentIdentity !== owner.processIdentity
+}
+
 function recoverDeadRuntimeLock(lockPath: string, ownerToken: string): void {
   const claimPath = `${lockPath}.reclaim.${process.pid}.${randomUUID()}`
   try {
     linkSync(lockPath, claimPath)
-    const claimedOwner = JSON.parse(readFileSync(claimPath, 'utf8')) as {
-      token?: unknown
-    }
-    if (claimedOwner.token !== ownerToken) return
+    const claimedOwner = readRuntimeLockOwner(claimPath)
+    if (claimedOwner?.token !== ownerToken) return
     const claimedStat = lstatSync(claimPath)
     const currentStat = lstatSync(lockPath)
     if (
@@ -77,56 +135,65 @@ function recoverDeadRuntimeLock(lockPath: string, ownerToken: string): void {
   }
 }
 
-function acquireRuntimeLock(runtimePath: string): string {
+function acquireRuntimeLock(runtimePath: string): RuntimeLock {
   const lockPath = `${runtimePath}.lock`
   const token = randomUUID()
+  const processIdentity = readProcessIdentity(process.pid)
+  const owner: RuntimeLockOwner = {
+    token,
+    pid: process.pid,
+    ...(processIdentity ? { processIdentity } : {}),
+  }
+  const candidatePath = `${lockPath}.owner.${process.pid}.${token}`
   const startedAt = Date.now()
   const sleeper = new Int32Array(new SharedArrayBuffer(4))
-  while (Date.now() - startedAt < RUNTIME_LOCK_TIMEOUT_MS) {
-    let descriptor: number | null = null
-    try {
-      descriptor = openSync(lockPath, 'wx', 0o600)
-      writeSync(
-        descriptor,
-        `${JSON.stringify({ token, pid: process.pid, createdAt: Date.now() })}\n`,
-      )
-      closeSync(descriptor)
-      return token
-    } catch (error) {
-      if (descriptor !== null) closeSync(descriptor)
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+  let descriptor: number | null = null
+  try {
+    // The discoverable lock path is created only after the complete owner record
+    // is durable. A creator crash can therefore leave only an undiscoverable
+    // candidate, never an empty lock inode that wedges reset forever.
+    descriptor = openSync(candidatePath, 'wx', 0o600)
+    writeFileSync(descriptor, `${JSON.stringify(owner)}\n`, 'utf8')
+    fsyncSync(descriptor)
+    closeSync(descriptor)
+    descriptor = null
+
+    while (Date.now() - startedAt < RUNTIME_LOCK_TIMEOUT_MS) {
       try {
-        const owner = JSON.parse(readFileSync(lockPath, 'utf8')) as {
-          token?: unknown
-          pid?: unknown
-        }
-        if (
-          typeof owner.token === 'string' &&
-          typeof owner.pid === 'number' &&
-          !processIsAlive(owner.pid)
-        ) {
-          // A hard-link claim pins the observed inode. Comparing it with the
-          // current path prevents concurrent recovery from deleting a newly
-          // published successor generation.
-          recoverDeadRuntimeLock(lockPath, owner.token)
+        linkSync(candidatePath, lockPath)
+        const acquired = lstatSync(lockPath)
+        return { ...owner, dev: acquired.dev, ino: acquired.ino }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+        const currentOwner = readRuntimeLockOwner(lockPath)
+        if (runtimeLockIsRecoverable(currentOwner)) {
+          recoverDeadRuntimeLock(lockPath, currentOwner!.token)
           continue
         }
-      } catch {
-        // The owner may still be publishing metadata. Fail closed and retry.
+        Atomics.wait(sleeper, 0, 0, 10)
       }
-      Atomics.wait(sleeper, 0, 0, 10)
     }
+    throw new Error(`Timed out acquiring worker runtime lock: ${runtimePath}`)
+  } finally {
+    if (descriptor !== null) closeSync(descriptor)
+    try {
+      unlinkSync(candidatePath)
+    } catch {}
   }
-  throw new Error(`Timed out acquiring worker runtime lock: ${runtimePath}`)
 }
 
-function releaseRuntimeLock(runtimePath: string, token: string): void {
+function releaseRuntimeLock(runtimePath: string, lock: RuntimeLock): void {
   const lockPath = `${runtimePath}.lock`
   try {
-    const owner = JSON.parse(readFileSync(lockPath, 'utf8')) as {
-      token?: unknown
+    const owner = readRuntimeLockOwner(lockPath)
+    const current = lstatSync(lockPath)
+    if (
+      owner?.token === lock.token &&
+      current.dev === lock.dev &&
+      current.ino === lock.ino
+    ) {
+      unlinkSync(lockPath)
     }
-    if (owner.token === token) unlinkSync(lockPath)
   } catch {
     // Never unlink a lock whose generation cannot be proven.
   }
@@ -143,7 +210,7 @@ export function mutateSwarmWorkerRuntime<T>(
 ): T {
   mkdirSync(profilePath, { recursive: true })
   const runtimePath = join(profilePath, 'runtime.json')
-  const token = acquireRuntimeLock(runtimePath)
+  const lock = acquireRuntimeLock(runtimePath)
   try {
     const mutation = mutate(readJson(runtimePath))
     if (mutation.next) {
@@ -152,7 +219,7 @@ export function mutateSwarmWorkerRuntime<T>(
     }
     return mutation.value
   } finally {
-    releaseRuntimeLock(runtimePath, token)
+    releaseRuntimeLock(runtimePath, lock)
   }
 }
 

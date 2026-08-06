@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   hasMissionAuthority: vi.fn(),
   markMissionAssignmentDispatched: vi.fn(),
   markMissionAssignmentsReviewedByWorker: vi.fn(),
+  missionAcceptsRuntimeMutation: vi.fn(),
+  mutateRuntime: vi.fn(),
   readWorkerMessages: vi.fn(),
   recordMissionAssignmentBlocked: vi.fn(),
   recordMissionCheckpoint: vi.fn(),
@@ -42,7 +44,12 @@ vi.mock('../../server/swarm-missions', () => ({
     mocks.markMissionAssignmentsReviewedByWorker,
   recordMissionAssignmentBlocked: mocks.recordMissionAssignmentBlocked,
   recordMissionCheckpoint: mocks.recordMissionCheckpoint,
+  swarmMissionAssignmentAcceptsRuntimeMutation:
+    mocks.missionAcceptsRuntimeMutation,
   swarmMissionHasExactCardAuthority: mocks.hasMissionAuthority,
+}))
+vi.mock('../../server/swarm-runtime-reset', () => ({
+  mutateSwarmWorkerRuntime: mocks.mutateRuntime,
 }))
 
 const binding: SessionCardOperationBinding = {
@@ -76,6 +83,11 @@ beforeEach(() => {
   mocks.hasMissionAuthority.mockReturnValue(false)
   mocks.bindMissionAuthority.mockReturnValue(true)
   mocks.createMissionWithAuthorities.mockReturnValue(null)
+  mocks.missionAcceptsRuntimeMutation.mockReturnValue(true)
+  mocks.mutateRuntime.mockImplementation(
+    (_path: string, mutation: (current: Record<string, unknown>) => unknown) =>
+      (mutation({}) as { value: unknown }).value,
+  )
 })
 
 describe('Swarm mission identity authority', () => {

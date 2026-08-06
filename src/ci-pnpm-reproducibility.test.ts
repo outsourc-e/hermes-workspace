@@ -65,15 +65,20 @@ describe('CI pnpm reproducibility', () => {
 
     expect(packageJson.packageManager).toBe('pnpm@10.15.0')
     expect(installer).toContain('readonly PNPM_VERSION="10.15.0"')
-    expect(installer).toContain('corepack "pnpm@${PNPM_VERSION}" "$@"')
-    expect(installer).toContain('npx --yes "pnpm@${PNPM_VERSION}" "$@"')
     expect(installer).toContain(
-      'corepack enable --install-directory "$pnpm_bin_dir" pnpm',
+      `printf '#!/usr/bin/env bash\\nexec corepack "pnpm@%s" "$@"\\n'`,
     )
+    expect(installer).toContain(
+      `printf '#!/usr/bin/env bash\\nexec npx --yes "pnpm@%s" "$@"\\n'`,
+    )
+    expect(installer).not.toContain('corepack enable --install-directory')
     expect(installer).toContain('chmod 0755 "$pnpm_bin"')
-    expect(installer).toContain('command -v pnpm')
-    expect(installer).toContain('pnpm --version')
-    expect(installer).toContain('pnpm_cmd install --frozen-lockfile --silent')
+    expect(installer).toContain('resolved_pnpm="$(command -v pnpm || true)"')
+    expect(installer).toContain('installed_version="$("$pnpm_bin" --version)"')
+    expect(installer).toContain(
+      '"$PINNED_PNPM_BIN" install --frozen-lockfile --silent',
+    )
+    expect(installer).toContain('cd "$INSTALL_DIR" && "$PINNED_PNPM_BIN" dev')
     expect(installer).not.toMatch(/pnpm@latest|npm install -g pnpm(?:\s|$)/u)
     expect(installer).not.toContain('pnpm_cmd install --silent')
   })

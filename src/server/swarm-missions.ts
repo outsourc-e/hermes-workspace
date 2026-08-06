@@ -689,6 +689,10 @@ function isTerminalAssignment(assignment: SwarmMissionAssignment): boolean {
   return TERMINAL_ASSIGNMENT_STATES.has(assignment.state)
 }
 
+function isTerminalMission(mission: SwarmMission): boolean {
+  return mission.state === 'cancelled' || mission.state === 'complete'
+}
+
 export function listSwarmMissions(limit = 20): Array<SwarmMission> {
   return readStore()
     .missions.sort((a, b) => b.updatedAt - a.updatedAt)
@@ -1097,10 +1101,10 @@ export function recordMissionCheckpoint(input: {
   return mutateStore<RecordCheckpointResult>((store) => {
     const mission = store.missions.find((item) => item.id === input.missionId)
     if (!mission) return { result: null, write: false }
-    if (mission.state === 'cancelled') {
+    if (isTerminalMission(mission)) {
       return {
         result: Object.assign(mission, {
-          _ignoredReason: 'mission cancelled',
+          _ignoredReason: `mission ${mission.state}`,
         }),
         write: false,
       }
@@ -1273,7 +1277,7 @@ export function appendMissionContinuation(input: {
   if (!input.missionId) return null
   return mutateStore<SwarmMission | null>((store) => {
     const mission = store.missions.find((item) => item.id === input.missionId)
-    if (!mission || mission.state === 'cancelled') {
+    if (!mission || isTerminalMission(mission)) {
       return { result: null, write: false }
     }
     const id = shortId('assign')
@@ -1337,7 +1341,9 @@ export function cancelSwarmAssignment(input: {
     changed: boolean
   } | null>((store) => {
     const mission = store.missions.find((item) => item.id === input.missionId)
-    if (!mission) return { result: null, write: false }
+    if (!mission || isTerminalMission(mission)) {
+      return { result: null, write: false }
+    }
     const assignment =
       (input.assignmentId
         ? mission.assignments.find((item) => item.id === input.assignmentId)
@@ -1352,7 +1358,7 @@ export function cancelSwarmAssignment(input: {
         : null) ??
       null
     if (!assignment) return { result: null, write: false }
-    if (assignment.state === 'cancelled') {
+    if (isTerminalAssignment(assignment)) {
       return {
         result: { mission, assignment, changed: false },
         write: false,
@@ -1400,6 +1406,16 @@ export function cancelSwarmMission(input: {
   } | null>((store) => {
     const mission = store.missions.find((item) => item.id === input.missionId)
     if (!mission) return { result: null, write: false }
+    if (isTerminalMission(mission)) {
+      return {
+        result: {
+          mission,
+          cancelledAssignmentIds: [],
+          changed: false,
+        },
+        write: false,
+      }
+    }
     const cancelledAt = now()
     const cancelledAssignmentIds: Array<string> = []
     for (const assignment of mission.assignments) {
@@ -1444,11 +1460,15 @@ export function markMissionAssignmentReviewed(input: {
   if (!input.missionId) return null
   return mutateStore<SwarmMission | null>((store) => {
     const mission = store.missions.find((item) => item.id === input.missionId)
-    if (!mission) return { result: null, write: false }
+    if (!mission || isTerminalMission(mission)) {
+      return { result: null, write: false }
+    }
     const assignment = mission.assignments.find(
       (item) => item.id === input.assignmentId,
     )
-    if (!assignment) return { result: null, write: false }
+    if (!assignment || assignment.state !== 'checkpointed') {
+      return { result: null, write: false }
+    }
     assignment.state = 'done'
     assignment.reviewedAt = now()
     assignment.reviewedBy = input.reviewerId ?? null
@@ -1476,7 +1496,9 @@ export function markMissionAssignmentsReviewedByWorker(input: {
     reviewedAssignmentIds: Array<string>
   } | null>((store) => {
     const mission = store.missions.find((item) => item.id === input.missionId)
-    if (!mission) return { result: null, write: false }
+    if (!mission || isTerminalMission(mission)) {
+      return { result: null, write: false }
+    }
 
     const reviewedAt = now()
     const reviewed = mission.assignments.filter(

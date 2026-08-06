@@ -17,6 +17,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",
+    "electron:package:portable": "pnpm build && pnpm electron:bundle-server && electron-builder --win portable --x64 --config electron-builder.config.cjs",
+    "electron:smoke:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-portable-package.ps1",
     "lint": "eslint",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix",

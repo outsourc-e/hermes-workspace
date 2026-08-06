@@ -9,6 +9,7 @@ import type {
   ChatMessage,
   SessionCardChild,
 } from '@/screens/chat/types'
+import type { SwarmDirectChatUserAcknowledgement } from '@/lib/swarm-direct-chat-delivery'
 import {
   fetchCompleteSessionCardHistory,
   fetchSessionCards,
@@ -20,11 +21,13 @@ import {
 import { textFromMessage } from '@/screens/chat/utils'
 import { createOptimisticMessage } from '@/screens/chat/chat-screen-utils'
 import {
+  acknowledgeDeliveredCardTranscriptRecoveryMessage,
   appendCardTranscriptRecoveryMessage,
   isCardTranscriptRecoveryMessagePortable,
   removeRejectedCardTranscriptRecoveryMessage,
 } from '@/screens/chat/card-transcript-recovery'
 import { parsePortableAttachmentDataUrl } from '@/screens/chat/attachment-envelope'
+import { parseSwarmDirectChatUserAcknowledgement } from '@/lib/swarm-direct-chat-delivery'
 
 export type SwarmChatMessage = {
   id: string
@@ -40,6 +43,7 @@ type DirectChatResponse = {
   cardOwner: SwarmSessionCardOwner
   delivered: boolean
   delivery?: 'tmux'
+  userAcknowledgement?: unknown
   error?: string | null
   fetchedAt: number
 }
@@ -54,10 +58,15 @@ type SwarmDirectChatOutcome = {
   cardOwner: SwarmSessionCardOwner
 }
 
+type SwarmDirectChatTransportOutcome = SwarmDirectChatOutcome & {
+  userAcknowledgement: SwarmDirectChatUserAcknowledgement | null
+}
+
 type SwarmDirectChatInput = {
   prompt: string
   attachments: Array<ChatAttachment>
   cardOwner: SwarmSessionCardOwner
+  clientId: string
 }
 
 /**
@@ -293,16 +302,18 @@ export function resolveSwarmSessionCardTarget(
 
 async function sendDirectChat(
   workerId: string,
+  clientId: string,
   prompt: string,
   attachments: Array<ChatAttachment>,
   limit: number,
   cardBinding: SwarmDirectChatBinding,
-): Promise<SwarmDirectChatOutcome> {
+): Promise<SwarmDirectChatTransportOutcome> {
   const res = await fetch('/api/swarm-direct-chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       workerId,
+      clientId,
       prompt,
       attachments,
       cardBinding,
@@ -326,7 +337,13 @@ async function sendDirectChat(
   ) {
     throw new Error(SAFE_SEND_ERROR)
   }
-  return { cardOwner: data.cardOwner }
+  return {
+    cardOwner: data.cardOwner,
+    userAcknowledgement: parseSwarmDirectChatUserAcknowledgement(
+      data.userAcknowledgement,
+      clientId,
+    ),
+  }
 }
 
 function directChatBindingForMapping(
@@ -637,13 +654,22 @@ export function useSwarmChat({
         )
         const cardBinding = directChatBindingForMapping(mapping, workerId)
         if (!cardBinding) throw new Error(SAFE_SEND_ERROR)
-        return await sendDirectChat(
+        const outcome = await sendDirectChat(
           workerId,
+          input.clientId,
           input.prompt || 'Please review the attached content.',
           input.attachments,
           limit,
           cardBinding,
         )
+        if (outcome.userAcknowledgement) {
+          acknowledgeDeliveredCardTranscriptRecoveryMessage(
+            { cardId: input.cardOwner.cardId },
+            input.clientId,
+            outcome.userAcknowledgement,
+          )
+        }
+        return { cardOwner: outcome.cardOwner }
       } catch {
         throw new Error(SAFE_SEND_ERROR)
       }
@@ -716,6 +742,7 @@ export function useSwarmChat({
       prompt: body,
       attachments: portableAttachments,
       cardOwner: activeOwner,
+      clientId: optimistic.clientId,
     })
   }
 

@@ -334,6 +334,7 @@ function directChatRequest() {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       workerId: 'builder',
+      clientId: 'artifact-direct-chat-client',
       prompt: 'Run the generated artifact check',
       cardBinding: localCardBinding,
       limit: 30,

@@ -16,6 +16,7 @@ import {
   clearCardTranscriptRecoveryMemory,
   readCardTranscriptRecovery,
 } from '@/screens/chat/card-transcript-recovery'
+import { swarmDirectChatContentDigest } from '@/lib/swarm-direct-chat-delivery'
 
 const RAW_SEGMENT_ONE = 'local:raw-worker-segment-one'
 const RAW_SEGMENT_TWO = 'local:raw-worker-segment-two'
@@ -533,6 +534,9 @@ it('keeps the same Card key and both user/assistant rows through continuation re
 })
 
 it('binds a valid send to the current local Card and refreshes only that owner history', async () => {
+  vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+    '00000000-0000-4000-8000-000000000001',
+  )
   const sendCardResponse = cardResponse({
     canonicalSegmentKey: 'local:builder',
   })
@@ -548,6 +552,14 @@ it('binds a valid send to the current local Card and refreshes only that owner h
           cardOwner: rootOwner,
           delivered: true,
           delivery: 'tmux',
+          userAcknowledgement: {
+            version: 1,
+            clientId: '00000000-0000-4000-8000-000000000001',
+            observedAt: 500,
+            contentDigest: swarmDirectChatContentDigest(
+              'Persist under this Card',
+            ),
+          },
           fetchedAt: 123,
         }),
       )
@@ -582,6 +594,7 @@ it('binds a valid send to the current local Card and refreshes only that owner h
   >
   expect(requestBody).toEqual({
     workerId: 'builder',
+    clientId: '00000000-0000-4000-8000-000000000001',
     prompt: 'Persist under this Card',
     attachments: [],
     cardBinding: {
@@ -603,9 +616,20 @@ it('binds a valid send to the current local Card and refreshes only that owner h
     queryKey: ['chat', 'session-cards', 'history', rootOwner.cardId, ''],
   })
   expect(JSON.stringify(mocks.mutationResults)).not.toContain('local:builder"')
+  expect(
+    readCardTranscriptRecovery({ cardId: rootOwner.cardId })?.messages.at(-1),
+  ).toMatchObject({
+    clientId: '00000000-0000-4000-8000-000000000001',
+    __swarmDeliveryAcknowledgement: {
+      version: 1,
+      clientId: '00000000-0000-4000-8000-000000000001',
+      observedAt: 500,
+      contentDigest: swarmDirectChatContentDigest('Persist under this Card'),
+    },
+  })
 })
 
-it('admits embedded attachments into Card recovery before transport and sends the portable envelope', async () => {
+it('delivers attachment-only submissions after admitting them into Card recovery', async () => {
   const sendCardResponse = cardResponse({
     canonicalSegmentKey: 'local:builder',
   })
@@ -636,7 +660,9 @@ it('admits embedded attachments into Card recovery before transport and sends th
     ).toBeTruthy(),
   )
   await React.act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'Send attachment' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Send attachment only' }),
+    )
     await Promise.resolve()
   })
 
@@ -655,7 +681,7 @@ it('admits embedded attachments into Card recovery before transport and sends th
   })
   expect(mocks.queryData?.messages.at(-1)).toMatchObject({
     role: 'user',
-    content: 'Review the evidence',
+    content: '',
     pending: true,
     attachments: [{ id: 'swarm-attachment-1', name: 'evidence.txt' }],
   })
@@ -663,8 +689,10 @@ it('admits embedded attachments into Card recovery before transport and sends th
     ([input]) => String(input) === '/api/swarm-direct-chat',
   )
   const requestBody = JSON.parse(String(sendCall?.[1]?.body)) as {
+    prompt?: string
     attachments?: Array<Record<string, unknown>>
   }
+  expect(requestBody.prompt).toBe('Please review the attached content.')
   expect(requestBody.attachments).toEqual([
     {
       id: 'swarm-attachment-1',
