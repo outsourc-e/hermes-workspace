@@ -139,6 +139,7 @@ describe('/api/swarm-runtime/reset', () => {
     expect(augurRuntime.phase).toBe('cancelled')
     expect(augurRuntime.currentTask).toBeNull()
     expect(augurRuntime.currentMissionId).toBeNull()
+    expect(augurRuntime.acceptsCheckpoints).toBe(false)
     expect(augurRuntime.extraField).toBe('keep-me')
     expect(augurRuntime.cancelledBy).toBe('test-suite')
     expect(consulRuntime.state).toBe('executing')

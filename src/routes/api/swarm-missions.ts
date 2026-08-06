@@ -148,6 +148,100 @@ export const Route = createFileRoute('/api/swarm-missions')({
             { status: 400 },
           )
         }
+
+        const missionBeforeCancellation = getSwarmMission(missionId)
+        if (!missionBeforeCancellation)
+          return json(
+            { ok: false, error: 'Mission not found' },
+            { status: 404 },
+          )
+        const assignmentBeforeCancellation = assignmentId
+          ? missionBeforeCancellation.assignments.find(
+              (assignment) => assignment.id === assignmentId,
+            )
+          : null
+        if (assignmentId && !assignmentBeforeCancellation) {
+          return json(
+            { ok: false, error: 'Mission assignment not found' },
+            { status: 404 },
+          )
+        }
+
+        // Include already-cancelled assignments so a retry after partial cleanup
+        // retains the workers affected by the first durable cancellation.
+        const workerIds = new Set(
+          assignmentBeforeCancellation
+            ? [assignmentBeforeCancellation.workerId]
+            : missionBeforeCancellation.assignments
+                .filter(
+                  (assignment) =>
+                    assignment.state !== 'checkpointed' &&
+                    assignment.state !== 'done',
+                )
+                .map((assignment) => assignment.workerId),
+        )
+        const shouldResetWorkers =
+          body.resetWorkers !== false && workerIds.size > 0
+        const workerBindings = shouldResetWorkers
+          ? parseWorkerCardBindings(body.workerCardBindings)
+          : new Map<string, SessionCardOperationBinding>()
+        if (!workerBindings) {
+          return json(
+            {
+              ok: false,
+              retryable: true,
+              error: 'Exact worker Card reset bindings required',
+              unresolvedWorkerIds: [...workerIds],
+            },
+            { status: 409 },
+          )
+        }
+
+        // Preflight every destructive cleanup authority before making the
+        // durable cancellation visible. A missing binding must not strand a
+        // newly-cancelled mission with no recoverable worker target list.
+        if (shouldResetWorkers) {
+          const unavailableWorkerIds: Array<string> = []
+          for (const id of workerIds) {
+            const binding = workerBindings.get(id)
+            if (
+              !binding ||
+              !swarmMissionHasExactCardAuthority(missionId, binding) ||
+              !(await resolveExactSessionCardOperationBinding(binding))
+            ) {
+              unavailableWorkerIds.push(id)
+            }
+          }
+          if (unavailableWorkerIds.length > 0) {
+            return json(
+              {
+                ok: false,
+                retryable: true,
+                error: 'Worker cleanup authority is unavailable',
+                unresolvedWorkerIds: unavailableWorkerIds,
+              },
+              { status: 409 },
+            )
+          }
+        }
+
+        // Revalidate the mission owner at the mutation edge after worker
+        // preflight awaits; ownership may have rolled while those resolved.
+        if (
+          !swarmMissionHasExactCardAuthority(missionId, cardBinding) ||
+          !(await resolveExactSessionCardOperationBinding(cardBinding))
+        ) {
+          return json(
+            {
+              ok: false,
+              retryable: true,
+              error: 'Session Card ownership changed before cancellation',
+              unresolvedWorkerIds: [...workerIds],
+            },
+            { status: 409 },
+          )
+        }
+
         const result = assignmentId
           ? cancelSwarmAssignment({
               missionId,
@@ -163,34 +257,12 @@ export const Route = createFileRoute('/api/swarm-missions')({
             { status: 404 },
           )
 
-        const workerIds = new Set<string>()
-        if ('assignment' in result) workerIds.add(result.assignment.workerId)
-        if ('cancelledAssignmentIds' in result) {
-          const cancelledIds = new Set(result.cancelledAssignmentIds)
-          for (const assignment of result.mission.assignments) {
-            if (cancelledIds.has(assignment.id))
-              workerIds.add(assignment.workerId)
-          }
-        }
         const runtimeResets = []
-        if (body.resetWorkers !== false && workerIds.size > 0) {
-          const workerBindings = parseWorkerCardBindings(
-            body.workerCardBindings,
-          )
-          if (!workerBindings) {
-            return json(
-              {
-                ok: false,
-                error: 'Exact worker Card reset bindings required',
-                result,
-              },
-              { status: 409 },
-            )
-          }
+        if (shouldResetWorkers) {
           for (const id of workerIds) {
-            const binding = workerBindings.get(id)
+            const binding = workerBindings.get(id)!
             if (
-              !binding ||
+              !swarmMissionHasExactCardAuthority(missionId, binding) ||
               !(await resolveExactSessionCardOperationBinding(binding))
             ) {
               runtimeResets.push({
@@ -200,16 +272,38 @@ export const Route = createFileRoute('/api/swarm-missions')({
               })
               continue
             }
-            runtimeResets.push(resetSwarmWorkerRuntime(id, { actor, reason }))
+            try {
+              runtimeResets.push(resetSwarmWorkerRuntime(id, { actor, reason }))
+            } catch (error) {
+              runtimeResets.push({
+                workerId: id,
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+              })
+            }
           }
         }
 
-        return json({
-          ok: true,
+        const unresolvedWorkerIds = runtimeResets
+          .filter((reset) => !reset.ok)
+          .map((reset) => reset.workerId)
+        const response = {
+          ok: unresolvedWorkerIds.length === 0,
           action,
           result,
           runtimeResets,
+          unresolvedWorkerIds,
+          retryable: unresolvedWorkerIds.length > 0,
+          ...(unresolvedWorkerIds.length > 0
+            ? {
+                error:
+                  'Cancellation persisted but worker cleanup is incomplete',
+              }
+            : {}),
           cancelledAt: Date.now(),
+        }
+        return json(response, {
+          status: unresolvedWorkerIds.length > 0 ? 503 : 200,
         })
       },
     },

@@ -35,6 +35,16 @@ export type SwarmMissionState =
   | 'complete'
   | 'cancelled'
 
+export class TerminalSwarmMissionMutationError extends Error {
+  readonly missionId: string
+
+  constructor(missionId: string) {
+    super(`Swarm mission ${missionId} is terminal`)
+    this.name = 'TerminalSwarmMissionMutationError'
+    this.missionId = missionId
+  }
+}
+
 export type SwarmMissionAssignment = {
   id: string
   workerId: string
@@ -914,6 +924,16 @@ function createOrUpdateMissionInStore(
     }
     store.missions.push(mission)
     created = true
+  }
+
+  // Terminal state is absorbing. Keep this check inside the locked store
+  // transaction: a route-level preflight can race cancellation/completion in
+  // another process and must not authorize a late queued assignment.
+  if (
+    !created &&
+    (mission.state === 'cancelled' || mission.state === 'complete')
+  ) {
+    throw new TerminalSwarmMissionMutationError(mission.id)
   }
 
   mission.title = input.title || mission.title

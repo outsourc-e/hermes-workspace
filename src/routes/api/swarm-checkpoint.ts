@@ -1,10 +1,3 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs'
 import { join } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
@@ -14,6 +7,8 @@ import { getSwarmProfilePath } from '../../server/swarm-foundation'
 import { isSwarmWorkerId } from '../../server/swarm-roster'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
+import { swarmMissionAssignmentAcceptsRuntimeMutation } from '../../server/swarm-missions'
+import { mutateSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 import {
   parseSessionCardOperationBinding,
   resolveExactSessionCardOperationBinding,
@@ -38,6 +33,14 @@ type CheckpointRequest = {
   tasks?: unknown
   artifacts?: unknown
   previews?: unknown
+}
+
+type CheckpointCommit = {
+  accepted: boolean
+  checkpoint: Record<string, unknown>
+  notification:
+    | ReturnType<typeof publishSwarmCheckpointNotification>
+    | { published: false; sessionKey: string }
 }
 
 const CheckpointBodySchema = z.object({
@@ -109,24 +112,6 @@ function cleanString(value: unknown): string | null | undefined {
 
 function cleanArray(value: unknown): Array<unknown> | undefined {
   return Array.isArray(value) ? value : undefined
-}
-
-function readCurrent(runtimePath: string): Record<string, unknown> {
-  if (!existsSync(runtimePath)) return {}
-  try {
-    return JSON.parse(readFileSync(runtimePath, 'utf8')) as Record<
-      string,
-      unknown
-    >
-  } catch {
-    return {}
-  }
-}
-
-function writeJsonAtomic(path: string, value: Record<string, unknown>): void {
-  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`
-  writeFileSync(tmp, JSON.stringify(value, null, 2) + '\n')
-  renameSync(tmp, path)
 }
 
 export const Route = createFileRoute('/api/swarm-checkpoint')({
@@ -202,6 +187,7 @@ export const Route = createFileRoute('/api/swarm-checkpoint')({
         }
 
         const profilePath = getSwarmProfilePath(workerId)
+        const expectedRuntime = readRuntimeCheckpointSnapshot(profilePath)
         if (!(await bindingIsCurrent())) {
           return json(
             {
@@ -211,10 +197,7 @@ export const Route = createFileRoute('/api/swarm-checkpoint')({
             { status: 409 },
           )
         }
-        mkdirSync(profilePath, { recursive: true })
         const runtimePath = join(profilePath, 'runtime.json')
-        const current = readCurrent(runtimePath)
-        const next = { ...current, ...patch }
         if (!(await bindingIsCurrent())) {
           return json(
             {
@@ -224,85 +207,128 @@ export const Route = createFileRoute('/api/swarm-checkpoint')({
             { status: 409 },
           )
         }
-        writeJsonAtomic(runtimePath, next)
+        const committed = mutateSwarmWorkerRuntime<CheckpointCommit>(
+          profilePath,
+          (current) => {
+            const missionId =
+              typeof current.currentMissionId === 'string'
+                ? current.currentMissionId
+                : null
+            const assignmentId =
+              typeof current.currentAssignmentId === 'string'
+                ? current.currentAssignmentId
+                : null
+            const generationMatches =
+              missionId === expectedRuntime.currentMissionId &&
+              assignmentId === expectedRuntime.currentAssignmentId
+            const missionAcceptsCheckpoint =
+              !missionId && !assignmentId
+                ? true
+                : Boolean(
+                    missionId &&
+                    assignmentId &&
+                    swarmMissionAssignmentAcceptsRuntimeMutation({
+                      missionId,
+                      assignmentId,
+                      workerId,
+                      binding: cardBinding,
+                    }),
+                  )
+            if (
+              current.acceptsCheckpoints === false ||
+              !generationMatches ||
+              !missionAcceptsCheckpoint
+            ) {
+              return {
+                next: null,
+                value: {
+                  accepted: false as const,
+                  checkpoint: current,
+                  notification: { published: false, sessionKey: 'main' },
+                },
+              }
+            }
 
-        const missionId =
-          typeof next.currentMissionId === 'string'
-            ? next.currentMissionId
-            : null
-        const assignmentId =
-          typeof next.currentAssignmentId === 'string'
-            ? next.currentAssignmentId
-            : null
-        if (!(await bindingIsCurrent())) {
+            const next = { ...current, ...patch }
+            const value: CheckpointCommit = {
+              accepted: true as const,
+              checkpoint: next,
+              notification: {
+                published: false,
+                sessionKey:
+                  typeof next.notifySessionKey === 'string'
+                    ? next.notifySessionKey
+                    : 'main',
+              },
+            }
+            return {
+              next,
+              value,
+              afterWrite: () => {
+                // Reset uses this same lock, so no cancellation cleanup can land
+                // between the commit and these attributed side effects.
+                appendSwarmMemoryEvent({
+                  workerId,
+                  missionId,
+                  assignmentId,
+                  type:
+                    input.checkpointStatus === 'blocked' ||
+                    input.state === 'blocked'
+                      ? 'blocked'
+                      : 'checkpoint',
+                  summary:
+                    input.lastResult ??
+                    input.lastSummary ??
+                    input.currentTask ??
+                    'Runtime checkpoint updated',
+                  event: {
+                    state: input.state ?? null,
+                    phase: input.phase ?? null,
+                    checkpointStatus: input.checkpointStatus ?? null,
+                    nextAction: input.nextAction ?? null,
+                    blockedReason: input.blockedReason ?? null,
+                  },
+                })
+
+                const parsedCheckpoint = checkpointFromRuntimeSnapshot(
+                  readRuntimeCheckpointSnapshot(profilePath),
+                )
+                if (parsedCheckpoint) {
+                  value.notification = publishSwarmCheckpointNotification({
+                    workerId,
+                    missionId,
+                    assignmentId,
+                    checkpoint: parsedCheckpoint,
+                    notifySessionKey:
+                      typeof next.notifySessionKey === 'string'
+                        ? next.notifySessionKey
+                        : null,
+                  })
+                }
+              },
+            }
+          },
+        )
+
+        if (!committed.accepted) {
           return json(
             {
               ok: false,
-              error: 'Session Card ownership changed after checkpoint write',
+              retryable: false,
+              error:
+                'Checkpoint rejected because the runtime assignment is no longer active',
             },
             { status: 409 },
           )
-        }
-        appendSwarmMemoryEvent({
-          workerId,
-          missionId,
-          assignmentId,
-          type:
-            input.checkpointStatus === 'blocked' || input.state === 'blocked'
-              ? 'blocked'
-              : 'checkpoint',
-          summary:
-            input.lastResult ??
-            input.lastSummary ??
-            input.currentTask ??
-            'Runtime checkpoint updated',
-          event: {
-            state: input.state ?? null,
-            phase: input.phase ?? null,
-            checkpointStatus: input.checkpointStatus ?? null,
-            nextAction: input.nextAction ?? null,
-            blockedReason: input.blockedReason ?? null,
-          },
-        })
-
-        const runtimeSnapshot = readRuntimeCheckpointSnapshot(profilePath)
-        const parsedCheckpoint = checkpointFromRuntimeSnapshot(runtimeSnapshot)
-        let notification = {
-          published: false,
-          sessionKey:
-            typeof next.notifySessionKey === 'string'
-              ? next.notifySessionKey
-              : 'main',
-        }
-        if (parsedCheckpoint) {
-          if (!(await bindingIsCurrent())) {
-            return json(
-              {
-                ok: false,
-                error: 'Session Card ownership changed after checkpoint write',
-              },
-              { status: 409 },
-            )
-          }
-          notification = publishSwarmCheckpointNotification({
-            workerId,
-            missionId,
-            assignmentId,
-            checkpoint: parsedCheckpoint,
-            notifySessionKey:
-              typeof next.notifySessionKey === 'string'
-                ? next.notifySessionKey
-                : null,
-          })
         }
 
         return json({
           ok: true,
           workerId,
           runtimePath,
-          checkpoint: next,
+          checkpoint: committed.checkpoint,
           savedAt: Date.now(),
-          notification,
+          notification: committed.notification,
         })
       },
     },

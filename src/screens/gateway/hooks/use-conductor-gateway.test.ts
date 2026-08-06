@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildConductorStopCardBindings,
+  normalizeConductorCardOwners,
   resolveAuthoritativeConductorCardOwner,
   retainConductorOwnersAfterStopFailure,
   shouldPersistActiveConductorMission,
@@ -68,6 +69,27 @@ function cardProjection(): SessionCardListWire {
 }
 
 describe('Conductor stream event authority', () => {
+  it('normalizes native admission owners for immediate and persisted Stop authority', () => {
+    expect(
+      normalizeConductorCardOwners([
+        { cardId: ' local:builder-card ' },
+        {
+          cardId: 'local:reviewer-child',
+          parentCardId: 'local:reviewer-root',
+        },
+        { cardId: 'local:builder-card' },
+        { cardId: '' },
+        null,
+      ]),
+    ).toEqual([
+      { cardId: 'local:builder-card' },
+      {
+        cardId: 'local:reviewer-child',
+        parentCardId: 'local:reviewer-root',
+      },
+    ])
+  })
+
   it('builds destructive requests from exact Card owners and canonical bindings', () => {
     expect(
       buildConductorStopCardBindings(cardProjection(), [

@@ -319,6 +319,9 @@ describe('Conductor mission Card admission', () => {
     })
 
     expect(response.status).toBe(200)
+    await expect(response.clone().json()).resolves.toMatchObject({
+      mission: { cardOwners: [{ cardId: 'local:builder-card' }] },
+    })
     await expect(response.json()).resolves.toMatchObject({ ok: true })
     expect(mocks.recordCheckpoint).not.toHaveBeenCalled()
   })
@@ -438,6 +441,9 @@ describe('Conductor mission Card admission', () => {
     })
 
     expect(response.status).toBe(200)
+    await expect(response.clone().json()).resolves.toMatchObject({
+      cardOwners: [{ cardId: 'local:builder-card' }],
+    })
     expect(mocks.createAtomicMission).toHaveBeenCalledWith(
       expect.objectContaining({
         assignments: expect.arrayContaining([

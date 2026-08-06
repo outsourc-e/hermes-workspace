@@ -95,6 +95,19 @@ async function bindMissionCardAuthority(input: {
   return Boolean(await establishMissionCardAuthority(input))
 }
 
+function conductorCardOwners(
+  bindings: Array<SessionCardOperationBinding>,
+): Array<{ cardId: string; parentCardId?: string }> {
+  const owners = new Map<string, { cardId: string; parentCardId?: string }>()
+  for (const binding of bindings) {
+    const owner = binding.parentCardId
+      ? { cardId: binding.cardId, parentCardId: binding.parentCardId }
+      : { cardId: binding.cardId }
+    owners.set(`${owner.cardId}\u0000${owner.parentCardId ?? ''}`, owner)
+  }
+  return [...owners.values()]
+}
+
 function repoRoot(): string {
   try {
     const here = dirname(fileURLToPath(import.meta.url))
@@ -556,7 +569,16 @@ async function createNativeConductorMission(input: {
     }
     console.error('[conductor] native swarm dispatch failed:', reason)
   })
-  return { missionId: input.missionName, missionTitle, assignments }
+  return {
+    missionId: input.missionName,
+    missionTitle,
+    assignments,
+    cardOwners: conductorCardOwners(
+      cardBindings.filter((binding): binding is SessionCardOperationBinding =>
+        Boolean(binding),
+      ),
+    ),
+  }
 }
 
 export const Route = createFileRoute('/api/conductor-spawn')({
@@ -582,7 +604,7 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           const workerBindings = await Promise.all(
             nativeMission.assignments.map(async (assignment) => ({
               workerId: assignment.workerId,
-              bound: await bindMissionCardAuthority({
+              binding: await establishMissionCardAuthority({
                 missionId,
                 source: 'local',
                 upstreamKey: assignment.workerId,
@@ -590,7 +612,7 @@ export const Route = createFileRoute('/api/conductor-spawn')({
             })),
           )
           const unavailableWorker = workerBindings.find(
-            (binding) => !binding.bound,
+            (binding) => !binding.binding,
           )
           if (unavailableWorker) {
             return json(
@@ -705,10 +727,16 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           // Re-read the mission from the store so the response reflects any
           // checkpoints just synced via recordMissionCheckpoint above.
           const updatedNative = getSwarmMission(missionId) ?? nativeMission
+          const cardOwners = conductorCardOwners(
+            workerBindings.flatMap(({ binding }) => (binding ? [binding] : [])),
+          )
           return json({
             ok: true,
             mode: 'native-swarm',
-            mission: toNativeConductorMissionRecord(updatedNative, lines),
+            mission: {
+              ...toNativeConductorMissionRecord(updatedNative, lines),
+              cardOwners,
+            },
           })
         }
 
@@ -837,6 +865,7 @@ export const Route = createFileRoute('/api/conductor-spawn')({
               runId: null,
               warnings: goalSanitization.warnings,
               assignments: native.assignments,
+              cardOwners: native.cardOwners,
               results: null,
             })
           }

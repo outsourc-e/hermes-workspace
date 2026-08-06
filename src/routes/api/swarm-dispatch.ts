@@ -15,6 +15,7 @@ import {
 } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import {
+  TerminalSwarmMissionMutationError,
   createOrUpdateMission,
   createSwarmMissionId,
   createSwarmMissionWithCardAuthorities,
@@ -32,6 +33,7 @@ import {
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import { mutateSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 import type { CreateOrUpdateMissionResult } from '../../server/swarm-missions'
 import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 import type { SwarmRosterWorker } from '../../server/swarm-roster'
@@ -322,15 +324,21 @@ function writeRuntimePatch(
   patch: Record<string, unknown>,
 ): void {
   const profilePath = getProfilePath(workerId)
-  mkdirSync(profilePath, { recursive: true })
-  const runtimePath = join(profilePath, 'runtime.json')
-  const current = readRuntimeJson(profilePath)
-  const next = {
-    ...current,
-    workerId,
-    ...patch,
-  }
-  writeFileSync(runtimePath, JSON.stringify(next, null, 2) + '\n')
+  mutateSwarmWorkerRuntime(profilePath, (current) => {
+    // A cancellation reset closes the current runtime generation. Only a new
+    // dispatch may explicitly open the next one; late result/checkpoint
+    // callbacks from the prior generation become no-ops.
+    if (
+      current.acceptsCheckpoints === false &&
+      patch.acceptsCheckpoints !== true
+    ) {
+      return { next: null, value: undefined }
+    }
+    return {
+      next: { ...current, workerId, ...patch },
+      value: undefined,
+    }
+  })
 }
 
 function cleanRuntimeText(value: unknown): string | null {
@@ -590,6 +598,7 @@ function markDispatchStarted(
 ): void {
   const controlMessage = `Dispatched task: ${task.slice(0, 180)}`
   writeRuntimePatch(workerId, {
+    acceptsCheckpoints: true,
     state: 'executing',
     phase: 'dispatched',
     currentTask: task,
@@ -700,6 +709,7 @@ function markCheckpointResult(
     state: checkpoint.runtimeState,
     phase: checkpoint.stateLabel.toLowerCase(),
     checkpointStatus: checkpoint.checkpointStatus,
+    ...(clearCurrentTask ? { acceptsCheckpoints: false } : {}),
     ...(clearCurrentTask ? { currentTask: null } : {}),
     lastCheckIn: new Date().toISOString(),
     lastOutputAt: Date.now(),
@@ -1556,11 +1566,21 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     ) {
       throw new SwarmDispatchError('Swarm mission Card authority changed', 409)
     }
-    mission = createOrUpdateMission({
-      missionId,
-      title: missionTitle,
-      assignments,
-    })
+    try {
+      mission = createOrUpdateMission({
+        missionId,
+        title: missionTitle,
+        assignments,
+      })
+    } catch (error) {
+      if (error instanceof TerminalSwarmMissionMutationError) {
+        throw new SwarmDispatchError(
+          'Terminal Swarm missions cannot accept new assignments',
+          409,
+        )
+      }
+      throw error
+    }
   } else {
     const createdMission = createSwarmMissionWithCardAuthorities({
       missionId,

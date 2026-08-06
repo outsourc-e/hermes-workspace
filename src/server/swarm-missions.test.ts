@@ -754,6 +754,60 @@ describe('swarm-missions', () => {
     ).toHaveLength(0)
   })
 
+  it.each(['cancelled', 'complete'] as const)(
+    'keeps a %s mission absorbing when late dispatch tries to append work',
+    async (terminalState) => {
+      const mod = await loadModule()
+      const mission = mod.createOrUpdateMission({
+        missionId: `mission-terminal-${terminalState}`,
+        title: 'Terminal mission',
+        assignments: [
+          { workerId: 'builder', task: 'Original task', reviewRequired: false },
+        ],
+      })
+      if (terminalState === 'cancelled') {
+        mod.cancelSwarmMission({ missionId: mission.id, actor: 'test' })
+      } else {
+        mod.recordMissionCheckpoint({
+          missionId: mission.id,
+          assignmentId: mission.assignments[0]?.id,
+          workerId: 'builder',
+          checkpoint: {
+            stateLabel: 'DONE',
+            runtimeState: 'idle',
+            checkpointStatus: 'done',
+            filesChanged: 'none',
+            commandsRun: 'none',
+            result: 'done',
+            blocker: null,
+            nextAction: 'none',
+            raw: 'STATE: DONE\nRESULT: done',
+          },
+        })
+      }
+
+      expect(() =>
+        mod.createOrUpdateMission({
+          missionId: mission.id,
+          title: 'Hostile late extension',
+          assignments: [
+            {
+              workerId: 'reviewer',
+              task: 'Late queued task',
+              reviewRequired: false,
+            },
+          ],
+        }),
+      ).toThrow(mod.TerminalSwarmMissionMutationError)
+
+      const persisted = mod.getSwarmMission(mission.id)
+      expect(persisted?.state).toBe(terminalState)
+      expect(persisted?.title).toBe('Terminal mission')
+      expect(persisted?.assignments).toHaveLength(1)
+      expect(persisted?.assignments[0]?.task).toBe('Original task')
+    },
+  )
+
   it('cancels a single assignment and leaves unaffected work active', async () => {
     const mod = await loadModule()
     const mission = mod.createOrUpdateMission({

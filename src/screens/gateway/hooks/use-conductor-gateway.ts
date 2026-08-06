@@ -30,6 +30,7 @@ type ConductorMissionRecord = {
   exit_code?: number | null
   // Native-swarm fields returned by the conductor-spawn GET handler
   nativeSwarm?: boolean
+  cardOwners?: unknown
   updatedAt?: number
   assignments?: Array<{
     id?: string
@@ -126,6 +127,7 @@ type ConductorSpawnResponse = {
   jobName?: string | null
   runId?: string | null
   assignments?: Array<{ workerId: string; task: string; rationale: string }>
+  cardOwners?: unknown
   error?: string
 }
 
@@ -291,6 +293,23 @@ function readString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim()
     : null
+}
+
+export function normalizeConductorCardOwners(
+  value: unknown,
+): Array<PersistedConductorCardOwner> {
+  if (!Array.isArray(value)) return []
+  const owners = new Map<string, PersistedConductorCardOwner>()
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== 'object') continue
+    const record = candidate as Record<string, unknown>
+    const cardId = readString(record.cardId)
+    if (!cardId) continue
+    const parentCardId = readString(record.parentCardId)
+    const owner = parentCardId ? { cardId, parentCardId } : { cardId }
+    owners.set(`${owner.cardId}\u0000${owner.parentCardId ?? ''}`, owner)
+  }
+  return [...owners.values()]
 }
 
 function readCardId(value: unknown): string | null {
@@ -1844,6 +1863,11 @@ export function useConductorGateway() {
       setTimeoutWarning(false)
     }
 
+    if (mission.nativeSwarm === true) {
+      const nativeOwners = normalizeConductorCardOwners(mission.cardOwners)
+      if (nativeOwners.length > 0) setMissionCardOwners(nativeOwners)
+    }
+
     if (isCompletedMissionStatus(status)) {
       doneRef.current = true
       setCompletedAt((value) => value ?? new Date().toISOString())
@@ -2391,8 +2415,16 @@ export function useConductorGateway() {
       // native-swarm mode: local swarm workers handle the mission, no orchestrator session
       if (result.mode === 'native-swarm') {
         const spawnedMissionId = result.missionId ?? null
+        const nativeOwners = normalizeConductorCardOwners(result.cardOwners)
+        if (nativeOwners.length === 0) {
+          throw new Error(
+            'Native swarm mission did not provide authoritative Card owners',
+          )
+        }
         setMissionId(spawnedMissionId)
         setMissionJobId(result.jobId ?? null)
+        setMissionCardOwners(nativeOwners)
+        setOrchestratorCardId(nativeOwners[0]?.cardId ?? null)
         setPendingOrchestratorSessionKey(null)
         setPlanText(
           result.assignments?.length
