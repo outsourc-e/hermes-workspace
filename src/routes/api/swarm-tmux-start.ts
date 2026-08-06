@@ -5,6 +5,10 @@ import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
 import { syncSwarmProfileModel } from '../../server/swarm-profile-config'
@@ -36,6 +40,7 @@ function getProfilesDir(): string {
 
 type StartRequest = {
   workerId?: unknown
+  cardBinding?: unknown
 }
 
 const TMUX_BIN_CANDIDATES = [
@@ -173,6 +178,23 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
             { status: 400 },
           )
         }
+        const cardBinding = parseSessionCardOperationBinding(body.cardBinding, {
+          source: 'local',
+          transport: 'tmux',
+          canonicalSegmentKey: `local:${workerId}`,
+        })
+        if (!cardBinding) {
+          return json(
+            { error: 'Invalid Session Card start binding' },
+            { status: 400 },
+          )
+        }
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card start binding is unavailable' },
+            { status: 409 },
+          )
+        }
 
         const profilesDir = getProfilesDir()
         const profilePath = join(profilesDir, workerId)
@@ -245,6 +267,12 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
         }
 
         const cwd = resolveWorkerCwd(workerId)
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card start binding is unavailable' },
+            { status: 409 },
+          )
+        }
         const result = await startSession(
           tmuxBin,
           sessionName,

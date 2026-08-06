@@ -10,6 +10,7 @@ import {
   SentIcon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
+import { fetchExactSwarmWorkerCardBindings } from '@/lib/swarm-card-bindings'
 
 type Message = {
   id: string
@@ -85,12 +86,21 @@ export function SwarmNodeChat({
     setDraft('')
     setBusy(true)
     try {
+      const cardBinding = (
+        await fetchExactSwarmWorkerCardBindings([workerId])
+      ).get(workerId)
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workerIds: [workerId],
-          prompt: text,
+          assignments: [
+            {
+              workerId,
+              task: text,
+              rationale: 'Direct worker chat.',
+              cardBinding,
+            },
+          ],
           timeoutSeconds: 240,
         }),
       })

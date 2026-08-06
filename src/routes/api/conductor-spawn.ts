@@ -432,6 +432,17 @@ async function createNativeConductorMission(input: {
     supervised: input.supervised,
   })
   const missionTitle = `Conductor: ${clipText(input.goal, 120)}`
+  const cardBindings = await Promise.all(
+    assignments.map((assignment) =>
+      resolveSessionCardOperationBindingByUpstream({
+        source: 'local',
+        upstreamKey: assignment.workerId,
+      }),
+    ),
+  )
+  if (cardBindings.some((binding) => !binding)) {
+    throw new Error('Session Card ownership unavailable for native dispatch')
+  }
   await Promise.all(
     assignments.map((assignment) =>
       bindMissionCardAuthority({
@@ -442,7 +453,10 @@ async function createNativeConductorMission(input: {
     ),
   )
   void dispatchSwarmAssignments({
-    assignments,
+    assignments: assignments.map((assignment, index) => ({
+      ...assignment,
+      cardBinding: cardBindings[index],
+    })),
     missionId: input.missionName,
     missionTitle,
     allowAsync: true,

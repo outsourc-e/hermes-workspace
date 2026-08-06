@@ -24,19 +24,19 @@ import { Swarm2ReportsView, buildSwarm2InboxLanes } from './swarm2-reports-view'
 import type { Swarm2InboxItem } from './swarm2-reports-view'
 import type { CSSProperties } from 'react'
 import type { CrewMember } from '@/hooks/use-crew-status'
-import type {
-  SessionCardChildWire,
-  SessionCardListWire,
-  SessionCardWire,
-} from '@/screens/chat/chat-queries'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import type { SwarmSessionCardOwner } from '@/hooks/use-swarm-chat'
 import { toast } from '@/components/ui/toast'
 import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
 import {
   fetchSessionCards,
-  hasExactCompleteSessionCardProjection,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
+import {
+  fetchExactSwarmWorkerCardBindings,
+  resolveSwarmWorkerCardBinding,
+  resolveUniqueSwarmWorkerCardBindings,
+} from '@/lib/swarm-card-bindings'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
@@ -420,82 +420,6 @@ function sanitizeRuntimeEntry(entry: RuntimeEntry): RuntimeEntry {
   return sanitized as RuntimeEntry
 }
 
-function exactSourceQualifiedIdentity(
-  value: unknown,
-  source: 'local' | 'remote',
-): value is string {
-  return (
-    typeof value === 'string' &&
-    value.trim() === value &&
-    value.startsWith(`${source}:`) &&
-    value.length > source.length + 1
-  )
-}
-
-function hasSourceCompleteContinuationProjection(
-  owner: {
-    cardId: string
-    canonicalSegmentKey: string
-    continuationSegmentKeys: ReadonlyArray<string>
-    continuationCount: number
-  },
-  source: 'local' | 'remote',
-): boolean {
-  const continuations = owner.continuationSegmentKeys
-  return (
-    exactSourceQualifiedIdentity(owner.cardId, source) &&
-    exactSourceQualifiedIdentity(owner.canonicalSegmentKey, source) &&
-    continuations.length > 0 &&
-    continuations.length === owner.continuationCount &&
-    continuations.every((identity) =>
-      exactSourceQualifiedIdentity(identity, source),
-    ) &&
-    new Set(continuations).size === continuations.length &&
-    continuations[0] === owner.cardId &&
-    continuations.at(-1) === owner.canonicalSegmentKey
-  )
-}
-
-function rootHasAuthoritativeProjection(
-  response: SessionCardListWire,
-  card: SessionCardWire,
-): card is SessionCardWire & { canonicalSource: 'local' } {
-  const source = card.canonicalSource
-  return (
-    source === 'local' &&
-    card.parentCardId === undefined &&
-    (card.relationshipKind === 'root' || card.relationshipKind === 'orphan') &&
-    hasExactCompleteSessionCardProjection(response, card.cardId) &&
-    hasSourceCompleteContinuationProjection(card, source)
-  )
-}
-
-function childHasAuthoritativeProjection(
-  child: SessionCardChildWire,
-  source: 'local' | 'remote',
-): boolean {
-  return hasSourceCompleteContinuationProjection(
-    {
-      cardId: child.cardId,
-      canonicalSegmentKey: child.sessionKey,
-      continuationSegmentKeys: child.continuationSegmentKeys,
-      continuationCount: child.continuationCount,
-    },
-    source,
-  )
-}
-
-function ownsCurrentLocalWorkerAlias(
-  workerId: string,
-  canonicalSegmentKey: string,
-): boolean {
-  return (
-    Boolean(workerId) &&
-    workerId.trim() === workerId &&
-    canonicalSegmentKey === `local:${workerId}`
-  )
-}
-
 /**
  * Project a stable Card owner from one exact source-qualified worker alias.
  * The alias is only lookup evidence: the returned owner is always copied from
@@ -505,60 +429,31 @@ export function resolveSwarmWorkerCardOwner(
   response: SessionCardListWire | undefined,
   workerId: string,
 ): SwarmSessionCardOwner | null {
-  if (
-    !response ||
-    !Array.isArray(response.cards) ||
-    !Array.isArray(response.cardResolutions)
-  ) {
-    return null
-  }
-
-  const candidates: Array<SwarmSessionCardOwner> = []
-  for (const card of response.cards) {
-    if (!rootHasAuthoritativeProjection(response, card)) continue
-    const source = card.canonicalSource
-    if (ownsCurrentLocalWorkerAlias(workerId, card.canonicalSegmentKey)) {
-      candidates.push({
-        kind: 'session-card-owner',
-        cardId: card.cardId,
-        parentCardId: null,
-      })
-    }
-
-    for (const child of card.childNodes) {
-      if (!childHasAuthoritativeProjection(child, source)) continue
-      if (ownsCurrentLocalWorkerAlias(workerId, child.sessionKey)) {
-        candidates.push({
-          kind: 'session-card-owner',
-          cardId: child.cardId,
-          parentCardId: card.cardId,
-        })
+  const binding = resolveSwarmWorkerCardBinding(response, workerId)
+  return binding
+    ? {
+        kind: binding.kind,
+        cardId: binding.cardId,
+        parentCardId: binding.parentCardId,
       }
-    }
-  }
-
-  return candidates.length === 1 ? candidates[0]! : null
+    : null
 }
 
 function projectUniqueSwarmWorkerCardOwners(
   response: SessionCardListWire | undefined,
   workerIds: ReadonlyArray<string>,
 ): ReadonlyMap<string, SwarmSessionCardOwner> {
-  const projected = workerIds.flatMap((workerId) => {
-    const owner = resolveSwarmWorkerCardOwner(response, workerId)
-    return owner ? [{ workerId, owner }] : []
-  })
-  const ownerCounts = new Map<string, number>()
-  for (const { owner } of projected) {
-    const key = JSON.stringify([owner.parentCardId, owner.cardId])
-    ownerCounts.set(key, (ownerCounts.get(key) ?? 0) + 1)
-  }
-
   return new Map(
-    projected.flatMap(({ workerId, owner }) => {
-      const key = JSON.stringify([owner.parentCardId, owner.cardId])
-      return ownerCounts.get(key) === 1 ? [[workerId, owner] as const] : []
-    }),
+    [...resolveUniqueSwarmWorkerCardBindings(response, workerIds)].map(
+      ([workerId, binding]) => [
+        workerId,
+        {
+          kind: binding.kind,
+          cardId: binding.cardId,
+          parentCardId: binding.parentCardId,
+        },
+      ],
+    ),
   )
 }
 
@@ -1475,10 +1370,13 @@ export function Swarm2Screen() {
     async (workerId: string) => {
       setPendingTmux((prev) => new Set(prev).add(workerId))
       try {
+        const cardBinding = (
+          await fetchExactSwarmWorkerCardBindings([workerId])
+        ).get(workerId)
         const res = await fetch('/api/swarm-tmux-start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workerId }),
+          body: JSON.stringify({ workerId, cardBinding }),
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
@@ -1563,13 +1461,16 @@ export function Swarm2Screen() {
     async (
       workerId: string,
       direction: 'up' | 'down',
-      session?: string | null,
+      _session?: string | null,
     ) => {
       try {
+        const cardBinding = (
+          await fetchExactSwarmWorkerCardBindings([workerId])
+        ).get(workerId)
         const res = await fetch('/api/swarm-tmux-scroll', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workerId, session, direction, lines: 8 }),
+          body: JSON.stringify({ workerId, cardBinding, direction, lines: 8 }),
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')

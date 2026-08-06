@@ -11,7 +11,9 @@ import { dirname, join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
 import { SWARM_MEMORY_ROOT } from './swarm-environment'
 import { appendSwarmMemoryEvent } from './swarm-memory'
+import { resolveExactSessionCardOperationBinding } from './session-card-operation-binding'
 import type { ChildProcess } from 'node:child_process'
+import type { SessionCardOperationBinding } from './session-card-operation-binding'
 
 export type SwarmContextState =
   | 'healthy'
@@ -236,17 +238,22 @@ function useNativeProcess(): boolean {
 export function sendToWorker(
   workerId: string,
   prompt: string,
+  cardBinding: SessionCardOperationBinding,
 ): Promise<{ ok: boolean; error?: string }> {
   if (useNativeProcess()) {
-    return sendToWorkerProcess(workerId, prompt)
+    return sendToWorkerProcess(workerId, prompt, cardBinding)
   }
-  return sendTmux(workerId, prompt)
+  return sendTmux(workerId, prompt, cardBinding)
 }
 
-function sendToWorkerProcess(
+async function sendToWorkerProcess(
   workerId: string,
   prompt: string,
+  cardBinding: SessionCardOperationBinding,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
+  }
   return new Promise((resolve) => {
     const proc = workerProcesses.get(workerId)
     if (!proc || !proc.stdin?.writable) {
@@ -264,77 +271,86 @@ function sendToWorkerProcess(
   })
 }
 
-function sendTmux(
-  workerId: string,
-  prompt: string,
+function execTmuxMutation(
+  tmux: string,
+  args: Array<string>,
+  input?: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const session = `swarm-${workerId}`
   return new Promise((resolve) => {
-    const tmux = tmuxBin()
-    if (!tmux)
-      return resolve({
-        ok: false,
-        error: 'tmux not available on this platform',
-      })
-    const child = execFile(
-      tmux,
-      ['load-buffer', '-b', `swarm-lifecycle-${workerId}`, '-'],
-      (loadErr, _stdout, stderr) => {
-        if (loadErr)
-          return resolve({
-            ok: false,
-            error: stderr.toString() || loadErr.message,
-          })
-        execFile(tmux, ['send-keys', '-t', session, 'C-u'], () => {
-          execFile(
-            tmux,
-            [
-              'paste-buffer',
-              '-d',
-              '-b',
-              `swarm-lifecycle-${workerId}`,
-              '-t',
-              session,
-            ],
-            (pasteErr, _out2, err2) => {
-              if (pasteErr)
-                return resolve({
-                  ok: false,
-                  error: err2.toString() || pasteErr.message,
-                })
-              setTimeout(
-                () =>
-                  execFile(
-                    tmux,
-                    ['send-keys', '-t', session, 'Enter'],
-                    (enterErr, _out3, err3) => {
-                      if (enterErr)
-                        return resolve({
-                          ok: false,
-                          error: err3.toString() || enterErr.message,
-                        })
-                      resolve({ ok: true })
-                    },
-                  ),
-                150,
-              )
-            },
-          )
-        })
-      },
-    )
-    child.stdin?.end(prompt)
+    const child = execFile(tmux, args, (error, _stdout, stderr) => {
+      if (error) {
+        resolve({ ok: false, error: stderr.toString() || error.message })
+        return
+      }
+      resolve({ ok: true })
+    })
+    if (input !== undefined) child.stdin?.end(input)
   })
 }
 
-async function killWorkerProcess(
+async function sendTmux(
   workerId: string,
+  prompt: string,
+  cardBinding: SessionCardOperationBinding,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = `swarm-${workerId}`
+  const tmux = tmuxBin()
+  if (!tmux) {
+    return { ok: false, error: 'tmux not available on this platform' }
+  }
+  const mutations: Array<{ args: Array<string>; input?: string }> = [
+    {
+      args: ['load-buffer', '-b', `swarm-lifecycle-${workerId}`, '-'],
+      input: prompt,
+    },
+    { args: ['send-keys', '-t', session, 'C-u'] },
+    {
+      args: [
+        'paste-buffer',
+        '-d',
+        '-b',
+        `swarm-lifecycle-${workerId}`,
+        '-t',
+        session,
+      ],
+    },
+  ]
+  for (const mutation of mutations) {
+    if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+      return {
+        ok: false,
+        error: 'Session Card lifecycle binding is unavailable',
+      }
+    }
+    const result = await execTmuxMutation(tmux, mutation.args, mutation.input)
+    if (!result.ok) return result
+  }
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
+  }
+  return execTmuxMutation(tmux, ['send-keys', '-t', session, 'Enter'])
+}
+
+export async function killWorkerProcess(
+  workerId: string,
+  cardBinding: SessionCardOperationBinding,
 ): Promise<{ ok: boolean; error?: string }> {
   const proc = workerProcesses.get(workerId)
   if (!proc) return { ok: false, error: 'No active process' }
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
+  }
   return new Promise((resolve) => {
     proc.kill('SIGTERM')
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(async () => {
+      if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+        resolve({
+          ok: false,
+          error: 'Session Card lifecycle binding is unavailable',
+        })
+        return
+      }
       try {
         proc.kill('SIGKILL')
       } catch {
@@ -353,26 +369,28 @@ async function killWorkerProcess(
 
 async function startWorkerProcess(
   workerId: string,
+  cardBinding: SessionCardOperationBinding,
 ): Promise<{ ok: boolean; error?: string }> {
   if (useNativeProcess()) {
-    return startWorkerProcessNative(workerId)
+    return startWorkerProcessNative(workerId, cardBinding)
   }
-  return tmuxStart(workerId)
+  return tmuxStart(workerId, cardBinding)
 }
 
 async function stopWorkerProcess(
   workerId: string,
+  cardBinding: SessionCardOperationBinding,
 ): Promise<{ ok: boolean; error?: string }> {
   if (useNativeProcess()) {
-    return killWorkerProcess(workerId)
+    return killWorkerProcess(workerId, cardBinding)
   }
-  return tmuxKill(workerId)
+  return tmuxKill(workerId, cardBinding)
 }
 
-function startWorkerProcessNative(workerId: string): {
-  ok: boolean
-  error?: string
-} {
+export async function startWorkerProcessNative(
+  workerId: string,
+  cardBinding: SessionCardOperationBinding,
+): Promise<{ ok: boolean; error?: string }> {
   if (workerProcesses.has(workerId)) {
     return {
       ok: false,
@@ -394,6 +412,9 @@ function startWorkerProcessNative(workerId: string): {
   const logDir = join(profilePath, 'logs')
   if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true })
 
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
+  }
   const proc = spawn(hermesCmd, args, {
     cwd: profilePath,
     env: {
@@ -460,6 +481,7 @@ function readRuntimeMissionContext(workerId: string): {
 
 export async function requestWorkerHandoff(
   workerId: string,
+  cardBinding: SessionCardOperationBinding,
 ): Promise<{ ok: boolean; handoffPath: string; error?: string }> {
   const hp = handoffPath(workerId)
   mkdirSync(dirname(hp), { recursive: true })
@@ -471,7 +493,7 @@ export async function requestWorkerHandoff(
     'latest.md',
   )
   const prompt = `CONTEXT_HANDOFF_REQUIRED. Stop current work and write a durable handoff.\n\nWrite the handoff to BOTH of these exact paths:\n${localHandoff}\n${hp}\n\nUse this template (fill it in, do not just copy):\n# Handoff — ${workerId} — <missionId>\n\nGenerated: <ISO timestamp>\n\n## Current state\n## Objective\n## Completed\n## In progress\n## Files touched\n## Commands run\n## Blockers\n## Next exact action\n## Resume prompt\nWhen this worker restarts, load this handoff and continue from "Next exact action".\n\nThen reply in the required checkpoint format:\nSTATE: HANDOFF\nFILES_CHANGED: exact files or none\nCOMMANDS_RUN: exact commands or none\nRESULT: concise current state and what landed\nBLOCKER: blocker or none\nNEXT_ACTION: exact next action after /new or restart\n\nDo not continue implementation until renewed.`
-  const sent = await sendToWorker(workerId, prompt)
+  const sent = await sendToWorker(workerId, prompt, cardBinding)
   const ctx = readRuntimeMissionContext(workerId)
   try {
     appendSwarmMemoryEvent({
@@ -492,7 +514,12 @@ export async function requestWorkerHandoff(
   return { ...sent, handoffPath: hp }
 }
 
-export function notifyHandoffWritten(workerId: string): void {
+export async function notifyHandoffWritten(
+  workerId: string,
+  cardBinding: SessionCardOperationBinding,
+): Promise<boolean> {
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding)))
+    return false
   const ctx = readRuntimeMissionContext(workerId)
   try {
     appendSwarmMemoryEvent({
@@ -506,13 +533,17 @@ export function notifyHandoffWritten(workerId: string): void {
   } catch {
     /* best-effort */
   }
+  return true
 }
 
 export function lifecycleHandoffPath(workerId: string): string {
   return handoffPath(workerId)
 }
 
-function tmuxKill(workerId: string): Promise<{ ok: boolean; error?: string }> {
+async function tmuxKill(
+  workerId: string,
+  cardBinding: SessionCardOperationBinding,
+): Promise<{ ok: boolean; error?: string }> {
   const session = `swarm-${workerId}`
   const tmux = tmuxBin()
   if (!tmux) {
@@ -521,19 +552,16 @@ function tmuxKill(workerId: string): Promise<{ ok: boolean; error?: string }> {
       error: 'tmux not available on this platform',
     })
   }
-  return new Promise((resolve) => {
-    execFile(tmux, ['kill-session', '-t', session], (err, _out, stderr) => {
-      if (err)
-        return resolve({
-          ok: false,
-          error: stderr.toString() || err.message,
-        })
-      resolve({ ok: true })
-    })
-  })
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
+  }
+  return execTmuxMutation(tmux, ['kill-session', '-t', session])
 }
 
-function tmuxStart(workerId: string): Promise<{ ok: boolean; error?: string }> {
+async function tmuxStart(
+  workerId: string,
+  cardBinding: SessionCardOperationBinding,
+): Promise<{ ok: boolean; error?: string }> {
   const session = `swarm-${workerId}`
   const wrapper = join(homedir(), '.local', 'bin', workerId)
   if (!existsSync(wrapper))
@@ -548,23 +576,16 @@ function tmuxStart(workerId: string): Promise<{ ok: boolean; error?: string }> {
       error: 'tmux not available on this platform',
     })
   }
-  return new Promise((resolve) => {
-    execFile(
-      tmux,
-      ['new-session', '-d', '-s', session, wrapper],
-      (err, _out, stderr) => {
-        if (err)
-          return resolve({
-            ok: false,
-            error: stderr.toString() || err.message,
-          })
-        resolve({ ok: true })
-      },
-    )
-  })
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'Session Card lifecycle binding is unavailable' }
+  }
+  return execTmuxMutation(tmux, ['new-session', '-d', '-s', session, wrapper])
 }
 
-export async function renewWorker(workerId: string): Promise<{
+export async function renewWorker(
+  workerId: string,
+  cardBinding: SessionCardOperationBinding,
+): Promise<{
   ok: boolean
   restarted: boolean
   resumeSent: boolean
@@ -581,12 +602,18 @@ export async function renewWorker(workerId: string): Promise<{
       handoffPath: hp,
     }
   }
-  const killed = await stopWorkerProcess(workerId)
+  const killed = await stopWorkerProcess(workerId, cardBinding)
   if (!killed.ok) {
-    // Process may already be gone; continue.
+    return {
+      ok: false,
+      restarted: false,
+      resumeSent: false,
+      error: killed.error,
+      handoffPath: hp,
+    }
   }
   await new Promise((resolve) => setTimeout(resolve, 600))
-  const started = await startWorkerProcess(workerId)
+  const started = await startWorkerProcess(workerId, cardBinding)
   if (!started.ok)
     return {
       ok: false,
@@ -598,7 +625,7 @@ export async function renewWorker(workerId: string): Promise<{
   // Wait for shell prompt to appear before sending the resume message.
   await new Promise((resolve) => setTimeout(resolve, 1500))
   const resumePrompt = `RESUME_AFTER_HANDOFF. Read your latest handoff at ${hp} and the local copy under ~/.hermes/profiles/${workerId}/memory/handoffs/, plus your runtime.json, then continue from "Next exact action". Reply with a fresh checkpoint when you have re-grounded.`
-  const sent = await sendToWorker(workerId, resumePrompt)
+  const sent = await sendToWorker(workerId, resumePrompt, cardBinding)
   const ctx = readRuntimeMissionContext(workerId)
   try {
     appendSwarmMemoryEvent({
@@ -621,7 +648,12 @@ export async function renewWorker(workerId: string): Promise<{
   }
 }
 
-export async function autoSweepLifecycle(workerIds: Array<string>): Promise<
+export async function autoSweepLifecycle(
+  targets: Array<{
+    workerId: string
+    cardBinding: SessionCardOperationBinding
+  }>,
+): Promise<
   Array<{
     workerId: string
     action: 'none' | 'request-handoff' | 'renew'
@@ -635,10 +667,10 @@ export async function autoSweepLifecycle(workerIds: Array<string>): Promise<
     status: SwarmLifecycleStatus
     result?: { ok: boolean; error?: string }
   }> = []
-  for (const workerId of workerIds) {
+  for (const { workerId, cardBinding } of targets) {
     const status = getSwarmLifecycleStatus(workerId)
     if (status.contextState === 'handoff_required') {
-      const result = await requestWorkerHandoff(workerId)
+      const result = await requestWorkerHandoff(workerId, cardBinding)
       out.push({
         workerId,
         action: 'request-handoff',
@@ -649,7 +681,7 @@ export async function autoSweepLifecycle(workerIds: Array<string>): Promise<
       status.contextState === 'renew_required' &&
       status.handoffExists
     ) {
-      const result = await renewWorker(workerId)
+      const result = await renewWorker(workerId, cardBinding)
       out.push({
         workerId,
         action: 'renew',
@@ -660,7 +692,7 @@ export async function autoSweepLifecycle(workerIds: Array<string>): Promise<
       status.contextState === 'renew_required' &&
       !status.handoffExists
     ) {
-      const result = await requestWorkerHandoff(workerId)
+      const result = await requestWorkerHandoff(workerId, cardBinding)
       out.push({
         workerId,
         action: 'request-handoff',

@@ -5,6 +5,10 @@ import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
 
 /**
  * POST /api/swarm-tmux-scroll
@@ -17,7 +21,7 @@ import { requireLocalOrAuth } from '../../server/auth-middleware'
 
 type ScrollRequest = {
   workerId?: unknown
-  session?: unknown
+  cardBinding?: unknown
   direction?: unknown
   lines?: unknown
 }
@@ -76,8 +80,6 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
 
         const workerId =
           typeof body.workerId === 'string' ? body.workerId.trim() : ''
-        const requestedSession =
-          typeof body.session === 'string' ? body.session.trim() : ''
         const direction =
           body.direction === 'up' || body.direction === 'down'
             ? body.direction
@@ -88,13 +90,28 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
         if (!workerId || !validateWorkerId(workerId)) {
           return json({ error: 'workerId required' }, { status: 400 })
         }
-        if (requestedSession && !validateWorkerId(requestedSession)) {
-          return json({ error: 'invalid session' }, { status: 400 })
-        }
         if (!direction) {
           return json(
             { error: 'direction must be up or down' },
             { status: 400 },
+          )
+        }
+
+        const cardBinding = parseSessionCardOperationBinding(body.cardBinding, {
+          source: 'local',
+          transport: 'tmux',
+          canonicalSegmentKey: `local:${workerId}`,
+        })
+        if (!cardBinding) {
+          return json(
+            { error: 'Invalid Session Card scroll binding' },
+            { status: 400 },
+          )
+        }
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card scroll binding is unavailable' },
+            { status: 409 },
           )
         }
 
@@ -103,8 +120,14 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
           return json({ error: 'tmux not installed' }, { status: 503 })
         }
 
-        const session = requestedSession || `swarm-${workerId}`
+        const session = `swarm-${workerId}`
 
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card scroll binding is unavailable' },
+            { status: 409 },
+          )
+        }
         const enterCopy = await execFileAsync(tmuxBin, [
           'copy-mode',
           '-t',
@@ -115,6 +138,12 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
         }
 
         const cmd = direction === 'up' ? 'scroll-up' : 'scroll-down'
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card scroll binding is unavailable' },
+            { status: 409 },
+          )
+        }
         const scrolled = await execFileAsync(tmuxBin, [
           'send-keys',
           '-t',

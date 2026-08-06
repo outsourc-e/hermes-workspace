@@ -10,6 +10,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
+import { fetchExactSwarmWorkerCardBindings } from '@/lib/swarm-card-bindings'
 
 type WorkerResult = {
   workerId: string
@@ -52,12 +53,17 @@ export function SwarmCompose({
     setBusy(true)
     setError(null)
     try {
+      const cardBindings = await fetchExactSwarmWorkerCardBindings(roomIds)
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workerIds: roomIds,
-          prompt: prompt.trim(),
+          assignments: roomIds.map((workerId) => ({
+            workerId,
+            task: prompt.trim(),
+            rationale: 'Broadcast.',
+            cardBinding: cardBindings.get(workerId),
+          })),
           timeoutSeconds,
         }),
       })

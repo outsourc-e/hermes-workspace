@@ -19,6 +19,7 @@ import {
   recordMissionCheckpoint,
 } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
+import { resolveSessionCardOperationBindingByUpstream } from '../../server/session-card-operation-binding'
 import {
   publishSwarmActionPrompt,
   publishSwarmCheckpointNotification,
@@ -481,6 +482,17 @@ async function dispatchAssignments(
 ): Promise<unknown | null> {
   const merged = mergeAssignments(assignments)
   if (merged.length === 0) return null
+  const bindings = await Promise.all(
+    merged.map((assignment) =>
+      resolveSessionCardOperationBindingByUpstream({
+        source: 'local',
+        upstreamKey: assignment.workerId,
+      }),
+    ),
+  )
+  if (bindings.some((binding) => !binding)) {
+    return { ok: false, status: 409, error: 'Session Card ownership changed' }
+  }
   for (const assignment of merged)
     appendMissionContinuation({ missionId, ...assignment })
   const res = await fetch(new URL('/api/swarm-dispatch', request.url), {
@@ -492,7 +504,10 @@ async function dispatchAssignments(
         : {}),
     },
     body: JSON.stringify({
-      assignments: merged,
+      assignments: merged.map((assignment, index) => ({
+        ...assignment,
+        cardBinding: bindings[index],
+      })),
       timeoutSeconds: 90,
       missionId,
       waitForCheckpoint: true,

@@ -14,6 +14,9 @@ describe('RouterChat dispatch request', () => {
     const src = source()
 
     expect(src).toContain("fetch('/api/swarm-dispatch'")
+    expect(src).toContain('fetchExactSwarmWorkerCardBindings')
+    expect(src).toContain('cardBinding: cardBindings.get(assignment.workerId)')
+    expect(src).not.toContain('workerIds: plan')
     expect(src).toContain('waitForCheckpoint: false')
     expect(src).not.toContain('checkpointPollSeconds: 90')
   })

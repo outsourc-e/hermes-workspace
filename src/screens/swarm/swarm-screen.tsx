@@ -22,6 +22,7 @@ import { AgentCard } from '@/components/swarm/agent-card'
 import { WidgetRail } from '@/components/swarm/widget-rail'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
+import { fetchExactSwarmWorkerCardBindings } from '@/lib/swarm-card-bindings'
 
 const SWARM_ROOM_STORAGE_KEY = 'claude-swarm-room-v1'
 const WORKER_ID_PATTERN = /^(swarm\d+|[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/i
@@ -222,12 +223,21 @@ export function SwarmScreen() {
     setPinging(true)
     setPingResult(null)
     try {
+      const cardBinding = (
+        await fetchExactSwarmWorkerCardBindings([selectedId])
+      ).get(selectedId)
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workerIds: [selectedId],
-          prompt: `Reply with exactly: ${selectedId.toUpperCase()}_PING_OK`,
+          assignments: [
+            {
+              workerId: selectedId,
+              task: `Reply with exactly: ${selectedId.toUpperCase()}_PING_OK`,
+              rationale: 'Card-bound health probe.',
+              cardBinding,
+            },
+          ],
           timeoutSeconds: 60,
         }),
       })

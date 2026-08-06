@@ -6,6 +6,10 @@ import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
+import {
   newestCheckpointFromMessages,
   parseSwarmCheckpoint,
 } from '../../server/swarm-checkpoints'
@@ -24,6 +28,7 @@ import {
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 import type { SwarmRosterWorker } from '../../server/swarm-roster'
 import type { ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 
@@ -48,6 +53,7 @@ function resolveHermesBin(): string {
 type AssignmentRequest = {
   workerId: string
   task: string
+  cardBinding: SessionCardOperationBinding
   rationale?: string
   assignmentId?: string
   dependsOn?: Array<string>
@@ -260,17 +266,28 @@ function parseAssignments(value: unknown): Array<AssignmentRequest> {
       typeof obj.rationale === 'string' ? obj.rationale.trim() : undefined
     const dependsOn = Array.isArray(obj.dependsOn)
       ? obj.dependsOn.filter(
-          (value): value is string =>
-            typeof value === 'string' && value.trim().length > 0,
+          (dependency): dependency is string =>
+            typeof dependency === 'string' && dependency.trim().length > 0,
         )
       : undefined
     const reviewRequired =
       typeof obj.reviewRequired === 'boolean' ? obj.reviewRequired : undefined
     const direct = typeof obj.direct === 'boolean' ? obj.direct : undefined
-    if (!workerId || !task || !validateWorkerId(workerId)) continue
+    if (!workerId || !task || !validateWorkerId(workerId)) {
+      throw new SwarmDispatchError('Invalid assignment')
+    }
+    const cardBinding = parseSessionCardOperationBinding(obj.cardBinding, {
+      source: 'local',
+      transport: 'tmux',
+      canonicalSegmentKey: `local:${workerId}`,
+    })
+    if (!cardBinding) {
+      throw new SwarmDispatchError('Invalid Session Card dispatch binding')
+    }
     assignments.push({
       workerId,
       task,
+      cardBinding,
       rationale,
       dependsOn,
       reviewRequired,
@@ -743,8 +760,9 @@ function redactStartupOutput(output: string): string {
     .replace(/(gh[pousr]_[A-Za-z0-9_]{12,})/g, '[REDACTED]')
 }
 
-async function ensureLiveTmuxSession(
+export async function ensureLiveTmuxSession(
   workerId: string,
+  cardBinding: SessionCardOperationBinding,
 ): Promise<
   | { ok: true; tmuxBin: string; sessionName: string }
   | { ok: false; error: string }
@@ -767,6 +785,9 @@ async function ensureLiveTmuxSession(
     ghToken: resolveGithubToken(),
   })
 
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'Session Card dispatch binding is unavailable' }
+  }
   const started = await execFileAsync(tmuxBin, [
     'new-session',
     '-d',
@@ -779,6 +800,9 @@ async function ensureLiveTmuxSession(
     return { ok: false, error: started.error }
   }
 
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'Session Card dispatch binding is unavailable' }
+  }
   const launched = await execFileAsync(tmuxBin, [
     'send-keys',
     '-t',
@@ -825,12 +849,13 @@ async function ensureLiveTmuxSession(
   return { ok: true, tmuxBin, sessionName }
 }
 
-async function sendPromptToLiveSession(
+export async function sendPromptToLiveSession(
   workerId: string,
   prompt: string,
+  cardBinding: SessionCardOperationBinding,
 ): Promise<WorkerResult | null> {
   const startedAt = Date.now()
-  const ensured = await ensureLiveTmuxSession(workerId)
+  const ensured = await ensureLiveTmuxSession(workerId, cardBinding)
   if (!ensured.ok) return null
 
   const { tmuxBin, sessionName } = ensured
@@ -840,6 +865,9 @@ async function sendPromptToLiveSession(
   // reliable for live TUI delivery because it preserves multiline content and
   // avoids key translation/terminal timing issues. Enter submits the composed
   // prompt after paste.
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return null
+  }
   const loaded = await execFileAsync(
     tmuxBin,
     ['load-buffer', '-b', `swarm-dispatch-${workerId}`, '-'],
@@ -861,6 +889,9 @@ async function sendPromptToLiveSession(
   // Ensure we are sending a fresh prompt, not appending onto a partially typed
   // line left in the agent TUI. Ctrl-U clears readline-style input in the
   // current prompt without disrupting the session.
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return null
+  }
   const cleared = await execFileAsync(tmuxBin, [
     'send-keys',
     '-t',
@@ -879,6 +910,9 @@ async function sendPromptToLiveSession(
     }
   }
 
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return null
+  }
   const pasted = await execFileAsync(tmuxBin, [
     'paste-buffer',
     '-d',
@@ -904,6 +938,9 @@ async function sendPromptToLiveSession(
   // to accept Enter; sending a confirmation Enter shortly after the first one
   // prevents the user-visible failure mode where the task sits at the prompt.
   await sleep(2000)
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return null
+  }
   const enter = await execFileAsync(tmuxBin, [
     'send-keys',
     '-t',
@@ -922,6 +959,9 @@ async function sendPromptToLiveSession(
     }
   }
   await sleep(1000)
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return null
+  }
   const confirmEnter = await execFileAsync(tmuxBin, [
     'send-keys',
     '-t',
@@ -1030,7 +1070,11 @@ function runWorker(
       const wrapperPath = getWrapperPath(workerId)
 
       // Prefer the persistent live agent session when available/startable.
-      const liveResult = await sendPromptToLiveSession(workerId, prompt)
+      const liveResult = await sendPromptToLiveSession(
+        workerId,
+        prompt,
+        assignment.cardBinding,
+      )
       if (liveResult) {
         markDispatchResult(workerId, liveResult)
         if (options?.waitForCheckpoint && liveResult.ok) {
@@ -1139,6 +1183,22 @@ function runWorker(
         env.GITHUB_TOKEN = ghToken
       }
 
+      if (
+        !(await resolveExactSessionCardOperationBinding(assignment.cardBinding))
+      ) {
+        const result: WorkerResult = {
+          workerId,
+          ok: false,
+          output: '',
+          error: 'Session Card dispatch binding is unavailable',
+          durationMs: Date.now() - startedAt,
+          exitCode: null,
+          delivery: 'oneshot',
+        }
+        markDispatchResult(workerId, result)
+        resolve(result)
+        return
+      }
       const proc = execFile(
         cmd,
         args,
@@ -1267,24 +1327,16 @@ export class SwarmDispatchError extends Error {
 
 export async function dispatchSwarmAssignments(body: DispatchRequest) {
   let assignments = parseAssignments(body.assignments)
-  const promptRaw = typeof body.prompt === 'string' ? body.prompt : ''
-  const prompt = promptRaw.trim()
-  if (assignments.length === 0) {
-    const workerIdsRaw = Array.isArray(body.workerIds) ? body.workerIds : []
-    const workerIds = workerIdsRaw
-      .filter((value): value is string => typeof value === 'string')
-      .map((value) => value.trim())
-      .filter((value) => value.length > 0 && validateWorkerId(value))
-    assignments = workerIds.map((workerId) => ({
-      workerId,
-      task: prompt,
-      rationale: 'Legacy broadcast dispatch.',
-      direct: body.direct === true,
-    }))
+  if (Object.prototype.hasOwnProperty.call(body, 'workerIds')) {
+    throw new SwarmDispatchError(
+      'Raw workerIds dispatch is unsupported; assignments[] with exact Session Card bindings required',
+    )
   }
 
   if (assignments.length === 0) {
-    throw new SwarmDispatchError('assignments[] or workerIds[] required')
+    throw new SwarmDispatchError(
+      'assignments[] with exact Session Card bindings required',
+    )
   }
   if (assignments.length > 12) {
     throw new SwarmDispatchError('Maximum 12 workers per dispatch')
@@ -1297,6 +1349,17 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
   ) {
     throw new SwarmDispatchError(
       `assignment task exceeds ${MAX_PROMPT_CHARS} characters`,
+    )
+  }
+  const currentBindings = await Promise.all(
+    assignments.map((assignment) =>
+      resolveExactSessionCardOperationBinding(assignment.cardBinding),
+    ),
+  )
+  if (currentBindings.some((owner) => !owner)) {
+    throw new SwarmDispatchError(
+      'Session Card dispatch binding is unavailable',
+      409,
     )
   }
 
