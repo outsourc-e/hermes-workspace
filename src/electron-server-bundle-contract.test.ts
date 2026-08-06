@@ -101,9 +101,8 @@ describe('checked-in Electron production server bundle', () => {
     ]) {
       const mutationEdge = mutationPattern.exec(route)?.index ?? -1
       const revalidation =
-        edgeRevalidations
-          .filter((match) => (match.index ?? -1) < mutationEdge)
-          .at(-1)?.index ?? -1
+        edgeRevalidations.filter((match) => match.index < mutationEdge).at(-1)
+          ?.index ?? -1
       const immediatelyBeforeMutation = route.slice(revalidation, mutationEdge)
 
       expect(mutationEdge).toBeGreaterThanOrEqual(0)
