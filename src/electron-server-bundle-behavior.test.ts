@@ -128,6 +128,7 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
   },
   setMissionStorePath(path) {
     SWARM_MISSIONS_PATH = path;
+    SWARM_MISSIONS_LOCK_PATH = path + '.lock';
   },
   writeMessageJournal(...args) {
     return writeMessageJournal(...args);
@@ -194,7 +195,8 @@ const artifact = loadExecutableElectronArtifact()
 const artifactStateDir = mkdtempSync(
   resolve(process.cwd(), '.electron-artifact-state-'),
 )
-const missionStorePath = resolve(artifactStateDir, 'swarm-missions.json')
+const missionStoreRuntimeDir = resolve(artifactStateDir, 'runtime')
+const missionStorePath = resolve(missionStoreRuntimeDir, 'swarm-missions.json')
 const localCardId = 'local:builder-card'
 const localSegmentKey = 'local:builder'
 const localCardBinding = {
@@ -594,7 +596,7 @@ describe('checked-in Electron server bundle behavior', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    rmSync(missionStorePath, { force: true })
+    rmSync(missionStoreRuntimeDir, { recursive: true, force: true })
     artifact.__artifactContract.setMissionStorePath(missionStorePath)
     swarmActions.dispatchSwarmAssignments.mockResolvedValue({})
     swarmActions.dispatchPromptToLiveSession.mockResolvedValue({
@@ -1043,6 +1045,36 @@ describe('checked-in Electron server bundle behavior', () => {
         ],
       },
     ])
+  })
+
+  it('creates a clean mission runtime before native mission behavior', async () => {
+    expect(existsSync(missionStoreRuntimeDir)).toBe(false)
+    const missionId = 'artifact-clean-runtime-stop'
+    expect(seedNativeMission(missionId)).not.toBeNull()
+    artifact.__artifactContract.replaceSessionCardService({
+      resolveCard: vi.fn().mockResolvedValue(resolvedLocalCard()),
+      resolveChildCard: vi.fn(),
+      resolveLocalCardByUpstreamSession: vi.fn(),
+      resolveRemoteCardByUpstreamSession: vi.fn(),
+      observeCardActivity: vi.fn().mockResolvedValue(null),
+      observeChildLifecycle: vi.fn().mockResolvedValue(null),
+    })
+
+    const response = await artifact.default.fetch(
+      conductorStopRequest(missionId),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      cancelledNativeMissions: 1,
+    })
+    expect(readMissionStore().missions[0]).toMatchObject({
+      id: missionId,
+      state: 'cancelled',
+      assignments: [{ workerId: 'builder', state: 'cancelled' }],
+    })
+    expect(existsSync(`${missionStorePath}.lock`)).toBe(false)
   })
 
   it('durably compensates native Conductor admission when a later worker Card is unavailable', async () => {
