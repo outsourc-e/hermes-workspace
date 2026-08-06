@@ -822,25 +822,6 @@ function remoteControlKeyForPrefix(
   return shortestMatches[0]!.slice('remote:'.length) || null
 }
 
-function activityMatchesTransientControl(
-  activity: ConductorCardActivity,
-  sessionKeys: ReadonlySet<string>,
-): boolean {
-  for (const sessionKey of sessionKeys) {
-    const normalized = sessionKey.trim()
-    if (!normalized) continue
-    if (normalized.startsWith('remote:') || normalized.startsWith('local:')) {
-      if (activity.identityAliases.includes(normalized)) return true
-      continue
-    }
-    // Dashboard Conductor returns upstream gateway keys. Compare those only to
-    // the authoritative remote-qualified Card aliases; local identities must
-    // already arrive qualified so same-key local/remote Cards cannot collide.
-    if (activity.identityAliases.includes(`remote:${normalized}`)) return true
-  }
-  return false
-}
-
 function activityMatchesCardOwner(
   activity: ConductorCardActivity,
   owners: ReadonlyArray<PersistedConductorCardOwner>,
@@ -850,6 +831,56 @@ function activityMatchesCardOwner(
       owner.cardId === activity.cardId &&
       owner.parentCardId === activity.parentCardId,
   )
+}
+
+function projectUniqueActivityForIdentity(
+  activities: ReadonlyArray<ConductorCardActivity>,
+  identity: string,
+): ConductorCardActivity | null {
+  const normalized = identity.trim()
+  if (!normalized) return null
+  const qualified =
+    normalized.startsWith('remote:') || normalized.startsWith('local:')
+      ? normalized
+      : `remote:${normalized}`
+  const matches = activities.filter((activity) =>
+    activity.identityAliases.includes(qualified),
+  )
+  return matches.length === 1 ? matches[0]! : null
+}
+
+/**
+ * A stream event can suggest a successor transport, but only the mission-bound
+ * identity returned by the spawn/status API is an ownership anchor. The
+ * candidate is trusted only when a complete Card projection proves both
+ * identities are aliases of the same exact Card owner.
+ */
+export function resolveAuthoritativeConductorCardOwner(
+  response: SessionCardListWire | undefined,
+  missionIdentity: string,
+  candidateIdentity: string,
+): (PersistedConductorCardOwner & { sessionKey: string }) | null {
+  const activities = projectSessionCardActivities(response)
+  const anchor = projectUniqueActivityForIdentity(activities, missionIdentity)
+  const candidate = projectUniqueActivityForIdentity(
+    activities,
+    candidateIdentity,
+  )
+  if (
+    !anchor ||
+    !candidate ||
+    anchor.cardId !== candidate.cardId ||
+    anchor.parentCardId !== candidate.parentCardId
+  ) {
+    return null
+  }
+  const sessionKey = remoteControlKey(candidate)
+  if (!sessionKey) return null
+  return {
+    cardId: candidate.cardId,
+    ...(candidate.parentCardId ? { parentCardId: candidate.parentCardId } : {}),
+    sessionKey,
+  }
 }
 
 function validatePersistedMissionCardOwnership(
@@ -1397,9 +1428,12 @@ export function useConductorGateway() {
   const [missionJobId, setMissionJobId] = useState<string | null>(null)
   const [phase, setPhase] = useState<MissionPhase>('idle')
   const [goal, setGoal] = useState('')
-  const [orchestratorSessionKey, setOrchestratorSessionKey] = useState<
-    string | null
-  >(null)
+  // A stream/header candidate remains pending and is never persisted or used for
+  // control until the exact mission-bound Card projection authorizes it.
+  const [pendingOrchestratorSessionKey, setPendingOrchestratorSessionKey] =
+    useState<string | null>(null)
+  const [orchestratorMissionIdentity, setOrchestratorMissionIdentity] =
+    useState<string | null>(null)
   const [orchestratorCardId, setOrchestratorCardId] = useState<string | null>(
     null,
   )
@@ -1414,9 +1448,6 @@ export function useConductorGateway() {
   const [completedAt, setCompletedAt] = useState<string | null>(null)
   const [streamError, setStreamError] = useState<string | null>(null)
   const [timeoutWarning, setTimeoutWarning] = useState(false)
-  const [missionWorkerKeys, setMissionWorkerKeys] = useState<Set<string>>(
-    () => new Set(),
-  )
   const [missionCardOwners, setMissionCardOwners] = useState<
     Array<PersistedConductorCardOwner>
   >([])
@@ -1486,15 +1517,6 @@ export function useConductorGateway() {
     setPauseStartedAt(validated.pauseStartedAt)
     setOrchestratorCardId(validated.orchestratorCardId)
     setMissionCardOwners(validated.workerCards)
-    setMissionWorkerKeys(
-      new Set(
-        cardActivities
-          .filter((activity) =>
-            activityMatchesCardOwner(activity, validated.workerCards),
-          )
-          .map((activity) => activity.canonicalSegmentKey),
-      ),
-    )
     setCompletedAt(validated.completedAt)
     setTasks(validated.tasks.map((task) => ({ ...task, output: null })))
     doneRef.current = validated.phase === 'complete'
@@ -1540,7 +1562,6 @@ export function useConductorGateway() {
       .filter(
         (activity) =>
           activityMatchesCardOwner(activity, missionCardOwners) ||
-          activityMatchesTransientControl(activity, missionWorkerKeys) ||
           (Boolean(activity.parentCardId) &&
             missionCardOwners.some(
               (owner) => owner.cardId === activity.parentCardId,
@@ -1556,7 +1577,7 @@ export function useConductorGateway() {
           new Date(left.updatedAt ?? 0).getTime()
         )
       })
-  }, [cardActivities, missionCardOwners, missionWorkerKeys, phase])
+  }, [cardActivities, missionCardOwners, phase])
 
   useEffect(() => {
     if (sessionWorkers.length === 0) return
@@ -1578,15 +1599,38 @@ export function useConductorGateway() {
   }, [sessionWorkers])
 
   useEffect(() => {
-    if (!orchestratorSessionKey) return
-    const activity = cardActivities.find((candidate) =>
-      activityMatchesTransientControl(
-        candidate,
-        new Set([orchestratorSessionKey]),
-      ),
+    if (!orchestratorMissionIdentity || !pendingOrchestratorSessionKey) return
+    const owner = resolveAuthoritativeConductorCardOwner(
+      sessionCardsQuery.data,
+      orchestratorMissionIdentity,
+      pendingOrchestratorSessionKey,
     )
-    if (activity) setOrchestratorCardId(activity.cardId)
-  }, [cardActivities, orchestratorSessionKey])
+    if (!owner) return
+
+    setOrchestratorCardId(owner.cardId)
+    setMissionCardOwners((current) => {
+      const exactOwner = owner.parentCardId
+        ? { cardId: owner.cardId, parentCardId: owner.parentCardId }
+        : { cardId: owner.cardId }
+      if (
+        current.some(
+          (candidate) =>
+            candidate.cardId === exactOwner.cardId &&
+            candidate.parentCardId === exactOwner.parentCardId,
+        )
+      ) {
+        return current
+      }
+      return [
+        ...current.filter((candidate) => candidate.cardId !== owner.cardId),
+        exactOwner,
+      ]
+    })
+  }, [
+    orchestratorMissionIdentity,
+    pendingOrchestratorSessionKey,
+    sessionCardsQuery.data,
+  ])
 
   // For native-swarm missions, build virtual worker cards from the mission
   // assignments so the UI shows progress instead of "Spawning workers..." forever.
@@ -1712,13 +1756,8 @@ export function useConductorGateway() {
     const missionLog = formatMissionLog(lines)
 
     if (realSessionKey) {
-      setOrchestratorSessionKey(realSessionKey)
-      setMissionWorkerKeys((current) => {
-        if (current.has(realSessionKey)) return current
-        const next = new Set(current)
-        next.add(realSessionKey)
-        return next
-      })
+      setOrchestratorMissionIdentity((current) => current ?? realSessionKey)
+      setPendingOrchestratorSessionKey(realSessionKey)
       setPlanText((current) =>
         current && !current.startsWith('Conductor mission')
           ? current
@@ -2122,7 +2161,8 @@ export function useConductorGateway() {
     setMissionJobId(null)
     setPhase('idle')
     setGoal('')
-    setOrchestratorSessionKey(null)
+    setPendingOrchestratorSessionKey(null)
+    setOrchestratorMissionIdentity(null)
     setOrchestratorCardId(null)
     setStreamText('')
     setPlanText('')
@@ -2137,7 +2177,6 @@ export function useConductorGateway() {
     setAccumulatedPausedMs(0)
     setPauseStartedAt(null)
     setCompletedAt(null)
-    setMissionWorkerKeys(new Set())
     setMissionCardOwners([])
     setWorkerOutputs({})
     setWorkerOutputStatuses({})
@@ -2164,7 +2203,8 @@ export function useConductorGateway() {
       setGoal(trimmed)
       setMissionId(null)
       setMissionJobId(null)
-      setOrchestratorSessionKey(null)
+      setPendingOrchestratorSessionKey(null)
+      setOrchestratorMissionIdentity(null)
       setOrchestratorCardId(null)
       setStreamText('')
       setPlanText('')
@@ -2175,7 +2215,6 @@ export function useConductorGateway() {
       setPausedElapsedMs(0)
       setAccumulatedPausedMs(0)
       setPauseStartedAt(null)
-      setMissionWorkerKeys(new Set())
       setMissionCardOwners([])
       setWorkerOutputs({})
       setTasks([])
@@ -2233,13 +2272,8 @@ export function useConductorGateway() {
         const portableFriendlyId = result.jobName?.trim() || portableSessionKey
         setMissionId(null)
         setMissionJobId(null)
-        setOrchestratorSessionKey(portableSessionKey)
-        setMissionWorkerKeys((current) => {
-          if (current.has(portableSessionKey)) return current
-          const next = new Set(current)
-          next.add(portableSessionKey)
-          return next
-        })
+        setOrchestratorMissionIdentity(portableSessionKey)
+        setPendingOrchestratorSessionKey(portableSessionKey)
         setPlanText(
           'Conductor portable mission launched. Streaming orchestrator output...',
         )
@@ -2256,13 +2290,7 @@ export function useConductorGateway() {
             model: settings.orchestratorModel || undefined,
             signal: abortController.signal,
             onSessionResolved: (resolvedSessionKey) => {
-              setOrchestratorSessionKey(resolvedSessionKey)
-              setMissionWorkerKeys((current) => {
-                if (current.has(resolvedSessionKey)) return current
-                const next = new Set(current)
-                next.add(resolvedSessionKey)
-                return next
-              })
+              setPendingOrchestratorSessionKey(resolvedSessionKey)
               lastActivityAtRef.current = Date.now()
               setTimeoutWarning(false)
             },
@@ -2302,7 +2330,7 @@ export function useConductorGateway() {
         const spawnedMissionId = result.missionId ?? null
         setMissionId(spawnedMissionId)
         setMissionJobId(result.jobId ?? null)
-        setOrchestratorSessionKey(null)
+        setPendingOrchestratorSessionKey(null)
         setPlanText(
           result.assignments?.length
             ? `Native swarm mission launched with ${result.assignments.length} workers. Watching for swarm activity...`
@@ -2328,13 +2356,8 @@ export function useConductorGateway() {
       const orchestratorKey = result.sessionKey ?? null
       const prefix = result.sessionKeyPrefix
       if (orchestratorKey) {
-        setOrchestratorSessionKey(orchestratorKey)
-        setMissionWorkerKeys((current) => {
-          if (current.has(orchestratorKey)) return current
-          const next = new Set(current)
-          next.add(orchestratorKey)
-          return next
-        })
+        setOrchestratorMissionIdentity(orchestratorKey)
+        setPendingOrchestratorSessionKey(orchestratorKey)
       }
 
       if (prefix) {
@@ -2346,13 +2369,8 @@ export function useConductorGateway() {
               const cards = await fetchSessionCards()
               const matchedKey = remoteControlKeyForPrefix(cards, prefix)
               if (matchedKey) {
-                setOrchestratorSessionKey(matchedKey)
-                setMissionWorkerKeys((current) => {
-                  const next = new Set(current)
-                  if (orchestratorKey) next.delete(orchestratorKey)
-                  next.add(matchedKey)
-                  return next
-                })
+                setOrchestratorMissionIdentity(matchedKey)
+                setPendingOrchestratorSessionKey(matchedKey)
                 return
               }
             } catch {
@@ -2435,31 +2453,85 @@ export function useConductorGateway() {
   })
 
   const stopMission = async () => {
-    portableStreamAbortRef.current?.abort()
-    portableStreamAbortRef.current = null
+    const ownedActivities = cardActivities.filter((activity) =>
+      activityMatchesCardOwner(activity, missionCardOwners),
+    )
     const sessionKeys = [
-      ...new Set([
-        ...missionWorkerKeys,
-        ...cardActivities
-          .filter((activity) =>
-            activityMatchesCardOwner(activity, missionCardOwners),
-          )
+      ...new Set(
+        ownedActivities
           .map(remoteControlKey)
           .filter((key): key is string => Boolean(key)),
-      ]),
+      ),
     ]
     const missionIds = missionId ? [missionId] : []
 
+    if (sessionKeys.length === 0 && missionIds.length === 0) {
+      setStreamError(
+        'Mission stop incomplete; retry Stop. No authoritative mission ownership is available yet.',
+      )
+      return
+    }
+
     try {
-      await fetch('/api/conductor-stop', {
+      const response = await fetch('/api/conductor-stop', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sessionKeys, missionIds }),
       })
-    } catch {
-      // Best effort cleanup.
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean
+        error?: string
+        failures?: Array<{ operation?: string; id?: string; error?: string }>
+      }
+      if (!response.ok || payload.ok !== true) {
+        const failures = payload.failures ?? []
+        if (failures.length > 0) {
+          const failedSessionKeys = new Set(
+            failures
+              .filter((failure) => failure.operation === 'delete-session')
+              .map((failure) => failure.id)
+              .filter((id): id is string => Boolean(id)),
+          )
+          const successfulSessionKeys = new Set(
+            sessionKeys.filter((key) => !failedSessionKeys.has(key)),
+          )
+          const retainedOwners = missionCardOwners.filter((owner) => {
+            const activity = ownedActivities.find(
+              (candidate) =>
+                candidate.cardId === owner.cardId &&
+                candidate.parentCardId === owner.parentCardId,
+            )
+            const key = activity ? remoteControlKey(activity) : null
+            return !key || !successfulSessionKeys.has(key)
+          })
+          setMissionCardOwners(retainedOwners)
+          setOrchestratorCardId((current) =>
+            current && retainedOwners.some((owner) => owner.cardId === current)
+              ? current
+              : null,
+          )
+        }
+        const detail =
+          failures.length > 0
+            ? failures
+                .map((failure) =>
+                  [failure.operation, failure.id, failure.error]
+                    .filter(Boolean)
+                    .join(' '),
+                )
+                .join('; ')
+            : payload.error || `Stop request failed (${response.status})`
+        setStreamError(`Mission stop incomplete; retry Stop. ${detail}`)
+        return
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      setStreamError(`Mission stop incomplete; retry Stop. ${detail}`)
+      return
     }
 
+    portableStreamAbortRef.current?.abort()
+    portableStreamAbortRef.current = null
     // Transition to complete with error instead of clearing — so it shows as failed in activity
     setStreamError('Mission stopped by user')
     setIsPaused(false)

@@ -3,7 +3,10 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { deleteSession } from '../../server/claude-api'
-import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
+import {
+  dashboardFetch,
+  ensureGatewayProbed,
+} from '../../server/gateway-capabilities'
 import { cancelSwarmMission } from '../../server/swarm-missions'
 import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 
@@ -18,25 +21,46 @@ export const Route = createFileRoute('/api/conductor-stop')({
         if (csrfCheck) return csrfCheck
 
         try {
-          const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
+          const body = (await request.json().catch(() => ({}))) as Record<
+            string,
+            unknown
+          >
           const sessionKeys = Array.isArray(body.sessionKeys)
-            ? body.sessionKeys.filter(
-                (value): value is string =>
-                  typeof value === 'string' && value.trim().length > 0,
+            ? Array.from(
+                new Set(
+                  body.sessionKeys
+                    .filter(
+                      (value): value is string =>
+                        typeof value === 'string' && value.trim().length > 0,
+                    )
+                    .map((value) => value.trim()),
+                ),
               )
             : []
           const missionIds = Array.isArray(body.missionIds)
-            ? body.missionIds.filter(
-                (value): value is string =>
-                  typeof value === 'string' && value.trim().length > 0,
+            ? Array.from(
+                new Set(
+                  body.missionIds
+                    .filter(
+                      (value): value is string =>
+                        typeof value === 'string' && value.trim().length > 0,
+                    )
+                    .map((value) => value.trim()),
+                ),
               )
             : []
 
           let deleted = 0
           let stoppedMissions = 0
           let cancelledNativeMissions = 0
+          const failures: Array<{
+            operation: 'delete-session' | 'stop-mission'
+            id: string
+            error: string
+          }> = []
           const capabilities = await ensureGatewayProbed()
           for (const missionId of missionIds) {
+            let nativeError: string | null = null
             try {
               const cancelled = cancelSwarmMission({
                 missionId,
@@ -45,7 +69,13 @@ export const Route = createFileRoute('/api/conductor-stop')({
               })
               if (cancelled) {
                 cancelledNativeMissions += 1
-                for (const workerId of Array.from(new Set(cancelled.mission.assignments.map((assignment) => assignment.workerId)))) {
+                for (const workerId of Array.from(
+                  new Set(
+                    cancelled.mission.assignments.map(
+                      (assignment) => assignment.workerId,
+                    ),
+                  ),
+                )) {
                   try {
                     resetSwarmWorkerRuntime(workerId, {
                       actor: 'conductor-stop',
@@ -57,7 +87,9 @@ export const Route = createFileRoute('/api/conductor-stop')({
                 }
                 continue
               }
-            } catch {
+            } catch (error) {
+              nativeError =
+                error instanceof Error ? error.message : String(error)
               // Fall through to dashboard cleanup.
             }
 
@@ -67,10 +99,31 @@ export const Route = createFileRoute('/api/conductor-stop')({
                   `/api/conductor/missions/${encodeURIComponent(missionId)}`,
                   { method: 'DELETE' },
                 )
-                if (res.ok) stoppedMissions += 1
-              } catch {
-                // Ignore per-mission stop errors so session cleanup still runs.
+                if (res.ok) {
+                  stoppedMissions += 1
+                } else {
+                  const detail = await res.text().catch(() => '')
+                  failures.push({
+                    operation: 'stop-mission',
+                    id: missionId,
+                    error: detail || `HTTP ${res.status}`,
+                  })
+                }
+              } catch (error) {
+                failures.push({
+                  operation: 'stop-mission',
+                  id: missionId,
+                  error: error instanceof Error ? error.message : String(error),
+                })
               }
+            } else {
+              failures.push({
+                operation: 'stop-mission',
+                id: missionId,
+                error:
+                  nativeError ||
+                  'Conductor mission stop capability unavailable',
+              })
             }
           }
 
@@ -78,12 +131,25 @@ export const Route = createFileRoute('/api/conductor-stop')({
             try {
               await deleteSession(sessionKey)
               deleted += 1
-            } catch {
-              // Ignore per-session delete errors so one bad key doesn't block the rest.
+            } catch (error) {
+              failures.push({
+                operation: 'delete-session',
+                id: sessionKey,
+                error: error instanceof Error ? error.message : String(error),
+              })
             }
           }
 
-          return json({ ok: true, deleted, stoppedMissions, cancelledNativeMissions })
+          return json(
+            {
+              ok: failures.length === 0,
+              deleted,
+              stoppedMissions,
+              cancelledNativeMissions,
+              failures,
+            },
+            { status: failures.length === 0 ? 200 : 502 },
+          )
         } catch (error) {
           return json(
             {

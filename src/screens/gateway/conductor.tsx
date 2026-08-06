@@ -3031,6 +3031,14 @@ export function Conductor() {
               </button>
             </div>
           </section>
+          {conductor.streamError && (
+            <section
+              role="alert"
+              className="rounded-2xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-5 py-4 text-sm text-[var(--theme-danger)]"
+            >
+              {conductor.streamError}
+            </section>
+          )}
           {conductor.timeoutWarning && (
             <section className="rounded-2xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-5 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

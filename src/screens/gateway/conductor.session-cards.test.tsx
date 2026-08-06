@@ -515,6 +515,110 @@ describe('mounted /conductor Session Card inventory', () => {
     ])
   })
 
+  it('retains durable Card ownership and stays retryable when stop is only partially successful', async () => {
+    localStorage.setItem(
+      'conductor:active-mission',
+      JSON.stringify(persistedMissionV3()),
+    )
+    let stopBody: { sessionKeys?: Array<string> } = {}
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      const url = String(input)
+      if (url === '/api/conductor-stop') {
+        stopBody = JSON.parse(String(init?.body)) as {
+          sessionKeys?: Array<string>
+        }
+        return Promise.resolve(
+          Response.json(
+            {
+              ok: false,
+              deleted: 1,
+              failures: [
+                {
+                  operation: 'delete-session',
+                  id: 'delegated-worker-tip',
+                  error: 'gateway delete failed',
+                },
+              ],
+            },
+            { status: 502 },
+          ),
+        )
+      }
+      if (url.includes('/history')) {
+        return Promise.resolve(
+          Response.json({
+            completeness: 'incomplete',
+            retryable: true,
+            messages: [],
+            missingSegments: [],
+          }),
+        )
+      }
+      return Promise.resolve(Response.json(mocks.cardResponse))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await renderConductor()
+    await React.act(async () => {
+      await Promise.resolve()
+      fireEvent.click(screen.getByRole('button', { name: /stop mission/i }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(stopBody.sessionKeys).toEqual(
+      expect.arrayContaining(['shared-runtime-key', 'delegated-worker-tip']),
+    )
+    expect(stopBody.sessionKeys).not.toContain('raw-incomplete-session')
+    expect(
+      screen.getByText(/Mission stop incomplete; retry Stop/),
+    ).not.toBeNull()
+    expect(screen.getByRole('button', { name: /stop mission/i })).not.toBeNull()
+
+    const persisted = localStorage.getItem('conductor:active-mission')
+    expect(persisted).not.toBeNull()
+    expect(JSON.parse(persisted ?? '{}').workerCards).toEqual([
+      {
+        cardId: 'remote:delegated-worker',
+        parentCardId: 'remote:shared-worker',
+      },
+    ])
+    expect(persisted).not.toContain('raw-incomplete-session')
+  })
+
+  it('stays retryable instead of completing when no authoritative stop target is projected', async () => {
+    localStorage.setItem(
+      'conductor:active-mission',
+      JSON.stringify(
+        persistedMissionV3({
+          orchestratorCardId: null,
+          workerCards: [],
+        }),
+      ),
+    )
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(Response.json(mocks.cardResponse)),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await renderConductor()
+    await React.act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /stop mission/i }))
+      await Promise.resolve()
+    })
+
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes('/api/conductor-stop'),
+      ),
+    ).toBe(false)
+    expect(
+      screen.getByText(/No authoritative mission ownership is available yet/),
+    ).not.toBeNull()
+    expect(screen.getByRole('button', { name: /stop mission/i })).not.toBeNull()
+    expect(localStorage.getItem('conductor:active-mission')).not.toBeNull()
+  })
+
   it('renders worker output from complete non-retryable Card history', async () => {
     localStorage.setItem(
       'conductor:active-mission',

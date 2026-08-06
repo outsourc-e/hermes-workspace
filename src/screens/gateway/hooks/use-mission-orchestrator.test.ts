@@ -4,6 +4,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { onFeedEvent } from '../components/feed-event-bus'
 import {
   resolveAuthoritativeGatewayTransport,
   useMissionOrchestrator,
@@ -272,6 +273,8 @@ describe('authoritative Mission gateway transport', () => {
   })
 
   it('refreshes successor transport before steer, pause, and kill while preserving ownership on kill failure', async () => {
+    const feedMessages: Array<string> = []
+    const unsubscribe = onFeedEvent((event) => feedMessages.push(event.message))
     startStoreMission()
     const initialCards = projection('remote:root-a')
     useMissionStore
@@ -328,7 +331,15 @@ describe('authoritative Mission gateway transport', () => {
     expect(useMissionStore.getState().agentCardIdMap).toEqual({
       'agent-1': ROOT_CARD_ID,
     })
+    expect(useMissionStore.getState().agentCardStatus['agent-1']).toMatchObject(
+      {
+        status: 'error',
+        lastMessage: 'Failed to stop agent; Card ownership was preserved',
+      },
+    )
+    expect(feedMessages).toContain('Agent 1 could not be stopped')
 
+    unsubscribe()
     harness.unmount()
   })
 

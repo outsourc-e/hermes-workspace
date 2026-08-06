@@ -33,8 +33,8 @@ function checkpoint(
       },
     ],
     tasks: [],
-    agentCardIdMap: { 'agent-1': 'card-child' },
-    agentParentCardIdMap: { 'agent-1': 'card-root' },
+    agentCardIdMap: { 'agent-1': 'remote:card-child' },
+    agentParentCardIdMap: { 'agent-1': 'remote:card-root' },
     agentCardTitleMap: { 'agent-1': 'Persisted title' },
     agentCardModelMap: { 'agent-1': 'model' },
     ...overrides,
@@ -45,20 +45,23 @@ function projection(): SessionCardListWire {
   return {
     cards: [
       {
-        cardId: 'card-root',
+        cardId: 'remote:card-root',
         canonicalSource: 'remote',
         canonicalTransport: 'gateway',
         title: 'Root',
         titleSource: 'manual',
         canonicalSegmentKey: 'remote:runtime-root',
-        continuationSegmentKeys: ['card-root', 'remote:runtime-root'],
+        continuationSegmentKeys: ['remote:card-root', 'remote:runtime-root'],
         continuationCount: 2,
         relationshipKind: 'root',
         childNodes: [
           {
-            cardId: 'card-child',
+            cardId: 'remote:card-child',
             sessionKey: 'remote:runtime-child',
-            continuationSegmentKeys: ['card-child', 'remote:runtime-child'],
+            continuationSegmentKeys: [
+              'remote:card-child',
+              'remote:runtime-child',
+            ],
             continuationCount: 2,
             relationshipKind: 'child',
             title: 'Authoritative child',
@@ -73,7 +76,7 @@ function projection(): SessionCardListWire {
     ],
     cardResolutions: [
       {
-        cardId: 'card-root',
+        cardId: 'remote:card-root',
         completeness: 'complete',
         retryable: false,
       },
@@ -85,6 +88,10 @@ function projection(): SessionCardListWire {
 }
 
 describe('Mission checkpoint Card ownership', () => {
+  it('parses production source-qualified Card ownership fixtures', () => {
+    expect(parseMissionCheckpoint(checkpoint())).not.toBeNull()
+  })
+
   it('accepts only an exact Card and exact child parent from the authoritative projection', () => {
     const validated = validateMissionCheckpointCardOwnership(
       checkpoint(),
