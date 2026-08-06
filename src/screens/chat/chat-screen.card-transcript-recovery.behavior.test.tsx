@@ -801,7 +801,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     mountedScreen.unmount()
   })
 
-  it('removes uniquely acknowledged optimistic and terminal overlays when ordinary Card history uses different identities', async () => {
+  it('removes uniquely acknowledged optimistic and terminal overlays when ordinary Card history omits local identities', async () => {
     const sentAt = Date.now()
     seedCardTranscriptRecovery(parentCard, [
       message('user', 'ordinary server user acknowledgement', {
@@ -836,7 +836,6 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
                 segmentKey: parentCard.canonicalSegmentKey,
                 message: {
                   id: 'server-assistant-ack',
-                  run_id: 'server-run-ack',
                   role: 'assistant',
                   content: 'ordinary server assistant acknowledgement',
                   timestamp: sentAt + 1,

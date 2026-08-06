@@ -884,10 +884,11 @@ export function reconcileAcknowledgedCardTranscriptRecoveryMessages(
       const authoritativeMessage = authoritativeMessages[index]!
       if (
         cardTranscriptMessagesMatch(authoritativeMessage, recoveryMessage) ||
-        ordinaryServerAcknowledgementMatches(
-          recoveryMessage,
-          authoritativeMessage,
-        )
+        (!conflictingRunIdentity(recoveryMessage, authoritativeMessage) &&
+          ordinaryServerAcknowledgementMatches(
+            recoveryMessage,
+            authoritativeMessage,
+          ))
       ) {
         authoritativeIndex = index
         break

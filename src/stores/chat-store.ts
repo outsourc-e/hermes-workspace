@@ -186,17 +186,7 @@ const LEGACY_CHAT_STORAGE_PREFIXES = [
   'claude_realtime_',
 ] as const
 const WAITING_TTL_MS = 120_000
-const CARD_STREAMING_PERSIST_INTERVAL_MS = 500
-const lastCardStreamingPersistAt = new Map<string, number>()
-const pendingCardStreamingPersists = new Map<
-  string,
-  {
-    generation: number
-    state: StreamingState
-    timer: ReturnType<typeof setTimeout>
-  }
->()
-const cardStreamingPersistGenerations = new Map<string, number>()
+const CARD_STREAMING_ENVELOPE_VERSION = 2
 
 function isAuthoritativeCardId(cardId: string): boolean {
   return cardId === cardId.trim() && /^(?:local|remote):\S+$/.test(cardId)
@@ -231,8 +221,38 @@ function cardStorageKey(prefix: string, cardId: string): string {
   return `${prefix}${encodeURIComponent(cardId)}`
 }
 
-function writeCardStreamingState(cardId: string, state: StreamingState): void {
+function normalizeCardStreamingStates(
+  states: ReadonlyArray<StreamingState>,
+): Array<StreamingState> {
+  const normalized = new Map<string, StreamingState>()
+  let ownerOnly: StreamingState | null = null
+  for (const state of states) {
+    const sanitized = sanitizeCardStreamingState(state)
+    if (
+      (sanitized.runId !== null && typeof sanitized.runId !== 'string') ||
+      typeof sanitized.text !== 'string' ||
+      typeof sanitized.thinking !== 'string' ||
+      !Array.isArray(sanitized.lifecycleEvents) ||
+      !Array.isArray(sanitized.toolCalls)
+    ) {
+      continue
+    }
+    if (sanitized.runId) normalized.set(sanitized.runId, sanitized)
+    else ownerOnly = sanitized
+  }
+  return [...(ownerOnly ? [ownerOnly] : []), ...normalized.values()]
+}
+
+function writeCardStreamingStates(
+  cardId: string,
+  states: ReadonlyArray<StreamingState>,
+): void {
   if (typeof sessionStorage === 'undefined' || !isAuthoritativeCardId(cardId)) {
+    return
+  }
+  const runs = normalizeCardStreamingStates(states)
+  if (runs.length === 0) {
+    removePersistedCardStreamingState(cardId)
     return
   }
   cleanupLegacyChatStorage()
@@ -240,8 +260,10 @@ function writeCardStreamingState(cardId: string, state: StreamingState): void {
     sessionStorage.setItem(
       cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId),
       JSON.stringify({
-        ...sanitizeCardStreamingState(state),
-        _savedAt: Date.now(),
+        version: CARD_STREAMING_ENVELOPE_VERSION,
+        cardId,
+        savedAt: Date.now(),
+        runs,
       }),
     )
   } catch {
@@ -249,55 +271,17 @@ function writeCardStreamingState(cardId: string, state: StreamingState): void {
   }
 }
 
-function cardStreamingPersistGeneration(cardId: string): number {
-  return cardStreamingPersistGenerations.get(cardId) ?? 0
-}
-
-function persistCardStreamingState(
+function persistCardStreamingStates(
   cardId: string,
-  state: StreamingState,
+  states: ReadonlyArray<StreamingState>,
 ): void {
   if (!isAuthoritativeCardId(cardId)) return
-  const sanitized = sanitizeCardStreamingState(state)
-  const existing = pendingCardStreamingPersists.get(cardId)
-  if (existing) {
-    existing.state = sanitized
-    return
-  }
-
-  const now = Date.now()
-  const elapsed = now - (lastCardStreamingPersistAt.get(cardId) ?? 0)
-  if (elapsed >= CARD_STREAMING_PERSIST_INTERVAL_MS) {
-    writeCardStreamingState(cardId, sanitized)
-    lastCardStreamingPersistAt.set(cardId, now)
-    return
-  }
-
-  const generation = cardStreamingPersistGeneration(cardId)
-  const pending = {
-    generation,
-    state: sanitized,
-    timer: setTimeout(() => {
-      const latest = pendingCardStreamingPersists.get(cardId)
-      if (latest !== pending) return
-      pendingCardStreamingPersists.delete(cardId)
-      if (latest.generation !== cardStreamingPersistGeneration(cardId)) return
-      writeCardStreamingState(cardId, latest.state)
-      lastCardStreamingPersistAt.set(cardId, Date.now())
-    }, CARD_STREAMING_PERSIST_INTERVAL_MS - elapsed),
-  }
-  pendingCardStreamingPersists.set(cardId, pending)
+  // Each accepted event is a recovery checkpoint. Deferring this write behind
+  // a trailing timer can lose sibling runs when the page is remounted first.
+  writeCardStreamingStates(cardId, states)
 }
 
 function removePersistedCardStreamingState(cardId: string): void {
-  cardStreamingPersistGenerations.set(
-    cardId,
-    cardStreamingPersistGeneration(cardId) + 1,
-  )
-  const pending = pendingCardStreamingPersists.get(cardId)
-  if (pending) clearTimeout(pending.timer)
-  pendingCardStreamingPersists.delete(cardId)
-  lastCardStreamingPersistAt.delete(cardId)
   if (typeof sessionStorage === 'undefined') return
   cleanupLegacyChatStorage()
   try {
@@ -309,11 +293,11 @@ function removePersistedCardStreamingState(cardId: string): void {
   }
 }
 
-export function restoreCardStreamingState(
+export function restoreCardStreamingStates(
   cardId: string,
-): StreamingState | null {
+): Array<StreamingState> {
   if (typeof sessionStorage === 'undefined' || !isAuthoritativeCardId(cardId)) {
-    return null
+    return []
   }
   cleanupLegacyChatStorage()
   const storageKey = cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId)
@@ -321,29 +305,60 @@ export function restoreCardStreamingState(
   try {
     raw = sessionStorage.getItem(storageKey)
   } catch {
-    return null
+    return []
   }
-  if (!raw) return null
+  if (!raw) return []
 
   try {
-    const parsed = JSON.parse(raw) as StreamingState & { _savedAt?: unknown }
+    const parsed = JSON.parse(raw) as Record<string, unknown>
     const savedAt =
-      typeof parsed._savedAt === 'number' && Number.isFinite(parsed._savedAt)
-        ? parsed._savedAt
-        : null
+      typeof parsed.savedAt === 'number' && Number.isFinite(parsed.savedAt)
+        ? parsed.savedAt
+        : typeof parsed._savedAt === 'number' &&
+            Number.isFinite(parsed._savedAt)
+          ? parsed._savedAt
+          : null
     if (!savedAt || savedAt > Date.now() + 60_000) {
       sessionStorage.removeItem(storageKey)
-      return null
+      return []
     }
-    const { _savedAt, ...streamingState } = parsed
-    const sanitized = sanitizeCardStreamingState(streamingState)
-    const sanitizedRaw = JSON.stringify({ ...sanitized, _savedAt: savedAt })
+    const {
+      _savedAt: _legacySavedAt,
+      savedAt: _legacySavedAtV2,
+      version: _legacyVersion,
+      cardId: _legacyCardId,
+      runs: _legacyRuns,
+      ...legacyState
+    } = parsed
+    const candidateStates =
+      parsed.version === CARD_STREAMING_ENVELOPE_VERSION &&
+      parsed.cardId === cardId &&
+      Array.isArray(parsed.runs)
+        ? (parsed.runs as Array<StreamingState>)
+        : [legacyState as StreamingState]
+    const sanitized = normalizeCardStreamingStates(candidateStates)
+    if (sanitized.length === 0) {
+      sessionStorage.removeItem(storageKey)
+      return []
+    }
+    const sanitizedRaw = JSON.stringify({
+      version: CARD_STREAMING_ENVELOPE_VERSION,
+      cardId,
+      savedAt,
+      runs: sanitized,
+    })
     if (sanitizedRaw !== raw) sessionStorage.setItem(storageKey, sanitizedRaw)
     return sanitized
   } catch {
     sessionStorage.removeItem(storageKey)
-    return null
+    return []
   }
+}
+
+export function restoreCardStreamingState(
+  cardId: string,
+): StreamingState | null {
+  return restoreCardStreamingStates(cardId).at(-1) ?? null
 }
 
 function persistCardWaitingState(
@@ -905,7 +920,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         cardStreamingRuns: nextCardRuns,
         lastEventAt: now,
       })
-      persistCardStreamingState(ownerCardId, normalizedNext)
+      persistCardStreamingStates(ownerCardId, Array.from(cardRuns.values()))
     }
 
     // An owner-only event is admissible while there is at most one candidate
@@ -1464,8 +1479,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
             cardStreamingRuns: nextCardRuns,
             lastEventAt: now,
           })
-          if (remaining) persistCardStreamingState(ownerCardId, remaining)
-          else removePersistedCardStreamingState(ownerCardId)
+          if (remaining) {
+            persistCardStreamingStates(
+              ownerCardId,
+              Array.from(cardRuns.values()),
+            )
+          } else removePersistedCardStreamingState(ownerCardId)
         } else {
           streamingMap.delete(sessionKey)
           set({ streamingState: streamingMap, lastEventAt: now })
@@ -1501,21 +1520,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
       get().cardStreamingRuns.get(cardId)?.values() ?? [],
     )
     if (active.length > 0) return active
-    const projected =
-      get().streamingState.get(cardId) ?? restoreCardStreamingState(cardId)
+    const restored = restoreCardStreamingStates(cardId)
+    if (restored.length > 0) return restored
+    const projected = get().streamingState.get(cardId)
     return projected ? [projected] : []
   },
 
   hydrateCardStreamingState: (cardId) => {
-    if (!isAuthoritativeCardId(cardId) || get().streamingState.has(cardId))
+    if (
+      !isAuthoritativeCardId(cardId) ||
+      get().streamingState.has(cardId) ||
+      get().cardStreamingRuns.has(cardId)
+    )
       return
-    const restored = restoreCardStreamingState(cardId)
-    if (!restored) return
+    const restored = restoreCardStreamingStates(cardId)
+    if (restored.length === 0) return
     const streamingState = new Map(get().streamingState)
-    streamingState.set(cardId, restored)
+    streamingState.set(cardId, restored.at(-1)!)
     const cardStreamingRuns = new Map(get().cardStreamingRuns)
-    if (restored.runId) {
-      cardStreamingRuns.set(cardId, new Map([[restored.runId, restored]]))
+    const restoredRuns = restored.filter(
+      (state): state is StreamingState & { runId: string } =>
+        typeof state.runId === 'string' && state.runId.length > 0,
+    )
+    if (restoredRuns.length > 0) {
+      cardStreamingRuns.set(
+        cardId,
+        new Map(restoredRuns.map((state) => [state.runId, state])),
+      )
     }
     set({ streamingState, cardStreamingRuns, lastEventAt: Date.now() })
   },
@@ -1550,7 +1581,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (remaining) {
       cardStreamingRuns.set(cardId, runs)
       streamingState.set(cardId, remaining)
-      persistCardStreamingState(cardId, remaining)
+      persistCardStreamingStates(cardId, Array.from(runs.values()))
     } else {
       cardStreamingRuns.delete(cardId)
       streamingState.delete(cardId)
@@ -1576,8 +1607,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       )
       set({ realtimeMessages })
     }
+    const runs = Array.from(get().cardStreamingRuns.get(cardId)?.values() ?? [])
     const streaming = get().streamingState.get(cardId)
-    if (streaming) persistCardStreamingState(cardId, streaming)
+    if (runs.length > 0) persistCardStreamingStates(cardId, runs)
+    else if (streaming) persistCardStreamingStates(cardId, [streaming])
     const waiting = get().waitingSessionMeta[cardId]
     if (waiting) persistCardWaitingState(cardId, waiting)
   },

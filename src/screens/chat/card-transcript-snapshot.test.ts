@@ -56,4 +56,92 @@ describe('Card transcript snapshot mirror arbitration', () => {
       message('fresh'),
     ])
   })
+
+  it('round-trips complete histories beyond the former message and single-value caps', () => {
+    const messages = Array.from({ length: 2_101 }, (_, index) => ({
+      ...message(`history row ${index}`),
+      id: `history-${index}`,
+      ...(index === 1_050
+        ? {
+            attachments: [
+              {
+                id: 'large-attachment',
+                name: 'complete-history.bin',
+                contentType: 'application/octet-stream',
+                dataUrl: `data:application/octet-stream;base64,${'a'.repeat(4_600_000)}`,
+              },
+            ],
+          }
+        : {}),
+    }))
+
+    const written = writeCardTranscriptSnapshot(cardId, messages)
+
+    expect(written?.messages).toHaveLength(2_101)
+    expect(readCardTranscriptSnapshot(cardId)?.messages).toEqual(messages)
+    const key = cardTranscriptSnapshotStorageKey(cardId)
+    const index = JSON.parse(window.localStorage.getItem(key) ?? '{}') as {
+      version?: number
+      chunkCount?: number
+    }
+    expect(index.version).toBe(2)
+    expect(index.chunkCount).toBeGreaterThan(1)
+  })
+
+  it('derives each revision from the maximum valid persistent mirror despite clock rollback and one failed mirror', () => {
+    const key = cardTranscriptSnapshotStorageKey(cardId)
+    window.localStorage.setItem(key, raw(200, 40_000, 'local baseline'))
+    window.sessionStorage.setItem(key, raw(100, 90_000, 'session baseline'))
+    vi.spyOn(Date, 'now').mockReturnValue(50)
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      storageKey,
+      value,
+    ) {
+      if (this === window.localStorage) {
+        throw new DOMException('local mirror unavailable', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, storageKey, value)
+    })
+
+    const first = writeCardTranscriptSnapshot(cardId, [message('first write')])
+    expect(first?.revision).toBe(90_001)
+
+    vi.mocked(Storage.prototype.setItem).mockRestore()
+    vi.spyOn(Date, 'now').mockReturnValue(25)
+    const second = writeCardTranscriptSnapshot(cardId, [
+      message('after restart'),
+    ])
+
+    expect(second?.revision).toBe(90_002)
+    expect(readCardTranscriptSnapshot(cardId)?.messages).toEqual([
+      message('after restart'),
+    ])
+  })
+
+  it('fails closed on an interrupted index commit and keeps the prior complete snapshot readable', () => {
+    expect(
+      writeCardTranscriptSnapshot(cardId, [message('last durable baseline')]),
+    ).not.toBeNull()
+    const key = cardTranscriptSnapshotStorageKey(cardId)
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      storageKey,
+      value,
+    ) {
+      if (storageKey === key) {
+        throw new DOMException('index commit denied', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, storageKey, value)
+    })
+
+    expect(
+      writeCardTranscriptSnapshot(cardId, [message('uncommitted replacement')]),
+    ).toBeNull()
+    expect(readCardTranscriptSnapshot(cardId)?.messages).toEqual([
+      message('last durable baseline'),
+    ])
+  })
 })

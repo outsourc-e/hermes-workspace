@@ -284,6 +284,78 @@ describe('chat-store Card ownership', () => {
     ])
   })
 
+  it('serializes and hydrates every concurrent same-Card run independently after remount', () => {
+    const store = useChatStore.getState()
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'alpha partial text',
+      fullReplace: true,
+      runId: 'run-remount-alpha',
+      sessionKey: 'remote:segment-alpha',
+      transport: 'chat-events',
+    })
+    store.processCardEvent('remote:card-owner', {
+      type: 'tool',
+      name: 'inspect-alpha',
+      phase: 'start',
+      toolCallId: 'tool-alpha',
+      args: { safe: 'alpha' },
+      runId: 'run-remount-alpha',
+      sessionKey: 'remote:segment-alpha',
+      transport: 'chat-events',
+    })
+    store.processCardEvent('remote:card-owner', {
+      type: 'thinking',
+      text: 'beta private reasoning',
+      runId: 'run-remount-beta',
+      sessionKey: 'remote:segment-beta',
+      transport: 'chat-events',
+    })
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'beta partial text',
+      fullReplace: true,
+      runId: 'run-remount-beta',
+      sessionKey: 'remote:segment-beta',
+      transport: 'chat-events',
+    })
+    store.processCardEvent('remote:card-owner', {
+      type: 'lifecycle',
+      text: 'beta lifecycle checkpoint',
+      runId: 'run-remount-beta',
+      sessionKey: 'remote:segment-beta',
+      transport: 'chat-events',
+    })
+
+    useChatStore.setState({
+      streamingState: new Map(),
+      cardStreamingRuns: new Map(),
+    })
+    useChatStore.getState().hydrateCardStreamingState('remote:card-owner')
+
+    expect(
+      useChatStore.getState().getCardStreamingStates('remote:card-owner'),
+    ).toMatchObject([
+      {
+        runId: 'run-remount-alpha',
+        text: 'alpha partial text',
+        toolCalls: [
+          {
+            id: 'tool-alpha',
+            name: 'inspect-alpha',
+            args: { safe: 'alpha' },
+          },
+        ],
+      },
+      {
+        runId: 'run-remount-beta',
+        text: 'beta partial text',
+        thinking: 'beta private reasoning',
+        lifecycleEvents: [{ text: 'beta lifecycle checkpoint' }],
+      },
+    ])
+  })
+
   it('scrubs raw transport identity from live Card messages and tool state', () => {
     const store = useChatStore.getState()
     store.processCardEvent('remote:card-owner', {

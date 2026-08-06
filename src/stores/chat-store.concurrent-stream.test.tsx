@@ -28,6 +28,7 @@ let unmount: (() => void) | null = null
 
 beforeEach(() => {
   window.localStorage.clear()
+  window.sessionStorage.clear()
   useChatStore.setState({
     realtimeMessages: new Map(),
     streamingState: new Map(),
@@ -66,6 +67,23 @@ describe('mounted same-Card concurrent stream projection', () => {
         sessionKey: 'remote:segment-beta',
         transport: 'chat-events',
       })
+    })
+
+    expect(screen.getByTestId('stream-run-alpha').textContent).toBe(
+      'alpha live content',
+    )
+    expect(screen.getByTestId('stream-run-beta').textContent).toBe(
+      'beta live content',
+    )
+
+    React.act(() => {
+      root.render(null)
+      useChatStore.setState({
+        streamingState: new Map(),
+        cardStreamingRuns: new Map(),
+      })
+      useChatStore.getState().hydrateCardStreamingState('remote:card')
+      root.render(<MountedCardStreams cardId="remote:card" />)
     })
 
     expect(screen.getByTestId('stream-run-alpha').textContent).toBe(

@@ -315,7 +315,37 @@ describe('Card transcript recovery storage contract', () => {
     ])
   })
 
-  it('acknowledges uniquely matching ordinary server rows when client and run identities differ', () => {
+  it('never acknowledges equal text and timestamps across conflicting non-null run identities', () => {
+    const overlay = message('assistant', 'same answer at the same instant', {
+      runId: 'run-local',
+      stableId: 'stream-run:run-local',
+      __streamingStatus: 'complete',
+      timestamp: now,
+    })
+    replaceCardTranscriptRecoveryMessages(owner, [overlay], { now })
+
+    const authoritative = message(
+      'assistant',
+      'same answer at the same instant',
+      {
+        id: 'server-assistant',
+        runId: 'run-other',
+        timestamp: now,
+      },
+    )
+    const reconciled = removeAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      [authoritative],
+      { now },
+    )
+
+    expect(reconciled?.messages).toEqual([overlay])
+    expect(
+      mergeCardTranscriptRecoveryMessages([authoritative], [overlay]),
+    ).toEqual([authoritative, overlay])
+  })
+
+  it('acknowledges uniquely matching ordinary server rows when client identity differs and server run identity is absent', () => {
     const optimistic = message('user', 'ordinary user acknowledgement', {
       clientId: 'client-local',
       __optimisticId: 'opt-client-local',
@@ -343,7 +373,6 @@ describe('Card transcript recovery storage contract', () => {
         }),
         message('assistant', 'ordinary assistant acknowledgement', {
           id: 'server-assistant',
-          run_id: 'server-run',
         }),
       ],
       { now },
