@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildAgentSessionCardRoute,
   resolveAgentSessionCardNavigation,
+  resolveAgentSessionCardOperationBinding,
 } from './agent-session-card-navigation'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import type { SessionCard } from '@/screens/chat/types'
@@ -9,6 +10,7 @@ import type { SessionCard } from '@/screens/chat/types'
 const parentCard: SessionCard = {
   cardId: 'remote:parent-card',
   canonicalSource: 'remote',
+  canonicalTransport: 'gateway',
   title: 'Parent Card',
   titleSource: 'manual',
   canonicalSegmentKey: 'remote:parent-tip',
@@ -75,6 +77,31 @@ describe('gateway agent Session Card navigation', () => {
       params: { sessionKey: 'remote:parent-card' },
       search: { inspect: 'remote:child-card' },
     })
+    expect(
+      resolveAgentSessionCardOperationBinding(completeResponse, target),
+    ).toEqual({
+      kind: 'session-card-owner',
+      cardId: 'remote:child-card',
+      parentCardId: 'remote:parent-card',
+      canonicalSource: 'remote',
+      canonicalSegmentKey: 'remote:child-tip',
+      canonicalTransport: 'gateway',
+    })
+  })
+
+  it('projects a source-qualified root Card operation binding', () => {
+    expect(
+      resolveAgentSessionCardOperationBinding(completeResponse, {
+        cardId: parentCard.cardId,
+      }),
+    ).toEqual({
+      kind: 'session-card-owner',
+      cardId: parentCard.cardId,
+      parentCardId: null,
+      canonicalSource: 'remote',
+      canonicalSegmentKey: parentCard.canonicalSegmentKey,
+      canonicalTransport: 'gateway',
+    })
   })
 
   it('fails closed for missing, incomplete, and unmapped Card projections', () => {
@@ -104,6 +131,23 @@ describe('gateway agent Session Card navigation', () => {
           retryable: true,
         },
         { sessionKey: 'remote:parent-tip' },
+      ),
+    ).toBeUndefined()
+    expect(
+      resolveAgentSessionCardOperationBinding(
+        {
+          ...completeResponse,
+          cardResolutions: [
+            {
+              cardId: parentCard.cardId,
+              completeness: 'incomplete',
+              retryable: true,
+            },
+          ],
+          completeness: 'incomplete',
+          retryable: true,
+        },
+        { cardId: parentCard.cardId },
       ),
     ).toBeUndefined()
     expect(

@@ -160,7 +160,9 @@ import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/se
 import { Route as ApiSessionsSessionKeyLatestDescendantRouteImport } from './routes/api/sessions/$sessionKey.latest-descendant'
 import { Route as ApiSessionsSessionKeyForkRouteImport } from './routes/api/sessions/$sessionKey.fork'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
+import { Route as ApiSessionCardsCardIdSteerRouteImport } from './routes/api/session-cards.$cardId.steer'
 import { Route as ApiSessionCardsCardIdPauseRouteImport } from './routes/api/session-cards.$cardId.pause'
+import { Route as ApiSessionCardsCardIdKillRouteImport } from './routes/api/session-cards.$cardId.kill'
 import { Route as ApiSessionCardsCardIdHistoryRouteImport } from './routes/api/session-cards.$cardId.history'
 import { Route as ApiSessionCardsCardIdBranchRouteImport } from './routes/api/session-cards.$cardId.branch'
 import { Route as ApiSessionCardsCardIdArchiveRouteImport } from './routes/api/session-cards.$cardId.archive'
@@ -930,10 +932,22 @@ const ApiSessionsSessionKeyActiveRunRoute =
     path: '/$sessionKey/active-run',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
+const ApiSessionCardsCardIdSteerRoute =
+  ApiSessionCardsCardIdSteerRouteImport.update({
+    id: '/steer',
+    path: '/steer',
+    getParentRoute: () => ApiSessionCardsCardIdRoute,
+  } as any)
 const ApiSessionCardsCardIdPauseRoute =
   ApiSessionCardsCardIdPauseRouteImport.update({
     id: '/pause',
     path: '/pause',
+    getParentRoute: () => ApiSessionCardsCardIdRoute,
+  } as any)
+const ApiSessionCardsCardIdKillRoute =
+  ApiSessionCardsCardIdKillRouteImport.update({
+    id: '/kill',
+    path: '/kill',
     getParentRoute: () => ApiSessionCardsCardIdRoute,
   } as any)
 const ApiSessionCardsCardIdHistoryRoute =
@@ -1124,7 +1138,9 @@ export interface FileRoutesByFullPath {
   '/api/session-cards/$cardId/archive': typeof ApiSessionCardsCardIdArchiveRoute
   '/api/session-cards/$cardId/branch': typeof ApiSessionCardsCardIdBranchRoute
   '/api/session-cards/$cardId/history': typeof ApiSessionCardsCardIdHistoryRoute
+  '/api/session-cards/$cardId/kill': typeof ApiSessionCardsCardIdKillRoute
   '/api/session-cards/$cardId/pause': typeof ApiSessionCardsCardIdPauseRoute
+  '/api/session-cards/$cardId/steer': typeof ApiSessionCardsCardIdSteerRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
   '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
@@ -1283,7 +1299,9 @@ export interface FileRoutesByTo {
   '/api/session-cards/$cardId/archive': typeof ApiSessionCardsCardIdArchiveRoute
   '/api/session-cards/$cardId/branch': typeof ApiSessionCardsCardIdBranchRoute
   '/api/session-cards/$cardId/history': typeof ApiSessionCardsCardIdHistoryRoute
+  '/api/session-cards/$cardId/kill': typeof ApiSessionCardsCardIdKillRoute
   '/api/session-cards/$cardId/pause': typeof ApiSessionCardsCardIdPauseRoute
+  '/api/session-cards/$cardId/steer': typeof ApiSessionCardsCardIdSteerRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
   '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
@@ -1444,7 +1462,9 @@ export interface FileRoutesById {
   '/api/session-cards/$cardId/archive': typeof ApiSessionCardsCardIdArchiveRoute
   '/api/session-cards/$cardId/branch': typeof ApiSessionCardsCardIdBranchRoute
   '/api/session-cards/$cardId/history': typeof ApiSessionCardsCardIdHistoryRoute
+  '/api/session-cards/$cardId/kill': typeof ApiSessionCardsCardIdKillRoute
   '/api/session-cards/$cardId/pause': typeof ApiSessionCardsCardIdPauseRoute
+  '/api/session-cards/$cardId/steer': typeof ApiSessionCardsCardIdSteerRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
   '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
@@ -1606,7 +1626,9 @@ export interface FileRouteTypes {
     | '/api/session-cards/$cardId/archive'
     | '/api/session-cards/$cardId/branch'
     | '/api/session-cards/$cardId/history'
+    | '/api/session-cards/$cardId/kill'
     | '/api/session-cards/$cardId/pause'
+    | '/api/session-cards/$cardId/steer'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/fork'
     | '/api/sessions/$sessionKey/latest-descendant'
@@ -1765,7 +1787,9 @@ export interface FileRouteTypes {
     | '/api/session-cards/$cardId/archive'
     | '/api/session-cards/$cardId/branch'
     | '/api/session-cards/$cardId/history'
+    | '/api/session-cards/$cardId/kill'
     | '/api/session-cards/$cardId/pause'
+    | '/api/session-cards/$cardId/steer'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/fork'
     | '/api/sessions/$sessionKey/latest-descendant'
@@ -1925,7 +1949,9 @@ export interface FileRouteTypes {
     | '/api/session-cards/$cardId/archive'
     | '/api/session-cards/$cardId/branch'
     | '/api/session-cards/$cardId/history'
+    | '/api/session-cards/$cardId/kill'
     | '/api/session-cards/$cardId/pause'
+    | '/api/session-cards/$cardId/steer'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/fork'
     | '/api/sessions/$sessionKey/latest-descendant'
@@ -3116,11 +3142,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/session-cards/$cardId/steer': {
+      id: '/api/session-cards/$cardId/steer'
+      path: '/steer'
+      fullPath: '/api/session-cards/$cardId/steer'
+      preLoaderRoute: typeof ApiSessionCardsCardIdSteerRouteImport
+      parentRoute: typeof ApiSessionCardsCardIdRoute
+    }
     '/api/session-cards/$cardId/pause': {
       id: '/api/session-cards/$cardId/pause'
       path: '/pause'
       fullPath: '/api/session-cards/$cardId/pause'
       preLoaderRoute: typeof ApiSessionCardsCardIdPauseRouteImport
+      parentRoute: typeof ApiSessionCardsCardIdRoute
+    }
+    '/api/session-cards/$cardId/kill': {
+      id: '/api/session-cards/$cardId/kill'
+      path: '/kill'
+      fullPath: '/api/session-cards/$cardId/kill'
+      preLoaderRoute: typeof ApiSessionCardsCardIdKillRouteImport
       parentRoute: typeof ApiSessionCardsCardIdRoute
     }
     '/api/session-cards/$cardId/history': {
@@ -3298,7 +3338,9 @@ interface ApiSessionCardsCardIdRouteChildren {
   ApiSessionCardsCardIdArchiveRoute: typeof ApiSessionCardsCardIdArchiveRoute
   ApiSessionCardsCardIdBranchRoute: typeof ApiSessionCardsCardIdBranchRoute
   ApiSessionCardsCardIdHistoryRoute: typeof ApiSessionCardsCardIdHistoryRoute
+  ApiSessionCardsCardIdKillRoute: typeof ApiSessionCardsCardIdKillRoute
   ApiSessionCardsCardIdPauseRoute: typeof ApiSessionCardsCardIdPauseRoute
+  ApiSessionCardsCardIdSteerRoute: typeof ApiSessionCardsCardIdSteerRoute
   ApiSessionCardsCardIdActiveRunAbandonRoute: typeof ApiSessionCardsCardIdActiveRunAbandonRoute
 }
 
@@ -3306,7 +3348,9 @@ const ApiSessionCardsCardIdRouteChildren: ApiSessionCardsCardIdRouteChildren = {
   ApiSessionCardsCardIdArchiveRoute: ApiSessionCardsCardIdArchiveRoute,
   ApiSessionCardsCardIdBranchRoute: ApiSessionCardsCardIdBranchRoute,
   ApiSessionCardsCardIdHistoryRoute: ApiSessionCardsCardIdHistoryRoute,
+  ApiSessionCardsCardIdKillRoute: ApiSessionCardsCardIdKillRoute,
   ApiSessionCardsCardIdPauseRoute: ApiSessionCardsCardIdPauseRoute,
+  ApiSessionCardsCardIdSteerRoute: ApiSessionCardsCardIdSteerRoute,
   ApiSessionCardsCardIdActiveRunAbandonRoute:
     ApiSessionCardsCardIdActiveRunAbandonRoute,
 }

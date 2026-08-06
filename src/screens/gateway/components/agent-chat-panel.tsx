@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { SessionHistoryMessage } from '@/lib/gateway-api'
+import type {
+  GatewayAgentCardBinding,
+  SessionHistoryMessage,
+} from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import {
@@ -17,6 +20,8 @@ export type AgentChatPanelProps = {
   agentId: string
   /** Session key for this agent (from agentSessionMap) */
   sessionKey: string | null
+  /** Exact source-qualified Card capability required for mutations. */
+  cardBinding?: GatewayAgentCardBinding
   /** Whether agent is currently running */
   isRunning: boolean
   /** Close handler */
@@ -69,6 +74,7 @@ export function AgentChatPanel({
   agentName,
   agentId: _agentId,
   sessionKey,
+  cardBinding,
   isRunning,
   onClose,
 }: AgentChatPanelProps) {
@@ -193,7 +199,7 @@ export function AgentChatPanel({
   // ── Send message ──────────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
     const text = draft.trim()
-    if (!text || !sessionKey) return
+    if (!text || !sessionKey || !cardBinding) return
 
     const userMsg: ChatMessage = { id: localId(), role: 'user', content: text }
     setMessages((prev) => [...prev, userMsg])
@@ -204,10 +210,10 @@ export function AgentChatPanel({
     try {
       if (isRunning) {
         // Agent is running — use steer to send a directive
-        await steerAgent(sessionKey, text)
+        await steerAgent(cardBinding, text)
       } else {
         // Agent is idle — send a new message to the session
-        await sendToSession(sessionKey, text)
+        await sendToSession(cardBinding, text)
       }
       // Reload history to get agent's response
       setTimeout(() => void loadHistory(), 1500)
@@ -216,7 +222,7 @@ export function AgentChatPanel({
     } finally {
       setSending(false)
     }
-  }, [draft, sessionKey, isRunning, loadHistory])
+  }, [cardBinding, draft, sessionKey, isRunning, loadHistory])
 
   // ── Focus textarea on mount ───────────────────────────────────────────────
   useEffect(() => {
@@ -350,7 +356,7 @@ export function AgentChatPanel({
                     ? 'Send a directive to the running agent…'
                     : 'Send a message…'
               }
-              disabled={!sessionKey || sending}
+              disabled={!sessionKey || !cardBinding || sending}
               className="flex-1 resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 outline-none transition-colors placeholder:text-neutral-400 focus:ring-1 focus:ring-accent-400 disabled:opacity-50 dark:border-neutral-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-neutral-500"
               rows={2}
               onKeyDown={(e) => {
@@ -362,7 +368,7 @@ export function AgentChatPanel({
             />
             <button
               type="button"
-              disabled={!draft.trim() || !sessionKey || sending}
+              disabled={!draft.trim() || !sessionKey || !cardBinding || sending}
               onClick={() => void handleSend()}
               className={cn(
                 'rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-all',

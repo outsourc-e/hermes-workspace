@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   isExplicitSendStreamBootstrap: vi.fn(),
   appendLocalMessage: vi.fn(),
   ensureLocalSession: vi.fn(),
+  getLocalSession: vi.fn(),
   buildResolvedSessionHeaders: vi.fn(() => ({})),
   openaiChat: vi.fn(),
   streamResponses: vi.fn(),
@@ -113,6 +114,7 @@ vi.mock('./-send-stream-authority', () => ({
 vi.mock('../../server/local-session-store', () => ({
   appendLocalMessage: mocks.appendLocalMessage,
   ensureLocalSession: mocks.ensureLocalSession,
+  getLocalSession: mocks.getLocalSession,
   getLocalMessages: vi.fn(() => []),
   touchLocalSession: vi.fn(),
 }))
@@ -228,6 +230,7 @@ describe('send-stream bootstrap session handoff', () => {
     )
     mocks.createSession.mockResolvedValue({ id: 'created-session' })
     mocks.listSessions.mockResolvedValue([])
+    mocks.getLocalSession.mockReturnValue(null)
     mocks.getSession.mockImplementation((sessionId: string) =>
       Promise.resolve({
         id: sessionId,
@@ -426,6 +429,135 @@ describe('send-stream bootstrap session handoff', () => {
     expect(mocks.streamChat).not.toHaveBeenCalled()
     expect(mocks.openaiChat).not.toHaveBeenCalled()
     expect(mocks.streamResponses).not.toHaveBeenCalled()
+  })
+
+  it('fails enhanced main closed when runtime discovery fails before projection', async () => {
+    mocks.listSessions.mockRejectedValueOnce(
+      new Error('gateway inventory failed'),
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'main',
+          friendlyId: 'main',
+          message: 'do not guess main authority',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Unable to verify existing main Session Card ownership',
+    })
+    expect(mocks.createSession).not.toHaveBeenCalled()
+    expect(mocks.resolveRemoteCardByUpstreamSession).not.toHaveBeenCalled()
+    expect(mocks.streamChat).not.toHaveBeenCalled()
+    expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+  })
+
+  it('fails enhanced main closed when any existing runtime has no exact Card projection', async () => {
+    mocks.listSessions.mockResolvedValueOnce([{ id: 'existing-empty-runtime' }])
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'main',
+          friendlyId: 'main',
+          message: 'do not mutate unowned main',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Existing main Session Card ownership is unavailable',
+    })
+    expect(mocks.resolveRemoteCardByUpstreamSession).toHaveBeenCalledWith(
+      'existing-empty-runtime',
+    )
+    expect(mocks.createSession).not.toHaveBeenCalled()
+    expect(mocks.streamChat).not.toHaveBeenCalled()
+    expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+  })
+
+  it('binds an existing enhanced main runtime to its exact remote Card before streaming', async () => {
+    mocks.listSessions.mockResolvedValueOnce([{ id: 'existing-main-runtime' }])
+    mocks.resolveRemoteCardByUpstreamSession.mockResolvedValueOnce({
+      card: {
+        cardId: 'remote:main-card',
+        canonicalSource: 'remote',
+        canonicalTransport: 'gateway',
+        canonicalSegmentKey: 'remote:main-tip',
+        continuationSegmentKeys: ['remote:main-card', 'remote:main-tip'],
+        continuationCount: 2,
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete', retryable: false },
+      sourceBySegmentKey: new Map([['remote:main-tip', 'remote']]),
+      upstreamKeyBySegmentKey: new Map([
+        ['remote:main-tip', 'existing-main-runtime'],
+      ]),
+    })
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        expect(sessionKey).toBe('existing-main-runtime')
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'main-run', session_id: sessionKey },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'main-run', session_id: sessionKey },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'main',
+          friendlyId: 'main',
+          message: 'continue exact main',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const events = parseEvents(await response.text())
+    expect(events[0]).toMatchObject({
+      event: 'session_handoff',
+      data: {
+        fromSessionKey: 'main',
+        sessionKey: 'remote:main-tip',
+        friendlyId: 'remote:main-card',
+      },
+    })
+    expect(mocks.resolveExactSessionCardOperationBinding).toHaveBeenCalledTimes(
+      2,
+    )
+    expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
+      sessionKey: 'remote:main-tip',
+      friendlyId: 'remote:main-card',
+    })
+    expect(mocks.createSession).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -3587,7 +3719,7 @@ describe('send-stream bootstrap session handoff', () => {
           mocks.createSession.mockReturnValueOnce(bootstrapPending)
         }
 
-        const response = await handler({
+        const responsePending = handler({
           request: new Request('http://workspace.test/api/send-stream', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -3598,21 +3730,28 @@ describe('send-stream bootstrap session handoff', () => {
             }),
           }),
         })
-        const responseText = response.text()
 
         await vi.advanceTimersByTimeAsync(600_000)
-        const events = parseEvents(await responseText)
-
-        expect(events.at(-1)).toEqual({
-          event: 'error',
-          data: {
-            message: 'Stream timeout',
-            sessionKey: bootstrapSessionKey,
-          },
-        })
-        expect(events.some(({ event }) => event === 'session_handoff')).toBe(
-          false,
-        )
+        const response = await responsePending
+        if (bootstrapSessionKey === 'main') {
+          expect(response.status).toBe(504)
+          await expect(response.json()).resolves.toEqual({
+            ok: false,
+            error: 'Stream timeout',
+          })
+        } else {
+          const events = parseEvents(await response.text())
+          expect(events.at(-1)).toEqual({
+            event: 'error',
+            data: {
+              message: 'Stream timeout',
+              sessionKey: bootstrapSessionKey,
+            },
+          })
+          expect(events.some(({ event }) => event === 'session_handoff')).toBe(
+            false,
+          )
+        }
         expect(mocks.getSession).not.toHaveBeenCalled()
         expect(mocks.getMessages).not.toHaveBeenCalled()
         expect(mocks.streamChat).not.toHaveBeenCalled()
@@ -4839,6 +4978,7 @@ describe('send-stream bootstrap session handoff', () => {
 
   it('qualifies every Card-owned portable main identity while retaining raw main only for the backend call', async () => {
     mocks.getChatMode.mockReturnValue('portable')
+    mocks.getLocalSession.mockReturnValue({ id: 'main' })
     mocks.resolveLocalCardByUpstreamSession.mockResolvedValueOnce({
       card: {
         cardId: 'local:main-card',
@@ -5156,6 +5296,7 @@ describe('send-stream bootstrap session handoff', () => {
 
   it('qualifies portable main after resolving its authoritative local Card identity', async () => {
     mocks.getChatMode.mockReturnValue('portable')
+    mocks.getLocalSession.mockReturnValue({ id: 'main' })
     mocks.resolveLocalCardByUpstreamSession.mockResolvedValueOnce({
       card: {
         cardId: 'local:main-card',

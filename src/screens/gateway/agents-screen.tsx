@@ -24,6 +24,7 @@ import {
 import {
   buildAgentSessionCardRoute,
   resolveAgentSessionCardNavigation,
+  resolveAgentSessionCardOperationBinding,
 } from '@/components/agent-view/agent-session-card-navigation'
 import { isCardProjectionComplete } from '@/routes/chat/-session-route-state'
 
@@ -890,7 +891,10 @@ export function AgentsScreen({
         color: definition.color,
         status,
         cardNavigation: primarySession?.cardNavigation,
-        controlKey: undefined,
+        cardBinding: resolveAgentSessionCardOperationBinding(
+          sessionCardsQuery.data,
+          primarySession?.cardNavigation,
+        ),
         matchedSessions,
       } satisfies AgentRuntime
     })

@@ -11,6 +11,7 @@ import {
 import {
   buildAgentSessionCardRoute,
   resolveAgentSessionCardNavigation,
+  resolveAgentSessionCardOperationBinding,
 } from '@/components/agent-view/agent-session-card-navigation'
 
 export type AgentStreamPanelProps = {
@@ -78,6 +79,10 @@ export function AgentStreamPanel({
     sessionCardsQuery.data,
     { sessionKey },
   )
+  const cardBinding = resolveAgentSessionCardOperationBinding(
+    sessionCardsQuery.data,
+    chatNavigation,
+  )
 
   const cardActivity = useMemo(() => {
     if (!chatNavigation) return null
@@ -142,10 +147,10 @@ export function AgentStreamPanel({
   }
 
   async function onKill() {
-    if (killPending) return
+    if (killPending || !cardBinding) return
     setKillPending(true)
     try {
-      await killAgentSession(sessionKey)
+      await killAgentSession(cardBinding)
       toast(`${agentName} terminated`, { type: 'success' })
       onClose()
     } catch (error) {
@@ -271,6 +276,7 @@ export function AgentStreamPanel({
               <button
                 type="button"
                 onClick={() => setSteerOpen(true)}
+                disabled={!cardBinding}
                 className="rounded-lg border border-neutral-200 px-2 py-2 text-xs font-medium text-neutral-800 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-800"
               >
                 Steer
@@ -293,7 +299,7 @@ export function AgentStreamPanel({
                     <button
                       type="button"
                       onClick={() => void onKill()}
-                      disabled={killPending}
+                      disabled={killPending || !cardBinding}
                       className="flex w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-60 dark:text-red-300 dark:hover:bg-red-950/40"
                     >
                       {killPending ? 'Terminating...' : 'Kill'}
@@ -328,12 +334,14 @@ export function AgentStreamPanel({
             </div>
           </div>
         </div>
-        <SteerModal
-          open={steerOpen}
-          onOpenChange={setSteerOpen}
-          agentName={agentName}
-          sessionKey={sessionKey}
-        />
+        {cardBinding ? (
+          <SteerModal
+            open={steerOpen}
+            onOpenChange={setSteerOpen}
+            agentName={agentName}
+            cardBinding={cardBinding}
+          />
+        ) : null}
       </aside>
     </>
   )

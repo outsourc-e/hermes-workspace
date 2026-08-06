@@ -88,6 +88,17 @@ export type GatewayModelDefaultResponse = {
 export type GatewayAgentActionResponse = {
   ok?: boolean
   error?: string
+  cardId?: string
+  parentCardId?: string | null
+}
+
+export type GatewayAgentCardBinding = {
+  kind: 'session-card-owner'
+  cardId: string
+  parentCardId: string | null
+  canonicalSource: 'remote'
+  canonicalSegmentKey: string
+  canonicalTransport: 'gateway'
 }
 
 export type GatewayAgentPauseResponse = GatewayAgentActionResponse & {
@@ -174,7 +185,7 @@ export type SendToSessionResponse = {
 }
 
 export async function sendToSession(
-  sessionKey: string,
+  cardBinding: GatewayAgentCardBinding,
   message: string,
 ): Promise<SendToSessionResponse> {
   const controller = new AbortController()
@@ -183,7 +194,7 @@ export async function sendToSession(
     const response = await fetch(makeEndpoint('/api/session-send'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionKey, message }),
+      body: JSON.stringify({ cardBinding, message }),
       signal: controller.signal,
     })
     const payload = (await response
@@ -340,19 +351,24 @@ export async function setDefaultModel(
 }
 
 export async function steerAgent(
-  sessionKey: string,
+  cardBinding: GatewayAgentCardBinding,
   message: string,
 ): Promise<GatewayAgentActionResponse> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), 12000)
 
   try {
-    const response = await fetch(makeEndpoint('/api/agent-steer'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionKey, message }),
-      signal: controller.signal,
-    })
+    const response = await fetch(
+      makeEndpoint(
+        `/api/session-cards/${encodeURIComponent(cardBinding.cardId)}/steer`,
+      ),
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cardBinding, message }),
+        signal: controller.signal,
+      },
+    )
 
     const payload = (await response
       .json()
@@ -378,18 +394,23 @@ export async function steerAgent(
 }
 
 export async function killAgentSession(
-  sessionKey: string,
+  cardBinding: GatewayAgentCardBinding,
 ): Promise<GatewayAgentActionResponse> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), 12000)
 
   try {
-    const response = await fetch(makeEndpoint('/api/agent-kill'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionKey }),
-      signal: controller.signal,
-    })
+    const response = await fetch(
+      makeEndpoint(
+        `/api/session-cards/${encodeURIComponent(cardBinding.cardId)}/kill`,
+      ),
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cardBinding }),
+        signal: controller.signal,
+      },
+    )
 
     const payload = (await response
       .json()

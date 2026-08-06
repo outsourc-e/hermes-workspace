@@ -67,6 +67,7 @@ function parentCard(
   return {
     cardId: 'remote:parent-card',
     canonicalSource: 'remote',
+    canonicalTransport: 'gateway',
     title: 'Parent Card',
     titleSource: 'manual',
     canonicalSegmentKey: 'remote:parent-tip',

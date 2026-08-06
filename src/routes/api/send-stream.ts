@@ -30,6 +30,7 @@ import {
   appendLocalMessage,
   ensureLocalSession,
   getLocalMessages,
+  getLocalSession,
   touchLocalSession,
 } from '../../server/local-session-store'
 import {
@@ -774,20 +775,89 @@ export const Route = createFileRoute('/api/send-stream')({
           activeCardCanonicalSegmentKey = canonicalSegmentKey
           activeCardCanonicalSource = canonicalSource
           resolvedFriendlyId = resolvedBootstrapCard.card.cardId
+          requestedCardMutationBinding = {
+            kind: 'session-card-owner',
+            cardId: resolvedBootstrapCard.card.cardId,
+            parentCardId: null,
+            canonicalSource: 'local',
+            canonicalSegmentKey,
+            canonicalTransport: 'tmux',
+          }
           return canonicalUpstreamKey
         }
         let portableBootstrapProjectionAttemptedBeforeStream = false
         if (portableBootstrapSessionKey === 'main' && !activeCardId) {
-          // Headers are committed when the Response is constructed, before the
-          // async stream body can resolve. Resolve an existing local main Card
-          // now so its source-qualified identity owns headers as well as SSE.
-          ensureLocalSession(
-            sessionKey,
-            typeof body.model === 'string' ? body.model : undefined,
-          )
-          portableBootstrapProjectionAttemptedBeforeStream = true
+          // Cardless `main` is allowed only when the local store proves that this
+          // request will create a new session. An existing main must resolve to an
+          // exact Card before any local-store or provider mutation.
+          if (getLocalSession(sessionKey)) {
+            portableBootstrapProjectionAttemptedBeforeStream = true
+            try {
+              sessionKey = await resolvePortableBootstrapCard(sessionKey)
+              if (!activeCardId) {
+                throw new Error('Existing main has no exact Session Card owner')
+              }
+            } catch (error) {
+              if (error === streamTimeoutError) {
+                return finishPreStreamResponse(streamTimeoutResponse())
+              }
+              if (error === streamAbortError || streamTransportUnavailable()) {
+                return finishPreStreamResponse(abortedResponse())
+              }
+              return finishPreStreamResponse(
+                new Response(
+                  JSON.stringify({
+                    ok: false,
+                    error:
+                      'Existing main Session Card ownership is unavailable',
+                  }),
+                  {
+                    status: 409,
+                    headers: { 'Content-Type': 'application/json' },
+                  },
+                ),
+              )
+            }
+          }
+        }
+        let enhancedMainBootstrapSessionKey: string | null = null
+        if (
+          chatMode === 'enhanced' &&
+          rawSessionKey === 'main' &&
+          !activeCardId
+        ) {
+          enhancedMainBootstrapSessionKey = 'main'
+          let existingMain:
+            | Awaited<ReturnType<typeof listSessions>>[number]
+            | undefined
           try {
-            sessionKey = await resolvePortableBootstrapCard(sessionKey)
+            const allSessions = await waitWithinStreamLifetime(
+              listSessions(30, 0),
+            )
+            ensureStreamTransportAvailable()
+            const isInternal = (id: string) =>
+              id.startsWith('cron_') ||
+              id.startsWith('cron:') ||
+              id.startsWith('agent:main:ops-')
+            const hasRealTitle = (session: {
+              id: string
+              title?: string | null
+            }) => {
+              const title = (session.title ?? '').trim()
+              return title.length > 0 && title !== session.id
+            }
+            const nonInternal = allSessions.filter(
+              (session) => !isInternal(session.id),
+            )
+            const titled = nonInternal.find(hasRealTitle)
+            existingMain =
+              titled ??
+              nonInternal.find(
+                (session) =>
+                  typeof session.message_count === 'number' &&
+                  session.message_count > 0,
+              ) ??
+              nonInternal[0]
           } catch (error) {
             if (error === streamTimeoutError) {
               return finishPreStreamResponse(streamTimeoutResponse())
@@ -795,7 +865,141 @@ export const Route = createFileRoute('/api/send-stream')({
             if (error === streamAbortError || streamTransportUnavailable()) {
               return finishPreStreamResponse(abortedResponse())
             }
-            // A genuine no-Card bootstrap remains on the legacy main identity.
+            return finishPreStreamResponse(
+              new Response(
+                JSON.stringify({
+                  ok: false,
+                  error:
+                    'Unable to verify existing main Session Card ownership',
+                }),
+                {
+                  status: 503,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              ),
+            )
+          }
+
+          if (existingMain) {
+            try {
+              const resolution = await waitWithinStreamLifetime(
+                sessionCardService.resolveRemoteCardByUpstreamSession(
+                  existingMain.id,
+                ),
+              )
+              ensureStreamTransportAvailable()
+              const canonicalSegmentKey = resolution.card.canonicalSegmentKey
+              const canonicalSource =
+                resolution.sourceBySegmentKey
+                  .get(canonicalSegmentKey)
+                  ?.trim() ?? ''
+              const canonicalUpstreamKey =
+                resolution.upstreamKeyBySegmentKey
+                  .get(canonicalSegmentKey)
+                  ?.trim() ?? ''
+              const continuations = resolution.card.continuationSegmentKeys
+              const isCompleteParentCard =
+                resolution.collection.completeness === 'complete' &&
+                !resolution.collection.retryable &&
+                resolution.card.canonicalSource === 'remote' &&
+                resolution.card.canonicalTransport === 'gateway' &&
+                (resolution.card.relationshipKind === 'root' ||
+                  resolution.card.relationshipKind === 'orphan') &&
+                resolution.card.parentCardId === undefined
+              if (
+                !isCompleteParentCard ||
+                canonicalSource !== 'remote' ||
+                !canonicalSegmentKey.startsWith('remote:') ||
+                !canonicalUpstreamKey ||
+                !resolution.card.cardId.startsWith('remote:') ||
+                continuations.length === 0 ||
+                continuations.length !== resolution.card.continuationCount ||
+                continuations[0] !== resolution.card.cardId ||
+                continuations.at(-1) !== canonicalSegmentKey ||
+                new Set(continuations).size !== continuations.length ||
+                !continuations.some(
+                  (segmentKey) =>
+                    resolution.upstreamKeyBySegmentKey.get(segmentKey) ===
+                    existingMain.id,
+                )
+              ) {
+                throw new Error('Existing main has no exact Session Card owner')
+              }
+              const mutationBinding: SessionCardOperationBinding = {
+                kind: 'session-card-owner',
+                cardId: resolution.card.cardId,
+                parentCardId: null,
+                canonicalSource: 'remote',
+                canonicalSegmentKey,
+                canonicalTransport: 'gateway',
+              }
+              const preflightOwner = await waitWithinStreamLifetime(
+                resolveExactSessionCardOperationBinding(mutationBinding),
+              )
+              ensureStreamTransportAvailable()
+              if (
+                !preflightOwner ||
+                preflightOwner.cardId !== mutationBinding.cardId ||
+                preflightOwner.parentCardId !== null
+              ) {
+                throw new Error('Existing main has no exact Session Card owner')
+              }
+              activeCardResolution = resolution
+              activeCardId = resolution.card.cardId
+              activeCardCanonicalSegmentKey = canonicalSegmentKey
+              activeCardCanonicalSource = canonicalSource
+              sessionKey = canonicalUpstreamKey
+              resolvedFriendlyId = resolution.card.cardId
+              requestedCardMutationBinding = mutationBinding
+            } catch (error) {
+              if (error === streamTimeoutError) {
+                return finishPreStreamResponse(streamTimeoutResponse())
+              }
+              if (error === streamAbortError || streamTransportUnavailable()) {
+                return finishPreStreamResponse(abortedResponse())
+              }
+              return finishPreStreamResponse(
+                new Response(
+                  JSON.stringify({
+                    ok: false,
+                    error:
+                      'Existing main Session Card ownership is unavailable',
+                  }),
+                  {
+                    status: 409,
+                    headers: { 'Content-Type': 'application/json' },
+                  },
+                ),
+              )
+            }
+          } else {
+            try {
+              const created = await waitWithinStreamLifetime(createSession())
+              ensureStreamTransportAvailable()
+              if (!created.id) {
+                throw new Error('Gateway did not create a main session')
+              }
+              sessionKey = created.id
+            } catch (error) {
+              if (error === streamTimeoutError) {
+                return finishPreStreamResponse(streamTimeoutResponse())
+              }
+              if (error === streamAbortError || streamTransportUnavailable()) {
+                return finishPreStreamResponse(abortedResponse())
+              }
+              return finishPreStreamResponse(
+                new Response(
+                  JSON.stringify({
+                    ok: false,
+                    error: normalizeClaudeErrorMessage(error),
+                  }),
+                  {
+                    status: 502,
+                    headers: { 'Content-Type': 'application/json' },
+                  },
+                ),
+              )
+            }
           }
         }
         // Once a request has a validated Card projection, every public identity
@@ -805,9 +1009,13 @@ export const Route = createFileRoute('/api/send-stream')({
         const getPublicSessionKey = () =>
           activeCardCanonicalSegmentKey ??
           portableBootstrapSessionKey ??
+          enhancedMainBootstrapSessionKey ??
           sessionKey
         const publicFriendlyId =
-          activeCardId ?? portableBootstrapSessionKey ?? resolvedFriendlyId
+          activeCardId ??
+          portableBootstrapSessionKey ??
+          enhancedMainBootstrapSessionKey ??
+          resolvedFriendlyId
         const getVerifiedBootstrapCardAuthority = () => {
           const card = activeCardResolution?.card
           if (
@@ -1768,7 +1976,8 @@ export const Route = createFileRoute('/api/send-stream')({
                 throw new Error(SESSIONS_API_UNAVAILABLE_MESSAGE)
               }
 
-              const requestedPreStreamSessionKey = sessionKey
+              const requestedPreStreamSessionKey =
+                enhancedMainBootstrapSessionKey ?? sessionKey
               if (SESSION_BOOTSTRAP_KEYS.has(sessionKey)) {
                 // 'main' should land in the user's existing main chat,
                 // not spin up a brand new session every time. Skip cron
@@ -1839,7 +2048,16 @@ export const Route = createFileRoute('/api/send-stream')({
               let bootstrapHandoff: ReturnType<
                 typeof resolveAuthoritativeBootstrapHandoff
               > = null
-              if (enhancedBootstrapSessionKey) {
+              if (
+                enhancedBootstrapSessionKey &&
+                activeCardId &&
+                activeCardCanonicalSegmentKey
+              ) {
+                bootstrapHandoff = resolveAuthoritativeBootstrapHandoff(
+                  requestedPreStreamSessionKey,
+                  activeCardCanonicalSegmentKey,
+                )
+              } else if (enhancedBootstrapSessionKey) {
                 try {
                   const resolvedBootstrapCard = await waitWithinStreamLifetime(
                     sessionCardService.resolveRemoteCardByUpstreamSession(
@@ -1884,6 +2102,14 @@ export const Route = createFileRoute('/api/send-stream')({
                   activeCardCanonicalSegmentKey = canonicalSegmentKey
                   activeCardCanonicalSource = canonicalSource
                   resolvedFriendlyId = resolvedBootstrapCard.card.cardId
+                  requestedCardMutationBinding = {
+                    kind: 'session-card-owner',
+                    cardId: resolvedBootstrapCard.card.cardId,
+                    parentCardId: null,
+                    canonicalSource: 'remote',
+                    canonicalSegmentKey,
+                    canonicalTransport: 'gateway',
+                  }
                   bootstrapHandoff = resolveAuthoritativeBootstrapHandoff(
                     requestedPreStreamSessionKey,
                     canonicalSegmentKey,

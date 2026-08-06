@@ -3,6 +3,7 @@ import { KillConfirmDialog } from './kill-confirm-dialog'
 import { SteerModal } from './steer-modal'
 
 import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
+import type { GatewayAgentCardBinding } from '@/lib/gateway-api'
 
 export type AgentRegistryStatus = 'active' | 'idle' | 'available' | 'paused'
 
@@ -15,7 +16,7 @@ export type AgentRegistryCardData = {
   status: AgentRegistryStatus
   sessionKey?: string
   friendlyId?: string
-  controlKey?: string
+  cardBinding?: GatewayAgentCardBinding
   cardNavigation?: SessionCardProducerNavigation
 }
 
@@ -90,10 +91,10 @@ export function AgentRegistryCard({
     setKillOpen(false)
     setPausePending(false)
     setNotice('')
-  }, [agent.id, agent.sessionKey, agent.status])
+  }, [agent.cardBinding, agent.id, agent.status])
 
-  const hasSession = Boolean(agent.sessionKey)
-  const hasControlIdentity = Boolean(agent.sessionKey && agent.controlKey)
+  const hasSession = Boolean(agent.cardNavigation)
+  const hasControlIdentity = Boolean(agent.cardBinding)
   const isPaused = agent.status === 'paused'
 
   function showSpawnFirstNotice() {
@@ -101,7 +102,7 @@ export function AgentRegistryCard({
   }
 
   function handleSteerIntent() {
-    if (!hasSession) {
+    if (!hasControlIdentity) {
       showSpawnFirstNotice()
       return
     }
@@ -109,7 +110,7 @@ export function AgentRegistryCard({
   }
 
   function handleKillIntent() {
-    if (!hasSession) {
+    if (!hasControlIdentity) {
       showSpawnFirstNotice()
       return
     }
@@ -268,20 +269,24 @@ export function AgentRegistryCard({
         </div>
       </div>
 
-      <SteerModal
-        open={steerOpen}
-        onOpenChange={setSteerOpen}
-        agentName={agent.name}
-        sessionKey={agent.sessionKey}
-      />
+      {agent.cardBinding ? (
+        <>
+          <SteerModal
+            open={steerOpen}
+            onOpenChange={setSteerOpen}
+            agentName={agent.name}
+            cardBinding={agent.cardBinding}
+          />
 
-      <KillConfirmDialog
-        open={killOpen}
-        onOpenChange={setKillOpen}
-        agentName={agent.name}
-        sessionKey={agent.sessionKey}
-        onKilled={() => onKilled?.(agent)}
-      />
+          <KillConfirmDialog
+            open={killOpen}
+            onOpenChange={setKillOpen}
+            agentName={agent.name}
+            cardBinding={agent.cardBinding}
+            onKilled={() => onKilled?.(agent)}
+          />
+        </>
+      ) : null}
     </article>
   )
 }

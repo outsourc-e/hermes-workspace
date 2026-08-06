@@ -20,6 +20,7 @@ reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const gatewayMocks = vi.hoisted(() => ({
   killAgentSession: vi.fn(),
+  steerAgent: vi.fn(),
   toggleAgentPause: vi.fn(),
 }))
 
@@ -40,6 +41,7 @@ vi.mock('@/stores/mission-store', async (importOriginal) => {
 
 vi.mock('@/lib/gateway-api', () => ({
   killAgentSession: gatewayMocks.killAgentSession,
+  steerAgent: gatewayMocks.steerAgent,
   toggleAgentPause: gatewayMocks.toggleAgentPause,
 }))
 
@@ -202,6 +204,7 @@ beforeEach(() => {
   localStorage.clear()
   useMissionStore.setState(useMissionStore.getInitialState(), true)
   gatewayMocks.killAgentSession.mockReset()
+  gatewayMocks.steerAgent.mockReset()
   gatewayMocks.toggleAgentPause.mockReset()
   vi.stubGlobal('EventSource', FakeEventSource)
 })
@@ -291,22 +294,17 @@ describe('authoritative Mission gateway transport', () => {
       projection('remote:root-c'),
       projection('remote:root-d'),
     ]
-    const sendKeys: Array<string> = []
-    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+    const fetchMock = vi.fn<typeof fetch>((input) => {
       const url = String(input)
       if (url === '/api/session-cards') {
         return Promise.resolve(
           Response.json(successorCards.shift() ?? emptyProjection()),
         )
       }
-      if (url === '/api/sessions/send') {
-        const body = JSON.parse(String(init?.body)) as { sessionKey: string }
-        sendKeys.push(body.sessionKey)
-        return Promise.resolve(Response.json({ ok: true }))
-      }
       return Promise.resolve(Response.json({}, { status: 404 }))
     })
     vi.stubGlobal('fetch', fetchMock)
+    gatewayMocks.steerAgent.mockResolvedValue({ ok: true })
     gatewayMocks.toggleAgentPause.mockResolvedValue(undefined)
     gatewayMocks.killAgentSession.mockRejectedValue(new Error('kill failed'))
 
@@ -315,7 +313,17 @@ describe('authoritative Mission gateway transport', () => {
     await React.act(async () => {
       await harness.current.handleSteerAgent('agent-1', 'continue')
     })
-    expect(sendKeys).toEqual(['root-b'])
+    expect(gatewayMocks.steerAgent).toHaveBeenCalledWith(
+      {
+        kind: 'session-card-owner',
+        cardId: ROOT_CARD_ID,
+        parentCardId: null,
+        canonicalSource: 'remote',
+        canonicalSegmentKey: 'remote:root-b',
+        canonicalTransport: 'gateway',
+      },
+      'continue',
+    )
 
     await React.act(async () => {
       await harness.current.handleMissionPause(true)
@@ -330,7 +338,14 @@ describe('authoritative Mission gateway transport', () => {
         'kill failed',
       )
     })
-    expect(gatewayMocks.killAgentSession).toHaveBeenCalledWith('root-c')
+    expect(gatewayMocks.killAgentSession).toHaveBeenCalledWith({
+      kind: 'session-card-owner',
+      cardId: ROOT_CARD_ID,
+      parentCardId: null,
+      canonicalSource: 'remote',
+      canonicalSegmentKey: 'remote:root-c',
+      canonicalTransport: 'gateway',
+    })
     expect(useMissionStore.getState().agentCardIdMap).toEqual({
       'agent-1': ROOT_CARD_ID,
     })

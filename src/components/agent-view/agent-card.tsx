@@ -16,6 +16,7 @@ import { AgentProgress } from './agent-progress'
 import { KillConfirmDialog } from './kill-confirm-dialog'
 import { SteerModal } from './steer-modal'
 import type { AgentProgressStatus } from './agent-progress'
+import type { GatewayAgentCardBinding } from '@/lib/gateway-api'
 import { Button } from '@/components/ui/button'
 import { AgentAvatar } from '@/components/agent-avatar'
 import {
@@ -66,6 +67,7 @@ export type AgentNode = {
   statusBubble?: AgentStatusBubble
   isMain?: boolean
   sessionKey?: string
+  cardBinding?: GatewayAgentCardBinding
   cardId?: string
   parentCardId?: string | null
 }
@@ -181,10 +183,10 @@ export function AgentCard({
   const showActions = !node.isMain
   const isCompact = viewMode === 'compact'
   const isQueued = node.status === 'queued'
-  // Card IDs are navigation identities, not gateway agent-control identities.
-  // Fail closed unless the caller supplies a distinct control session key.
-  const sessionKey = (node.sessionKey || '').trim()
-  const canWardenControl = showActions && !isQueued && sessionKey.length > 0
+  // Raw transport keys never authorize steer/kill. Controls require the exact
+  // source-qualified Card operation capability projected by the caller.
+  const cardBinding = node.cardBinding
+  const canWardenControl = showActions && !isQueued && Boolean(cardBinding)
   const cardId = (node.cardId || '').trim()
   const canPauseControl = showActions && !isQueued && cardId.length > 0
   const [showDetail, setShowDetail] = useState(false)
@@ -303,23 +305,24 @@ export function AgentCard({
     )
   }
 
-  const wardenDialogs = canWardenControl ? (
-    <>
-      <SteerModal
-        open={steerOpen}
-        onOpenChange={setSteerOpen}
-        agentName={node.name}
-        sessionKey={sessionKey}
-      />
-      <KillConfirmDialog
-        open={killConfirmOpen}
-        onOpenChange={setKillConfirmOpen}
-        agentName={node.name}
-        sessionKey={sessionKey}
-        onKilled={handleKillComplete}
-      />
-    </>
-  ) : null
+  const wardenDialogs =
+    canWardenControl && cardBinding ? (
+      <>
+        <SteerModal
+          open={steerOpen}
+          onOpenChange={setSteerOpen}
+          agentName={node.name}
+          cardBinding={cardBinding}
+        />
+        <KillConfirmDialog
+          open={killConfirmOpen}
+          onOpenChange={setKillConfirmOpen}
+          agentName={node.name}
+          cardBinding={cardBinding}
+          onKilled={handleKillComplete}
+        />
+      </>
+    ) : null
 
   const compactModelLabel =
     node.model.length > 20 ? `${node.model.slice(0, 19)}…` : node.model

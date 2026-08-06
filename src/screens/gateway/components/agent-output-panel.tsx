@@ -716,7 +716,7 @@ export function AgentOutputPanel({
       )}
 
       {/* Inline message input */}
-      {enableMessaging && sessionKey && !sessionEnded && (
+      {enableMessaging && sessionKey && onSendMessage && !sessionEnded && (
         <form
           className="mt-2 flex items-center gap-2"
           onSubmit={(e) => {
@@ -732,17 +732,7 @@ export function AgentOutputPanel({
             ])
             // Clear sessionEnded so we show the streaming cursor again
             setSessionEnded(false)
-            if (onSendMessage) {
-              onSendMessage(sessionKey, text)
-            } else {
-              fetch('/api/sessions/send', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ sessionKey, message: text }),
-              }).catch(() => {
-                /* best effort */
-              })
-            }
+            onSendMessage(sessionKey, text)
             setSendingMessage(false)
             messageInputRef.current?.focus()
           }}

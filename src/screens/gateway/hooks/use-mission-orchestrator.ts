@@ -11,8 +11,13 @@ import type {
   SessionCardListWire,
 } from '@/screens/chat/chat-queries'
 import type { ActiveMission, MissionProcessType } from '@/stores/mission-store'
+import type { GatewayAgentCardBinding } from '@/lib/gateway-api'
 import { useMissionStore } from '@/stores/mission-store'
-import { killAgentSession, toggleAgentPause } from '@/lib/gateway-api'
+import {
+  killAgentSession,
+  steerAgent,
+  toggleAgentPause,
+} from '@/lib/gateway-api'
 import {
   fetchSessionCards,
   retainCompleteSessionCardProjections,
@@ -608,11 +613,14 @@ export function useMissionOrchestrator() {
     [maybeCompleteMission, setAgentStatus, updateTasksForAgent],
   )
 
-  const refreshAgentTransport = useCallback(
+  const refreshAgentControl = useCallback(
     async (
       agentId: string,
       response?: SessionCardListWire,
-    ): Promise<string> => {
+    ): Promise<{
+      sessionKey: string
+      cardBinding: GatewayAgentCardBinding
+    }> => {
       const state = useMissionStore.getState()
       const cardId = state.agentCardIdMap[agentId]
       if (!cardId) throw new Error('No authoritative Card owner to control')
@@ -626,6 +634,14 @@ export function useMissionOrchestrator() {
         throw new Error('Card has no authoritative gateway transport')
       }
       const { owner, sessionKey: nextSessionKey } = resolved
+      if (
+        !owner.cardId.startsWith('remote:') ||
+        !owner.canonicalSegmentKey.startsWith('remote:') ||
+        (owner.parentCardId !== undefined &&
+          !owner.parentCardId.startsWith('remote:'))
+      ) {
+        throw new Error('Card has no exact source-qualified control binding')
+      }
 
       const previousSessionKey = transientSessionMapRef.current[agentId]
       if (previousSessionKey !== nextSessionKey) {
@@ -638,9 +654,25 @@ export function useMissionOrchestrator() {
         }
       }
       persistCardOwner(agentId, owner, cards, state.agentCardModelMap[agentId])
-      return nextSessionKey
+      return {
+        sessionKey: nextSessionKey,
+        cardBinding: {
+          kind: 'session-card-owner',
+          cardId: owner.cardId,
+          parentCardId: owner.parentCardId ?? null,
+          canonicalSource: 'remote',
+          canonicalSegmentKey: owner.canonicalSegmentKey,
+          canonicalTransport: 'gateway',
+        },
+      }
     },
     [attachSessionStream, persistCardOwner],
+  )
+
+  const refreshAgentTransport = useCallback(
+    async (agentId: string, response?: SessionCardListWire): Promise<string> =>
+      (await refreshAgentControl(agentId, response)).sessionKey,
+    [refreshAgentControl],
   )
 
   const spawnAgentSession = useCallback(
@@ -1167,9 +1199,10 @@ export function useMissionOrchestrator() {
       const payload = retryPayloadRef.current[agentId]
       if (!member || !payload) return
 
-      const currentSessionKey = await refreshAgentTransport(agentId)
+      const currentControl = await refreshAgentControl(agentId)
+      const currentSessionKey = currentControl.sessionKey
       try {
-        await killAgentSession(currentSessionKey)
+        await killAgentSession(currentControl.cardBinding)
       } catch (error) {
         setAgentStatus(agentId, {
           status: 'error',
@@ -1204,7 +1237,7 @@ export function useMissionOrchestrator() {
     },
     [
       dispatchAgentTasks,
-      refreshAgentTransport,
+      refreshAgentControl,
       setAgentStatus,
       spawnAgentSession,
     ],
@@ -1280,14 +1313,14 @@ export function useMissionOrchestrator() {
 
   const handleKillAgent = useCallback(
     async (agentId: string) => {
-      const sessionKey = await refreshAgentTransport(agentId)
+      const { cardBinding, sessionKey } = await refreshAgentControl(agentId)
       const member = missionRef.current?.team.find(
         (entry) => entry.id === agentId,
       )
       const agentName = member?.name ?? agentId
 
       try {
-        await killAgentSession(sessionKey)
+        await killAgentSession(cardBinding)
       } catch (error) {
         setAgentStatus(agentId, {
           status: 'error',
@@ -1322,7 +1355,7 @@ export function useMissionOrchestrator() {
       })
     },
     [
-      refreshAgentTransport,
+      refreshAgentControl,
       setAgentCardOwner,
       setAgentCardStatus,
       setAgentStatus,
@@ -1331,24 +1364,14 @@ export function useMissionOrchestrator() {
 
   const handleSteerAgent = useCallback(
     async (agentId: string, message: string) => {
-      const sessionKey = await refreshAgentTransport(agentId)
+      const { cardBinding, sessionKey } = await refreshAgentControl(agentId)
 
       const directive = message.trim()
       if (!directive) return
 
-      const response = await fetch('/api/sessions/send', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionKey, message: directive }),
-      })
-      const payload = (await response
-        .json()
-        .catch(() => ({}))) as DispatchResponse
-
-      if (!response.ok || payload.ok === false) {
-        throw new Error(
-          payload.error || payload.message || `HTTP ${response.status}`,
-        )
+      const response = await steerAgent(cardBinding, directive)
+      if (response.ok === false) {
+        throw new Error(response.error || 'Failed to steer agent')
       }
 
       const member = missionRef.current?.team.find(
@@ -1371,7 +1394,7 @@ export function useMissionOrchestrator() {
         agentName,
       })
     },
-    [refreshAgentTransport, setAgentCardStatus],
+    [refreshAgentControl, setAgentCardStatus],
   )
 
   const abortMission = useCallback(async () => {
