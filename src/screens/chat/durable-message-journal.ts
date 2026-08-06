@@ -156,17 +156,41 @@ export function writeMessageJournal<T>(
     let valueVerified = false
     let valuePersistent = false
     for (const storage of storages) {
+      let preparedWritten = false
       try {
         // A prepared row is never recovery authority. Only promote it after an
         // exact readback proves this mirror accepted the candidate bytes.
         storage.setItem(key, prepared)
-        if (storage.getItem(key) !== prepared) continue
+        preparedWritten = true
+        if (storage.getItem(key) !== prepared) {
+          try {
+            storage.removeItem(key)
+          } catch {
+            // Cleanup is best effort for an unavailable mirror.
+          }
+          continue
+        }
         storage.setItem(key, committed)
+        if (storage.getItem(key) !== committed) {
+          try {
+            storage.removeItem(key)
+          } catch {
+            // Cleanup is best effort for an unavailable mirror.
+          }
+          continue
+        }
         valueVerified = true
         if (isPersistentBrowserStorage(storage)) valuePersistent = true
       } catch {
-        // A setItem that landed before readback failed leaves only a prepared
-        // row, which future readers reject instead of resurrecting the send.
+        // If preparation landed before readback/commit failed, remove the
+        // unverified row so later recovery does not repeatedly encounter it.
+        if (preparedWritten) {
+          try {
+            storage.removeItem(key)
+          } catch {
+            // Cleanup is best effort for an unavailable mirror.
+          }
+        }
       }
     }
     if (!valueVerified) return { anyVerified: false, persistentVerified: false }

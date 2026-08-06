@@ -4,6 +4,7 @@ import {
   removeMessageJournalValues,
   writeMessageJournal,
 } from './durable-message-journal'
+import { parsePortableAttachmentDataUrl } from './attachment-envelope'
 import type { ChatAttachment, ChatMessage } from './types'
 
 export const CARD_TRANSCRIPT_RECOVERY_VERSION = 2 as const
@@ -289,6 +290,7 @@ export function cardTranscriptMessagesMatch(
   if (!compatibleContent(left, right)) return false
 
   const runKeys = [
+    'recoveryId',
     'runId',
     'run_id',
     'providerRunId',
@@ -358,6 +360,7 @@ function isRecoveryOverlay(message: ChatMessage): boolean {
   if (message.role !== 'assistant') return false
   return (
     identifierSet(message, [
+      'recoveryId',
       'runId',
       'run_id',
       'providerRunId',
@@ -456,6 +459,12 @@ function hasOversizedString(value: unknown): boolean {
 
 function validAttachment(value: unknown): boolean {
   if (!record(value)) return false
+  if (
+    value.dataUrl !== undefined &&
+    !parsePortableAttachmentDataUrl(value.dataUrl, value.contentType)
+  ) {
+    return false
+  }
   for (const key of ['dataUrl', 'previewUrl', 'url'] as const) {
     const candidate = value[key]
     if (

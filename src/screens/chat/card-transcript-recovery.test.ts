@@ -466,6 +466,31 @@ describe('Card transcript recovery storage contract', () => {
     ])
   })
 
+  it('preserves equal assistant recovery rows with distinct recovery-only identities', () => {
+    const first = message('assistant', 'Recovered answer', {
+      recoveryId: 'recovery-only-a',
+      __streamingStatus: 'complete',
+    })
+    const second = message('assistant', 'Recovered answer', {
+      recoveryId: 'recovery-only-b',
+      __streamingStatus: 'complete',
+      timestamp: now + 1_000,
+    })
+
+    expect(cardTranscriptMessagesMatch(first, second)).toBe(false)
+    expect(
+      replaceCardTranscriptRecoveryMessages(owner, [first, second], { now })
+        ?.messages,
+    ).toEqual([first, second])
+
+    clearCardTranscriptRecoveryMemory()
+    window.sessionStorage.clear()
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      first,
+      second,
+    ])
+  })
+
   it('never acknowledges equal text and timestamps across conflicting non-null run identities', () => {
     const overlay = message('assistant', 'same answer at the same instant', {
       runId: 'run-local',
@@ -705,7 +730,7 @@ describe('Card transcript recovery storage contract', () => {
       name: 'notes.txt',
       contentType: 'text/plain',
       size: 5,
-      dataUrl: 'hello',
+      dataUrl: 'data:text/plain;base64,aGVsbG8=',
     }
     replaceCardTranscriptRecoveryMessages(
       owner,
@@ -771,7 +796,7 @@ describe('Card transcript recovery storage contract', () => {
               name: 'notes.txt',
               contentType: 'text/plain',
               size: 5,
-              dataUrl: 'hello',
+              dataUrl: 'data:text/plain;base64,aGVsbG8=',
             },
           ],
         },

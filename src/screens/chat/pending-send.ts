@@ -8,6 +8,7 @@ import {
 import {
   clearMessageJournal,
   readMessageJournal,
+  removeMessageJournalValues,
   writeMessageJournal,
 } from './durable-message-journal'
 import type { ChatAttachment, ChatMessage } from './types'
@@ -286,9 +287,18 @@ function writePendingSendToStorage(
     window.localStorage.setItem(key, serialized)
     // The per-message journal is the cross-context authority. The aggregate
     // record is retained for transport metadata and legacy readers.
-    window.localStorage.getItem(key)
+    if (window.localStorage.getItem(key) !== serialized) {
+      throw new Error('pending-send aggregate readback mismatch')
+    }
     return true
   } catch {
+    if (reserveTerminal) {
+      removeRejectedPendingMessage(
+        ownedPayload.sessionKey,
+        optimisticClientId,
+        ownedPayload.provisionalOwnerId,
+      )
+    }
     return false
   }
 }
@@ -418,6 +428,121 @@ function pendingMessageClientId(message: ChatMessage): string {
     if (typeof value === 'string' && value.trim()) return value.trim()
   }
   return ''
+}
+
+function pendingMessageText(message: ChatMessage): string {
+  if (!Array.isArray(message.content)) return ''
+  return message.content
+    .filter(
+      (part): part is { type: 'text'; text: string } =>
+        part.type === 'text' && typeof part.text === 'string',
+    )
+    .map((part) => part.text)
+    .join('')
+}
+
+function lastPendingUserMessage(
+  messages: Array<ChatMessage>,
+): ChatMessage | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'user') return messages[index]
+  }
+  return undefined
+}
+
+/** Remove one user turn that failed the bootstrap pre-transport admission gate. */
+export function removeRejectedPendingMessage(
+  sessionKey: string,
+  clientId: string,
+  provisionalOwnerId = '',
+): void {
+  const normalizedClientId = clientId.trim()
+  if (!canUseLocalStorage() || !sessionKey || !normalizedClientId) return
+
+  const key = getPendingStorageKey(sessionKey, provisionalOwnerId)
+  const journalMessages = readPendingJournal(key)
+  removeMessageJournalValues(
+    key,
+    journalMessages.filter(
+      (message) => pendingMessageClientId(message) === normalizedClientId,
+    ),
+    [window.localStorage],
+    pendingJournalIdentity,
+  )
+
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (raw) {
+      const parsed = JSON.parse(raw) as PersistedPendingSendPayload
+      const payload = toPendingSendPayload(parsed)
+      if (payload) {
+        const priorMessages = getPendingRecoveryMessages(payload)
+        const recoveryMessages = priorMessages.filter(
+          (message) => pendingMessageClientId(message) !== normalizedClientId,
+        )
+        if (
+          pendingMessageClientId(payload.optimisticMessage) ===
+          normalizedClientId
+        ) {
+          const replacement = lastPendingUserMessage(recoveryMessages)
+          if (!replacement) {
+            window.localStorage.removeItem(key)
+          } else {
+            const record: PersistedPendingSendPayload = {
+              ...payload,
+              message: pendingMessageText(replacement),
+              attachments: Array.isArray(replacement.attachments)
+                ? replacement.attachments
+                : [],
+              optimisticMessage: replacement,
+              recoveryMessages,
+              storedAt:
+                typeof parsed.storedAt === 'number'
+                  ? parsed.storedAt
+                  : Date.now(),
+            }
+            window.localStorage.setItem(key, JSON.stringify(record))
+          }
+        } else if (recoveryMessages.length !== priorMessages.length) {
+          window.localStorage.setItem(
+            key,
+            JSON.stringify({ ...parsed, recoveryMessages }),
+          )
+        }
+      }
+    }
+  } catch {
+    // Cleanup is best effort when browser storage becomes unavailable.
+  }
+
+  if (
+    pendingSend?.sessionKey === sessionKey &&
+    (!provisionalOwnerId ||
+      pendingSend.provisionalOwnerId === provisionalOwnerId)
+  ) {
+    const recoveryMessages = getPendingRecoveryMessages(pendingSend).filter(
+      (message) => pendingMessageClientId(message) !== normalizedClientId,
+    )
+    if (
+      pendingMessageClientId(pendingSend.optimisticMessage) ===
+      normalizedClientId
+    ) {
+      const replacement = lastPendingUserMessage(recoveryMessages)
+      pendingSend = replacement
+        ? {
+            ...pendingSend,
+            message: pendingMessageText(replacement),
+            attachments: Array.isArray(replacement.attachments)
+              ? replacement.attachments
+              : [],
+            optimisticMessage: replacement,
+            recoveryMessages,
+          }
+        : null
+    } else {
+      pendingSend = { ...pendingSend, recoveryMessages }
+    }
+  }
 }
 
 /** Update the durable provisional/legacy overlay before a route can remount. */

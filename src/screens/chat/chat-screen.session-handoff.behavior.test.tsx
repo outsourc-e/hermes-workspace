@@ -20,6 +20,7 @@ import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
 import { chatQueryKeys, sessionCardQueryKeys } from './chat-queries'
 import { ChatScreen } from './chat-screen'
 import {
+  getNewChatProvisionalOwnerId,
   getPendingRecoveryMessages,
   hasPendingGeneration,
   persistPendingMessage,
@@ -410,7 +411,7 @@ vi.mock('./components/chat-composer', () => ({
                   name: 'notes.txt',
                   contentType: 'text/plain',
                   size: 5,
-                  dataUrl: 'hello',
+                  dataUrl: 'data:text/plain;base64,aGVsbG8=',
                 },
               ],
               false,
@@ -3488,6 +3489,116 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     remountClient.clear()
   })
 
+  it('rolls back a bootstrap journal append when aggregate admission fails before transport', () => {
+    const provisionalOwnerId = getNewChatProvisionalOwnerId()
+    const baseline: ChatMessage = {
+      role: 'user',
+      content: [{ type: 'text', text: 'accepted bootstrap baseline' }],
+      clientId: 'client-bootstrap-baseline',
+      client_id: 'client-bootstrap-baseline',
+      __optimisticId: 'opt-client-bootstrap-baseline',
+      status: 'sent',
+      timestamp: 1,
+    }
+    expect(
+      persistPendingMessage({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        provisionalOwnerId,
+        message: 'accepted bootstrap baseline',
+        attachments: [],
+        optimisticMessage: baseline,
+      }),
+    ).toBe(true)
+
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      if (
+        this === window.localStorage &&
+        key.startsWith('workspace.chat-provisional-send.v2:new-chat:') &&
+        !key.includes(':entry:') &&
+        value.includes('"text":"continue"')
+      ) {
+        throw new DOMException('aggregate quota failure', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, key, value)
+    })
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }))
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatRouteHarness
+            initialRoute={{ friendlyId: 'new', sessionKey: 'new' }}
+          />
+        </QueryClientProvider>,
+      )
+    })
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+
+    expect(showErrorToast).toHaveBeenCalledWith(
+      expect.stringContaining('could not be saved safely'),
+    )
+    expect(queryContext.composerReset).not.toHaveBeenCalled()
+    expect(
+      fetchSpy.mock.calls.some(
+        ([input]) => String(input) === '/api/send-stream',
+      ),
+    ).toBe(false)
+    expect(
+      getPendingRecoveryMessages(
+        readPendingMessage('new', 'new', provisionalOwnerId)!,
+      ),
+    ).toEqual([baseline])
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+    vi.mocked(Storage.prototype.setItem).mockRestore()
+
+    const remountClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = remountClient
+    const remountContainer = document.createElement('div')
+    document.body.appendChild(remountContainer)
+    const remountRoot = createRoot(remountContainer)
+    React.act(() => {
+      remountRoot.render(
+        <QueryClientProvider client={remountClient}>
+          <ChatRouteHarness
+            initialRoute={{ friendlyId: 'new', sessionKey: 'new' }}
+          />
+        </QueryClientProvider>,
+      )
+    })
+    const transcript = remountContainer.querySelector(
+      '[data-testid="chat-transcript"]',
+    )?.textContent
+    expect(transcript).toContain('accepted bootstrap baseline')
+    expect(transcript).not.toContain('continue')
+
+    React.act(() => remountRoot.unmount())
+    document.body.removeChild(remountContainer)
+    remountClient.clear()
+  })
+
   it.each([
     ['identical', 'Repeated answer'],
     ['prefix', 'Repeated answer from an older turn'],
@@ -3678,7 +3789,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           {
             id: 'safe-file',
             name: 'notes.txt',
-            dataUrl: 'hello',
+            dataUrl: 'data:text/plain;base64,aGVsbG8=',
           },
         ],
       },

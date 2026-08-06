@@ -65,4 +65,21 @@ describe('CI pnpm reproducibility', () => {
     expect(installer).not.toMatch(/pnpm@latest|npm install -g pnpm(?:\s|$)/u)
     expect(installer).not.toContain('pnpm_cmd install --silent')
   })
+
+  it('pins the Windows setup guide to the package pnpm version and a frozen lockfile', () => {
+    const packageJson = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'),
+    ) as { packageManager?: string }
+    const windowsGuide = readFileSync(
+      resolve(process.cwd(), 'docs/windows-setup-guide.md'),
+      'utf8',
+    )
+    const packageManager = packageJson.packageManager
+
+    expect(packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/u)
+    expect(windowsGuide).toContain(`npm install -g ${packageManager}`)
+    expect(windowsGuide).toContain('pnpm install --frozen-lockfile')
+    expect(windowsGuide).not.toMatch(/^npm install -g pnpm\s*$/mu)
+    expect(windowsGuide).not.toMatch(/^pnpm install\s*$/mu)
+  })
 })

@@ -865,6 +865,34 @@ describe('send-stream bootstrap session handoff', () => {
     },
   )
 
+  it('accepts the browser text-attachment base64 data-URL envelope', async () => {
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'review this text file',
+          attachments: [
+            {
+              id: 'browser-text-file',
+              name: 'notes.txt',
+              contentType: 'text/plain',
+              size: 7,
+              dataUrl: 'data:text/plain;base64,aGVsbG8gz4A=',
+            },
+          ],
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    await response.text()
+    expect(mocks.streamChat).toHaveBeenCalledTimes(1)
+    expect(mocks.createSession).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects an initially stale local Card before local session or provider mutation', async () => {
     mocks.getDiscoveredModels.mockReturnValue([
       { id: 'local-model', name: 'Local Model', provider: 'local-provider' },

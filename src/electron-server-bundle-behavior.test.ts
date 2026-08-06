@@ -65,10 +65,12 @@ type ElectronServerArtifact = {
     getMission: ArtifactFunction
     getMissionAuthorityBindings: ArtifactFunction
     initializeRoutes: () => void
+    readMessageJournal: ArtifactFunction
     runDispatchWorker: (...args: Array<unknown>) => Promise<unknown>
     setMissionStorePath: (path: string) => void
     replaceBoundaries: (boundaries: ElectronArtifactBoundaries) => void
     replaceSessionCardService: (service: SessionCardServiceBoundary) => void
+    writeMessageJournal: ArtifactFunction
   }
 }
 
@@ -115,6 +117,9 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
       globalThis.fetch = originalFetch;
     }
   },
+  readMessageJournal(...args) {
+    return readMessageJournal(...args);
+  },
   replaceSessionCardService(service) {
     sessionCardService = service;
   },
@@ -123,6 +128,9 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
   },
   setMissionStorePath(path) {
     SWARM_MISSIONS_PATH = path;
+  },
+  writeMessageJournal(...args) {
+    return writeMessageJournal(...args);
   },
   replaceBoundaries(boundaries) {
     abandonActiveCardRun = boundaries.abandonActiveCardRun;
@@ -492,6 +500,49 @@ function workerMessagesWithImmediateReply() {
   }
 }
 
+class RecordingStorage implements Storage {
+  readonly writes: Array<{ key: string; value: string }> = []
+  readonly removals: Array<string> = []
+  readbackFailureState: 'prepared' | 'committed' | null = null
+  readbackFailuresRemaining = 0
+  private readonly values = new Map<string, string>()
+
+  get length(): number {
+    return this.values.size
+  }
+
+  clear(): void {
+    this.values.clear()
+  }
+
+  getItem(key: string): string | null {
+    const value = this.values.get(key) ?? null
+    if (
+      this.readbackFailureState &&
+      value?.includes(`"state":"${this.readbackFailureState}"`) &&
+      this.readbackFailuresRemaining > 0
+    ) {
+      this.readbackFailuresRemaining -= 1
+      return null
+    }
+    return value
+  }
+
+  key(index: number): string | null {
+    return [...this.values.keys()][index] ?? null
+  }
+
+  removeItem(key: string): void {
+    this.removals.push(key)
+    this.values.delete(key)
+  }
+
+  setItem(key: string, value: string): void {
+    this.writes.push({ key, value })
+    this.values.set(key, value)
+  }
+}
+
 describe('checked-in Electron server bundle behavior', () => {
   const providerActions = {
     openaiChat: vi.fn(),
@@ -614,6 +665,104 @@ describe('checked-in Electron server bundle behavior', () => {
       unregisterActiveSendRun: runStoreActions.unregisterActiveSendRun,
     })
   })
+
+  it('executes journal-v2 prepare, commit, and recovery through the generated artifact', () => {
+    const storage = new RecordingStorage()
+    const message = { id: 'artifact-message', text: 'durable Electron value' }
+    const identityOf = (value: unknown) =>
+      typeof value === 'object' && value !== null && 'id' in value
+        ? String(value.id)
+        : ''
+    const validate = (value: unknown) =>
+      identityOf(value) === message.id ? value : null
+
+    expect(
+      artifact.__artifactContract.writeMessageJournal(
+        'electron-journal-v2',
+        [message],
+        [storage],
+        identityOf,
+      ),
+    ).toEqual({ anyVerified: true, persistentVerified: false })
+
+    expect(storage.writes).toHaveLength(2)
+    const prepared = JSON.parse(storage.writes[0]!.value) as Record<
+      string,
+      unknown
+    >
+    const committed = JSON.parse(storage.writes[1]!.value) as Record<
+      string,
+      unknown
+    >
+    expect(prepared).toMatchObject({
+      version: 2,
+      revision: 1,
+      state: 'prepared',
+      value: message,
+    })
+    expect(committed).toMatchObject({
+      version: 2,
+      revision: prepared.revision,
+      commitId: prepared.commitId,
+      state: 'committed',
+      value: message,
+    })
+    expect(
+      artifact.__artifactContract.readMessageJournal(
+        'electron-journal-v2',
+        [storage],
+        identityOf,
+        validate,
+      ),
+    ).toEqual([message])
+  })
+
+  it.each([
+    ['prepared', 1],
+    ['committed', 2],
+  ] as const)(
+    'rejects and removes a generated journal-v2 row whose %s readback fails',
+    (failedState, expectedWrites) => {
+      const storage = new RecordingStorage()
+      storage.readbackFailureState = failedState
+      storage.readbackFailuresRemaining = 1
+      const message = { id: 'unverified-artifact-message' }
+      const identityOf = (value: unknown) =>
+        typeof value === 'object' && value !== null && 'id' in value
+          ? String(value.id)
+          : ''
+      const validate = (value: unknown) =>
+        identityOf(value) === message.id ? value : null
+
+      expect(
+        artifact.__artifactContract.writeMessageJournal(
+          'electron-journal-v2-failed-readback',
+          [message],
+          [storage],
+          identityOf,
+        ),
+      ).toEqual({ anyVerified: false, persistentVerified: false })
+      expect(storage.writes).toHaveLength(expectedWrites)
+      expect(JSON.parse(storage.writes.at(-1)!.value)).toMatchObject({
+        version: 2,
+        revision: 1,
+        state: failedState,
+        value: message,
+      })
+      expect(storage.removals).toHaveLength(1)
+      expect(storage.length).toBe(0)
+
+      expect(
+        artifact.__artifactContract.readMessageJournal(
+          'electron-journal-v2-failed-readback',
+          [storage],
+          identityOf,
+          validate,
+        ),
+      ).toEqual([])
+      expect(storage.removals).toHaveLength(1)
+    },
+  )
 
   it('rejects local Card rollover at the send mutation edge before provider dispatch', async () => {
     const resolveCard = vi

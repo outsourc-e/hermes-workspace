@@ -61,6 +61,7 @@ import {
   isRecentSession,
   persistPendingMessage,
   readPendingMessage,
+  removeRejectedPendingMessage,
   resetPendingSend,
   setPendingGeneration,
   updatePendingMessageByClientId,
@@ -72,6 +73,7 @@ import {
   mergeCardTranscriptRecoveryMessages,
   removeRejectedCardTranscriptRecoveryMessage,
 } from './card-transcript-recovery'
+import { parsePortableAttachmentDataUrl } from './attachment-envelope'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
@@ -3109,7 +3111,11 @@ export function ChatScreen({
       // Every accepted send needs a durable owner before transport starts;
       // post-accept assistant checkpoints depend on this admission record.
       const missingPortableAttachment = attachmentPayload.some(
-        (attachment) => typeof attachment.dataUrl !== 'string',
+        (attachment) =>
+          !parsePortableAttachmentDataUrl(
+            attachment.dataUrl,
+            attachment.contentType,
+          ),
       )
       const optimistic = createOptimisticMessage(trimmedBody, attachmentPayload)
       const durableOptimisticMessage = optimistic.optimisticMessage
@@ -3186,6 +3192,13 @@ export function ChatScreen({
       }
 
       if (!persisted) {
+        if (!activeCard) {
+          removeRejectedPendingMessage(
+            sessionKeyForSend,
+            durableClientId,
+            provisionalOwnerId,
+          )
+        }
         const safeMessage =
           attachmentPayload.length > 0
             ? 'This message was not sent because its attachments could not be saved for recovery. Free browser storage or remove the attachments, then try again.'

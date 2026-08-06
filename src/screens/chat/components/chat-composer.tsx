@@ -63,6 +63,7 @@ import { setLocalModelOverride } from '@/screens/chat/local-model-override'
 import { formatModelName } from '@/lib/format-model-name'
 import { fetchSessionCardStatusModel } from '@/screens/chat/session-card-status'
 import { cardDraftStorageKey } from '@/screens/chat/session-card-ui-state'
+import { createTextAttachmentDataUrl } from '@/screens/chat/attachment-envelope'
 
 type ChatComposerAttachment = {
   id: string
@@ -1382,18 +1383,25 @@ function ChatComposerComponent({
                 file.name && file.name.trim().length > 0
                   ? file.name.trim()
                   : `pasted-text-${timestamp}-${index + 1}.txt`
+              const contentType =
+                (isTextMimeType(file.type)
+                  ? normalizeMimeType(file.type)
+                  : '') ||
+                inferTextMimeTypeFromFileName(name) ||
+                'text/plain'
+              const portableContentType = contentType.split(';', 1)[0]!
+              const dataUrl = createTextAttachmentDataUrl(
+                textContent,
+                portableContentType,
+              )
+              if (!dataUrl) return null
               const textBytes = new TextEncoder().encode(textContent).length
               return {
                 id: crypto.randomUUID(),
                 name,
-                contentType:
-                  (isTextMimeType(file.type)
-                    ? normalizeMimeType(file.type)
-                    : '') ||
-                  inferTextMimeTypeFromFileName(name) ||
-                  'text/plain',
+                contentType: portableContentType,
                 size: textBytes,
-                dataUrl: textContent,
+                dataUrl,
                 kind: 'file',
               }
             }

@@ -189,11 +189,19 @@ describe('bootstrap pending-send recovery ownership', () => {
       }),
     ).toBe(true)
     const originalGetItem = Storage.prototype.getItem
+    let servedStaleAggregate = false
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (
       this: Storage,
       storageKey,
     ) {
-      if (this === window.localStorage && storageKey === key) return staleRaw
+      if (
+        this === window.localStorage &&
+        storageKey === key &&
+        !servedStaleAggregate
+      ) {
+        servedStaleAggregate = true
+        return staleRaw
+      }
       return originalGetItem.call(this, storageKey)
     })
     const second = provisionalUser('client-second-tab', 'second tab turn', 3)
@@ -220,6 +228,51 @@ describe('bootstrap pending-send recovery ownership', () => {
         'second tab turn',
       ]),
     )
+  })
+
+  it('rolls back a journaled bootstrap turn when the aggregate admission write fails', () => {
+    persistBootstrap()
+    const key = currentProvisionalStorageKey()
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      storageKey,
+      value,
+    ) {
+      if (
+        this === window.localStorage &&
+        storageKey === key &&
+        value.includes('client-rejected-after-journal')
+      ) {
+        throw new DOMException('aggregate quota failure', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, storageKey, value)
+    })
+
+    const rejected = provisionalUser(
+      'client-rejected-after-journal',
+      'must not resurrect after aggregate rejection',
+      2,
+    )
+    expect(
+      persistPendingMessage({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'must not resurrect after aggregate rejection',
+        attachments: [],
+        optimisticMessage: rejected,
+      }),
+    ).toBe(false)
+
+    vi.mocked(Storage.prototype.setItem).mockRestore()
+    expect(
+      getPendingRecoveryMessages(readPendingMessage('new', 'new')!),
+    ).toEqual([bootstrapUser()])
+    expect(
+      Array.from({ length: window.localStorage.length }, (_, index) =>
+        window.localStorage.getItem(window.localStorage.key(index) ?? ''),
+      ).join('\n'),
+    ).not.toContain('client-rejected-after-journal')
   })
 
   it('hands off only the originating provisional tab and leaves a sibling tab recoverable after tab close', () => {
