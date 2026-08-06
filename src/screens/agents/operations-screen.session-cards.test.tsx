@@ -675,7 +675,7 @@ describe('mounted Operations Session Card activity', () => {
   )
 
   it.each(['QuotaExceededError', 'SecurityError'] as const)(
-    'recovers accepted stream chunks after remount when local recovery raises %s mid-stream',
+    'does not accept a session-only stream chunk after tab close and partial history when local recovery raises %s',
     async (exceptionName) => {
       const userText = `accepted ${exceptionName} user turn`
       const assistantText = `accepted ${exceptionName} assistant chunk`
@@ -720,7 +720,12 @@ describe('mounted Operations Session Card activity', () => {
 
       expect(input.value).toBe('')
       expect(screen.getByText(userText)).toBeTruthy()
-      expect(screen.getByText(assistantText)).toBeTruthy()
+      expect(screen.queryByText(assistantText)).toBeNull()
+      expect(
+        screen.getByText(
+          'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
+        ),
+      ).toBeTruthy()
       expect(
         JSON.parse(window.localStorage.getItem(operationsOverlayKey) ?? '{}'),
       ).toMatchObject({
@@ -742,12 +747,13 @@ describe('mounted Operations Session Card activity', () => {
       await mounted.rerender()
 
       expect(screen.getByText(userText)).toBeTruthy()
-      expect(screen.getByText(assistantText)).toBeTruthy()
+      expect(screen.queryByText(assistantText)).toBeNull()
 
       mounted.unmount()
+      window.sessionStorage.clear()
       await renderOperations()
       expect(screen.getByText(userText)).toBeTruthy()
-      expect(screen.getByText(assistantText)).toBeTruthy()
+      expect(screen.queryByText(assistantText)).toBeNull()
     },
   )
 

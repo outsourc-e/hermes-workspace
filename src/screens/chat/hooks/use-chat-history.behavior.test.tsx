@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getChatSessionSourceState } from '../chat-screen-utils'
-import { persistPendingMessage } from '../pending-send'
+import { persistPendingMessage, readPendingMessage } from '../pending-send'
 import { useChatHistory } from './use-chat-history'
 import type { QueryClient as QueryClientType } from '@tanstack/react-query'
 
@@ -250,11 +250,9 @@ describe('useChatHistory cold session source behavior', () => {
         optimisticMessage,
       }),
     ).toBe(true)
-    expect(
-      window.localStorage.getItem(
-        'workspace.chat-provisional-send.v1:new-chat',
-      ),
-    ).toContain('first turn survives')
+    expect(JSON.stringify(readPendingMessage('new', 'new'))).toContain(
+      'first turn survives',
+    )
     expect(window.localStorage.getItem('claude_pending_msg_new')).toBeNull()
 
     const mount = async () => {

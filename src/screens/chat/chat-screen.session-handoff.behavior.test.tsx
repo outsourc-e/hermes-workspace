@@ -3141,11 +3141,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       )
       expect(showErrorToast).toHaveBeenCalledWith('bootstrap unavailable')
     })
-    expect(
-      window.localStorage.getItem(
-        'workspace.chat-provisional-send.v1:new-chat',
-      ),
-    ).toContain('continue')
+    expect(JSON.stringify(readPendingMessage('new', 'new'))).toContain(
+      'continue',
+    )
     expect(window.localStorage.getItem('claude_pending_msg_new')).toBeNull()
 
     React.act(() => root.unmount())
@@ -3239,11 +3237,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       ).toContain('Recovered answer')
     })
     expect(sendStream).toHaveBeenCalledTimes(1)
-    expect(
-      window.localStorage.getItem(
-        'workspace.chat-provisional-send.v1:new-chat',
-      ),
-    ).toContain('Recovered answer')
+    expect(JSON.stringify(readPendingMessage('new', 'new'))).toContain(
+      'Recovered answer',
+    )
 
     React.act(() => first.root.unmount())
     document.body.removeChild(first.container)

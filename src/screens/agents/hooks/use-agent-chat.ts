@@ -104,6 +104,15 @@ function storageMirrors() {
   return mirrors
 }
 
+function persistentStorageMirrors() {
+  if (typeof window === 'undefined') return []
+  try {
+    return [window.localStorage]
+  } catch {
+    return []
+  }
+}
+
 function removeInvalidStoredValue(storage: Storage, key: string) {
   try {
     storage.removeItem(key)
@@ -143,9 +152,10 @@ function parseEnvelope(
 function readMirroredMessages<T>(
   key: string,
   parse: (raw: string) => StoredMessages<T> | undefined,
+  mirrors = storageMirrors(),
 ): StoredMessages<T> | undefined {
   let newest: StoredMessages<T> | undefined
-  for (const storage of storageMirrors()) {
+  for (const storage of mirrors) {
     try {
       const raw = storage.getItem(key)
       if (!raw) continue
@@ -401,10 +411,13 @@ function parseOverlay(
 function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
   if (!cardId) return []
   const key = overlayStorageKey(cardId)
-  const mirrors = storageMirrors()
+  // Operations renders overlay rows only from the shared durable mirror.
+  // sessionStorage is a write fallback for the current tab, not proof that an
+  // accepted assistant chunk survives a full tab close.
+  const mirrors = persistentStorageMirrors()
   const base =
-    readMirroredMessages(key, (raw) => parseOverlay(raw, cardId))?.messages ??
-    []
+    readMirroredMessages(key, (raw) => parseOverlay(raw, cardId), mirrors)
+      ?.messages ?? []
   const journal = readMessageJournal(
     key,
     mirrors,
@@ -698,7 +711,12 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
   const [overlayMessages, setOverlayMessages] = useState<
     Array<OperationsChatOverlayMessage>
   >(() => readOverlay(ownerCardId))
-  const [durabilityError, setDurabilityError] = useState<string | null>(null)
+  const [snapshotDurabilityError, setSnapshotDurabilityError] = useState<
+    string | null
+  >(null)
+  const [overlayDurabilityError, setOverlayDurabilityError] = useState<
+    string | null
+  >(null)
   const overlayRef = useRef(overlayMessages)
   const overlayOwnerRef = useRef(ownerCardId)
 
@@ -718,7 +736,8 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
   }
 
   useEffect(() => {
-    setDurabilityError(null)
+    setSnapshotDurabilityError(null)
+    setOverlayDurabilityError(null)
     setCompleteSnapshot({
       ownerCardId: cardId,
       messages: readCompleteSnapshot(cardId),
@@ -733,14 +752,14 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
       currentAuthoritativeMessages,
     )
     if (snapshotWrite.anyVerified) {
-      setDurabilityError(null)
+      setSnapshotDurabilityError(null)
       setCompleteSnapshot({
         ownerCardId: cardId,
         messages: currentAuthoritativeMessages,
         persistentVerified: snapshotWrite.persistentVerified,
       })
     } else {
-      setDurabilityError(
+      setSnapshotDurabilityError(
         'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
       )
     }
@@ -912,11 +931,13 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
               ? { ...entry, content, acknowledgementOrdinal }
               : entry,
           )
-          if (!commitOverlay(activeSendOverlay, ownerCardId, false)) {
-            throw new Error(
+          if (!commitOverlay(activeSendOverlay, ownerCardId)) {
+            setOverlayDurabilityError(
               'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
             )
+            return
           }
+          setOverlayDurabilityError(null)
           return
         }
         const assistant: OperationsChatOverlayMessage = {
@@ -931,11 +952,13 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
           ),
         }
         activeSendOverlay = [...activeSendOverlay, assistant]
-        if (!commitOverlay(activeSendOverlay, ownerCardId, false)) {
-          throw new Error(
+        if (!commitOverlay(activeSendOverlay, ownerCardId)) {
+          setOverlayDurabilityError(
             'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
           )
+          return
         }
+        setOverlayDurabilityError(null)
       })
     },
     onSuccess: async () => {
@@ -960,7 +983,8 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
         ? 'Direct child transcript · read-only'
         : (historyQuery.error instanceof Error && historyQuery.error.message) ||
           (sendMutation.error instanceof Error && sendMutation.error.message) ||
-          durabilityError ||
+          overlayDurabilityError ||
+          snapshotDurabilityError ||
           null
 
   return {

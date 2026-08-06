@@ -434,7 +434,7 @@ describe('Card transcript recovery storage contract', () => {
     ).toEqual([authoritative, overlay])
   })
 
-  it('acknowledges uniquely matching ordinary server rows when client identity differs and server run identity is absent', () => {
+  it('acknowledges ordinary server rows with matching client identity when server run identity is absent', () => {
     const optimistic = message('user', 'ordinary user acknowledgement', {
       clientId: 'client-local',
       __optimisticId: 'opt-client-local',
@@ -458,7 +458,7 @@ describe('Card transcript recovery storage contract', () => {
       [
         message('user', 'ordinary user acknowledgement', {
           id: 'server-user',
-          client_id: 'server-client',
+          client_id: 'client-local',
         }),
         message('assistant', 'ordinary assistant acknowledgement', {
           id: 'server-assistant',
@@ -487,7 +487,7 @@ describe('Card transcript recovery storage contract', () => {
       [
         message('user', 'repeat this exact turn', {
           id: 'server-repeat',
-          client_id: 'server-client',
+          client_id: 'repeat-first',
         }),
       ],
       { now },
@@ -499,11 +499,42 @@ describe('Card transcript recovery storage contract', () => {
         [
           message('user', 'repeat this exact turn', {
             id: 'server-repeat',
+            client_id: 'repeat-first',
           }),
         ],
         [first, second],
       ),
     ).toEqual([expect.objectContaining({ id: 'server-repeat' }), second])
+  })
+
+  it('does not let a stale client-identified server row acknowledge a newer repeated user turn', () => {
+    const newer = message('user', 'repeat after a stale history window', {
+      clientId: 'client-newer',
+      __optimisticId: 'opt-client-newer',
+      status: 'sent',
+      timestamp: now,
+    })
+    replaceCardTranscriptRecoveryMessages(owner, [newer], { now })
+
+    const staleAuthoritative = message(
+      'user',
+      'repeat after a stale history window',
+      {
+        id: 'server-old-row',
+        client_id: 'client-older',
+        timestamp: now,
+      },
+    )
+    const reconciled = removeAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      [staleAuthoritative],
+      { now },
+    )
+
+    expect(reconciled?.messages).toEqual([newer])
+    expect(
+      mergeCardTranscriptRecoveryMessages([staleAuthoritative], [newer]),
+    ).toEqual([staleAuthoritative, newer])
   })
 
   it('acknowledges repeated equal paired turns in order without duplicate overlays', () => {
@@ -521,11 +552,17 @@ describe('Card transcript recovery storage contract', () => {
       ...owner,
       canonicalSegmentKey: 'remote:segment-a',
       messages: [
-        message('user', 'same prompt', { id: 'server-user-a' }),
+        message('user', 'same prompt', {
+          id: 'server-user-a',
+          client_id: 'client-a',
+        }),
         message('assistant', 'same acknowledgement', {
           id: 'server-assistant-a',
         }),
-        message('user', 'same prompt', { id: 'server-user-b' }),
+        message('user', 'same prompt', {
+          id: 'server-user-b',
+          client_id: 'client-b',
+        }),
         message('assistant', 'same acknowledgement', {
           id: 'server-assistant-b',
         }),
@@ -626,6 +663,7 @@ describe('Card transcript recovery storage contract', () => {
         {
           ...message('user', 'review this file', {
             id: 'server-file-message',
+            client_id: 'client-file',
           }),
           attachments: [
             {

@@ -396,6 +396,28 @@ function ordinaryServerAcknowledgementMatches(
   recoveryMessage: ChatMessage,
   authoritativeMessage: ChatMessage,
 ): boolean {
+  const clientKeys = [
+    'clientId',
+    'client_id',
+    'idempotencyKey',
+    'nonce',
+    '__optimisticId',
+  ] as const
+  const recoveryClientIdentifiers = identifierSet(recoveryMessage, clientKeys)
+  const authoritativeClientIdentifiers = identifierSet(
+    authoritativeMessage,
+    clientKeys,
+  )
+  // A browser-identified user turn has no safe text-only fallback. Without a
+  // durable server cursor, a stale repeated row could otherwise consume a
+  // newer recovery turn before its own authoritative echo arrives.
+  if (
+    recoveryMessage.role === 'user' &&
+    recoveryClientIdentifiers.size > 0 &&
+    !intersects(recoveryClientIdentifiers, authoritativeClientIdentifiers)
+  ) {
+    return false
+  }
   return (
     recoveryMessage.role === authoritativeMessage.role &&
     isRecoveryOverlay(recoveryMessage) &&

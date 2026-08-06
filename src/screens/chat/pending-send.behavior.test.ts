@@ -7,6 +7,7 @@ import {
 } from './card-transcript-recovery'
 import {
   appendPendingRecoveryMessage,
+  getNewChatProvisionalOwnerId,
   getPendingRecoveryMessages,
   handoffPendingSend,
   persistPendingMessage,
@@ -56,6 +57,37 @@ function persistBootstrap(): void {
   ).toBe(true)
 }
 
+function persistOwnedBootstrap(
+  provisionalOwnerId: string,
+  clientId: string,
+  text: string,
+  timestamp: number,
+): void {
+  const optimisticMessage = provisionalUser(clientId, text, timestamp)
+  expect(
+    persistPendingMessage({
+      sessionKey: 'new',
+      friendlyId: 'new',
+      provisionalOwnerId,
+      message: text,
+      attachments: [],
+      optimisticMessage,
+    }),
+  ).toBe(true)
+}
+
+function currentProvisionalStorageKey(): string {
+  const key = Array.from({ length: window.localStorage.length }, (_, index) =>
+    window.localStorage.key(index),
+  ).find(
+    (candidate) =>
+      candidate?.startsWith('workspace.chat-provisional-send.v2:new-chat:') &&
+      !candidate.includes(':entry:'),
+  )
+  if (!key) throw new Error('missing provisional aggregate storage key')
+  return key
+}
+
 describe('bootstrap pending-send recovery ownership', () => {
   beforeEach(() => {
     resetPendingSend()
@@ -93,7 +125,7 @@ describe('bootstrap pending-send recovery ownership', () => {
       },
     ])
     const serialized = window.localStorage.getItem(
-      'workspace.chat-provisional-send.v1:new-chat',
+      currentProvisionalStorageKey(),
     )
     expect(serialized).toContain('durable answer')
     expect(serialized).not.toContain('remote:raw-session')
@@ -144,7 +176,7 @@ describe('bootstrap pending-send recovery ownership', () => {
 
   it('unions divergent provisional turns when a stale tab writes last', () => {
     persistBootstrap()
-    const key = 'workspace.chat-provisional-send.v1:new-chat'
+    const key = currentProvisionalStorageKey()
     const staleRaw = window.localStorage.getItem(key)
     const first = provisionalUser('client-first-tab', 'first tab turn', 2)
     expect(
@@ -188,6 +220,90 @@ describe('bootstrap pending-send recovery ownership', () => {
         'second tab turn',
       ]),
     )
+  })
+
+  it('hands off only the originating provisional tab and leaves a sibling tab recoverable after tab close', () => {
+    const ownerA = 'bootstrap-tab-a'
+    const ownerB = 'bootstrap-tab-b'
+    persistOwnedBootstrap(ownerA, 'client-tab-a', 'tab A question', 1)
+    persistOwnedBootstrap(ownerB, 'client-tab-b', 'tab B question', 2)
+
+    expect(
+      appendPendingRecoveryMessage(
+        'new',
+        'new',
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'tab A answer' }],
+          timestamp: 3,
+          runId: 'run-tab-a',
+        },
+        ownerA,
+      ),
+    ).toBe(true)
+    expect(
+      appendPendingRecoveryMessage(
+        'new',
+        'new',
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'tab B answer' }],
+          timestamp: 4,
+          runId: 'run-tab-b',
+        },
+        ownerB,
+      ),
+    ).toBe(true)
+
+    handoffPendingSend('new', 'remote:segment-a', 'remote:card-a', {
+      verifiedCardDestination: true,
+      provisionalOwnerId: ownerA,
+    })
+
+    expect(readPendingMessage('new', 'new', ownerA)).toBeNull()
+    expect(
+      getPendingRecoveryMessages(readPendingMessage('new', 'new', ownerB)!).map(
+        (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
+      ),
+    ).toEqual(['tab B question', 'tab B answer'])
+    expect(
+      readCardTranscriptRecovery({ cardId: 'remote:card-a' })?.messages.map(
+        (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
+      ),
+    ).toEqual(['tab A question', 'tab A answer'])
+
+    window.sessionStorage.clear()
+    expect(
+      getPendingRecoveryMessages(readPendingMessage('new', 'new', ownerB)!).map(
+        (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
+      ),
+    ).toEqual(['tab B question', 'tab B answer'])
+  })
+
+  it('allocates a new automatic owner for a new tab lifetime without overwriting the closed tab', () => {
+    const firstOwner = getNewChatProvisionalOwnerId()
+    persistOwnedBootstrap(firstOwner, 'client-first-life', 'first tab life', 1)
+
+    window.sessionStorage.clear()
+    const secondOwner = getNewChatProvisionalOwnerId()
+    expect(secondOwner).not.toBe(firstOwner)
+    persistOwnedBootstrap(
+      secondOwner,
+      'client-second-life',
+      'second tab life',
+      2,
+    )
+
+    expect(
+      getPendingRecoveryMessages(
+        readPendingMessage('new', 'new', firstOwner)!,
+      )[0],
+    ).toMatchObject({ clientId: 'client-first-life' })
+    expect(
+      getPendingRecoveryMessages(
+        readPendingMessage('new', 'new', secondOwner)!,
+      )[0],
+    ).toMatchObject({ clientId: 'client-second-life' })
   })
 
   it('fails admission before transport instead of evicting retryable recovery rows', () => {

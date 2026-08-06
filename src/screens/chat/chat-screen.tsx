@@ -54,6 +54,7 @@ import {
   checkpointPendingRecoveryMessage,
   clearPendingSendForSession,
   consumePendingSend,
+  getNewChatProvisionalOwnerId,
   getPendingRecoveryMessages,
   hasPendingGeneration,
   hasPendingSend,
@@ -688,7 +689,7 @@ export function ChatScreen({
     friendlyId: string
     cardId?: string
     clientId: string
-    provisionalOwner?: 'new'
+    provisionalOwnerId?: string
   } | null>(null)
   // A live send-stream reader is authoritative over its waiting state. Keep
   // this separate from sessionStorage-backed recovery so a continuation cannot
@@ -1741,6 +1742,7 @@ export function ChatScreen({
         activeSend.sessionKey,
         activeSend.friendlyId,
         checkpointMessage,
+        activeSend.provisionalOwnerId,
       )
     }, []),
     onComplete: useCallback(
@@ -1775,7 +1777,7 @@ export function ChatScreen({
               { persistRecovery: false },
             )
           }
-          if (activeSend.provisionalOwner === 'new' && !activeSend.cardId) {
+          if (activeSend.provisionalOwnerId && !activeSend.cardId) {
             // A successful bootstrap stream may complete before any Card
             // handoff. Retain both sides of the turn until a verified Card
             // migration owns them, so remounting cannot erase the answer.
@@ -1783,6 +1785,7 @@ export function ChatScreen({
               'new',
               'new',
               completedMessage,
+              activeSend.provisionalOwnerId,
             )
           } else {
             clearPendingSendForSession(
@@ -1825,6 +1828,7 @@ export function ChatScreen({
               activeSend.sessionKey,
               activeSend.friendlyId,
               interruptedMessage,
+              activeSend.provisionalOwnerId,
             )
         if (activeSend.cardId) {
           appendSessionCardTransientMessage(
@@ -2611,6 +2615,7 @@ export function ChatScreen({
       fastMode = false,
       skipOptimistic = false,
       existingClientId = '',
+      provisionalOwnerId = '',
     ) {
       // Read from ref so we always get the latest value without capturing it in deps
       const currentThinkingLevel = thinkingLevelRef.current
@@ -2683,9 +2688,7 @@ export function ChatScreen({
         friendlyId,
         ...(activeCard ? { cardId: activeCard.cardId } : {}),
         clientId: optimisticClientId,
-        ...(sessionKey === 'new' && friendlyId === 'new'
-          ? { provisionalOwner: 'new' as const }
-          : {}),
+        ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
       }
 
       // Failsafe: clear waitingForResponse after 120s no matter what
@@ -3138,6 +3141,8 @@ export function ChatScreen({
               activeSessionKey ||
               'main'
 
+      const provisionalOwnerId = isNewChat ? getNewChatProvisionalOwnerId() : ''
+
       let persisted = false
       if (activeCard) {
         const priorRecovery = readCardTranscriptRecovery({
@@ -3172,6 +3177,7 @@ export function ChatScreen({
         persisted = persistPendingMessage({
           sessionKey: sessionKeyForSend,
           friendlyId: isNewChat ? 'new' : transportFriendlyId,
+          ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
           message: trimmedBody,
           attachments: attachmentPayload,
           optimisticMessage: durableOptimisticMessage,
@@ -3218,6 +3224,7 @@ export function ChatScreen({
         fastMode,
         true,
         durableClientId,
+        provisionalOwnerId,
       )
       // New Chat stays on the bootstrap route until the stream provides the
       // authoritative Card handoff; its provisional localStorage owner is moved

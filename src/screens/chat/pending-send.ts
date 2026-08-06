@@ -15,6 +15,8 @@ import type { ChatAttachment, ChatMessage } from './types'
 export type PendingSendPayload = {
   sessionKey: string
   friendlyId: string
+  /** Per-browser-tab bootstrap owner. Required for the provisional `new` key. */
+  provisionalOwnerId?: string
   message: string
   attachments: Array<ChatAttachment>
   optimisticMessage: ChatMessage
@@ -27,8 +29,13 @@ let pendingGeneration = false
 let recentSession: { friendlyId: string; at: number } | null = null
 
 const PENDING_MESSAGE_STORAGE_PREFIX = 'claude_pending_msg_'
-const NEW_CHAT_PROVISIONAL_STORAGE_KEY =
+const LEGACY_NEW_CHAT_PROVISIONAL_STORAGE_KEY =
   'workspace.chat-provisional-send.v1:new-chat'
+const NEW_CHAT_PROVISIONAL_STORAGE_PREFIX =
+  'workspace.chat-provisional-send.v2:new-chat:'
+const NEW_CHAT_PROVISIONAL_OWNER_SESSION_KEY =
+  'workspace.chat-provisional-owner.v1'
+let fallbackProvisionalOwnerId = ''
 
 type PersistedPendingSendPayload = PendingSendPayload & {
   storedAt: number
@@ -38,6 +45,38 @@ function canUseLocalStorage() {
   return (
     typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
   )
+}
+
+function normalizedProvisionalOwnerId(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function createProvisionalOwnerId(): string {
+  try {
+    return crypto.randomUUID()
+  } catch {
+    return `bootstrap-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  }
+}
+
+/** Stable for one browser tab, but independent from sibling `/chat/new` tabs. */
+export function getNewChatProvisionalOwnerId(): string {
+  if (typeof window === 'undefined') return createProvisionalOwnerId()
+  try {
+    const existing = normalizedProvisionalOwnerId(
+      window.sessionStorage.getItem(NEW_CHAT_PROVISIONAL_OWNER_SESSION_KEY),
+    )
+    if (existing) return existing
+    const created = createProvisionalOwnerId()
+    window.sessionStorage.setItem(
+      NEW_CHAT_PROVISIONAL_OWNER_SESSION_KEY,
+      created,
+    )
+    return created
+  } catch {
+    fallbackProvisionalOwnerId ||= createProvisionalOwnerId()
+    return fallbackProvisionalOwnerId
+  }
 }
 
 function pendingJournalIdentity(message: ChatMessage): string {
@@ -77,15 +116,22 @@ function readPendingJournal(key: string): Array<ChatMessage> {
   )
 }
 
-function getPendingStorageKey(sessionKey: string) {
-  if (sessionKey === 'new') return NEW_CHAT_PROVISIONAL_STORAGE_KEY
+function getPendingStorageKey(sessionKey: string, provisionalOwnerId = '') {
+  if (sessionKey === 'new') {
+    const ownerId =
+      normalizedProvisionalOwnerId(provisionalOwnerId) ||
+      getNewChatProvisionalOwnerId()
+    return `${NEW_CHAT_PROVISIONAL_STORAGE_PREFIX}${encodeURIComponent(ownerId)}`
+  }
   return `${PENDING_MESSAGE_STORAGE_PREFIX}${sessionKey || 'main'}`
 }
 
 function isPendingStorageKey(key: string | null): key is string {
+  if (!key || key.includes(':entry:')) return false
   return (
-    key === NEW_CHAT_PROVISIONAL_STORAGE_KEY ||
-    Boolean(key?.startsWith(PENDING_MESSAGE_STORAGE_PREFIX))
+    key === LEGACY_NEW_CHAT_PROVISIONAL_STORAGE_KEY ||
+    key.startsWith(NEW_CHAT_PROVISIONAL_STORAGE_PREFIX) ||
+    key.startsWith(PENDING_MESSAGE_STORAGE_PREFIX)
   )
 }
 
@@ -102,6 +148,11 @@ function toPendingSendPayload(
   ) {
     return null
   }
+
+  const provisionalOwnerId = normalizedProvisionalOwnerId(
+    parsed.provisionalOwnerId,
+  )
+  if (parsed.sessionKey === 'new' && !provisionalOwnerId) return null
 
   const sanitizedOptimisticMessage = sanitizeCardOwnedMessage(
     optimisticMessage as ChatMessage,
@@ -125,6 +176,7 @@ function toPendingSendPayload(
   return {
     sessionKey: parsed.sessionKey,
     friendlyId: parsed.friendlyId,
+    ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
     message: parsed.message,
     attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
     optimisticMessage: sanitizedOptimisticMessage,
@@ -163,12 +215,23 @@ function writePendingSendToStorage(
 
   cleanupExpiredPendingSends()
 
-  // A provisional `new` owner can accept another turn before a Card handoff.
-  // Preserve every prior admitted row and append the candidate. setItem is
-  // atomic, so quota failure leaves the old envelope intact and lets the caller
-  // fail admission before transport instead of evicting recovery data.
+  const provisionalOwnerId =
+    payload.sessionKey === 'new'
+      ? normalizedProvisionalOwnerId(payload.provisionalOwnerId) ||
+        getNewChatProvisionalOwnerId()
+      : undefined
+  const ownedPayload: PendingSendPayload = {
+    ...payload,
+    ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
+  }
+
+  // A provisional owner can accept another turn before a Card handoff. Preserve
+  // only this tab's prior rows; sibling `/new` tabs use independent keys.
   let existing: PendingSendPayload | null = null
-  const key = getPendingStorageKey(payload.sessionKey)
+  const key = getPendingStorageKey(
+    ownedPayload.sessionKey,
+    ownedPayload.provisionalOwnerId,
+  )
   try {
     const raw = window.localStorage.getItem(key)
     existing = raw
@@ -178,11 +241,11 @@ function writePendingSendToStorage(
     existing = null
   }
   const recoveryMessages = getPendingRecoveryMessages({
-    ...payload,
+    ...ownedPayload,
     recoveryMessages: [
       ...(existing ? getPendingRecoveryMessages(existing) : []),
       ...readPendingJournal(key),
-      ...getPendingRecoveryMessages(payload),
+      ...getPendingRecoveryMessages(ownedPayload),
     ],
   })
   // Reserve one row for the terminal assistant before admitting the user send.
@@ -196,14 +259,16 @@ function writePendingSendToStorage(
   ) {
     return false
   }
-  const optimisticClientId = pendingMessageClientId(payload.optimisticMessage)
+  const optimisticClientId = pendingMessageClientId(
+    ownedPayload.optimisticMessage,
+  )
   const optimisticMessage = recoveryMessages.find(
     (message) => pendingMessageClientId(message) === optimisticClientId,
   )
   if (!optimisticMessage) return false
 
   const record: PersistedPendingSendPayload = {
-    ...payload,
+    ...ownedPayload,
     optimisticMessage,
     recoveryMessages,
     storedAt: Date.now(),
@@ -295,8 +360,9 @@ export function appendPendingRecoveryMessage(
   sessionKey: string,
   friendlyId: string,
   message: ChatMessage,
+  provisionalOwnerId = '',
 ): boolean {
-  const source = readPendingMessage(sessionKey, friendlyId)
+  const source = readPendingMessage(sessionKey, friendlyId, provisionalOwnerId)
   if (!source) return false
   const sanitized = sanitizeCardOwnedMessage(message)
   if (!isCardTranscriptRecoveryMessagePortable(sanitized)) return false
@@ -326,8 +392,9 @@ export function checkpointPendingRecoveryMessage(
   sessionKey: string,
   friendlyId: string,
   message: ChatMessage,
+  provisionalOwnerId = '',
 ): boolean {
-  const source = readPendingMessage(sessionKey, friendlyId)
+  const source = readPendingMessage(sessionKey, friendlyId, provisionalOwnerId)
   if (!source) return false
   const sanitized = sanitizeCardOwnedMessage(message)
   if (!isCardTranscriptRecoveryMessagePortable(sanitized)) return false
@@ -411,7 +478,10 @@ export function handoffPendingSend(
   fromSessionKey: string,
   toSessionKey: string,
   toFriendlyId: string,
-  options: { verifiedCardDestination?: boolean } = {},
+  options: {
+    verifiedCardDestination?: boolean
+    provisionalOwnerId?: string
+  } = {},
 ) {
   const normalizedFrom = fromSessionKey.trim()
   const normalizedTo = toSessionKey.trim()
@@ -419,9 +489,17 @@ export function handoffPendingSend(
   if (!normalizedFrom || !normalizedTo || normalizedFrom === normalizedTo)
     return
 
-  const persisted = readPendingMessage(normalizedFrom)
+  const persisted = readPendingMessage(
+    normalizedFrom,
+    undefined,
+    options.provisionalOwnerId,
+  )
   const source =
-    pendingSend?.sessionKey === normalizedFrom ? pendingSend : persisted
+    pendingSend?.sessionKey === normalizedFrom &&
+    (!options.provisionalOwnerId ||
+      pendingSend.provisionalOwnerId === options.provisionalOwnerId)
+      ? pendingSend
+      : persisted
   if (!source) return
 
   // A bootstrap owner can move only into a verified source-qualified Card.
@@ -440,7 +518,7 @@ export function handoffPendingSend(
     )
     if (!migrated) return
     if (pendingSend?.sessionKey === normalizedFrom) pendingSend = null
-    clearPendingMessage(normalizedFrom)
+    clearPendingMessage(normalizedFrom, source.provisionalOwnerId)
     return
   }
 
@@ -454,27 +532,31 @@ export function handoffPendingSend(
   // recoverable on /chat/new rather than losing both copies during handoff.
   if (!writePendingSendToStorage(next)) return
   pendingSend = pendingSend?.sessionKey === normalizedFrom ? next : pendingSend
-  clearPendingMessage(normalizedFrom)
+  clearPendingMessage(normalizedFrom, source.provisionalOwnerId)
 }
 
 export function readPendingMessage(
   sessionKey: string,
   friendlyId?: string,
+  provisionalOwnerId = '',
 ): PendingSendPayload | null {
   if (!canUseLocalStorage() || !sessionKey) return null
 
   cleanupExpiredPendingSends()
 
+  const key = getPendingStorageKey(sessionKey, provisionalOwnerId)
   try {
-    const raw = window.localStorage.getItem(getPendingStorageKey(sessionKey))
+    const raw = window.localStorage.getItem(key)
     if (!raw) {
-      return friendlyId
+      return friendlyId && sessionKey !== 'new'
         ? readPendingSendFromStorageByFriendlyId(friendlyId)
         : null
     }
     const parsed = JSON.parse(raw) as PersistedPendingSendPayload
     if (friendlyId && parsed.friendlyId !== friendlyId) {
-      return readPendingSendFromStorageByFriendlyId(friendlyId)
+      return sessionKey === 'new'
+        ? null
+        : readPendingSendFromStorageByFriendlyId(friendlyId)
     }
     const payload = toPendingSendPayload(parsed)
     if (!payload) return null
@@ -484,13 +566,13 @@ export function readPendingMessage(
         ...payload,
         recoveryMessages: [
           ...getPendingRecoveryMessages(payload),
-          ...readPendingJournal(getPendingStorageKey(sessionKey)),
+          ...readPendingJournal(key),
         ],
       }),
     }
   } catch {
     try {
-      window.localStorage.removeItem(getPendingStorageKey(sessionKey))
+      window.localStorage.removeItem(key)
     } catch {
       // Ignore storage cleanup failures.
     }
@@ -498,10 +580,13 @@ export function readPendingMessage(
   }
 }
 
-export function clearPendingMessage(sessionKey: string) {
+export function clearPendingMessage(
+  sessionKey: string,
+  provisionalOwnerId = '',
+) {
   if (!canUseLocalStorage() || !sessionKey) return
   try {
-    const key = getPendingStorageKey(sessionKey)
+    const key = getPendingStorageKey(sessionKey, provisionalOwnerId)
     clearMessageJournal(key, [window.localStorage])
     window.localStorage.removeItem(key)
   } catch {
@@ -528,7 +613,7 @@ export function hasPendingGeneration() {
 
 export function resetPendingSend() {
   if (pendingSend?.sessionKey) {
-    clearPendingMessage(pendingSend.sessionKey)
+    clearPendingMessage(pendingSend.sessionKey, pendingSend.provisionalOwnerId)
   }
   pendingSend = null
   pendingGeneration = false
