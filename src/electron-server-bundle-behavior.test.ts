@@ -1140,6 +1140,69 @@ describe('checked-in Electron server bundle behavior', () => {
     },
   )
 
+  it('rejects a durably cancelled mission before worker runtime or provider dispatch', async () => {
+    const missionId = 'artifact-cancel-before-dispatch'
+    const mission = seedNativeMission(missionId) as {
+      assignments: Array<{ id: string }>
+    }
+    artifact.__artifactContract.replaceSessionCardService({
+      resolveCard: vi.fn().mockResolvedValue(resolvedLocalCard()),
+      resolveChildCard: vi.fn(),
+      resolveLocalCardByUpstreamSession: vi.fn(),
+      resolveRemoteCardByUpstreamSession: vi.fn(),
+      observeCardActivity: vi.fn().mockResolvedValue(null),
+      observeChildLifecycle: vi.fn().mockResolvedValue(null),
+    })
+
+    const stop = await artifact.default.fetch(conductorStopRequest(missionId))
+    expect(stop.status).toBe(200)
+    vi.clearAllMocks()
+
+    const result = await artifact.__artifactContract.runDispatchWorker(
+      {
+        workerId: 'builder',
+        task: 'Execute the mission',
+        assignmentId: mission.assignments[0]?.id,
+        cardBinding: localCardBinding,
+      },
+      1_000,
+      undefined,
+      { missionId, waitForCheckpoint: false },
+    )
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: 'Session Card dispatch binding is unavailable',
+    })
+    expect(swarmActions.markDispatchStarted).not.toHaveBeenCalled()
+    expect(swarmActions.dispatchPromptToLiveSession).not.toHaveBeenCalled()
+    expect(execFile).not.toHaveBeenCalled()
+  })
+
+  it('settles a worker dispatch when an unexpected admission dependency throws', async () => {
+    swarmActions.readRuntimeCheckpointSnapshot.mockImplementation(() => {
+      throw new Error('simulated runtime snapshot failure')
+    })
+
+    const result = await artifact.__artifactContract.runDispatchWorker(
+      {
+        workerId: 'builder',
+        task: 'Fail closed without hanging',
+        cardBinding: localCardBinding,
+      },
+      1_000,
+      undefined,
+      { waitForCheckpoint: false },
+    )
+
+    expect(result).toMatchObject({
+      workerId: 'builder',
+      ok: false,
+      error: 'simulated runtime snapshot failure',
+    })
+    expect(swarmActions.dispatchPromptToLiveSession).not.toHaveBeenCalled()
+  })
+
   it('executes a generated Card-authoritative dispatch and records its durable state edges', async () => {
     const resolveCard = vi.fn().mockResolvedValue(resolvedLocalCard())
     artifact.__artifactContract.replaceSessionCardService({

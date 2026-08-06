@@ -346,6 +346,86 @@ describe('swarm-missions', () => {
     )
   }, 20_000)
 
+  it('reclaims a mission-store lock whose live PID has a mismatched process identity', async () => {
+    const mod = await loadModule()
+    const lockPath = `${mod.SWARM_MISSIONS_PATH}.lock`
+    mkdirSync(join(tempRoot, '.runtime'), { recursive: true })
+    writeFileSync(
+      lockPath,
+      `${JSON.stringify({
+        token: 'stale-owner-token',
+        pid: process.pid,
+        processIdentity: 'linux:definitely-not-this-process',
+      })}\n`,
+    )
+
+    expect(
+      mod.createOrUpdateMission({
+        missionId: 'mission-after-reused-pid',
+        title: 'PID reuse recovery',
+        assignments: [{ workerId: 'builder', task: 'Recover the lock' }],
+      }).id,
+    ).toBe('mission-after-reused-pid')
+    expect(existsSync(lockPath)).toBe(false)
+  }, 10_000)
+
+  it('rejects checkpoint attribution when an explicit assignment does not belong to the reporting worker', async () => {
+    const mod = await loadModule()
+    const mission = mod.createOrUpdateMission({
+      missionId: 'mission-checkpoint-attribution',
+      title: 'Checkpoint attribution',
+      assignments: [
+        { workerId: 'builder', task: 'Build the patch', reviewRequired: false },
+        {
+          workerId: 'reviewer',
+          task: 'Review the patch',
+          reviewRequired: false,
+        },
+      ],
+    })
+    const reviewerAssignment = mission.assignments.find(
+      (assignment) => assignment.workerId === 'reviewer',
+    )
+    const checkpoint = {
+      stateLabel: 'DONE' as const,
+      runtimeState: 'idle' as const,
+      checkpointStatus: 'done' as const,
+      filesChanged: 'none',
+      commandsRun: 'none',
+      result: 'Hostile cross-worker checkpoint',
+      blocker: null,
+      nextAction: 'none',
+      raw: 'STATE: DONE\nRESULT: hostile cross-worker checkpoint',
+    }
+
+    expect(
+      mod.recordMissionCheckpoint({
+        missionId: mission.id,
+        assignmentId: reviewerAssignment?.id,
+        workerId: 'builder',
+        checkpoint,
+        source: 'hostile-worker',
+      }),
+    ).toBeNull()
+    expect(
+      mod.recordMissionCheckpoint({
+        missionId: mission.id,
+        assignmentId: 'missing-assignment-id',
+        workerId: 'builder',
+        checkpoint,
+        source: 'stale-worker',
+      }),
+    ).toBeNull()
+
+    const persisted = mod.getSwarmMission(mission.id)
+    expect(
+      persisted?.assignments.every((assignment) => !assignment.checkpoint),
+    ).toBe(true)
+    expect(
+      persisted?.events.filter((candidate) => candidate.type === 'checkpoint'),
+    ).toHaveLength(0)
+  })
+
   it('records checkpoints by assignment id, stores report metadata, and exposes flattened reports', async () => {
     const mod = await loadModule()
     const mission = mod.createOrUpdateMission({
@@ -512,6 +592,20 @@ describe('swarm-missions', () => {
       workerId: 'builder',
       task: 'Probe runtime health',
     })
+    expect(
+      mod.markMissionAssignmentDispatched({
+        missionId: mission.id,
+        workerId: 'builder',
+        task: 'Probe runtime health',
+      }),
+    ).toBeNull()
+    expect(
+      mod
+        .getSwarmMission(mission.id)
+        ?.events.filter(
+          (candidate) => candidate.type === 'assignment_dispatched',
+        ),
+    ).toHaveLength(1)
 
     const blocked = mod.recordMissionAssignmentBlocked({
       missionId: mission.id,

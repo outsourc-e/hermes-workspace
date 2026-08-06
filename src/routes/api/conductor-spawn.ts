@@ -12,6 +12,7 @@ import {
 import { sanitizeConductorMissionGoal } from '../../server/conductor-mission-sanitize'
 import {
   bindSwarmMissionCardAuthority,
+  cancelSwarmMission,
   createSwarmMissionWithCardAuthorities,
   getSwarmMission,
   recordMissionCheckpoint,
@@ -533,10 +534,27 @@ async function createNativeConductorMission(input: {
     checkpointPollSeconds: 10,
     notifySessionKey: 'main',
   }).catch((error) => {
-    console.error(
-      '[conductor] native swarm dispatch failed:',
-      error instanceof Error ? error.message : String(error),
-    )
+    const reason = error instanceof Error ? error.message : String(error)
+    try {
+      const compensation = cancelSwarmMission({
+        missionId: input.missionName,
+        actor: 'conductor-dispatch-compensation',
+        reason: `Native Conductor dispatch failed: ${reason}`,
+      })
+      if (!compensation) {
+        console.error(
+          '[conductor] native swarm dispatch compensation could not find the mission',
+        )
+      }
+    } catch (compensationError) {
+      console.error(
+        '[conductor] native swarm dispatch compensation failed:',
+        compensationError instanceof Error
+          ? compensationError.message
+          : String(compensationError),
+      )
+    }
+    console.error('[conductor] native swarm dispatch failed:', reason)
   })
   return { missionId: input.missionName, missionTitle, assignments }
 }
@@ -597,11 +615,19 @@ export const Route = createFileRoute('/api/conductor-spawn')({
                   const profilePath = getSwarmProfilePath(assignment.workerId)
                   // Check runtime.json first
                   const snapshot = readRuntimeCheckpointSnapshot(profilePath)
-                  checkpoint = checkpointFromRuntimeSnapshot(snapshot)
+                  const ownsCheckpoint =
+                    snapshot.currentMissionId === nativeMission.id &&
+                    snapshot.currentAssignmentId === assignment.id
+                  checkpoint = ownsCheckpoint
+                    ? checkpointFromRuntimeSnapshot(snapshot)
+                    : null
 
                   // Also check the worker's chat SQLite DB for checkpoint messages
                   // (tmux workers write checkpoints there)
-                  if (!checkpoint || checkpoint.stateLabel === 'IN_PROGRESS') {
+                  if (
+                    ownsCheckpoint &&
+                    (!checkpoint || checkpoint.stateLabel === 'IN_PROGRESS')
+                  ) {
                     const chat = readWorkerMessages(profilePath, 50)
                     if (chat.ok) {
                       const msgCheckpoint = newestCheckpointFromMessages(

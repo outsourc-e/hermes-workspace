@@ -118,7 +118,6 @@ export const SWARM_MISSIONS_PATH = join(
 
 const SWARM_MISSIONS_LOCK_PATH = `${SWARM_MISSIONS_PATH}.lock`
 const SWARM_MISSIONS_LOCK_WAIT_MS = 5_000
-const SWARM_MISSIONS_LOCK_STALE_MS = 30_000
 const SWARM_MISSIONS_LOCK_POLL_MS = 10
 const LOCK_SLEEP_ARRAY = new Int32Array(new SharedArrayBuffer(4))
 
@@ -399,7 +398,11 @@ function writeStore(store: SwarmMissionStore): void {
   }
 }
 
-type MissionStoreLockMetadata = { token: string; pid: number }
+type MissionStoreLockMetadata = {
+  token: string
+  pid: number
+  processIdentity?: string
+}
 type MissionStoreLock = { release: () => void }
 
 function readMissionStoreLockMetadata(): MissionStoreLockMetadata | null {
@@ -411,11 +414,19 @@ function readMissionStoreLockMetadata(): MissionStoreLockMetadata | null {
       !isRecord(value) ||
       typeof value.token !== 'string' ||
       !Number.isSafeInteger(value.pid) ||
-      Number(value.pid) < 1
+      Number(value.pid) < 1 ||
+      (value.processIdentity !== undefined &&
+        typeof value.processIdentity !== 'string')
     ) {
       return null
     }
-    return { token: value.token, pid: Number(value.pid) }
+    return {
+      token: value.token,
+      pid: Number(value.pid),
+      ...(typeof value.processIdentity === 'string'
+        ? { processIdentity: value.processIdentity }
+        : {}),
+    }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw error
     return null
@@ -431,6 +442,33 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
+function readProcessIdentity(pid: number): string | null {
+  if (process.platform !== 'linux') return null
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+    const fields = stat.slice(stat.lastIndexOf(') ') + 2).split(' ')
+    const startTime = fields[19]
+    return startTime && /^\d+$/u.test(startTime) ? `linux:${startTime}` : null
+  } catch {
+    return null
+  }
+}
+
+function missionStoreLockIsRecoverable(
+  metadata: MissionStoreLockMetadata | null,
+): boolean {
+  // A malformed owner is unknown authority. Atomic lock publication means it is
+  // never a legitimate half-written acquisition, so fail closed instead of
+  // evicting it by age and risking a paused writer's late publication.
+  if (!metadata) return false
+  if (!processIsAlive(metadata.pid)) return true
+  if (!metadata.processIdentity) return false
+  const currentIdentity = readProcessIdentity(metadata.pid)
+  return (
+    currentIdentity !== null && currentIdentity !== metadata.processIdentity
+  )
+}
+
 function recoverAbandonedMissionStoreLock(): boolean {
   let observed: ReturnType<typeof lstatSync>
   let metadata: MissionStoreLockMetadata | null
@@ -441,10 +479,7 @@ function recoverAbandonedMissionStoreLock(): boolean {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
     throw error
   }
-  const recoverable = metadata
-    ? !processIsAlive(metadata.pid)
-    : Date.now() - observed.mtimeMs >= SWARM_MISSIONS_LOCK_STALE_MS
-  if (!recoverable) return false
+  if (!missionStoreLockIsRecoverable(metadata)) return false
 
   const claimPath = `${SWARM_MISSIONS_LOCK_PATH}.claim.${process.pid}.${randomBytes(8).toString('hex')}`
   try {
@@ -475,49 +510,60 @@ function recoverAbandonedMissionStoreLock(): boolean {
 function acquireMissionStoreLock(): MissionStoreLock {
   mkdirSync(dirname(SWARM_MISSIONS_PATH), { recursive: true })
   const token = randomBytes(16).toString('hex')
+  const ownerIdentity = readProcessIdentity(process.pid)
+  const metadata: MissionStoreLockMetadata = {
+    token,
+    pid: process.pid,
+    ...(ownerIdentity ? { processIdentity: ownerIdentity } : {}),
+  }
+  const candidatePath = `${SWARM_MISSIONS_LOCK_PATH}.owner.${process.pid}.${token}`
   const startedAt = process.hrtime.bigint()
-  for (;;) {
-    let descriptor: number | null = null
-    try {
-      descriptor = openSync(SWARM_MISSIONS_LOCK_PATH, 'wx', 0o600)
-      writeFileSync(
-        descriptor,
-        `${JSON.stringify({ token, pid: process.pid })}\n`,
-        'utf8',
-      )
-      fsyncSync(descriptor)
-      closeSync(descriptor)
-      descriptor = null
-      return {
-        release: () => {
-          try {
-            const current = readMissionStoreLockMetadata()
-            if (current?.token === token) unlinkSync(SWARM_MISSIONS_LOCK_PATH)
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-          }
-        },
-      }
-    } catch (error) {
-      if (descriptor !== null) {
-        try {
-          closeSync(descriptor)
-        } finally {
-          try {
-            rmSync(SWARM_MISSIONS_LOCK_PATH, { force: true })
-          } catch {
-            // Preserve the lock acquisition failure.
-          }
+  let descriptor: number | null = null
+  try {
+    descriptor = openSync(candidatePath, 'wx', 0o600)
+    writeFileSync(descriptor, `${JSON.stringify(metadata)}\n`, 'utf8')
+    fsyncSync(descriptor)
+    closeSync(descriptor)
+    descriptor = null
+
+    for (;;) {
+      try {
+        // Publish a fully-written owner record with a no-replace primitive.
+        // Direct `open(..., 'wx')` exposes an empty inode before metadata lands.
+        linkSync(candidatePath, SWARM_MISSIONS_LOCK_PATH)
+        const acquired = lstatSync(SWARM_MISSIONS_LOCK_PATH)
+        return {
+          release: () => {
+            try {
+              const currentStat = lstatSync(SWARM_MISSIONS_LOCK_PATH)
+              const current = readMissionStoreLockMetadata()
+              if (
+                current?.token === token &&
+                currentStat.dev === acquired.dev &&
+                currentStat.ino === acquired.ino
+              ) {
+                unlinkSync(SWARM_MISSIONS_LOCK_PATH)
+              }
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+                throw error
+            }
+          },
         }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+        if (recoverAbandonedMissionStoreLock()) continue
+        const elapsedMs =
+          Number(process.hrtime.bigint() - startedAt) / 1_000_000
+        if (elapsedMs >= SWARM_MISSIONS_LOCK_WAIT_MS) {
+          throw new Error('Swarm mission store is busy')
+        }
+        Atomics.wait(LOCK_SLEEP_ARRAY, 0, 0, SWARM_MISSIONS_LOCK_POLL_MS)
       }
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-      if (recoverAbandonedMissionStoreLock()) continue
-      const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000
-      if (elapsedMs >= SWARM_MISSIONS_LOCK_WAIT_MS) {
-        throw new Error('Swarm mission store is busy')
-      }
-      Atomics.wait(LOCK_SLEEP_ARRAY, 0, 0, SWARM_MISSIONS_LOCK_POLL_MS)
     }
+  } finally {
+    if (descriptor !== null) closeSync(descriptor)
+    rmSync(candidatePath, { force: true })
   }
 }
 
@@ -623,6 +669,11 @@ const TERMINAL_ASSIGNMENT_STATES = new Set<SwarmMissionAssignmentState>([
   'done',
   'cancelled',
 ])
+const DISPATCHABLE_ASSIGNMENT_STATES = new Set<SwarmMissionAssignmentState>([
+  'queued',
+  'blocked',
+  'needs_input',
+])
 
 function isTerminalAssignment(assignment: SwarmMissionAssignment): boolean {
   return TERMINAL_ASSIGNMENT_STATES.has(assignment.state)
@@ -659,6 +710,18 @@ function sameExactCardBinding(
   return (
     sameCardOwner(left, right) &&
     left.canonicalSegmentKey === right.canonicalSegmentKey
+  )
+}
+
+function storeHasExactCardAuthority(
+  store: SwarmMissionStore,
+  missionId: string,
+  binding: SessionCardOperationBinding,
+): boolean {
+  return Boolean(
+    store.missionCardAuthorities
+      .find((authority) => authority.missionId === missionId)
+      ?.anchors.some((anchor) => sameExactCardBinding(anchor.binding, binding)),
   )
 }
 
@@ -757,6 +820,29 @@ export function swarmMissionHasExactCardAuthority(
   return getSwarmMissionCardAuthorityBindings(missionId).some((candidate) =>
     sameExactCardBinding(candidate, binding),
   )
+}
+
+export function swarmMissionAssignmentAcceptsRuntimeMutation(input: {
+  missionId: string
+  assignmentId: string
+  workerId: string
+  binding: SessionCardOperationBinding
+}): boolean {
+  const store = readStore()
+  const mission = store.missions.find((item) => item.id === input.missionId)
+  if (
+    !mission ||
+    mission.state === 'cancelled' ||
+    mission.state === 'complete' ||
+    !storeHasExactCardAuthority(store, input.missionId, input.binding)
+  ) {
+    return false
+  }
+  const assignment = mission.assignments.find(
+    (item) =>
+      item.id === input.assignmentId && item.workerId === input.workerId,
+  )
+  return Boolean(assignment && !isTerminalAssignment(assignment))
 }
 
 export function archiveStaleMissions(staleMs: number = 6 * 60 * 60 * 1000): {
@@ -917,8 +1003,10 @@ export function createSwarmMissionWithCardAuthorities(
 
 export function markMissionAssignmentDispatched(input: {
   missionId: string
+  assignmentId?: string | null
   workerId: string
   task: string
+  binding?: SessionCardOperationBinding | null
   source?: string | null
   author?: string | null
 }): SwarmMission | null {
@@ -926,14 +1014,30 @@ export function markMissionAssignmentDispatched(input: {
     const mission = store.missions.find((item) => item.id === input.missionId)
     if (!mission) return { result: null, write: false }
     if (mission.state === 'cancelled' || mission.state === 'complete') {
-      return { result: mission, write: false }
+      return { result: null, write: false }
     }
-    const assignment = mission.assignments.find(
-      (item) => item.workerId === input.workerId && item.task === input.task,
-    )
+    if (
+      (input.assignmentId || input.binding) &&
+      (!input.assignmentId ||
+        !input.binding ||
+        !storeHasExactCardAuthority(store, input.missionId, input.binding))
+    ) {
+      return { result: null, write: false }
+    }
+    const assignment = input.assignmentId
+      ? mission.assignments.find(
+          (item) =>
+            item.id === input.assignmentId &&
+            item.workerId === input.workerId &&
+            item.task === input.task,
+        )
+      : mission.assignments.find(
+          (item) =>
+            item.workerId === input.workerId && item.task === input.task,
+        )
     if (!assignment) return { result: null, write: false }
-    if (isTerminalAssignment(assignment)) {
-      return { result: mission, write: false }
+    if (!DISPATCHABLE_ASSIGNMENT_STATES.has(assignment.state)) {
+      return { result: null, write: false }
     }
     assignment.state = 'dispatched'
     assignment.dispatchedAt = now()
@@ -981,18 +1085,19 @@ export function recordMissionCheckpoint(input: {
         write: false,
       }
     }
-    const assignment =
-      (input.assignmentId
-        ? mission.assignments.find((item) => item.id === input.assignmentId)
-        : null) ??
-      [...mission.assignments]
-        .reverse()
-        .find(
-          (item) => item.workerId === input.workerId && item.state !== 'done',
-        ) ??
-      [...mission.assignments]
-        .reverse()
-        .find((item) => item.workerId === input.workerId)
+    const assignment = input.assignmentId
+      ? mission.assignments.find(
+          (item) =>
+            item.id === input.assignmentId && item.workerId === input.workerId,
+        )
+      : ([...mission.assignments]
+          .reverse()
+          .find(
+            (item) => item.workerId === input.workerId && item.state !== 'done',
+          ) ??
+        [...mission.assignments]
+          .reverse()
+          .find((item) => item.workerId === input.workerId))
     if (!assignment) return { result: null, write: false }
     if (assignment.state === 'cancelled') {
       return {
@@ -1074,19 +1179,20 @@ export function recordMissionAssignmentBlocked(input: {
     if (mission.state === 'cancelled' || mission.state === 'complete') {
       return { result: null, write: false }
     }
-    const assignment =
-      (input.assignmentId
-        ? mission.assignments.find((item) => item.id === input.assignmentId)
-        : null) ??
-      [...mission.assignments]
-        .reverse()
-        .find(
+    const assignment = input.assignmentId
+      ? mission.assignments.find(
           (item) =>
-            item.workerId === input.workerId && !isTerminalAssignment(item),
-        ) ??
-      [...mission.assignments]
-        .reverse()
-        .find((item) => item.workerId === input.workerId)
+            item.id === input.assignmentId && item.workerId === input.workerId,
+        )
+      : ([...mission.assignments]
+          .reverse()
+          .find(
+            (item) =>
+              item.workerId === input.workerId && !isTerminalAssignment(item),
+          ) ??
+        [...mission.assignments]
+          .reverse()
+          .find((item) => item.workerId === input.workerId))
     if (!assignment) return { result: null, write: false }
     if (assignment.state === 'cancelled' || assignment.state === 'done') {
       return {

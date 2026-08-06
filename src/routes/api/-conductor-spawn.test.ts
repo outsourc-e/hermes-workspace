@@ -233,7 +233,11 @@ describe('Conductor mission Card admission', () => {
   it('revalidates worker Card authority immediately before a polled checkpoint mutation', async () => {
     const mission = nativeMission()
     mocks.getMission.mockReturnValue(mission)
-    mocks.readRuntimeSnapshot.mockReturnValue({ checkpointRaw: null })
+    mocks.readRuntimeSnapshot.mockReturnValue({
+      checkpointRaw: null,
+      currentMissionId: mission.id,
+      currentAssignmentId: mission.assignments[0]?.id,
+    })
     mocks.checkpointFromSnapshot.mockReturnValue({
       stateLabel: 'DONE',
       checkpointStatus: 'checkpointed',
@@ -266,7 +270,11 @@ describe('Conductor mission Card admission', () => {
   it('returns a retryable non-success when a polled checkpoint cannot be persisted', async () => {
     const mission = nativeMission()
     mocks.getMission.mockReturnValue(mission)
-    mocks.readRuntimeSnapshot.mockReturnValue({ checkpointRaw: null })
+    mocks.readRuntimeSnapshot.mockReturnValue({
+      checkpointRaw: null,
+      currentMissionId: mission.id,
+      currentAssignmentId: mission.assignments[0]?.id,
+    })
     mocks.checkpointFromSnapshot.mockReturnValue({
       stateLabel: 'DONE',
       checkpointStatus: 'checkpointed',
@@ -312,6 +320,37 @@ describe('Conductor mission Card admission', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({ ok: true })
+    expect(mocks.recordCheckpoint).not.toHaveBeenCalled()
+  })
+
+  it('does not import a checkpoint attributed to another mission assignment', async () => {
+    const mission = nativeMission()
+    mocks.getMission.mockReturnValue(mission)
+    mocks.readRuntimeSnapshot.mockReturnValue({
+      checkpointRaw: 'STATE: DONE',
+      currentMissionId: mission.id,
+      currentAssignmentId: 'stale-assignment',
+    })
+    mocks.checkpointFromSnapshot.mockReturnValue({
+      stateLabel: 'DONE',
+      checkpointStatus: 'done',
+      runtimeState: 'idle',
+      filesChanged: 'none',
+      commandsRun: 'none',
+      result: 'stale result',
+      blocker: null,
+      nextAction: null,
+      raw: 'STATE: DONE',
+    })
+
+    const response = await handlers.GET({
+      request: new Request(
+        'http://workspace.test/api/conductor-spawn?missionId=conductor-test',
+      ),
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.checkpointFromSnapshot).not.toHaveBeenCalled()
     expect(mocks.recordCheckpoint).not.toHaveBeenCalled()
   })
 
@@ -420,6 +459,32 @@ describe('Conductor mission Card admission', () => {
     expect(mocks.createMission).not.toHaveBeenCalled()
     expect(mocks.bindAuthority).not.toHaveBeenCalled()
     expect(mocks.dispatchAssignments).toHaveBeenCalledTimes(1)
+  })
+
+  it('durably cancels an admitted native mission when asynchronous dispatch rejects', async () => {
+    mocks.ensureGatewayProbed.mockResolvedValue({
+      conductor: false,
+      dashboard: { available: false },
+    })
+    mocks.dispatchAssignments.mockRejectedValue(
+      new Error('simulated asynchronous dispatch failure'),
+    )
+    mocks.cancelMission.mockReturnValue({ changed: true })
+
+    const response = await handlers.POST({
+      request: post({ goal: 'Fix runtime', maxParallel: 1 }),
+    })
+    const payload = (await response.json()) as { missionId?: string }
+
+    expect(response.status).toBe(200)
+    await vi.waitFor(() =>
+      expect(mocks.cancelMission).toHaveBeenCalledWith({
+        missionId: payload.missionId,
+        actor: 'conductor-dispatch-compensation',
+        reason:
+          'Native Conductor dispatch failed: simulated asynchronous dispatch failure',
+      }),
+    )
   })
 
   it('persists nothing when any native worker binding cannot be resolved', async () => {
