@@ -9,6 +9,8 @@ type ArtifactFunction = (...args: Array<unknown>) => unknown
 type SessionCardServiceBoundary = {
   resolveCard: ArtifactFunction
   resolveChildCard: ArtifactFunction
+  resolveLocalCardByUpstreamSession?: ArtifactFunction
+  resolveRemoteCardByUpstreamSession?: ArtifactFunction
   observeCardActivity: ArtifactFunction
   observeChildLifecycle: ArtifactFunction
 }
@@ -20,6 +22,7 @@ type ElectronArtifactBoundaries = {
   appendSwarmMemoryEvent: ArtifactFunction
   createPersistedRun: ArtifactFunction
   dashboardFetch: ArtifactFunction
+  dispatchSwarmAssignments: ArtifactFunction
   dispatchPromptToLiveSession: ArtifactFunction
   ensureGatewayProbed: ArtifactFunction
   ensureLocalSession: ArtifactFunction
@@ -52,8 +55,12 @@ type ElectronServerArtifact = {
     fetch: (request: Request) => Promise<Response>
   }
   __artifactContract: {
+    createAtomicMission: ArtifactFunction
+    getMission: ArtifactFunction
+    getMissionAuthorityBindings: ArtifactFunction
     initializeRoutes: () => void
     runDispatchWorker: (...args: Array<unknown>) => Promise<unknown>
+    setMissionStorePath: (path: string) => void
     replaceBoundaries: (boundaries: ElectronArtifactBoundaries) => void
     replaceSessionCardService: (service: SessionCardServiceBoundary) => void
   }
@@ -82,6 +89,15 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
   }
   const instrumented = `${bundle}
 ;module.exports.__artifactContract = {
+  createAtomicMission(input) {
+    return createSwarmMissionWithCardAuthorities(input);
+  },
+  getMission(missionId) {
+    return getSwarmMission(missionId);
+  },
+  getMissionAuthorityBindings(missionId) {
+    return getSwarmMissionCardAuthorityBindings(missionId);
+  },
   initializeRoutes() {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () => {
@@ -99,6 +115,9 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
   runDispatchWorker(...args) {
     return runWorker(...args);
   },
+  setMissionStorePath(path) {
+    SWARM_MISSIONS_PATH = path;
+  },
   replaceBoundaries(boundaries) {
     abandonActiveCardRun = boundaries.abandonActiveCardRun;
     appendLocalMessage = boundaries.appendLocalMessage;
@@ -106,6 +125,7 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
     appendSwarmMemoryEvent = boundaries.appendSwarmMemoryEvent;
     createPersistedRun = boundaries.createPersistedRun;
     dashboardFetch$1 = boundaries.dashboardFetch;
+    dispatchSwarmAssignments = boundaries.dispatchSwarmAssignments;
     ${dispatchDelivery} = boundaries.dispatchPromptToLiveSession;
     ensureGatewayProbed = boundaries.ensureGatewayProbed;
     ensureLocalSession = boundaries.ensureLocalSession;
@@ -160,6 +180,7 @@ const artifact = loadExecutableElectronArtifact()
 const artifactStateDir = mkdtempSync(
   resolve(process.cwd(), '.electron-artifact-state-'),
 )
+const missionStorePath = resolve(artifactStateDir, 'swarm-missions.json')
 const localCardId = 'local:builder-card'
 const localSegmentKey = 'local:builder'
 const localCardBinding = {
@@ -200,6 +221,32 @@ function resolvedLocalCard(cardId = localCardId) {
     aliases: [cardId],
     sourceBySegmentKey: new Map([[localSegmentKey, 'local']]),
     upstreamKeyBySegmentKey: new Map([[localSegmentKey, 'builder']]),
+    pinEligible: false,
+    collection: { completeness: 'complete', retryable: false, sources: [] },
+  }
+}
+
+function resolvedLocalWorkerCard(workerId: string) {
+  const cardId = `local:${workerId}-card`
+  const segmentKey = `local:${workerId}`
+  return {
+    card: {
+      cardId,
+      canonicalSource: 'local',
+      title: `${workerId} Card`,
+      titleSource: 'manual',
+      canonicalSegmentKey: segmentKey,
+      continuationSegmentKeys: [cardId, segmentKey],
+      continuationCount: 2,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 10,
+      archived: false,
+      pinned: false,
+    },
+    aliases: [cardId],
+    sourceBySegmentKey: new Map([[segmentKey, 'local']]),
+    upstreamKeyBySegmentKey: new Map([[segmentKey, workerId]]),
     pinEligible: false,
     collection: { completeness: 'complete', retryable: false, sources: [] },
   }
@@ -329,6 +376,66 @@ function activeChildAbandonRequest() {
   )
 }
 
+function conductorSpawnRequest(maxParallel = 2) {
+  return new Request('http://workspace.test/api/conductor-spawn', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      goal: 'Create a focused prototype',
+      maxParallel,
+    }),
+  })
+}
+
+function conductorStopRequest(
+  missionId: string,
+  cardBindings = [localCardBinding],
+) {
+  return new Request('http://workspace.test/api/conductor-stop', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      cardBindings,
+      missionIds: [missionId],
+      missionCardId: localCardId,
+    }),
+  })
+}
+
+function readMissionStore() {
+  return JSON.parse(readFileSync(missionStorePath, 'utf8')) as {
+    missions: Array<{
+      id: string
+      state: string
+      assignments: Array<{ workerId: string; state: string }>
+      events: Array<{ type: string; message: string }>
+    }>
+    missionCardAuthorities: Array<{
+      missionId: string
+      anchors: Array<{
+        source: string
+        key: string
+        binding: typeof localCardBinding
+      }>
+    }>
+  }
+}
+
+function seedNativeMission(missionId: string) {
+  return artifact.__artifactContract.createAtomicMission({
+    missionId,
+    title: 'Executable native mission',
+    assignments: [{ workerId: 'builder', task: 'Execute the mission' }],
+    authorities: [
+      {
+        anchorSource: 'local',
+        anchorKey: 'builder',
+        binding: localCardBinding,
+      },
+    ],
+  })
+}
+
 function successfulExecFile(
   _command: unknown,
   _args: unknown,
@@ -408,6 +515,7 @@ describe('checked-in Electron server bundle behavior', () => {
   const swarmActions = {
     abandonActiveCardRun: vi.fn(),
     appendSwarmMemoryEvent: vi.fn(),
+    dispatchSwarmAssignments: vi.fn(),
     dispatchPromptToLiveSession: vi.fn(),
     getSwarmProfilePath: vi.fn(),
     listAllActiveRuns: vi.fn(),
@@ -428,6 +536,9 @@ describe('checked-in Electron server bundle behavior', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    rmSync(missionStorePath, { force: true })
+    artifact.__artifactContract.setMissionStorePath(missionStorePath)
+    swarmActions.dispatchSwarmAssignments.mockResolvedValue({})
     swarmActions.dispatchPromptToLiveSession.mockResolvedValue({
       workerId: 'builder',
       ok: true,
@@ -463,6 +574,7 @@ describe('checked-in Electron server bundle behavior', () => {
       appendSwarmMemoryEvent: swarmActions.appendSwarmMemoryEvent,
       createPersistedRun: runStoreActions.createPersistedRun,
       dashboardFetch: gatewayActions.dashboardFetch,
+      dispatchSwarmAssignments: swarmActions.dispatchSwarmAssignments,
       dispatchPromptToLiveSession: swarmActions.dispatchPromptToLiveSession,
       ensureGatewayProbed: gatewayActions.ensureGatewayProbed.mockResolvedValue(
         {
@@ -702,6 +814,269 @@ describe('checked-in Electron server bundle behavior', () => {
     expect(
       swarmActions.publishSwarmCheckpointNotification,
     ).not.toHaveBeenCalled()
+  })
+
+  it('atomically persists an executable multiworker mission and its complete Card authority set', () => {
+    const reviewerBinding = {
+      ...localCardBinding,
+      cardId: 'local:reviewer-card',
+      canonicalSegmentKey: 'local:reviewer',
+    }
+
+    const mission = artifact.__artifactContract.createAtomicMission({
+      missionId: 'artifact-atomic-mission',
+      title: 'Artifact atomic mission',
+      assignments: [
+        { workerId: 'builder', task: 'Implement the artifact patch' },
+        { workerId: 'reviewer', task: 'Review the artifact patch' },
+      ],
+      authorities: [
+        {
+          anchorSource: 'local',
+          anchorKey: 'builder',
+          binding: localCardBinding,
+        },
+        {
+          anchorSource: 'local',
+          anchorKey: 'reviewer',
+          binding: reviewerBinding,
+        },
+      ],
+    })
+
+    expect(mission).toMatchObject({
+      id: 'artifact-atomic-mission',
+      _created: true,
+    })
+    expect(
+      artifact.__artifactContract.getMissionAuthorityBindings(
+        'artifact-atomic-mission',
+      ),
+    ).toEqual([localCardBinding, reviewerBinding])
+    const persisted = readMissionStore()
+    expect(
+      persisted.missions.map((entry) => ({
+        id: entry.id,
+        workers: entry.assignments.map((assignment) => assignment.workerId),
+      })),
+    ).toEqual([
+      {
+        id: 'artifact-atomic-mission',
+        workers: ['builder', 'reviewer'],
+      },
+    ])
+    expect(
+      persisted.missionCardAuthorities.map((authority) => ({
+        missionId: authority.missionId,
+        anchors: authority.anchors.map((anchor) => ({
+          source: anchor.source,
+          key: anchor.key,
+          cardId: anchor.binding.cardId,
+        })),
+      })),
+    ).toEqual([
+      {
+        missionId: 'artifact-atomic-mission',
+        anchors: [
+          { source: 'local', key: 'builder', cardId: localCardId },
+          {
+            source: 'local',
+            key: 'reviewer',
+            cardId: 'local:reviewer-card',
+          },
+        ],
+      },
+    ])
+  })
+
+  it('durably compensates native Conductor admission when a later worker Card is unavailable', async () => {
+    const resolveLocalCardByUpstreamSession = vi
+      .fn()
+      .mockImplementation((workerId) =>
+        workerId === 'reviewer'
+          ? Promise.reject(new Error('reviewer Card unavailable'))
+          : Promise.resolve(resolvedLocalWorkerCard(String(workerId))),
+      )
+    artifact.__artifactContract.replaceSessionCardService({
+      resolveCard: vi
+        .fn()
+        .mockImplementation((cardId) =>
+          Promise.resolve(
+            resolvedLocalWorkerCard(
+              String(cardId).replace(/^local:|-card$/gu, ''),
+            ),
+          ),
+        ),
+      resolveChildCard: vi.fn(),
+      resolveLocalCardByUpstreamSession,
+      resolveRemoteCardByUpstreamSession: vi.fn(),
+      observeCardActivity: vi.fn().mockResolvedValue(null),
+      observeChildLifecycle: vi.fn().mockResolvedValue(null),
+    })
+    gatewayActions.ensureGatewayProbed.mockResolvedValue({
+      conductor: false,
+      dashboard: { available: false },
+    })
+
+    const response = await artifact.default.fetch(conductorSpawnRequest())
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: 'Session Card ownership unavailable for native dispatch',
+    })
+    expect(swarmActions.dispatchSwarmAssignments).not.toHaveBeenCalled()
+    const persisted = readMissionStore()
+    expect(persisted.missions).toHaveLength(1)
+    expect(persisted.missions[0]).toMatchObject({
+      state: 'cancelled',
+      assignments: [
+        { workerId: 'builder', state: 'cancelled' },
+        { workerId: 'reviewer', state: 'cancelled' },
+      ],
+    })
+    expect(persisted.missions[0]?.events.at(-1)).toMatchObject({
+      type: 'mission_cancelled',
+      message: expect.stringContaining(
+        'Native Conductor worker Session Card binding unavailable',
+      ),
+    })
+  })
+
+  it('deletes a dashboard Conductor mission when exact Card admission fails', async () => {
+    artifact.__artifactContract.replaceSessionCardService({
+      resolveCard: vi
+        .fn()
+        .mockResolvedValue(resolvedRemoteCard('remote:rolled-over-card')),
+      resolveChildCard: vi.fn(),
+      resolveLocalCardByUpstreamSession: vi.fn(),
+      resolveRemoteCardByUpstreamSession: vi
+        .fn()
+        .mockResolvedValue(resolvedRemoteCard()),
+      observeCardActivity: vi.fn().mockResolvedValue(null),
+      observeChildLifecycle: vi.fn().mockResolvedValue(null),
+    })
+    gatewayActions.ensureGatewayProbed.mockResolvedValue({
+      conductor: true,
+      dashboard: { available: true },
+    })
+    gatewayActions.dashboardFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'dashboard-artifact-mission',
+            name: 'Dashboard artifact mission',
+            session_id: 'private-upstream-tip',
+          }),
+          { status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    const response = await artifact.default.fetch(conductorSpawnRequest())
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      missionId: 'dashboard-artifact-mission',
+      error: 'Dashboard Conductor mission Session Card binding is unavailable',
+      compensated: true,
+      compensationError: null,
+    })
+    expect(gatewayActions.dashboardFetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/conductor/missions/dashboard-artifact-mission',
+      { method: 'DELETE' },
+    )
+    expect(
+      artifact.__artifactContract.getMission('dashboard-artifact-mission'),
+    ).toBeNull()
+  })
+
+  it('keeps native cancellation persisted when a worker Card becomes stale before reset', async () => {
+    const missionId = 'artifact-stale-stop'
+    expect(seedNativeMission(missionId)).not.toBeNull()
+    artifact.__artifactContract.replaceSessionCardService({
+      resolveCard: vi
+        .fn()
+        .mockResolvedValueOnce(resolvedLocalCard())
+        .mockResolvedValueOnce(resolvedLocalCard('local:rolled-over-card')),
+      resolveChildCard: vi.fn(),
+      resolveLocalCardByUpstreamSession: vi.fn(),
+      resolveRemoteCardByUpstreamSession: vi.fn(),
+      observeCardActivity: vi.fn().mockResolvedValue(null),
+      observeChildLifecycle: vi.fn().mockResolvedValue(null),
+    })
+
+    const response = await artifact.default.fetch(
+      conductorStopRequest(missionId),
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      cancelledNativeMissions: 1,
+      failures: [
+        {
+          operation: 'reset-worker',
+          id: 'builder',
+          error: 'Session Card worker binding is unavailable',
+        },
+      ],
+    })
+    expect(swarmActions.resetSwarmWorkerRuntime).not.toHaveBeenCalled()
+    expect(readMissionStore().missions[0]).toMatchObject({
+      id: missionId,
+      state: 'cancelled',
+      assignments: [{ workerId: 'builder', state: 'cancelled' }],
+    })
+  })
+
+  it('reports reset failure without rolling back the persisted native stop', async () => {
+    const missionId = 'artifact-reset-failure-stop'
+    expect(seedNativeMission(missionId)).not.toBeNull()
+    artifact.__artifactContract.replaceSessionCardService({
+      resolveCard: vi.fn().mockResolvedValue(resolvedLocalCard()),
+      resolveChildCard: vi.fn(),
+      resolveLocalCardByUpstreamSession: vi.fn(),
+      resolveRemoteCardByUpstreamSession: vi.fn(),
+      observeCardActivity: vi.fn().mockResolvedValue(null),
+      observeChildLifecycle: vi.fn().mockResolvedValue(null),
+    })
+    swarmActions.resetSwarmWorkerRuntime.mockReturnValue({
+      workerId: 'builder',
+      ok: false,
+      error: 'simulated reset failure',
+    })
+
+    const response = await artifact.default.fetch(
+      conductorStopRequest(missionId),
+    )
+
+    expect(response.status).toBe(502)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      cancelledNativeMissions: 1,
+      failures: [
+        {
+          operation: 'reset-worker',
+          id: 'builder',
+          error: 'Unable to reset worker runtime: simulated reset failure',
+        },
+      ],
+    })
+    expect(swarmActions.resetSwarmWorkerRuntime).toHaveBeenCalledWith(
+      'builder',
+      {
+        actor: 'conductor-stop',
+        reason: `Cancelled native Conductor mission ${missionId}`,
+      },
+    )
+    expect(readMissionStore().missions[0]).toMatchObject({
+      id: missionId,
+      state: 'cancelled',
+      assignments: [{ workerId: 'builder', state: 'cancelled' }],
+    })
   })
 
   it.each(['steer', 'kill'] as const)(

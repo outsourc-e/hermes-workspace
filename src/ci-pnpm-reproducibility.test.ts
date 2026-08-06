@@ -50,4 +50,19 @@ describe('CI pnpm reproducibility', () => {
     expect(workflow.on.push.branches).toContain('picknik-fixes')
     expect(workflow.on.pull_request.branches).toContain('picknik-fixes')
   })
+
+  it('pins the public installer to the package pnpm version and a frozen lockfile', () => {
+    const packageJson = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'),
+    ) as { packageManager?: string }
+    const installer = readFileSync(resolve(process.cwd(), 'install.sh'), 'utf8')
+
+    expect(packageJson.packageManager).toBe('pnpm@10.15.0')
+    expect(installer).toContain('readonly PNPM_VERSION="10.15.0"')
+    expect(installer).toContain('corepack "pnpm@${PNPM_VERSION}" "$@"')
+    expect(installer).toContain('npx --yes "pnpm@${PNPM_VERSION}" "$@"')
+    expect(installer).toContain('pnpm_cmd install --frozen-lockfile --silent')
+    expect(installer).not.toMatch(/pnpm@latest|npm install -g pnpm(?:\s|$)/u)
+    expect(installer).not.toContain('pnpm_cmd install --silent')
+  })
 })

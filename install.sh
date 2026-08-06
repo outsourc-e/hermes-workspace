@@ -19,6 +19,7 @@ REPO_URL="${REPO_URL:-https://github.com/outsourc-e/hermes-workspace.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/hermes-workspace}"
 GATEWAY_PORT="${GATEWAY_PORT:-8642}"
 NOUS_INSTALLER_URL="${NOUS_INSTALLER_URL:-https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh}"
+readonly PNPM_VERSION="10.15.0"
 
 # ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -52,17 +53,11 @@ ensure_path() {
 }
 
 pnpm_cmd() {
-  if command -v pnpm &>/dev/null; then
-    pnpm "$@"
+  if command -v corepack &>/dev/null; then
+    corepack "pnpm@${PNPM_VERSION}" "$@"
     return
   fi
-  if command -v corepack &>/dev/null && corepack pnpm --version &>/dev/null; then
-    corepack pnpm "$@"
-    return
-  fi
-  red "pnpm is not available in this shell."
-  red "Try opening a new shell, or install pnpm manually: https://pnpm.io/installation"
-  exit 1
+  npx --yes "pnpm@${PNPM_VERSION}" "$@"
 }
 
 ensure_env_key() {
@@ -116,15 +111,8 @@ green "  git $(git --version | awk '{print $3}') ✓"
 need curl "Install curl (usually: apt install curl / brew install curl)"
 green "  curl ✓"
 
-if ! command -v pnpm &>/dev/null; then
-  yellow "  pnpm not found — installing via corepack…"
-  if command -v corepack &>/dev/null; then
-    corepack enable 2>/dev/null || true
-    corepack prepare pnpm@latest --activate 2>/dev/null || true
-  fi
-  if ! command -v pnpm &>/dev/null && ! (command -v corepack &>/dev/null && corepack pnpm --version &>/dev/null); then
-    npm install -g pnpm
-  fi
+if ! command -v corepack &>/dev/null; then
+  need npm "Install npm (included with Node.js) to run pnpm ${PNPM_VERSION}."
 fi
 green "  pnpm $(pnpm_cmd --version) ✓"
 
@@ -212,8 +200,8 @@ if [[ -f "$HERMES_ENV_PATH" ]]; then
   fi
 fi
 
-cyan "→ Installing npm deps (pnpm install)…"
-pnpm_cmd install --silent
+cyan "→ Installing npm deps (pnpm install --frozen-lockfile)…"
+pnpm_cmd install --frozen-lockfile --silent
 green "  deps installed ✓"
 
 # ─── seed Hermes skills (Conductor needs workspace-dispatch) ─────────────
