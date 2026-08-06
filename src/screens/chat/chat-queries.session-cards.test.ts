@@ -98,6 +98,7 @@ describe('Session Card query keys', () => {
       'remote:root',
       'signed.cursor',
     ])
+    // eslint-disable-next-line no-constant-condition, @typescript-eslint/no-unnecessary-condition -- compile-only legacy API contract.
     if (false) {
       // @ts-expect-error Legacy segment arguments must be compile failures.
       sessionCardQueryKeys.history('remote:root', 'remote:legacy-segment')
@@ -132,6 +133,7 @@ describe('Session Card query keys', () => {
       'remote:child',
       'child.cursor',
     ])
+    // eslint-disable-next-line no-constant-condition, @typescript-eslint/no-unnecessary-condition -- compile-only legacy API contract.
     if (false) {
       sessionCardQueryKeys.childHistory(
         'remote:root',
