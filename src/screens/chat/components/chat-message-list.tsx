@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   ArrowExpand01Icon,
   ArrowUp01Icon,
@@ -670,6 +678,12 @@ type ChatMessageListProps = {
    *  can confirm the server received it). Keeps the thinking indicator visible
    *  during the very first render after the user submits. */
   sending?: boolean
+  /** True when the Card query has another verified older continuation window. */
+  hasOlderHistory?: boolean
+  /** Parent-query request state; an internal guard also closes event races. */
+  loadingOlderHistory?: boolean
+  /** Load and merge exactly one older continuation window. */
+  onLoadOlderHistory?: () => Promise<unknown>
 }
 
 function ChatMessageListComponent({
@@ -699,6 +713,9 @@ function ChatMessageListComponent({
   hideSystemMessages = false,
   isCompacting = false,
   sending = false,
+  hasOlderHistory = false,
+  loadingOlderHistory = false,
+  onLoadOlderHistory,
 }: ChatMessageListProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
   const lastUserRef = useRef<HTMLDivElement | null>(null)
@@ -711,7 +728,19 @@ function ChatMessageListComponent({
   const [streamingCleared, setStreamingCleared] = useState(0)
   streamingTargetsClearRef.current = () => setStreamingCleared((c) => c + 1)
   const lastScrollTopRef = useRef(0)
+  const olderHistoryLoadInFlightRef = useRef(false)
+  const olderHistoryRequestIdRef = useRef(0)
+  const prependAnchorRef = useRef<{
+    requestId: number
+    viewport: HTMLElement
+    scrollHeight: number
+    scrollTop: number
+    visibleMessage: HTMLElement | null
+    visibleMessageOffset: number | null
+  } | null>(null)
   const isNearBottomRef = useRef(true)
+  const [pendingPrependAnchorRequestId, setPendingPrependAnchorRequestId] =
+    useState<number | null>(null)
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const [expandAllToolSections, setExpandAllToolSections] = useState(false)
@@ -771,30 +800,115 @@ function ChatMessageListComponent({
     }
   }, [contentStyle, isMobileViewport])
 
-  // Simple scroll handler — only tracks if user is near bottom via refs (no state updates)
-  const handleUserScroll = useCallback(function handleUserScroll(metrics: {
-    scrollTop: number
-    scrollHeight: number
-    clientHeight: number
-  }) {
-    const distanceFromBottom =
-      metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight
-    const nearBottom = distanceFromBottom <= NEAR_BOTTOM_THRESHOLD
-    const wasScrollingUp = metrics.scrollTop < lastScrollTopRef.current - 5
-    lastScrollTopRef.current = metrics.scrollTop
+  const restorePrependAnchor = useCallback((requestId: number) => {
+    const anchor = prependAnchorRef.current
+    if (!anchor || anchor.requestId !== requestId) return
+    prependAnchorRef.current = null
+    if (!anchor.viewport.isConnected) return
+    const viewportTop = anchor.viewport.getBoundingClientRect().top
+    const visibleMessageTop = anchor.visibleMessage?.isConnected
+      ? anchor.visibleMessage.getBoundingClientRect().top
+      : undefined
+    const visibleMessageOffset =
+      visibleMessageTop === undefined || anchor.visibleMessageOffset === null
+        ? undefined
+        : visibleMessageTop - viewportTop
+    const heightDelta = anchor.viewport.scrollHeight - anchor.scrollHeight
+    const scrollDelta =
+      visibleMessageOffset === undefined || anchor.visibleMessageOffset === null
+        ? heightDelta
+        : visibleMessageOffset - anchor.visibleMessageOffset
+    anchor.viewport.scrollTop = Math.max(0, anchor.scrollTop + scrollDelta)
+    lastScrollTopRef.current = anchor.viewport.scrollTop
+    stickToBottomRef.current = false
+    isNearBottomRef.current = false
+    setIsNearBottom(false)
+  }, [])
 
-    // Bug #552: any user-initiated upward scroll releases stick-to-bottom
-    // (previously required >200px from bottom, which let streaming yank the
-    // viewport back down during near-bottom reading). Re-stick only when the
-    // user lands back at the bottom.
-    if (wasScrollingUp) {
+  // Simple scroll handler — only tracks if user is near bottom via refs (no state updates)
+  const handleUserScroll = useCallback(
+    function handleUserScroll(metrics: {
+      scrollTop: number
+      scrollHeight: number
+      clientHeight: number
+    }) {
+      const distanceFromBottom =
+        metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight
+      const nearBottom = distanceFromBottom <= NEAR_BOTTOM_THRESHOLD
+      const wasScrollingUp = metrics.scrollTop < lastScrollTopRef.current - 5
+      lastScrollTopRef.current = metrics.scrollTop
+
+      // Bug #552: any user-initiated upward scroll releases stick-to-bottom
+      // (previously required >200px from bottom, which let streaming yank the
+      // viewport back down during near-bottom reading). Re-stick only when the
+      // user lands back at the bottom.
+      if (wasScrollingUp) {
+        stickToBottomRef.current = false
+        isNearBottomRef.current = false
+      } else if (nearBottom) {
+        stickToBottomRef.current = true
+        isNearBottomRef.current = true
+      }
+
+      if (
+        metrics.scrollTop > 16 ||
+        !hasOlderHistory ||
+        loadingOlderHistory ||
+        olderHistoryLoadInFlightRef.current ||
+        !onLoadOlderHistory
+      ) {
+        return
+      }
+
+      const viewport = anchorRef.current?.closest('[data-chat-scroll-viewport]')
+      if (!(viewport instanceof HTMLElement)) return
+      const requestId = ++olderHistoryRequestIdRef.current
+      const viewportTop = viewport.getBoundingClientRect().top
+      const viewportBottom = viewport.getBoundingClientRect().bottom
+      const visibleMessage = Array.from(
+        viewport.querySelectorAll<HTMLElement>('[data-chat-message-id]'),
+      ).find((message) => {
+        const rect = message.getBoundingClientRect()
+        return rect.bottom > viewportTop && rect.top < viewportBottom
+      })
+      const visibleMessageOffset = visibleMessage
+        ? visibleMessage.getBoundingClientRect().top - viewportTop
+        : null
+      prependAnchorRef.current = {
+        requestId,
+        viewport,
+        scrollHeight: metrics.scrollHeight,
+        scrollTop: metrics.scrollTop,
+        visibleMessage: visibleMessage ?? null,
+        visibleMessageOffset,
+      }
+      olderHistoryLoadInFlightRef.current = true
       stickToBottomRef.current = false
       isNearBottomRef.current = false
-    } else if (nearBottom) {
-      stickToBottomRef.current = true
-      isNearBottomRef.current = true
-    }
-  }, [])
+      void onLoadOlderHistory()
+        .then((didPrepend) => {
+          if (didPrepend === true) {
+            setPendingPrependAnchorRequestId(requestId)
+          } else if (prependAnchorRef.current?.requestId === requestId) {
+            prependAnchorRef.current = null
+          }
+        })
+        .catch(() => {
+          if (prependAnchorRef.current?.requestId === requestId) {
+            prependAnchorRef.current = null
+          }
+        })
+        .finally(() => {
+          olderHistoryLoadInFlightRef.current = false
+        })
+    },
+    [
+      hasOlderHistory,
+      loadingOlderHistory,
+      onLoadOlderHistory,
+      restorePrependAnchor,
+    ],
+  )
 
   // Simple scroll to bottom — find viewport and scroll
   const scrollToBottom = useCallback(function scrollToBottom(
@@ -897,6 +1011,16 @@ function ChatMessageListComponent({
     () => buildDisplayEntries(displayMessages),
     [displayMessages],
   )
+
+  useLayoutEffect(() => {
+    if (pendingPrependAnchorRequestId === null) return
+    restorePrependAnchor(pendingPrependAnchorRequestId)
+    setPendingPrependAnchorRequestId(null)
+  }, [
+    displayEntries.length,
+    pendingPrependAnchorRequestId,
+    restorePrependAnchor,
+  ])
 
   // Bug 2 fix: grace-period effects — placed after displayMessages so they can
   // reference it safely.
@@ -2146,7 +2270,10 @@ function areChatMessageListEqual(
     prev.liveToolActivity === next.liveToolActivity &&
     prev.researchCard === next.researchCard &&
     prev.hideSystemMessages === next.hideSystemMessages &&
-    prev.sending === next.sending
+    prev.sending === next.sending &&
+    prev.hasOlderHistory === next.hasOlderHistory &&
+    prev.loadingOlderHistory === next.loadingOlderHistory &&
+    prev.onLoadOlderHistory === next.onLoadOlderHistory
   )
 }
 

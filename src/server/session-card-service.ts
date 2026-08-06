@@ -145,6 +145,8 @@ export type ResolvedSessionCard = {
   aliases: Array<string>
   sourceBySegmentKey: ReadonlyMap<string, string>
   upstreamKeyBySegmentKey: ReadonlyMap<string, string>
+  /** Source-authoritative session generation carried by the list projection. */
+  updatedAtBySegmentKey: ReadonlyMap<string, number | undefined>
   collection: Pick<
     SessionCardCollection,
     'completeness' | 'retryable' | 'sources'
@@ -1302,6 +1304,10 @@ function resolveProjectedCard(
 ): ResolvedSessionCard {
   const sourceBySegmentKey = new Map<string, string>()
   const upstreamKeyBySegmentKey = new Map<string, string>()
+  const updatedAtBySegmentKey = new Map<string, number | undefined>()
+  const sessionByProjectedKey = new Map(
+    fresh.collection.sessions.map((session) => [session.key, session]),
+  )
   const resolvedCard = authoritativeCardProjections(fresh, [card])[0]!
   const requiredSources: Array<SessionCardSourceStatus> = []
   const seenRequiredSources = new Set<SessionCardSourceStatus>()
@@ -1313,6 +1319,10 @@ function resolveProjectedCard(
       fresh.collection.sourceStatusBySessionKey.get(segmentKey)
     if (source) sourceBySegmentKey.set(segmentKey, source)
     if (upstreamKey) upstreamKeyBySegmentKey.set(segmentKey, upstreamKey)
+    updatedAtBySegmentKey.set(
+      segmentKey,
+      sessionByProjectedKey.get(segmentKey)?.updatedAt,
+    )
     if (!source || !upstreamKey || sourceStatus?.status !== 'complete') {
       componentComplete = false
     }
@@ -1340,6 +1350,7 @@ function resolveProjectedCard(
     aliases,
     sourceBySegmentKey,
     upstreamKeyBySegmentKey,
+    updatedAtBySegmentKey,
     collection: {
       completeness: componentComplete ? 'complete' : 'incomplete',
       retryable:

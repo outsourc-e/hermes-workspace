@@ -46,6 +46,26 @@ function chain(tip = 'third'): Array<SessionMeta> {
   return rows
 }
 
+function numberedChain(
+  count: number,
+  keyFor = (index: number) => `segment-${index + 1}`,
+): Array<SessionMeta> {
+  return Array.from({ length: count }, (_, index) => {
+    const key = keyFor(index)
+    const previous = index > 0 ? keyFor(index - 1) : undefined
+    return session(key, {
+      ...(previous ? { parentSessionId: previous } : {}),
+      source: 'cli',
+      ...(index < count - 1
+        ? { endReason: 'compression', endedAt: index + 1 }
+        : {}),
+      ...(index > 0 ? { startedAt: index } : {}),
+      lineageRootId: keyFor(0),
+      lineageTipId: keyFor(count - 1),
+    })
+  })
+}
+
 const noMetadata: SessionCardMetadataStore = {
   list: () => [],
   update: () => {
@@ -80,7 +100,13 @@ function cardService(rows: () => Array<SessionMeta>): SessionCardService {
 
 function source(
   messages: Record<string, Array<Record<string, unknown>> | Error>,
-): SessionCardHistoryMessageSource & { getMessages: ReturnType<typeof vi.fn> } {
+): SessionCardHistoryMessageSource & {
+  getMessages: ReturnType<typeof vi.fn>
+  setMessages: (
+    segmentKey: string,
+    value: Array<Record<string, unknown>> | Error,
+  ) => void
+} {
   return {
     getMessages: vi.fn((segmentKey: string) => {
       const value = messages[segmentKey]
@@ -92,6 +118,9 @@ function source(
             resolvedSegmentKey: segmentKey,
           })
     }),
+    setMessages(segmentKey, value) {
+      messages[segmentKey] = value
+    },
   }
 }
 
@@ -137,6 +166,284 @@ describe('SessionCardHistoryService', () => {
       retryable: false,
       missingSegments: [],
     })
+  })
+
+  it.each([3, 5, 7])(
+    'reaches the root through every page of an odd %i-segment chain',
+    async (count) => {
+      const entries = Object.fromEntries(
+        Array.from({ length: count }, (_, index) => {
+          const key = `segment-${index + 1}`
+          return [
+            key,
+            [{ id: key, role: 'user', content: key, timestamp: index }],
+          ]
+        }),
+      )
+      const messages = source(entries)
+      const history = new SessionCardHistoryService({
+        cardService: cardService(() => numberedChain(count)),
+        messageSource: messages,
+        cursorSecret: Buffer.from('history-test-secret'),
+      })
+
+      let page = await history.fetch({
+        cardId: 'segment-1',
+        window: 'recent',
+      })
+      const seen = new Set(page.messages.map((message) => message.segmentKey))
+      while (page.previousCursor) {
+        page = await history.fetch({
+          cardId: 'segment-1',
+          window: 'recent',
+          cursor: page.previousCursor,
+        })
+        for (const message of page.messages) seen.add(message.segmentKey)
+      }
+
+      expect([...seen].sort()).toEqual(
+        Array.from(
+          { length: count },
+          (_, index) => `remote:segment-${index + 1}`,
+        ).sort(),
+      )
+    },
+  )
+
+  it('keeps issued recent cursors below the accepted URL limit on long chains', async () => {
+    const count = 61
+    const keyFor = (index: number) =>
+      `${String(index).padStart(2, '0')}-${'x'.repeat(40)}`
+    const entries = Object.fromEntries(
+      Array.from({ length: count }, (_, index) => {
+        const key = keyFor(index)
+        return [
+          key,
+          [{ id: key, role: 'user', content: key, timestamp: index }],
+        ]
+      }),
+    )
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => numberedChain(count, keyFor)),
+      messageSource: source(entries),
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    let page = await history.fetch({ cardId: keyFor(0), window: 'recent' })
+    while (page.previousCursor) {
+      expect(page.previousCursor.length).toBeLessThanOrEqual(4096)
+      page = await history.fetch({
+        cardId: keyFor(0),
+        window: 'recent',
+        cursor: page.previousCursor,
+      })
+    }
+  })
+
+  it('loads two recent continuation segments and pages two older segments without reading the full Card', async () => {
+    const segments = ['first', 'second', 'third', 'fourth', 'fifth']
+    let rows = segments.map((key, index) =>
+      session(key, {
+        source: 'cli',
+        ...(index > 0 ? { parentSessionId: segments[index - 1] } : {}),
+        ...(index < segments.length - 1
+          ? { endReason: 'compression', endedAt: (index + 1) * 100 }
+          : {}),
+        ...(index > 0 ? { startedAt: index * 100 } : {}),
+        lineageRootId: 'first',
+        lineageTipId: 'fifth',
+      }),
+    )
+    rows.push(session('other'))
+    const messages = source({
+      first: [{ id: 'first', content: 'first' }],
+      second: [{ id: 'second', content: 'second' }],
+      third: [{ id: 'third', role: 'user', content: 'third', timestamp: 3 }],
+      fourth: [
+        // A cloned prefix with a changed row ID can only be proven duplicate
+        // by reading the already-visible boundary segment.
+        {
+          id: 'third-clone',
+          role: 'user',
+          content: 'third',
+          timestamp: 3,
+        },
+        { id: 'fourth', role: 'assistant', content: 'fourth', timestamp: 4 },
+      ],
+      fifth: [{ id: 'fifth', content: 'fifth' }],
+      other: [{ id: 'other', content: 'other' }],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => rows),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const recent = await history.fetch({ cardId: 'first', window: 'recent' })
+
+    expect(messages.getMessages.mock.calls.map(([key]) => key)).toEqual([
+      'fourth',
+      'fifth',
+    ])
+    expect(recent).toMatchObject({
+      completeness: 'partial',
+      retryable: false,
+      missingSegments: [],
+      loadedSegmentKeys: ['remote:fourth', 'remote:fifth'],
+      previousCursor: expect.any(String),
+    })
+
+    const older = await history.fetch({
+      cardId: 'first',
+      window: 'recent',
+      cursor: recent.previousCursor,
+    })
+
+    // The prior two visible segments are re-read before the page, and the
+    // prospective full window is re-read after it to reject source changes
+    // that occur during a multi-segment older request.
+    expect(messages.getMessages.mock.calls.map(([key]) => key)).toEqual([
+      'fourth',
+      'fifth',
+      'fourth',
+      'fifth',
+      'second',
+      'third',
+      'fourth',
+      'second',
+      'third',
+      'fourth',
+      'fifth',
+    ])
+    expect(older).toMatchObject({
+      loadedSegmentKeys: ['remote:second', 'remote:third', 'remote:fourth'],
+      previousCursor: expect.any(String),
+    })
+    expect(older.messages.map((entry) => entry.message.content)).toEqual([
+      'second',
+      'third',
+      'fourth',
+    ])
+
+    messages.setMessages('fourth', [
+      {
+        id: 'third-clone',
+        role: 'user',
+        content: 'third',
+        timestamp: 3,
+      },
+      {
+        id: 'fourth-updated-after-cursor',
+        role: 'assistant',
+        content: 'fourth updated',
+        timestamp: 4,
+      },
+    ])
+    await expect(
+      history.fetch({
+        cardId: 'first',
+        window: 'recent',
+        cursor: recent.previousCursor,
+      }),
+    ).rejects.toBeInstanceOf(SessionCardHistoryCursorError)
+    messages.setMessages('fourth', [
+      {
+        id: 'third-clone',
+        role: 'user',
+        content: 'third',
+        timestamp: 3,
+      },
+      { id: 'fourth', role: 'assistant', content: 'fourth', timestamp: 4 },
+    ])
+
+    messages.setMessages('fifth', [
+      {
+        id: 'fifth-rewritten-without-list-generation',
+        role: 'assistant',
+        content: 'fifth rewritten',
+        timestamp: 5,
+      },
+    ])
+    await expect(
+      history.fetch({
+        cardId: 'first',
+        window: 'recent',
+        cursor: recent.previousCursor,
+      }),
+    ).rejects.toBeInstanceOf(SessionCardHistoryCursorError)
+    messages.setMessages('fifth', [
+      { id: 'fifth', role: 'assistant', content: 'fifth', timestamp: 5 },
+    ])
+
+    rows = rows.map((row) =>
+      row.key === 'fifth' ? { ...row, updatedAt: 1 } : row,
+    )
+    await expect(
+      history.fetch({
+        cardId: 'first',
+        window: 'recent',
+        cursor: recent.previousCursor,
+      }),
+    ).rejects.toBeInstanceOf(SessionCardHistoryCursorError)
+
+    const cursor = recent.previousCursor!
+    const replacement = cursor.endsWith('a') ? 'b' : 'a'
+    await expect(
+      history.fetch({
+        cardId: 'first',
+        window: 'recent',
+        cursor: `${cursor.slice(0, -1)}${replacement}`,
+      }),
+    ).rejects.toBeInstanceOf(SessionCardHistoryCursorError)
+    await expect(
+      history.fetch({ cardId: 'other', window: 'recent', cursor }),
+    ).rejects.toBeInstanceOf(SessionCardHistoryCursorError)
+    await expect(
+      history.fetch({ cardId: 'first', cursor }),
+    ).rejects.toBeInstanceOf(SessionCardHistoryCursorError)
+
+    rows = rows.map((row) =>
+      row.key === 'second'
+        ? session(row.key, { ...row.lineage, source: 'gateway' }, row.updatedAt)
+        : row,
+    )
+    await expect(
+      history.fetch({ cardId: 'first', window: 'recent', cursor }),
+    ).rejects.toBeInstanceOf(SessionCardHistoryCursorError)
+
+    rows = [
+      ...rows.filter((row) => row.key !== 'other'),
+      session('sixth', {
+        parentSessionId: 'fifth',
+        source: 'cli',
+        startedAt: 500,
+        lineageRootId: 'first',
+        lineageTipId: 'sixth',
+      }),
+      session('other'),
+    ].map((row) =>
+      row.key === 'fifth'
+        ? session(
+            'fifth',
+            {
+              ...row.lineage,
+              endReason: 'compression',
+              endedAt: 500,
+              lineageTipId: 'sixth',
+            },
+            row.updatedAt,
+          )
+        : row.key === 'other'
+          ? row
+          : session(
+              row.key,
+              { ...row.lineage, lineageTipId: 'sixth' },
+              row.updatedAt,
+            ),
+    )
+    await expect(
+      history.fetch({ cardId: 'first', window: 'recent', cursor }),
+    ).rejects.toBeInstanceOf(SessionCardHistoryCursorError)
   })
 
   it('loads a nonempty standalone Card through the same one-segment aggregation path', async () => {

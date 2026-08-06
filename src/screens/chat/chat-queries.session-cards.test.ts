@@ -8,15 +8,22 @@ import {
   chatQueryKeys,
   fetchChatSessionCardsPage,
   fetchCompleteSessionCardHistory,
+  fetchRecentSessionCardHistory,
   fetchSessionCard,
   fetchSessionCardHistory,
   fetchSessionCards,
   isAuthoritativeCompleteSessionCardHistory,
+  isDisplayableRecentSessionCardHistory,
+  isSessionCardRootHistoryLoaded,
   mergeChatSessionCardPages,
+  mergeFetchedOlderRecentSessionCardHistoryWindow,
+  mergeRecentSessionCardHistoryWindows,
+  mergeRefreshedRecentSessionCardHistoryWindows,
   mergeSessionCardDetail,
   mergeSessionCardHistoryResponse,
   moveLegacyHistoryMessagesToSessionCard,
   moveSessionCardHistoryMessages,
+  recentSessionCardHistoryWindowSignature,
   reconcileSessionCardHistoryResponse,
   sessionCardQueryKeys,
   updateSessionCardMetadata,
@@ -1288,6 +1295,511 @@ describe('Session Card fetchers', () => {
       }),
     ).rejects.toThrow('Invalid Session Card history request')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('requests a strict recent Card suffix and parses its segment contract', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:fifth',
+        messages: [
+          {
+            segmentKey: 'remote:fourth',
+            message: { id: 'm4', role: 'assistant', content: 'fourth' },
+          },
+          {
+            segmentKey: 'remote:fifth',
+            message: { id: 'm5', role: 'user', content: 'fifth' },
+          },
+        ],
+        completeness: 'partial',
+        retryable: false,
+        missingSegments: [],
+        loadedSegmentKeys: ['remote:fourth', 'remote:fifth'],
+        previousCursor: 'signed.previous',
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      fetchRecentSessionCardHistory({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:fifth',
+        continuationSegmentKeys: [
+          'remote:root',
+          'remote:second',
+          'remote:third',
+          'remote:fourth',
+          'remote:fifth',
+        ],
+        cursor: 'signed.current',
+      }),
+    ).resolves.toMatchObject({
+      messages: [
+        { id: 'm4', __segmentKey: 'remote:fourth' },
+        { id: 'm5', __segmentKey: 'remote:fifth' },
+      ],
+      loadedSegmentKeys: ['remote:fourth', 'remote:fifth'],
+      previousCursor: 'signed.previous',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/session-cards/remote%3Aroot/history?cursor=signed.current&window=recent',
+      { signal: undefined },
+    )
+    expect(fetchMock.mock.calls.flat().join(' ')).not.toContain('/api/history?')
+  })
+
+  it('rejects recent-window metadata on the unchanged complete-history request mode', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          cardId: 'remote:root',
+          canonicalSegmentKey: 'remote:fifth',
+          messages: [],
+          completeness: 'partial',
+          retryable: false,
+          missingSegments: [],
+          loadedSegmentKeys: ['remote:fourth', 'remote:fifth'],
+          previousCursor: 'signed.previous',
+        }),
+      ),
+    )
+
+    await expect(
+      fetchSessionCardHistory({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:fifth',
+        continuationSegmentKeys: [
+          'remote:root',
+          'remote:second',
+          'remote:third',
+          'remote:fourth',
+          'remote:fifth',
+        ],
+      }),
+    ).rejects.toThrow('Invalid Session Card response')
+  })
+
+  it.each([
+    ['missing previous cursor', { previousCursor: undefined }],
+    ['missing loaded keys', { loadedSegmentKeys: undefined }],
+    [
+      'duplicate loaded key',
+      { loadedSegmentKeys: ['remote:fourth', 'remote:fourth'] },
+    ],
+    [
+      'out-of-order loaded keys',
+      { loadedSegmentKeys: ['remote:fifth', 'remote:fourth'] },
+    ],
+    [
+      'non-contiguous loaded keys',
+      { loadedSegmentKeys: ['remote:third', 'remote:fifth'] },
+    ],
+    [
+      'initial window not ending at the canonical tip',
+      { loadedSegmentKeys: ['remote:third', 'remote:fourth'] },
+    ],
+    ['message outside loaded keys', { loadedSegmentKeys: ['remote:fifth'] }],
+    ['foreign loaded key', { loadedSegmentKeys: ['remote:other'] }],
+    ['retryable intentional suffix', { retryable: true }],
+  ])('rejects malformed recent Card history: %s', async (_name, patch) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          cardId: 'remote:root',
+          canonicalSegmentKey: 'remote:fifth',
+          messages: [
+            {
+              segmentKey: 'remote:fourth',
+              message: { id: 'm4', role: 'assistant', content: [] },
+            },
+          ],
+          completeness: 'partial',
+          retryable: false,
+          missingSegments: [],
+          loadedSegmentKeys: ['remote:fourth', 'remote:fifth'],
+          previousCursor: 'signed.previous',
+          ...patch,
+        }),
+      ),
+    )
+
+    await expect(
+      fetchRecentSessionCardHistory({
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:fifth',
+        continuationSegmentKeys: [
+          'remote:root',
+          'remote:second',
+          'remote:third',
+          'remote:fourth',
+          'remote:fifth',
+        ],
+      }),
+    ).rejects.toThrow('Invalid Session Card response')
+  })
+
+  it('allows Card auto-titles only once the root segment is loaded', () => {
+    const autoTitleCard = {
+      continuationSegmentKeys: ['remote:root', 'remote:tip'],
+    }
+    expect(
+      isSessionCardRootHistoryLoaded(autoTitleCard, {
+        loadedSegmentKeys: ['remote:tip'],
+        missingSegments: [],
+        completeness: 'complete',
+        retryable: false,
+      }),
+    ).toBe(false)
+    expect(
+      isSessionCardRootHistoryLoaded(autoTitleCard, {
+        loadedSegmentKeys: ['remote:root', 'remote:tip'],
+        missingSegments: [
+          {
+            segmentKey: 'remote:root',
+            retryable: true,
+            error: 'root unavailable',
+          },
+        ],
+        completeness: 'partial',
+        retryable: true,
+      }),
+    ).toBe(false)
+    expect(
+      isSessionCardRootHistoryLoaded(autoTitleCard, {
+        loadedSegmentKeys: ['remote:root', 'remote:tip'],
+        missingSegments: [],
+        completeness: 'partial',
+        retryable: true,
+      }),
+    ).toBe(false)
+    expect(
+      isSessionCardRootHistoryLoaded(autoTitleCard, {
+        loadedSegmentKeys: ['remote:root', 'remote:tip'],
+        missingSegments: [],
+        completeness: 'complete',
+        retryable: false,
+      }),
+    ).toBe(true)
+  })
+
+  it('merges older windows in Card chronology, replaces the boundary, and never resurrects a prior full transcript', () => {
+    const topology = [
+      'remote:root',
+      'remote:second',
+      'remote:third',
+      'remote:fourth',
+      'remote:fifth',
+    ]
+    const message = (id: string, segmentKey: string) => ({
+      id,
+      role: 'assistant' as const,
+      content: [],
+      __segmentKey: segmentKey,
+    })
+    const recentCursor = (offset: number, snapshot = 'same-topology') =>
+      `${Buffer.from(
+        JSON.stringify({
+          v: 3,
+          window: 'recent',
+          snapshot,
+          offset,
+        }),
+      ).toString('base64url')}.signature`
+    const current = {
+      sessionKey: 'remote:fifth',
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:fifth',
+      messages: [
+        message('fourth-stale-prefix', 'remote:fourth'),
+        message('fifth', 'remote:fifth'),
+      ],
+      persistedMessages: [
+        message('fourth-stale-prefix', 'remote:fourth'),
+        message('fifth', 'remote:fifth'),
+      ],
+      completeness: 'partial' as const,
+      retryable: false,
+      missingSegments: [],
+      loadedSegmentKeys: ['remote:fourth', 'remote:fifth'],
+      previousCursor: recentCursor(3),
+    }
+    const older = {
+      ...current,
+      messages: [
+        message('second', 'remote:second'),
+        message('third', 'remote:third'),
+        message('fourth-deduped', 'remote:fourth'),
+      ],
+      persistedMessages: [
+        message('second', 'remote:second'),
+        message('third', 'remote:third'),
+        message('fourth-deduped', 'remote:fourth'),
+      ],
+      loadedSegmentKeys: ['remote:second', 'remote:third', 'remote:fourth'],
+      previousCursor: recentCursor(1),
+    }
+
+    const merged = mergeRecentSessionCardHistoryWindows(
+      older,
+      current,
+      topology,
+    )
+    expect(merged.loadedSegmentKeys).toEqual([
+      'remote:second',
+      'remote:third',
+      'remote:fourth',
+      'remote:fifth',
+    ])
+    expect(merged.persistedMessages?.map((entry) => entry.id)).toEqual([
+      'second',
+      'third',
+      'fourth-deduped',
+      'fifth',
+    ])
+    expect(merged.previousCursor).toBe(recentCursor(1))
+    expect(isDisplayableRecentSessionCardHistory(merged)).toBe(true)
+
+    const failedOlder: SessionCardHistoryResponse = {
+      ...older,
+      retryable: true as const,
+      missingSegments: [
+        {
+          segmentKey: 'remote:second',
+          retryable: true,
+          error: 'source failed',
+        },
+      ],
+      previousCursor: undefined,
+    }
+    expect(
+      mergeFetchedOlderRecentSessionCardHistoryWindow(
+        failedOlder,
+        current,
+        topology,
+        current.previousCursor,
+        recentSessionCardHistoryWindowSignature(current),
+      ),
+    ).toBe(current)
+
+    const tipRefreshedWhileOlderWindowWasLoading = {
+      ...current,
+      messages: [
+        message('fourth-refreshed-before-older', 'remote:fourth'),
+        message('fifth-refreshed-before-older', 'remote:fifth'),
+      ],
+      persistedMessages: [
+        message('fourth-refreshed-before-older', 'remote:fourth'),
+        message('fifth-refreshed-before-older', 'remote:fifth'),
+      ],
+    }
+    const appliedToLatest = mergeFetchedOlderRecentSessionCardHistoryWindow(
+      older,
+      tipRefreshedWhileOlderWindowWasLoading,
+      topology,
+      current.previousCursor,
+      recentSessionCardHistoryWindowSignature(current),
+    )
+    expect(
+      appliedToLatest?.persistedMessages?.map((entry) => entry.id),
+    ).toEqual(['fourth-refreshed-before-older', 'fifth-refreshed-before-older'])
+
+    const continuationHandoff = {
+      ...tipRefreshedWhileOlderWindowWasLoading,
+      canonicalSegmentKey: 'remote:handoff-tip',
+    }
+    expect(
+      mergeFetchedOlderRecentSessionCardHistoryWindow(
+        older,
+        continuationHandoff,
+        topology,
+        current.previousCursor,
+        recentSessionCardHistoryWindowSignature(current),
+      ),
+    ).toBe(continuationHandoff)
+
+    const refreshedCursor = {
+      ...tipRefreshedWhileOlderWindowWasLoading,
+      previousCursor: 'newer-window-cursor.signature',
+    }
+    expect(
+      mergeFetchedOlderRecentSessionCardHistoryWindow(
+        older,
+        refreshedCursor,
+        topology,
+        current.previousCursor,
+        recentSessionCardHistoryWindowSignature(current),
+      ),
+    ).toBe(refreshedCursor)
+
+    const refreshed = mergeRefreshedRecentSessionCardHistoryWindows(
+      {
+        ...current,
+        messages: [
+          message('fourth-refreshed', 'remote:fourth'),
+          message('fifth-refreshed', 'remote:fifth'),
+        ],
+        persistedMessages: [
+          message('fourth-refreshed', 'remote:fourth'),
+          message('fifth-refreshed', 'remote:fifth'),
+        ],
+        previousCursor: recentCursor(3),
+      },
+      merged,
+      topology,
+    )
+    expect(refreshed.persistedMessages?.map((entry) => entry.id)).toEqual([
+      'second',
+      'third',
+      'fourth-refreshed',
+      'fifth-refreshed',
+    ])
+    expect(refreshed.previousCursor).toBe(recentCursor(1))
+
+    const rewrittenTipRefresh = mergeRefreshedRecentSessionCardHistoryWindows(
+      {
+        ...current,
+        recentSnapshot: 'same-topology',
+        recentTipSnapshot: 'tip-generation-2',
+      },
+      {
+        ...merged,
+        recentSnapshot: 'same-topology',
+        recentTipSnapshot: 'tip-generation-1',
+      },
+      topology,
+    )
+    expect(rewrittenTipRefresh.loadedSegmentKeys).toEqual(
+      current.loadedSegmentKeys,
+    )
+
+    const retainedThird = {
+      id: 'third-original-row',
+      role: 'tool' as const,
+      content: [],
+      timestamp: 3,
+      tool: { alpha: 1, beta: 2 },
+      __segmentKey: 'remote:third',
+    }
+    const refreshedFourthClone = {
+      id: 'fourth-cloned-row',
+      role: 'tool' as const,
+      content: [],
+      timestamp: 3,
+      tool: { beta: 2, alpha: 1 },
+      __segmentKey: 'remote:fourth',
+    }
+    const deduplicatedRefresh = mergeRefreshedRecentSessionCardHistoryWindows(
+      {
+        ...current,
+        messages: [
+          refreshedFourthClone,
+          {
+            id: 'fourth-refreshed-tail',
+            role: 'assistant' as const,
+            content: [{ type: 'text' as const, text: 'fresh tail' }],
+            timestamp: 4,
+            __segmentKey: 'remote:fourth',
+          },
+          message('fifth-refreshed-after-clone', 'remote:fifth'),
+        ],
+        persistedMessages: [
+          refreshedFourthClone,
+          {
+            id: 'fourth-refreshed-tail',
+            role: 'assistant' as const,
+            content: [{ type: 'text' as const, text: 'fresh tail' }],
+            timestamp: 4,
+            __segmentKey: 'remote:fourth',
+          },
+          message('fifth-refreshed-after-clone', 'remote:fifth'),
+        ],
+      },
+      {
+        ...merged,
+        messages: [
+          retainedThird,
+          ...merged.messages.filter(
+            (entry) => entry.__segmentKey !== 'remote:third',
+          ),
+        ],
+        persistedMessages: [
+          retainedThird,
+          ...(merged.persistedMessages ?? []).filter(
+            (entry) => entry.__segmentKey !== 'remote:third',
+          ),
+        ],
+      },
+      topology,
+    )
+    expect(
+      deduplicatedRefresh.persistedMessages?.map((entry) => entry.id),
+    ).toEqual([
+      'second',
+      'third-original-row',
+      'fourth-refreshed-tail',
+      'fifth-refreshed-after-clone',
+    ])
+
+    const terminalWindow = {
+      ...merged,
+      previousCursor: undefined,
+      recentSnapshot: 'same-topology',
+    }
+    const terminalRefresh = mergeRefreshedRecentSessionCardHistoryWindows(
+      { ...current, recentSnapshot: 'same-topology' },
+      terminalWindow,
+      topology,
+    )
+    expect(terminalRefresh.loadedSegmentKeys).toEqual(merged.loadedSegmentKeys)
+    expect(terminalRefresh.persistedMessages?.map((entry) => entry.id)).toEqual(
+      ['second', 'third', 'fourth-stale-prefix', 'fifth'],
+    )
+
+    const topologyRefreshed = mergeRefreshedRecentSessionCardHistoryWindows(
+      {
+        ...current,
+        messages: [message('fifth-new-source', 'remote:fifth')],
+        persistedMessages: [message('fifth-new-source', 'remote:fifth')],
+        loadedSegmentKeys: ['remote:fifth'],
+        previousCursor: recentCursor(4, 'changed-source-binding'),
+      },
+      merged,
+      topology,
+    )
+    expect(
+      topologyRefreshed.persistedMessages?.map((entry) => entry.id),
+    ).toEqual(['fifth-new-source'])
+    expect(topologyRefreshed.previousCursor).toBe(
+      recentCursor(4, 'changed-source-binding'),
+    )
+
+    const legacyFull = {
+      ...current,
+      messages: topology.map((segmentKey) => message(segmentKey, segmentKey)),
+      persistedMessages: topology.map((segmentKey) =>
+        message(segmentKey, segmentKey),
+      ),
+      completeness: 'complete' as const,
+      loadedSegmentKeys: undefined,
+      previousCursor: undefined,
+    }
+    const reconciled = reconcileSessionCardHistoryResponse(current, {
+      previous: legacyFull,
+      continuationSegmentKeys: topology,
+      recoveryMessages: [message('recovery', 'remote:fifth')],
+    })
+    expect(reconciled.persistedMessages?.map((entry) => entry.id)).toEqual([
+      'fourth-stale-prefix',
+      'fifth',
+    ])
+    expect(reconciled.messages.map((entry) => entry.id)).toEqual([
+      'fourth-stale-prefix',
+      'fifth',
+      'recovery',
+    ])
   })
 
   it('loads every Card history cursor page in parent order', async () => {

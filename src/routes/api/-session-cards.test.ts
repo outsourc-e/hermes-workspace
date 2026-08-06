@@ -967,6 +967,9 @@ describe('GET /api/session-cards/$cardId/history', () => {
       'cursor=',
       `cursor=${'x'.repeat(4097)}`,
       'segmentKey=remote%3Atip',
+      'window=older',
+      'window=recent&limit=1',
+      'window=recent&window=recent',
       'parentCardId=',
       'parentCardId=remote%3Aroot&parentCardId=remote%3Aother',
       'parentCardId=remote%3Aroot',
@@ -980,6 +983,32 @@ describe('GET /api/session-cards/$cardId/history', () => {
       expect(response.status).toBe(400)
     }
     expect(mocks.getHistory).not.toHaveBeenCalled()
+  })
+
+  it('passes a verified recent-window request to history service', async () => {
+    mocks.getHistory.mockResolvedValue({
+      cardId: 'remote:root',
+      canonicalSegmentKey: 'remote:tip',
+      messages: [],
+      completeness: 'partial',
+      retryable: false,
+      missingSegments: [],
+      loadedSegmentKeys: ['remote:previous', 'remote:tip'],
+      previousCursor: 'previous-cursor',
+    })
+
+    const response = await historyHandler({
+      request: getRequest(
+        '/api/session-cards/remote%3Aroot/history?window=recent',
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.getHistory).toHaveBeenCalledWith({
+      cardId: 'remote:root',
+      window: 'recent',
+    })
   })
 
   it('passes a distinct parent Card only for validated child-history resolution', async () => {

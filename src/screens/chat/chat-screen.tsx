@@ -29,11 +29,17 @@ import {
   chatQueryKeys,
   clearHistoryMessages,
   fetchCompleteSessionCardHistory,
+  fetchRecentSessionCardHistory,
   fetchStatus,
   isAuthoritativeCompleteSessionCardHistory,
+  isDisplayableRecentSessionCardHistory,
+  isSessionCardRootHistoryLoaded,
+  mergeFetchedOlderRecentSessionCardHistoryWindow,
+  mergeRefreshedRecentSessionCardHistoryWindows,
   moveLegacyHistoryMessagesToSessionCard,
   moveSessionCardHistoryMessages,
   moveSessionCardHistoryToCard,
+  recentSessionCardHistoryWindowSignature,
   reconcileSessionCardHistoryResponse,
   retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
@@ -824,19 +830,29 @@ export function ChatScreen({
       if (!activeCard || !activeCardCanonicalSegmentKey) {
         throw new Error('Session Card route is not resolved')
       }
-      const server = await fetchCompleteSessionCardHistory({
+      const server = await fetchRecentSessionCardHistory({
         cardId: activeCard.cardId,
         canonicalSegmentKey: activeCardCanonicalSegmentKey,
         continuationSegmentKeys: activeCard.continuationSegmentKeys,
         signal,
       })
-      return reconcileSessionCardHistoryResponse(server, {
-        previous:
-          queryClient.getQueryData<SessionCardHistoryResponse>(
-            cardHistoryQueryKey,
-          ),
-        continuationSegmentKeys: activeCard.continuationSegmentKeys,
-      })
+      const previous =
+        queryClient.getQueryData<SessionCardHistoryResponse>(
+          cardHistoryQueryKey,
+        )
+      return reconcileSessionCardHistoryResponse(
+        previous
+          ? mergeRefreshedRecentSessionCardHistoryWindows(
+              server,
+              previous,
+              activeCard.continuationSegmentKeys,
+            )
+          : server,
+        {
+          previous,
+          continuationSegmentKeys: activeCard.continuationSegmentKeys,
+        },
+      )
     },
     enabled:
       cardTransportReady &&
@@ -891,6 +907,9 @@ export function ChatScreen({
         )
       : legacyHistoryMessages
   const messageCount = activeCard ? historyMessages.length : legacyMessageCount
+  const cardRootHistoryLoaded =
+    !activeCard ||
+    isSessionCardRootHistoryLoaded(activeCard, cardHistoryQuery.data)
   const historyError = activeCard
     ? (cardSourceError ?? cardHistoryQuery.error?.message ?? null)
     : legacyHistoryError
@@ -905,7 +924,61 @@ export function ChatScreen({
   const displayedCardHistoryRetryable = displayedCardHistory?.retryable === true
   const displayedCardHistoryReady =
     !activeCard ||
-    isAuthoritativeCompleteSessionCardHistory(displayedCardHistory)
+    (inspectedChildCard
+      ? isAuthoritativeCompleteSessionCardHistory(displayedCardHistory)
+      : isDisplayableRecentSessionCardHistory(displayedCardHistory))
+  const [loadingOlderCardHistory, setLoadingOlderCardHistory] = useState(false)
+  const loadOlderCardHistory = useCallback(async () => {
+    const current = cardHistoryQuery.data
+    if (
+      inspectedChildCard ||
+      !current?.previousCursor ||
+      current.retryable ||
+      !activeCard ||
+      !activeCardCanonicalSegmentKey ||
+      loadingOlderCardHistory
+    ) {
+      return false
+    }
+    const previousCursor = current.previousCursor
+    const requestedWindowSignature =
+      recentSessionCardHistoryWindowSignature(current)
+    setLoadingOlderCardHistory(true)
+    try {
+      const older = await fetchRecentSessionCardHistory({
+        cardId: activeCard.cardId,
+        canonicalSegmentKey: activeCardCanonicalSegmentKey,
+        continuationSegmentKeys: activeCard.continuationSegmentKeys,
+        cursor: previousCursor,
+      })
+      let didPrepend = false
+      queryClient.setQueryData<SessionCardHistoryResponse>(
+        cardHistoryQueryKey,
+        (latest) => {
+          const merged = mergeFetchedOlderRecentSessionCardHistoryWindow(
+            older,
+            latest,
+            activeCard.continuationSegmentKeys,
+            previousCursor,
+            requestedWindowSignature,
+          )
+          didPrepend = merged !== latest
+          return merged
+        },
+      )
+      return didPrepend
+    } finally {
+      setLoadingOlderCardHistory(false)
+    }
+  }, [
+    activeCard,
+    activeCardCanonicalSegmentKey,
+    cardHistoryQuery.data,
+    cardHistoryQueryKey,
+    inspectedChildCard,
+    loadingOlderCardHistory,
+    queryClient,
+  ])
   const displayedHistoryError = inspectedChildCard
     ? (inspectedChildHistoryQuery.error?.message ?? null)
     : historyError
@@ -1407,7 +1480,8 @@ export function ChatScreen({
       cardTransportReady &&
       !isNewChat &&
       Boolean(resolvedSessionKey) &&
-      historyQuery.isSuccess,
+      historyQuery.isSuccess &&
+      cardRootHistoryLoaded,
   })
 
   // Phase 4.1: Smart Model Suggestions
@@ -3757,6 +3831,17 @@ export function ChatScreen({
               }
               onRefresh={handleRefreshHistory}
               loading={historyLoading}
+              hasOlderHistory={Boolean(
+                !inspectedChildCard && cardHistoryQuery.data?.previousCursor,
+              )}
+              loadingOlderHistory={
+                !inspectedChildCard && loadingOlderCardHistory
+              }
+              onLoadOlderHistory={
+                !inspectedChildCard && cardHistoryQuery.data?.previousCursor
+                  ? loadOlderCardHistory
+                  : undefined
+              }
               empty={historyEmpty}
               emptyState={
                 <ChatEmptyState

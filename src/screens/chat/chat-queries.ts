@@ -245,6 +245,10 @@ export type SessionCardHistoryWire = {
     error: string
   }>
   nextCursor?: string
+  /** Signed cursor for the next older pair of continuation segments. */
+  previousCursor?: string
+  /** Ordered Card segment keys materialized in this history window. */
+  loadedSegmentKeys?: Array<string>
 }
 
 export type SessionCardArchiveWire = {
@@ -1105,6 +1109,11 @@ export function mergeSessionCardDetail(
 function parseSessionCardHistory(
   value: unknown,
   allowedSegmentKeys?: ReadonlySet<string>,
+  options: {
+    recentWindow?: boolean
+    continuationSegmentKeys?: ReadonlyArray<string>
+    cursor?: string
+  } = {},
 ): SessionCardHistoryWire {
   if (
     !isWireRecord(value) ||
@@ -1114,7 +1123,11 @@ function parseSessionCardHistory(
     (value.completeness !== 'complete' && value.completeness !== 'partial') ||
     typeof value.retryable !== 'boolean' ||
     !Array.isArray(value.missingSegments) ||
-    (value.nextCursor !== undefined && !nonblankWireString(value.nextCursor))
+    (value.nextCursor !== undefined && !nonblankWireString(value.nextCursor)) ||
+    (value.previousCursor !== undefined &&
+      !nonblankWireString(value.previousCursor)) ||
+    (value.loadedSegmentKeys !== undefined &&
+      !Array.isArray(value.loadedSegmentKeys))
   ) {
     return invalidSessionCardResponse()
   }
@@ -1180,10 +1193,75 @@ function parseSessionCardHistory(
     }
   })
 
+  const loadedSegmentKeys =
+    value.loadedSegmentKeys === undefined
+      ? undefined
+      : value.loadedSegmentKeys.map((segmentKey) => {
+          const identity = exactSourceQualifiedIdentity(segmentKey)
+          if (
+            !identity ||
+            identity.source !== cardIdentity.source ||
+            (allowedSegmentKeys && !allowedSegmentKeys.has(identity.identity))
+          ) {
+            return invalidSessionCardResponse()
+          }
+          return identity.identity
+        })
   if (
-    (value.completeness === 'complete' &&
+    loadedSegmentKeys &&
+    (loadedSegmentKeys.length === 0 ||
+      new Set(loadedSegmentKeys).size !== loadedSegmentKeys.length)
+  ) {
+    return invalidSessionCardResponse()
+  }
+  const previousCursor =
+    value.previousCursor === undefined
+      ? undefined
+      : nonblankWireString(value.previousCursor)!
+  const topology = options.continuationSegmentKeys
+  const loadedPositions =
+    loadedSegmentKeys && topology
+      ? loadedSegmentKeys.map((segmentKey) => topology.indexOf(segmentKey))
+      : []
+  const loadedKeysAreContiguous =
+    loadedSegmentKeys !== undefined &&
+    (!topology ||
+      loadedPositions.every(
+        (position, index) =>
+          position >= 0 &&
+          (index === 0 || position === loadedPositions[index - 1]! + 1),
+      ))
+  const recentWindowContract =
+    options.recentWindow === true &&
+    loadedSegmentKeys !== undefined &&
+    loadedKeysAreContiguous &&
+    value.nextCursor === undefined &&
+    messages.every((entry) => loadedSegmentKeys.includes(entry.segmentKey)) &&
+    (options.cursor !== undefined ||
+      loadedSegmentKeys.at(-1) === canonicalSegmentIdentity.identity) &&
+    (value.completeness === 'complete'
+      ? value.retryable === false &&
+        missingSegments.length === 0 &&
+        previousCursor === undefined &&
+        (!topology || loadedPositions[0] === 0)
+      : value.retryable
+        ? previousCursor === undefined
+        : missingSegments.length === 0 &&
+          previousCursor !== undefined &&
+          (!topology || loadedPositions[0]! > 0))
+
+  if (
+    (previousCursor !== undefined &&
+      (previousCursor.length > 4096 ||
+        !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(previousCursor))) ||
+    (options.recentWindow === true && !recentWindowContract) ||
+    (options.recentWindow !== true &&
+      (previousCursor !== undefined || loadedSegmentKeys !== undefined)) ||
+    (options.recentWindow !== true &&
+      value.completeness === 'complete' &&
       (value.retryable || missingSegments.length > 0)) ||
-    (value.completeness === 'partial' &&
+    (options.recentWindow !== true &&
+      value.completeness === 'partial' &&
       (!value.retryable || value.nextCursor !== undefined))
   ) {
     return invalidSessionCardResponse()
@@ -1199,6 +1277,8 @@ function parseSessionCardHistory(
     ...(value.nextCursor === undefined
       ? {}
       : { nextCursor: nonblankWireString(value.nextCursor)! }),
+    ...(previousCursor === undefined ? {} : { previousCursor }),
+    ...(loadedSegmentKeys === undefined ? {} : { loadedSegmentKeys }),
   }
 }
 
@@ -1209,6 +1289,7 @@ export async function fetchSessionCardHistory(payload: {
   continuationSegmentKeys?: ReadonlyArray<string>
   cursor?: string
   limit?: number
+  window?: 'recent'
   signal?: AbortSignal
 }): Promise<SessionCardHistoryWire> {
   const cardIdentity = sourceQualifiedWireIdentity(payload.cardId)
@@ -1250,6 +1331,9 @@ export async function fetchSessionCardHistory(payload: {
       (!Number.isSafeInteger(payload.limit) ||
         payload.limit < 1 ||
         payload.limit > 500)) ||
+    (payload.window === 'recent' &&
+      (continuationSegmentIdentities === undefined ||
+        payload.limit !== undefined)) ||
     (payload.cursor !== undefined &&
       (!payload.cursor || payload.cursor.length > 4096))
   ) {
@@ -1259,6 +1343,7 @@ export async function fetchSessionCardHistory(payload: {
   if (payload.parentCardId) query.set('parentCardId', payload.parentCardId)
   if (payload.limit !== undefined) query.set('limit', String(payload.limit))
   if (payload.cursor) query.set('cursor', payload.cursor)
+  if (payload.window) query.set('window', payload.window)
   const suffix = query.size ? `?${query.toString()}` : ''
   return fetchAndParseSessionCardResponse(
     () =>
@@ -1269,12 +1354,34 @@ export async function fetchSessionCardHistory(payload: {
         },
       ),
     (value) => {
-      const history = parseSessionCardHistory(value, allowedSegmentKeys)
+      const history = parseSessionCardHistory(value, allowedSegmentKeys, {
+        recentWindow: payload.window === 'recent',
+        continuationSegmentKeys: continuationSegmentIdentities?.map(
+          (identity) => identity!.identity,
+        ),
+        cursor: payload.cursor,
+      })
       if (
         history.cardId !== payload.cardId ||
         history.canonicalSegmentKey !== payload.canonicalSegmentKey
       ) {
         return invalidSessionCardResponse()
+      }
+      if (history.loadedSegmentKeys && continuationSegmentIdentities) {
+        const positions = history.loadedSegmentKeys.map((segmentKey) =>
+          continuationSegmentIdentities.findIndex(
+            (identity) => identity?.identity === segmentKey,
+          ),
+        )
+        if (
+          positions.some((position) => position < 0) ||
+          positions.some(
+            (position, index) =>
+              index > 0 && position !== positions[index - 1]! + 1,
+          )
+        ) {
+          return invalidSessionCardResponse()
+        }
       }
       return history
     },
@@ -1291,6 +1398,14 @@ export type SessionCardHistoryResponse = HistoryResponse & {
   persistedMessages?: Array<ChatMessage>
   /** Browser durability result for the latest authoritative complete snapshot. */
   completeSnapshotDurability?: 'verified' | 'failed'
+  /** Cursor for the next older pair of complete continuation segments. */
+  previousCursor?: string
+  /** Signed recent-window snapshot retained after the terminal page clears its cursor. */
+  recentSnapshot?: string
+  /** Signed current-tip content generation retained after terminal paging. */
+  recentTipSnapshot?: string
+  /** Ordered Card segment keys represented by this local history window. */
+  loadedSegmentKeys?: Array<string>
 }
 
 /**
@@ -1306,6 +1421,30 @@ export function isAuthoritativeCompleteSessionCardHistory(
     history.retryable === false &&
     history.missingSegments.length === 0,
   )
+}
+
+/** A bounded recent window is safe to render even when older segments remain. */
+export function isDisplayableRecentSessionCardHistory(
+  history: SessionCardHistoryResponse | undefined,
+): boolean {
+  if (
+    !history ||
+    history.retryable ||
+    history.missingSegments.length > 0 ||
+    !Array.isArray(history.loadedSegmentKeys) ||
+    history.loadedSegmentKeys.length === 0 ||
+    new Set(history.loadedSegmentKeys).size !==
+      history.loadedSegmentKeys.length ||
+    history.loadedSegmentKeys.some(
+      (segmentKey) => exactSourceQualifiedIdentity(segmentKey) === null,
+    )
+  ) {
+    return false
+  }
+  return history.completeness === 'complete'
+    ? history.previousCursor === undefined
+    : typeof history.previousCursor === 'string' &&
+        /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(history.previousCursor)
 }
 
 function sessionCardMessage(
@@ -1375,6 +1514,413 @@ export async function fetchCompleteSessionCardHistory(payload: {
   }
 }
 
+/** Extract the non-secret snapshot identity from a signed recent cursor. */
+function recentCursorSnapshot(cursor: string | undefined): string | undefined {
+  if (!cursor) return undefined
+  const [encoded, signature, ...extra] = cursor.split('.')
+  if (!encoded || !signature || extra.length > 0) return undefined
+  try {
+    const value = JSON.parse(
+      atob(encoded.replace(/-/gu, '+').replace(/_/gu, '/')),
+    ) as { window?: unknown; snapshot?: unknown }
+    return value.window === 'recent' && typeof value.snapshot === 'string'
+      ? value.snapshot
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function recentCursorTipSnapshot(
+  cursor: string | undefined,
+): string | undefined {
+  if (!cursor) return undefined
+  const [encoded, signature, ...extra] = cursor.split('.')
+  if (!encoded || !signature || extra.length > 0) return undefined
+  try {
+    const value = JSON.parse(
+      atob(encoded.replace(/-/gu, '+').replace(/_/gu, '/')),
+    ) as { window?: unknown; tipSnapshot?: unknown }
+    return value.window === 'recent' && typeof value.tipSnapshot === 'string'
+      ? value.tipSnapshot
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Fetch exactly one signed window of the two newest or next older segments. */
+export async function fetchRecentSessionCardHistory(payload: {
+  cardId: string
+  canonicalSegmentKey: string
+  parentCardId?: string
+  continuationSegmentKeys: ReadonlyArray<string>
+  cursor?: string
+  signal?: AbortSignal
+}): Promise<SessionCardHistoryResponse> {
+  const page = await fetchSessionCardHistory({
+    ...payload,
+    window: 'recent',
+  })
+  const messages = page.messages.map(sessionCardMessage)
+  const recentSnapshot = recentCursorSnapshot(
+    page.previousCursor ?? payload.cursor,
+  )
+  const recentTipSnapshot = recentCursorTipSnapshot(
+    page.previousCursor ?? payload.cursor,
+  )
+  return {
+    sessionKey: page.canonicalSegmentKey,
+    cardId: page.cardId,
+    canonicalSegmentKey: page.canonicalSegmentKey,
+    messages,
+    persistedMessages: messages,
+    completeness: page.completeness,
+    retryable: page.retryable,
+    missingSegments: page.missingSegments,
+    ...(page.previousCursor ? { previousCursor: page.previousCursor } : {}),
+    ...(recentSnapshot ? { recentSnapshot } : {}),
+    ...(recentTipSnapshot ? { recentTipSnapshot } : {}),
+    ...(page.loadedSegmentKeys
+      ? { loadedSegmentKeys: page.loadedSegmentKeys }
+      : {}),
+  }
+}
+
+/**
+ * Prepend an older window. The older response owns an overlapping boundary
+ * segment so corrected persisted content replaces the newer window's copy.
+ */
+export function mergeRecentSessionCardHistoryWindows(
+  older: SessionCardHistoryResponse,
+  current: SessionCardHistoryResponse,
+  continuationSegmentKeys: ReadonlyArray<string>,
+): SessionCardHistoryResponse {
+  if (
+    !isSameSessionCardHistoryOwner(older, current) ||
+    !older.loadedSegmentKeys ||
+    !current.loadedSegmentKeys
+  ) {
+    return current
+  }
+  const loadedSet = new Set([
+    ...older.loadedSegmentKeys,
+    ...current.loadedSegmentKeys,
+  ])
+  const loadedSegmentKeys = continuationSegmentKeys.filter((segmentKey) =>
+    loadedSet.has(segmentKey),
+  )
+  const messagesFor = (
+    history: SessionCardHistoryResponse,
+    segmentKey: string,
+  ) =>
+    persistedCardHistoryMessages(history).filter(
+      (message) =>
+        (message as Record<string, unknown>).__segmentKey === segmentKey,
+    )
+  const persistedMessages = loadedSegmentKeys.flatMap((segmentKey) =>
+    older.loadedSegmentKeys!.includes(segmentKey)
+      ? messagesFor(older, segmentKey)
+      : messagesFor(current, segmentKey),
+  )
+  const recoveryMessages = current.messages.filter(
+    (message) =>
+      !sourceQualifiedWireIdentity(
+        (message as Record<string, unknown>).__segmentKey,
+      ),
+  )
+  return {
+    ...current,
+    completeness: older.completeness,
+    retryable: older.retryable,
+    missingSegments: older.missingSegments,
+    ...(older.previousCursor
+      ? { previousCursor: older.previousCursor }
+      : { previousCursor: undefined }),
+    ...((older.recentSnapshot ?? current.recentSnapshot)
+      ? { recentSnapshot: older.recentSnapshot ?? current.recentSnapshot }
+      : {}),
+    ...((older.recentTipSnapshot ?? current.recentTipSnapshot)
+      ? {
+          recentTipSnapshot:
+            older.recentTipSnapshot ?? current.recentTipSnapshot,
+        }
+      : {}),
+    loadedSegmentKeys,
+    persistedMessages,
+    messages: mergeCardHistoryMessages(persistedMessages, recoveryMessages),
+  }
+}
+
+export function recentSessionCardHistoryWindowSignature(
+  history: SessionCardHistoryResponse,
+): string | undefined {
+  try {
+    return JSON.stringify({
+      loadedSegmentKeys: history.loadedSegmentKeys,
+      persistedMessages: persistedCardHistoryMessages(history),
+    })
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Apply an older-window response to the cache value that exists when the
+ * request finishes, rather than the value that existed when it began. A tip
+ * refresh or continuation handoff may have replaced that cache entry while
+ * the older request was in flight.
+ */
+export function mergeFetchedOlderRecentSessionCardHistoryWindow(
+  older: SessionCardHistoryResponse,
+  latest: SessionCardHistoryResponse | undefined,
+  continuationSegmentKeys: ReadonlyArray<string>,
+  requestedPreviousCursor: string,
+  requestedWindowSignature: string | undefined,
+): SessionCardHistoryResponse | undefined {
+  if (
+    !latest ||
+    requestedWindowSignature === undefined ||
+    recentSessionCardHistoryWindowSignature(latest) !==
+      requestedWindowSignature ||
+    latest.previousCursor !== requestedPreviousCursor ||
+    !isSameSessionCardHistoryOwner(older, latest) ||
+    older.retryable ||
+    older.missingSegments.length > 0 ||
+    latest.retryable ||
+    latest.missingSegments.length > 0 ||
+    !latest.loadedSegmentKeys
+  ) {
+    return latest
+  }
+  return reconcileSessionCardHistoryResponse(
+    mergeRecentSessionCardHistoryWindows(
+      older,
+      latest,
+      continuationSegmentKeys,
+    ),
+    {
+      previous: latest,
+      continuationSegmentKeys,
+    },
+  )
+}
+
+function sameRecentCursorSnapshot(
+  left: SessionCardHistoryResponse,
+  right: SessionCardHistoryResponse,
+): boolean {
+  const leftSnapshot =
+    left.recentSnapshot ?? recentCursorSnapshot(left.previousCursor)
+  const rightSnapshot =
+    right.recentSnapshot ?? recentCursorSnapshot(right.previousCursor)
+  const leftTipSnapshot =
+    left.recentTipSnapshot ?? recentCursorTipSnapshot(left.previousCursor)
+  const rightTipSnapshot =
+    right.recentTipSnapshot ?? recentCursorTipSnapshot(right.previousCursor)
+  return (
+    leftSnapshot !== undefined &&
+    leftSnapshot === rightSnapshot &&
+    leftTipSnapshot === rightTipSnapshot
+  )
+}
+
+function continuationMessageEvidence(
+  message: ChatMessage,
+): Record<string, unknown> {
+  const {
+    id: _id,
+    stableId: _stableId,
+    sessionId: _sessionId,
+    session_id: _wireSessionId,
+    sessionKey: _sessionKey,
+    __segmentKey: _segmentKey,
+    ...evidence
+  } = message as ChatMessage & Record<string, unknown>
+  return evidence
+}
+
+function normalizedContinuationMessageId(value: unknown): string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim()
+  return normalized || undefined
+}
+
+function canonicalContinuationEvidence(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalContinuationEvidence)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, child]) => [key, canonicalContinuationEvidence(child)]),
+    )
+  }
+  return value
+}
+
+function continuationMessagesMatch(
+  previous: ChatMessage,
+  next: ChatMessage,
+): boolean {
+  const previousEvidence = continuationMessageEvidence(previous)
+  const nextEvidence = continuationMessageEvidence(next)
+  if (
+    JSON.stringify(canonicalContinuationEvidence(previousEvidence)) !==
+    JSON.stringify(canonicalContinuationEvidence(nextEvidence))
+  )
+    return false
+
+  const previousId = normalizedContinuationMessageId(
+    (previous as Record<string, unknown>).stableId ?? previous.id,
+  )
+  const nextId = normalizedContinuationMessageId(
+    (next as Record<string, unknown>).stableId ?? next.id,
+  )
+  if (previousId && nextId && previousId === nextId) {
+    return Object.keys(previousEvidence).length > 0
+  }
+  if (
+    normalizedContinuationMessageId(
+      (previous as Record<string, unknown>).stableId,
+    ) ||
+    normalizedContinuationMessageId((next as Record<string, unknown>).stableId)
+  ) {
+    return false
+  }
+  return (
+    typeof previous.role === 'string' &&
+    previous.role.length > 0 &&
+    Object.prototype.hasOwnProperty.call(previous, 'content') &&
+    typeof (previous as Record<string, unknown>).timestamp === 'number' &&
+    Number.isFinite((previous as Record<string, unknown>).timestamp)
+  )
+}
+
+function adjacentContinuationOverlap(
+  previous: Array<ChatMessage>,
+  next: Array<ChatMessage>,
+): number {
+  const max = Math.min(previous.length, next.length)
+  for (let overlap = max; overlap > 0; overlap -= 1) {
+    if (
+      previous
+        .slice(previous.length - overlap)
+        .every((message, index) =>
+          continuationMessagesMatch(message, next[index]!),
+        )
+    ) {
+      return overlap
+    }
+  }
+  return 0
+}
+
+export function isSessionCardRootHistoryLoaded(
+  card: Pick<SessionCard, 'continuationSegmentKeys'>,
+  history:
+    | Pick<
+        SessionCardHistoryResponse,
+        'loadedSegmentKeys' | 'missingSegments' | 'retryable' | 'completeness'
+      >
+    | undefined,
+): boolean {
+  const rootSegmentKey = card.continuationSegmentKeys[0]
+  return (
+    rootSegmentKey === undefined ||
+    (history?.completeness === 'complete' &&
+      history.retryable === false &&
+      history.loadedSegmentKeys?.includes(rootSegmentKey) === true &&
+      !history.missingSegments.some(
+        (segment) => segment.segmentKey === rootSegmentKey,
+      ))
+  )
+}
+
+export function mergeRefreshedRecentSessionCardHistoryWindows(
+  newer: SessionCardHistoryResponse,
+  current: SessionCardHistoryResponse,
+  continuationSegmentKeys: ReadonlyArray<string>,
+): SessionCardHistoryResponse {
+  if (
+    !isSameSessionCardHistoryOwner(newer, current) ||
+    !newer.loadedSegmentKeys ||
+    !current.loadedSegmentKeys ||
+    newer.retryable ||
+    newer.missingSegments.length > 0 ||
+    !sameRecentCursorSnapshot(newer, current)
+  ) {
+    return newer
+  }
+  const refreshedSet = new Set(newer.loadedSegmentKeys)
+  const loadedSet = new Set([
+    ...current.loadedSegmentKeys,
+    ...newer.loadedSegmentKeys,
+  ])
+  const loadedSegmentKeys = continuationSegmentKeys.filter((segmentKey) =>
+    loadedSet.has(segmentKey),
+  )
+  const messagesFor = (
+    history: SessionCardHistoryResponse,
+    segmentKey: string,
+  ) =>
+    persistedCardHistoryMessages(history).filter(
+      (message) =>
+        (message as Record<string, unknown>).__segmentKey === segmentKey,
+    )
+  const refreshedSegmentKeys = continuationSegmentKeys.filter((segmentKey) =>
+    refreshedSet.has(segmentKey),
+  )
+  const firstRefreshedSegmentKey = refreshedSegmentKeys[0]
+  const predecessorIndex = firstRefreshedSegmentKey
+    ? continuationSegmentKeys.indexOf(firstRefreshedSegmentKey) - 1
+    : -1
+  const predecessorSegmentKey =
+    predecessorIndex >= 0
+      ? continuationSegmentKeys[predecessorIndex]
+      : undefined
+  const refreshedMessagesBySegmentKey = new Map<string, Array<ChatMessage>>()
+  if (
+    firstRefreshedSegmentKey &&
+    predecessorSegmentKey &&
+    current.loadedSegmentKeys.includes(predecessorSegmentKey)
+  ) {
+    const refreshedMessages = messagesFor(newer, firstRefreshedSegmentKey)
+    const overlap = adjacentContinuationOverlap(
+      messagesFor(current, predecessorSegmentKey),
+      refreshedMessages,
+    )
+    refreshedMessagesBySegmentKey.set(
+      firstRefreshedSegmentKey,
+      refreshedMessages.slice(overlap),
+    )
+  }
+  const persistedMessages = loadedSegmentKeys.flatMap((segmentKey) =>
+    refreshedSet.has(segmentKey)
+      ? (refreshedMessagesBySegmentKey.get(segmentKey) ??
+        messagesFor(newer, segmentKey))
+      : messagesFor(current, segmentKey),
+  )
+  const recoveryMessages = current.messages.filter(
+    (message) =>
+      !sourceQualifiedWireIdentity(
+        (message as Record<string, unknown>).__segmentKey,
+      ),
+  )
+  return {
+    ...newer,
+    completeness: current.completeness,
+    retryable: current.retryable,
+    missingSegments: current.missingSegments,
+    ...(current.previousCursor
+      ? { previousCursor: current.previousCursor }
+      : { previousCursor: undefined }),
+    loadedSegmentKeys,
+    persistedMessages,
+    messages: mergeCardHistoryMessages(persistedMessages, recoveryMessages),
+  }
+}
+
 function mergeCardHistoryMessages(
   primary: Array<ChatMessage>,
   secondary: Array<ChatMessage>,
@@ -1414,6 +1960,7 @@ function mergePartialPersistedCardHistory(
   const serverMessages = persistedCardHistoryMessages(server, true)
   if (
     server.completeness === 'complete' ||
+    (server.retryable === false && server.loadedSegmentKeys !== undefined) ||
     !previous ||
     !isSameSessionCardHistoryOwner(server, previous)
   ) {
@@ -1486,6 +2033,8 @@ export function reconcileSessionCardHistoryResponse(
 ): SessionCardHistoryResponse {
   const owner = { cardId: server.cardId }
   const isComplete = isAuthoritativeCompleteSessionCardHistory(server)
+  const isIntentionalRecentWindow =
+    isDisplayableRecentSessionCardHistory(server)
   let persistedMessages = mergePartialPersistedCardHistory(
     server,
     options.previous,
@@ -1495,7 +2044,7 @@ export function reconcileSessionCardHistoryResponse(
 
   // Query memory is not a reload boundary. A partial response must retain the
   // last scrubbed complete Card projection even after a fresh QueryClient.
-  if (!isComplete) {
+  if (!isComplete && !isIntentionalRecentWindow) {
     const snapshotMessages =
       readCardTranscriptSnapshot(server.cardId)?.messages ?? []
     persistedMessages = mergeCardHistoryMessages(

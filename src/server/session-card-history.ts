@@ -14,9 +14,10 @@ import type {
   SessionCardService,
 } from './session-card-service'
 
-const CURSOR_VERSION = 2 as const
+const CURSOR_VERSION = 6 as const
 const DEFAULT_HISTORY_LIMIT = 100
 const MAX_HISTORY_LIMIT = 500
+const RECENT_SEGMENT_WINDOW_SIZE = 2
 const defaultCursorSecret = randomBytes(32)
 
 export type SessionCardUpstreamMessage = Record<string, unknown> & {
@@ -66,6 +67,10 @@ export type SessionCardHistoryResult = {
   retryable: boolean
   missingSegments: Array<SessionCardHistoryMissingSegment>
   nextCursor?: string
+  /** Cursor for the next older pair of continuation segments. */
+  previousCursor?: string
+  /** Ordered continuation segments represented by this response. */
+  loadedSegmentKeys?: Array<string>
 }
 
 export type SessionCardHistoryRequest = {
@@ -74,6 +79,8 @@ export type SessionCardHistoryRequest = {
   parentCardId?: string
   cursor?: string
   limit?: number
+  /** Fetch the current pair of continuation segments, or the pair named by a cursor. */
+  window?: 'recent'
 }
 
 type SessionCardHistoryServiceOptions = {
@@ -87,6 +94,15 @@ type CursorPayload = {
   cardId: string
   snapshot: string
   offset: number
+  window: 'messages' | 'recent'
+  /** Signed content generation for the re-read newer boundary of a recent page. */
+  boundarySegmentKey?: string
+  boundarySnapshot?: string
+  /** Number of contiguous newest segments already accumulated by the client. */
+  visibleSegmentCount?: number
+  visibleSnapshot?: string
+  /** Signed content generation for the always-visible newest two segments. */
+  tipSnapshot?: string
 }
 
 export class SessionCardHistoryCursorError extends Error {
@@ -186,6 +202,64 @@ function historySnapshotFingerprint(
     .digest('base64url')
 }
 
+function recentWindowSnapshotFingerprint(
+  resolved: ResolvedSessionCard,
+): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        cardId: resolved.card.cardId,
+        canonicalSegmentKey: resolved.card.canonicalSegmentKey,
+        continuationSegments: resolved.card.continuationSegmentKeys.map(
+          (segmentKey) => ({
+            segmentKey,
+            source: resolved.sourceBySegmentKey.get(segmentKey),
+            upstreamKey: resolved.upstreamKeyBySegmentKey.get(segmentKey),
+            updatedAt: resolved.updatedAtBySegmentKey.get(segmentKey),
+          }),
+        ),
+      }),
+    )
+    .digest('base64url')
+}
+
+function recentBoundarySnapshot(segment: RetrievedSegmentSnapshot): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        segmentKey: segment.segmentKey,
+        source: segment.source,
+        upstreamKey: segment.upstreamKey,
+        batchSource: segment.batch.source,
+        resolvedSegmentKey: segment.batch.resolvedSegmentKey,
+        upstreamSnapshot: segment.batch.snapshot,
+        upstreamTotal: segment.batch.total,
+        truncated: segment.batch.truncated === true,
+        messages: segment.batch.messages,
+      }),
+    )
+    .digest('base64url')
+}
+
+function recentVisibleSnapshot(
+  segments: ReadonlyArray<RetrievedSegmentSnapshot>,
+  segmentKeys: ReadonlyArray<string>,
+): string | undefined {
+  const byKey = new Map(
+    segments.map((segment) => [segment.segmentKey, segment]),
+  )
+  const snapshot = segmentKeys.map((segmentKey) => {
+    const segment = byKey.get(segmentKey)
+    return segment
+      ? { segmentKey, snapshot: recentBoundarySnapshot(segment) }
+      : undefined
+  })
+  if (snapshot.some((entry) => entry === undefined)) return undefined
+  return createHash('sha256')
+    .update(JSON.stringify(snapshot))
+    .digest('base64url')
+}
+
 function cursorSignature(payload: string, secret: Uint8Array): string {
   return createHmac('sha256', secret).update(payload).digest('base64url')
 }
@@ -224,7 +298,19 @@ function decodeCursor(cursor: string, secret: Uint8Array): CursorPayload {
       typeof parsed.snapshot !== 'string' ||
       !parsed.snapshot ||
       !Number.isSafeInteger(parsed.offset) ||
-      Number(parsed.offset) < 0
+      Number(parsed.offset) < 0 ||
+      (parsed.window !== 'messages' && parsed.window !== 'recent') ||
+      (parsed.window === 'recent' &&
+        (typeof parsed.boundarySegmentKey !== 'string' ||
+          !parsed.boundarySegmentKey ||
+          typeof parsed.boundarySnapshot !== 'string' ||
+          !parsed.boundarySnapshot ||
+          !Number.isSafeInteger(parsed.visibleSegmentCount) ||
+          Number(parsed.visibleSegmentCount) < 1 ||
+          typeof parsed.visibleSnapshot !== 'string' ||
+          !parsed.visibleSnapshot ||
+          typeof parsed.tipSnapshot !== 'string' ||
+          !parsed.tipSnapshot))
     ) {
       throw new SessionCardHistoryCursorError()
     }
@@ -333,6 +419,7 @@ type AggregatedCardHistory = {
 async function aggregateCardSegmentHistory(
   resolved: ResolvedSessionCard,
   messageSource: SessionCardHistoryMessageSource,
+  segmentKeys = resolved.card.continuationSegmentKeys,
 ): Promise<AggregatedCardHistory> {
   const messages: Array<SessionCardHistoryEntry> = []
   const missingSegments: Array<SessionCardHistoryMissingSegment> = []
@@ -343,7 +430,7 @@ async function aggregateCardSegmentHistory(
   // Every Card follows this path. A standalone Card is simply an ordered segment
   // list of length one; a child Card supplies only its own resolved segment list.
   // Sequential reads preserve the authoritative continuation order.
-  for (const segmentKey of resolved.card.continuationSegmentKeys) {
+  for (const segmentKey of segmentKeys) {
     const source = resolved.sourceBySegmentKey.get(segmentKey)
     const upstreamKey = resolved.upstreamKeyBySegmentKey.get(segmentKey)
     if (!source || !upstreamKey) {
@@ -466,6 +553,173 @@ export class SessionCardHistoryService {
     if (cursor && cursor.cardId !== resolved.card.cardId) {
       throw new SessionCardHistoryCursorError()
     }
+    if (request.window === 'recent') {
+      if (cursor && cursor.window !== 'recent') {
+        throw new SessionCardHistoryCursorError()
+      }
+      const snapshot = recentWindowSnapshotFingerprint(resolved)
+      let priorVisibleSegments: Array<RetrievedSegmentSnapshot> = []
+      const segmentCount = resolved.card.continuationSegmentKeys.length
+      const offset =
+        cursor?.offset ?? Math.max(0, segmentCount - RECENT_SEGMENT_WINDOW_SIZE)
+      if (offset >= segmentCount) throw new SessionCardHistoryCursorError()
+      if (cursor && cursor.snapshot !== snapshot) {
+        throw new SessionCardHistoryCursorError()
+      }
+      if (cursor) {
+        const cursorVisibleSegmentKeys =
+          resolved.card.continuationSegmentKeys.slice(
+            -cursor.visibleSegmentCount!,
+          )
+        if (cursorVisibleSegmentKeys.length !== cursor.visibleSegmentCount) {
+          throw new SessionCardHistoryCursorError()
+        }
+        const visibleHistory = await aggregateCardSegmentHistory(
+          resolved,
+          this.messageSource,
+          cursorVisibleSegmentKeys,
+        )
+        if (
+          visibleHistory.missingSegments.length > 0 ||
+          visibleHistory.truncated ||
+          recentVisibleSnapshot(
+            visibleHistory.retrievedSegments,
+            cursorVisibleSegmentKeys,
+          ) !== cursor.visibleSnapshot
+        ) {
+          throw new SessionCardHistoryCursorError()
+        }
+        priorVisibleSegments = visibleHistory.retrievedSegments
+      }
+      const visibleSegmentKeys = resolved.card.continuationSegmentKeys.slice(
+        offset,
+        offset + RECENT_SEGMENT_WINDOW_SIZE,
+      )
+      // Older windows re-read exactly one already-visible successor so cloned
+      // continuation prefixes can be removed with the same adjacent-boundary
+      // proof as complete aggregation. The client replaces this overlap, so
+      // every non-terminal request still adds two previously unseen segments.
+      const loadedSegmentKeys =
+        cursor && offset + RECENT_SEGMENT_WINDOW_SIZE < segmentCount
+          ? resolved.card.continuationSegmentKeys.slice(
+              offset,
+              offset + RECENT_SEGMENT_WINDOW_SIZE + 1,
+            )
+          : visibleSegmentKeys
+      const { messages, missingSegments, truncated, retrievedSegments } =
+        await aggregateCardSegmentHistory(
+          resolved,
+          this.messageSource,
+          loadedSegmentKeys,
+        )
+      const expectedBoundarySegmentKey =
+        cursor === undefined
+          ? undefined
+          : resolved.card.continuationSegmentKeys[
+              offset + RECENT_SEGMENT_WINDOW_SIZE
+            ]
+      const retrievedBoundary = expectedBoundarySegmentKey
+        ? retrievedSegments.find(
+            (segment) => segment.segmentKey === expectedBoundarySegmentKey,
+          )
+        : undefined
+      if (
+        cursor &&
+        (!retrievedBoundary ||
+          cursor.boundarySegmentKey !== expectedBoundarySegmentKey ||
+          cursor.boundarySnapshot !== recentBoundarySnapshot(retrievedBoundary))
+      ) {
+        throw new SessionCardHistoryCursorError()
+      }
+      const sourceIncomplete =
+        missingSegments.length > 0 ||
+        truncated ||
+        resolved.collection.completeness === 'incomplete'
+      const hasOlderSegments = offset > 0
+      const nextOffset = Math.max(0, offset - RECENT_SEGMENT_WINDOW_SIZE)
+      const nextBoundarySegmentKey = hasOlderSegments
+        ? resolved.card.continuationSegmentKeys[
+            nextOffset + RECENT_SEGMENT_WINDOW_SIZE
+          ]
+        : undefined
+      const nextBoundary = nextBoundarySegmentKey
+        ? retrievedSegments.find(
+            (segment) => segment.segmentKey === nextBoundarySegmentKey,
+          )
+        : undefined
+      const nextVisibleSegmentCount = cursor
+        ? cursor.visibleSegmentCount! + visibleSegmentKeys.length
+        : visibleSegmentKeys.length
+      const nextVisibleSegmentKeys =
+        resolved.card.continuationSegmentKeys.slice(-nextVisibleSegmentCount)
+      const nextVisibleSnapshot = recentVisibleSnapshot(
+        [...retrievedSegments, ...priorVisibleSegments],
+        nextVisibleSegmentKeys,
+      )
+      if (cursor && nextVisibleSnapshot) {
+        // The retained suffix was validated before the older reads. Verify the
+        // complete prospective client window again after those reads so a
+        // source transition between the two phases cannot be returned as a
+        // falsely coherent, terminal history.
+        const confirmedVisibleHistory = await aggregateCardSegmentHistory(
+          resolved,
+          this.messageSource,
+          nextVisibleSegmentKeys,
+        )
+        if (
+          confirmedVisibleHistory.missingSegments.length > 0 ||
+          confirmedVisibleHistory.truncated ||
+          recentVisibleSnapshot(
+            confirmedVisibleHistory.retrievedSegments,
+            nextVisibleSegmentKeys,
+          ) !== nextVisibleSnapshot
+        ) {
+          throw new SessionCardHistoryCursorError()
+        }
+      }
+      const tipSegmentKeys = resolved.card.continuationSegmentKeys.slice(-2)
+      const tipSnapshot = recentVisibleSnapshot(
+        [...retrievedSegments, ...priorVisibleSegments],
+        tipSegmentKeys,
+      )
+      const previousCursor =
+        !sourceIncomplete &&
+        hasOlderSegments &&
+        nextBoundary &&
+        nextBoundarySegmentKey &&
+        nextVisibleSnapshot &&
+        tipSnapshot
+          ? encodeCursor(
+              {
+                v: CURSOR_VERSION,
+                cardId: resolved.card.cardId,
+                snapshot,
+                offset: nextOffset,
+                window: 'recent',
+                boundarySegmentKey: nextBoundarySegmentKey,
+                boundarySnapshot: recentBoundarySnapshot(nextBoundary),
+                visibleSegmentCount: nextVisibleSegmentCount,
+                visibleSnapshot: nextVisibleSnapshot,
+                tipSnapshot,
+              },
+              this.cursorSecret,
+            )
+          : undefined
+      return {
+        cardId: resolved.card.cardId,
+        canonicalSegmentKey: resolved.card.canonicalSegmentKey,
+        messages,
+        completeness:
+          sourceIncomplete || hasOlderSegments ? 'partial' : 'complete',
+        retryable: sourceIncomplete,
+        missingSegments,
+        loadedSegmentKeys,
+        ...(previousCursor ? { previousCursor } : {}),
+      }
+    }
+    if (cursor && cursor.window !== 'messages') {
+      throw new SessionCardHistoryCursorError()
+    }
     const offset = cursor?.offset ?? 0
 
     const {
@@ -499,6 +753,7 @@ export class SessionCardHistoryService {
               cardId: resolved.card.cardId,
               snapshot,
               offset: nextOffset,
+              window: 'messages',
             },
             this.cursorSecret,
           )

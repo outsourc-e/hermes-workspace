@@ -184,6 +184,7 @@ type CardHistoryWire = {
     retryable: true
     error: string
   }>
+  loadedSegmentKeys?: Array<string>
 }
 
 type CardTranscriptRecoveryWire = {
@@ -307,6 +308,16 @@ function completeHistory(
     completeness: 'complete',
     retryable: false,
     missingSegments: [],
+  }
+}
+
+function recentHistory(
+  card: SessionCard,
+  history: CardHistoryWire,
+): CardHistoryWire {
+  return {
+    ...history,
+    loadedSegmentKeys: card.continuationSegmentKeys,
   }
 }
 
@@ -482,10 +493,34 @@ function mockHttp(
     const url = String(input)
     requests.push(url)
     const match = /^\/api\/session-cards\/([^/]+)\/history/.exec(url)
-    if (match)
-      return Promise.resolve(
-        jsonResponse(resolveHistory(decodeURIComponent(match[1]!))),
+    if (match) {
+      const cardId = decodeURIComponent(match[1]!)
+      const history = resolveHistory(cardId)
+      const requestedRecentWindow =
+        new URL(url, 'http://test').searchParams.get('window') === 'recent'
+      const card = [
+        parentCard,
+        successorCard,
+        childAsSessionCard,
+        siblingCard,
+      ].find(
+        (candidate) =>
+          candidate.cardId === cardId &&
+          candidate.canonicalSegmentKey === history.canonicalSegmentKey,
       )
+      return Promise.resolve(
+        jsonResponse({
+          ...history,
+          ...(requestedRecentWindow
+            ? {
+                loadedSegmentKeys: card?.continuationSegmentKeys ?? [
+                  history.canonicalSegmentKey,
+                ],
+              }
+            : {}),
+        }),
+      )
+    }
     if (url === '/api/status')
       return Promise.resolve(jsonResponse({ ok: true, status: 200 }))
     if (url === '/api/models')
@@ -650,10 +685,13 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       if (url.startsWith('/api/session-cards/')) {
         historyRequestCount += 1
         if (historyRequestCount === 1) {
-          return Promise.resolve(jsonResponse(initialPartial))
+          return Promise.resolve(
+            jsonResponse(recentHistory(parentCard, initialPartial)),
+          )
         }
         return new Promise<Response>((resolve) => {
-          resolveRetry = () => resolve(jsonResponse(subsequentPartial))
+          resolveRetry = () =>
+            resolve(jsonResponse(recentHistory(parentCard, subsequentPartial)))
         })
       }
       if (url === '/api/status')
@@ -1035,7 +1073,9 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       const url = String(input)
       requests.push(url)
       if (url.startsWith('/api/session-cards/')) {
-        return Promise.resolve(jsonResponse(completeHistory(parentCard)))
+        return Promise.resolve(
+          jsonResponse(recentHistory(parentCard, completeHistory(parentCard))),
+        )
       }
       if (url === '/api/send-stream') {
         const reader = {
@@ -1112,7 +1152,9 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       const url = String(input)
       requests.push(url)
       if (url.startsWith('/api/session-cards/')) {
-        return Promise.resolve(jsonResponse(completeHistory(parentCard)))
+        return Promise.resolve(
+          jsonResponse(recentHistory(parentCard, completeHistory(parentCard))),
+        )
       }
       if (url === '/api/send-stream') {
         const pendingRead = new Promise<ReadableStreamReadResult<Uint8Array>>(
@@ -1301,7 +1343,9 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       const url = String(input)
       requests.push(url)
       if (url.startsWith('/api/session-cards/')) {
-        return Promise.resolve(jsonResponse(completeHistory(parentCard)))
+        return Promise.resolve(
+          jsonResponse(recentHistory(parentCard, completeHistory(parentCard))),
+        )
       }
       if (url === '/api/send-stream') {
         sendAttempts += 1
@@ -1371,7 +1415,9 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       const url = String(input)
       requests.push(url)
       if (url.startsWith('/api/session-cards/')) {
-        return Promise.resolve(jsonResponse(completeHistory(parentCard)))
+        return Promise.resolve(
+          jsonResponse(recentHistory(parentCard, completeHistory(parentCard))),
+        )
       }
       if (url === '/api/send-stream') {
         const runId = runIds[sendIndex++]

@@ -273,6 +273,8 @@ function installHttp() {
     if (historyMatch) {
       const cardId = decodeURIComponent(historyMatch[1]!)
       const card = cardId === cardB.cardId ? cardB : cardA
+      const requestedRecentWindow =
+        new URL(url, 'http://test').searchParams.get('window') === 'recent'
       return jsonResponse({
         cardId: card.cardId,
         canonicalSegmentKey: card.canonicalSegmentKey,
@@ -280,6 +282,9 @@ function installHttp() {
         completeness: 'complete',
         retryable: false,
         missingSegments: [],
+        ...(requestedRecentWindow
+          ? { loadedSegmentKeys: card.continuationSegmentKeys }
+          : {}),
       })
     }
     if (url.startsWith('/api/session-status?cardId=')) {

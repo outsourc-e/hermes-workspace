@@ -17,13 +17,20 @@ import {
 const MAX_HISTORY_LIMIT = 500
 const MAX_CURSOR_LENGTH = 4096
 
-function parseHistoryQuery(
-  request: Request,
-): { cursor?: string; limit?: number; parentCardId?: string } | null {
+function parseHistoryQuery(request: Request): {
+  cursor?: string
+  limit?: number
+  parentCardId?: string
+  window?: 'recent'
+} | null {
   const search = new URL(request.url).searchParams
   if (
     [...search.keys()].some(
-      (key) => key !== 'cursor' && key !== 'limit' && key !== 'parentCardId',
+      (key) =>
+        key !== 'cursor' &&
+        key !== 'limit' &&
+        key !== 'parentCardId' &&
+        key !== 'window',
     )
   ) {
     return null
@@ -31,10 +38,12 @@ function parseHistoryQuery(
   const cursorValues = search.getAll('cursor')
   const limitValues = search.getAll('limit')
   const parentCardIdValues = search.getAll('parentCardId')
+  const windowValues = search.getAll('window')
   if (
     cursorValues.length > 1 ||
     limitValues.length > 1 ||
-    parentCardIdValues.length > 1
+    parentCardIdValues.length > 1 ||
+    windowValues.length > 1
   ) {
     return null
   }
@@ -43,6 +52,8 @@ function parseHistoryQuery(
   if (cursor !== undefined && (!cursor || cursor.length > MAX_CURSOR_LENGTH)) {
     return null
   }
+  const window = windowValues[0]
+  if (window !== undefined && window !== 'recent') return null
 
   const rawLimit = limitValues[0]
   let limit: number | undefined
@@ -51,6 +62,8 @@ function parseHistoryQuery(
     limit = Number(rawLimit)
     if (!Number.isSafeInteger(limit) || limit > MAX_HISTORY_LIMIT) return null
   }
+  if (window === 'recent' && limit !== undefined) return null
+
   const rawParentCardId = parentCardIdValues[0]
   const parentCardId =
     rawParentCardId === undefined
@@ -61,6 +74,7 @@ function parseHistoryQuery(
     ...(cursor === undefined ? {} : { cursor }),
     ...(limit === undefined ? {} : { limit }),
     ...(parentCardId === undefined ? {} : { parentCardId }),
+    ...(window === undefined ? {} : { window }),
   }
 }
 
