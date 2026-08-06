@@ -1,3 +1,9 @@
+import {
+  cardTranscriptMessagesMatch,
+  isCardTranscriptRecoveryMessagePortable,
+  replaceCardTranscriptRecoveryMessages,
+  sanitizeCardOwnedMessage,
+} from './card-transcript-recovery'
 import type { ChatAttachment, ChatMessage } from './types'
 
 export type PendingSendPayload = {
@@ -6,6 +12,8 @@ export type PendingSendPayload = {
   message: string
   attachments: Array<ChatAttachment>
   optimisticMessage: ChatMessage
+  /** Durable bootstrap transcript retained until a verified Card migration. */
+  recoveryMessages?: Array<ChatMessage>
 }
 
 let pendingSend: PendingSendPayload | null = null
@@ -63,13 +71,49 @@ function toPendingSendPayload(
     return null
   }
 
+  const sanitizedOptimisticMessage = sanitizeCardOwnedMessage(
+    optimisticMessage as ChatMessage,
+  )
+  if (!isCardTranscriptRecoveryMessagePortable(sanitizedOptimisticMessage)) {
+    return null
+  }
+  const recoveryMessages = Array.isArray(parsed.recoveryMessages)
+    ? parsed.recoveryMessages
+        .map((message) => sanitizeCardOwnedMessage(message as ChatMessage))
+        .filter(isCardTranscriptRecoveryMessagePortable)
+    : [sanitizedOptimisticMessage]
+
   return {
     sessionKey: parsed.sessionKey,
     friendlyId: parsed.friendlyId,
     message: parsed.message,
     attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
-    optimisticMessage: optimisticMessage as ChatMessage,
+    optimisticMessage: sanitizedOptimisticMessage,
+    recoveryMessages:
+      recoveryMessages.length > 0
+        ? recoveryMessages
+        : [sanitizedOptimisticMessage],
   }
+}
+
+export function getPendingRecoveryMessages(
+  payload: PendingSendPayload,
+): Array<ChatMessage> {
+  const candidates =
+    payload.recoveryMessages && payload.recoveryMessages.length > 0
+      ? payload.recoveryMessages
+      : [payload.optimisticMessage]
+  const messages: Array<ChatMessage> = []
+  for (const candidate of candidates) {
+    const sanitized = sanitizeCardOwnedMessage(candidate)
+    if (!isCardTranscriptRecoveryMessagePortable(sanitized)) continue
+    const matchingIndex = messages.findIndex((message) =>
+      cardTranscriptMessagesMatch(message, sanitized),
+    )
+    if (matchingIndex >= 0) messages[matchingIndex] = sanitized
+    else messages.push(sanitized)
+  }
+  return messages
 }
 
 function writePendingSendToStorage(payload: PendingSendPayload): boolean {
@@ -77,8 +121,18 @@ function writePendingSendToStorage(payload: PendingSendPayload): boolean {
 
   cleanupExpiredPendingSends()
 
+  const recoveryMessages = getPendingRecoveryMessages(payload)
+  if (recoveryMessages.length === 0) return false
+  const optimisticClientId = pendingMessageClientId(payload.optimisticMessage)
+  const optimisticMessage = recoveryMessages.find(
+    (message) => pendingMessageClientId(message) === optimisticClientId,
+  )
+  if (!optimisticMessage) return false
+
   const record: PersistedPendingSendPayload = {
     ...payload,
+    optimisticMessage,
+    recoveryMessages,
     storedAt: Date.now(),
   }
 
@@ -184,6 +238,22 @@ export function persistPendingMessage(payload: PendingSendPayload): boolean {
   return writePendingSendToStorage(payload)
 }
 
+/** Append terminal bootstrap output without relinquishing provisional ownership. */
+export function appendPendingRecoveryMessage(
+  sessionKey: string,
+  friendlyId: string,
+  message: ChatMessage,
+): boolean {
+  const source = readPendingMessage(sessionKey, friendlyId)
+  if (!source) return false
+  const sanitized = sanitizeCardOwnedMessage(message)
+  if (!isCardTranscriptRecoveryMessagePortable(sanitized)) return false
+  return writePendingSendToStorage({
+    ...source,
+    recoveryMessages: [...getPendingRecoveryMessages(source), sanitized],
+  })
+}
+
 function pendingMessageClientId(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
   for (const key of ['clientId', 'client_id', 'idempotencyKey']) {
@@ -215,14 +285,26 @@ export function updatePendingMessageByClientId(
         ) {
           continue
         }
-        const optimisticMessage = updater(payload.optimisticMessage)
-        const next = { ...parsed, optimisticMessage }
+        const optimisticMessage = sanitizeCardOwnedMessage(
+          updater(payload.optimisticMessage),
+        )
+        const recoveryMessages = getPendingRecoveryMessages(payload).map(
+          (message) =>
+            pendingMessageClientId(message) === clientId
+              ? optimisticMessage
+              : message,
+        )
+        const next = { ...parsed, optimisticMessage, recoveryMessages }
         window.localStorage.setItem(key, JSON.stringify(next))
         if (
           pendingSend &&
           pendingMessageClientId(pendingSend.optimisticMessage) === clientId
         ) {
-          pendingSend = { ...pendingSend, optimisticMessage }
+          pendingSend = {
+            ...pendingSend,
+            optimisticMessage,
+            recoveryMessages,
+          }
         }
         updated = true
       } catch {
@@ -239,6 +321,7 @@ export function handoffPendingSend(
   fromSessionKey: string,
   toSessionKey: string,
   toFriendlyId: string,
+  options: { verifiedCardDestination?: boolean } = {},
 ) {
   const normalizedFrom = fromSessionKey.trim()
   const normalizedTo = toSessionKey.trim()
@@ -250,6 +333,26 @@ export function handoffPendingSend(
   const source =
     pendingSend?.sessionKey === normalizedFrom ? pendingSend : persisted
   if (!source) return
+
+  // A bootstrap owner can move only into a verified source-qualified Card.
+  // Never replace the provisional key with a raw canonical segment key.
+  if (normalizedFrom === 'new') {
+    if (
+      !options.verifiedCardDestination ||
+      (!normalizedFriendlyId.startsWith('remote:') &&
+        !normalizedFriendlyId.startsWith('local:'))
+    ) {
+      return
+    }
+    const migrated = replaceCardTranscriptRecoveryMessages(
+      { cardId: normalizedFriendlyId },
+      getPendingRecoveryMessages(source),
+    )
+    if (!migrated) return
+    if (pendingSend?.sessionKey === normalizedFrom) pendingSend = null
+    clearPendingMessage(normalizedFrom)
+    return
+  }
 
   const next: PendingSendPayload = {
     ...source,

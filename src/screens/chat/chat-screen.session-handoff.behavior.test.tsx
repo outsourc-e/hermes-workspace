@@ -11,11 +11,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { applySessionRouteResolution } from '../../routes/chat/-session-route-state'
 import { useChatStore } from '../../stores/chat-store'
-import { readCardTranscriptRecovery } from './card-transcript-recovery'
+import {
+  clearCardTranscriptRecoveryMemory,
+  readCardTranscriptRecovery,
+} from './card-transcript-recovery'
 import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
 import { chatQueryKeys, sessionCardQueryKeys } from './chat-queries'
 import { ChatScreen } from './chat-screen'
 import {
+  getPendingRecoveryMessages,
   hasPendingGeneration,
   persistPendingMessage,
   readPendingMessage,
@@ -49,6 +53,7 @@ const queryContext = vi.hoisted(() => ({
   realtimeStreaming: false,
   realtimeStreamingText: '',
   realtimeStreamingThinking: '',
+  realtimeStreamingRunId: null as string | null,
   realtimeLifecycleEvents: [] as Array<unknown>,
   realtimeToolCalls: [] as Array<{ name: string }>,
   realtimeInput: null as null | {
@@ -86,6 +91,7 @@ const queryContext = vi.hoisted(() => ({
   },
   legacySessionsRefetch: vi.fn(),
   mobileSessionCards: [] as Array<SessionCard>,
+  composerReset: vi.fn(),
 }))
 
 function cardList(
@@ -369,7 +375,9 @@ vi.mock('./components/chat-composer', () => ({
     onAbort?: () => void
   }) => {
     const helpers = {
-      reset() {},
+      reset() {
+        queryContext.composerReset()
+      },
       setValue() {},
       getValue: () => '',
     }
@@ -520,9 +528,11 @@ vi.mock('./hooks/use-chat-history', () => ({
         (queryContext.newRouteResolvesLegacyMain && activeFriendlyId === 'new'
           ? 'main'
           : activeSessionKey))
+    const pending = readPendingMessage(sessionKey, activeFriendlyId)
+    const historyMessages = pending ? getPendingRecoveryMessages(pending) : []
     return {
       historyQuery: {
-        data: { sessionKey, messages: [] },
+        data: { sessionKey, messages: historyMessages },
         dataUpdatedAt: 0,
         isError: false,
         isFetching: false,
@@ -530,8 +540,8 @@ vi.mock('./hooks/use-chat-history', () => ({
         isSuccess: true,
         refetch: vi.fn().mockResolvedValue(undefined),
       },
-      historyMessages: [],
-      messageCount: 0,
+      historyMessages,
+      messageCount: historyMessages.length,
       historyError: null,
       resolvedSessionKey: sessionKey,
       activeCanonicalKey: sessionKey,
@@ -559,7 +569,7 @@ vi.mock('./hooks/use-realtime-chat-history', () => ({
       completedStreamingText: { current: '' },
       completedStreamingThinking: { current: '' },
       clearCompletedStreaming: vi.fn(),
-      streamingRunId: null,
+      streamingRunId: queryContext.realtimeStreamingRunId,
       activeToolCalls: queryContext.realtimeToolCalls,
     }
   },
@@ -901,6 +911,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     vi.stubGlobal('EventSource', StubEventSource)
     window.localStorage.clear()
     window.sessionStorage.clear()
+    clearCardTranscriptRecoveryMemory()
     resetPendingSend()
     navigate.mockReset()
     vi.mocked(showErrorToast).mockReset()
@@ -919,6 +930,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryContext.realtimeStreaming = false
     queryContext.realtimeStreamingText = ''
     queryContext.realtimeStreamingThinking = ''
+    queryContext.realtimeStreamingRunId = null
     queryContext.realtimeLifecycleEvents = []
     queryContext.realtimeToolCalls = []
     queryContext.realtimeInput = null
@@ -933,6 +945,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryContext.legacyHistoryInput = null
     queryContext.legacySessionsRefetch.mockReset()
     queryContext.mobileSessionCards = []
+    queryContext.composerReset.mockReset()
     for (const sessionKey of [
       'new',
       'backend-parent',
@@ -1518,7 +1531,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     queryContext.client = queryClient
     const activeCard: SessionCard = {
-      cardId: 'opaque-card-id',
+      cardId: 'remote:opaque-card-id',
       canonicalSource: 'remote',
       title: 'Remote Card',
       titleSource: 'manual',
@@ -1566,13 +1579,13 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     await waitForAssertion(() => expect(stream.getRequestBody()).toBeDefined())
     expect(stream.getRequestBody()).toMatchObject({
       sessionKey: 'opaque-canonical-segment',
-      friendlyId: 'opaque-card-id',
-      cardId: 'opaque-card-id',
+      friendlyId: 'remote:opaque-card-id',
+      cardId: 'remote:opaque-card-id',
       history: [{ role: 'user', content: 'remote Card history' }],
     })
     expect(queryContext.realtimeInput).toMatchObject({
       sessionKey: 'opaque-canonical-segment',
-      friendlyId: 'opaque-card-id',
+      friendlyId: 'remote:opaque-card-id',
       portableMode: false,
       enabled: true,
     })
@@ -1581,7 +1594,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     await waitForAssertion(() =>
       expect(queryContext.activeRunInput).toMatchObject({
         sessionKey: 'opaque-canonical-segment',
-        cardId: 'opaque-card-id',
+        cardId: 'remote:opaque-card-id',
         enabled: false,
       }),
     )
@@ -1598,7 +1611,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     queryContext.client = queryClient
     const activeCard: SessionCard = {
-      cardId: 'another-opaque-card-id',
+      cardId: 'local:another-opaque-card-id',
       canonicalSource: 'local',
       title: 'Local Card',
       titleSource: 'manual',
@@ -1646,20 +1659,20 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     await waitForAssertion(() => expect(stream.getRequestBody()).toBeDefined())
     expect(stream.getRequestBody()).toMatchObject({
       sessionKey: 'another-opaque-canonical-segment',
-      friendlyId: 'another-opaque-card-id',
-      cardId: 'another-opaque-card-id',
+      friendlyId: 'local:another-opaque-card-id',
+      cardId: 'local:another-opaque-card-id',
       history: [{ role: 'user', content: 'local Card history' }],
     })
     expect(queryContext.realtimeInput).toMatchObject({
       sessionKey: 'another-opaque-canonical-segment',
-      friendlyId: 'another-opaque-card-id',
+      friendlyId: 'local:another-opaque-card-id',
       portableMode: false,
       enabled: true,
     })
     await waitForAssertion(() =>
       expect(queryContext.activeRunInput).toMatchObject({
         sessionKey: 'another-opaque-canonical-segment',
-        cardId: 'another-opaque-card-id',
+        cardId: 'local:another-opaque-card-id',
         enabled: false,
       }),
     )
@@ -2683,12 +2696,11 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       optimisticMessage,
       'run-chain',
     )
-    expect(readPendingMessage('backend-b', 'successor-friendly')).toMatchObject(
-      {
-        sessionKey: 'backend-b',
-        friendlyId: 'successor-friendly',
-      },
-    )
+    expect(readPendingMessage('backend-b', 'successor-friendly')).toBeNull()
+    expect(readPendingMessage('new', 'new')).toMatchObject({
+      sessionKey: 'new',
+      friendlyId: 'new',
+    })
     expect(useChatStore.getState().getRealtimeMessages('new')).toMatchObject([
       userMessage('live-chain', 'chain message'),
     ])
@@ -3132,6 +3144,115 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
+  it('keeps a completed /chat/new turn visible across remount when no Card handoff arrives', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const encoder = new TextEncoder()
+    const sendStream = vi.fn().mockImplementation(() => {
+      const reader = {
+        read: vi
+          .fn()
+          .mockResolvedValueOnce({
+            done: false,
+            value: encoder.encode(
+              [
+                'event: started',
+                'data: {"runId":"run-no-handoff","sessionKey":"new"}',
+                '',
+                'event: chunk',
+                'data: {"delta":"Recovered answer","runId":"run-no-handoff"}',
+                '',
+                'event: done',
+                'data: {"state":"complete","sessionKey":"new","runId":"run-no-handoff"}',
+                '',
+                '',
+              ].join('\n'),
+            ),
+          })
+          .mockResolvedValueOnce({ done: true, value: undefined }),
+        cancel: vi.fn().mockResolvedValue(undefined),
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        body: { getReader: () => reader },
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(''),
+      } as unknown as Response)
+    })
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) =>
+      String(input) === '/api/send-stream'
+        ? sendStream()
+        : Promise.resolve(new Response('{}', { status: 200 })),
+    )
+
+    const mount = () => {
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+      React.act(() => {
+        root.render(
+          <QueryClientProvider client={queryClient}>
+            <ChatScreen
+              activeFriendlyId="new"
+              forcedSessionKey="new"
+              isNewChat
+              compact
+            />
+          </QueryClientProvider>,
+        )
+      })
+      return { container, root }
+    }
+
+    const first = mount()
+    React.act(() => {
+      first.container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+    await waitForAssertion(() => {
+      expect(
+        getPendingRecoveryMessages(readPendingMessage('new', 'new')!),
+      ).toMatchObject([
+        { role: 'user' },
+        {
+          role: 'assistant',
+          runId: 'run-no-handoff',
+          stableId: 'stream-run:run-no-handoff',
+        },
+      ])
+      expect(
+        first.container.querySelector('[data-testid="chat-transcript"]')
+          ?.textContent,
+      ).toContain('Recovered answer')
+    })
+    expect(sendStream).toHaveBeenCalledTimes(1)
+    expect(
+      window.localStorage.getItem(
+        'workspace.chat-provisional-send.v1:new-chat',
+      ),
+    ).toContain('Recovered answer')
+
+    React.act(() => first.root.unmount())
+    document.body.removeChild(first.container)
+    const remounted = mount()
+    await waitForAssertion(() => {
+      const transcript = remounted.container.querySelector(
+        '[data-testid="chat-transcript"]',
+      )?.textContent
+      expect(transcript).toContain('continue')
+      expect(transcript).toContain('Recovered answer')
+    })
+    expect(sendStream).toHaveBeenCalledTimes(1)
+
+    React.act(() => remounted.root.unmount())
+    document.body.removeChild(remounted.container)
+    queryClient.clear()
+  })
+
   it('keeps a cancelled pre-handoff /chat/new first turn retryable', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -3234,6 +3355,143 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     document.body.removeChild(container)
     queryClient.clear()
   })
+
+  it('fails closed before transport when a text turn cannot be durably overlaid on its Card', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard = createRootCard({
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:tip',
+    })
+    queryContext.cardHistories.set(activeCard.cardId, {
+      sessionKey: 'remote:tip',
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: 'remote:tip',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      if (key.startsWith('workspace.card-transcript-recovery.')) {
+        throw new DOMException('quota exceeded', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, key, value)
+    })
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }))
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCardList={cardList([activeCard])}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+
+    expect(showErrorToast).toHaveBeenCalledWith(
+      expect.stringContaining('could not be saved safely'),
+    )
+    expect(queryContext.composerReset).not.toHaveBeenCalled()
+    expect(
+      fetchSpy.mock.calls.some(
+        ([input]) => String(input) === '/api/send-stream',
+      ),
+    ).toBe(false)
+    expect(readCardTranscriptRecovery({ cardId: activeCard.cardId })).toBeNull()
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it.each([
+    ['identical', 'Repeated answer'],
+    ['prefix', 'Repeated answer from an older turn'],
+  ])(
+    'renders a newer run when an old %s assistant answer overlaps its stream',
+    (_caseName, oldAnswer) => {
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      })
+      queryContext.client = queryClient
+      const activeCard = createRootCard({
+        cardId: 'remote:parent',
+        canonicalSegmentKey: 'remote:tip',
+      })
+      queryContext.cardHistories.set(activeCard.cardId, {
+        sessionKey: 'remote:tip',
+        cardId: activeCard.cardId,
+        canonicalSegmentKey: 'remote:tip',
+        messages: [
+          {
+            id: 'old-answer',
+            role: 'assistant',
+            content: [{ type: 'text', text: oldAnswer }],
+            timestamp: 1,
+            runId: 'run-old',
+          },
+          {
+            id: 'new-user-turn',
+            role: 'user',
+            content: [{ type: 'text', text: 'Ask again' }],
+            timestamp: 2,
+          },
+        ],
+        completeness: 'complete',
+        retryable: false,
+        missingSegments: [],
+      })
+      queryContext.realtimeStreaming = true
+      queryContext.realtimeStreamingText = 'Repeated answer'
+      queryContext.realtimeStreamingRunId = 'run-new'
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+      React.act(() => {
+        root.render(
+          <QueryClientProvider client={queryClient}>
+            <ChatScreen
+              activeFriendlyId={activeCard.cardId}
+              activeCard={activeCard}
+              sessionCardList={cardList([activeCard])}
+              compact
+            />
+          </QueryClientProvider>,
+        )
+      })
+
+      const transcript = container.querySelector(
+        '[data-testid="chat-transcript"]',
+      )?.textContent
+      expect(transcript).toContain('streaming-current')
+      expect(transcript).toContain('stream-run:run-new')
+
+      React.act(() => root.unmount())
+      document.body.removeChild(container)
+      queryClient.clear()
+    },
+  )
 
   it('persists a safe attachment under the Card before transport starts', async () => {
     const queryClient = new QueryClient({

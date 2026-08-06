@@ -6,9 +6,11 @@ import { getMessageTimestamp, textFromMessage } from '../utils'
 import {
   cleanupExpiredPendingSends,
   clearPendingMessage,
+  getPendingRecoveryMessages,
   persistPendingMessage,
   readPendingMessage,
 } from '../pending-send'
+import { mergeCardTranscriptRecoveryMessages } from '../card-transcript-recovery'
 import { useChatSettingsStore } from '../../../hooks/use-chat-settings'
 import { resolveLatestDescendant } from '../latest-descendant'
 import type { PendingSendPayload } from '../pending-send'
@@ -459,6 +461,9 @@ export function useChatHistory({
 
   useEffect(() => {
     if (!persistedPending) return
+    // The bootstrap transcript is Card-owned provisional recovery. Only the
+    // verified Card migration path may relinquish it.
+    if (persistedPending.sessionKey === 'new') return
     if (
       hasConfirmedPendingMessage(
         rawHistoryMessages,
@@ -474,9 +479,14 @@ export function useChatHistory({
   const stableHistoryMessagesRef = useRef<Array<ChatMessage>>([])
   const historyMessages = useMemo(() => {
     const messages = persistedPending
-      ? mergeOptimisticHistoryMessages(rawHistoryMessages, [
-          persistedPending.optimisticMessage,
-        ])
+      ? persistedPending.sessionKey === 'new'
+        ? mergeCardTranscriptRecoveryMessages(
+            rawHistoryMessages,
+            getPendingRecoveryMessages(persistedPending),
+          )
+        : mergeOptimisticHistoryMessages(rawHistoryMessages, [
+            persistedPending.optimisticMessage,
+          ])
       : rawHistoryMessages
     const last = messages[messages.length - 1]
     const lastId =

@@ -376,11 +376,13 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       expect(
         queryClient.getQueryData<HistoryResponse>(targetHistoryKey)?.messages,
       ).toEqual([optimisticMessage])
-      expect(
-        consumePendingSend('canonical-child', targetFriendlyId),
-      ).toMatchObject({
-        sessionKey: 'canonical-child',
-        friendlyId: targetFriendlyId,
+      const pendingAfterResolution =
+        fromSessionKey === 'new'
+          ? consumePendingSend('new', 'new')
+          : consumePendingSend('canonical-child', targetFriendlyId)
+      expect(pendingAfterResolution).toMatchObject({
+        sessionKey: fromSessionKey === 'new' ? 'new' : 'canonical-child',
+        friendlyId: fromSessionKey === 'new' ? 'new' : targetFriendlyId,
         message: 'continue',
       })
       expect(

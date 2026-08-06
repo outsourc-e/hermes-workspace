@@ -246,7 +246,14 @@ export function applySessionRouteResolution({
       payload.friendlyId,
       payload.sessionKey,
     )
-    handoffPendingSend(sourceSessionKey, payload.sessionKey, payload.friendlyId)
+    handoffPendingSend(
+      sourceSessionKey,
+      payload.sessionKey,
+      payload.friendlyId,
+      {
+        verifiedCardDestination: payload.reason === 'bootstrap',
+      },
+    )
   }
 
   if (

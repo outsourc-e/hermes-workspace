@@ -51,6 +51,7 @@ import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
 import { ConnectionStatusMessage } from './components/connection-status-message'
 import {
+  appendPendingRecoveryMessage,
   clearPendingSendForSession,
   consumePendingSend,
   hasPendingGeneration,
@@ -63,7 +64,10 @@ import {
 } from './pending-send'
 import {
   appendCardTranscriptRecoveryMessage,
+  clearCardTranscriptRecovery,
   isCardTranscriptRecoveryMessagePortable,
+  readCardTranscriptRecovery,
+  replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
@@ -680,6 +684,7 @@ export function ChatScreen({
     friendlyId: string
     cardId?: string
     clientId: string
+    provisionalOwner?: 'new'
   } | null>(null)
   // A live send-stream reader is authoritative over its waiting state. Keep
   // this separate from sessionStorage-backed recovery so a continuation cannot
@@ -1731,10 +1736,21 @@ export function ChatScreen({
               completedMessage,
             )
           }
-          clearPendingSendForSession(
-            activeSend.sessionKey,
-            activeSend.friendlyId,
-          )
+          if (activeSend.provisionalOwner === 'new' && !activeSend.cardId) {
+            // A successful bootstrap stream may complete before any Card
+            // handoff. Retain both sides of the turn until a verified Card
+            // migration owns them, so remounting cannot erase the answer.
+            if (!appendPendingRecoveryMessage('new', 'new', completedMessage)) {
+              setError(
+                'The response completed, but could not be saved for recovery. Keep this tab open while you copy the result.',
+              )
+            }
+          } else {
+            clearPendingSendForSession(
+              activeSend.sessionKey,
+              activeSend.friendlyId,
+            )
+          }
         }
         activeSendRef.current = null
         liveStreamSessionKeyRef.current = null
@@ -2037,17 +2053,33 @@ export function ChatScreen({
       __streamingText: stableActiveStreamingText,
       __streamingThinking: realtimeStreamingThinking,
       __streamToolCalls: streamToolCalls,
+      ...(streamingRunId
+        ? {
+            runId: streamingRunId,
+            stableId: `stream-run:${streamingRunId}`,
+          }
+        : {}),
     } as ChatMessage
 
     // Check if the server has already returned a completed assistant message
     // that overlaps with the streaming text. If so, drop the streaming
     // placeholder to avoid showing the same response twice.
     const streamingText = stableActiveStreamingText.trim()
-    const hasServerAssistantVersion = nextMessages.some((msg) => {
+    const lastUserIdx = nextMessages.reduce(
+      (lastIdx, msg, idx) => (msg.role === 'user' ? idx : lastIdx),
+      -1,
+    )
+    const activeTurnMessages = nextMessages.slice(lastUserIdx + 1)
+    const hasServerAssistantVersion = activeTurnMessages.some((msg) => {
       if (msg.role !== 'assistant') return false
       if (msg.__streamingStatus === 'streaming') return false
-      // Any non-streaming assistant message that appears after the last user
-      // message is potentially the same response — match by text overlap
+      const messageRunId =
+        typeof msg.runId === 'string' && msg.runId.trim() ? msg.runId : null
+      if (streamingRunId && messageRunId && streamingRunId !== messageRunId) {
+        return false
+      }
+      // Only a same-run assistant in the active user turn can acknowledge the
+      // live stream. An identical answer from an older turn is unrelated.
       if (streamingText.length > 0) {
         const msgText = textFromMessage(msg).trim()
         if (
@@ -2100,10 +2132,6 @@ export function ChatScreen({
       return nextMessages
     }
 
-    const lastUserIdx = nextMessages.reduce(
-      (lastIdx, msg, idx) => (msg.role === 'user' ? idx : lastIdx),
-      -1,
-    )
     if (lastUserIdx >= 0 && lastUserIdx === nextMessages.length - 1) {
       nextMessages.push(streamingMsg)
     } else if (lastUserIdx >= 0) {
@@ -2118,6 +2146,7 @@ export function ChatScreen({
     activeRealtimeStreamingText,
     realtimeMessages,
     realtimeStreamingThinking,
+    streamingRunId,
   ])
 
   const inspectedChildDisplayMessages = useMemo(() => {
@@ -2625,6 +2654,9 @@ export function ChatScreen({
         friendlyId,
         ...(activeCard ? { cardId: activeCard.cardId } : {}),
         clientId: optimisticClientId,
+        ...(sessionKey === 'new' && friendlyId === 'new'
+          ? { provisionalOwner: 'new' as const }
+          : {}),
       }
 
       // Failsafe: clear waitingForResponse after 120s no matter what
@@ -3044,7 +3076,8 @@ export function ChatScreen({
           dataUrl: attachment.dataUrl,
         }),
       )
-      const requiresDurableOverlay = isNewChat || attachmentPayload.length > 0
+      const requiresDurableOverlay =
+        isNewChat || Boolean(activeCard) || attachmentPayload.length > 0
       let durableOptimisticMessage: ChatMessage | null = null
       let durableClientId = ''
 
@@ -3087,6 +3120,9 @@ export function ChatScreen({
       if (durableOptimisticMessage) {
         let persisted = false
         if (activeCard) {
+          const priorRecovery = readCardTranscriptRecovery({
+            cardId: activeCard.cardId,
+          })
           persisted = Boolean(
             appendCardTranscriptRecoveryMessage(
               { cardId: activeCard.cardId },
@@ -3099,7 +3135,18 @@ export function ChatScreen({
               activeCard.cardId,
               sessionKeyForSend,
               durableOptimisticMessage,
+              { persistRecovery: false },
             )
+          } else if (priorRecovery) {
+            // The recovery helper intentionally retains an in-memory fallback
+            // for post-transport failures. This is a pre-transport admission
+            // gate, so roll that candidate back to the last durable snapshot.
+            replaceCardTranscriptRecoveryMessages(
+              { cardId: activeCard.cardId },
+              priorRecovery.messages,
+            )
+          } else {
+            clearCardTranscriptRecovery({ cardId: activeCard.cardId })
           }
         } else {
           persisted = persistPendingMessage({
@@ -3123,7 +3170,9 @@ export function ChatScreen({
           const safeMessage =
             attachmentPayload.length > 0
               ? 'This message was not sent because its attachments could not be saved for recovery. Free browser storage or remove the attachments, then try again.'
-              : 'This first message was not sent because it could not be saved safely. Free browser storage and try again.'
+              : activeCard
+                ? 'This message was not sent because it could not be saved safely. Free browser storage and try again.'
+                : 'This first message was not sent because it could not be saved safely. Free browser storage and try again.'
           setError(safeMessage)
           toast(safeMessage, { type: 'error' })
           showErrorToast(safeMessage)

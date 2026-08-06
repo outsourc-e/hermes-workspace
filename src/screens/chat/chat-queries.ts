@@ -1560,15 +1560,13 @@ export function appendSessionCardHistoryMessage(
 export function appendSessionCardTransientMessage(
   queryClient: QueryClient,
   cardId: string,
-  canonicalSegmentKey: string,
+  sessionKey: string,
   message: ChatMessage,
-) {
-  appendSessionCardHistoryMessage(
-    queryClient,
-    cardId,
-    canonicalSegmentKey,
-    message,
-  )
+  options: { persistRecovery?: boolean } = {},
+): void {
+  appendSessionCardHistoryMessage(queryClient, cardId, sessionKey, message, {
+    persistRecovery: options.persistRecovery ?? true,
+  })
 }
 
 export function moveSessionCardHistoryMessages(
