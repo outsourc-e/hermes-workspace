@@ -54,6 +54,15 @@ const binding = {
   canonicalTransport: 'gateway',
 }
 
+const localBinding = {
+  kind: 'session-card-owner',
+  cardId: 'local:builder-card',
+  parentCardId: null,
+  canonicalSource: 'local',
+  canonicalSegmentKey: 'local:builder',
+  canonicalTransport: 'tmux',
+}
+
 function resolvedRemoteCard(overrides: Record<string, unknown> = {}) {
   const cardId = (overrides.cardId as string | undefined) ?? binding.cardId
   const segment =
@@ -64,6 +73,25 @@ function resolvedRemoteCard(overrides: Record<string, unknown> = {}) {
       cardId,
       canonicalSource: 'remote',
       canonicalTransport: 'gateway',
+      canonicalSegmentKey: segment,
+      continuationSegmentKeys: [cardId, segment],
+      continuationCount: 2,
+      relationshipKind: 'root',
+      ...overrides,
+    },
+    collection: { completeness: 'complete', retryable: false },
+  }
+}
+
+function resolvedLocalCard(overrides: Record<string, unknown> = {}) {
+  const cardId = (overrides.cardId as string | undefined) ?? localBinding.cardId
+  const segment =
+    (overrides.canonicalSegmentKey as string | undefined) ??
+    localBinding.canonicalSegmentKey
+  return {
+    card: {
+      cardId,
+      canonicalSource: 'local',
       canonicalSegmentKey: segment,
       continuationSegmentKeys: [cardId, segment],
       continuationCount: 2,
@@ -93,6 +121,10 @@ beforeEach(() => {
   mocks.swarmMissionHasExactCardAuthority.mockReturnValue(true)
   mocks.dashboardFetch.mockResolvedValue(new Response(null, { status: 204 }))
   mocks.deleteSession.mockResolvedValue(undefined)
+  mocks.resetSwarmWorkerRuntime.mockReturnValue({
+    workerId: 'builder',
+    ok: true,
+  })
   mocks.resolveCard.mockResolvedValue(resolvedRemoteCard())
   mocks.resolveChildCard.mockResolvedValue(resolvedRemoteCard())
 })
@@ -227,6 +259,149 @@ describe('POST /api/conductor-stop Card authority', () => {
           operation: 'delete-session',
           id: binding.cardId,
           error: 'Unable to delete Session Card runtime',
+        },
+      ],
+    })
+  })
+
+  it('keeps native cancellation durable but reports a missing exact worker binding', async () => {
+    mocks.cancelSwarmMission.mockReturnValue({
+      mission: {
+        assignments: [{ workerId: 'builder' }],
+      },
+      changed: true,
+    })
+
+    const response = await handler({
+      request: request({
+        cardBindings: [binding],
+        missionIds: ['mission-1'],
+        missionCardId: binding.cardId,
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      cancelledNativeMissions: 1,
+      failures: [
+        {
+          operation: 'reset-worker',
+          id: 'builder',
+          error: 'Exact Session Card worker binding is required',
+        },
+      ],
+    })
+    expect(mocks.cancelSwarmMission).toHaveBeenCalled()
+    expect(mocks.resetSwarmWorkerRuntime).not.toHaveBeenCalled()
+  })
+
+  it('keeps native cancellation durable but reports worker runtime reset failures', async () => {
+    mocks.cancelSwarmMission.mockReturnValue({
+      mission: {
+        assignments: [{ workerId: 'builder' }],
+      },
+      changed: true,
+    })
+    mocks.resolveCard.mockResolvedValue(resolvedLocalCard())
+    mocks.resetSwarmWorkerRuntime.mockReturnValue({
+      workerId: 'builder',
+      ok: false,
+      error: 'disk full',
+    })
+
+    const response = await handler({
+      request: request({
+        cardBindings: [localBinding],
+        missionIds: ['mission-1'],
+        missionCardId: localBinding.cardId,
+      }),
+    })
+
+    expect(response.status).toBe(502)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      cancelledNativeMissions: 1,
+      failures: [
+        {
+          operation: 'reset-worker',
+          id: 'builder',
+          error: 'Unable to reset worker runtime: disk full',
+        },
+      ],
+    })
+    expect(mocks.cancelSwarmMission).toHaveBeenCalled()
+    expect(mocks.resetSwarmWorkerRuntime).toHaveBeenCalledWith('builder', {
+      actor: 'conductor-stop',
+      reason: 'Cancelled native Conductor mission mission-1',
+    })
+  })
+
+  it('reports a worker binding that rolls after durable native cancellation', async () => {
+    mocks.cancelSwarmMission.mockReturnValue({
+      mission: {
+        assignments: [{ workerId: 'builder' }],
+      },
+      changed: true,
+    })
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(
+        resolvedLocalCard({ canonicalSegmentKey: 'local:replacement' }),
+      )
+
+    const response = await handler({
+      request: request({
+        cardBindings: [localBinding],
+        missionIds: ['mission-1'],
+        missionCardId: localBinding.cardId,
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      cancelledNativeMissions: 1,
+      failures: [
+        {
+          operation: 'reset-worker',
+          id: 'builder',
+          error: 'Session Card worker binding is unavailable',
+        },
+      ],
+    })
+    expect(mocks.resetSwarmWorkerRuntime).not.toHaveBeenCalled()
+  })
+
+  it('reports thrown worker reset errors instead of silently accepting them', async () => {
+    mocks.cancelSwarmMission.mockReturnValue({
+      mission: {
+        assignments: [{ workerId: 'builder' }],
+      },
+      changed: true,
+    })
+    mocks.resolveCard.mockResolvedValue(resolvedLocalCard())
+    mocks.resetSwarmWorkerRuntime.mockImplementation(() => {
+      throw new Error('reset exploded')
+    })
+
+    const response = await handler({
+      request: request({
+        cardBindings: [localBinding],
+        missionIds: ['mission-1'],
+        missionCardId: localBinding.cardId,
+      }),
+    })
+
+    expect(response.status).toBe(502)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      cancelledNativeMissions: 1,
+      failures: [
+        {
+          operation: 'reset-worker',
+          id: 'builder',
+          error: 'Unable to reset worker runtime: reset exploded',
         },
       ],
     })

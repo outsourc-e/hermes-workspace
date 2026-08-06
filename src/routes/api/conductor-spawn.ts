@@ -12,6 +12,8 @@ import {
 import { sanitizeConductorMissionGoal } from '../../server/conductor-mission-sanitize'
 import {
   bindSwarmMissionCardAuthority,
+  cancelSwarmMission,
+  createOrUpdateMission,
   getSwarmMission,
   recordMissionCheckpoint,
 } from '../../server/swarm-missions'
@@ -26,6 +28,7 @@ import {
   runtimeCheckpointSignature,
 } from './swarm-dispatch'
 import type { SwarmMission } from '../../server/swarm-missions'
+import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 
 let cachedSkill: string | null = null
 
@@ -41,20 +44,43 @@ type ConductorSpawnBody = {
   supervised?: unknown
 }
 
+class ConductorAdmissionError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ConductorAdmissionError'
+    this.status = status
+  }
+}
+
+async function establishMissionCardAuthority(input: {
+  missionId: string
+  source: 'local' | 'remote'
+  upstreamKey: string
+}): Promise<SessionCardOperationBinding | null> {
+  try {
+    const binding = await resolveSessionCardOperationBindingByUpstream(input)
+    if (!binding) return null
+    return bindSwarmMissionCardAuthority({
+      missionId: input.missionId,
+      anchorSource: input.source,
+      anchorKey: input.upstreamKey,
+      binding,
+    })
+      ? binding
+      : null
+  } catch {
+    return null
+  }
+}
+
 async function bindMissionCardAuthority(input: {
   missionId: string
   source: 'local' | 'remote'
   upstreamKey: string
 }): Promise<boolean> {
-  const binding = await resolveSessionCardOperationBindingByUpstream(input)
-  return binding
-    ? bindSwarmMissionCardAuthority({
-        missionId: input.missionId,
-        anchorSource: input.source,
-        anchorKey: input.upstreamKey,
-        binding,
-      })
-    : false
+  return Boolean(await establishMissionCardAuthority(input))
 }
 
 function repoRoot(): string {
@@ -193,6 +219,26 @@ async function createDashboardConductorMission(payload: {
     return { error: data.error || data.detail || `HTTP ${res.status}` }
   }
   return { id: data.id, name: data.name, sessionKey: data.session_id }
+}
+
+async function deleteDashboardConductorMission(missionId: string): Promise<{
+  ok: boolean
+  error: string | null
+}> {
+  try {
+    const response = await dashboardFetch(
+      `/api/conductor/missions/${encodeURIComponent(missionId)}`,
+      { method: 'DELETE' },
+    )
+    if (response.ok) return { ok: true, error: null }
+    const detail = await response.text().catch(() => '')
+    return { ok: false, error: detail || `HTTP ${response.status}` }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
 }
 
 type NativeConductorAssignment = {
@@ -432,30 +478,35 @@ async function createNativeConductorMission(input: {
     supervised: input.supervised,
   })
   const missionTitle = `Conductor: ${clipText(input.goal, 120)}`
+  createOrUpdateMission({
+    missionId: input.missionName,
+    title: missionTitle,
+    assignments,
+  })
   const cardBindings = await Promise.all(
     assignments.map((assignment) =>
-      resolveSessionCardOperationBindingByUpstream({
-        source: 'local',
-        upstreamKey: assignment.workerId,
-      }),
-    ),
-  )
-  if (cardBindings.some((binding) => !binding)) {
-    throw new Error('Session Card ownership unavailable for native dispatch')
-  }
-  await Promise.all(
-    assignments.map((assignment) =>
-      bindMissionCardAuthority({
+      establishMissionCardAuthority({
         missionId: input.missionName,
         source: 'local',
         upstreamKey: assignment.workerId,
       }),
     ),
   )
+  if (cardBindings.some((binding) => !binding)) {
+    cancelSwarmMission({
+      missionId: input.missionName,
+      actor: 'conductor-spawn',
+      reason: 'Native Conductor worker Session Card binding unavailable',
+    })
+    throw new ConductorAdmissionError(
+      'Session Card ownership unavailable for native dispatch',
+      409,
+    )
+  }
   void dispatchSwarmAssignments({
     assignments: assignments.map((assignment, index) => ({
       ...assignment,
-      cardBinding: cardBindings[index],
+      cardBinding: cardBindings[index]!,
     })),
     missionId: input.missionName,
     missionTitle,
@@ -464,24 +515,12 @@ async function createNativeConductorMission(input: {
     timeoutSeconds: 600,
     checkpointPollSeconds: 10,
     notifySessionKey: 'main',
+  }).catch((error) => {
+    console.error(
+      '[conductor] native swarm dispatch failed:',
+      error instanceof Error ? error.message : String(error),
+    )
   })
-    .then(async () => {
-      await Promise.all(
-        assignments.map((assignment) =>
-          bindMissionCardAuthority({
-            missionId: input.missionName,
-            source: 'local',
-            upstreamKey: assignment.workerId,
-          }),
-        ),
-      )
-    })
-    .catch((error) => {
-      console.error(
-        '[conductor] native swarm dispatch failed:',
-        error instanceof Error ? error.message : String(error),
-      )
-    })
   return { missionId: input.missionName, missionTitle, assignments }
 }
 
@@ -505,15 +544,30 @@ export const Route = createFileRoute('/api/conductor-spawn')({
 
         const nativeMission = getSwarmMission(missionId)
         if (nativeMission) {
-          await Promise.all(
-            nativeMission.assignments.map((assignment) =>
-              bindMissionCardAuthority({
+          const workerBindings = await Promise.all(
+            nativeMission.assignments.map(async (assignment) => ({
+              workerId: assignment.workerId,
+              bound: await bindMissionCardAuthority({
                 missionId,
                 source: 'local',
                 upstreamKey: assignment.workerId,
               }),
-            ),
+            })),
           )
+          const unavailableWorker = workerBindings.find(
+            (binding) => !binding.bound,
+          )
+          if (unavailableWorker) {
+            return json(
+              {
+                ok: false,
+                error:
+                  'Native Conductor worker Session Card binding is unavailable',
+                workerId: unavailableWorker.workerId,
+              },
+              { status: 409 },
+            )
+          }
           // For active native missions, check worker runtime.json for fresh
           // checkpoints that haven't been written back to the mission store yet.
           // This bridges the gap between fire-and-forget dispatch (waitForCheckpoint=false)
@@ -551,6 +605,26 @@ export const Route = createFileRoute('/api/conductor-spawn')({
                       checkpoint.stateLabel === 'HANDOFF' ||
                       checkpoint.stateLabel === 'NEEDS_INPUT')
                   ) {
+                    // Re-resolve and bind the exact worker Card at the mutation
+                    // edge. A successful admission-time binding cannot authorize
+                    // a checkpoint after the upstream worker identity rolls.
+                    if (
+                      !(await bindMissionCardAuthority({
+                        missionId,
+                        source: 'local',
+                        upstreamKey: assignment.workerId,
+                      }))
+                    ) {
+                      return json(
+                        {
+                          ok: false,
+                          error:
+                            'Native Conductor worker Session Card binding is unavailable',
+                          workerId: assignment.workerId,
+                        },
+                        { status: 409 },
+                      )
+                    }
                     recordMissionCheckpoint({
                       missionId: nativeMission.id,
                       assignmentId: assignment.id,
@@ -610,12 +684,31 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           return json({ ok: false, error }, { status: res.status })
         }
         const dashboardSessionId = readOptionalString(mission.session_id)
-        if (dashboardSessionId) {
-          await bindMissionCardAuthority({
+        if (!dashboardSessionId) {
+          return json(
+            {
+              ok: false,
+              error:
+                'Dashboard Conductor mission did not provide a Session Card binding',
+            },
+            { status: 502 },
+          )
+        }
+        if (
+          !(await bindMissionCardAuthority({
             missionId,
             source: 'remote',
             upstreamKey: dashboardSessionId,
-          })
+          }))
+        ) {
+          return json(
+            {
+              ok: false,
+              error:
+                'Dashboard Conductor mission Session Card binding is unavailable',
+            },
+            { status: 409 },
+          )
         }
         return json({ ok: true, mission })
       },
@@ -692,12 +785,41 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           if (result.error)
             return json({ ok: false, error: result.error }, { status: 502 })
           const missionId = result.id ?? missionName
-          if (result.sessionKey) {
-            await bindMissionCardAuthority({
+          if (!result.sessionKey) {
+            const compensation =
+              await deleteDashboardConductorMission(missionId)
+            return json(
+              {
+                ok: false,
+                error:
+                  'Dashboard Conductor mission did not provide a Session Card binding',
+                missionId,
+                compensated: compensation.ok,
+                compensationError: compensation.error,
+              },
+              { status: 502 },
+            )
+          }
+          if (
+            !(await bindMissionCardAuthority({
               missionId,
               source: 'remote',
               upstreamKey: result.sessionKey,
-            })
+            }))
+          ) {
+            const compensation =
+              await deleteDashboardConductorMission(missionId)
+            return json(
+              {
+                ok: false,
+                error:
+                  'Dashboard Conductor mission Session Card binding is unavailable',
+                missionId,
+                compensated: compensation.ok,
+                compensationError: compensation.error,
+              },
+              { status: compensation.ok ? 409 : 502 },
+            )
           }
           return json({
             ok: true,
@@ -718,7 +840,10 @@ export const Route = createFileRoute('/api/conductor-spawn')({
               ok: false,
               error: error instanceof Error ? error.message : String(error),
             },
-            { status: 500 },
+            {
+              status:
+                error instanceof ConductorAdmissionError ? error.status : 500,
+            },
           )
         }
       },

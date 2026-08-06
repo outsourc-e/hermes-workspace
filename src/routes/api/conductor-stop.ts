@@ -149,7 +149,7 @@ export const Route = createFileRoute('/api/conductor-stop')({
           let cancelledNativeMissions = 0
           let staleAuthority = false
           const failures: Array<{
-            operation: 'delete-session' | 'stop-mission'
+            operation: 'delete-session' | 'stop-mission' | 'reset-worker'
             id: string
             error: string
           }> = []
@@ -190,23 +190,51 @@ export const Route = createFileRoute('/api/conductor-stop')({
                       binding.canonicalSource === 'local' &&
                       binding.canonicalSegmentKey === `local:${workerId}`,
                   )
-                  if (!workerBinding) continue
+                  if (!workerBinding) {
+                    staleAuthority = true
+                    failures.push({
+                      operation: 'reset-worker',
+                      id: workerId,
+                      error: 'Exact Session Card worker binding is required',
+                    })
+                    continue
+                  }
+                  // Native mission cancellation does not authorize a later
+                  // worker runtime reset. Re-resolve each local worker Card
+                  // independently at the file mutation edge.
+                  if (
+                    !(await resolveExactSessionCardOperationBinding(
+                      workerBinding,
+                    ))
+                  ) {
+                    staleAuthority = true
+                    failures.push({
+                      operation: 'reset-worker',
+                      id: workerId,
+                      error: 'Session Card worker binding is unavailable',
+                    })
+                    continue
+                  }
                   try {
-                    // Native mission cancellation does not authorize a later
-                    // worker runtime reset. Re-resolve each local worker Card
-                    // independently at the file mutation edge.
-                    if (
-                      await resolveExactSessionCardOperationBinding(
-                        workerBinding,
-                      )
-                    ) {
-                      resetSwarmWorkerRuntime(workerId, {
-                        actor: 'conductor-stop',
-                        reason: `Cancelled native Conductor mission ${missionId}`,
+                    const reset = resetSwarmWorkerRuntime(workerId, {
+                      actor: 'conductor-stop',
+                      reason: `Cancelled native Conductor mission ${missionId}`,
+                    })
+                    if (!reset.ok) {
+                      failures.push({
+                        operation: 'reset-worker',
+                        id: workerId,
+                        error: `Unable to reset worker runtime${reset.error ? `: ${reset.error}` : ''}`,
                       })
                     }
-                  } catch {
-                    // Runtime reset is best-effort; cancellation state is durable.
+                  } catch (error) {
+                    failures.push({
+                      operation: 'reset-worker',
+                      id: workerId,
+                      error: `Unable to reset worker runtime: ${
+                        error instanceof Error ? error.message : String(error)
+                      }`,
+                    })
                   }
                 }
                 continue
