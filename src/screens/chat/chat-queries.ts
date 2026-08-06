@@ -2,7 +2,6 @@ import { normalizeSessions, readError } from './utils'
 import {
   appendCardTranscriptRecoveryMessage,
   mergeCardTranscriptRecoveryMessages,
-  moveCardTranscriptRecovery,
   readCardTranscriptRecovery,
   removeAcknowledgedCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
@@ -85,25 +84,19 @@ export const sessionCardQueryKeys = {
   detail: function detail(cardId: string) {
     return ['chat', 'session-cards', 'detail', cardId] as const
   },
-  history: function history(
-    cardId: string,
-    canonicalSegmentKey: string,
-    cursor?: string,
-  ) {
+  history: function history(cardId: string, options?: { cursor?: string }) {
     return [
       'chat',
       'session-cards',
       'history',
       cardId,
-      canonicalSegmentKey,
-      cursor ?? '',
+      options?.cursor ?? '',
     ] as const
   },
   childHistory: function childHistory(
     parentCardId: string,
     childCardId: string,
-    canonicalSegmentKey: string,
-    cursor?: string,
+    options?: { cursor?: string },
   ) {
     return [
       'chat',
@@ -111,8 +104,7 @@ export const sessionCardQueryKeys = {
       'child-history',
       parentCardId,
       childCardId,
-      canonicalSegmentKey,
-      cursor ?? '',
+      options?.cursor ?? '',
     ] as const
   },
   metadata: function metadata(cardId: string) {
@@ -1477,7 +1469,7 @@ type ReconcileSessionCardHistoryOptions = {
 
 /**
  * Reconcile one Card-history response with only same-owner persisted rows and
- * the exact Card/segment recovery envelope. Complete history replaces retained
+ * the exact Card recovery envelope. Complete history replaces retained
  * persisted rows and may acknowledge overlays; partial history keeps prior
  * validated rows visible and cannot clear recovery.
  */
@@ -1485,10 +1477,7 @@ export function reconcileSessionCardHistoryResponse(
   server: SessionCardHistoryResponse,
   options: ReconcileSessionCardHistoryOptions = {},
 ): SessionCardHistoryResponse {
-  const owner = {
-    cardId: server.cardId,
-    canonicalSegmentKey: server.canonicalSegmentKey,
-  }
+  const owner = { cardId: server.cardId }
   const persistedMessages = mergePartialPersistedCardHistory(
     server,
     options.previous,
@@ -1515,7 +1504,7 @@ export function updateSessionCardHistoryMessages(
   canonicalSegmentKey: string,
   updater: (messages: Array<ChatMessage>) => Array<ChatMessage>,
 ) {
-  const queryKey = sessionCardQueryKeys.history(cardId, canonicalSegmentKey)
+  const queryKey = sessionCardQueryKeys.history(cardId)
   queryClient.setQueryData(queryKey, function update(data: unknown) {
     const current = data as SessionCardHistoryResponse | undefined
     if (!current) {
@@ -1550,10 +1539,7 @@ export function appendSessionCardHistoryMessage(
   options: { persistRecovery?: boolean } = {},
 ) {
   if (options.persistRecovery ?? true) {
-    appendCardTranscriptRecoveryMessage(
-      { cardId, canonicalSegmentKey },
-      message,
-    )
+    appendCardTranscriptRecoveryMessage({ cardId }, message)
   }
   updateSessionCardHistoryMessages(
     queryClient,
@@ -1596,45 +1582,27 @@ export function moveSessionCardHistoryMessages(
   ) {
     return false
   }
-  const fromRecoveryOwner = {
-    cardId,
-    canonicalSegmentKey: fromSegmentKey,
-  }
-  const toRecoveryOwner = { cardId, canonicalSegmentKey }
-  const sourceRecovery = readCardTranscriptRecovery(fromRecoveryOwner, {
-    storage: options.recoveryStorage,
-    now: options.now,
-  })
-  if (
-    sourceRecovery &&
-    !moveCardTranscriptRecovery(fromRecoveryOwner, toRecoveryOwner, {
+  // Recovery and browser cache ownership remain on the stable Card ID. The
+  // successor segment updates only transport metadata in the same cache row.
+  readCardTranscriptRecovery(
+    { cardId },
+    {
       storage: options.recoveryStorage,
       now: options.now,
-    })
-  ) {
-    return false
-  }
-  const fromKey = sessionCardQueryKeys.history(cardId, fromSegmentKey)
-  const toKey = sessionCardQueryKeys.history(cardId, canonicalSegmentKey)
-  const fromData = queryClient.getQueryData<SessionCardHistoryResponse>(fromKey)
+    },
+  )
+  const historyKey = sessionCardQueryKeys.history(cardId)
+  const fromData =
+    queryClient.getQueryData<SessionCardHistoryResponse>(historyKey)
   if (!fromData) return true
-  const toData = queryClient.getQueryData<SessionCardHistoryResponse>(toKey)
-  queryClient.setQueryData(toKey, {
+  queryClient.setQueryData(historyKey, {
     ...fromData,
-    ...toData,
     sessionKey: canonicalSegmentKey,
     cardId,
     canonicalSegmentKey,
-    messages: mergeCardHistoryMessages(
-      fromData.messages,
-      toData?.messages ?? [],
-    ),
-    persistedMessages: mergeCardHistoryMessages(
-      persistedCardHistoryMessages(fromData),
-      toData ? persistedCardHistoryMessages(toData) : [],
-    ),
+    messages: fromData.messages,
+    persistedMessages: persistedCardHistoryMessages(fromData),
   } satisfies SessionCardHistoryResponse)
-  queryClient.removeQueries({ queryKey: fromKey, exact: true })
   return true
 }
 
@@ -2192,11 +2160,8 @@ export function moveSessionCardHistoryToCard(
   ) {
     return
   }
-  const fromKey = sessionCardQueryKeys.history(
-    fromCardId,
-    fromCanonicalSegmentKey,
-  )
-  const toKey = sessionCardQueryKeys.history(toCardId, toCanonicalSegmentKey)
+  const fromKey = sessionCardQueryKeys.history(fromCardId)
+  const toKey = sessionCardQueryKeys.history(toCardId)
   const fromData = queryClient.getQueryData<SessionCardHistoryResponse>(fromKey)
   if (!fromData) return
   const toData = queryClient.getQueryData<SessionCardHistoryResponse>(toKey)
@@ -2246,10 +2211,7 @@ export function moveLegacyHistoryMessagesToSessionCard(
   if (transient.length === 0) return
 
   for (const message of transient) {
-    appendCardTranscriptRecoveryMessage(
-      { cardId, canonicalSegmentKey: sessionKey },
-      message,
-    )
+    appendCardTranscriptRecoveryMessage({ cardId }, message)
   }
   updateSessionCardHistoryMessages(
     queryClient,

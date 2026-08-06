@@ -11,7 +11,6 @@ import {
   clearCardTranscriptRecovery,
   clearCardTranscriptRecoveryMemory,
   mergeCardTranscriptRecoveryMessages,
-  moveCardTranscriptRecovery,
   parseCardTranscriptRecovery,
   readCardTranscriptRecovery,
   removeAcknowledgedCardTranscriptRecoveryMessages,
@@ -28,7 +27,6 @@ import type { ChatMessage } from './types'
 const now = 1_800_000_000_000
 const owner: CardTranscriptRecoveryOwner = {
   cardId: 'remote:card-a',
-  canonicalSegmentKey: 'remote:segment-a',
 }
 
 function message(
@@ -49,9 +47,8 @@ function envelope(
   fields: Partial<CardTranscriptRecoveryEnvelope> = {},
 ): CardTranscriptRecoveryEnvelope {
   return {
-    version: 1,
+    version: 2,
     cardId: owner.cardId,
-    canonicalSegmentKey: owner.canonicalSegmentKey,
     createdAt: now,
     messages,
     ...fields,
@@ -69,15 +66,12 @@ describe('Card transcript recovery storage contract', () => {
     vi.restoreAllMocks()
   })
 
-  it('uses one encoded Card-and-canonical-segment storage envelope', () => {
+  it('uses one encoded Card-only storage envelope', () => {
     expect(
       cardTranscriptRecoveryStorageKey({
         cardId: 'remote:card / one',
-        canonicalSegmentKey: 'remote:tip?next',
       }),
-    ).toBe(
-      'workspace.card-transcript-recovery.v1:remote%3Acard%20%2F%20one:remote%3Atip%3Fnext',
-    )
+    ).toBe('workspace.card-transcript-recovery.v2:remote%3Acard%20%2F%20one')
 
     const written = replaceCardTranscriptRecoveryMessages(
       owner,
@@ -85,7 +79,7 @@ describe('Card transcript recovery storage contract', () => {
       { now },
     )
     expect(written).toMatchObject({
-      version: 1,
+      version: 2,
       ...owner,
       createdAt: now,
     })
@@ -93,13 +87,8 @@ describe('Card transcript recovery storage contract', () => {
   })
 
   it.each([
-    ['raw Card ID', { cardId: 'card-a', canonicalSegmentKey: 'remote:tip' }],
-    ['raw segment ID', { cardId: 'remote:card-a', canonicalSegmentKey: 'tip' }],
-    [
-      'cross-source segment',
-      { cardId: 'remote:card-a', canonicalSegmentKey: 'local:tip' },
-    ],
-    ['blank segment', { cardId: 'remote:card-a', canonicalSegmentKey: ' ' }],
+    ['raw Card ID', { cardId: 'card-a' }],
+    ['blank Card ID', { cardId: ' ' }],
   ])('rejects %s ownership without writing', (_name, invalidOwner) => {
     expect(
       appendCardTranscriptRecoveryMessage(
@@ -115,12 +104,8 @@ describe('Card transcript recovery storage contract', () => {
     const key = cardTranscriptRecoveryStorageKey(owner)
     const rejected = [
       '{',
-      JSON.stringify({ ...envelope([]), version: 2 }),
+      JSON.stringify({ ...envelope([]), version: 1 }),
       JSON.stringify({ ...envelope([]), cardId: 'remote:other-card' }),
-      JSON.stringify({
-        ...envelope([]),
-        canonicalSegmentKey: 'remote:other-segment',
-      }),
       JSON.stringify({
         ...envelope([]),
         createdAt: now - CARD_TRANSCRIPT_RECOVERY_TTL_MS - 1,
@@ -133,6 +118,24 @@ describe('Card transcript recovery storage contract', () => {
       expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
       expect(window.sessionStorage.getItem(key)).toBeNull()
     }
+  })
+
+  it('clears and ignores legacy segment-keyed recovery records', () => {
+    const legacyKey =
+      'workspace.card-transcript-recovery.v1:remote%3Acard-a:remote%3Asegment-a'
+    window.sessionStorage.setItem(
+      legacyKey,
+      JSON.stringify({
+        version: 1,
+        cardId: owner.cardId,
+        canonicalSegmentKey: 'remote:segment-a',
+        createdAt: now,
+        messages: [message('user', 'legacy must not revive')],
+      }),
+    )
+
+    expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
+    expect(window.sessionStorage.getItem(legacyKey)).toBeNull()
   })
 
   it('bounds text size and message count while retaining the newest messages', () => {
@@ -282,8 +285,9 @@ describe('Card transcript recovery storage contract', () => {
     ).toBeNull()
 
     const staleServer: SessionCardHistoryResponse = {
-      sessionKey: owner.canonicalSegmentKey,
+      sessionKey: 'remote:segment-a',
       ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
       messages: [],
       completeness: 'complete',
       retryable: false,
@@ -336,74 +340,6 @@ describe('Card transcript recovery storage contract', () => {
     expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
       pending,
     ])
-  })
-
-  it('moves only between canonical segments of the exact same Card', () => {
-    const successor = {
-      cardId: owner.cardId,
-      canonicalSegmentKey: 'remote:segment-b',
-    }
-    const overlay = message('assistant', 'move me', { id: 'assistant-1' })
-    replaceCardTranscriptRecoveryMessages(owner, [overlay], { now })
-
-    expect(
-      moveCardTranscriptRecovery(
-        owner,
-        { ...successor, cardId: 'remote:other-card' },
-        { now },
-      ),
-    ).toBe(false)
-    expect(
-      moveCardTranscriptRecovery(
-        owner,
-        { ...successor, canonicalSegmentKey: 'local:segment-b' },
-        { now },
-      ),
-    ).toBe(false)
-    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
-      overlay,
-    ])
-
-    expect(moveCardTranscriptRecovery(owner, successor, { now })).toBe(true)
-    expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
-    expect(readCardTranscriptRecovery(successor, { now })?.messages).toEqual([
-      overlay,
-    ])
-  })
-
-  it('fails and rolls back the target when source removal fails', () => {
-    const successor = {
-      cardId: owner.cardId,
-      canonicalSegmentKey: 'remote:segment-b',
-    }
-    const records = new Map<string, string>()
-    const sourceKey = cardTranscriptRecoveryStorageKey(owner)
-    const targetKey = cardTranscriptRecoveryStorageKey(successor)
-    const storage: Storage = {
-      get length() {
-        return records.size
-      },
-      clear: () => records.clear(),
-      getItem: (key) => records.get(key) ?? null,
-      key: (index) => [...records.keys()][index] ?? null,
-      removeItem: (key) => {
-        if (key === sourceKey) throw new Error('source remove failed')
-        records.delete(key)
-      },
-      setItem: (key, value) => records.set(key, value),
-    }
-    const overlay = message('assistant', 'must stay at source', {
-      id: 'assistant-rollback',
-    })
-    replaceCardTranscriptRecoveryMessages(owner, [overlay], { storage, now })
-
-    expect(moveCardTranscriptRecovery(owner, successor, { storage, now })).toBe(
-      false,
-    )
-    expect(
-      readCardTranscriptRecovery(owner, { storage, now })?.messages,
-    ).toEqual([overlay])
-    expect(storage.getItem(targetKey)).toBeNull()
   })
 
   it('clears the exact owner and parse rejects a cross-Card envelope', () => {

@@ -56,12 +56,8 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     child?.sessionKey ?? target?.card.canonicalSegmentKey ?? ''
   const historyQueryKey =
     child && target
-      ? sessionCardQueryKeys.childHistory(
-          target.card.cardId,
-          child.cardId,
-          child.sessionKey,
-        )
-      : sessionCardQueryKeys.history(cardId, canonicalSegmentKey)
+      ? sessionCardQueryKeys.childHistory(target.card.cardId, child.cardId)
+      : sessionCardQueryKeys.history(cardId)
 
   const historyQuery = useQuery({
     queryKey: historyQueryKey,

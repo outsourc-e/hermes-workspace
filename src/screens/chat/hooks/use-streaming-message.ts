@@ -332,6 +332,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     typeof setTimeout
   > | null>(null)
   const activeSessionKeyRef = useRef<string>('main')
+  // Browser ownership is Card-only once an authoritative Card is known. Raw
+  // segment keys remain confined to the request and SSE transport boundary.
+  const activeCardIdRef = useRef<string | null>(null)
   // Stream-owned Card authority. Unlike the render-captured active Card, this
   // advances synchronously while a coalesced SSE batch is being processed.
   // That lets a bootstrap handoff establish Card ownership before a chained
@@ -363,8 +366,27 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const registerSendStreamRun = useChatStore((s) => s.registerSendStreamRun)
   const unregisterSendStreamRun = useChatStore((s) => s.unregisterSendStreamRun)
   const processStoreEvent = useChatStore((s) => s.processEvent)
+  const processCardEvent = useChatStore((s) => s.processCardEvent)
   const clearStreamingSession = useChatStore((s) => s.clearStreamingSession)
-  const handoffSession = useChatStore((s) => s.handoffSession)
+  const clearCardStreaming = useChatStore((s) => s.clearCardStreaming)
+  const claimSessionStateForCard = useChatStore(
+    (s) => s.claimSessionStateForCard,
+  )
+
+  const processBrowserEvent = useCallback(
+    (event: Parameters<typeof processStoreEvent>[0]) => {
+      const cardId = activeCardIdRef.current
+      if (cardId) processCardEvent(cardId, event)
+      else processStoreEvent(event)
+    },
+    [processCardEvent, processStoreEvent],
+  )
+
+  const clearBrowserStreaming = useCallback(() => {
+    const cardId = activeCardIdRef.current
+    if (cardId) clearCardStreaming(cardId)
+    else clearStreamingSession(activeSessionKeyRef.current)
+  }, [clearCardStreaming, clearStreamingSession])
 
   const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = acceptedTimeoutMs ?? 120_000
   const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = handoffTimeoutMs ?? 300_000
@@ -400,7 +422,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         clearTimeout(delayedUnregisterTimerRef.current)
         delayedUnregisterTimerRef.current = null
       }
-      clearStreamingSession(activeSessionKeyRef.current)
+      clearBrowserStreaming()
+      activeCardIdRef.current = null
       activeStreamCardRef.current = null
       awaitingProjectedSegmentRef.current = null
       if (nextSessionKey) {
@@ -421,7 +444,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         error: null,
       })
     },
-    [clearHandoffTimer, clearSendStreamRun, clearStreamingSession, stopFrame],
+    [clearBrowserStreaming, clearHandoffTimer, clearSendStreamRun, stopFrame],
   )
 
   const markActivity = useCallback(() => {
@@ -451,7 +474,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       lifecyclePhaseRef.current = 'error'
       clearHandoffTimer()
       clearSendStreamRun()
-      clearStreamingSession(activeSessionKeyRef.current)
+      clearBrowserStreaming()
       setState((prev) => ({
         ...prev,
         isStreaming: false,
@@ -461,9 +484,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       useChatStore.getState().setHeartbeatActivity(null)
     },
     [
+      clearBrowserStreaming,
       clearHandoffTimer,
       clearSendStreamRun,
-      clearStreamingSession,
       onError,
       stopFrame,
     ],
@@ -487,7 +510,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         if (reason === 'handoff') {
           const store = useChatStore.getState()
           const streamingState =
-            store.streamingState.get(activeSessionKeyRef.current) ?? null
+            store.streamingState.get(
+              activeCardIdRef.current ?? activeSessionKeyRef.current,
+            ) ?? null
           const lastEventTimestamp = store.lastEventAt
           if (
             streamingState !== null ||
@@ -678,16 +703,17 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         return
       }
 
-      handoffSession(fromSessionKey, resolvedSessionKey)
-      activeSessionKeyRef.current = resolvedSessionKey
-      if (
+      const hasVerifiedCardAuthority =
         SESSION_BOOTSTRAP_KEYS.has(fromSessionKey) &&
         verifiedCardAuthority &&
         verifiedCardAuthority.cardId === resolvedFriendlyId &&
         verifiedCardAuthority.canonicalSegmentKey === resolvedSessionKey
-      ) {
+      if (hasVerifiedCardAuthority) {
+        claimSessionStateForCard(fromSessionKey, verifiedCardAuthority.cardId)
+        activeCardIdRef.current = verifiedCardAuthority.cardId
         activeStreamCardRef.current = verifiedCardAuthority
       }
+      activeSessionKeyRef.current = resolvedSessionKey
       onSessionResolved?.({
         fromSessionKey,
         sessionKey: resolvedSessionKey,
@@ -697,7 +723,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           : 'stream-handoff',
       })
     },
-    [handoffSession, onSessionResolved, pinMainSession],
+    [claimSessionStateForCard, onSessionResolved, pinMainSession],
   )
 
   const processEvent = useCallback(
@@ -746,7 +772,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             time: new Date().toLocaleTimeString(),
             text: 'Assistant started',
           })
-          processStoreEvent({
+          processBrowserEvent({
             type: 'chunk',
             text: '',
             runId: runId ?? undefined,
@@ -807,8 +833,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           if (onCardHandoff?.(handoff, targetCardAuthority) !== true) break
           activeRunIdRef.current = handoff.runId
           registerSendStreamRun(handoff.runId)
-          handoffSession(handoff.fromSegmentKey, handoff.canonicalSegmentKey)
+          // Same-Card continuation: only the ephemeral transport segment moves.
+          // Browser live state remains under the single stable Card owner.
           activeSessionKeyRef.current = handoff.canonicalSegmentKey
+          activeCardIdRef.current = handoff.cardId
           activeStreamCardRef.current = targetCardAuthority
           awaitingProjectedSegmentRef.current = handoff.canonicalSegmentKey
           onSessionResolved?.({
@@ -839,7 +867,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const text = (payload as { text?: string }).text ?? ''
           if (text) {
             markActivity()
-            processStoreEvent({
+            processBrowserEvent({
               type: 'chunk',
               text,
               runId: activeRunIdRef.current ?? undefined,
@@ -862,7 +890,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
               ? newText
               : fullTextRef.current + newText
             pushTargetText(accumulated)
-            processStoreEvent({
+            processBrowserEvent({
               type: 'chunk',
               text: accumulated,
               fullReplace: true,
@@ -888,7 +916,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           if (thinking) {
             markActivity()
             thinkingRef.current = thinking
-            processStoreEvent({
+            processBrowserEvent({
               type: 'thinking',
               text: thinking,
               runId: activeRunIdRef.current ?? undefined,
@@ -928,7 +956,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
               text: `${toolName} (${phase})`,
             })
           }
-          processStoreEvent({
+          processBrowserEvent({
             type: 'tool',
             phase:
               typeof payload.phase === 'string' ? payload.phase : 'calling',
@@ -968,7 +996,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             time: new Date().toLocaleTimeString(),
             text: path ? `${title} — ${path}` : title,
           })
-          processStoreEvent({
+          processBrowserEvent({
             type: 'tool',
             phase: 'complete',
             name: `artifact:${kind}`,
@@ -1030,7 +1058,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             time: new Date().toLocaleTimeString(),
             text: doneState === 'error' ? `Error: ${errorMessage}` : 'Complete',
           })
-          processStoreEvent({
+          processBrowserEvent({
             type: 'done',
             state: doneState ?? 'final',
             errorMessage,
@@ -1104,14 +1132,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       activeCard,
       applySessionHandoff,
       finishStream,
-      handoffSession,
       markFailed,
       onCardHandoff,
       onStarted,
       onThinking,
       onTool,
       markActivity,
-      processStoreEvent,
+      processBrowserEvent,
       pushTargetText,
       registerSendStreamRun,
       sessionCards,
@@ -1142,7 +1169,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         // Preserve in-progress response as a partial message before aborting
         // so it doesn't vanish from the UI when the user interrupts
         if (fullTextRef.current && !finishedRef.current) {
-          processStoreEvent({
+          processBrowserEvent({
             type: 'done',
             state: 'interrupted',
             sessionKey: activeSessionKeyRef.current,
@@ -1171,6 +1198,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       eventSourceRef.current = abortController
       finishedRef.current = false
       resetActiveStreamState(params.sessionKey)
+      activeCardIdRef.current = params.cardId ?? null
       const selectedCard = activeCard
       activeStreamCardRef.current =
         selectedCard &&
@@ -1356,6 +1384,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       onAbort,
       onMessageAccepted,
       onReaderOpened,
+      processBrowserEvent,
       resetActiveStreamState,
       schedulePostAcceptanceTimeout,
     ],

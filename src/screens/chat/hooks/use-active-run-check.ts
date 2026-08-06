@@ -108,7 +108,9 @@ export function useActiveRunCheck({
       // after this check was dispatched.
       if (shouldApplyResultRef.current?.(sessionKey) === false) return
       const store = useChatStore.getState()
-      if (store.isSessionWaiting(sessionKey)) {
+      if (cardId) {
+        if (store.isCardWaiting(cardId)) store.clearCardWaiting(cardId)
+      } else if (store.isSessionWaiting(sessionKey)) {
         store.clearSessionWaiting(sessionKey)
       }
     }, ACTIVE_RUN_CHECK_TIMEOUT_MS)
@@ -126,8 +128,11 @@ export function useActiveRunCheck({
 
         const store = useChatStore.getState()
         if (data.run && ACTIVE_STATUSES.has(data.run.status)) {
-          store.setSessionWaiting(sessionKey, data.run.runId)
-        } else if (store.isSessionWaiting(sessionKey)) {
+          if (cardId) store.setCardWaiting(cardId, data.run.runId)
+          else store.setSessionWaiting(sessionKey, data.run.runId)
+        } else if (cardId && store.isCardWaiting(cardId)) {
+          store.clearCardWaiting(cardId)
+        } else if (!cardId && store.isSessionWaiting(sessionKey)) {
           // Server says run is done but we still have stale waiting state
           store.clearSessionWaiting(sessionKey)
         }

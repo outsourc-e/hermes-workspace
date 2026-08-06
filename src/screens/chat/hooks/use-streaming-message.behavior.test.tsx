@@ -117,6 +117,9 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
     useChatStore.getState().clearSession('canonical-child')
     useChatStore.getState().clearSession('remote:created-segment')
     useChatStore.getState().clearSession('remote:continuation-segment')
+    useChatStore.getState().clearCard('remote:card')
+    useChatStore.getState().clearCard('remote:parent-card')
+    useChatStore.getState().clearCard('remote:created-card')
   })
 
   afterEach(() => {
@@ -269,13 +272,13 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       })
 
       const store = useChatStore.getState()
-      store.processEvent({
+      store.processCardEvent(cardId, {
         type: 'message',
         message: userMessage('live-1', 'live message'),
         sessionKey: fromSessionKey,
         transport: 'send-stream',
       })
-      store.setSessionWaiting(fromSessionKey, 'run-1')
+      store.setCardWaiting(cardId, 'run-1')
 
       const encoder = new TextEncoder()
       const reader = {
@@ -385,13 +388,17 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       ).toEqual([])
       expect(
         useChatStore.getState().getRealtimeMessages('canonical-child'),
+      ).toEqual([])
+      expect(
+        useChatStore.getState().getCardRealtimeMessages(cardId),
       ).toMatchObject([userMessage('live-1', 'live message')])
       expect(useChatStore.getState().isSessionWaiting(fromSessionKey)).toBe(
         false,
       )
       expect(useChatStore.getState().isSessionWaiting('canonical-child')).toBe(
-        true,
+        false,
       )
+      expect(useChatStore.getState().isCardWaiting(cardId)).toBe(true)
       expect(navigate).toHaveBeenCalledWith({
         to: '/chat/$sessionKey',
         params: { sessionKey: targetFriendlyId },
@@ -619,9 +626,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       expect.anything(),
     )
     expect(
-      useChatStore
-        .getState()
-        .getRealtimeMessages('remote:continuation-segment'),
+      useChatStore.getState().getCardRealtimeMessages('remote:created-card'),
     ).toMatchObject([
       {
         role: 'assistant',
@@ -864,7 +869,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
         text: () => Promise.resolve(''),
       } as unknown as Response)
 
-      useChatStore.getState().clearSession('remote:parent-segment')
+      useChatStore.getState().clearCard(activeCard.cardId)
       useChatStore.getState().clearSession(payload.canonicalSegmentKey)
       const onCardHandoff = vi.fn(() => true)
       let controller: StreamingController | null = null
@@ -898,7 +903,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
 
       expect(onCardHandoff).not.toHaveBeenCalled()
       expect(
-        useChatStore.getState().getRealtimeMessages('remote:parent-segment'),
+        useChatStore.getState().getCardRealtimeMessages(activeCard.cardId),
       ).toMatchObject([
         {
           role: 'assistant',

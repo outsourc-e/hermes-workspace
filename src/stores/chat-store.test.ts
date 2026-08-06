@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+// @vitest-environment jsdom
+
+import { beforeEach, describe, expect, it } from 'vitest'
 import { useChatStore } from './chat-store'
 import type { ChatMessage } from '../screens/chat/types'
 
@@ -16,6 +18,76 @@ function textMessage(
     content: [{ type: 'text', text }],
   }
 }
+
+beforeEach(() => {
+  window.sessionStorage.clear()
+  useChatStore.getState().clearCard('remote:card-owner')
+})
+
+describe('chat-store Card ownership', () => {
+  it('keeps live, streaming, and waiting state under one Card owner', () => {
+    const store = useChatStore.getState()
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'response',
+      runId: 'run-card',
+      sessionKey: 'remote:raw-segment',
+      transport: 'send-stream',
+    })
+    store.processCardEvent('remote:card-owner', {
+      type: 'message',
+      message: textMessage('assistant-card', 'assistant', 'response', 1),
+      runId: 'run-card',
+      sessionKey: 'remote:successor-segment',
+      transport: 'send-stream',
+    })
+    store.setCardWaiting('remote:card-owner', 'run-card')
+
+    const next = useChatStore.getState()
+    expect([...next.realtimeMessages.keys()]).toEqual(['remote:card-owner'])
+    expect([...next.streamingState.keys()]).toEqual(['remote:card-owner'])
+    expect([...next.waitingSessionKeys]).toEqual(['remote:card-owner'])
+    const stored = Array.from(
+      { length: window.sessionStorage.length },
+      (_, index) => {
+        const key = window.sessionStorage.key(index)
+        return [key, key ? window.sessionStorage.getItem(key) : null]
+      },
+    )
+    expect(stored).toContainEqual([
+      'workspace.chat-card-waiting.v1:remote%3Acard-owner',
+      expect.stringContaining('remote:card-owner'),
+    ])
+    expect(JSON.stringify(stored)).not.toContain('raw-segment')
+    expect(JSON.stringify(stored)).not.toContain('successor-segment')
+  })
+
+  it('drops legacy raw waiting and streaming storage without restoring it', () => {
+    window.sessionStorage.setItem(
+      'claude_waiting_remote:raw-segment',
+      JSON.stringify({ since: Date.now(), runId: 'legacy-run' }),
+    )
+    window.sessionStorage.setItem(
+      'claude_streaming_remote:raw-segment',
+      JSON.stringify({ text: 'legacy response', _savedAt: Date.now() }),
+    )
+
+    useChatStore.getState().setCardWaiting('remote:card-owner', 'new-run')
+
+    expect(
+      window.sessionStorage.getItem('claude_waiting_remote:raw-segment'),
+    ).toBeNull()
+    expect(
+      window.sessionStorage.getItem('claude_streaming_remote:raw-segment'),
+    ).toBeNull()
+    expect(useChatStore.getState().isCardWaiting('remote:raw-segment')).toBe(
+      false,
+    )
+    expect(
+      useChatStore.getState().getCardStreamingState('remote:raw-segment'),
+    ).toBeNull()
+  })
+})
 
 describe('chat-store history merge ordering', () => {
   it('preserves persisted history order when messages share a timestamp', () => {

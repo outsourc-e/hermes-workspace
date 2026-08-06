@@ -196,15 +196,8 @@ export function useSwarmChat({
     [listQuery.data, activityCardId],
   )
   const historyQueryKey = target?.parentCardId
-    ? sessionCardQueryKeys.childHistory(
-        target.parentCardId,
-        target.cardId,
-        target.canonicalSegmentKey,
-      )
-    : sessionCardQueryKeys.history(
-        target?.cardId ?? '',
-        target?.canonicalSegmentKey ?? '',
-      )
+    ? sessionCardQueryKeys.childHistory(target.parentCardId, target.cardId)
+    : sessionCardQueryKeys.history(target?.cardId ?? '')
   const historyQuery = useQuery({
     queryKey: historyQueryKey,
     queryFn: ({ signal }) => {

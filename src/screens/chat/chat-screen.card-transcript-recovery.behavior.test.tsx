@@ -12,7 +12,11 @@ import { fireEvent, screen, waitFor } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useChatStore } from '../../stores/chat-store'
-import { clearCardTranscriptRecoveryMemory } from './card-transcript-recovery'
+import {
+  CARD_TRANSCRIPT_RECOVERY_VERSION,
+  cardTranscriptRecoveryStorageKey,
+  clearCardTranscriptRecoveryMemory,
+} from './card-transcript-recovery'
 import { ChatScreen } from './chat-screen'
 import {
   appendSessionCardHistoryMessage,
@@ -168,20 +172,10 @@ type CardHistoryWire = {
 }
 
 type CardTranscriptRecoveryWire = {
-  version: 1
+  version: typeof CARD_TRANSCRIPT_RECOVERY_VERSION
   cardId: string
-  canonicalSegmentKey: string
   createdAt: number
   messages: Array<ChatMessage>
-}
-
-const CARD_TRANSCRIPT_RECOVERY_PREFIX = 'workspace.card-transcript-recovery.v1'
-
-function cardTranscriptRecoveryKey(
-  cardId: string,
-  canonicalSegmentKey: string,
-) {
-  return `${CARD_TRANSCRIPT_RECOVERY_PREFIX}:${encodeURIComponent(cardId)}:${encodeURIComponent(canonicalSegmentKey)}`
 }
 
 function seedCardTranscriptRecovery(
@@ -189,14 +183,13 @@ function seedCardTranscriptRecovery(
   messages: Array<ChatMessage>,
 ) {
   const wire: CardTranscriptRecoveryWire = {
-    version: 1,
+    version: CARD_TRANSCRIPT_RECOVERY_VERSION,
     cardId: card.cardId,
-    canonicalSegmentKey: card.canonicalSegmentKey,
     createdAt: Date.now(),
     messages,
   }
   window.sessionStorage.setItem(
-    cardTranscriptRecoveryKey(card.cardId, card.canonicalSegmentKey),
+    cardTranscriptRecoveryStorageKey({ cardId: card.cardId }),
     JSON.stringify(wire),
   )
 }
@@ -510,6 +503,8 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     ]) {
       useChatStore.getState().clearSession(key)
     }
+    useChatStore.getState().clearCard(parentCard.cardId)
+    useChatStore.getState().clearCard(childAsSessionCard.cardId)
   })
 
   afterEach(async () => {
@@ -690,21 +685,15 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: Infinity } },
     })
-    queryClient.setQueryData(
-      sessionCardQueryKeys.history(
-        parentCard.cardId,
-        parentCard.canonicalSegmentKey,
-      ),
-      {
-        sessionKey: parentCard.canonicalSegmentKey,
-        cardId: parentCard.cardId,
-        canonicalSegmentKey: parentCard.canonicalSegmentKey,
-        messages: [],
-        completeness: 'complete',
-        retryable: false,
-        missingSegments: [],
-      },
-    )
+    queryClient.setQueryData(sessionCardQueryKeys.history(parentCard.cardId), {
+      sessionKey: parentCard.canonicalSegmentKey,
+      cardId: parentCard.cardId,
+      canonicalSegmentKey: parentCard.canonicalSegmentKey,
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
     appendSessionCardHistoryMessage(
       queryClient,
       parentCard.cardId,
@@ -722,10 +711,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     )
     await React.act(async () => {
       await queryClient.refetchQueries({
-        queryKey: sessionCardQueryKeys.history(
-          parentCard.cardId,
-          parentCard.canonicalSegmentKey,
-        ),
+        queryKey: sessionCardQueryKeys.history(parentCard.cardId),
         exact: true,
       })
     })
@@ -737,7 +723,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
   it('preserves terminal assistant text while complete Card history still lags', async () => {
     const requests = mockHttp()
     const store = useChatStore.getState()
-    store.processEvent({
+    store.processCardEvent(parentCard.cardId, {
       type: 'chunk',
       text: 'terminal answer survives lag',
       fullReplace: true,
@@ -745,7 +731,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       sessionKey: parentCard.canonicalSegmentKey,
       transport: 'send-stream',
     })
-    store.processEvent({
+    store.processCardEvent(parentCard.cardId, {
       type: 'done',
       state: 'complete',
       runId: 'run-terminal',
@@ -760,10 +746,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     )
     await React.act(async () => {
       await mountedScreen.queryClient.refetchQueries({
-        queryKey: sessionCardQueryKeys.history(
-          parentCard.cardId,
-          parentCard.canonicalSegmentKey,
-        ),
+        queryKey: sessionCardQueryKeys.history(parentCard.cardId),
         exact: true,
       })
     })
@@ -838,22 +821,12 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       [parentCard],
     )
 
-    expect(
-      window.sessionStorage.getItem(
-        cardTranscriptRecoveryKey(
-          parentCard.cardId,
-          parentCard.canonicalSegmentKey,
-        ),
-      ),
-    ).toBeNull()
-    expect(
-      window.sessionStorage.getItem(
-        cardTranscriptRecoveryKey(
-          successorCard.cardId,
-          successorCard.canonicalSegmentKey,
-        ),
-      ),
-    ).not.toBeNull()
+    const recoveryStorageKey = cardTranscriptRecoveryStorageKey({
+      cardId: parentCard.cardId,
+    })
+    expect(window.sessionStorage.getItem(recoveryStorageKey)).not.toBeNull()
+    expect(recoveryStorageKey).not.toContain(parentCard.canonicalSegmentKey)
+    expect(recoveryStorageKey).not.toContain(successorCard.canonicalSegmentKey)
 
     const mountedScreen = await mountChatScreen(
       defaultInput(successorCard),

@@ -1,7 +1,9 @@
 import type { ChatMessage } from './types'
 
-export const CARD_TRANSCRIPT_RECOVERY_VERSION = 1 as const
+export const CARD_TRANSCRIPT_RECOVERY_VERSION = 2 as const
 export const CARD_TRANSCRIPT_RECOVERY_PREFIX =
+  'workspace.card-transcript-recovery.v2'
+const LEGACY_CARD_TRANSCRIPT_RECOVERY_PREFIX =
   'workspace.card-transcript-recovery.v1'
 export const CARD_TRANSCRIPT_RECOVERY_TTL_MS = 10 * 60 * 1000
 export const CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES = 50
@@ -14,13 +16,11 @@ const CARD_TRANSCRIPT_RECOVERY_MAX_MEMORY_OWNERS = 32
 
 export type CardTranscriptRecoveryOwner = {
   cardId: string
-  canonicalSegmentKey: string
 }
 
 export type CardTranscriptRecoveryEnvelope = {
   version: typeof CARD_TRANSCRIPT_RECOVERY_VERSION
   cardId: string
-  canonicalSegmentKey: string
   createdAt: number
   messages: Array<ChatMessage>
 }
@@ -30,7 +30,7 @@ type RecoveryOptions = {
   now?: number
 }
 
-// Card/segment-owned fail-closed overlay for storage-denied writes. Existing
+// Card-owned fail-closed overlay for storage-denied writes. Existing
 // failed owners are never evicted; new owners fail closed at the hard bound.
 const memoryRecovery = new Map<string, CardTranscriptRecoveryEnvelope>()
 
@@ -40,7 +40,7 @@ export function clearCardTranscriptRecoveryMemory(): void {
 }
 
 function memoryRecoveryKey(owner: CardTranscriptRecoveryOwner): string {
-  return `${owner.cardId}\u0000${owner.canonicalSegmentKey}`
+  return owner.cardId
 }
 
 function rememberMemoryRecovery(
@@ -95,15 +95,26 @@ function sourceQualifiedIdentity(
 export function isValidCardTranscriptRecoveryOwner(
   owner: CardTranscriptRecoveryOwner,
 ): boolean {
-  const card = sourceQualifiedIdentity(owner.cardId)
-  const segment = sourceQualifiedIdentity(owner.canonicalSegmentKey)
-  return Boolean(card && segment && card.source === segment.source)
+  return sourceQualifiedIdentity(owner.cardId) !== null
 }
 
 export function cardTranscriptRecoveryStorageKey(
   owner: CardTranscriptRecoveryOwner,
 ): string {
-  return `${CARD_TRANSCRIPT_RECOVERY_PREFIX}:${encodeURIComponent(owner.cardId)}:${encodeURIComponent(owner.canonicalSegmentKey)}`
+  return `${CARD_TRANSCRIPT_RECOVERY_PREFIX}:${encodeURIComponent(owner.cardId)}`
+}
+
+function clearLegacyRecovery(storage: Storage): void {
+  try {
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index)
+      if (key?.startsWith(`${LEGACY_CARD_TRANSCRIPT_RECOVERY_PREFIX}:`)) {
+        storage.removeItem(key)
+      }
+    }
+  } catch {
+    // Legacy cleanup is best effort when browser storage is unavailable.
+  }
 }
 
 function resolveStorage(storage: Storage | undefined): Storage | null {
@@ -333,10 +344,7 @@ export function parseCardTranscriptRecovery(
     return null
   }
   if (value.version !== CARD_TRANSCRIPT_RECOVERY_VERSION) return null
-  if (
-    value.cardId !== expectedOwner.cardId ||
-    value.canonicalSegmentKey !== expectedOwner.canonicalSegmentKey
-  ) {
+  if (value.cardId !== expectedOwner.cardId) {
     return null
   }
   if (!isValidCardTranscriptRecoveryOwner(expectedOwner)) return null
@@ -360,7 +368,6 @@ export function parseCardTranscriptRecovery(
   const envelope: CardTranscriptRecoveryEnvelope = {
     version: CARD_TRANSCRIPT_RECOVERY_VERSION,
     cardId: expectedOwner.cardId,
-    canonicalSegmentKey: expectedOwner.canonicalSegmentKey,
     createdAt: value.createdAt,
     messages: dedupeMessages(value.messages),
   }
@@ -386,6 +393,7 @@ export function readCardTranscriptRecovery(
   const memory = readMemoryRecovery(owner, now)
   const storage = resolveStorage(options.storage)
   if (!storage) return memory
+  clearLegacyRecovery(storage)
   const key = cardTranscriptRecoveryStorageKey(owner)
   let raw: string | null
   try {
@@ -424,6 +432,7 @@ export function clearCardTranscriptRecovery(
   memoryRecovery.delete(memoryRecoveryKey(owner))
   const storage = resolveStorage(options.storage)
   if (!storage) return
+  clearLegacyRecovery(storage)
   try {
     storage.removeItem(cardTranscriptRecoveryStorageKey(owner))
   } catch {
@@ -446,7 +455,6 @@ export function replaceCardTranscriptRecoveryMessages(
   const envelope: CardTranscriptRecoveryEnvelope = {
     version: CARD_TRANSCRIPT_RECOVERY_VERSION,
     cardId: owner.cardId,
-    canonicalSegmentKey: owner.canonicalSegmentKey,
     createdAt: options.now ?? Date.now(),
     messages: deduped,
   }
@@ -455,6 +463,7 @@ export function replaceCardTranscriptRecoveryMessages(
     rememberMemoryRecovery(owner, envelope)
     return null
   }
+  clearLegacyRecovery(storage)
   let serialized: string
   try {
     serialized = JSON.stringify(envelope)
@@ -522,69 +531,4 @@ export function removeAcknowledgedCardTranscriptRecoveryMessages(
   )
   if (remaining.length === recovery.messages.length) return recovery
   return replaceCardTranscriptRecoveryMessages(owner, remaining, options)
-}
-
-export function moveCardTranscriptRecovery(
-  fromOwner: CardTranscriptRecoveryOwner,
-  toOwner: CardTranscriptRecoveryOwner,
-  options: RecoveryOptions = {},
-): boolean {
-  if (
-    !isValidCardTranscriptRecoveryOwner(fromOwner) ||
-    !isValidCardTranscriptRecoveryOwner(toOwner) ||
-    fromOwner.cardId !== toOwner.cardId ||
-    fromOwner.canonicalSegmentKey === toOwner.canonicalSegmentKey
-  ) {
-    return false
-  }
-  const storage = resolveStorage(options.storage)
-  if (!storage) return false
-  const sourceKey = cardTranscriptRecoveryStorageKey(fromOwner)
-  let previousSourceRaw: string | null
-  try {
-    previousSourceRaw = storage.getItem(sourceKey)
-  } catch {
-    return false
-  }
-  if (previousSourceRaw === null) return false
-  const from = readCardTranscriptRecovery(fromOwner, { ...options, storage })
-  if (!from) return false
-  const to = readCardTranscriptRecovery(toOwner, { ...options, storage })
-  const targetKey = cardTranscriptRecoveryStorageKey(toOwner)
-  let previousTargetRaw: string | null
-  try {
-    previousTargetRaw = storage.getItem(targetKey)
-  } catch {
-    return false
-  }
-  const moved = replaceCardTranscriptRecoveryMessages(
-    toOwner,
-    [...from.messages, ...(to?.messages ?? [])],
-    { ...options, storage },
-  )
-  if (!moved) return false
-
-  try {
-    storage.removeItem(sourceKey)
-    if (storage.getItem(sourceKey) === null) return true
-  } catch {
-    // Restore the source and roll back the target below. This also covers a
-    // storage implementation that removed the source but failed while the
-    // removal was being verified.
-  }
-  try {
-    storage.setItem(sourceKey, previousSourceRaw)
-  } catch {
-    // Best effort; the caller still fails closed.
-  }
-
-  // Best effort rollback. Returning false prevents cache and live-stream state
-  // from advancing even if storage becomes unavailable during compensation.
-  try {
-    if (previousTargetRaw === null) storage.removeItem(targetKey)
-    else storage.setItem(targetKey, previousTargetRaw)
-  } catch {
-    // The caller still fails closed and must not advance Card ownership.
-  }
-  return false
 }

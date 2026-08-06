@@ -682,11 +682,13 @@ export function ChatScreen({
   const [localReaderOwnershipVersion, setLocalReaderOwnershipVersion] =
     useState(0)
   const isLocalLiveStreamOwner = useCallback(
-    (sessionKey: string | undefined) =>
+    (browserOwnerKey: string | undefined) =>
       Boolean(
-        sessionKey &&
-        activeSendRef.current !== null &&
-        liveStreamSessionKeyRef.current === sessionKey,
+        browserOwnerKey &&
+        activeSendRef.current &&
+        liveStreamSessionKeyRef.current &&
+        (activeSendRef.current.cardId ?? activeSendRef.current.sessionKey) ===
+          browserOwnerKey,
       ),
     [],
   )
@@ -797,7 +799,6 @@ export function ChatScreen({
 
   const cardHistoryQueryKey = sessionCardQueryKeys.history(
     activeCard?.cardId ?? '',
-    activeCardCanonicalSegmentKey ?? '',
   )
   const cardHistoryQuery = useQuery({
     queryKey: cardHistoryQueryKey,
@@ -829,7 +830,6 @@ export function ChatScreen({
   const inspectedChildHistoryQueryKey = sessionCardQueryKeys.childHistory(
     activeCard?.cardId ?? '',
     inspectedChildCard?.cardId ?? '',
-    inspectedChildCard?.sessionKey ?? '',
   )
   const inspectedChildHistoryQuery = useQuery({
     queryKey: inspectedChildHistoryQueryKey,
@@ -895,33 +895,37 @@ export function ChatScreen({
   // this mounted local reader. That narrow exception preserves live handoff
   // status without resurfacing stale realtime state after a remount.
   const canShowLiveActivity =
-    displayedCardHistoryReady || isLocalLiveStreamOwner(resolvedSessionKey)
+    displayedCardHistoryReady || isLocalLiveStreamOwner(activeCard.cardId)
 
   // --- Waiting state management (Issue #43 + #449) ---
   // resolvedSessionKey is now available (defined above from useChatHistory).
   const storeWaiting = useChatStore((s) => s.waitingSessionKeys)
   const sessionKeyForWaiting = useRef<string | undefined>(undefined)
+  const cardIdForWaiting = useRef<string | undefined>(undefined)
   const pendingVerifySessionKeyRef = useRef<string | undefined>(undefined)
   const activeRunCheckDoneForSessionRef = useRef<string | undefined>(undefined)
 
   // A `new` route can momentarily resolve legacy history to `main` before its
   // optimistic cache is present. Waiting is owned by the send target, so never
   // let that fallback move a live new-chat wait state onto `main`.
-  sessionKeyForWaiting.current = isNewChat ? 'new' : resolvedSessionKey
+  cardIdForWaiting.current = activeCard?.cardId
+  sessionKeyForWaiting.current = isNewChat
+    ? 'new'
+    : (activeCard?.cardId ?? resolvedSessionKey)
 
   // Synchronously detect stale waiting state from sessionStorage.
   // This runs during render (not in an effect) so the guard in
   // waitingForResponse is active on the very first render, preventing
   // a flash of the "Thinking" indicator when reopening an old session.
   const needsStaleCheck =
-    resolvedSessionKey &&
+    sessionKeyForWaiting.current &&
     !isNewChat &&
-    storeWaiting.has(resolvedSessionKey) &&
-    !isLocalLiveStreamOwner(resolvedSessionKey) &&
-    pendingVerifySessionKeyRef.current !== resolvedSessionKey
+    storeWaiting.has(sessionKeyForWaiting.current) &&
+    !isLocalLiveStreamOwner(sessionKeyForWaiting.current) &&
+    pendingVerifySessionKeyRef.current !== sessionKeyForWaiting.current
 
   if (needsStaleCheck) {
-    pendingVerifySessionKeyRef.current = resolvedSessionKey
+    pendingVerifySessionKeyRef.current = sessionKeyForWaiting.current
     activeRunCheckDoneForSessionRef.current = undefined
   }
 
@@ -957,35 +961,42 @@ export function ChatScreen({
     const store = useChatStore.getState()
     const key = sessionKeyForWaiting.current
     if (!key) return
+    const cardId = cardIdForWaiting.current
     if (waiting) {
-      store.setSessionWaiting(key)
+      if (cardId) store.setCardWaiting(cardId)
+      else store.setSessionWaiting(key)
     } else {
-      store.clearSessionWaiting(key)
+      if (cardId) store.clearCardWaiting(cardId)
+      else store.clearSessionWaiting(key)
     }
   }, [])
   // verification before showing thinking (Issue #449).
   useEffect(() => {
     const currentSessionKey = resolvedSessionKey
-    if (!currentSessionKey || isNewChat) return
+    const browserOwnerKey = activeCard?.cardId ?? currentSessionKey
+    if (!currentSessionKey || !browserOwnerKey || isNewChat) return
     const store = useChatStore.getState()
-    if (store.isSessionWaiting(currentSessionKey)) {
-      if (isLocalLiveStreamOwner(currentSessionKey)) {
+    const isWaiting = activeCard
+      ? store.isCardWaiting(activeCard.cardId)
+      : store.isSessionWaiting(currentSessionKey)
+    if (isWaiting) {
+      if (isLocalLiveStreamOwner(browserOwnerKey)) {
         // This wait belongs to an open local reader, not recovered storage.
         pendingVerifySessionKeyRef.current = undefined
-        activeRunCheckDoneForSessionRef.current = currentSessionKey
+        activeRunCheckDoneForSessionRef.current = browserOwnerKey
         setActiveRunCheckDone(true)
         return
       }
-      pendingVerifySessionKeyRef.current = currentSessionKey
+      pendingVerifySessionKeyRef.current = browserOwnerKey
       activeRunCheckDoneForSessionRef.current = undefined
       setActiveRunCheckDone(false)
     } else {
       // No restored waiting state — no need to verify
       pendingVerifySessionKeyRef.current = undefined
-      activeRunCheckDoneForSessionRef.current = currentSessionKey
+      activeRunCheckDoneForSessionRef.current = browserOwnerKey
       setActiveRunCheckDone(true)
     }
-  }, [resolvedSessionKey, isNewChat])
+  }, [activeCard, isLocalLiveStreamOwner, resolvedSessionKey, isNewChat])
 
   // On remount, check if the server still has an active run for this session.
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
@@ -996,16 +1007,21 @@ export function ChatScreen({
       cardTransportReady &&
       !isNewChat &&
       Boolean(resolvedSessionKey) &&
-      !isLocalLiveStreamOwner(resolvedSessionKey) &&
+      !isLocalLiveStreamOwner(activeCard?.cardId ?? resolvedSessionKey) &&
       historyQuery.isSuccess,
     shouldApplyResult: useCallback(
-      (sessionKey: string) => !isLocalLiveStreamOwner(sessionKey),
-      [isLocalLiveStreamOwner],
+      (sessionKey: string) =>
+        !isLocalLiveStreamOwner(activeCard?.cardId ?? sessionKey),
+      [activeCard?.cardId, isLocalLiveStreamOwner],
     ),
-    onCheckComplete: useCallback((sessionKey: string) => {
-      activeRunCheckDoneForSessionRef.current = sessionKey
-      setActiveRunCheckDone(true)
-    }, []),
+    onCheckComplete: useCallback(
+      (sessionKey: string) => {
+        activeRunCheckDoneForSessionRef.current =
+          activeCard?.cardId ?? sessionKey
+        setActiveRunCheckDone(true)
+      },
+      [activeCard?.cardId],
+    ),
   })
 
   // Wire SSE realtime stream for instant message delivery
@@ -1239,15 +1255,19 @@ export function ChatScreen({
   }, [streamStop])
 
   const streamFinish = useCallback(
-    (sessionKey?: string) => {
+    (sessionKey?: string, cardId?: string) => {
       streamStop()
       if (failsafeTimerRef.current) {
         window.clearTimeout(failsafeTimerRef.current)
         failsafeTimerRef.current = null
       }
       setPendingGeneration(false)
-      const targetSessionKey = sessionKey ?? activeSendRef.current?.sessionKey
-      if (targetSessionKey) {
+      const activeSend = activeSendRef.current
+      const targetCardId = cardId ?? activeSend?.cardId
+      const targetSessionKey = sessionKey ?? activeSend?.sessionKey
+      if (targetCardId) {
+        useChatStore.getState().clearCardWaiting(targetCardId)
+      } else if (targetSessionKey) {
         useChatStore.getState().clearSessionWaiting(targetSessionKey)
       } else {
         setWaitingForResponse(false)
@@ -1525,7 +1545,8 @@ export function ChatScreen({
           friendlyId: handoff.cardId,
           cardId: handoff.cardId,
         }
-        sessionKeyForWaiting.current = handoff.canonicalSegmentKey
+        cardIdForWaiting.current = handoff.cardId
+        sessionKeyForWaiting.current = handoff.cardId
         liveStreamSessionKeyRef.current = handoff.canonicalSegmentKey
         setCardHandoff({
           cardId: handoff.cardId,
@@ -1574,7 +1595,12 @@ export function ChatScreen({
               ? { cardId: friendlyId }
               : {}),
           }
-          sessionKeyForWaiting.current = sessionKey
+          const resolvedCardId =
+            friendlyId.startsWith('remote:') || friendlyId.startsWith('local:')
+              ? friendlyId
+              : activeSend.cardId
+          cardIdForWaiting.current = resolvedCardId
+          sessionKeyForWaiting.current = resolvedCardId ?? sessionKey
           liveStreamSessionKeyRef.current = sessionKey
         }
         if (alreadyResolved) return
@@ -1650,6 +1676,7 @@ export function ChatScreen({
       (completedMessage: ChatMessage) => {
         const activeSend = activeSendRef.current
         const completedSessionKey = activeSend?.sessionKey
+        const completedCardId = activeSend?.cardId
         if (activeSend?.clientId) {
           updateHistoryMessageByClientIdEverywhere(
             queryClient,
@@ -1679,7 +1706,7 @@ export function ChatScreen({
         refreshHistoryRef.current()
         setSending(false)
         // Clear waitingForResponse so ThinkingBubble hides and message renders
-        streamFinish(completedSessionKey)
+        streamFinish(completedSessionKey, completedCardId)
         // Play notification sound if the user opted in (Settings → Chat).
         // Read directly from the store to avoid re-creating this callback on every settings change.
         if (useChatSettingsStore.getState().settings.soundOnChatComplete) {
@@ -1692,6 +1719,7 @@ export function ChatScreen({
       (messageText: string) => {
         const activeSend = activeSendRef.current
         const failedSessionKey = activeSend?.sessionKey
+        const failedCardId = activeSend?.cardId
         if (activeSend?.clientId && !isMissingAuth(messageText)) {
           updateHistoryMessageByClientIdEverywhere(
             queryClient,
@@ -1706,7 +1734,7 @@ export function ChatScreen({
         liveStreamSessionKeyRef.current = null
         setSending(false)
         if (isMissingAuth(messageText)) {
-          streamFinish(failedSessionKey)
+          streamFinish(failedSessionKey, failedCardId)
           if (!embedded) {
             try {
               navigate({ to: '/', replace: true })
@@ -1720,7 +1748,7 @@ export function ChatScreen({
         setError(errorMessage)
         toast('Failed to send message', { type: 'error' })
         showErrorToast(messageText)
-        streamFinish(failedSessionKey)
+        streamFinish(failedSessionKey, failedCardId)
       },
       [navigate, queryClient, streamFinish],
     ),
@@ -1764,7 +1792,11 @@ export function ChatScreen({
       // The hook captures the reader's origin key. Never let a late abort for
       // that reader clear a newer destination send or its recovery-confirmed
       // wait after route navigation.
-      useChatStore.getState().clearSessionWaiting(abortedSessionKey)
+      if (activeSend?.sessionKey === abortedSessionKey && activeSend.cardId) {
+        useChatStore.getState().clearCardWaiting(activeSend.cardId)
+      } else {
+        useChatStore.getState().clearSessionWaiting(abortedSessionKey)
+      }
       if (activeSend?.sessionKey !== abortedSessionKey) return
       activeSendRef.current = null
       liveStreamSessionKeyRef.current = null
@@ -2644,10 +2676,7 @@ export function ChatScreen({
     if (!pending) return
     pendingStartRef.current = true
     const historyKey = activeCard
-      ? sessionCardQueryKeys.history(
-          activeCard.cardId,
-          activeCardCanonicalSegmentKey || '',
-        )
+      ? sessionCardQueryKeys.history(activeCard.cardId)
       : chatQueryKeys.history(pending.friendlyId, pending.sessionKey)
     const cached = queryClient.getQueryData(historyKey)
     const cachedMessages = Array.isArray((cached as any)?.messages)

@@ -3,15 +3,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useChatStream } from '../../../hooks/use-chat-stream'
 import { useChatStore } from '../../../stores/chat-store'
 import {
-  appendHistoryMessage,
   appendSessionCardHistoryMessage,
   appendSessionCardTransientMessage,
-  chatQueryKeys,
   sessionCardQueryKeys,
 } from '../chat-queries'
 import { toast } from '../../../components/ui/toast'
 import { textFromMessage } from '../utils'
-import { snapshotOptimisticUserMessages } from './optimistic-message-reinject'
 import type { ChatMessage } from '../types'
 import type { StreamingState } from '../../../stores/chat-store'
 
@@ -145,10 +142,8 @@ export function useRealtimeChatHistory({
   const effectiveCardId = portableMode ? undefined : cardId
   const getHistoryQueryKey = useCallback(
     () =>
-      effectiveCardId
-        ? sessionCardQueryKeys.history(effectiveCardId, effectiveSessionKey)
-        : chatQueryKeys.history(effectiveFriendlyId, effectiveSessionKey),
-    [effectiveCardId, effectiveFriendlyId, effectiveSessionKey],
+      effectiveCardId ? sessionCardQueryKeys.history(effectiveCardId) : null,
+    [effectiveCardId],
   )
   const [lastCompletedRunAt, setLastCompletedRunAt] = useState<number | null>(
     null,
@@ -163,12 +158,18 @@ export function useRealtimeChatHistory({
   }, [])
 
   const backfillHistory = useCallback(async () => {
-    if (!effectiveSessionKey || effectiveSessionKey === 'new') return
+    if (
+      !effectiveCardId ||
+      !effectiveSessionKey ||
+      effectiveSessionKey === 'new'
+    )
+      return
     if (isBackfillingRef.current) return
 
     isBackfillingRef.current = true
     try {
       const key = getHistoryQueryKey()
+      if (!key) return
       await queryClient.invalidateQueries({ queryKey: key, exact: true })
       await queryClient.refetchQueries({
         queryKey: key,
@@ -178,17 +179,23 @@ export function useRealtimeChatHistory({
     } finally {
       isBackfillingRef.current = false
     }
-  }, [effectiveSessionKey, getHistoryQueryKey, queryClient])
+  }, [effectiveCardId, effectiveSessionKey, getHistoryQueryKey, queryClient])
 
   useEffect(() => {
     if (!enabled) return
-    if (!effectiveSessionKey || effectiveSessionKey === 'new') return
+    if (
+      !effectiveCardId ||
+      !effectiveSessionKey ||
+      effectiveSessionKey === 'new'
+    )
+      return
     void backfillHistory()
-  }, [backfillHistory, effectiveSessionKey, enabled])
+  }, [backfillHistory, effectiveCardId, effectiveSessionKey, enabled])
 
   const { connectionState, lastError, reconnect } = useChatStream({
     sessionKey: effectiveSessionKey === 'new' ? undefined : effectiveSessionKey,
-    enabled: enabled && effectiveSessionKey !== 'new',
+    enabled:
+      enabled && Boolean(effectiveCardId) && effectiveSessionKey !== 'new',
     onReconnect: useCallback(() => {
       void backfillHistory()
     }, [backfillHistory]),
@@ -249,8 +256,9 @@ export function useRealtimeChatHistory({
             const echoText = extractUserMessageText(message)
             const echoAttachSig = attachmentSignature(message)
             const hasContent = echoText.length > 0 || echoAttachSig.length > 0
-            if (hasContent) {
+            if (hasContent && effectiveCardId) {
               const key = getHistoryQueryKey()
+              if (!key) return
               const cached =
                 queryClient.getQueryData<Record<string, unknown>>(key)
               const existing = (cached?.messages ?? []) as Array<any>
@@ -296,13 +304,6 @@ export function useRealtimeChatHistory({
               realtimeMessage,
               { persistRecovery: false },
             )
-          } else {
-            appendHistoryMessage(
-              queryClient,
-              effectiveFriendlyId,
-              effectiveSessionKey,
-              realtimeMessage,
-            )
           }
         }
         onUserMessage?.(message, source)
@@ -323,8 +324,11 @@ export function useRealtimeChatHistory({
         eventSessionKey: string,
         streamingSnapshot: StreamingState | null,
       ) => {
-        const currentState =
-          eventSessionKey === effectiveSessionKey ? streamingSnapshot : null
+        const currentState = effectiveCardId
+          ? useChatStore.getState().getCardStreamingState(effectiveCardId)
+          : eventSessionKey === effectiveSessionKey
+            ? streamingSnapshot
+            : null
         if (currentState?.text) {
           completedStreamingTextRef.current = currentState.text
         }
@@ -340,22 +344,17 @@ export function useRealtimeChatHistory({
         ) {
           setLastCompletedRunAt(Date.now())
           // Refetch history after generation completes — keeps chat in sync
-          if (effectiveSessionKey && effectiveSessionKey !== 'new') {
+          if (
+            effectiveCardId &&
+            effectiveSessionKey &&
+            effectiveSessionKey !== 'new'
+          ) {
             const key = getHistoryQueryKey()
+            if (!key) return
             const prevData =
               queryClient.getQueryData<Record<string, unknown>>(key)
             const prevCount =
               (prevData?.messages as Array<unknown> | undefined)?.length ?? 0
-
-            // Legacy bootstrap/main caches still need an in-memory snapshot.
-            // Card conversations restore only their exact recovery envelope.
-            const reInjectOptimistic = effectiveCardId
-              ? null
-              : snapshotOptimisticUserMessages(
-                  queryClient,
-                  effectiveFriendlyId,
-                  effectiveSessionKey,
-                )
 
             // Issue #441 fix: Directly merge realtime buffer into history cache
             // INSTEAD of invalidateQueries. The old approach caused a race:
@@ -366,8 +365,9 @@ export function useRealtimeChatHistory({
             // then clear the realtime buffer in the same tick. A background
             // refetch runs after for consistency but doesn't block rendering.
             const store = useChatStore.getState()
-            const realtimeMessages =
-              store.realtimeMessages.get(effectiveSessionKey) ?? []
+            const realtimeMessages = effectiveCardId
+              ? store.getCardRealtimeMessages(effectiveCardId)
+              : []
             const cachedHistoryMessages = prevData?.messages as
               | Array<unknown>
               | undefined
@@ -437,46 +437,14 @@ export function useRealtimeChatHistory({
 
             // Clear realtime buffer only after a Card terminal message is
             // synchronously recorded in its query overlay and recovery envelope.
-            store.clearRealtimeBuffer(effectiveSessionKey)
+            store.clearCardRealtimeBuffer(effectiveCardId)
             clearCompletedStreaming()
 
             // Background refetch for long-term consistency — doesn't block render
-            queryClient
-              .invalidateQueries({ queryKey: key, refetchType: 'all' })
-              .then(() => {
-                // Non-Card bootstrap/main caches retain their existing in-memory
-                // handoff; Card queries reconcile from the recovery envelope.
-                if (completedAssistant && !effectiveCardId) {
-                  const refetchData =
-                    queryClient.getQueryData<Record<string, unknown>>(key)
-                  const refetchedMessages = Array.isArray(refetchData?.messages)
-                    ? (refetchData.messages as Array<Record<string, unknown>>)
-                    : []
-                  const assistantTail = (
-                    completedAssistant.content ??
-                    completedAssistant.text ??
-                    ''
-                  )
-                    .toString()
-                    .slice(-64)
-                  const alreadyPresent = refetchedMessages.some(
-                    (m) =>
-                      m.role === 'assistant' &&
-                      ((m.content ?? m.text ?? '') as string)
-                        .toString()
-                        .slice(-64) === assistantTail,
-                  )
-                  if (!alreadyPresent) {
-                    appendHistoryMessage(
-                      queryClient,
-                      effectiveFriendlyId,
-                      effectiveSessionKey,
-                      completedAssistant as unknown as ChatMessage,
-                    )
-                  }
-                }
-                reInjectOptimistic?.()
-              })
+            void queryClient.invalidateQueries({
+              queryKey: key,
+              refetchType: 'all',
+            })
 
             // Check for compaction — significant message count drop
             const newData =
@@ -529,16 +497,25 @@ export function useRealtimeChatHistory({
   })
 
   const mergeHistoryMessages = useChatStore((s) => s.mergeHistoryMessages)
+  const mergeCardHistoryMessages = useChatStore(
+    (s) => s.mergeCardHistoryMessages,
+  )
   const clearSession = useChatStore((s) => s.clearSession)
+  const clearCard = useChatStore((s) => s.clearCard)
   const lastEventAt = useChatStore((s) => s.lastEventAt)
-  const clearRealtimeBuffer = useChatStore((s) => s.clearRealtimeBuffer)
   const realtimeMessages = useChatStore(
-    (s) => s.realtimeMessages.get(effectiveSessionKey) ?? EMPTY_MESSAGES,
+    (s) =>
+      (effectiveCardId
+        ? s.realtimeMessages.get(effectiveCardId)
+        : s.realtimeMessages.get(effectiveSessionKey)) ?? EMPTY_MESSAGES,
   )
 
   // Subscribe directly to streaming state — useMemo with stable fn ref was stale (bug #1)
   const streamingState = useChatStore(
-    (s) => s.streamingState.get(effectiveSessionKey) ?? null,
+    (s) =>
+      (effectiveCardId
+        ? s.streamingState.get(effectiveCardId)
+        : s.streamingState.get(effectiveSessionKey)) ?? null,
   )
   const streamingStateRef = useRef(streamingState)
   const lastStreamClearTimeRef = useRef<number>(0)
@@ -546,9 +523,10 @@ export function useRealtimeChatHistory({
   const delayedClearSessionTimeoutRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null)
-  const activeSessionKeyRef = useRef(effectiveSessionKey)
+  const browserOwnerKey = effectiveCardId ?? effectiveSessionKey
+  const activeBrowserOwnerRef = useRef(browserOwnerKey)
   const isUnmountingRef = useRef(false)
-  activeSessionKeyRef.current = effectiveSessionKey
+  activeBrowserOwnerRef.current = browserOwnerKey
 
   useEffect(() => {
     const prev = streamingStateRef.current
@@ -575,34 +553,24 @@ export function useRealtimeChatHistory({
   // Re-merge when realtime events arrive (lastEventAt changes)
   const mergedMessages = useMemo(() => {
     if (effectiveSessionKey === 'new') return historyMessages
-    return mergeHistoryMessages(effectiveSessionKey, historyMessages)
+    return effectiveCardId
+      ? mergeCardHistoryMessages(effectiveCardId, historyMessages)
+      : mergeHistoryMessages(effectiveSessionKey, historyMessages)
     // Hook dependencies are intentionally constrained to the explicit array below.
-  }, [effectiveSessionKey, historyMessages, mergeHistoryMessages, lastEventAt])
+  }, [
+    effectiveCardId,
+    effectiveSessionKey,
+    historyMessages,
+    lastEventAt,
+    mergeCardHistoryMessages,
+    mergeHistoryMessages,
+  ])
 
   useEffect(() => {
     if (!portableMode) return
     if (mergedMessages.length === 0) return
     persistPortableHistory(mergedMessages)
   }, [mergedMessages, portableMode])
-
-  // History has caught up — cleanup realtime buffer outside render
-  // DISABLED: This was aggressively clearing realtime messages before history
-  // caught up, causing the "message appears then disappears" bug.
-  // TODO: Re-enable with smarter timing (e.g. only after history confirms the message)
-  useEffect(() => {
-    return // disabled
-    if (portableMode) return
-    if (!effectiveSessionKey || effectiveSessionKey === 'new') return
-    if (realtimeMessages.length === 0) return
-    if (mergedMessages.length !== historyMessages.length) return
-    clearRealtimeBuffer(effectiveSessionKey)
-  }, [
-    clearRealtimeBuffer,
-    effectiveSessionKey,
-    historyMessages.length,
-    mergedMessages.length,
-    realtimeMessages.length,
-  ])
 
   useEffect(() => {
     if (!onCompactionStart) return
@@ -644,6 +612,7 @@ export function useRealtimeChatHistory({
       // may be starting and history API may return stale/incomplete data
       if (Date.now() - lastStreamClearTimeRef.current < 3000) return
       const key = getHistoryQueryKey()
+      if (!key) return
       queryClient.invalidateQueries({ queryKey: key })
     }, 30000)
     return () => {
@@ -653,7 +622,7 @@ export function useRealtimeChatHistory({
 
   // Clear realtime buffer when session changes
   useEffect(() => {
-    if (!effectiveSessionKey || effectiveSessionKey === 'new') return undefined
+    if (!browserOwnerKey || browserOwnerKey === 'new') return undefined
     if (delayedClearSessionTimeoutRef.current) {
       clearTimeout(delayedClearSessionTimeoutRef.current)
       delayedClearSessionTimeoutRef.current = null
@@ -668,11 +637,18 @@ export function useRealtimeChatHistory({
       }
       delayedClearSessionTimeoutRef.current = setTimeout(() => {
         delayedClearSessionTimeoutRef.current = null
-        if (activeSessionKeyRef.current === effectiveSessionKey) return
-        clearSession(effectiveSessionKey)
+        if (activeBrowserOwnerRef.current === browserOwnerKey) return
+        if (effectiveCardId) clearCard(effectiveCardId)
+        else clearSession(effectiveSessionKey)
       }, 5000)
     }
-  }, [effectiveSessionKey, clearSession])
+  }, [
+    browserOwnerKey,
+    clearCard,
+    clearSession,
+    effectiveCardId,
+    effectiveSessionKey,
+  ])
 
   useEffect(() => {
     isUnmountingRef.current = false
