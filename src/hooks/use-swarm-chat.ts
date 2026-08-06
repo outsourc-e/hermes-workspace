@@ -1,7 +1,6 @@
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
-  SessionCardHistoryResponse,
   SessionCardListWire,
   SessionCardWire,
 } from '@/screens/chat/chat-queries'
@@ -10,6 +9,7 @@ import {
   fetchCompleteSessionCardHistory,
   fetchSessionCards,
   hasExactCompleteSessionCardProjection,
+  isAuthoritativeCompleteSessionCardHistory,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
 import { textFromMessage } from '@/screens/chat/utils'
@@ -31,10 +31,19 @@ type DirectChatResponse = {
   fetchedAt: number
 }
 
+/**
+ * Browser-visible ownership for embedded worker Chat. The discriminant and
+ * explicit null parent keep raw session/worker strings out of identity APIs.
+ */
+export type SwarmSessionCardOwner = Readonly<{
+  kind: 'session-card-owner'
+  cardId: string
+  parentCardId: string | null
+}>
+
 export type SwarmSessionCardTarget = {
   cardId: string
-  parentCardId?: string
-  canonicalSegmentKey: string
+  parentCardId: string | null
   title: string
   relationship: 'root' | 'child'
   route: {
@@ -44,56 +53,193 @@ export type SwarmSessionCardTarget = {
   }
 }
 
+type ResolvedSwarmSessionCardMapping = {
+  target: SwarmSessionCardTarget
+  canonicalSegmentKey: string
+  continuationSegmentKeys: ReadonlyArray<string>
+}
+
+type SwarmTranscriptStatus =
+  | 'ready'
+  | 'loading'
+  | 'unmapped'
+  | 'incomplete'
+  | 'unavailable'
+
+type SwarmCardTranscript = {
+  target: SwarmSessionCardTarget | null
+  status: Exclude<SwarmTranscriptStatus, 'loading'>
+  messages: Array<SwarmChatMessage>
+  error: string | null
+}
+
+type MappingState = {
+  status: 'loading' | 'unmapped' | 'ready' | 'unavailable'
+  target?: SwarmSessionCardTarget
+}
+
 const POLL_INTERVAL_MS = 5_000
 const DEFAULT_LIMIT = 30
+const UNMAPPED_HISTORY_QUERY_KEY = ['swarm', 'card-chat', 'unmapped'] as const
+const SAFE_TRANSCRIPT_ERROR = 'Session Card transcript is unavailable'
+const SAFE_SEND_ERROR = 'Unable to deliver the worker message'
 
-function sourceQualifiedCardId(
-  value: string | null | undefined,
-): string | null {
-  const normalized = value?.trim() ?? ''
-  if (
-    (normalized.startsWith('local:') && normalized.length > 'local:'.length) ||
-    (normalized.startsWith('remote:') && normalized.length > 'remote:'.length)
-  ) {
-    return normalized
+function exactSourceQualifiedIdentity(
+  value: unknown,
+): { identity: string; source: 'local' | 'remote' } | null {
+  if (typeof value !== 'string' || value.trim() !== value) return null
+  if (value.startsWith('local:') && value.length > 'local:'.length) {
+    return { identity: value, source: 'local' }
+  }
+  if (value.startsWith('remote:') && value.length > 'remote:'.length) {
+    return { identity: value, source: 'remote' }
   }
   return null
 }
 
-/**
- * Resolve only an exact stable Card ID supplied by an authoritative producer.
- * Worker IDs, titles, canonical segment keys, and continuation aliases are not
- * sufficient to identify a mounted transcript.
- */
-export function resolveSwarmSessionCardTarget(
-  response: SessionCardListWire | undefined,
-  activityCardId: string | null | undefined,
-): SwarmSessionCardTarget | undefined {
-  const cardId = sourceQualifiedCardId(activityCardId)
-  if (!response || !cardId) return undefined
+function hasExactContinuationProjection(
+  owner: {
+    cardId: string
+    canonicalSegmentKey: string
+    continuationSegmentKeys: ReadonlyArray<string>
+    continuationCount: number
+  },
+  source: 'local' | 'remote',
+): boolean {
+  const cardId = exactSourceQualifiedIdentity(owner.cardId)
+  const canonicalSegment = exactSourceQualifiedIdentity(
+    owner.canonicalSegmentKey,
+  )
+  const continuations = owner.continuationSegmentKeys.map(
+    exactSourceQualifiedIdentity,
+  )
+  return Boolean(
+    cardId &&
+    canonicalSegment &&
+    cardId.source === source &&
+    canonicalSegment.source === source &&
+    continuations.length > 0 &&
+    continuations.length === owner.continuationCount &&
+    continuations.every((identity) => identity?.source === source) &&
+    new Set(owner.continuationSegmentKeys).size === continuations.length &&
+    owner.continuationSegmentKeys[0] === owner.cardId &&
+    owner.continuationSegmentKeys.at(-1) === owner.canonicalSegmentKey,
+  )
+}
 
-  const matches: Array<{
-    parent: SessionCardWire
-    child?: SessionCardChild
-  }> = []
-  for (const parent of response.cards) {
-    if (parent.cardId === cardId) matches.push({ parent })
-    for (const child of parent.childNodes) {
-      if (child.cardId === cardId) matches.push({ parent, child })
+function isExactRootProjection(
+  response: SessionCardListWire,
+  card: SessionCardWire,
+): card is SessionCardWire & { canonicalSource: 'local' | 'remote' } {
+  const source = card.canonicalSource
+  return (
+    (source === 'local' || source === 'remote') &&
+    card.parentCardId === undefined &&
+    (card.relationshipKind === 'root' || card.relationshipKind === 'orphan') &&
+    hasExactCompleteSessionCardProjection(response, card.cardId) &&
+    hasExactContinuationProjection(card, source)
+  )
+}
+
+function isExactChildProjection(
+  child: SessionCardChild,
+  source: 'local' | 'remote',
+): boolean {
+  return hasExactContinuationProjection(
+    {
+      cardId: child.cardId,
+      canonicalSegmentKey: child.sessionKey,
+      continuationSegmentKeys: child.continuationSegmentKeys,
+      continuationCount: child.continuationCount,
+    },
+    source,
+  )
+}
+
+function isRuntimeCardOwner(value: unknown): value is SwarmSessionCardOwner {
+  if (!value || typeof value !== 'object') return false
+  const owner = value as Partial<SwarmSessionCardOwner>
+  if (owner.kind !== 'session-card-owner') return false
+  const cardId = exactSourceQualifiedIdentity(owner.cardId)
+  if (!cardId) return false
+  if (owner.parentCardId === null) return true
+  const parentCardId = exactSourceQualifiedIdentity(owner.parentCardId)
+  return Boolean(
+    parentCardId &&
+    parentCardId.source === cardId.source &&
+    parentCardId.identity !== cardId.identity,
+  )
+}
+
+function matchingChildProjections(
+  children: ReadonlyArray<SessionCardChild>,
+  cardId: string,
+): Array<SessionCardChild> {
+  return children.flatMap((child) => [
+    ...(child.cardId === cardId ? [child] : []),
+    ...matchingChildProjections(child.childNodes ?? [], cardId),
+  ])
+}
+
+/**
+ * Resolve an asserted Card owner only through the complete server projection.
+ * Canonical segments are retained solely in this transient mapping and never
+ * returned to mounted UI or React Query state.
+ */
+function resolveSwarmSessionCardMapping(
+  response: SessionCardListWire | undefined,
+  owner: SwarmSessionCardOwner | null | undefined,
+): ResolvedSwarmSessionCardMapping | undefined {
+  if (!response || !isRuntimeCardOwner(owner)) return undefined
+
+  const allParentMatches = response.cards.filter(
+    (parent) => parent.cardId === owner.cardId,
+  )
+  const allChildMatches = response.cards.flatMap((parent) =>
+    matchingChildProjections(parent.childNodes, owner.cardId).map((child) => ({
+      parent,
+      child,
+    })),
+  )
+
+  if (owner.parentCardId === null) {
+    if (allParentMatches.length !== 1 || allChildMatches.length !== 0) {
+      return undefined
+    }
+    const parent = allParentMatches[0]!
+    if (!isExactRootProjection(response, parent)) return undefined
+    return {
+      target: {
+        cardId: parent.cardId,
+        parentCardId: null,
+        title: parent.title,
+        relationship: 'root',
+        route: {
+          to: '/chat/$sessionKey',
+          params: { sessionKey: parent.cardId },
+          search: {},
+        },
+      },
+      canonicalSegmentKey: parent.canonicalSegmentKey,
+      continuationSegmentKeys: parent.continuationSegmentKeys,
     }
   }
-  if (matches.length !== 1) return undefined
 
-  const { parent, child } = matches[0]!
-  if (!hasExactCompleteSessionCardProjection(response, parent.cardId)) {
+  if (allParentMatches.length !== 0 || allChildMatches.length !== 1) {
     return undefined
   }
-  if (child) {
-    if (!sourceQualifiedCardId(child.cardId)) return undefined
-    return {
+  const { parent, child } = allChildMatches[0]!
+  if (
+    parent.cardId !== owner.parentCardId ||
+    !isExactRootProjection(response, parent) ||
+    !isExactChildProjection(child, parent.canonicalSource)
+  ) {
+    return undefined
+  }
+  return {
+    target: {
       cardId: child.cardId,
       parentCardId: parent.cardId,
-      canonicalSegmentKey: child.sessionKey,
       title: child.title,
       relationship: 'child',
       route: {
@@ -101,27 +247,24 @@ export function resolveSwarmSessionCardTarget(
         params: { sessionKey: parent.cardId },
         search: { inspect: child.cardId },
       },
-    }
-  }
-
-  return {
-    cardId: parent.cardId,
-    canonicalSegmentKey: parent.canonicalSegmentKey,
-    title: parent.title,
-    relationship: 'root',
-    route: {
-      to: '/chat/$sessionKey',
-      params: { sessionKey: parent.cardId },
-      search: {},
     },
+    canonicalSegmentKey: child.sessionKey,
+    continuationSegmentKeys: child.continuationSegmentKeys,
   }
+}
+
+export function resolveSwarmSessionCardTarget(
+  response: SessionCardListWire | undefined,
+  owner: SwarmSessionCardOwner | null | undefined,
+): SwarmSessionCardTarget | undefined {
+  return resolveSwarmSessionCardMapping(response, owner)?.target
 }
 
 async function sendDirectChat(
   workerId: string,
   prompt: string,
   limit: number,
-): Promise<DirectChatResponse> {
+): Promise<void> {
   const res = await fetch('/api/swarm-direct-chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -131,19 +274,9 @@ async function sendDirectChat(
     | DirectChatResponse
     | { error?: string }
     | null
-  if (!res.ok) {
-    throw new Error(
-      (data && 'error' in data && data.error) ||
-        `swarm-direct-chat HTTP ${res.status}`,
-    )
+  if (!res.ok || !data || !('delivered' in data) || !data.delivered) {
+    throw new Error(SAFE_SEND_ERROR)
   }
-  if (!data || !('delivered' in data) || !data.delivered) {
-    throw new Error(
-      (data as { error?: string } | null)?.error ||
-        'Direct chat did not reach worker',
-    )
-  }
-  return data
 }
 
 function normalizeCardMessage(
@@ -162,7 +295,6 @@ function normalizeCardMessage(
           ? 'tool'
           : 'system'
   return {
-    // Never reuse or expose an upstream raw message ID in the mounted viewer.
     id: `card-message-${cardId}-${index}`,
     role,
     content,
@@ -170,115 +302,240 @@ function normalizeCardMessage(
   }
 }
 
+function targetMatchesOwner(
+  target: SwarmSessionCardTarget | undefined,
+  owner: SwarmSessionCardOwner | null | undefined,
+): boolean {
+  return Boolean(
+    target &&
+    owner &&
+    target.cardId === owner.cardId &&
+    target.parentCardId === owner.parentCardId,
+  )
+}
+
+function cardHistoryQueryKey(target: SwarmSessionCardTarget | undefined) {
+  if (!target) return UNMAPPED_HISTORY_QUERY_KEY
+  return target.parentCardId
+    ? sessionCardQueryKeys.childHistory(target.parentCardId, target.cardId)
+    : sessionCardQueryKeys.history(target.cardId)
+}
+
+async function fetchSanitizedSwarmCardTranscript(
+  owner: SwarmSessionCardOwner,
+  signal?: AbortSignal,
+): Promise<SwarmCardTranscript> {
+  let mapping: ResolvedSwarmSessionCardMapping | undefined
+  try {
+    mapping = resolveSwarmSessionCardMapping(await fetchSessionCards(), owner)
+  } catch {
+    return {
+      target: null,
+      status: 'unavailable',
+      messages: [],
+      error: SAFE_TRANSCRIPT_ERROR,
+    }
+  }
+  if (!mapping) {
+    return { target: null, status: 'unmapped', messages: [], error: null }
+  }
+
+  try {
+    const history = await fetchCompleteSessionCardHistory({
+      ...(mapping.target.parentCardId
+        ? { parentCardId: mapping.target.parentCardId }
+        : {}),
+      cardId: mapping.target.cardId,
+      canonicalSegmentKey: mapping.canonicalSegmentKey,
+      continuationSegmentKeys: mapping.continuationSegmentKeys,
+      signal,
+    })
+    if (
+      history.cardId !== mapping.target.cardId ||
+      history.canonicalSegmentKey !== mapping.canonicalSegmentKey
+    ) {
+      return {
+        target: null,
+        status: 'unavailable',
+        messages: [],
+        error: SAFE_TRANSCRIPT_ERROR,
+      }
+    }
+    if (!isAuthoritativeCompleteSessionCardHistory(history)) {
+      return {
+        target: mapping.target,
+        status: 'incomplete',
+        messages: [],
+        error: null,
+      }
+    }
+    return {
+      target: mapping.target,
+      status: 'ready',
+      messages: history.messages
+        .map((message, index) =>
+          normalizeCardMessage(message, index, mapping.target.cardId),
+        )
+        .filter((message): message is SwarmChatMessage => Boolean(message)),
+      error: null,
+    }
+  } catch {
+    return {
+      target: mapping.target,
+      status: 'unavailable',
+      messages: [],
+      error: SAFE_TRANSCRIPT_ERROR,
+    }
+  }
+}
+
 export type UseSwarmChatOptions = {
   workerId: string
-  /** Exact source-qualified Card ID from an authoritative worker projection. */
-  activityCardId?: string | null
+  cardOwner?: SwarmSessionCardOwner | null
   limit?: number
   enabled?: boolean
 }
 
 export function useSwarmChat({
   workerId,
-  activityCardId,
+  cardOwner,
   limit = DEFAULT_LIMIT,
   enabled = true,
 }: UseSwarmChatOptions) {
   const queryClient = useQueryClient()
-  const listQuery = useQuery({
-    queryKey: sessionCardQueryKeys.list(false),
-    queryFn: () => fetchSessionCards(),
-    enabled: Boolean(workerId) && enabled,
-    refetchInterval: 15_000,
-  })
-  const target = useMemo(
-    () => resolveSwarmSessionCardTarget(listQuery.data, activityCardId),
-    [listQuery.data, activityCardId],
-  )
-  const historyQueryKey = target?.parentCardId
-    ? sessionCardQueryKeys.childHistory(target.parentCardId, target.cardId)
-    : sessionCardQueryKeys.history(target?.cardId ?? '')
+  const [mappingState, setMappingState] = useState<MappingState>(() => ({
+    status: cardOwner ? 'loading' : 'unmapped',
+  }))
+  const [mappingEpoch, setMappingEpoch] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!enabled || !workerId || !isRuntimeCardOwner(cardOwner)) {
+      setMappingState({ status: 'unmapped' })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    setMappingState({ status: 'loading' })
+    void fetchSessionCards()
+      .then((response) => {
+        if (cancelled) return
+        const mapping = resolveSwarmSessionCardMapping(response, cardOwner)
+        setMappingState(
+          mapping
+            ? { status: 'ready', target: mapping.target }
+            : { status: 'unmapped' },
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setMappingState({ status: 'unavailable' })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    cardOwner?.kind,
+    cardOwner?.cardId,
+    cardOwner?.parentCardId,
+    enabled,
+    mappingEpoch,
+    workerId,
+  ])
+
+  const verifiedTarget = targetMatchesOwner(mappingState.target, cardOwner)
+    ? mappingState.target
+    : undefined
+  const verifiedOwner: SwarmSessionCardOwner | undefined = verifiedTarget
+    ? {
+        kind: 'session-card-owner',
+        cardId: verifiedTarget.cardId,
+        parentCardId: verifiedTarget.parentCardId,
+      }
+    : undefined
+  const historyQueryKey = cardHistoryQueryKey(verifiedTarget)
   const historyQuery = useQuery({
     queryKey: historyQueryKey,
-    queryFn: ({ signal }) => {
-      if (!target) throw new Error('Worker Session Card is unavailable')
-      return fetchCompleteSessionCardHistory({
-        ...(target.parentCardId ? { parentCardId: target.parentCardId } : {}),
-        cardId: target.cardId,
-        canonicalSegmentKey: target.canonicalSegmentKey,
-        signal,
-      })
-    },
-    enabled: Boolean(target) && enabled,
+    queryFn: ({ signal }) =>
+      verifiedOwner
+        ? fetchSanitizedSwarmCardTranscript(verifiedOwner, signal)
+        : Promise.resolve<SwarmCardTranscript>({
+            target: null,
+            status: 'unmapped',
+            messages: [],
+            error: null,
+          }),
+    enabled: Boolean(verifiedOwner) && enabled,
     refetchInterval: POLL_INTERVAL_MS,
   })
 
+  const transcript = historyQuery.data
+  const transcriptStatus: SwarmTranscriptStatus = !verifiedTarget
+    ? mappingState.status === 'loading'
+      ? 'loading'
+      : mappingState.status === 'unavailable'
+        ? 'unavailable'
+        : 'unmapped'
+    : historyQuery.isPending
+      ? 'loading'
+      : (transcript?.status ?? 'loading')
+  const target = transcript ? (transcript.target ?? undefined) : verifiedTarget
+  const activeOwner: SwarmSessionCardOwner | undefined = target
+    ? {
+        kind: 'session-card-owner',
+        cardId: target.cardId,
+        parentCardId: target.parentCardId,
+      }
+    : undefined
+  const messages =
+    transcriptStatus === 'ready' ? (transcript?.messages ?? []) : []
+  const safeError =
+    mappingState.status === 'unavailable'
+      ? SAFE_TRANSCRIPT_ERROR
+      : (transcript?.error ?? null)
+
   const dispatch = useMutation({
     mutationFn: async (prompt: string) => {
-      return await sendDirectChat(workerId, prompt, limit)
+      if (!activeOwner) throw new Error(SAFE_SEND_ERROR)
+      try {
+        return await sendDirectChat(workerId, prompt, limit)
+      } catch {
+        throw new Error(SAFE_SEND_ERROR)
+      }
     },
     onSuccess: async () => {
-      const invalidations = [
+      await Promise.all([
         queryClient.invalidateQueries({
           queryKey: sessionCardQueryKeys.list(false),
         }),
-      ]
-      if (target) {
-        invalidations.push(
-          queryClient.invalidateQueries({ queryKey: historyQueryKey }),
-        )
-      }
-      await Promise.all(invalidations)
+        queryClient.invalidateQueries({ queryKey: historyQueryKey }),
+      ])
     },
   })
-
-  const completeHistory: SessionCardHistoryResponse | undefined =
-    historyQuery.data?.completeness === 'complete' &&
-    historyQuery.data.retryable === false
-      ? historyQuery.data
-      : undefined
-  const messages = useMemo(
-    () =>
-      (completeHistory?.messages ?? [])
-        .map((message, index) =>
-          normalizeCardMessage(message, index, target?.cardId ?? 'unresolved'),
-        )
-        .filter((message): message is SwarmChatMessage => Boolean(message)),
-    [completeHistory?.messages, target?.cardId],
-  )
-
-  const historyIncomplete =
-    Boolean(target && historyQuery.data) && !completeHistory
-  const queryError =
-    (listQuery.error instanceof Error ? listQuery.error.message : null) ??
-    (historyQuery.error instanceof Error ? historyQuery.error.message : null)
 
   return {
     workerId,
     target,
     sessionTitle: target?.title ?? null,
     source:
-      target && completeHistory
+      target && transcriptStatus === 'ready'
         ? ('session-card' as const)
         : ('unavailable' as const),
-    transcriptStatus: !target
-      ? ('unmapped' as const)
-      : historyIncomplete
-        ? ('incomplete' as const)
-        : completeHistory
-          ? ('ready' as const)
-          : ('loading' as const),
-    error: queryError,
+    transcriptStatus,
+    error: safeError,
     messages,
-    isLoading:
-      listQuery.isPending || (Boolean(target) && historyQuery.isPending),
-    isFetching: listQuery.isFetching || historyQuery.isFetching,
+    isLoading: transcriptStatus === 'loading',
+    isFetching: mappingState.status === 'loading' || historyQuery.isFetching,
     refetch: async () => {
-      await listQuery.refetch()
-      if (target) await historyQuery.refetch()
+      if (verifiedOwner) {
+        await historyQuery.refetch()
+      } else {
+        setMappingEpoch((current) => current + 1)
+      }
     },
     sendMessage: dispatch.mutateAsync,
     isSending: dispatch.isPending,
-    sendError: dispatch.error instanceof Error ? dispatch.error.message : null,
+    sendError: dispatch.error instanceof Error ? SAFE_SEND_ERROR : null,
   }
 }

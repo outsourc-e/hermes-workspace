@@ -16,6 +16,7 @@ import { Swarm2LiveChat } from './swarm2-live-chat'
 import { Swarm2TaskQueue } from './swarm2-task-queue'
 import type { Swarm2Artifact, Swarm2Preview } from './swarm2-artifacts'
 import type { CrewMember } from '@/hooks/use-crew-status'
+import type { SwarmSessionCardOwner } from '@/hooks/use-swarm-chat'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { getOnlineStatus } from '@/hooks/use-crew-status'
@@ -273,6 +274,7 @@ const AVATAR_OPTIONS = [
 
 export type OperationalWorkerCardProps = {
   member: CrewMember
+  chatCardOwner?: SwarmSessionCardOwner | null
   currentTask?: string | null
   checkpointStatus?: string | null
   runtimeState?: string | null
@@ -292,6 +294,7 @@ export type OperationalWorkerCardProps = {
 
 export function OperationalWorkerCard({
   member,
+  chatCardOwner = null,
   currentTask = null,
   checkpointStatus = null,
   runtimeState = null,
@@ -566,6 +569,7 @@ export function OperationalWorkerCard({
           >
             <Swarm2LiveChat
               workerId={member.id}
+              cardOwner={chatCardOwner}
               preview={false}
               previewLimit={6}
               nativeStyle

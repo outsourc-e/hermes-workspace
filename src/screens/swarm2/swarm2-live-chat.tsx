@@ -8,14 +8,17 @@ import {
   Clock01Icon,
   SentIcon,
 } from '@hugeicons/core-free-icons'
-import type { SwarmChatMessage } from '@/hooks/use-swarm-chat'
+import type {
+  SwarmChatMessage,
+  SwarmSessionCardOwner,
+} from '@/hooks/use-swarm-chat'
 import { ChatComposer } from '@/screens/chat/components/chat-composer'
 import { cn } from '@/lib/utils'
 import { useSwarmChat } from '@/hooks/use-swarm-chat'
 
 type Swarm2LiveChatProps = {
   workerId: string
-  activityCardId?: string | null
+  cardOwner?: SwarmSessionCardOwner | null
   className?: string
   preview?: boolean
   previewLimit?: number
@@ -208,7 +211,7 @@ function MessageBubble({
 
 export function Swarm2LiveChat({
   workerId,
-  activityCardId,
+  cardOwner,
   className,
   preview = false,
   previewLimit = 4,
@@ -227,7 +230,7 @@ export function Swarm2LiveChat({
     transcriptStatus,
   } = useSwarmChat({
     workerId,
-    activityCardId,
+    cardOwner,
     limit: 30,
     enabled: Boolean(workerId),
   })
@@ -303,7 +306,8 @@ export function Swarm2LiveChat({
               : 'max-h-[250px] min-h-[120px]',
         )}
       >
-        {transcriptStatus === 'unmapped' ? (
+        {transcriptStatus === 'unmapped' ||
+        transcriptStatus === 'unavailable' ? (
           <p className="text-center text-[11px] text-[var(--theme-muted)]">
             Transcript unavailable: no complete Session Card is mapped to this
             worker.
@@ -351,7 +355,7 @@ export function Swarm2LiveChat({
                 })
               }}
               isLoading={isSending}
-              disabled={false}
+              disabled={!target}
               embedded
               hideModelSelector
             />
@@ -373,14 +377,16 @@ export function Swarm2LiveChat({
                     void handleSend()
                   }
                 }}
-                disabled={isSending}
-                placeholder={`Message ${workerId}…`}
+                disabled={!target || isSending}
+                placeholder={
+                  target ? `Message ${workerId}…` : 'Session Card unavailable'
+                }
                 className="flex-1 resize-none bg-transparent px-1.5 text-[12px] text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)]"
               />
               <button
                 type="button"
                 onClick={() => void handleSend()}
-                disabled={isSending || !draft.trim()}
+                disabled={!target || isSending || !draft.trim()}
                 className={cn(
                   'inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold transition-colors',
                   isSending

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { resolveSwarmSessionCardTarget } from './use-swarm-chat'
 import type {
+  SwarmSessionCardOwner,
+  UseSwarmChatOptions,
+} from './use-swarm-chat'
+import type {
   SessionCardListWire,
   SessionCardWire,
 } from '@/screens/chat/chat-queries'
@@ -41,61 +45,96 @@ function response(
   }
 }
 
+const rootOwner: SwarmSessionCardOwner = {
+  kind: 'session-card-owner',
+  cardId: 'remote:worker-card',
+  parentCardId: null,
+}
+
+const childOwner: SwarmSessionCardOwner = {
+  kind: 'session-card-owner',
+  cardId: 'remote:worker-child-card',
+  parentCardId: 'remote:worker-card',
+}
+
+function childCard(): SessionCardWire {
+  return card({
+    childNodes: [
+      {
+        cardId: 'remote:worker-child-card',
+        sessionKey: 'remote:worker-child-tip',
+        continuationSegmentKeys: [
+          'remote:worker-child-card',
+          'remote:worker-child-tip',
+        ],
+        continuationCount: 2,
+        relationshipKind: 'child',
+        title: 'Worker child Card',
+        status: 'running',
+        updatedAt: 20,
+      },
+    ],
+  })
+}
+
 describe('resolveSwarmSessionCardTarget', () => {
-  it('resolves only an exact source-qualified stable Card ID', () => {
+  it('resolves only an exact source-qualified stable root Card owner', () => {
     const list = response([card()])
 
-    expect(
-      resolveSwarmSessionCardTarget(list, 'remote:worker-card'),
-    ).toMatchObject({
+    expect(resolveSwarmSessionCardTarget(list, rootOwner)).toEqual({
       cardId: 'remote:worker-card',
-      canonicalSegmentKey: 'remote:worker-tip',
+      parentCardId: null,
+      title: 'Authoritative worker Card',
+      relationship: 'root',
       route: {
+        to: '/chat/$sessionKey',
         params: { sessionKey: 'remote:worker-card' },
         search: {},
       },
     })
-    expect(resolveSwarmSessionCardTarget(list, 'worker-card')).toBeUndefined()
     expect(
-      resolveSwarmSessionCardTarget(list, 'remote:worker-tip'),
+      resolveSwarmSessionCardTarget(list, {
+        ...rootOwner,
+        cardId: 'remote:worker-tip',
+      }),
+    ).toBeUndefined()
+    expect(
+      resolveSwarmSessionCardTarget(list, {
+        ...rootOwner,
+        cardId: 'worker-card',
+      }),
     ).toBeUndefined()
   })
 
-  it('resolves an exact direct-child Card under its owning parent route', () => {
-    const list = response([
-      card({
-        childNodes: [
-          {
-            cardId: 'remote:worker-child-card',
-            sessionKey: 'remote:worker-child-tip',
-            continuationSegmentKeys: [
-              'remote:worker-child-card',
-              'remote:worker-child-tip',
-            ],
-            continuationCount: 2,
-            relationshipKind: 'child',
-            title: 'Worker child Card',
-            status: 'running',
-            updatedAt: 20,
-          },
-        ],
-      }),
-    ])
+  it('resolves an exact child only under its authoritative parent Card', () => {
+    const list = response([childCard()])
 
-    expect(
-      resolveSwarmSessionCardTarget(list, 'remote:worker-child-card'),
-    ).toMatchObject({
+    expect(resolveSwarmSessionCardTarget(list, childOwner)).toEqual({
       cardId: 'remote:worker-child-card',
       parentCardId: 'remote:worker-card',
-      canonicalSegmentKey: 'remote:worker-child-tip',
+      title: 'Worker child Card',
+      relationship: 'child',
       route: {
+        to: '/chat/$sessionKey',
         params: { sessionKey: 'remote:worker-card' },
         search: { inspect: 'remote:worker-child-card' },
       },
     })
+    expect(
+      resolveSwarmSessionCardTarget(list, {
+        ...childOwner,
+        parentCardId: 'remote:other-parent',
+      }),
+    ).toBeUndefined()
+    expect(
+      resolveSwarmSessionCardTarget(list, {
+        ...childOwner,
+        parentCardId: null,
+      }),
+    ).toBeUndefined()
   })
 
-  it('fails closed for incomplete, retryable, duplicate, and unmapped Cards', () => {
+  it('fails closed for source mismatch, malformed child ownership, incomplete, duplicate, and unmapped Cards', () => {
     const complete = card()
     expect(
       resolveSwarmSessionCardTarget(
@@ -109,17 +148,80 @@ describe('resolveSwarmSessionCardTarget', () => {
             },
           ],
         ),
-        complete.cardId,
+        rootOwner,
       ),
     ).toBeUndefined()
     expect(
       resolveSwarmSessionCardTarget(
         response([complete, { ...complete }]),
-        complete.cardId,
+        rootOwner,
       ),
     ).toBeUndefined()
     expect(
-      resolveSwarmSessionCardTarget(response([complete]), 'remote:missing'),
+      resolveSwarmSessionCardTarget(response([complete]), {
+        ...rootOwner,
+        cardId: 'remote:missing',
+      }),
+    ).toBeUndefined()
+    expect(
+      resolveSwarmSessionCardTarget(
+        response([
+          childCard(),
+          card({
+            cardId: 'remote:other-parent',
+            canonicalSegmentKey: 'remote:other-parent',
+            continuationSegmentKeys: ['remote:other-parent'],
+            continuationCount: 1,
+            childNodes: [childCard().childNodes[0]!],
+          }),
+        ]),
+        childOwner,
+      ),
+    ).toBeUndefined()
+    expect(
+      resolveSwarmSessionCardTarget(
+        response(
+          [childCard()].map((parent) => ({
+            ...parent,
+            childNodes: parent.childNodes.map((child) => ({
+              ...child,
+              cardId: 'local:worker-child-card',
+              sessionKey: 'local:worker-child-tip',
+              continuationSegmentKeys: [
+                'local:worker-child-card',
+                'local:worker-child-tip',
+              ],
+            })),
+          })),
+        ),
+        {
+          ...childOwner,
+          cardId: 'local:worker-child-card',
+        },
+      ),
     ).toBeUndefined()
   })
 })
+
+// Compile-time closure: callers must provide a Card-owner object with explicit
+// parent identity. Retired raw activity/session strings are not identity APIs.
+function compileTimeIdentityContract() {
+  // @ts-expect-error Raw Card/session strings cannot identify embedded Chat.
+  resolveSwarmSessionCardTarget(response([card()]), 'remote:worker-card')
+
+  const invalidOptions: UseSwarmChatOptions = {
+    workerId: 'builder',
+    // @ts-expect-error The legacy raw activity Card argument is retired.
+    activityCardId: 'remote:worker-card',
+  }
+  void invalidOptions
+
+  const incompleteOwner: SwarmSessionCardOwner = {
+    kind: 'session-card-owner',
+    cardId: 'remote:worker-card',
+    // @ts-expect-error Parent identity must be explicit, including null for roots.
+    parentCardId: undefined,
+  }
+  void incompleteOwner
+}
+void compileTimeIdentityContract
