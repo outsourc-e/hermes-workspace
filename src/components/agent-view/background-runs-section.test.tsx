@@ -32,6 +32,15 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => mocks.navigate,
 }))
 
+vi.mock('@/screens/chat/chat-queries', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/screens/chat/chat-queries')>()
+  return {
+    ...actual,
+    fetchSessionCards: vi.fn(async () => mocks.cardWire),
+  }
+})
+
 vi.mock('@hugeicons/react', () => ({
   HugeiconsIcon: () => <span aria-hidden="true" />,
 }))
@@ -71,13 +80,22 @@ function cards(): SessionCardListWire {
         completeness: 'complete',
         retryable: false,
       },
+      {
+        cardId: 'remote:child-card',
+        parentCardId: 'remote:parent-card',
+        completeness: 'complete',
+        retryable: false,
+      },
     ],
     cards: [
       {
         cardId: 'remote:parent-card',
         canonicalSource: 'remote',
+        canonicalTransport: 'gateway',
         canonicalSegmentKey: 'remote:parent-tip',
+        continuationCount: 2,
         continuationSegmentKeys: ['remote:parent-card', 'remote:parent-tip'],
+        relationshipKind: 'root',
         sessionKey: 'remote:parent-tip',
         title: 'Parent Card title',
         status: 'running',
@@ -167,7 +185,19 @@ describe('BackgroundRunsSection Card-only mounting', () => {
           }),
         )
       }
-      if (url === '/api/session-cards/remote%3Achild-card/active-run/abandon') {
+      if (url === '/api/session-cards') {
+        return Promise.resolve(
+          new Response(JSON.stringify(cards()), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      if (
+        url.startsWith(
+          '/api/session-cards/remote%3Achild-card/active-run/abandon',
+        )
+      ) {
         return Promise.resolve(
           new Response(JSON.stringify({ ok: true }), {
             status: 200,
@@ -217,21 +247,34 @@ describe('BackgroundRunsSection Card-only mounting', () => {
     expect(queryKeys).toEqual(new Set())
     const urls = fetchMock.mock.calls.map(([input]) => String(input))
     expect(urls).not.toContain('/api/sessions')
-    expect(urls).not.toContain('/api/session-cards')
     expect(urls.some((url) => url.startsWith('/api/history'))).toBe(false)
     expect(urls).not.toContain('/api/sessions/send')
-    expect(urls).toContain(
-      '/api/session-cards/remote%3Achild-card/active-run/abandon',
-    )
-    const abandonCall = fetchMock.mock.calls.find(
-      ([input]) =>
-        String(input) ===
+    expect(
+      urls.some((url) =>
+        url.startsWith(
+          '/api/session-cards/remote%3Achild-card/active-run/abandon',
+        ),
+      ),
+    ).toBe(true)
+    const abandonCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).startsWith(
         '/api/session-cards/remote%3Achild-card/active-run/abandon',
+      ),
     )
     expect(abandonCall?.[1]).toMatchObject({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ runId: 'mapped-run' }),
+    })
+    expect(JSON.parse(String(abandonCall?.[1]?.body))).toEqual({
+      runId: 'mapped-run',
+      cardBinding: {
+        kind: 'session-card-owner',
+        cardId: 'remote:child-card',
+        parentCardId: 'remote:parent-card',
+        canonicalSource: 'remote',
+        canonicalSegmentKey: 'remote:child-tip',
+        canonicalTransport: 'gateway',
+      },
     })
     expect(
       urls.some(
