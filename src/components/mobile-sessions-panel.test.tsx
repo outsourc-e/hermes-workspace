@@ -114,6 +114,11 @@ describe('MobileSessionsPanel Card routing', () => {
     expect(screen.queryByText('Child activity')).toBeNull()
     React.act(() => fireEvent.click(expandButton))
     expect(screen.getByText('Child activity')).toBeTruthy()
+    expect(document.body.innerHTML).toContain('card:root')
+    expect(document.body.innerHTML).toContain('card:child')
+    expect(document.body.innerHTML).not.toContain('remote:tip')
+    expect(document.body.innerHTML).not.toContain('remote:root')
+    expect(document.body.innerHTML).not.toContain('remote:child')
   })
 
   it('selects the parent by cardId and child activity as inspect state', () => {

@@ -508,7 +508,6 @@ export function MobileSessionsPanel({
                           onClick={() => onSelectSession(card.cardId)}
                           aria-current={active ? 'page' : undefined}
                           data-card-id={card.cardId}
-                          data-session-key={card.canonicalSegmentKey}
                           data-session-depth={0}
                           className={cn(
                             'min-w-0 flex-1 rounded-lg border px-3 py-2 text-left transition-colors',

@@ -99,8 +99,12 @@ export function OperationsInlineChat({
   async function handleSend() {
     const message = draft.trim()
     if (!message || isSending || !canSend) return
-    await sendMessage(message)
-    setDraft('')
+    try {
+      await sendMessage(message)
+      setDraft('')
+    } catch {
+      // The mutation exposes a safe inline error and the unsent draft remains.
+    }
   }
 
   return (

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { fireEvent, screen } from '@testing-library/dom'
+import { fireEvent, screen, within } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OperationsScreen } from './operations-screen'
@@ -276,13 +276,27 @@ async function renderOperations() {
     root.render(<OperationsScreen />)
     await Promise.resolve()
   })
-  mountedRoots.push(() => {
+  let mounted = true
+  const unmount = () => {
+    if (!mounted) return
+    mounted = false
     React.act(() => root.unmount())
     container.remove()
-  })
+  }
+  mountedRoots.push(unmount)
+  return {
+    rerender: async () => {
+      await React.act(async () => {
+        root.render(<OperationsScreen />)
+        await Promise.resolve()
+      })
+    },
+    unmount,
+  }
 }
 
 beforeEach(() => {
+  window.localStorage.clear()
   mocks.navigate.mockReset()
   mocks.invalidateQueries.mockReset()
   mocks.historyRefetch.mockReset()
@@ -389,9 +403,18 @@ describe('mounted Operations Session Card activity', () => {
         queryKey[1] === 'session-cards' &&
         (queryKey[2] === 'history' || queryKey[2] === 'child-history'),
     )
-    expect(historyQueries).toHaveLength(2)
+    expect(
+      new Set(historyQueries.map(({ queryKey }) => JSON.stringify(queryKey))),
+    ).toHaveLength(2)
     await Promise.all(
-      historyQueries.map((query) => query.queryFn({ signal: undefined })),
+      [
+        ...new Map(
+          historyQueries.map((query) => [
+            JSON.stringify(query.queryKey),
+            query,
+          ]),
+        ).values(),
+      ].map((query) => query.queryFn({ signal: undefined })),
     )
 
     const rootInput = screen.getByPlaceholderText('Message Worker...')
@@ -425,6 +448,145 @@ describe('mounted Operations Session Card activity', () => {
     expect(mocks.invalidateQueries.mock.calls).toContainEqual([
       { queryKey: ['chat', 'session-cards', 'list', false, 0] },
     ])
+  })
+
+  it('keeps the optimistic user and returned assistant rows Card-owned across stale history and remount', async () => {
+    const assistantText = 'durable Operations assistant reply'
+    const userText = 'durable Operations user turn'
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      const url = String(input)
+      if (url === '/api/session-cards') {
+        return Promise.resolve(Response.json(mocks.cardResponse))
+      }
+      if (url === '/api/send-stream' && init?.method === 'POST') {
+        return Promise.resolve(
+          new Response(
+            [
+              'event: started',
+              'data: {"runId":"operations-run"}',
+              '',
+              'event: chunk',
+              `data: ${JSON.stringify({ text: assistantText, fullReplace: true })}`,
+              '',
+              'event: done',
+              'data: {"state":"final"}',
+              '',
+              '',
+            ].join('\n'),
+          ),
+        )
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const mounted = await renderOperations()
+    const input =
+      screen.getByPlaceholderText<HTMLInputElement>('Message Worker...')
+    await React.act(async () => {
+      fireEvent.change(input, { target: { value: userText } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText(userText)).toBeTruthy()
+    expect(screen.getByText(assistantText)).toBeTruthy()
+
+    await React.act(async () => {
+      await mocks.historyRefetch()
+    })
+    await mounted.rerender()
+    expect(screen.getByText(userText)).toBeTruthy()
+    expect(screen.getByText(assistantText)).toBeTruthy()
+
+    const storedKeys = Array.from(
+      { length: window.localStorage.length },
+      (_, index) => window.localStorage.key(index) ?? '',
+    ).filter((key) => key.startsWith('workspace.operations-card-chat.'))
+    expect(storedKeys).toEqual([
+      'workspace.operations-card-chat.v1:remote%3Aworker-card',
+    ])
+    expect(JSON.stringify(window.localStorage)).not.toContain(
+      'remote:agent%3Amain%3Aops-worker',
+    )
+
+    mounted.unmount()
+    const remounted = await renderOperations()
+    expect(screen.getByText(userText)).toBeTruthy()
+    expect(screen.getByText(assistantText)).toBeTruthy()
+
+    mocks.historyResponse = {
+      messages: [
+        {
+          id: 'server-user',
+          role: 'user',
+          content: [{ type: 'text', text: userText }],
+        },
+        {
+          id: 'server-assistant',
+          role: 'assistant',
+          content: [{ type: 'text', text: assistantText }],
+        },
+      ],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+    await remounted.rerender()
+    const remountedRootCard = screen
+      .getByPlaceholderText('Message Worker...')
+      .closest('article')!
+    expect(within(remountedRootCard).getAllByText(userText)).toHaveLength(1)
+    expect(within(remountedRootCard).getAllByText(assistantText)).toHaveLength(
+      1,
+    )
+    expect(
+      window.localStorage.getItem(
+        'workspace.operations-card-chat.v1:remote%3Aworker-card',
+      ),
+    ).toBeNull()
+  })
+
+  it('fails closed before send when the current Card projection no longer matches the mounted binding', async () => {
+    const rolledResponse = sessionCardResponse()
+    rolledResponse.cards = rolledResponse.cards.map((card) =>
+      card.cardId === 'remote:worker-card'
+        ? {
+            ...card,
+            canonicalSegmentKey: 'remote:agent%3Amain%3Aops-worker-next',
+            continuationSegmentKeys: [
+              ...card.continuationSegmentKeys,
+              'remote:agent%3Amain%3Aops-worker-next',
+            ],
+            continuationCount: card.continuationCount + 1,
+          }
+        : card,
+    )
+    const fetchMock = vi.fn<typeof fetch>((input) => {
+      const url = String(input)
+      if (url === '/api/session-cards') {
+        return Promise.resolve(Response.json(rolledResponse))
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await renderOperations()
+    const input =
+      screen.getByPlaceholderText<HTMLInputElement>('Message Worker...')
+    await React.act(async () => {
+      fireEvent.change(input, { target: { value: 'do not misroute' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await Promise.resolve()
+    })
+
+    expect(input.value).toBe('do not misroute')
+    expect(screen.queryByText('do not misroute')).toBeNull()
+    expect(
+      fetchMock.mock.calls.some(
+        ([request]) => String(request) === '/api/send-stream',
+      ),
+    ).toBe(false)
   })
 
   it('hides incomplete and unresolved Card activity', async () => {

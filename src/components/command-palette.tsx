@@ -251,7 +251,7 @@ export function CommandPalette({ pathname }: CommandPaletteProps) {
         id: `session-${card.cardId}`,
         group: 'Recent Sessions',
         label: card.title,
-        keywords: `${card.cardId} ${card.canonicalSegmentKey} ${card.continuationSegmentKeys.join(' ')}`,
+        keywords: card.cardId,
         shortcut: 'Open',
         icon: Chat01Icon,
         onSelect: () =>

@@ -1,9 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { resolveOperationsChatCardId } from './use-operations'
 import type { OperationsChatTarget } from './use-operations'
-import type { ChatMessage } from '@/screens/chat/types'
+import type { ChatMessage, SessionCard } from '@/screens/chat/types'
 import {
   fetchCompleteSessionCardHistory,
+  fetchSessionCards,
   isAuthoritativeCompleteSessionCardHistory,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
@@ -15,6 +17,20 @@ export type OperationsChatMessage = {
   content: string
   timestamp?: number
 }
+
+type OperationsChatOverlayMessage = OperationsChatMessage & {
+  role: 'user' | 'assistant'
+  acknowledgementOrdinal: number
+}
+
+type OperationsChatOverlayEnvelope = {
+  version: 1
+  owner: { cardId: string }
+  messages: Array<OperationsChatOverlayMessage>
+}
+
+const OPERATIONS_CHAT_OVERLAY_PREFIX = 'workspace.operations-card-chat.v1:'
+const MAX_OVERLAY_MESSAGES = 100
 
 function normalizeMessage(
   message: ChatMessage,
@@ -47,13 +63,280 @@ function childForTarget(target: OperationsChatTarget) {
   )
 }
 
-/** Card-only history and send transport for mounted Operations agent chats. */
+function overlayStorageKey(cardId: string) {
+  return `${OPERATIONS_CHAT_OVERLAY_PREFIX}${encodeURIComponent(cardId)}`
+}
+
+function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
+  if (typeof window === 'undefined' || !cardId) return []
+  try {
+    const raw = window.localStorage.getItem(overlayStorageKey(cardId))
+    if (!raw) return []
+    const parsedValue = JSON.parse(raw) as unknown
+    if (!parsedValue || typeof parsedValue !== 'object') {
+      window.localStorage.removeItem(overlayStorageKey(cardId))
+      return []
+    }
+    const parsed = parsedValue as Record<string, unknown>
+    const owner =
+      parsed.owner && typeof parsed.owner === 'object'
+        ? (parsed.owner as Record<string, unknown>)
+        : undefined
+    if (
+      parsed.version !== 1 ||
+      owner?.cardId !== cardId ||
+      !Array.isArray(parsed.messages) ||
+      parsed.messages.length > MAX_OVERLAY_MESSAGES
+    ) {
+      window.localStorage.removeItem(overlayStorageKey(cardId))
+      return []
+    }
+
+    const messages: Array<OperationsChatOverlayMessage> = []
+    for (const candidateValue of parsed.messages) {
+      if (
+        !candidateValue ||
+        typeof candidateValue !== 'object' ||
+        Array.isArray(candidateValue)
+      ) {
+        window.localStorage.removeItem(overlayStorageKey(cardId))
+        return []
+      }
+      const candidate = candidateValue as Record<string, unknown>
+      if (
+        (candidate.role !== 'user' && candidate.role !== 'assistant') ||
+        typeof candidate.id !== 'string' ||
+        !candidate.id ||
+        typeof candidate.content !== 'string' ||
+        !candidate.content.trim() ||
+        typeof candidate.acknowledgementOrdinal !== 'number' ||
+        !Number.isSafeInteger(candidate.acknowledgementOrdinal) ||
+        candidate.acknowledgementOrdinal < 1
+      ) {
+        window.localStorage.removeItem(overlayStorageKey(cardId))
+        return []
+      }
+      messages.push({
+        id: candidate.id,
+        role: candidate.role,
+        content: candidate.content,
+        acknowledgementOrdinal: candidate.acknowledgementOrdinal,
+        ...(typeof candidate.timestamp === 'number' &&
+        Number.isFinite(candidate.timestamp)
+          ? { timestamp: candidate.timestamp }
+          : {}),
+      })
+    }
+    return messages
+  } catch {
+    window.localStorage.removeItem(overlayStorageKey(cardId))
+    return []
+  }
+}
+
+function writeOverlay(
+  cardId: string,
+  messages: Array<OperationsChatOverlayMessage>,
+) {
+  if (typeof window === 'undefined' || !cardId) return
+  const key = overlayStorageKey(cardId)
+  if (messages.length === 0) {
+    window.localStorage.removeItem(key)
+    return
+  }
+  const envelope: OperationsChatOverlayEnvelope = {
+    version: 1,
+    owner: { cardId },
+    messages: messages.slice(-MAX_OVERLAY_MESSAGES),
+  }
+  window.localStorage.setItem(key, JSON.stringify(envelope))
+}
+
+function messageSignature(
+  message: Pick<OperationsChatMessage, 'role' | 'content'>,
+) {
+  return `${message.role}\u0000${message.content.trim()}`
+}
+
+function signatureCounts(messages: Array<OperationsChatMessage>) {
+  const counts = new Map<string, number>()
+  for (const message of messages) {
+    const signature = messageSignature(message)
+    counts.set(signature, (counts.get(signature) ?? 0) + 1)
+  }
+  return counts
+}
+
+function nextAcknowledgementOrdinal(
+  message: Pick<OperationsChatOverlayMessage, 'role' | 'content'>,
+  history: Array<OperationsChatMessage>,
+  overlay: Array<OperationsChatOverlayMessage>,
+) {
+  const signature = messageSignature(message)
+  const historyCount = signatureCounts(history).get(signature) ?? 0
+  const overlayOrdinal = overlay.reduce(
+    (highest, candidate) =>
+      messageSignature(candidate) === signature
+        ? Math.max(highest, candidate.acknowledgementOrdinal)
+        : highest,
+    0,
+  )
+  return Math.max(historyCount, overlayOrdinal) + 1
+}
+
+function textFromUnknownContent(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (!Array.isArray(value)) return ''
+  return value
+    .map((part) => {
+      if (!part || typeof part !== 'object') return ''
+      const record = part as Record<string, unknown>
+      return typeof record.text === 'string' ? record.text : ''
+    })
+    .join('')
+}
+
+function assistantTextFromPayload(payload: Record<string, unknown>) {
+  const message = payload.message
+  if (typeof message === 'string') return message
+  if (!message || typeof message !== 'object' || Array.isArray(message))
+    return ''
+  const record = message as Record<string, unknown>
+  return (
+    (typeof record.text === 'string' ? record.text : '') ||
+    textFromUnknownContent(record.content)
+  )
+}
+
+function processSseBlock(
+  block: string,
+  currentText: string,
+): { text: string; changed: boolean; error?: string } {
+  let event = ''
+  let data = ''
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) event = line.slice(6).trim()
+    else if (line.startsWith('data:')) data += line.slice(5).trimStart()
+  }
+  if (!event || !data) return { text: currentText, changed: false }
+
+  let payload: Record<string, unknown>
+  try {
+    const parsed = JSON.parse(data) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { text: currentText, changed: false }
+    }
+    payload = parsed as Record<string, unknown>
+  } catch {
+    return { text: currentText, changed: false }
+  }
+
+  if (event === 'error') {
+    return {
+      text: currentText,
+      changed: false,
+      error:
+        typeof payload.message === 'string'
+          ? payload.message
+          : 'Operations chat stream failed',
+    }
+  }
+  if (event === 'done' && payload.state === 'error') {
+    return {
+      text: currentText,
+      changed: false,
+      error:
+        typeof payload.errorMessage === 'string'
+          ? payload.errorMessage
+          : 'Operations chat stream failed',
+    }
+  }
+
+  if (event === 'assistant') {
+    const text = typeof payload.text === 'string' ? payload.text : ''
+    return text
+      ? { text, changed: text !== currentText }
+      : { text: currentText, changed: false }
+  }
+  if (event === 'chunk') {
+    const nextPart = [
+      payload.delta,
+      payload.text,
+      payload.content,
+      payload.chunk,
+    ].find(
+      (candidate): candidate is string =>
+        typeof candidate === 'string' && candidate.length > 0,
+    )
+    if (!nextPart) return { text: currentText, changed: false }
+    const text =
+      payload.fullReplace === true ? nextPart : currentText + nextPart
+    return { text, changed: text !== currentText }
+  }
+  if ((event === 'done' || event === 'complete') && !currentText) {
+    const text = assistantTextFromPayload(payload)
+    return text
+      ? { text, changed: true }
+      : { text: currentText, changed: false }
+  }
+  return { text: currentText, changed: false }
+}
+
+async function consumeAssistantStream(
+  response: Response,
+  onText: (text: string) => void,
+) {
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('Operations chat stream is unavailable')
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let assistantText = ''
+
+  const processBufferedEvents = (flush: boolean) => {
+    const blocks = buffer.split('\n\n')
+    buffer = flush ? '' : (blocks.pop() ?? '')
+    for (const block of blocks) {
+      if (!block.trim()) continue
+      const result = processSseBlock(block, assistantText)
+      if (result.error) throw new Error(result.error)
+      assistantText = result.text
+      if (result.changed) onText(assistantText)
+    }
+  }
+
+  let streamDone = false
+  while (!streamDone) {
+    const result = await reader.read()
+    streamDone = result.done
+    if (streamDone) continue
+    buffer += decoder
+      .decode(result.value, { stream: true })
+      .replaceAll('\r\n', '\n')
+    processBufferedEvents(false)
+  }
+  buffer += decoder.decode().replaceAll('\r\n', '\n')
+  if (buffer.trim()) buffer += '\n\n'
+  processBufferedEvents(true)
+}
+
+function sameBinding(left: SessionCard, right: SessionCard) {
+  return (
+    left.cardId === right.cardId &&
+    left.canonicalSegmentKey === right.canonicalSegmentKey &&
+    left.canonicalSource === right.canonicalSource &&
+    left.canonicalTransport === right.canonicalTransport &&
+    left.relationshipKind === right.relationshipKind
+  )
+}
+
+/** Card-only history, immediate overlay, recovery, and send transport. */
 export function useAgentChat(target: OperationsChatTarget | undefined) {
   const queryClient = useQueryClient()
   const child = target ? childForTarget(target) : undefined
   const cardId = child?.cardId ?? target?.card.cardId ?? ''
   const canonicalSegmentKey =
     child?.sessionKey ?? target?.card.canonicalSegmentKey ?? ''
+  const ownerCardId = child ? '' : cardId
   const historyQueryKey =
     child && target
       ? sessionCardQueryKeys.childHistory(target.card.cardId, child.cardId)
@@ -76,32 +359,179 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     refetchInterval: 5_000,
   })
 
+  const completeHistory = isAuthoritativeCompleteSessionCardHistory(
+    historyQuery.data,
+  )
+    ? historyQuery.data
+    : undefined
+  const authoritativeMessages = useMemo(
+    () =>
+      (completeHistory?.messages ?? [])
+        .map(normalizeMessage)
+        .filter((message): message is OperationsChatMessage =>
+          Boolean(message),
+        ),
+    [completeHistory?.messages],
+  )
+  const [overlayMessages, setOverlayMessages] = useState<
+    Array<OperationsChatOverlayMessage>
+  >(() => readOverlay(ownerCardId))
+  const overlayRef = useRef(overlayMessages)
+  const overlayOwnerRef = useRef(ownerCardId)
+
+  const commitOverlay = (
+    nextMessages: Array<OperationsChatOverlayMessage>,
+    expectedOwner = ownerCardId,
+  ) => {
+    if (!expectedOwner) return
+    const bounded = nextMessages.slice(-MAX_OVERLAY_MESSAGES)
+    writeOverlay(expectedOwner, bounded)
+    if (overlayOwnerRef.current !== expectedOwner) return
+    overlayRef.current = bounded
+    setOverlayMessages(bounded)
+  }
+
+  useEffect(() => {
+    overlayOwnerRef.current = ownerCardId
+    const recovered = readOverlay(ownerCardId)
+    overlayRef.current = recovered
+    setOverlayMessages(recovered)
+  }, [ownerCardId])
+
+  const historySignatureCounts = useMemo(
+    () => signatureCounts(authoritativeMessages),
+    [authoritativeMessages],
+  )
+  const unacknowledgedOverlay = useMemo(
+    () =>
+      overlayMessages.filter(
+        (message) =>
+          (historySignatureCounts.get(messageSignature(message)) ?? 0) <
+          message.acknowledgementOrdinal,
+      ),
+    [historySignatureCounts, overlayMessages],
+  )
+
+  useEffect(() => {
+    if (
+      !ownerCardId ||
+      unacknowledgedOverlay.length === overlayMessages.length
+    ) {
+      return
+    }
+    commitOverlay(unacknowledgedOverlay, ownerCardId)
+  }, [ownerCardId, overlayMessages, unacknowledgedOverlay])
+
+  const messages = useMemo(
+    () => [...authoritativeMessages, ...unacknowledgedOverlay],
+    [authoritativeMessages, unacknowledgedOverlay],
+  )
+
   const sendMutation = useMutation({
     mutationFn: async (message: string) => {
-      if (!target || child) {
+      if (!target || child || !ownerCardId) {
         throw new Error(
           child
             ? 'Child Session Card transcripts are read-only'
             : 'Operations chat Card is unavailable',
         )
       }
+
+      const mountedResolution = resolveOperationsChatCardId(
+        target.cardList,
+        target.card.cardId,
+      )
+      const currentCardList = await fetchSessionCards()
+      const currentResolution = resolveOperationsChatCardId(
+        currentCardList,
+        target.card.cardId,
+      )
+      if (
+        !mountedResolution ||
+        mountedResolution.inspectedChildCardId ||
+        !sameBinding(mountedResolution.card, target.card) ||
+        !currentResolution ||
+        currentResolution.inspectedChildCardId ||
+        !sameBinding(currentResolution.card, target.card) ||
+        (currentResolution.card.relationshipKind !== 'root' &&
+          currentResolution.card.relationshipKind !== 'orphan')
+      ) {
+        throw new Error(
+          'Operations chat Card changed. Refresh before sending again.',
+        )
+      }
+
+      const idempotencyKey = crypto.randomUUID()
+      const timestamp = Date.now()
+      const optimisticUser: OperationsChatOverlayMessage = {
+        id: `operations-user-${idempotencyKey}`,
+        role: 'user',
+        content: message,
+        timestamp,
+        acknowledgementOrdinal: nextAcknowledgementOrdinal(
+          { role: 'user', content: message },
+          authoritativeMessages,
+          overlayRef.current,
+        ),
+      }
+      let activeSendOverlay = [...overlayRef.current, optimisticUser]
+      commitOverlay(activeSendOverlay, ownerCardId)
+
       const response = await fetch('/api/send-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cardId: target.card.cardId,
-          sessionKey: target.card.canonicalSegmentKey,
-          friendlyId: target.card.cardId,
+          cardId: currentResolution.card.cardId,
+          sessionKey: currentResolution.card.canonicalSegmentKey,
+          friendlyId: currentResolution.card.cardId,
           message,
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey,
         }),
       })
       if (!response.ok) {
         throw new Error((await response.text()) || 'Failed to send message')
       }
-      // Keep the mutation pending for the stream lifetime. The authoritative
-      // Card history refetch below supplies the rendered transcript.
-      await response.text()
+
+      const assistantId = `operations-assistant-${idempotencyKey}`
+      await consumeAssistantStream(response, (content) => {
+        const existing = activeSendOverlay.find(
+          (entry) => entry.id === assistantId,
+        )
+        if (existing) {
+          const withoutAssistant = activeSendOverlay.filter(
+            (entry) => entry.id !== assistantId,
+          )
+          const acknowledgementOrdinal =
+            messageSignature(existing) ===
+            messageSignature({ role: 'assistant', content })
+              ? existing.acknowledgementOrdinal
+              : nextAcknowledgementOrdinal(
+                  { role: 'assistant', content },
+                  authoritativeMessages,
+                  withoutAssistant,
+                )
+          activeSendOverlay = activeSendOverlay.map((entry) =>
+            entry.id === assistantId
+              ? { ...entry, content, acknowledgementOrdinal }
+              : entry,
+          )
+          commitOverlay(activeSendOverlay, ownerCardId)
+          return
+        }
+        const assistant: OperationsChatOverlayMessage = {
+          id: assistantId,
+          role: 'assistant',
+          content,
+          timestamp: Date.now(),
+          acknowledgementOrdinal: nextAcknowledgementOrdinal(
+            { role: 'assistant', content },
+            authoritativeMessages,
+            activeSendOverlay,
+          ),
+        }
+        activeSendOverlay = [...activeSendOverlay, assistant]
+        commitOverlay(activeSendOverlay, ownerCardId)
+      })
     },
     onSuccess: async () => {
       if (!target) return
@@ -114,22 +544,8 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     },
   })
 
-  const completeHistory = isAuthoritativeCompleteSessionCardHistory(
-    historyQuery.data,
-  )
-    ? historyQuery.data
-    : undefined
   const historyUnavailable = Boolean(
     target && historyQuery.data && !completeHistory,
-  )
-  const messages = useMemo(
-    () =>
-      (completeHistory?.messages ?? [])
-        .map(normalizeMessage)
-        .filter((message): message is OperationsChatMessage =>
-          Boolean(message),
-        ),
-    [completeHistory?.messages],
   )
   const error = !target
     ? 'Chat unavailable: no complete Session Card was resolved.'

@@ -28,8 +28,20 @@ vi.mock('@hugeicons/react', () => ({
 }))
 
 vi.mock('@/components/ui/command', () => ({
-  Command: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
+  Command: ({
+    children,
+    onValueChange,
+  }: {
+    children: React.ReactNode
+    onValueChange: (value: string) => void
+  }) => (
+    <div>
+      <input
+        aria-label="Command search"
+        onChange={(event) => onValueChange(event.target.value)}
+      />
+      {children}
+    </div>
   ),
   CommandDialog: ({
     children,
@@ -50,7 +62,7 @@ vi.mock('@/components/ui/command', () => ({
   CommandGroupLabel: ({ children }: { children: React.ReactNode }) => (
     <h2>{children}</h2>
   ),
-  CommandInput: () => <input aria-label="Command search" />,
+  CommandInput: () => null,
   CommandItem: ({
     children,
     onClick,
@@ -67,15 +79,23 @@ vi.mock('@/components/ui/command', () => ({
   CommandSeparator: () => <hr />,
 }))
 
-function card(cardId: string, title: string, updatedAt: number): SessionCard {
+function card(
+  cardId: string,
+  title: string,
+  updatedAt: number,
+  canonicalSegmentKey = 'remote:raw-canonical-segment',
+): SessionCard {
   return {
     cardId,
     canonicalSource: 'remote',
     title,
     titleSource: 'manual',
-    canonicalSegmentKey: `${cardId}:tip`,
-    continuationSegmentKeys: [`${cardId}:tip`],
-    continuationCount: 1,
+    canonicalSegmentKey,
+    continuationSegmentKeys: [
+      'remote:raw-continuation-segment',
+      canonicalSegmentKey,
+    ],
+    continuationCount: 2,
     relationshipKind: 'root',
     childNodes: [],
     updatedAt,
@@ -155,6 +175,23 @@ describe('CommandPalette Session Card inventory', () => {
 
     expect(screen.getByText(complete.title)).toBeTruthy()
     expect(screen.queryByText(incomplete.title)).toBeNull()
+    expect(document.body.innerHTML).not.toContain(complete.canonicalSegmentKey)
+    expect(document.body.innerHTML).not.toContain(
+      complete.continuationSegmentKeys[0],
+    )
+
+    React.act(() =>
+      fireEvent.change(screen.getByLabelText('Command search'), {
+        target: { value: complete.canonicalSegmentKey },
+      }),
+    )
+    expect(screen.queryByText(complete.title)).toBeNull()
+
+    React.act(() =>
+      fireEvent.change(screen.getByLabelText('Command search'), {
+        target: { value: '' },
+      }),
+    )
     React.act(() => fireEvent.click(screen.getByText(complete.title)))
     expect(mocks.navigate).toHaveBeenCalledWith({
       to: '/chat/$sessionKey',
