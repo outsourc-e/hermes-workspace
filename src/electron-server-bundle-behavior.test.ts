@@ -16,27 +16,35 @@ type SessionCardServiceBoundary = {
 type ElectronArtifactBoundaries = {
   abandonActiveCardRun: ArtifactFunction
   appendLocalMessage: ArtifactFunction
+  appendRunText: ArtifactFunction
   appendSwarmMemoryEvent: ArtifactFunction
+  createPersistedRun: ArtifactFunction
   dashboardFetch: ArtifactFunction
   dispatchPromptToLiveSession: ArtifactFunction
   ensureGatewayProbed: ArtifactFunction
   ensureLocalSession: ArtifactFunction
   execFile: ArtifactFunction
+  getLocalMessages: ArtifactFunction
   getSwarmProfilePath: ArtifactFunction
   listAllActiveRuns: ArtifactFunction
   loadWorkspaceCatalog: ArtifactFunction
   markCheckpointResult: ArtifactFunction
   markDispatchResult: ArtifactFunction
   markDispatchStarted: ArtifactFunction
+  markRunStatus: ArtifactFunction
   openaiChat: ArtifactFunction
+  publishCardActivityEvent: ArtifactFunction
   publishSwarmCheckpointNotification: ArtifactFunction
   readRuntimeCheckpointSnapshot: ArtifactFunction
   readWorkerMessages: ArtifactFunction
   recordMissionCheckpoint: ArtifactFunction
+  registerActiveSendRun: ArtifactFunction
   requireLocalOrAuth: ArtifactFunction
   resetSwarmWorkerRuntime: ArtifactFunction
   streamChat: ArtifactFunction
   streamResponses: ArtifactFunction
+  touchLocalSession: ArtifactFunction
+  unregisterActiveSendRun: ArtifactFunction
 }
 
 type ElectronServerArtifact = {
@@ -94,7 +102,9 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
   replaceBoundaries(boundaries) {
     abandonActiveCardRun = boundaries.abandonActiveCardRun;
     appendLocalMessage = boundaries.appendLocalMessage;
+    appendRunText = boundaries.appendRunText;
     appendSwarmMemoryEvent = boundaries.appendSwarmMemoryEvent;
+    createPersistedRun = boundaries.createPersistedRun;
     dashboardFetch$1 = boundaries.dashboardFetch;
     ${dispatchDelivery} = boundaries.dispatchPromptToLiveSession;
     ensureGatewayProbed = boundaries.ensureGatewayProbed;
@@ -103,21 +113,27 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
       ...import_node_child_process,
       execFile: boundaries.execFile,
     };
+    getLocalMessages = boundaries.getLocalMessages;
     getSwarmProfilePath = boundaries.getSwarmProfilePath;
     listAllActiveRuns = boundaries.listAllActiveRuns;
     loadWorkspaceCatalog = boundaries.loadWorkspaceCatalog;
     markCheckpointResult = boundaries.markCheckpointResult;
     markDispatchResult = boundaries.markDispatchResult;
     markDispatchStarted = boundaries.markDispatchStarted;
+    markRunStatus = boundaries.markRunStatus;
     openaiChat = boundaries.openaiChat;
+    publishCardActivityEvent = boundaries.publishCardActivityEvent;
     publishSwarmCheckpointNotification = boundaries.publishSwarmCheckpointNotification;
     readRuntimeCheckpointSnapshot = boundaries.readRuntimeCheckpointSnapshot;
     readWorkerMessages = boundaries.readWorkerMessages;
     recordMissionCheckpoint = boundaries.recordMissionCheckpoint;
+    registerActiveSendRun = boundaries.registerActiveSendRun;
     requireLocalOrAuth = boundaries.requireLocalOrAuth;
     resetSwarmWorkerRuntime = boundaries.resetSwarmWorkerRuntime;
     streamChat = boundaries.streamChat;
     streamResponses = boundaries.streamResponses;
+    touchLocalSession = boundaries.touchLocalSession;
+    unregisterActiveSendRun = boundaries.unregisterActiveSendRun;
   },
 };
 `
@@ -265,7 +281,7 @@ function directChatRequest() {
   })
 }
 
-function sendStreamRequest() {
+function sendStreamRequest(message = 'Do not reach a provider after rollover') {
   return new Request('http://workspace.test/api/send-stream', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -273,7 +289,7 @@ function sendStreamRequest() {
       cardId: localCardId,
       sessionKey: localSegmentKey,
       friendlyId: localCardId,
-      message: 'Do not reach a provider after rollover',
+      message,
     }),
   })
 }
@@ -372,6 +388,18 @@ describe('checked-in Electron server bundle behavior', () => {
   const localStoreActions = {
     appendLocalMessage: vi.fn(),
     ensureLocalSession: vi.fn(),
+    getLocalMessages: vi.fn(),
+    touchLocalSession: vi.fn(),
+  }
+  const runStoreActions = {
+    appendRunText: vi.fn(),
+    createPersistedRun: vi.fn(),
+    markRunStatus: vi.fn(),
+    registerActiveSendRun: vi.fn(),
+    unregisterActiveSendRun: vi.fn(),
+  }
+  const eventActions = {
+    publishCardActivityEvent: vi.fn(),
   }
   const gatewayActions = {
     dashboardFetch: vi.fn(),
@@ -422,10 +450,18 @@ describe('checked-in Electron server bundle behavior', () => {
       workerId: 'builder',
       ok: true,
     })
+    localStoreActions.getLocalMessages.mockReturnValue([])
+    runStoreActions.appendRunText.mockResolvedValue(null)
+    runStoreActions.createPersistedRun.mockImplementation((input) =>
+      Promise.resolve(input),
+    )
+    runStoreActions.markRunStatus.mockResolvedValue(null)
     artifact.__artifactContract.replaceBoundaries({
       abandonActiveCardRun: swarmActions.abandonActiveCardRun,
       appendLocalMessage: localStoreActions.appendLocalMessage,
+      appendRunText: runStoreActions.appendRunText,
       appendSwarmMemoryEvent: swarmActions.appendSwarmMemoryEvent,
+      createPersistedRun: runStoreActions.createPersistedRun,
       dashboardFetch: gatewayActions.dashboardFetch,
       dispatchPromptToLiveSession: swarmActions.dispatchPromptToLiveSession,
       ensureGatewayProbed: gatewayActions.ensureGatewayProbed.mockResolvedValue(
@@ -436,22 +472,28 @@ describe('checked-in Electron server bundle behavior', () => {
       ),
       ensureLocalSession: localStoreActions.ensureLocalSession,
       execFile,
+      getLocalMessages: localStoreActions.getLocalMessages,
       getSwarmProfilePath: swarmActions.getSwarmProfilePath,
       listAllActiveRuns: swarmActions.listAllActiveRuns,
       loadWorkspaceCatalog: vi.fn().mockResolvedValue(null),
       markCheckpointResult: swarmActions.markCheckpointResult,
       markDispatchResult: swarmActions.markDispatchResult,
       markDispatchStarted: swarmActions.markDispatchStarted,
+      markRunStatus: runStoreActions.markRunStatus,
       openaiChat: providerActions.openaiChat,
+      publishCardActivityEvent: eventActions.publishCardActivityEvent,
       publishSwarmCheckpointNotification:
         swarmActions.publishSwarmCheckpointNotification,
       readRuntimeCheckpointSnapshot: swarmActions.readRuntimeCheckpointSnapshot,
       readWorkerMessages: swarmActions.readWorkerMessages,
       recordMissionCheckpoint: swarmActions.recordMissionCheckpoint,
+      registerActiveSendRun: runStoreActions.registerActiveSendRun,
       requireLocalOrAuth: vi.fn().mockReturnValue(true),
       resetSwarmWorkerRuntime: swarmActions.resetSwarmWorkerRuntime,
       streamChat: providerActions.streamChat,
       streamResponses: providerActions.streamResponses,
+      touchLocalSession: localStoreActions.touchLocalSession,
+      unregisterActiveSendRun: runStoreActions.unregisterActiveSendRun,
     })
   })
 
@@ -515,6 +557,80 @@ describe('checked-in Electron server bundle behavior', () => {
     expect(providerActions.openaiChat).not.toHaveBeenCalled()
     expect(providerActions.streamResponses).not.toHaveBeenCalled()
     expect(providerActions.streamChat).not.toHaveBeenCalled()
+  })
+
+  it('executes a Card-authoritative send stream and persists its accepted state effects', async () => {
+    const resolveCard = vi.fn().mockResolvedValue(resolvedLocalCard())
+    const observeCardActivity = vi.fn().mockImplementation((input) =>
+      Promise.resolve({
+        ...(input as Record<string, unknown>),
+        sessionKey: localSegmentKey,
+        updatedAt: Date.now(),
+      }),
+    )
+    artifact.__artifactContract.replaceSessionCardService({
+      resolveCard,
+      resolveChildCard: vi.fn(),
+      observeCardActivity,
+      observeChildLifecycle: vi.fn().mockResolvedValue(null),
+    })
+    providerActions.openaiChat.mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        await Promise.resolve()
+        yield { type: 'text', text: 'Accepted assistant output' }
+      },
+    })
+
+    const response = await artifact.default.fetch(
+      sendStreamRequest('Accepted user turn'),
+    )
+    const stream = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(stream).toContain('event: chunk')
+    expect(stream).toContain('Accepted assistant output')
+    expect(stream).toContain('event: done')
+    expect(localStoreActions.ensureLocalSession).toHaveBeenCalledWith(
+      'builder',
+      undefined,
+    )
+    expect(localStoreActions.appendLocalMessage).toHaveBeenNthCalledWith(
+      1,
+      'builder',
+      expect.objectContaining({ role: 'user', content: 'Accepted user turn' }),
+    )
+    expect(localStoreActions.appendLocalMessage).toHaveBeenNthCalledWith(
+      2,
+      'builder',
+      expect.objectContaining({
+        role: 'assistant',
+        content: 'Accepted assistant output',
+      }),
+    )
+    expect(localStoreActions.touchLocalSession).toHaveBeenCalledWith('builder')
+    expect(providerActions.openaiChat).toHaveBeenCalledTimes(1)
+    expect(runStoreActions.createPersistedRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionKey: localSegmentKey,
+        friendlyId: localCardId,
+        cardId: localCardId,
+        canonicalSegmentKey: localSegmentKey,
+      }),
+    )
+    expect(runStoreActions.appendRunText).toHaveBeenCalledWith(
+      localSegmentKey,
+      expect.any(String),
+      'Accepted assistant output',
+      { replace: true },
+    )
+    expect(runStoreActions.markRunStatus).toHaveBeenCalledWith(
+      localSegmentKey,
+      expect.any(String),
+      'complete',
+      undefined,
+    )
+    expect(observeCardActivity).toHaveBeenCalledTimes(2)
+    expect(eventActions.publishCardActivityEvent).toHaveBeenCalledTimes(2)
   })
 
   it('executes retirement of raw session sends without touching gateway or provider mutations', async () => {
@@ -616,6 +732,96 @@ describe('checked-in Electron server bundle behavior', () => {
       expect(gatewayActions.dashboardFetch).not.toHaveBeenCalled()
     },
   )
+
+  it.each(['steer', 'kill'] as const)(
+    'executes generated Card-authoritative %s against the canonical gateway owner',
+    async (action) => {
+      const resolveCard = vi.fn().mockResolvedValue(resolvedRemoteCard())
+      artifact.__artifactContract.replaceSessionCardService({
+        resolveCard,
+        resolveChildCard: vi.fn(),
+        observeCardActivity: vi.fn().mockResolvedValue(null),
+        observeChildLifecycle: vi.fn().mockResolvedValue(null),
+      })
+      gatewayActions.dashboardFetch.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      )
+
+      const response = await artifact.default.fetch(
+        sessionCardControlRequest(action),
+      )
+
+      expect(response.status).toBe(200)
+      await expect(response.json()).resolves.toEqual({
+        ok: true,
+        cardId: remoteCardId,
+        parentCardId: null,
+      })
+      expect(resolveCard).toHaveBeenCalledTimes(2)
+      expect(gatewayActions.dashboardFetch).toHaveBeenCalledWith(
+        `/api/agent-${action}`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            session_key: remoteSegmentKey,
+            ...(action === 'steer' ? { message: 'Continue carefully' } : {}),
+          }),
+        }),
+      )
+    },
+  )
+
+  it('executes a generated Card-authoritative dispatch and records its durable state edges', async () => {
+    const resolveCard = vi.fn().mockResolvedValue(resolvedLocalCard())
+    artifact.__artifactContract.replaceSessionCardService({
+      resolveCard,
+      resolveChildCard: vi.fn(),
+      observeCardActivity: vi.fn().mockResolvedValue(null),
+      observeChildLifecycle: vi.fn().mockResolvedValue(null),
+    })
+
+    const result = await artifact.__artifactContract.runDispatchWorker(
+      {
+        workerId: 'builder',
+        task: 'Execute the generated Card-authoritative dispatch',
+        cardBinding: localCardBinding,
+      },
+      1_000,
+      undefined,
+      { waitForCheckpoint: false },
+    )
+
+    expect(result).toMatchObject({
+      workerId: 'builder',
+      ok: true,
+      delivery: 'tmux',
+      checkpointStatus: 'not-requested',
+    })
+    expect(swarmActions.markDispatchStarted).toHaveBeenCalledWith(
+      'builder',
+      'Execute the generated Card-authoritative dispatch',
+      null,
+      null,
+      'main',
+    )
+    expect(swarmActions.appendSwarmMemoryEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workerId: 'builder',
+        type: 'dispatch',
+      }),
+    )
+    expect(swarmActions.dispatchPromptToLiveSession).toHaveBeenCalledWith(
+      'builder',
+      expect.stringContaining(
+        'Execute the generated Card-authoritative dispatch',
+      ),
+      localCardBinding,
+    )
+    expect(swarmActions.markDispatchResult).toHaveBeenCalledWith(
+      'builder',
+      expect.objectContaining({ ok: true, delivery: 'tmux' }),
+    )
+  })
 
   it('rejects a post-wait dispatch rollover before checkpoint state changes', async () => {
     let checkpointObserved = false
@@ -723,6 +929,58 @@ describe('checked-in Electron server bundle behavior', () => {
         cardId: 'remote:child-card',
         runId: 'child-run',
         sessionKey: 'remote:child-old',
+        revalidateCardOwner: expect.any(Function),
+      }),
+    )
+  })
+
+  it('executes generated active-run abandonment for the exact child Card continuation', async () => {
+    const resolveChildCard = vi
+      .fn()
+      .mockResolvedValue(resolvedRemoteChildCard())
+    artifact.__artifactContract.replaceSessionCardService({
+      resolveCard: vi.fn().mockResolvedValue(resolvedRemoteChildCard()),
+      resolveChildCard,
+      observeCardActivity: vi.fn().mockResolvedValue(null),
+      observeChildLifecycle: vi.fn().mockResolvedValue(null),
+    })
+    swarmActions.listAllActiveRuns.mockResolvedValue([
+      {
+        runId: 'child-run',
+        sessionKey: 'remote:child-old',
+        friendlyId: 'internal-child-run',
+        cardId: 'remote:child-card',
+        canonicalSegmentKey: 'remote:child-old',
+        status: 'active',
+      },
+    ])
+    swarmActions.abandonActiveCardRun.mockImplementation(async (input) => {
+      const candidate = input as {
+        revalidateCardOwner?: () => Promise<boolean>
+      }
+      expect(await candidate.revalidateCardOwner?.()).toBe(true)
+      return { outcome: 'abandoned', run: { status: 'error' } }
+    })
+
+    const response = await artifact.default.fetch(activeChildAbandonRequest())
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      cardId: 'remote:child-card',
+      status: 'error',
+    })
+    expect(resolveChildCard).toHaveBeenCalledTimes(3)
+    expect(swarmActions.abandonActiveCardRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cardId: 'remote:child-card',
+        runId: 'child-run',
+        sessionKey: 'remote:child-old',
+        ownedSegmentKeys: [
+          'remote:child-card',
+          'remote:child-old',
+          'remote:child-tip',
+        ],
         revalidateCardOwner: expect.any(Function),
       }),
     )
