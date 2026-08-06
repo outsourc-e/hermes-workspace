@@ -1,4 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
@@ -926,21 +932,9 @@ describe('checked-in Electron server bundle behavior', () => {
       error: 'Session Card ownership unavailable for native dispatch',
     })
     expect(swarmActions.dispatchSwarmAssignments).not.toHaveBeenCalled()
-    const persisted = readMissionStore()
-    expect(persisted.missions).toHaveLength(1)
-    expect(persisted.missions[0]).toMatchObject({
-      state: 'cancelled',
-      assignments: [
-        { workerId: 'builder', state: 'cancelled' },
-        { workerId: 'reviewer', state: 'cancelled' },
-      ],
-    })
-    expect(persisted.missions[0]?.events.at(-1)).toMatchObject({
-      type: 'mission_cancelled',
-      message: expect.stringContaining(
-        'Native Conductor worker Session Card binding unavailable',
-      ),
-    })
+    // Bindings are resolved before native mission persistence. A later unavailable
+    // Card therefore leaves no half-authoritative mission or anchor store behind.
+    expect(existsSync(missionStorePath)).toBe(false)
   })
 
   it('deletes a dashboard Conductor mission when exact Card admission fails', async () => {
