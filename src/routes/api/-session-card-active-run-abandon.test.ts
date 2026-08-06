@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   isAuthenticated: vi.fn(),
   resolveCard: vi.fn(),
   listAllActiveRuns: vi.fn(),
-  markRunStatus: vi.fn(),
+  abandonActiveCardRun: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -22,7 +22,7 @@ vi.mock('../../server/session-card-service', () => ({
 
 vi.mock('../../server/run-store', () => ({
   listAllActiveRuns: mocks.listAllActiveRuns,
-  markRunStatus: mocks.markRunStatus,
+  abandonActiveCardRun: mocks.abandonActiveCardRun,
 }))
 
 type Handler = (context: {
@@ -76,7 +76,10 @@ beforeEach(() => {
       status: 'active',
     },
   ])
-  mocks.markRunStatus.mockReset().mockResolvedValue({ status: 'error' })
+  mocks.abandonActiveCardRun.mockReset().mockResolvedValue({
+    outcome: 'abandoned',
+    run: { status: 'error' },
+  })
 })
 
 describe('Card-owned active-run abandonment', () => {
@@ -87,12 +90,16 @@ describe('Card-owned active-run abandonment', () => {
     })
 
     expect(mocks.resolveCard).toHaveBeenCalledWith('remote:child-card')
-    expect(mocks.markRunStatus).toHaveBeenCalledWith(
-      'remote:child-old',
-      'internal-run-id',
-      'error',
-      'Abandoned by user',
-    )
+    expect(mocks.abandonActiveCardRun).toHaveBeenCalledWith({
+      sessionKey: 'remote:child-old',
+      runId: 'internal-run-id',
+      cardId: 'remote:child-card',
+      ownedSegmentKeys: [
+        'remote:child-card',
+        'remote:child-old',
+        'remote:child-tip',
+      ],
+    })
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
       ok: true,
@@ -119,7 +126,7 @@ describe('Card-owned active-run abandonment', () => {
     })
 
     expect(response.status).toBe(404)
-    expect(mocks.markRunStatus).not.toHaveBeenCalled()
+    expect(mocks.abandonActiveCardRun).not.toHaveBeenCalled()
   })
 
   it('requires the exact active run ID owned by the Card', async () => {
@@ -129,7 +136,7 @@ describe('Card-owned active-run abandonment', () => {
     })
 
     expect(response.status).toBe(404)
-    expect(mocks.markRunStatus).not.toHaveBeenCalled()
+    expect(mocks.abandonActiveCardRun).not.toHaveBeenCalled()
   })
 
   it('fails closed when fresh Card ownership is incomplete', async () => {
@@ -144,6 +151,41 @@ describe('Card-owned active-run abandonment', () => {
     })
 
     expect(response.status).toBe(503)
-    expect(mocks.markRunStatus).not.toHaveBeenCalled()
+    expect(mocks.abandonActiveCardRun).not.toHaveBeenCalled()
+  })
+
+  it('returns the current terminal result without reporting an abandonment', async () => {
+    mocks.abandonActiveCardRun.mockResolvedValue({
+      outcome: 'terminal',
+      run: { status: 'complete' },
+    })
+
+    const response = await handler({
+      request: abandonRequest(),
+      params: { cardId: 'remote:child-card' },
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({
+      ok: false,
+      cardId: 'remote:child-card',
+      status: 'complete',
+      error: 'Active Card run is already terminal',
+    })
+  })
+
+  it('fails closed when ownership changes before the locked mutation', async () => {
+    mocks.abandonActiveCardRun.mockResolvedValue({ outcome: 'not-found' })
+
+    const response = await handler({
+      request: abandonRequest(),
+      params: { cardId: 'remote:child-card' },
+    })
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Active Card run not found',
+    })
   })
 })

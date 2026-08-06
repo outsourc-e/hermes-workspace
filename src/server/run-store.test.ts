@@ -435,6 +435,113 @@ describe('run-store persistence', () => {
     }
   })
 
+  it('preserves completion when Card abandonment interleaves after active lookup', async () => {
+    const {
+      abandonActiveCardRun,
+      createPersistedRun,
+      getPersistedRun,
+      listAllActiveRuns,
+      markRunStatus,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'card-abandon-race',
+      sessionKey: 'remote:card-segment',
+      friendlyId: 'remote:card',
+      cardId: 'remote:card',
+      canonicalSegmentKey: 'remote:card-segment',
+    })
+    await markRunStatus('remote:card-segment', 'card-abandon-race', 'active')
+
+    await expect(listAllActiveRuns()).resolves.toEqual([
+      expect.objectContaining({
+        runId: 'card-abandon-race',
+        sessionKey: 'remote:card-segment',
+        status: 'active',
+      }),
+    ])
+    await markRunStatus('remote:card-segment', 'card-abandon-race', 'complete')
+
+    await expect(
+      abandonActiveCardRun({
+        sessionKey: 'remote:card-segment',
+        runId: 'card-abandon-race',
+        cardId: 'remote:card',
+        ownedSegmentKeys: ['remote:card-segment'],
+      }),
+    ).resolves.toMatchObject({
+      outcome: 'terminal',
+      run: { status: 'complete' },
+    })
+    const stored = await getPersistedRun(
+      'remote:card-segment',
+      'card-abandon-race',
+    )
+    expect({
+      status: stored?.status,
+      assistantText: stored?.assistantText,
+      errorMessage: stored?.errorMessage,
+    }).toEqual({
+      status: 'complete',
+      assistantText: '',
+      errorMessage: undefined,
+    })
+  })
+
+  it('requires persisted Card ownership beneath the abandonment lock', async () => {
+    const {
+      abandonActiveCardRun,
+      createPersistedRun,
+      getPersistedRun,
+      markRunStatus,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'card-owner-mismatch',
+      sessionKey: 'remote:shared-segment',
+      friendlyId: 'remote:other-card',
+      cardId: 'remote:other-card',
+      canonicalSegmentKey: 'remote:shared-segment',
+    })
+    await markRunStatus(
+      'remote:shared-segment',
+      'card-owner-mismatch',
+      'active',
+    )
+
+    await expect(
+      abandonActiveCardRun({
+        sessionKey: 'remote:shared-segment',
+        runId: 'card-owner-mismatch',
+        cardId: 'remote:requested-card',
+        ownedSegmentKeys: ['remote:shared-segment'],
+      }),
+    ).resolves.toEqual({ outcome: 'not-found' })
+    await expect(
+      getPersistedRun('remote:shared-segment', 'card-owner-mismatch'),
+    ).resolves.toMatchObject({
+      status: 'active',
+      cardId: 'remote:other-card',
+    })
+
+    await expect(
+      abandonActiveCardRun({
+        sessionKey: 'remote:shared-segment',
+        runId: 'card-owner-mismatch',
+        cardId: 'remote:other-card',
+        ownedSegmentKeys: ['remote:shared-segment'],
+      }),
+    ).resolves.toMatchObject({
+      outcome: 'abandoned',
+      run: { status: 'error', errorMessage: 'Abandoned by user' },
+    })
+    await expect(
+      getPersistedRun('remote:shared-segment', 'card-owner-mismatch'),
+    ).resolves.toMatchObject({
+      status: 'error',
+      cardId: 'remote:other-card',
+      errorMessage: 'Abandoned by user',
+    })
+  })
+
   it('bounds tool count and fields while allowing retained tools to terminalize', async () => {
     const {
       MAX_PERSISTED_RUN_TOOL_CALLS,

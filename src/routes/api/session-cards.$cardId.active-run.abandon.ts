@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { listAllActiveRuns, markRunStatus } from '../../server/run-store'
+import { abandonActiveCardRun, listAllActiveRuns } from '../../server/run-store'
 import { sessionCardService } from '../../server/session-card-service'
 import { normalizedCardId } from './-session-card-http'
 
@@ -96,16 +96,27 @@ export const Route = createFileRoute(
           }
 
           const run = candidates[0]!
-          const updated = await markRunStatus(
-            run.sessionKey,
-            run.runId,
-            'error',
-            'Abandoned by user',
-          )
-          if (!updated) {
+          const result = await abandonActiveCardRun({
+            sessionKey: run.sessionKey,
+            runId: run.runId,
+            cardId,
+            ownedSegmentKeys: resolved.card.continuationSegmentKeys,
+          })
+          if (result.outcome === 'not-found') {
             return json(
               { ok: false, error: 'Active Card run not found' },
               { status: 404 },
+            )
+          }
+          if (result.outcome === 'terminal') {
+            return json(
+              {
+                ok: false,
+                cardId,
+                status: result.run.status,
+                error: 'Active Card run is already terminal',
+              },
+              { status: 409 },
             )
           }
           return json({ ok: true, cardId, status: 'error' })

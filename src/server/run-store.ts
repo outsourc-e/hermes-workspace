@@ -102,6 +102,11 @@ const TERMINAL_RUN_STATUSES = new Set<PersistedRunState['status']>([
   'error',
   'handoff',
 ])
+const ABANDONABLE_RUN_STATUSES = new Set<PersistedRunState['status']>([
+  'accepted',
+  'active',
+  'stalled',
+])
 
 export const MAX_PERSISTED_RUN_TOOL_CALLS = 128
 export const PERSISTED_TOOL_ID_MAX_BYTES = 256
@@ -1439,6 +1444,83 @@ export async function markRunStatus(
     lastEventAt: Date.now(),
     ...(errorMessage ? { errorMessage } : {}),
   }))
+}
+
+export type AbandonActiveCardRunResult =
+  | { outcome: 'abandoned'; run: PersistedRunState }
+  | { outcome: 'terminal'; run: PersistedRunState }
+  | { outcome: 'not-found' }
+
+/**
+ * Atomically abandons an active run only while its persisted Card ownership
+ * still matches the complete Card projection used by the caller. The status
+ * and owner checks happen beneath the same cross-process run lock as the
+ * write, so a concurrent completion remains absorbing.
+ */
+export async function abandonActiveCardRun(input: {
+  sessionKey: string
+  runId: string
+  cardId: string
+  ownedSegmentKeys: Array<string>
+}): Promise<AbandonActiveCardRunResult> {
+  const sessionKey = input.sessionKey
+  const cardId = input.cardId
+  const ownedSegmentKeys = new Set(
+    input.ownedSegmentKeys.filter(
+      (key) => key.length > 0 && key.trim() === key,
+    ),
+  )
+  if (
+    !sessionKey ||
+    sessionKey.trim() !== sessionKey ||
+    !cardId ||
+    cardId.trim() !== cardId ||
+    !isSafeRunId(input.runId) ||
+    !ownedSegmentKeys.has(sessionKey)
+  ) {
+    return { outcome: 'not-found' }
+  }
+
+  return enqueueRunUpdate(sessionKey, input.runId, async () =>
+    withRunLocks(
+      [{ sessionKey, runId: input.runId }],
+      async (assertLocksOwned) => {
+        const current = await getPersistedRun(sessionKey, input.runId)
+        if (!current) return { outcome: 'not-found' }
+
+        const hasPersistedCardOwner =
+          current.cardId !== undefined ||
+          current.canonicalSegmentKey !== undefined
+        const ownerMatches = hasPersistedCardOwner
+          ? typeof current.canonicalSegmentKey === 'string' &&
+            ownedSegmentKeys.has(current.canonicalSegmentKey) &&
+            persistedRunMatchesOwner(current, {
+              runId: input.runId,
+              sessionKey,
+              friendlyId: cardId,
+              cardId,
+              canonicalSegmentKey: current.canonicalSegmentKey,
+            })
+          : ownedSegmentKeys.has(current.sessionKey)
+        if (!ownerMatches) return { outcome: 'not-found' }
+        if (!ABANDONABLE_RUN_STATUSES.has(current.status)) {
+          return { outcome: 'terminal', run: current }
+        }
+
+        const now = Date.now()
+        const abandoned = normalizePersistedRun({
+          ...current,
+          status: 'error',
+          updatedAt: now,
+          lastEventAt: now,
+          errorMessage: 'Abandoned by user',
+        })
+        if (!abandoned) throw new Error('Persisted run abandonment is invalid')
+        await writeRun(abandoned, assertLocksOwned)
+        return { outcome: 'abandoned', run: abandoned }
+      },
+    ),
+  )
 }
 
 // A run that hasn't been touched in this long is considered orphaned (e.g.
