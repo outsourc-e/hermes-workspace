@@ -406,6 +406,98 @@ describe('send-stream bootstrap session handoff', () => {
     },
   )
 
+  it('revalidates a delayed upstream run-start callback before persisted run creation', async () => {
+    const cardId = 'remote:delayed-event-card'
+    const segmentKey = 'remote:delayed-event-segment'
+    const upstreamKey = 'delayed-event-upstream'
+    let rolledOver = false
+    const emitRunStarted = deferred<void>()
+
+    mocks.resolveSessionCard.mockResolvedValueOnce({
+      card: {
+        cardId,
+        canonicalSegmentKey: segmentKey,
+        canonicalSource: 'remote',
+        canonicalTransport: 'gateway',
+        continuationSegmentKeys: [cardId, segmentKey],
+        continuationCount: 2,
+        relationshipKind: 'root',
+      },
+      sourceBySegmentKey: new Map([[segmentKey, 'remote']]),
+      upstreamKeyBySegmentKey: new Map([[segmentKey, upstreamKey]]),
+      collection: { completeness: 'complete', retryable: false },
+    })
+    mocks.resolveExactSessionCardOperationBinding.mockImplementation(
+      (binding: { cardId: string; parentCardId: string | null }) =>
+        Promise.resolve(
+          rolledOver
+            ? null
+            : {
+                kind: 'session-card-owner',
+                cardId: binding.cardId,
+                parentCardId: binding.parentCardId,
+              },
+        ),
+    )
+    mocks.streamChat.mockImplementationOnce(
+      async (
+        sessionKey: string,
+        _request: unknown,
+        options: {
+          onEvent: (payload: {
+            event: string
+            data: Record<string, unknown>
+          }) => Promise<void>
+        },
+      ) => {
+        expect(sessionKey).toBe(upstreamKey)
+        await emitRunStarted.promise
+        await options.onEvent({
+          event: 'run.started',
+          data: { run_id: 'delayed-event-run', session_id: upstreamKey },
+        })
+        await options.onEvent({
+          event: 'run.completed',
+          data: { run_id: 'delayed-event-run', session_id: upstreamKey },
+        })
+      },
+    )
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId,
+          sessionKey: segmentKey,
+          friendlyId: cardId,
+          message: 'do not persist after rollover',
+        }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(mocks.resolveExactSessionCardOperationBinding).toHaveBeenCalledTimes(
+      2,
+    )
+
+    rolledOver = true
+    emitRunStarted.resolve()
+    const events = parseEvents(await response.text())
+
+    expect(mocks.resolveExactSessionCardOperationBinding).toHaveBeenCalledTimes(
+      3,
+    )
+    expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+    expect(mocks.observeCardActivity).not.toHaveBeenCalled()
+    expect(mocks.markRunStatus).not.toHaveBeenCalled()
+    expect(events).toContainEqual({
+      event: 'error',
+      data: expect.objectContaining({
+        message: 'Session Card ownership changed before send',
+      }),
+    })
+  })
+
   it.each([
     {
       label: 'local session creation',
@@ -728,7 +820,7 @@ describe('send-stream bootstrap session handoff', () => {
       },
     })
     expect(mocks.resolveExactSessionCardOperationBinding).toHaveBeenCalledTimes(
-      2,
+      3,
     )
     expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
       sessionKey: 'remote:main-tip',

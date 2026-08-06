@@ -814,7 +814,7 @@ describe('mounted Operations Session Card activity', () => {
   )
 
   it.each(['QuotaExceededError', 'SecurityError'] as const)(
-    'falls back durably when the complete snapshot local write raises %s',
+    'keeps complete history visible but warns when its snapshot is only tab-scoped after %s',
     async (exceptionName) => {
       const priorAssistantText = `prior durable ${exceptionName} assistant reply`
       const userText = `complete ${exceptionName} user turn`
@@ -862,9 +862,17 @@ describe('mounted Operations Session Card activity', () => {
         .closest('article')!
       expect(within(rootCard).getByText(userText)).toBeTruthy()
       expect(within(rootCard).getByText(assistantText)).toBeTruthy()
+      const durabilityWarning =
+        'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.'
+      expect(within(rootCard).getByText(durabilityWarning)).toBeTruthy()
       expect(
         window.localStorage.getItem(operationsCompleteSnapshotKey),
       ).toContain(priorAssistantText)
+
+      storageSpy.mockRestore()
+      mocks.historyResponse = { ...mocks.historyResponse }
+      await mounted.rerender()
+      expect(within(rootCard).queryByText(durabilityWarning)).toBeNull()
 
       mocks.historyResponse = {
         messages: [],
@@ -883,7 +891,6 @@ describe('mounted Operations Session Card activity', () => {
       expect(within(rootCard).getByText(userText)).toBeTruthy()
       expect(within(rootCard).getByText(assistantText)).toBeTruthy()
 
-      storageSpy.mockRestore()
       mounted.unmount()
       await renderOperations()
       const remountedRootCard = screen
@@ -932,10 +939,10 @@ describe('mounted Operations Session Card activity', () => {
       const mounted = await renderOperations()
       expect(screen.getAllByText(rejectedText).length).toBeGreaterThan(0)
       expect(
-        screen.getByText(
+        screen.getAllByText(
           'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
-        ),
-      ).toBeTruthy()
+        ).length,
+      ).toBeGreaterThan(0)
 
       mocks.historyResponse = {
         messages: [],

@@ -1289,6 +1289,8 @@ export type SessionCardHistoryResponse = HistoryResponse & {
   missingSegments: SessionCardHistoryWire['missingSegments']
   /** Server-persisted rows before exact Card recovery/live overlays. */
   persistedMessages?: Array<ChatMessage>
+  /** Browser durability result for the latest authoritative complete snapshot. */
+  completeSnapshotDurability?: 'verified' | 'failed'
 }
 
 /**
@@ -1489,6 +1491,7 @@ export function reconcileSessionCardHistoryResponse(
     options.previous,
     options.continuationSegmentKeys,
   )
+  let completeSnapshotDurability = options.previous?.completeSnapshotDurability
 
   // Query memory is not a reload boundary. A partial response must retain the
   // last scrubbed complete Card projection even after a fresh QueryClient.
@@ -1511,6 +1514,7 @@ export function reconcileSessionCardHistoryResponse(
       server.cardId,
       persistedMessages,
     )
+    completeSnapshotDurability = snapshot ? 'verified' : 'failed'
     if (!snapshot) {
       recoveryMessages = readCardTranscriptRecovery(owner)?.messages ?? []
     } else {
@@ -1532,6 +1536,7 @@ export function reconcileSessionCardHistoryResponse(
     ...server,
     messages: persistedMessages,
     persistedMessages,
+    ...(completeSnapshotDurability ? { completeSnapshotDurability } : {}),
   }
   return mergeSessionCardHistoryResponse(persistedServer, recoveryMessages)
 }

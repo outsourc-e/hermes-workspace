@@ -751,17 +751,19 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
       cardId,
       currentAuthoritativeMessages,
     )
-    if (snapshotWrite.anyVerified) {
+    if (snapshotWrite.persistentVerified) {
       setSnapshotDurabilityError(null)
+    } else {
+      setSnapshotDurabilityError(
+        'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
+      )
+    }
+    if (snapshotWrite.anyVerified) {
       setCompleteSnapshot({
         ownerCardId: cardId,
         messages: currentAuthoritativeMessages,
         persistentVerified: snapshotWrite.persistentVerified,
       })
-    } else {
-      setSnapshotDurabilityError(
-        'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
-      )
     }
   }, [cardId, completeHistory, currentAuthoritativeMessages])
 
@@ -983,9 +985,8 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
         ? 'Direct child transcript · read-only'
         : (historyQuery.error instanceof Error && historyQuery.error.message) ||
           (sendMutation.error instanceof Error && sendMutation.error.message) ||
-          overlayDurabilityError ||
-          snapshotDurabilityError ||
           null
+  const durabilityWarning = overlayDurabilityError || snapshotDurabilityError
 
   return {
     messages,
@@ -995,6 +996,7 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     isRefreshing: historyQuery.isFetching,
     isSending: sendMutation.isPending,
     error,
+    durabilityWarning,
     canRetryHistory: Boolean(
       target && (historyUnavailable || historyQuery.error),
     ),

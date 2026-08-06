@@ -704,6 +704,63 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     expectCardOnlyTranscriptBoundary(requests)
   })
 
+  it('warns when a complete transcript is visible but its durable snapshot fails, then clears after a verified retry', async () => {
+    const completeText = 'complete transcript visible before durable retry'
+    const requests = mockHttp(() =>
+      completeHistory(parentCard, [
+        {
+          segmentKey: parentCard.canonicalSegmentKey,
+          message: {
+            id: 'complete-before-storage-retry',
+            role: 'assistant',
+            content: completeText,
+          },
+        },
+      ]),
+    )
+    const originalSetItem = Storage.prototype.setItem
+    const storageSpy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(function (this: Storage, key, value) {
+        if (
+          this === window.localStorage &&
+          key.startsWith('workspace.card-transcript-snapshot.v1:')
+        ) {
+          throw new DOMException(
+            'persistent transcript snapshot denied',
+            'QuotaExceededError',
+          )
+        }
+        return originalSetItem.call(this, key, value)
+      })
+
+    const mountedChat = await mountChatScreen(defaultInput())
+
+    await waitFor(() => {
+      expect(screen.getByText(completeText)).toBeTruthy()
+      expect(
+        screen.getByText(
+          'Transcript recovery storage is unavailable. This complete transcript is not guaranteed to survive a reload until storage recovers.',
+        ),
+      ).toBeTruthy()
+    })
+
+    storageSpy.mockRestore()
+    await React.act(async () => {
+      await mountedChat.queryClient.refetchQueries({
+        queryKey: sessionCardQueryKeys.history(parentCard.cardId),
+      })
+    })
+    await waitFor(() => {
+      expect(
+        screen.queryByText(
+          'Transcript recovery storage is unavailable. This complete transcript is not guaranteed to survive a reload until storage recovers.',
+        ),
+      ).toBeNull()
+    })
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
   it('hydrates persisted partial Card streaming text after remount while history is stale and incomplete', async () => {
     const requests = mockHttp(() => ({
       ...completeHistory(parentCard),

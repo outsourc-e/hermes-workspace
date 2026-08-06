@@ -3409,6 +3409,17 @@ export function ChatScreen({
         ) : null}
       </div>
     ) : null
+  const snapshotDurabilityNotice =
+    displayedCardHistory?.completeSnapshotDurability === 'failed' ? (
+      <div
+        className="mx-4 mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-200"
+        role="alert"
+        aria-live="assertive"
+      >
+        Transcript recovery storage is unavailable. This complete transcript is
+        not guaranteed to survive a reload until storage recovers.
+      </div>
+    ) : null
   const errorNotice = useMemo(() => {
     if (!showErrorNotice) return null
     if (!serverError) return null
@@ -3680,6 +3691,7 @@ export function ChatScreen({
           {errorNotice && (
             <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>
           )}
+          {snapshotDurabilityNotice}
           {incompleteHistoryNotice}
           {pendingApprovals.length > 0 && (
             <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/15">

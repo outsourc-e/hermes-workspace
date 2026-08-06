@@ -1512,7 +1512,8 @@ export async function abandonActiveCardRun(input: {
           return { outcome: 'terminal', run: current }
         }
 
-        // Reading the run is awaitable. Revalidate again at the final write edge.
+        // Reading the run is awaitable. Revalidate before preparing the
+        // destructive state, then fence once more at filesystem publication.
         if (!(await input.revalidateCardOwner()))
           return { outcome: 'not-found' }
 
@@ -1525,7 +1526,22 @@ export async function abandonActiveCardRun(input: {
           errorMessage: 'Abandoned by user',
         })
         if (!abandoned) throw new Error('Persisted run abandonment is invalid')
-        await writeRun(abandoned, assertLocksOwned)
+        const staleCardPublication = new Error(
+          'Persisted run Card ownership changed before publication',
+        )
+        try {
+          await writeRun(abandoned, async () => {
+            // The temporary write above is awaitable. Combine the existing run
+            // lock fence with a fresh Card check at the actual rename edge.
+            await assertLocksOwned()
+            if (!(await input.revalidateCardOwner())) {
+              throw staleCardPublication
+            }
+          })
+        } catch (error) {
+          if (error === staleCardPublication) return { outcome: 'not-found' }
+          throw error
+        }
         return { outcome: 'abandoned', run: abandoned }
       },
     ),

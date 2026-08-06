@@ -580,6 +580,50 @@ describe('run-store persistence', () => {
     ).resolves.toMatchObject({ status: 'active' })
   })
 
+  it('revalidates Card ownership at abandonment publication after the temporary write', async () => {
+    const {
+      abandonActiveCardRun,
+      createPersistedRun,
+      getPersistedRun,
+      markRunStatus,
+    } = await import('./run-store')
+    await createPersistedRun({
+      runId: 'card-publication-rollover',
+      sessionKey: 'remote:publication-segment',
+      friendlyId: 'remote:publication-card',
+      cardId: 'remote:publication-card',
+      canonicalSegmentKey: 'remote:publication-segment',
+    })
+    await markRunStatus(
+      'remote:publication-segment',
+      'card-publication-rollover',
+      'active',
+    )
+    let cardOwnerIsCurrent = true
+    const revalidateCardOwner = vi.fn(() => Promise.resolve(cardOwnerIsCurrent))
+    fsPromiseState.afterRunTempWrite = () => {
+      fsPromiseState.afterRunTempWrite = null
+      cardOwnerIsCurrent = false
+    }
+
+    await expect(
+      abandonActiveCardRun({
+        sessionKey: 'remote:publication-segment',
+        runId: 'card-publication-rollover',
+        cardId: 'remote:publication-card',
+        ownedSegmentKeys: ['remote:publication-segment'],
+        revalidateCardOwner,
+      }),
+    ).resolves.toEqual({ outcome: 'not-found' })
+    expect(revalidateCardOwner).toHaveBeenCalledTimes(3)
+    const stored = await getPersistedRun(
+      'remote:publication-segment',
+      'card-publication-rollover',
+    )
+    expect(stored?.status).toBe('active')
+    expect(stored).not.toHaveProperty('errorMessage')
+  })
+
   it('bounds tool count and fields while allowing retained tools to terminalize', async () => {
     const {
       MAX_PERSISTED_RUN_TOOL_CALLS,

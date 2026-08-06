@@ -133,6 +133,7 @@ export function OperationsInlineChat({
   canSend,
   isSending,
   error,
+  durabilityWarning,
   canRetryHistory,
   onRetryHistory,
 }: {
@@ -142,6 +143,7 @@ export function OperationsInlineChat({
   canSend: boolean
   isSending: boolean
   error: string | null
+  durabilityWarning: string | null
   canRetryHistory: boolean
   onRetryHistory: () => void
 }) {
@@ -224,6 +226,15 @@ export function OperationsInlineChat({
             ) : null}
           </div>
         ) : null}
+        {durabilityWarning ? (
+          <p
+            className="mb-2 rounded-md border border-amber-300/60 bg-amber-300/10 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-200"
+            role="alert"
+            aria-live="assertive"
+          >
+            {durabilityWarning}
+          </p>
+        ) : null}
         <div className="flex items-center gap-2 rounded-[1rem] border border-[var(--theme-border)] bg-[var(--theme-bg)] p-2">
           <input
             type="text"
@@ -285,6 +296,7 @@ export function OperationsAgentCard({
     canSend,
     isSending,
     error,
+    durabilityWarning,
     canRetryHistory,
     refresh,
   } = useAgentChat(chatTarget)
@@ -602,6 +614,7 @@ export function OperationsAgentCard({
           canSend={canSend}
           isSending={isSending}
           error={error}
+          durabilityWarning={durabilityWarning}
           canRetryHistory={canRetryHistory}
           onRetryHistory={() => void refresh()}
         />

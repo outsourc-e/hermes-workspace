@@ -2567,6 +2567,10 @@ export const Route = createFileRoute('/api/send-stream')({
                         registerActiveSendRun(runId)
                         const runSessionKey = getEnhancedRunSessionKey()
                         if (runSessionKey) {
+                          // The provider callback may arrive long after streamChat
+                          // was admitted. Re-resolve the exact Card immediately
+                          // before publishing this run's durable owner.
+                          await revalidateCardMutationAuthority()
                           persistRunStarted(
                             runId,
                             runSessionKey,
