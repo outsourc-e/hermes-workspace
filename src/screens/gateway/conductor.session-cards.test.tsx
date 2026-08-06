@@ -444,6 +444,77 @@ describe('mounted /conductor Session Card inventory', () => {
     },
   )
 
+  it('removes current-version canonical transport strings injected as Card ownership', async () => {
+    localStorage.setItem(
+      'conductor:active-mission',
+      JSON.stringify(
+        persistedMissionV3({
+          orchestratorCardId: 'remote:shared-runtime-key',
+          workerCards: [{ cardId: 'remote:delegated-worker-tip' }],
+          tasks: [
+            {
+              id: 'task-raw',
+              title: 'Raw injection',
+              status: 'running',
+              workerCardId: 'remote:delegated-worker-tip',
+            },
+          ],
+        }),
+      ),
+    )
+
+    await renderConductor()
+    await React.act(async () => Promise.resolve())
+
+    expect(localStorage.getItem('conductor:active-mission')).toBeNull()
+    expect(screen.queryByText('Raw injection')).toBeNull()
+  })
+
+  it('requires the exact projected parent for a persisted child Card', async () => {
+    localStorage.setItem(
+      'conductor:active-mission',
+      JSON.stringify(
+        persistedMissionV3({
+          workerCards: [{ cardId: 'remote:delegated-worker' }],
+          tasks: [],
+        }),
+      ),
+    )
+
+    await renderConductor()
+    await React.act(async () => Promise.resolve())
+    expect(localStorage.getItem('conductor:active-mission')).toBeNull()
+  })
+
+  it('retains and re-persists an exact child Card with its exact parent', async () => {
+    localStorage.setItem(
+      'conductor:active-mission',
+      JSON.stringify(
+        persistedMissionV3({
+          workerCards: [
+            {
+              cardId: 'remote:delegated-worker',
+              parentCardId: 'remote:shared-worker',
+            },
+          ],
+          tasks: [],
+        }),
+      ),
+    )
+
+    await renderConductor()
+    await React.act(async () => Promise.resolve())
+
+    const restored = localStorage.getItem('conductor:active-mission')
+    expect(restored).not.toBeNull()
+    expect(JSON.parse(restored ?? '{}').workerCards).toEqual([
+      {
+        cardId: 'remote:delegated-worker',
+        parentCardId: 'remote:shared-worker',
+      },
+    ])
+  })
+
   it('renders worker output from complete non-retryable Card history', async () => {
     localStorage.setItem(
       'conductor:active-mission',

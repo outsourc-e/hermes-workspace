@@ -8,12 +8,14 @@ import type {
   HubTask,
   TaskStatus,
 } from '@/screens/gateway/components/task-board'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import type { MissionCheckpoint } from '@/screens/gateway/lib/mission-checkpoint'
 import {
   MISSION_CHECKPOINT_VERSION,
   archiveMissionToHistory,
   loadMissionHistory,
   parseMissionCheckpoint,
+  validateMissionCheckpointCardOwnership,
 } from '@/screens/gateway/lib/mission-checkpoint'
 
 export type MissionProcessType = 'sequential' | 'hierarchical' | 'parallel'
@@ -101,6 +103,7 @@ type MissionStore = {
   agentCardStatus: Record<string, AgentSessionStatusEntry>
   artifacts: Array<MissionArtifact>
   restoreCheckpoint: MissionCheckpoint | null
+  cardOwnershipValidated: boolean
   missionHistory: MissionHistory
   beforeUnloadRegistered: boolean
   startMission: (mission: StartMissionInput) => void
@@ -112,10 +115,17 @@ type MissionStore = {
     agentId: string,
     entry: AgentSessionStatusEntry | null,
   ) => void
-  setAgentCardOwner: (agentId: string, owner: MissionCardOwner | null) => void
+  setAgentCardOwner: (
+    agentId: string,
+    owner: MissionCardOwner | null,
+    cardProjection?: SessionCardListWire,
+  ) => boolean
   addArtifact: (artifact: MissionArtifact | Array<MissionArtifact>) => void
   setMissionState: (state: Updater<MissionStore['missionState']>) => void
-  restoreMission: (checkpoint: MissionCheckpoint) => void
+  restoreMission: (
+    checkpoint: MissionCheckpoint,
+    cardProjection: SessionCardListWire,
+  ) => void
   setMissionGoal: (goal: string) => void
   setRestoreCheckpoint: (checkpoint: MissionCheckpoint | null) => void
   setBoardTasks: (tasks: Updater<Array<HubTask>>) => void
@@ -397,6 +407,7 @@ export const useMissionStore = create<MissionStore>()(
       agentCardStatus: {},
       artifacts: [],
       restoreCheckpoint: null,
+      cardOwnershipValidated: true,
       missionHistory: { reports: initialHistory },
       beforeUnloadRegistered: false,
 
@@ -433,6 +444,7 @@ export const useMissionStore = create<MissionStore>()(
             artifacts: activeMission.artifacts,
             dispatchedTaskIdsByAgent: {},
             restoreCheckpoint: null,
+            cardOwnershipValidated: true,
           }
           return {
             ...nextState,
@@ -580,7 +592,8 @@ export const useMissionStore = create<MissionStore>()(
         })
       },
 
-      setAgentCardOwner: (agentId, owner) => {
+      setAgentCardOwner: (agentId, owner, cardProjection) => {
+        let accepted = false
         set((state) => {
           if (!state.activeMission) return state
 
@@ -588,7 +601,7 @@ export const useMissionStore = create<MissionStore>()(
           const agentParentCardIdMap = {
             ...state.activeMission.agentParentCardIdMap,
           }
-          const agentCardTitleMap = {
+          let agentCardTitleMap = {
             ...state.activeMission.agentCardTitleMap,
           }
           const agentCardModelMap = {
@@ -624,7 +637,7 @@ export const useMissionStore = create<MissionStore>()(
             }
           }
 
-          const activeMission = {
+          let activeMission = {
             ...state.activeMission,
             agentCardIdMap,
             agentParentCardIdMap,
@@ -639,11 +652,29 @@ export const useMissionStore = create<MissionStore>()(
             agentCardTitleMap,
             agentCardModelMap,
           }
+          if (owner) {
+            const checkpoint = buildCheckpoint(nextState)
+            const validated =
+              checkpoint && cardProjection
+                ? validateMissionCheckpointCardOwnership(
+                    checkpoint,
+                    cardProjection,
+                  )
+                : null
+            if (!validated) return state
+            agentCardTitleMap = validated.agentCardTitleMap
+            activeMission = { ...activeMission, agentCardTitleMap }
+            nextState.activeMission = activeMission
+            nextState.agentCardTitleMap = agentCardTitleMap
+            nextState.cardOwnershipValidated = true
+          }
+          accepted = true
           return {
             ...nextState,
             ...updateCheckpointSnapshot(nextState),
           }
         })
+        return accepted
       },
 
       addArtifact: (artifact) => {
@@ -698,48 +729,78 @@ export const useMissionStore = create<MissionStore>()(
         })
       },
 
-      restoreMission: (checkpoint) => {
-        const restoredTasks: Array<HubTask> = checkpoint.tasks.map((task) => ({
-          id: task.id,
-          title: task.title,
-          description: '',
-          priority: 'normal',
-          status: task.status as TaskStatus,
-          agentId: task.assignedTo,
-          missionId: checkpoint.id,
-          createdAt: checkpoint.startedAt,
-          updatedAt: checkpoint.updatedAt,
-        }))
+      restoreMission: (checkpoint, cardProjection) => {
+        const validatedCheckpoint = validateMissionCheckpointCardOwnership(
+          checkpoint,
+          cardProjection,
+        )
+        if (!validatedCheckpoint) {
+          discardPersistedMissionStore()
+          set({
+            activeMission: null,
+            missionActive: false,
+            missionGoal: '',
+            activeMissionName: '',
+            activeMissionGoal: '',
+            missionState: 'stopped',
+            missionTasks: [],
+            dispatchedTaskIdsByAgent: {},
+            agentCardIdMap: {},
+            agentParentCardIdMap: {},
+            agentCardTitleMap: {},
+            agentCardModelMap: {},
+            agentCardStatus: {},
+            artifacts: [],
+            restoreCheckpoint: null,
+            cardOwnershipValidated: false,
+          })
+          return
+        }
+
+        const restoredTasks: Array<HubTask> = validatedCheckpoint.tasks.map(
+          (task) => ({
+            id: task.id,
+            title: task.title,
+            description: '',
+            priority: 'normal',
+            status: task.status as TaskStatus,
+            agentId: task.assignedTo,
+            missionId: validatedCheckpoint.id,
+            createdAt: validatedCheckpoint.startedAt,
+            updatedAt: validatedCheckpoint.updatedAt,
+          }),
+        )
         const activeMission: ActiveMission = {
-          id: checkpoint.id,
-          goal: checkpoint.goal,
-          name: checkpoint.name || checkpoint.label,
-          state: checkpoint.status === 'paused' ? 'paused' : 'running',
-          team: checkpoint.team.map((member) => ({
+          id: validatedCheckpoint.id,
+          goal: validatedCheckpoint.goal,
+          name: validatedCheckpoint.name || validatedCheckpoint.label,
+          state: validatedCheckpoint.status === 'paused' ? 'paused' : 'running',
+          team: validatedCheckpoint.team.map((member) => ({
             ...member,
             status: 'available',
           })),
           tasks: restoredTasks,
-          agentCardIdMap: { ...checkpoint.agentCardIdMap },
+          agentCardIdMap: { ...validatedCheckpoint.agentCardIdMap },
           agentParentCardIdMap: {
-            ...checkpoint.agentParentCardIdMap,
+            ...validatedCheckpoint.agentParentCardIdMap,
           },
-          agentCardTitleMap: { ...checkpoint.agentCardTitleMap },
-          agentCardModelMap: { ...checkpoint.agentCardModelMap },
+          agentCardTitleMap: { ...validatedCheckpoint.agentCardTitleMap },
+          agentCardModelMap: { ...validatedCheckpoint.agentCardModelMap },
           agentCardStatus: {},
-          processType: checkpoint.processType,
-          budgetLimit: checkpoint.budgetLimit || '',
-          startedAt: checkpoint.startedAt,
+          processType: validatedCheckpoint.processType,
+          budgetLimit: validatedCheckpoint.budgetLimit || '',
+          startedAt: validatedCheckpoint.startedAt,
           artifacts: [],
         }
         const nextState: MissionStore = {
           ...get(),
           activeMission,
           missionActive: true,
-          missionGoal: checkpoint.goal,
+          missionGoal: validatedCheckpoint.goal,
           activeMissionName: activeMission.name,
           activeMissionGoal: activeMission.goal,
-          missionState: checkpoint.status === 'paused' ? 'paused' : 'running',
+          missionState:
+            validatedCheckpoint.status === 'paused' ? 'paused' : 'running',
           missionTasks: restoredTasks,
           agentCardIdMap: activeMission.agentCardIdMap,
           agentParentCardIdMap: activeMission.agentParentCardIdMap,
@@ -748,6 +809,7 @@ export const useMissionStore = create<MissionStore>()(
           agentCardStatus: {},
           artifacts: [],
           restoreCheckpoint: null,
+          cardOwnershipValidated: true,
         }
         set({
           ...nextState,
@@ -874,15 +936,18 @@ export const useMissionStore = create<MissionStore>()(
           discardPersistedMissionStore()
           return currentState
         }
+        const persistedRecord = persistedState as Record<string, unknown>
+        const restoreCheckpoint = parseMissionCheckpoint(
+          persistedRecord.restoreCheckpoint,
+        )
+        // Persisted Card-looking strings are only restore candidates. Remove
+        // the durable payload immediately and keep the candidate in memory
+        // until restoreMission validates it against a complete Card projection.
+        discardPersistedMissionStore()
         return {
           ...currentState,
-          ...(persistedState as Partial<MissionStore>),
-          missionHistory: currentState.missionHistory,
-          boardTasks: currentState.boardTasks,
-          dispatchedTaskIdsByAgent: {},
-          agentCardStatus: {},
-          artifacts: [],
-          beforeUnloadRegistered: false,
+          restoreCheckpoint,
+          cardOwnershipValidated: false,
         }
       },
       partialize: (state) => ({
@@ -899,7 +964,9 @@ export const useMissionStore = create<MissionStore>()(
         agentCardModelMap: { ...state.agentCardModelMap },
         agentCardStatus: {},
         artifacts: [],
-        restoreCheckpoint: persistedCheckpoint(state.restoreCheckpoint),
+        restoreCheckpoint: state.cardOwnershipValidated
+          ? persistedCheckpoint(state.restoreCheckpoint)
+          : null,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return

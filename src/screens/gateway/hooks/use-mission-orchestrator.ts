@@ -38,6 +38,12 @@ type AuthoritativeCardOwner = {
   parentCardId?: string
   title: string
   canonicalSegmentKey: string
+  canonicalTransport?: 'dashboard' | 'gateway'
+}
+
+type AuthoritativeCardResolution = {
+  owner: AuthoritativeCardOwner
+  cards: SessionCardListWire
 }
 
 function qualifyRemoteSessionKey(sessionKey: string): string {
@@ -50,6 +56,7 @@ function projectAuthoritativeChildOwner(
   children: ReadonlyArray<SessionCardChildWire>,
   parentCardId: string,
   identity: string,
+  canonicalTransport: AuthoritativeCardOwner['canonicalTransport'],
 ): AuthoritativeCardOwner | null {
   for (const child of children) {
     if (
@@ -64,12 +71,14 @@ function projectAuthoritativeChildOwner(
         parentCardId,
         title: child.title,
         canonicalSegmentKey: child.sessionKey,
+        canonicalTransport,
       }
     }
     const descendant = projectAuthoritativeChildOwner(
       child.childNodes ?? [],
       child.cardId,
       identity,
+      canonicalTransport,
     )
     if (descendant) return descendant
   }
@@ -96,14 +105,75 @@ function projectAuthoritativeCardOwner(
         cardId: card.cardId,
         title: card.title,
         canonicalSegmentKey: card.canonicalSegmentKey,
+        canonicalTransport: card.canonicalTransport,
       }
     }
     const childOwner = projectAuthoritativeChildOwner(
       card.childNodes,
       card.cardId,
       qualifiedIdentity,
+      card.canonicalTransport,
     )
     if (childOwner) return childOwner
+  }
+  return null
+}
+
+function projectExactChildAuthoritativeCardOwner(
+  children: ReadonlyArray<SessionCardChildWire>,
+  parentCardId: string,
+  canonicalTransport: AuthoritativeCardOwner['canonicalTransport'],
+  reference: { cardId: string; parentCardId?: string },
+): AuthoritativeCardOwner | null {
+  for (const child of children) {
+    if (
+      child.cardId === reference.cardId &&
+      parentCardId === reference.parentCardId
+    ) {
+      return {
+        cardId: child.cardId,
+        parentCardId,
+        title: child.title,
+        canonicalSegmentKey: child.sessionKey,
+        canonicalTransport,
+      }
+    }
+    const descendant = projectExactChildAuthoritativeCardOwner(
+      child.childNodes ?? [],
+      child.cardId,
+      canonicalTransport,
+      reference,
+    )
+    if (descendant) return descendant
+  }
+  return null
+}
+
+function projectExactAuthoritativeCardOwner(
+  response: SessionCardListWire | undefined,
+  reference: { cardId: string; parentCardId?: string },
+): AuthoritativeCardOwner | null {
+  const projection = retainCompleteSessionCardProjections(response)
+  if (!projection) return null
+  for (const card of projection.cards) {
+    if (
+      card.cardId === reference.cardId &&
+      reference.parentCardId === undefined
+    ) {
+      return {
+        cardId: card.cardId,
+        title: card.title,
+        canonicalSegmentKey: card.canonicalSegmentKey,
+        canonicalTransport: card.canonicalTransport,
+      }
+    }
+    const child = projectExactChildAuthoritativeCardOwner(
+      card.childNodes,
+      card.cardId,
+      card.canonicalTransport,
+      reference,
+    )
+    if (child) return child
   }
   return null
 }
@@ -111,13 +181,11 @@ function projectAuthoritativeCardOwner(
 async function resolveAuthoritativeCardOwner(
   identity: string,
   attempts = 6,
-): Promise<AuthoritativeCardOwner | null> {
+): Promise<AuthoritativeCardResolution | null> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const owner = projectAuthoritativeCardOwner(
-      await fetchSessionCards(),
-      identity,
-    )
-    if (owner) return owner
+    const cards = await fetchSessionCards()
+    const owner = projectAuthoritativeCardOwner(cards, identity)
+    if (owner) return { owner, cards }
     if (attempt + 1 < attempts) {
       await new Promise((resolve) => window.setTimeout(resolve, 150))
     }
@@ -126,9 +194,19 @@ async function resolveAuthoritativeCardOwner(
 }
 
 function remoteSessionKey(owner: AuthoritativeCardOwner): string | null {
-  return owner.canonicalSegmentKey.startsWith('remote:')
+  return owner.canonicalTransport === 'gateway' &&
+    owner.canonicalSegmentKey.startsWith('remote:')
     ? owner.canonicalSegmentKey.slice('remote:'.length) || null
     : null
+}
+
+export function resolveAuthoritativeGatewayTransport(
+  response: SessionCardListWire | undefined,
+  reference: { cardId: string; parentCardId?: string },
+): { owner: AuthoritativeCardOwner; sessionKey: string } | null {
+  const owner = projectExactAuthoritativeCardOwner(response, reference)
+  const sessionKey = owner ? remoteSessionKey(owner) : null
+  return owner && sessionKey ? { owner, sessionKey } : null
 }
 
 function readString(value: unknown): string {
@@ -401,13 +479,25 @@ export function useMissionOrchestrator() {
   )
 
   const persistCardOwner = useCallback(
-    (agentId: string, owner: AuthoritativeCardOwner, model?: string) => {
-      setAgentCardOwner(agentId, {
-        cardId: owner.cardId,
-        ...(owner.parentCardId ? { parentCardId: owner.parentCardId } : {}),
-        title: owner.title,
-        ...(model ? { model } : {}),
-      })
+    (
+      agentId: string,
+      owner: AuthoritativeCardOwner,
+      cardProjection: SessionCardListWire,
+      model?: string,
+    ) => {
+      const accepted = setAgentCardOwner(
+        agentId,
+        {
+          cardId: owner.cardId,
+          ...(owner.parentCardId ? { parentCardId: owner.parentCardId } : {}),
+          title: owner.title,
+          ...(model ? { model } : {}),
+        },
+        cardProjection,
+      )
+      if (!accepted) {
+        throw new Error('Authoritative Card ownership persistence was rejected')
+      }
     },
     [setAgentCardOwner],
   )
@@ -518,6 +608,41 @@ export function useMissionOrchestrator() {
     [maybeCompleteMission, setAgentStatus, updateTasksForAgent],
   )
 
+  const refreshAgentTransport = useCallback(
+    async (
+      agentId: string,
+      response?: SessionCardListWire,
+    ): Promise<string> => {
+      const state = useMissionStore.getState()
+      const cardId = state.agentCardIdMap[agentId]
+      if (!cardId) throw new Error('No authoritative Card owner to control')
+      const parentCardId = state.agentParentCardIdMap[agentId]
+      const cards = response ?? (await fetchSessionCards())
+      const resolved = resolveAuthoritativeGatewayTransport(cards, {
+        cardId,
+        ...(parentCardId ? { parentCardId } : {}),
+      })
+      if (!resolved) {
+        throw new Error('Card has no authoritative gateway transport')
+      }
+      const { owner, sessionKey: nextSessionKey } = resolved
+
+      const previousSessionKey = transientSessionMapRef.current[agentId]
+      if (previousSessionKey !== nextSessionKey) {
+        transientSessionMapRef.current[agentId] = nextSessionKey
+        attachSessionStream(agentId, nextSessionKey)
+        if (previousSessionKey) {
+          streamMapRef.current.get(previousSessionKey)?.close()
+          streamMapRef.current.delete(previousSessionKey)
+          completedSessionKeysRef.current.delete(previousSessionKey)
+        }
+      }
+      persistCardOwner(agentId, owner, cards, state.agentCardModelMap[agentId])
+      return nextSessionKey
+    },
+    [attachSessionStream, persistCardOwner],
+  )
+
   const spawnAgentSession = useCallback(
     async (
       member: TeamMember,
@@ -532,7 +657,6 @@ export function useMissionOrchestrator() {
         : ''
       const label = `Mission: ${member.name}${labelSuffix}`
       const model = resolveGatewayModelId(member.modelId)
-      setAgentCardOwner(member.id, null)
       setAgentStatus(member.id, {
         status: 'dispatching',
         lastSeen: Date.now(),
@@ -559,21 +683,39 @@ export function useMissionOrchestrator() {
               ? existing.key.trim()
               : ''
           if (existingKey) {
-            transientSessionMapRef.current[member.id] = existingKey
-            const owner = await resolveAuthoritativeCardOwner(existingKey)
-            if (owner) persistCardOwner(member.id, owner, model)
+            const resolution = await resolveAuthoritativeCardOwner(existingKey)
+            const transportKey = resolution
+              ? remoteSessionKey(resolution.owner)
+              : null
+            if (!resolution || !transportKey) {
+              const message =
+                'Session Card mapping is unavailable for the existing gateway session'
+              setAgentStatus(member.id, {
+                status: 'error',
+                lastSeen: Date.now(),
+                lastMessage: message,
+              })
+              throw new Error(message)
+            }
+            persistCardOwner(
+              member.id,
+              resolution.owner,
+              resolution.cards,
+              model,
+            )
+            transientSessionMapRef.current[member.id] = transportKey
             setAgentStatus(member.id, {
               status: 'dispatching',
               lastSeen: Date.now(),
-              lastMessage: 'Reusing existing session',
+              lastMessage: 'Reusing existing Card session',
             })
-            attachSessionStream(member.id, existingKey)
+            attachSessionStream(member.id, transportKey)
             emitFeedEvent({
               type: 'agent_spawned',
-              message: `reusing session for ${member.name}`,
+              message: `reusing Card session for ${member.name}`,
               agentName: member.name,
             })
-            return existingKey
+            return transportKey
           }
         }
       }
@@ -611,13 +753,29 @@ export function useMissionOrchestrator() {
         throw new Error(errorMessage)
       }
 
-      transientSessionMapRef.current[member.id] = sessionKey
+      const resolution = await resolveAuthoritativeCardOwner(sessionKey)
+      const transportKey = resolution
+        ? remoteSessionKey(resolution.owner)
+        : null
+      if (!resolution || !transportKey) {
+        const errorMessage =
+          'Created gateway session did not receive an authoritative Session Card mapping'
+        setAgentStatus(member.id, {
+          status: 'error',
+          lastSeen: Date.now(),
+          lastMessage: errorMessage,
+        })
+        throw new Error(errorMessage)
+      }
+
+      persistCardOwner(member.id, resolution.owner, resolution.cards, model)
+      transientSessionMapRef.current[member.id] = transportKey
       setAgentCardStatus((previous) => ({
         ...previous,
         [member.id]: {
           status: 'dispatching',
           lastSeen: Date.now(),
-          lastMessage: 'Session created',
+          lastMessage: 'Card session created',
         },
       }))
       emitFeedEvent({
@@ -626,10 +784,8 @@ export function useMissionOrchestrator() {
         agentName: member.name,
       })
 
-      attachSessionStream(member.id, sessionKey)
-      const owner = await resolveAuthoritativeCardOwner(sessionKey)
-      if (owner) persistCardOwner(member.id, owner, model)
-      return sessionKey
+      attachSessionStream(member.id, transportKey)
+      return transportKey
     },
     [
       attachSessionStream,
@@ -648,7 +804,8 @@ export function useMissionOrchestrator() {
       messageText: string
       member?: TeamMember
     }) => {
-      const { sessionKey, agentId, agentTasks, messageText, member } = params
+      const { agentId, agentTasks, messageText, member } = params
+      const sessionKey = await refreshAgentTransport(agentId)
       const model = member ? resolveGatewayModelId(member.modelId) : ''
 
       const response = await fetch('/api/agent-dispatch', {
@@ -709,7 +866,12 @@ export function useMissionOrchestrator() {
         })
       })
     },
-    [setAgentStatus, setDispatchedTaskIdsByAgent, setMissionTasks],
+    [
+      refreshAgentTransport,
+      setAgentStatus,
+      setDispatchedTaskIdsByAgent,
+      setMissionTasks,
+    ],
   )
 
   const ensureAgentSessions = useCallback(
@@ -747,22 +909,33 @@ export function useMissionOrchestrator() {
         mission.team.map(async (member) => {
           const cardId = mission.agentCardIdMap[member.id]
           if (!cardId) return
-          const owner = await resolveAuthoritativeCardOwner(cardId)
-          if (!owner || owner.cardId !== cardId) {
-            setAgentCardOwner(member.id, null)
+          const parentCardId = mission.agentParentCardIdMap[member.id]
+          const cards = await fetchSessionCards()
+          const resolved = resolveAuthoritativeGatewayTransport(cards, {
+            cardId,
+            ...(parentCardId ? { parentCardId } : {}),
+          })
+          if (!resolved) {
+            const exactOwner = projectExactAuthoritativeCardOwner(cards, {
+              cardId,
+              ...(parentCardId ? { parentCardId } : {}),
+            })
             setAgentStatus(member.id, {
               status: 'stopped',
               lastSeen: Date.now(),
-              lastMessage: 'Stored Card owner is no longer available',
+              lastMessage: exactOwner
+                ? 'Stored Card is not controllable through the gateway'
+                : 'Stored Card owner is no longer authoritative',
             })
             return
           }
+          const { owner, sessionKey } = resolved
 
-          const sessionKey = owner.canonicalSegmentKey
           transientSessionMapRef.current[member.id] = sessionKey
           persistCardOwner(
             member.id,
             owner,
+            cards,
             mission.agentCardModelMap[member.id] ||
               resolveGatewayModelId(member.modelId),
           )
@@ -994,20 +1167,21 @@ export function useMissionOrchestrator() {
       const payload = retryPayloadRef.current[agentId]
       if (!member || !payload) return
 
-      const currentSessionKey = transientSessionMapRef.current[agentId]
-      if (currentSessionKey) {
-        const existingStream = streamMapRef.current.get(currentSessionKey)
-        if (existingStream) {
-          existingStream.close()
-          streamMapRef.current.delete(currentSessionKey)
-        }
-        completedSessionKeysRef.current.delete(currentSessionKey)
-        try {
-          await killAgentSession(currentSessionKey)
-        } catch {
-          /* ignore stale session kill failures before retry */
-        }
+      const currentSessionKey = await refreshAgentTransport(agentId)
+      try {
+        await killAgentSession(currentSessionKey)
+      } catch (error) {
+        setAgentStatus(agentId, {
+          status: 'error',
+          lastSeen: Date.now(),
+          lastMessage:
+            'Retry blocked because the current Card could not be stopped',
+        })
+        throw error
       }
+      streamMapRef.current.get(currentSessionKey)?.close()
+      streamMapRef.current.delete(currentSessionKey)
+      completedSessionKeysRef.current.delete(currentSessionKey)
 
       setAgentStatus(agentId, {
         status: 'active',
@@ -1028,15 +1202,17 @@ export function useMissionOrchestrator() {
         member,
       })
     },
-    [dispatchAgentTasks, setAgentStatus, spawnAgentSession],
+    [
+      dispatchAgentTasks,
+      refreshAgentTransport,
+      setAgentStatus,
+      spawnAgentSession,
+    ],
   )
 
   const handleSetAgentPaused = useCallback(
     async (agentId: string, pause: boolean) => {
-      const sessionKey = transientSessionMapRef.current[agentId]
-      if (!sessionKey) {
-        throw new Error('No active session to control')
-      }
+      const sessionKey = await refreshAgentTransport(agentId)
 
       const member = missionRef.current?.team.find(
         (entry) => entry.id === agentId,
@@ -1073,7 +1249,7 @@ export function useMissionOrchestrator() {
         throw error
       }
     },
-    [setAgentCardStatus, setAgentStatus],
+    [refreshAgentTransport, setAgentCardStatus, setAgentStatus],
   )
 
   const handleMissionPause = useCallback(
@@ -1084,7 +1260,7 @@ export function useMissionOrchestrator() {
       const previousState = useMissionStore.getState().missionState
       const activeAgentIds = mission.team
         .map((member) => member.id)
-        .filter((agentId) => Boolean(transientSessionMapRef.current[agentId]))
+        .filter((agentId) => Boolean(mission.agentCardIdMap[agentId]))
 
       try {
         const results = await Promise.allSettled(
@@ -1101,17 +1277,7 @@ export function useMissionOrchestrator() {
 
   const handleKillAgent = useCallback(
     async (agentId: string) => {
-      const sessionKey = transientSessionMapRef.current[agentId]
-      if (!sessionKey) return
-
-      const existingStream = streamMapRef.current.get(sessionKey)
-      if (existingStream) {
-        existingStream.close()
-        streamMapRef.current.delete(sessionKey)
-      }
-
-      completedSessionKeysRef.current.delete(sessionKey)
-
+      const sessionKey = await refreshAgentTransport(agentId)
       const member = missionRef.current?.team.find(
         (entry) => entry.id === agentId,
       )
@@ -1119,37 +1285,50 @@ export function useMissionOrchestrator() {
 
       try {
         await killAgentSession(sessionKey)
-      } finally {
-        transientSessionMapRef.current = Object.fromEntries(
-          Object.entries(transientSessionMapRef.current).filter(
-            ([key]) => key !== agentId,
-          ),
-        )
-        setAgentCardOwner(agentId, null)
-        setAgentCardStatus((previous) => ({
-          ...previous,
-          [agentId]: {
-            status: 'error',
-            lastSeen: Date.now(),
-            lastMessage: 'Agent stopped',
-          },
-        }))
+      } catch (error) {
+        setAgentStatus(agentId, {
+          status: 'error',
+          lastSeen: Date.now(),
+          lastMessage: 'Failed to stop agent; Card ownership was preserved',
+        })
         emitFeedEvent({
-          type: 'agent_killed',
-          message: `${agentName} session killed`,
+          type: 'system',
+          message: `${agentName} could not be stopped`,
           agentName,
         })
+        throw error
       }
+
+      streamMapRef.current.get(sessionKey)?.close()
+      streamMapRef.current.delete(sessionKey)
+      completedSessionKeysRef.current.delete(sessionKey)
+      delete transientSessionMapRef.current[agentId]
+      setAgentCardOwner(agentId, null)
+      setAgentCardStatus((previous) => ({
+        ...previous,
+        [agentId]: {
+          status: 'stopped',
+          lastSeen: Date.now(),
+          lastMessage: 'Agent stopped',
+        },
+      }))
+      emitFeedEvent({
+        type: 'agent_killed',
+        message: `${agentName} session killed`,
+        agentName,
+      })
     },
-    [setAgentCardOwner, setAgentCardStatus],
+    [
+      refreshAgentTransport,
+      setAgentCardOwner,
+      setAgentCardStatus,
+      setAgentStatus,
+    ],
   )
 
   const handleSteerAgent = useCallback(
     async (agentId: string, message: string) => {
-      const sessionKey = transientSessionMapRef.current[agentId]
-      if (!sessionKey) {
-        throw new Error('No active session to steer')
-      }
+      const sessionKey = await refreshAgentTransport(agentId)
 
       const directive = message.trim()
       if (!directive) return
@@ -1189,26 +1368,35 @@ export function useMissionOrchestrator() {
         agentName,
       })
     },
-    [setAgentCardStatus],
+    [refreshAgentTransport, setAgentCardStatus],
   )
 
   const abortMission = useCallback(async () => {
-    const sessionKeys = Object.values(transientSessionMapRef.current).filter(
-      Boolean,
+    const mission = missionRef.current
+    if (!mission) return
+    const ownedAgentIds = mission.team
+      .map((member) => member.id)
+      .filter((agentId) => Boolean(mission.agentCardIdMap[agentId]))
+    const results = await Promise.allSettled(
+      ownedAgentIds.map((agentId) => handleKillAgent(agentId)),
     )
+    if (results.some((result) => result.status === 'rejected')) {
+      emitFeedEvent({
+        type: 'system',
+        message:
+          'Mission abort incomplete; failed Card ownership was preserved',
+      })
+      throw new Error('Mission abort incomplete')
+    }
+
     closeAllStreams()
-
-    await Promise.allSettled(
-      sessionKeys.map((sessionKey) => killAgentSession(sessionKey)),
-    )
-
     setIsDispatching(false)
     emitFeedEvent({
       type: 'system',
       message: 'Mission aborted',
     })
     abortMissionInStore()
-  }, [abortMissionInStore, closeAllStreams])
+  }, [abortMissionInStore, closeAllStreams, handleKillAgent])
 
   useEffect(() => {
     const hasSessions = Object.keys(agentCardIdMap).length > 0
@@ -1218,6 +1406,7 @@ export function useMissionOrchestrator() {
 
     const pollSessions = async () => {
       try {
+        const cards = await fetchSessionCards()
         const response = await fetch('/api/sessions', {
           signal: controller.signal,
         })
@@ -1232,8 +1421,17 @@ export function useMissionOrchestrator() {
         const now = Date.now()
 
         for (const member of activeMission.team) {
-          const sessionKey = transientSessionMapRef.current[member.id]
-          if (!sessionKey) continue
+          let sessionKey: string
+          try {
+            sessionKey = await refreshAgentTransport(member.id, cards)
+          } catch {
+            nextStatus[member.id] = {
+              status: 'stopped',
+              lastSeen: now,
+              lastMessage: 'Authoritative Card transport is unavailable',
+            }
+            continue
+          }
 
           const session = sessions.find(
             (entry) => readSessionId(entry) === sessionKey,
@@ -1329,7 +1527,13 @@ export function useMissionOrchestrator() {
       controller.abort()
       window.clearInterval(intervalId)
     }
-  }, [activeMission, agentCardIdMap, missionState, setAgentCardStatus])
+  }, [
+    activeMission,
+    agentCardIdMap,
+    missionState,
+    refreshAgentTransport,
+    setAgentCardStatus,
+  ])
 
   useEffect(() => {
     if (missionState === 'running' || missionState === 'paused') return

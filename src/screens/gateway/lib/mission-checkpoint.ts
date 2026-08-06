@@ -1,3 +1,9 @@
+import type {
+  SessionCardChildWire,
+  SessionCardListWire,
+} from '@/screens/chat/chat-queries'
+import { retainCompleteSessionCardProjections } from '@/screens/chat/chat-queries'
+
 export type MissionCheckpointTeamMember = {
   id: string
   name: string
@@ -279,16 +285,84 @@ export function parseMissionCheckpoint(
 
 function toPersistableCheckpoint(
   checkpoint: MissionCheckpoint,
+  cardProjection?: SessionCardListWire,
 ): MissionCheckpoint | null {
   const { report: _runtimeReport, ...withoutRuntimeReport } = checkpoint
-  return parseMissionCheckpoint({
+  const parsed = parseMissionCheckpoint({
     ...withoutRuntimeReport,
     version: MISSION_CHECKPOINT_VERSION,
   })
+  if (!parsed) return null
+  if (Object.keys(parsed.agentCardIdMap).length === 0) return parsed
+  return cardProjection
+    ? validateMissionCheckpointCardOwnership(parsed, cardProjection)
+    : null
 }
 
-export function saveMissionCheckpoint(checkpoint: MissionCheckpoint): void {
-  const safe = toPersistableCheckpoint(checkpoint)
+type ProjectedCheckpointCardOwner = {
+  cardId: string
+  parentCardId?: string
+  title: string
+}
+
+function collectProjectedChildOwners(
+  children: ReadonlyArray<SessionCardChildWire>,
+  parentCardId: string,
+  owners: Map<string, ProjectedCheckpointCardOwner>,
+): void {
+  for (const child of children) {
+    owners.set(child.cardId, {
+      cardId: child.cardId,
+      parentCardId,
+      title: child.title,
+    })
+    collectProjectedChildOwners(child.childNodes ?? [], child.cardId, owners)
+  }
+}
+
+/**
+ * Converts structurally valid persisted ownership into trusted Card ownership.
+ * Source-qualified strings are not Card IDs merely because they look like one:
+ * every owner must match an exact complete projected Card and exact parent.
+ */
+export function validateMissionCheckpointCardOwnership(
+  checkpoint: MissionCheckpoint,
+  response: SessionCardListWire | undefined,
+): MissionCheckpoint | null {
+  const projection = retainCompleteSessionCardProjections(response)
+  if (!projection) return null
+
+  const owners = new Map<string, ProjectedCheckpointCardOwner>()
+  for (const card of projection.cards) {
+    owners.set(card.cardId, {
+      cardId: card.cardId,
+      title: card.title,
+    })
+    collectProjectedChildOwners(card.childNodes, card.cardId, owners)
+  }
+
+  const agentCardTitleMap = { ...checkpoint.agentCardTitleMap }
+  for (const [agentId, cardId] of Object.entries(checkpoint.agentCardIdMap)) {
+    const owner = owners.get(cardId)
+    const persistedParent = checkpoint.agentParentCardIdMap[agentId]
+    if (!owner || owner.parentCardId !== persistedParent) return null
+    agentCardTitleMap[agentId] = owner.title
+  }
+
+  return {
+    ...checkpoint,
+    agentCardIdMap: { ...checkpoint.agentCardIdMap },
+    agentParentCardIdMap: { ...checkpoint.agentParentCardIdMap },
+    agentCardTitleMap,
+    agentCardModelMap: { ...checkpoint.agentCardModelMap },
+  }
+}
+
+export function saveMissionCheckpoint(
+  checkpoint: MissionCheckpoint,
+  cardProjection?: SessionCardListWire,
+): void {
+  const safe = toPersistableCheckpoint(checkpoint, cardProjection)
   if (!safe) {
     removeStorageItem(CHECKPOINT_KEY)
     return
@@ -300,13 +374,21 @@ export function saveMissionCheckpoint(checkpoint: MissionCheckpoint): void {
   }
 }
 
-export function loadMissionCheckpoint(): MissionCheckpoint | null {
+export function loadMissionCheckpoint(
+  cardProjection?: SessionCardListWire,
+): MissionCheckpoint | null {
   try {
     const raw = localStorage.getItem(CHECKPOINT_KEY)
     if (!raw) return null
     const parsed = parseMissionCheckpoint(JSON.parse(raw))
-    if (!parsed) removeStorageItem(CHECKPOINT_KEY)
-    return parsed
+    const safe =
+      parsed && Object.keys(parsed.agentCardIdMap).length === 0
+        ? parsed
+        : parsed && cardProjection
+          ? validateMissionCheckpointCardOwnership(parsed, cardProjection)
+          : null
+    removeStorageItem(CHECKPOINT_KEY)
+    return safe
   } catch {
     removeStorageItem(CHECKPOINT_KEY)
     return null
@@ -317,8 +399,11 @@ export function clearMissionCheckpoint(): void {
   removeStorageItem(CHECKPOINT_KEY)
 }
 
-export function archiveMissionToHistory(checkpoint: MissionCheckpoint): void {
-  const safe = toPersistableCheckpoint(checkpoint)
+export function archiveMissionToHistory(
+  checkpoint: MissionCheckpoint,
+  cardProjection?: SessionCardListWire,
+): void {
+  const safe = toPersistableCheckpoint(checkpoint, cardProjection)
   if (!safe) return
   const history = loadMissionHistory().filter((entry) => entry.id !== safe.id)
   history.unshift(safe)
