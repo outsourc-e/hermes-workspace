@@ -106,6 +106,31 @@ function rootCard(cardId: string, canonicalSegmentKey: string): SessionCard {
   }
 }
 
+function controlledSseResponse() {
+  const encoder = new TextEncoder()
+  let streamController: ReadableStreamDefaultController<Uint8Array> | null =
+    null
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      streamController = controller
+    },
+  })
+  return {
+    response: new Response(body, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+    }),
+    emit(event: string, data: Record<string, unknown>) {
+      streamController?.enqueue(
+        encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+      )
+    },
+    close() {
+      streamController?.close()
+    },
+  }
+}
+
 describe('useStreamingMessage authoritative handoff behavior', () => {
   beforeEach(() => {
     window.localStorage.clear()
@@ -120,6 +145,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
     useChatStore.getState().clearCard('remote:card')
     useChatStore.getState().clearCard('remote:parent-card')
     useChatStore.getState().clearCard('remote:created-card')
+    useChatStore.getState().clearCard('remote:concurrent-card')
   })
 
   afterEach(() => {
@@ -192,6 +218,173 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
         stableId: 'stream-run:run-identity',
       }),
     )
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+  })
+
+  it('keeps two actual send-stream readers independent through interleaved production events and sibling termination', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1)
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined)
+    const card = rootCard('remote:concurrent-card', 'remote:concurrent-segment')
+    const firstStream = controlledSseResponse()
+    const secondStream = controlledSseResponse()
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(firstStream.response)
+      .mockResolvedValueOnce(secondStream.response)
+    let firstController: StreamingController | null = null
+    let secondController: StreamingController | null = null
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+
+    React.act(() => {
+      root.render(
+        <>
+          <StreamingHarness
+            onReady={(next) => {
+              firstController = next
+            }}
+            onSessionResolved={vi.fn()}
+            onAbort={vi.fn()}
+            pinMainSession={false}
+            activeCard={card}
+            sessionCards={[card]}
+          />
+          <StreamingHarness
+            onReady={(next) => {
+              secondController = next
+            }}
+            onSessionResolved={vi.fn()}
+            onAbort={vi.fn()}
+            pinMainSession={false}
+            activeCard={card}
+            sessionCards={[card]}
+          />
+        </>,
+      )
+    })
+
+    let firstRun: Promise<void> | undefined
+    let secondRun: Promise<void> | undefined
+    await React.act(async () => {
+      firstRun = firstController!.startStreaming({
+        sessionKey: card.canonicalSegmentKey,
+        friendlyId: card.cardId,
+        cardId: card.cardId,
+        message: 'first concurrent turn',
+      })
+      secondRun = secondController!.startStreaming({
+        sessionKey: card.canonicalSegmentKey,
+        friendlyId: card.cardId,
+        cardId: card.cardId,
+        message: 'second concurrent turn',
+      })
+      await Promise.resolve()
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    await React.act(async () => {
+      firstStream.emit('started', {
+        runId: 'run-concurrent-a',
+        sessionKey: card.canonicalSegmentKey,
+      })
+      secondStream.emit('started', {
+        runId: 'run-concurrent-b',
+        sessionKey: card.canonicalSegmentKey,
+      })
+      firstStream.emit('chunk', {
+        text: 'alpha',
+        fullReplace: true,
+        runId: 'run-concurrent-a',
+      })
+      secondStream.emit('chunk', {
+        text: 'bravo',
+        fullReplace: true,
+        runId: 'run-concurrent-b',
+      })
+      firstStream.emit('chunk', {
+        text: 'alpha continued',
+        fullReplace: true,
+        runId: 'run-concurrent-a',
+      })
+      await Promise.resolve()
+    })
+
+    await vi.waitFor(() => {
+      expect(
+        useChatStore
+          .getState()
+          .getCardStreamingStates(card.cardId)
+          .map(({ runId, text }) => ({ runId, text }))
+          .sort((left, right) =>
+            String(left.runId).localeCompare(String(right.runId)),
+          ),
+      ).toEqual([
+        { runId: 'run-concurrent-a', text: 'alpha continued' },
+        { runId: 'run-concurrent-b', text: 'bravo' },
+      ])
+    })
+
+    await React.act(async () => {
+      firstStream.emit('done', {
+        state: 'complete',
+        sessionKey: card.canonicalSegmentKey,
+        runId: 'run-concurrent-a',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'alpha continued' }],
+        },
+      })
+      firstStream.close()
+      await firstRun
+    })
+
+    expect(
+      useChatStore
+        .getState()
+        .getCardStreamingStates(card.cardId)
+        .map(({ runId, text }) => ({ runId, text })),
+    ).toEqual([{ runId: 'run-concurrent-b', text: 'bravo' }])
+
+    await React.act(async () => {
+      secondStream.emit('chunk', {
+        text: 'bravo survives sibling completion',
+        fullReplace: true,
+        runId: 'run-concurrent-b',
+      })
+      await Promise.resolve()
+    })
+    await vi.waitFor(() => {
+      expect(
+        useChatStore.getState().getCardStreamingStates(card.cardId),
+      ).toEqual([
+        expect.objectContaining({
+          runId: 'run-concurrent-b',
+          text: 'bravo survives sibling completion',
+        }),
+      ])
+    })
+
+    await React.act(async () => {
+      secondStream.emit('done', {
+        state: 'complete',
+        sessionKey: card.canonicalSegmentKey,
+        runId: 'run-concurrent-b',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'bravo survives sibling completion' },
+          ],
+        },
+      })
+      secondStream.close()
+      await secondRun
+    })
+    expect(useChatStore.getState().getCardStreamingStates(card.cardId)).toEqual(
+      [],
+    )
+
     React.act(() => root.unmount())
     document.body.removeChild(container)
   })

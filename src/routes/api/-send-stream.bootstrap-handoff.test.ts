@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   appendLocalMessage: vi.fn(),
   ensureLocalSession: vi.fn(),
   getLocalSession: vi.fn(),
+  touchLocalSession: vi.fn(),
   buildResolvedSessionHeaders: vi.fn(() => ({})),
   openaiChat: vi.fn(),
   streamResponses: vi.fn(),
@@ -116,7 +117,7 @@ vi.mock('../../server/local-session-store', () => ({
   ensureLocalSession: mocks.ensureLocalSession,
   getLocalSession: mocks.getLocalSession,
   getLocalMessages: vi.fn(() => []),
-  touchLocalSession: vi.fn(),
+  touchLocalSession: mocks.touchLocalSession,
 }))
 
 vi.mock('../../server/local-provider-discovery', () => ({
@@ -401,6 +402,182 @@ describe('send-stream bootstrap session handoff', () => {
         expect(mocks.appendLocalMessage).not.toHaveBeenCalled()
         expect(mocks.observeCardActivity).not.toHaveBeenCalled()
         expect(mocks.publishCardActivityEvent).not.toHaveBeenCalled()
+      }
+    },
+  )
+
+  it.each([
+    {
+      label: 'local session creation',
+      rollOverAfter: 'session' as const,
+      expected: { run: 0, user: 0, running: 0, provider: 0 },
+      responseStatus: 409,
+    },
+    {
+      label: 'persisted run creation',
+      rollOverAfter: 'run' as const,
+      expected: { run: 1, user: 0, running: 0, provider: 0 },
+      responseStatus: 409,
+    },
+    {
+      label: 'durable user message append',
+      rollOverAfter: 'user' as const,
+      expected: { run: 1, user: 1, running: 0, provider: 0 },
+      responseStatus: 409,
+    },
+    {
+      label: 'running activity persistence',
+      rollOverAfter: 'activity' as const,
+      expected: { run: 1, user: 1, running: 1, provider: 0 },
+      responseStatus: 409,
+    },
+    {
+      label: 'provider mutation',
+      rollOverAfter: 'provider' as const,
+      expected: { run: 1, user: 1, running: 1, provider: 1 },
+      responseStatus: 200,
+    },
+  ])(
+    'revalidates immediately after $label and preserves only already accepted local side effects',
+    async ({ rollOverAfter, expected, responseStatus }) => {
+      const cardId = 'local:mutation-card'
+      const segmentKey = 'local:mutation-segment'
+      const upstreamKey = 'local-upstream-session'
+      let rolledOver = false
+      mocks.getChatMode.mockReturnValue('portable')
+      mocks.resolveSessionCard.mockResolvedValueOnce({
+        card: {
+          cardId,
+          canonicalSegmentKey: segmentKey,
+          canonicalSource: 'local',
+          canonicalTransport: 'tmux',
+          continuationSegmentKeys: [cardId, segmentKey],
+          continuationCount: 2,
+          relationshipKind: 'root',
+        },
+        sourceBySegmentKey: new Map([[segmentKey, 'local']]),
+        upstreamKeyBySegmentKey: new Map([[segmentKey, upstreamKey]]),
+        collection: { completeness: 'complete', retryable: false },
+      })
+      mocks.resolveExactSessionCardOperationBinding.mockImplementation(
+        (binding: { cardId: string; parentCardId: string | null }) =>
+          Promise.resolve(
+            rolledOver
+              ? null
+              : {
+                  kind: 'session-card-owner',
+                  cardId: binding.cardId,
+                  parentCardId: binding.parentCardId,
+                },
+          ),
+      )
+      mocks.ensureLocalSession.mockImplementation(() => {
+        if (rollOverAfter === 'session') rolledOver = true
+      })
+      mocks.createPersistedRun.mockImplementation(() => {
+        if (rollOverAfter === 'run') rolledOver = true
+        return Promise.resolve(undefined)
+      })
+      mocks.appendLocalMessage.mockImplementation(
+        (_sessionKey: string, message: { role: string }) => {
+          if (message.role === 'user' && rollOverAfter === 'user') {
+            rolledOver = true
+          }
+        },
+      )
+      let activityTimestamp = 100
+      mocks.observeCardActivity.mockImplementation(
+        (input: {
+          cardId: string
+          upstreamSessionKey: string
+          runId: string
+          state: 'running' | 'completed' | 'error' | 'pending_approval'
+        }) => {
+          if (input.state === 'running' && rollOverAfter === 'activity') {
+            rolledOver = true
+          }
+          return Promise.resolve({
+            cardId: input.cardId,
+            sessionKey: segmentKey,
+            runId: input.runId,
+            state: input.state,
+            updatedAt: activityTimestamp++,
+          })
+        },
+      )
+      mocks.openaiChat.mockImplementation(() => {
+        if (rollOverAfter === 'provider') rolledOver = true
+        return Promise.resolve({
+          async *[Symbol.asyncIterator]() {
+            await Promise.resolve()
+            yield { type: 'text', text: 'accepted assistant output' }
+          },
+        })
+      })
+
+      const response = await handler({
+        request: new Request('http://workspace.test/api/send-stream', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            cardId,
+            sessionKey: segmentKey,
+            friendlyId: cardId,
+            message: 'accepted user turn',
+          }),
+        }),
+      })
+      const responseBody = await response.text()
+
+      expect(response.status).toBe(responseStatus)
+      expect(mocks.ensureLocalSession).toHaveBeenCalledTimes(1)
+      expect(mocks.createPersistedRun).toHaveBeenCalledTimes(expected.run)
+      expect(
+        mocks.appendLocalMessage.mock.calls.filter(
+          ([, persisted]) => persisted.role === 'user',
+        ),
+      ).toHaveLength(expected.user)
+      expect(
+        mocks.observeCardActivity.mock.calls.filter(
+          ([input]) => input.state === 'running',
+        ),
+      ).toHaveLength(expected.running)
+      expect(mocks.openaiChat).toHaveBeenCalledTimes(expected.provider)
+
+      // Rollover never rewrites or deletes an already accepted session, run, or
+      // user turn. It only terminalizes the exact run that this request created.
+      expect(
+        mocks.appendLocalMessage.mock.calls.filter(
+          ([, persisted]) => persisted.role === 'assistant',
+        ),
+      ).toHaveLength(0)
+      expect(mocks.touchLocalSession).not.toHaveBeenCalled()
+      expect(
+        mocks.observeCardActivity.mock.calls.filter(
+          ([input]) => input.state === 'completed' || input.state === 'error',
+        ),
+      ).toHaveLength(0)
+      expect(mocks.markRunStatus).toHaveBeenCalledTimes(expected.run)
+      if (expected.run > 0) {
+        expect(mocks.markRunStatus).toHaveBeenCalledWith(
+          segmentKey,
+          expect.any(String),
+          'error',
+          'Session Card ownership changed before send',
+        )
+      }
+      if (responseStatus === 409) {
+        expect(JSON.parse(responseBody)).toEqual({
+          ok: false,
+          error: 'Session Card ownership changed before send',
+        })
+      } else {
+        expect(parseEvents(responseBody)).toContainEqual({
+          event: 'error',
+          data: expect.objectContaining({
+            message: 'Session Card ownership changed before send',
+          }),
+        })
       }
     },
   )

@@ -1045,6 +1045,7 @@ export const Route = createFileRoute('/api/send-stream')({
           }
         }
 
+        let cardMutationAuthorityStale = false
         let emitCardActivityToStream = (
           _payload: Record<string, unknown>,
         ): void => undefined
@@ -1054,7 +1055,14 @@ export const Route = createFileRoute('/api/send-stream')({
           upstreamSessionKey: string = sessionKey,
         ): Promise<void> => {
           const state = cardActivityStateForEvent(activity)
-          if (!state || !activeCardId || !activityRunId) return
+          if (
+            cardMutationAuthorityStale ||
+            !state ||
+            !activeCardId ||
+            !activityRunId
+          ) {
+            return
+          }
           const observed = await sessionCardService
             .observeCardActivity({
               cardId: activeCardId,
@@ -1120,40 +1128,6 @@ export const Route = createFileRoute('/api/send-stream')({
             ),
           )
 
-        // A selected local Card is about to mutate the local session store before
-        // its provider edge. Revalidate its exact owner now, after every preflight
-        // await and immediately before constructing the stream whose synchronous
-        // start performs ensureLocalSession. Bootstrap sends have no Card binding
-        // yet and intentionally retain their existing local-session creation path.
-        if (
-          requestedCardMutationBinding &&
-          activeCardCanonicalSource === 'local'
-        ) {
-          try {
-            const binding = requestedCardMutationBinding
-            const owner = await waitWithinStreamLifetime(
-              resolveExactSessionCardOperationBinding(binding),
-            )
-            ensureStreamTransportAvailable()
-            if (
-              !owner ||
-              owner.cardId !== binding.cardId ||
-              owner.parentCardId !== binding.parentCardId
-            ) {
-              return staleCardMutationResponse()
-            }
-          } catch (error) {
-            if (error === streamTimeoutError) {
-              return finishPreStreamResponse(streamTimeoutResponse())
-            }
-            if (error === streamAbortError || streamTransportUnavailable()) {
-              return finishPreStreamResponse(abortedResponse())
-            }
-            closeStream()
-            throw error
-          }
-        }
-
         type CardMutationEdgeStatus = 'authorized' | 'stale' | 'not-reached'
         let settleCardMutationEdge: (
           status: CardMutationEdgeStatus,
@@ -1168,6 +1142,38 @@ export const Route = createFileRoute('/api/send-stream')({
               }
             })
           : null
+        const revalidateCardMutationAuthority = async (): Promise<void> => {
+          const binding = requestedCardMutationBinding
+          if (!binding) return
+
+          let owner: Awaited<
+            ReturnType<typeof resolveExactSessionCardOperationBinding>
+          >
+          try {
+            owner = await waitWithinStreamLifetime(
+              resolveExactSessionCardOperationBinding(binding),
+            )
+            ensureStreamTransportAvailable()
+          } catch (error) {
+            if (
+              error === streamTimeoutError ||
+              error === streamAbortError ||
+              streamTransportUnavailable()
+            ) {
+              throw error
+            }
+            cardMutationAuthorityStale = true
+            throw staleCardMutationError
+          }
+          if (
+            !owner ||
+            owner.cardId !== binding.cardId ||
+            owner.parentCardId !== binding.parentCardId
+          ) {
+            cardMutationAuthorityStale = true
+            throw staleCardMutationError
+          }
+        }
         // Create streaming response using the SHARED server connection
         const encoder = new TextEncoder()
 
@@ -1497,8 +1503,10 @@ export const Route = createFileRoute('/api/send-stream')({
                 const runId = crypto.randomUUID()
                 let portableSessionKey = sessionKey
 
-                // Ensure the internal local/upstream session exists before asking
-                // the fresh Card projection to prove its stable public identity.
+                // Every selected-Card side effect gets its own just-in-time
+                // authority check. Bootstrap sends have no binding yet and keep
+                // their local-session creation path until projection succeeds.
+                await revalidateCardMutationAuthority()
                 ensureLocalSession(
                   portableSessionKey,
                   typeof body.model === 'string' ? body.model : undefined,
@@ -1565,6 +1573,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 activeRunId = runId
                 registerActiveSendRun(runId)
                 if (portableRunSessionKey) {
+                  await revalidateCardMutationAuthority()
                   persistRunStarted(
                     runId,
                     portableRunSessionKey,
@@ -1590,11 +1599,6 @@ export const Route = createFileRoute('/api/send-stream')({
                   friendlyId: portableClientFriendlyId,
                 })
                 lastActivity = 'Processing your message...'
-                await observeAndPublishCardActivity(
-                  'run.started',
-                  runId,
-                  portableSessionKey,
-                )
 
                 try {
                   const userContent = buildMultimodalContent(
@@ -1623,7 +1627,11 @@ export const Route = createFileRoute('/api/send-stream')({
                     role: m.role as 'user' | 'assistant' | 'system',
                     content: m.content,
                   }))
-                  // Persist user message AFTER reading history to avoid duplication
+                  // Persist the admitted user turn after reading history to avoid
+                  // duplication, then publish running activity. Each durable
+                  // mutation gets a fresh exact-owner check; accepted earlier data
+                  // is retained if a later check observes rollover.
+                  await revalidateCardMutationAuthority()
                   appendLocalMessage(portableSessionKey, {
                     id: crypto.randomUUID(),
                     role: 'user',
@@ -1631,6 +1639,12 @@ export const Route = createFileRoute('/api/send-stream')({
                       typeof body.message === 'string' ? body.message : '',
                     timestamp: Date.now(),
                   })
+                  await revalidateCardMutationAuthority()
+                  await observeAndPublishCardActivity(
+                    'run.started',
+                    runId,
+                    portableSessionKey,
+                  )
                   const effectiveHistory = selectPortableConversationHistory(
                     persistedHistory,
                     history,
@@ -1669,21 +1683,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       }
                     >()
                     try {
-                      const binding = requestedCardMutationBinding
-                      if (binding) {
-                        const owner = await waitWithinStreamLifetime(
-                          resolveExactSessionCardOperationBinding(binding),
-                        )
-                        ensureStreamTransportAvailable()
-                        if (
-                          !owner ||
-                          owner.cardId !== binding.cardId ||
-                          owner.parentCardId !== binding.parentCardId
-                        ) {
-                          settleCardMutationEdge('stale')
-                          throw staleCardMutationError
-                        }
-                      }
+                      await revalidateCardMutationAuthority()
                       const responsesStream = streamResponses({
                         input: scopedMessage,
                         conversationHistory: effectiveHistory,
@@ -1780,13 +1780,16 @@ export const Route = createFileRoute('/api/send-stream')({
                         }
                         throw new Error(ev.error)
                       }
+                      await revalidateCardMutationAuthority()
                       appendLocalMessage(portableSessionKey, {
                         id: crypto.randomUUID(),
                         role: 'assistant',
                         content: accumulated,
                         timestamp: Date.now(),
                       })
+                      await revalidateCardMutationAuthority()
                       touchLocalSession(portableSessionKey)
+                      await revalidateCardMutationAuthority()
                       await observeAndPublishCardActivity(
                         'run.completed',
                         runId,
@@ -1823,21 +1826,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   }
 
-                  const binding = requestedCardMutationBinding
-                  if (binding) {
-                    const owner = await waitWithinStreamLifetime(
-                      resolveExactSessionCardOperationBinding(binding),
-                    )
-                    ensureStreamTransportAvailable()
-                    if (
-                      !owner ||
-                      owner.cardId !== binding.cardId ||
-                      owner.parentCardId !== binding.parentCardId
-                    ) {
-                      settleCardMutationEdge('stale')
-                      throw staleCardMutationError
-                    }
-                  }
+                  await revalidateCardMutationAuthority()
                   const streamPending = openaiChat(portableMessages, {
                     model: localBaseUrl
                       ? bareModel
@@ -1916,15 +1905,20 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   }
 
-                  // Persist assistant response to local session store
+                  // Persist assistant response to the accepted local session.
+                  // A rollover after provider acceptance keeps the durable user
+                  // turn and exact run cleanup, but blocks all later Card writes.
+                  await revalidateCardMutationAuthority()
                   appendLocalMessage(portableSessionKey, {
                     id: crypto.randomUUID(),
                     role: 'assistant',
                     content: accumulated,
                     timestamp: Date.now(),
                   })
+                  await revalidateCardMutationAuthority()
                   touchLocalSession(portableSessionKey)
 
+                  await revalidateCardMutationAuthority()
                   await observeAndPublishCardActivity(
                     'run.completed',
                     runId,
@@ -1950,15 +1944,20 @@ export const Route = createFileRoute('/api/send-stream')({
                     },
                   )
                 } catch (err) {
-                  settleCardMutationEdge('not-reached')
                   if (!streamClosed) {
                     const errorMessage = normalizeClaudeErrorMessage(err)
+                    const terminalRunCleanup = persistTerminalRun(
+                      'error',
+                      errorMessage,
+                    )
                     await finalizeTerminalPersistence(
-                      withRouteOwnedCardError(
-                        persistTerminalRun('error', errorMessage),
-                        runId,
-                        portableSessionKey,
-                      ),
+                      cardMutationAuthorityStale
+                        ? terminalRunCleanup
+                        : withRouteOwnedCardError(
+                            terminalRunCleanup,
+                            runId,
+                            portableSessionKey,
+                          ),
                       () => {
                         sendEvent('error', {
                           message: errorMessage,
@@ -1968,6 +1967,9 @@ export const Route = createFileRoute('/api/send-stream')({
                       },
                     )
                   }
+                  settleCardMutationEdge(
+                    cardMutationAuthorityStale ? 'stale' : 'not-reached',
+                  )
                 }
                 return
               }
@@ -2277,21 +2279,7 @@ export const Route = createFileRoute('/api/send-stream')({
               })()
 
               try {
-                const binding = requestedCardMutationBinding
-                if (binding) {
-                  const owner = await waitWithinStreamLifetime(
-                    resolveExactSessionCardOperationBinding(binding),
-                  )
-                  ensureStreamTransportAvailable()
-                  if (
-                    !owner ||
-                    owner.cardId !== binding.cardId ||
-                    owner.parentCardId !== binding.parentCardId
-                  ) {
-                    settleCardMutationEdge('stale')
-                    throw staleCardMutationError
-                  }
-                }
+                await revalidateCardMutationAuthority()
                 const upstreamStream = streamChat(
                   sessionKey,
                   {
@@ -3042,7 +3030,6 @@ export const Route = createFileRoute('/api/send-stream')({
                 void livePollerPromise.catch(() => undefined)
               }
             } catch (err) {
-              settleCardMutationEdge('not-reached')
               // Only send error if stream hasn't already completed successfully.
               // Finalization consumes a sealing failure so this catch cannot loop
               // by requesting the already-rejected terminal transition again.
@@ -3062,6 +3049,9 @@ export const Route = createFileRoute('/api/send-stream')({
                   },
                 )
               }
+              settleCardMutationEdge(
+                cardMutationAuthorityStale ? 'stale' : 'not-reached',
+              )
             }
           },
           async cancel() {
