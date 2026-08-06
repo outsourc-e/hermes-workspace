@@ -15,7 +15,7 @@ import { useConductorGateway } from './hooks/use-conductor-gateway'
 import type { CSSProperties } from 'react'
 import type { AgentWorkingRow } from './components/agents-working-panel'
 import type {
-  ConductorCardActivity,
+  ConductorCardSummary,
   MissionHistoryEntry,
   MissionHistoryWorkerDetail,
 } from './hooks/use-conductor-gateway'
@@ -908,7 +908,7 @@ function extractProjectPath(text: string): string | null {
 }
 
 function deriveSessionStatus(
-  session: ConductorCardActivity,
+  session: ConductorCardSummary,
 ): 'running' | 'completed' | 'failed' {
   if (session.status === 'error') return 'failed'
   if (session.status === 'complete') return 'completed'
@@ -1209,7 +1209,8 @@ export function Conductor() {
       return conductor.workers.map((worker, index) => {
         const persona = getAgentPersona(index)
         const currentTask = conductor.tasks.find(
-          (task) => task.workerKey === worker.key && task.status === 'running',
+          (task) =>
+            task.workerCardId === worker.key && task.status === 'running',
         )?.title
         const lastLine = conductor.workerOutputs[worker.key] ?? ''
         const isWorkerPaused =
@@ -1233,7 +1234,7 @@ export function Conductor() {
             ? new Date(worker.updatedAt).getTime()
             : undefined,
           taskCount: conductor.tasks.filter(
-            (task) => task.workerKey === worker.key,
+            (task) => task.workerCardId === worker.key,
           ).length,
           currentTask: isWorkerPaused ? 'Paused' : currentTask,
           sessionKey: worker.cardId,
@@ -1414,7 +1415,7 @@ export function Conductor() {
       (session) => deriveSessionStatus(session) === activityFilter,
     )
   })()
-  const activityItems: Array<MissionHistoryEntry | ConductorCardActivity> =
+  const activityItems: Array<MissionHistoryEntry | ConductorCardSummary> =
     hasMissionHistory ? filteredHistory : filteredSessions
   const ACTIVITY_PAGE_SIZE = 3
   const activityTotalPages = Math.max(
@@ -1894,7 +1895,7 @@ export function Conductor() {
                           )
                         })
                       : visibleActivityItems.map((item) => {
-                          const recentSession = item as ConductorCardActivity
+                          const recentSession = item as ConductorCardSummary
                           const displayName = recentSession.title
                           const updatedAt = new Date(
                             recentSession.updatedAt,
@@ -1910,7 +1911,7 @@ export function Conductor() {
 
                           return (
                             <div
-                              key={recentSession.key}
+                              key={recentSession.cardId}
                               className="flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm sm:gap-3"
                             >
                               <span className="min-w-0 flex-1 truncate font-medium capitalize text-[var(--theme-text)]">
@@ -3000,14 +3001,12 @@ export function Conductor() {
               </button>
               <button
                 type="button"
-                disabled={
-                  !conductor.orchestratorSessionKey || conductor.isPausing
-                }
+                disabled={!conductor.orchestratorCardId || conductor.isPausing}
                 onClick={async () => {
-                  if (!conductor.orchestratorSessionKey) return
+                  if (!conductor.orchestratorCardId) return
                   try {
                     await conductor.pauseAgent(
-                      conductor.orchestratorSessionKey,
+                      conductor.orchestratorCardId,
                       !conductor.isPaused,
                     )
                   } catch {
@@ -3016,7 +3015,7 @@ export function Conductor() {
                 }}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  !conductor.orchestratorSessionKey || conductor.isPausing
+                  !conductor.orchestratorCardId || conductor.isPausing
                     ? 'cursor-not-allowed border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] opacity-50'
                     : conductor.isPaused
                       ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)] hover:bg-[var(--theme-accent-soft-strong)]'
@@ -3138,9 +3137,9 @@ export function Conductor() {
                   const selectedTask = selectedTaskId
                     ? conductor.tasks.find((task) => task.id === selectedTaskId)
                     : null
-                  const displayWorkers = selectedTask?.workerKey
+                  const displayWorkers = selectedTask?.workerCardId
                     ? conductor.workers.filter(
-                        (worker) => worker.key === selectedTask.workerKey,
+                        (worker) => worker.key === selectedTask.workerCardId,
                       )
                     : conductor.workers
                   return (

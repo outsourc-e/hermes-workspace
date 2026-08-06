@@ -61,6 +61,8 @@ export type ConductorSettings = {
 }
 
 const ACTIVE_MISSION_STORAGE_KEY = 'conductor:active-mission'
+const ACTIVE_MISSION_STORAGE_VERSION = 3
+const CONDUCTOR_HISTORY_STORAGE_VERSION = 2
 const CONDUCTOR_SETTINGS_STORAGE_KEY = 'conductor-settings'
 const DEFAULT_CONDUCTOR_SETTINGS: ConductorSettings = {
   orchestratorModel: '',
@@ -76,7 +78,15 @@ export function shouldPersistActiveConductorMission(
   return phase === 'decomposing' || phase === 'running'
 }
 
+type PersistedConductorCardOwner = {
+  cardId: string
+  parentCardId?: string
+}
+
+type PersistedConductorTask = Omit<ConductorTask, 'output'>
+
 type PersistedMission = {
+  version: typeof ACTIVE_MISSION_STORAGE_VERSION
   missionId: string | null
   missionJobId: string | null
   goal: string
@@ -86,13 +96,10 @@ type PersistedMission = {
   pausedElapsedMs: number
   accumulatedPausedMs: number
   pauseStartedAt: string | null
-  workerKeys: Array<string>
-  workerLabels: Array<string>
-  workerOutputs: Record<string, string>
-  streamText: string
-  planText: string
+  orchestratorCardId: string | null
+  workerCards: Array<PersistedConductorCardOwner>
   completedAt: string | null
-  tasks: Array<ConductorTask>
+  tasks: Array<PersistedConductorTask>
 }
 
 type StreamEvent =
@@ -131,7 +138,6 @@ type PortableStreamResult = {
 export type ConductorWorker = {
   key: string
   cardId?: string
-  canonicalSegmentKey?: string
   parentCardId?: string
   relationshipKind?: ConductorCardActivity['kind']
   label: string
@@ -144,7 +150,7 @@ export type ConductorWorker = {
   tokenUsageLabel: string
 }
 
-export type ConductorCardActivity = {
+type ConductorCardActivity = {
   key: string
   cardId: string
   canonicalSegmentKey: string
@@ -158,11 +164,16 @@ export type ConductorCardActivity = {
   parentTitle?: string
 }
 
+export type ConductorCardSummary = Pick<
+  ConductorCardActivity,
+  'cardId' | 'title' | 'kind' | 'status' | 'updatedAt'
+>
+
 export type ConductorTask = {
   id: string
   title: string
   status: 'pending' | 'running' | 'complete' | 'failed'
-  workerKey: string | null
+  workerCardId: string | null
   output: string | null
 }
 
@@ -192,6 +203,25 @@ export type MissionHistoryEntry = {
   completeSummary?: string
   workerDetails?: Array<MissionHistoryWorkerDetail>
   error?: string | null
+}
+
+type PersistedMissionHistoryEntry = Pick<
+  MissionHistoryEntry,
+  | 'id'
+  | 'goal'
+  | 'startedAt'
+  | 'completedAt'
+  | 'workerCount'
+  | 'totalTokens'
+  | 'status'
+  | 'projectPath'
+  | 'outputPath'
+  | 'workerDetails'
+>
+
+type PersistedMissionHistory = {
+  version: typeof CONDUCTOR_HISTORY_STORAGE_VERSION
+  entries: Array<PersistedMissionHistoryEntry>
 }
 
 const HISTORY_STORAGE_KEY = 'conductor:history'
@@ -239,7 +269,7 @@ function extractTasksFromPlan(planText: string): Array<ConductorTask> {
           id,
           title,
           status: 'pending',
-          workerKey: null,
+          workerCardId: null,
           output: null,
         })
       }
@@ -258,6 +288,14 @@ function extractTasksFromPlan(planText: string): Array<ConductorTask> {
 function readString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim()
+    : null
+}
+
+function readCardId(value: unknown): string | null {
+  const cardId = readString(value)
+  if (!cardId) return null
+  return cardId.startsWith('remote:') || cardId.startsWith('local:')
+    ? cardId
     : null
 }
 
@@ -281,51 +319,34 @@ function toIso(value: unknown): string | null {
   return null
 }
 
-function normalizeMatchText(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+const RETIRED_CONDUCTOR_PERSISTENCE_FIELDS = new Set([
+  'workerKey',
+  'workerKeys',
+  'workerLabels',
+  'workerOutputs',
+  'agentSessionMap',
+  'agentSessions',
+  'agentSessionModelMap',
+  'sessionKey',
+  'canonicalSegmentKey',
+  'streamText',
+  'planText',
+  'output',
+])
 
-function getSessionSearchText(session: ConductorCardActivity): string {
-  return [
-    readString(session.label),
-    readString(session.title),
-    readString(session.parentTitle),
-    readString(session.kind),
-  ]
-    .filter((value): value is string => Boolean(value))
-    .join(' ')
-}
-
-function buildMissionNeedles(goal: string): Array<string> {
-  const words = normalizeMatchText(goal).split(' ').filter(Boolean)
-  const prefixes = [5, 8, 12]
-    .map((count) => words.slice(0, count).join(' ').trim())
-    .filter(Boolean)
-  return [...new Set(prefixes)]
-}
-
-function sessionMatchesMissionContext(
-  session: ConductorCardActivity,
-  missionStartMs: number,
-  missionNeedles: Array<string>,
-): boolean {
-  const createdAt = toIso(session.updatedAt)
-  if (!createdAt) return false
-
-  const createdMs = new Date(createdAt).getTime()
-  if (!Number.isFinite(createdMs) || createdMs < missionStartMs) return false
-
-  const text = normalizeMatchText(getSessionSearchText(session))
-  if (!text) return false
-  if (text.includes('mission orchestrator')) return true
-  if (text.includes('dashboard-backed conductor')) return true
-  if (text.includes('conductor mission')) return true
-
-  return missionNeedles.some((needle) => text.includes(needle))
+function containsRetiredConductorPersistence(value: unknown): boolean {
+  if (Array.isArray(value))
+    return value.some(containsRetiredConductorPersistence)
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  if (
+    Object.keys(record).some((key) =>
+      RETIRED_CONDUCTOR_PERSISTENCE_FIELDS.has(key),
+    )
+  ) {
+    return true
+  }
+  return Object.values(record).some(containsRetiredConductorPersistence)
 }
 
 function loadPersistedMission(): PersistedMission | null {
@@ -334,37 +355,23 @@ function loadPersistedMission(): PersistedMission | null {
     if (!raw) return null
 
     const parsed = JSON.parse(raw) as Record<string, unknown>
+    if (
+      parsed.version !== ACTIVE_MISSION_STORAGE_VERSION ||
+      containsRetiredConductorPersistence(parsed)
+    ) {
+      clearPersistedMission()
+      return null
+    }
+
     const missionId = readString(parsed.missionId)
     const missionJobId = readString(parsed.missionJobId)
     const goal = typeof parsed.goal === 'string' ? parsed.goal : null
     const phase = parsed.phase
-    const streamText =
-      typeof parsed.streamText === 'string' ? parsed.streamText : null
-    const planText =
-      typeof parsed.planText === 'string' ? parsed.planText : null
-    const workerKeys = Array.isArray(parsed.workerKeys)
-      ? parsed.workerKeys.filter(
-          (value): value is string => typeof value === 'string',
-        )
-      : null
-    const workerLabels = Array.isArray(parsed.workerLabels)
-      ? parsed.workerLabels.filter(
-          (value): value is string => typeof value === 'string',
-        )
-      : null
-    const workerOutputs =
-      parsed.workerOutputs &&
-      typeof parsed.workerOutputs === 'object' &&
-      !Array.isArray(parsed.workerOutputs)
-        ? Object.fromEntries(
-            Object.entries(
-              parsed.workerOutputs as Record<string, unknown>,
-            ).filter(
-              (entry): entry is [string, string] =>
-                typeof entry[0] === 'string' && typeof entry[1] === 'string',
-            ),
-          )
-        : {}
+    const orchestratorCardId =
+      parsed.orchestratorCardId === null ||
+      parsed.orchestratorCardId === undefined
+        ? null
+        : readCardId(parsed.orchestratorCardId)
     const missionStartedAt =
       parsed.missionStartedAt === null || parsed.missionStartedAt === undefined
         ? null
@@ -388,41 +395,63 @@ function loadPersistedMission(): PersistedMission | null {
       parsed.completedAt === null || parsed.completedAt === undefined
         ? null
         : toIso(parsed.completedAt)
-    const tasks = Array.isArray(parsed.tasks)
-      ? parsed.tasks
-          .map((task): ConductorTask | null => {
-            const record = readRecord(task)
-            if (!record) return null
-            const id = readString(record.id)
-            const title = readString(record.title)
-            const status = record.status
-            if (
-              !id ||
-              !title ||
-              (status !== 'pending' &&
-                status !== 'running' &&
-                status !== 'complete' &&
-                status !== 'failed')
-            ) {
-              return null
-            }
 
-            return {
-              id,
-              title,
-              status,
-              workerKey:
-                record.workerKey === null || record.workerKey === undefined
-                  ? null
-                  : readString(record.workerKey),
-              output:
-                record.output === null || record.output === undefined
-                  ? null
-                  : readString(record.output),
-            }
-          })
-          .filter((task): task is ConductorTask => task !== null)
-      : []
+    if (!Array.isArray(parsed.workerCards) || !Array.isArray(parsed.tasks)) {
+      clearPersistedMission()
+      return null
+    }
+
+    const workerCards: Array<PersistedConductorCardOwner> = []
+    const seenCardIds = new Set<string>()
+    for (const value of parsed.workerCards) {
+      const record = readRecord(value)
+      const cardId = readCardId(record?.cardId)
+      const parentCardId =
+        record?.parentCardId === undefined
+          ? null
+          : readCardId(record.parentCardId)
+      if (
+        !record ||
+        !cardId ||
+        seenCardIds.has(cardId) ||
+        (record.parentCardId !== undefined && !parentCardId) ||
+        parentCardId === cardId
+      ) {
+        clearPersistedMission()
+        return null
+      }
+      seenCardIds.add(cardId)
+      workerCards.push(parentCardId ? { cardId, parentCardId } : { cardId })
+    }
+
+    const tasks: Array<PersistedConductorTask> = []
+    for (const task of parsed.tasks) {
+      const record = readRecord(task)
+      const id = readString(record?.id)
+      const title = readString(record?.title)
+      const status = record?.status
+      const workerCardId =
+        record?.workerCardId === null || record?.workerCardId === undefined
+          ? null
+          : readCardId(record.workerCardId)
+      if (
+        !record ||
+        !id ||
+        !title ||
+        (status !== 'pending' &&
+          status !== 'running' &&
+          status !== 'complete' &&
+          status !== 'failed') ||
+        (record.workerCardId != null && !workerCardId) ||
+        (workerCardId !== null &&
+          workerCardId !== orchestratorCardId &&
+          !seenCardIds.has(workerCardId))
+      ) {
+        clearPersistedMission()
+        return null
+      }
+      tasks.push({ id, title, status, workerCardId })
+    }
 
     if (
       !goal ||
@@ -430,24 +459,20 @@ function loadPersistedMission(): PersistedMission | null {
         phase !== 'decomposing' &&
         phase !== 'running' &&
         phase !== 'complete') ||
-      streamText === null ||
-      planText === null ||
-      !workerKeys ||
-      !workerLabels
+      (parsed.orchestratorCardId != null && !orchestratorCardId)
     ) {
+      clearPersistedMission()
       return null
     }
 
     // Completed/stopped missions are already represented in mission history.
-    // Restoring them as the active mission causes stale terminal records to be
-    // re-queried on page load and can surface an old failure as if Conductor is
-    // currently broken.
     if (!shouldPersistActiveConductorMission(phase)) {
       clearPersistedMission()
       return null
     }
 
     return {
+      version: ACTIVE_MISSION_STORAGE_VERSION,
       missionId,
       missionJobId,
       goal,
@@ -457,15 +482,13 @@ function loadPersistedMission(): PersistedMission | null {
       pausedElapsedMs,
       accumulatedPausedMs,
       pauseStartedAt,
-      workerKeys,
-      workerLabels,
-      workerOutputs,
-      streamText,
-      planText,
+      orchestratorCardId,
+      workerCards,
       completedAt,
       tasks,
     }
   } catch {
+    clearPersistedMission()
     return null
   }
 }
@@ -519,70 +542,144 @@ function persistConductorSettings(settings: ConductorSettings): void {
   }
 }
 
+function parsePersistedMissionHistoryEntry(
+  value: unknown,
+): PersistedMissionHistoryEntry | null {
+  const entry = readRecord(value)
+  if (!entry) return null
+  const id = readString(entry.id)
+  const startedAt = toIso(entry.startedAt)
+  const completedAt = toIso(entry.completedAt)
+  if (
+    !id ||
+    typeof entry.goal !== 'string' ||
+    !startedAt ||
+    !completedAt ||
+    typeof entry.workerCount !== 'number' ||
+    !Number.isFinite(entry.workerCount) ||
+    typeof entry.totalTokens !== 'number' ||
+    !Number.isFinite(entry.totalTokens) ||
+    (entry.status !== 'completed' && entry.status !== 'failed') ||
+    (entry.projectPath !== null && typeof entry.projectPath !== 'string') ||
+    (entry.outputPath !== undefined &&
+      entry.outputPath !== null &&
+      typeof entry.outputPath !== 'string') ||
+    'outputText' in entry ||
+    'streamText' in entry ||
+    'workerSummary' in entry ||
+    'completeSummary' in entry ||
+    'error' in entry
+  ) {
+    return null
+  }
+
+  let workerDetails: Array<MissionHistoryWorkerDetail> | undefined
+  if (entry.workerDetails !== undefined) {
+    if (!Array.isArray(entry.workerDetails)) return null
+    workerDetails = []
+    for (const value of entry.workerDetails) {
+      const detail = readRecord(value)
+      if (
+        !detail ||
+        typeof detail.label !== 'string' ||
+        typeof detail.model !== 'string' ||
+        typeof detail.totalTokens !== 'number' ||
+        !Number.isFinite(detail.totalTokens) ||
+        typeof detail.personaEmoji !== 'string' ||
+        typeof detail.personaName !== 'string'
+      ) {
+        return null
+      }
+      workerDetails.push({
+        label: detail.label,
+        model: detail.model,
+        totalTokens: detail.totalTokens,
+        personaEmoji: detail.personaEmoji,
+        personaName: detail.personaName,
+      })
+    }
+  }
+
+  return {
+    id,
+    goal: entry.goal,
+    startedAt,
+    completedAt,
+    workerCount: Math.max(0, entry.workerCount),
+    totalTokens: Math.max(0, entry.totalTokens),
+    status: entry.status,
+    projectPath: entry.projectPath,
+    ...(entry.outputPath !== undefined ? { outputPath: entry.outputPath } : {}),
+    ...(workerDetails ? { workerDetails } : {}),
+  }
+}
+
+function toPersistedMissionHistoryEntry(
+  entry: MissionHistoryEntry,
+): PersistedMissionHistoryEntry | null {
+  return parsePersistedMissionHistoryEntry({
+    id: entry.id,
+    goal: entry.goal,
+    startedAt: entry.startedAt,
+    completedAt: entry.completedAt,
+    workerCount: entry.workerCount,
+    totalTokens: entry.totalTokens,
+    status: entry.status,
+    projectPath: entry.projectPath,
+    ...(entry.outputPath !== undefined ? { outputPath: entry.outputPath } : {}),
+    ...(entry.workerDetails ? { workerDetails: entry.workerDetails } : {}),
+  })
+}
+
 function loadMissionHistory(): Array<MissionHistoryEntry> {
   try {
     const raw = globalThis.localStorage.getItem(HISTORY_STORAGE_KEY)
     if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    if (
+      parsed.version !== CONDUCTOR_HISTORY_STORAGE_VERSION ||
+      !Array.isArray(parsed.entries)
+    ) {
+      clearMissionHistoryStorage()
+      return []
+    }
+    const entries = parsed.entries.map(parsePersistedMissionHistoryEntry)
+    if (entries.some((entry) => entry === null)) {
+      clearMissionHistoryStorage()
+      return []
+    }
     const seen = new Set<string>()
-    return parsed
-      .filter((entry: unknown): entry is MissionHistoryEntry => {
-        if (!entry || typeof entry !== 'object') return false
-        const e = entry as Record<string, unknown>
-        if (
-          typeof e.id !== 'string' ||
-          typeof e.goal !== 'string' ||
-          typeof e.startedAt !== 'string'
-        )
-          return false
-        if (seen.has(e.id)) return false
-        seen.add(e.id)
+    return (entries as Array<PersistedMissionHistoryEntry>)
+      .filter((entry) => {
+        if (seen.has(entry.id)) return false
+        seen.add(entry.id)
         return true
-      })
-      .map((entry) => {
-        const projectPath =
-          (typeof entry.projectPath === 'string' && entry.projectPath.trim()) ||
-          extractProjectPath(
-            typeof entry.projectPath === 'string' ? entry.projectPath : '',
-          ) ||
-          null
-        const outputText =
-          typeof entry.outputText === 'string' ? entry.outputText : undefined
-        const streamText =
-          typeof entry.streamText === 'string' ? entry.streamText : undefined
-        const outputPath =
-          (typeof entry.outputPath === 'string' && entry.outputPath.trim()) ||
-          extractProjectPath(
-            typeof entry.outputPath === 'string' ? entry.outputPath : '',
-          ) ||
-          projectPath ||
-          extractProjectPath(outputText ?? '') ||
-          extractProjectPath(streamText ?? '') ||
-          null
-        return {
-          ...entry,
-          projectPath,
-          outputPath,
-          outputText,
-          streamText,
-        }
       })
       .slice(0, MAX_HISTORY_ENTRIES)
   } catch {
+    clearMissionHistoryStorage()
     return []
   }
 }
 
 function appendMissionHistory(entry: MissionHistoryEntry): void {
+  const safeEntry = toPersistedMissionHistoryEntry(entry)
+  if (!safeEntry) return
   try {
     const current = loadMissionHistory()
-    // Deduplicate by id before appending
-    const filtered = current.filter((e) => e.id !== entry.id)
-    const updated = [entry, ...filtered].slice(0, MAX_HISTORY_ENTRIES)
+      .map(toPersistedMissionHistoryEntry)
+      .filter((value): value is PersistedMissionHistoryEntry => Boolean(value))
+    const entries = [
+      safeEntry,
+      ...current.filter((candidate) => candidate.id !== safeEntry.id),
+    ].slice(0, MAX_HISTORY_ENTRIES)
+    const persisted: PersistedMissionHistory = {
+      version: CONDUCTOR_HISTORY_STORAGE_VERSION,
+      entries,
+    }
     globalThis.localStorage.setItem(
       HISTORY_STORAGE_KEY,
-      JSON.stringify(updated),
+      JSON.stringify(persisted),
     )
   } catch {
     // Ignore persistence failures.
@@ -699,12 +796,12 @@ function remoteControlKeyForPrefix(
   return shortestMatches[0]!.slice('remote:'.length) || null
 }
 
-function activityMatchesMissionWorker(
+function activityMatchesTransientControl(
   activity: ConductorCardActivity,
-  workerKeys: ReadonlySet<string>,
+  sessionKeys: ReadonlySet<string>,
 ): boolean {
-  for (const workerKey of workerKeys) {
-    const normalized = workerKey.trim()
+  for (const sessionKey of sessionKeys) {
+    const normalized = sessionKey.trim()
     if (!normalized) continue
     if (normalized.startsWith('remote:') || normalized.startsWith('local:')) {
       if (activity.identityAliases.includes(normalized)) return true
@@ -716,6 +813,24 @@ function activityMatchesMissionWorker(
     if (activity.identityAliases.includes(`remote:${normalized}`)) return true
   }
   return false
+}
+
+function activityMatchesCardOwner(
+  activity: ConductorCardActivity,
+  owners: ReadonlyArray<PersistedConductorCardOwner>,
+): boolean {
+  return owners.some(
+    (owner) =>
+      owner.cardId === activity.cardId &&
+      (owner.parentCardId === undefined ||
+        owner.parentCardId === activity.parentCardId),
+  )
+}
+
+function remoteControlKey(activity: ConductorCardActivity): string | null {
+  return activity.canonicalSegmentKey.startsWith('remote:')
+    ? activity.canonicalSegmentKey.slice('remote:'.length) || null
+    : null
 }
 
 function activityStatus(
@@ -731,7 +846,6 @@ function toWorker(session: ConductorCardActivity): ConductorWorker {
   return {
     key: session.cardId,
     cardId: session.cardId,
-    canonicalSegmentKey: session.canonicalSegmentKey,
     ...(session.parentCardId ? { parentCardId: session.parentCardId } : {}),
     relationshipKind: session.kind,
     label: session.title,
@@ -802,7 +916,13 @@ function extractSessionIdFromMission(
 function formatMissionLog(lines: Array<string>): string {
   return lines
     .map((line) => line.trimEnd())
-    .filter((line) => line.trim().length > 0)
+    .filter(
+      (line) =>
+        line.trim().length > 0 &&
+        !/\b(?:session_id|sessionKey|session_key|workerKey|worker_key)\s*:/i.test(
+          line,
+        ),
+    )
     .join('\n')
     .slice(-10_000)
 }
@@ -1203,11 +1323,12 @@ export function useConductorGateway() {
   const [goal, setGoal] = useState(() => initialMission?.goal ?? '')
   const [orchestratorSessionKey, setOrchestratorSessionKey] = useState<
     string | null
-  >(() => initialMission?.workerKeys[0] ?? null)
-  const [streamText, setStreamText] = useState(
-    () => initialMission?.streamText ?? '',
+  >(null)
+  const [orchestratorCardId, setOrchestratorCardId] = useState<string | null>(
+    () => initialMission?.orchestratorCardId ?? null,
   )
-  const [planText, setPlanText] = useState(() => initialMission?.planText ?? '')
+  const [streamText, setStreamText] = useState('')
+  const [planText, setPlanText] = useState('')
   const [streamEvents, setStreamEvents] = useState<Array<StreamEvent>>([])
   const [missionStartedAt, setMissionStartedAt] = useState<string | null>(
     () => initialMission?.missionStartedAt ?? null,
@@ -1230,11 +1351,11 @@ export function useConductorGateway() {
   const [streamError, setStreamError] = useState<string | null>(null)
   const [timeoutWarning, setTimeoutWarning] = useState(false)
   const [missionWorkerKeys, setMissionWorkerKeys] = useState<Set<string>>(
-    () => new Set(initialMission?.workerKeys ?? []),
+    () => new Set(),
   )
-  const [missionWorkerLabels, setMissionWorkerLabels] = useState<Set<string>>(
-    () => new Set(initialMission?.workerLabels ?? []),
-  )
+  const [missionCardOwners, setMissionCardOwners] = useState<
+    Array<PersistedConductorCardOwner>
+  >(() => initialMission?.workerCards ?? [])
   const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>(
     // Persisted text is not proof that the currently mounted Card history is
     // still complete. Revalidate every transcript before rendering or reuse.
@@ -1244,7 +1365,8 @@ export function useConductorGateway() {
     Record<string, ConductorWorkerOutputStatus>
   >({})
   const [tasks, setTasks] = useState<Array<ConductorTask>>(
-    () => initialMission?.tasks ?? [],
+    () =>
+      initialMission?.tasks.map((task) => ({ ...task, output: null })) ?? [],
   )
   const [missionHistory, setMissionHistory] = useState<
     Array<MissionHistoryEntry>
@@ -1282,6 +1404,13 @@ export function useConductorGateway() {
       .filter((activity) => activity.updatedAt >= cutoff)
       .sort((left, right) => right.updatedAt - left.updatedAt)
       .slice(0, 20)
+      .map(({ cardId, title, kind, status, updatedAt }) => ({
+        cardId,
+        title,
+        kind,
+        status,
+        updatedAt,
+      }))
   }, [cardActivities])
 
   const missionStatusQuery = useQuery({
@@ -1300,19 +1429,14 @@ export function useConductorGateway() {
 
   const sessionWorkers = useMemo<Array<ConductorWorker>>(() => {
     if (phase === 'idle') return []
-    const missionStartMs = missionStartedAt
-      ? new Date(missionStartedAt).getTime()
-      : 0
-    const missionNeedles = buildMissionNeedles(goal)
     return cardActivities
       .filter(
         (activity) =>
-          activityMatchesMissionWorker(activity, missionWorkerKeys) ||
-          (missionStartMs > 0 &&
-            sessionMatchesMissionContext(
-              activity,
-              missionStartMs,
-              missionNeedles,
+          activityMatchesCardOwner(activity, missionCardOwners) ||
+          activityMatchesTransientControl(activity, missionWorkerKeys) ||
+          (Boolean(activity.parentCardId) &&
+            missionCardOwners.some(
+              (owner) => owner.cardId === activity.parentCardId,
             )),
       )
       .map(toWorker)
@@ -1325,7 +1449,37 @@ export function useConductorGateway() {
           new Date(left.updatedAt ?? 0).getTime()
         )
       })
-  }, [cardActivities, goal, missionStartedAt, missionWorkerKeys, phase])
+  }, [cardActivities, missionCardOwners, missionWorkerKeys, phase])
+
+  useEffect(() => {
+    if (sessionWorkers.length === 0) return
+
+    setMissionCardOwners((current) => {
+      const byCardId = new Map(current.map((owner) => [owner.cardId, owner]))
+      for (const worker of sessionWorkers) {
+        if (!worker.cardId) continue
+        byCardId.set(
+          worker.cardId,
+          worker.parentCardId
+            ? { cardId: worker.cardId, parentCardId: worker.parentCardId }
+            : { cardId: worker.cardId },
+        )
+      }
+      const next = [...byCardId.values()]
+      return JSON.stringify(next) === JSON.stringify(current) ? current : next
+    })
+  }, [sessionWorkers])
+
+  useEffect(() => {
+    if (!orchestratorSessionKey) return
+    const activity = cardActivities.find((candidate) =>
+      activityMatchesTransientControl(
+        candidate,
+        new Set([orchestratorSessionKey]),
+      ),
+    )
+    if (activity) setOrchestratorCardId(activity.cardId)
+  }, [cardActivities, orchestratorSessionKey])
 
   // For native-swarm missions, build virtual worker cards from the mission
   // assignments so the UI shows progress instead of "Spawning workers..." forever.
@@ -1338,7 +1492,6 @@ export function useConductorGateway() {
       missionStatusQuery.data?.updatedAt ?? Date.now(),
     ).toISOString()
     return swarmAssignments.map((assignment, index) => {
-      const workerId = assignment.workerId
       const state = assignment.state ?? 'dispatched'
       const checkpoint = assignment.checkpoint
       const isComplete =
@@ -1356,8 +1509,8 @@ export function useConductorGateway() {
       ]
       const persona = personaNames[index % personaNames.length]
       return {
-        key: workerId,
-        label: workerId,
+        key: `native-assignment-${index}`,
+        label: `Agent ${index + 1}`,
         model: 'native-swarm',
         status: isComplete ? 'complete' : isBlocked ? 'stale' : 'running',
         updatedAt: missionUpdatedAt,
@@ -1411,16 +1564,24 @@ export function useConductorGateway() {
 
   const retryWorkerOutput = useCallback(
     async (worker: ConductorWorker) => {
-      if (!worker.cardId || !worker.canonicalSegmentKey) return
+      if (!worker.cardId) return
+      const activity = cardActivities.find(
+        (candidate) =>
+          candidate.cardId === worker.cardId &&
+          candidate.parentCardId === worker.parentCardId,
+      )
+      if (!activity) return
       setWorkerOutputStatuses((current) => ({
         ...current,
         [worker.key]: 'loading',
       }))
       try {
         const result = await fetchWorkerOutput({
-          cardId: worker.cardId,
-          canonicalSegmentKey: worker.canonicalSegmentKey,
-          ...(worker.parentCardId ? { parentCardId: worker.parentCardId } : {}),
+          cardId: activity.cardId,
+          canonicalSegmentKey: activity.canonicalSegmentKey,
+          ...(activity.parentCardId
+            ? { parentCardId: activity.parentCardId }
+            : {}),
         })
         applyWorkerOutputResult(worker.key, result)
       } catch {
@@ -1430,7 +1591,7 @@ export function useConductorGateway() {
         })
       }
     },
-    [applyWorkerOutputResult],
+    [applyWorkerOutputResult, cardActivities],
   )
 
   useEffect(() => {
@@ -1590,13 +1751,19 @@ export function useConductorGateway() {
 
     const fetchAll = async () => {
       for (const worker of workers) {
-        if (!worker.cardId || !worker.canonicalSegmentKey) continue
+        if (!worker.cardId) continue
+        const activity = cardActivities.find(
+          (candidate) =>
+            candidate.cardId === worker.cardId &&
+            candidate.parentCardId === worker.parentCardId,
+        )
+        if (!activity) continue
         try {
           const result = await fetchWorkerOutput({
-            cardId: worker.cardId,
-            canonicalSegmentKey: worker.canonicalSegmentKey,
-            ...(worker.parentCardId
-              ? { parentCardId: worker.parentCardId }
+            cardId: activity.cardId,
+            canonicalSegmentKey: activity.canonicalSegmentKey,
+            ...(activity.parentCardId
+              ? { parentCardId: activity.parentCardId }
               : {}),
           })
           if (cancelled) continue
@@ -1637,7 +1804,7 @@ export function useConductorGateway() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [applyWorkerOutputResult, phase, workers])
+  }, [applyWorkerOutputResult, cardActivities, phase, workers])
 
   useEffect(() => {
     if (!planText) return
@@ -1668,14 +1835,14 @@ export function useConductorGateway() {
                 ? 'running'
                 : task.status
         if (
-          task.workerKey === worker.key &&
+          task.workerCardId === worker.cardId &&
           task.status === newStatus &&
           task.output === workerOutput
         )
           return task
         return {
           ...task,
-          workerKey: worker.key,
+          workerCardId: worker.cardId ?? null,
           status: newStatus,
           output: workerOutput,
         }
@@ -1786,7 +1953,10 @@ export function useConductorGateway() {
       return
     }
 
+    const ownedCardIds = new Set(missionCardOwners.map((owner) => owner.cardId))
+    if (orchestratorCardId) ownedCardIds.add(orchestratorCardId)
     persistMission({
+      version: ACTIVE_MISSION_STORAGE_VERSION,
       missionId,
       missionJobId,
       goal,
@@ -1796,13 +1966,16 @@ export function useConductorGateway() {
       pausedElapsedMs,
       accumulatedPausedMs,
       pauseStartedAt,
-      workerKeys: [...missionWorkerKeys],
-      workerLabels: [...missionWorkerLabels],
-      workerOutputs,
-      streamText: streamText.slice(0, 10_000),
-      planText: planText.slice(0, 10_000),
+      orchestratorCardId,
+      workerCards: missionCardOwners,
       completedAt,
-      tasks,
+      tasks: tasks.map(({ output: _runtimeOutput, ...task }) => ({
+        ...task,
+        workerCardId:
+          task.workerCardId && ownedCardIds.has(task.workerCardId)
+            ? task.workerCardId
+            : null,
+      })),
     })
   }, [
     missionId,
@@ -1815,11 +1988,8 @@ export function useConductorGateway() {
     accumulatedPausedMs,
     pauseStartedAt,
     completedAt,
-    missionWorkerKeys,
-    missionWorkerLabels,
-    workerOutputs,
-    streamText,
-    planText,
+    orchestratorCardId,
+    missionCardOwners,
     tasks,
   ])
 
@@ -1838,6 +2008,7 @@ export function useConductorGateway() {
     setPhase('idle')
     setGoal('')
     setOrchestratorSessionKey(null)
+    setOrchestratorCardId(null)
     setStreamText('')
     setPlanText('')
     setStreamEvents([])
@@ -1852,7 +2023,7 @@ export function useConductorGateway() {
     setPauseStartedAt(null)
     setCompletedAt(null)
     setMissionWorkerKeys(new Set())
-    setMissionWorkerLabels(new Set())
+    setMissionCardOwners([])
     setWorkerOutputs({})
     setWorkerOutputStatuses({})
     setTasks([])
@@ -1879,6 +2050,7 @@ export function useConductorGateway() {
       setMissionId(null)
       setMissionJobId(null)
       setOrchestratorSessionKey(null)
+      setOrchestratorCardId(null)
       setStreamText('')
       setPlanText('')
       setStreamEvents([])
@@ -1889,7 +2061,7 @@ export function useConductorGateway() {
       setAccumulatedPausedMs(0)
       setPauseStartedAt(null)
       setMissionWorkerKeys(new Set())
-      setMissionWorkerLabels(new Set())
+      setMissionCardOwners([])
       setWorkerOutputs({})
       setTasks([])
       setSelectedHistoryEntry(null)
@@ -1899,6 +2071,7 @@ export function useConductorGateway() {
       setMissionStartedAt(startedAt)
       setPhase('decomposing')
       persistMission({
+        version: ACTIVE_MISSION_STORAGE_VERSION,
         missionId: null,
         missionJobId: null,
         goal: trimmed,
@@ -1908,11 +2081,8 @@ export function useConductorGateway() {
         pausedElapsedMs: 0,
         accumulatedPausedMs: 0,
         pauseStartedAt: null,
-        workerKeys: [],
-        workerLabels: [],
-        workerOutputs: {},
-        streamText: '',
-        planText: '',
+        orchestratorCardId: null,
+        workerCards: [],
         completedAt: null,
         tasks: [],
       })
@@ -2017,15 +2187,7 @@ export function useConductorGateway() {
         const spawnedMissionId = result.missionId ?? null
         setMissionId(spawnedMissionId)
         setMissionJobId(result.jobId ?? null)
-        setOrchestratorSessionKey(spawnedMissionId)
-        if (spawnedMissionId) {
-          setMissionWorkerKeys((current) => {
-            if (current.has(spawnedMissionId)) return current
-            const next = new Set(current)
-            next.add(spawnedMissionId)
-            return next
-          })
-        }
+        setOrchestratorSessionKey(null)
         setPlanText(
           result.assignments?.length
             ? `Native swarm mission launched with ${result.assignments.length} workers. Watching for swarm activity...`
@@ -2114,12 +2276,17 @@ export function useConductorGateway() {
 
   const pauseAgent = useMutation({
     mutationFn: async ({
-      sessionKey,
+      cardId,
       pause,
     }: {
-      sessionKey: string
+      cardId: string
       pause: boolean
     }) => {
+      const activity = cardActivities.find(
+        (candidate) => candidate.cardId === cardId,
+      )
+      const sessionKey = activity ? remoteControlKey(activity) : null
+      if (!sessionKey) throw new Error('Card activity cannot be controlled')
       const response = await fetch('/api/agent-pause', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2155,7 +2322,17 @@ export function useConductorGateway() {
   const stopMission = async () => {
     portableStreamAbortRef.current?.abort()
     portableStreamAbortRef.current = null
-    const sessionKeys = [...missionWorkerKeys]
+    const sessionKeys = [
+      ...new Set([
+        ...missionWorkerKeys,
+        ...cardActivities
+          .filter((activity) =>
+            activityMatchesCardOwner(activity, missionCardOwners),
+          )
+          .map(remoteControlKey)
+          .filter((key): key is string => Boolean(key)),
+      ]),
+    ]
     const missionIds = missionId ? [missionId] : []
 
     try {
@@ -2190,7 +2367,7 @@ export function useConductorGateway() {
   return {
     phase,
     goal,
-    orchestratorSessionKey,
+    orchestratorCardId,
     streamText,
     planText,
     streamEvents,
@@ -2211,7 +2388,6 @@ export function useConductorGateway() {
     selectedHistoryEntry,
     setSelectedHistoryEntry,
     recentSessions,
-    missionWorkerKeys,
     workerOutputs,
     workerOutputStatuses,
     retryWorkerOutput,
@@ -2219,8 +2395,8 @@ export function useConductorGateway() {
     setConductorSettings,
     sendMission: (nextGoal: string) =>
       sendMission.mutateAsync({ nextGoal, settings: conductorSettings }),
-    pauseAgent: (sessionKey: string, pause: boolean) =>
-      pauseAgent.mutateAsync({ sessionKey, pause }),
+    pauseAgent: (cardId: string, pause: boolean) =>
+      pauseAgent.mutateAsync({ cardId, pause }),
     isSending: sendMission.isPending,
     isPausing: pauseAgent.isPending,
     resetMission,

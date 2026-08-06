@@ -6,9 +6,17 @@ import type {
   AgentSessionStatusEntry,
   TeamMember,
 } from '../components/team-panel'
+import type {
+  SessionCardChildWire,
+  SessionCardListWire,
+} from '@/screens/chat/chat-queries'
 import type { ActiveMission, MissionProcessType } from '@/stores/mission-store'
 import { useMissionStore } from '@/stores/mission-store'
 import { killAgentSession, toggleAgentPause } from '@/lib/gateway-api'
+import {
+  fetchSessionCards,
+  retainCompleteSessionCardProjections,
+} from '@/screens/chat/chat-queries'
 
 type SessionRecord = Record<string, unknown>
 
@@ -23,6 +31,104 @@ type DispatchResponse = {
   message?: string
   sessionKey?: string
   runId?: string | null
+}
+
+type AuthoritativeCardOwner = {
+  cardId: string
+  parentCardId?: string
+  title: string
+  canonicalSegmentKey: string
+}
+
+function qualifyRemoteSessionKey(sessionKey: string): string {
+  return sessionKey.startsWith('remote:') || sessionKey.startsWith('local:')
+    ? sessionKey
+    : `remote:${sessionKey}`
+}
+
+function projectAuthoritativeChildOwner(
+  children: ReadonlyArray<SessionCardChildWire>,
+  parentCardId: string,
+  identity: string,
+): AuthoritativeCardOwner | null {
+  for (const child of children) {
+    if (
+      [
+        child.cardId,
+        child.sessionKey,
+        ...child.continuationSegmentKeys,
+      ].includes(identity)
+    ) {
+      return {
+        cardId: child.cardId,
+        parentCardId,
+        title: child.title,
+        canonicalSegmentKey: child.sessionKey,
+      }
+    }
+    const descendant = projectAuthoritativeChildOwner(
+      child.childNodes ?? [],
+      child.cardId,
+      identity,
+    )
+    if (descendant) return descendant
+  }
+  return null
+}
+
+function projectAuthoritativeCardOwner(
+  response: SessionCardListWire | undefined,
+  identity: string,
+): AuthoritativeCardOwner | null {
+  const projection = retainCompleteSessionCardProjections(response)
+  if (!projection) return null
+  const qualifiedIdentity = qualifyRemoteSessionKey(identity)
+
+  for (const card of projection.cards) {
+    if (
+      [
+        card.cardId,
+        card.canonicalSegmentKey,
+        ...card.continuationSegmentKeys,
+      ].includes(qualifiedIdentity)
+    ) {
+      return {
+        cardId: card.cardId,
+        title: card.title,
+        canonicalSegmentKey: card.canonicalSegmentKey,
+      }
+    }
+    const childOwner = projectAuthoritativeChildOwner(
+      card.childNodes,
+      card.cardId,
+      qualifiedIdentity,
+    )
+    if (childOwner) return childOwner
+  }
+  return null
+}
+
+async function resolveAuthoritativeCardOwner(
+  identity: string,
+  attempts = 6,
+): Promise<AuthoritativeCardOwner | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const owner = projectAuthoritativeCardOwner(
+      await fetchSessionCards(),
+      identity,
+    )
+    if (owner) return owner
+    if (attempt + 1 < attempts) {
+      await new Promise((resolve) => window.setTimeout(resolve, 150))
+    }
+  }
+  return null
+}
+
+function remoteSessionKey(owner: AuthoritativeCardOwner): string | null {
+  return owner.canonicalSegmentKey.startsWith('remote:')
+    ? owner.canonicalSegmentKey.slice('remote:'.length) || null
+    : null
 }
 
 function readString(value: unknown): string {
@@ -191,22 +297,15 @@ function buildDispatchMessage(params: {
 export function useMissionOrchestrator() {
   const activeMission = useMissionStore((state) => state.activeMission)
   const missionState = useMissionStore((state) => state.missionState)
-  const agentSessionMap = useMissionStore((state) => state.agentSessionMap)
-  const agentSessionStatus = useMissionStore(
-    (state) => state.agentSessionStatus,
-  )
+  const agentCardIdMap = useMissionStore((state) => state.agentCardIdMap)
+  const agentCardStatus = useMissionStore((state) => state.agentCardStatus)
   const setMissionTasks = useMissionStore((state) => state.setMissionTasks)
   const setDispatchedTaskIdsByAgent = useMissionStore(
     (state) => state.setDispatchedTaskIdsByAgent,
   )
-  const setAgentSessionMap = useMissionStore(
-    (state) => state.setAgentSessionMap,
-  )
-  const setAgentSessionModelMap = useMissionStore(
-    (state) => state.setAgentSessionModelMap,
-  )
-  const setAgentSessionStatus = useMissionStore(
-    (state) => state.setAgentSessionStatus,
+  const setAgentCardOwner = useMissionStore((state) => state.setAgentCardOwner)
+  const setAgentCardStatus = useMissionStore(
+    (state) => state.setAgentCardStatus,
   )
   const setMissionState = useMissionStore((state) => state.setMissionState)
   const completeMission = useMissionStore((state) => state.completeMission)
@@ -215,7 +314,7 @@ export function useMissionOrchestrator() {
   const [isDispatching, setIsDispatching] = useState(false)
 
   const missionRef = useRef<ActiveMission | null>(activeMission)
-  const sessionMapRef = useRef<Record<string, string>>(agentSessionMap)
+  const transientSessionMapRef = useRef<Record<string, string>>({})
   const streamMapRef = useRef<Map<string, EventSource>>(new Map())
   const lastOutputByAgentRef = useRef<Record<string, string>>({})
   const activityMarkerRef = useRef<Map<string, string>>(new Map())
@@ -227,10 +326,6 @@ export function useMissionOrchestrator() {
     missionRef.current = activeMission
   }, [activeMission])
 
-  useEffect(() => {
-    sessionMapRef.current = agentSessionMap
-  }, [agentSessionMap])
-
   const closeAllStreams = useCallback(() => {
     streamMapRef.current.forEach((source) => source.close())
     streamMapRef.current.clear()
@@ -238,7 +333,7 @@ export function useMissionOrchestrator() {
 
   const resetOrchestratorState = useCallback(() => {
     closeAllStreams()
-    sessionMapRef.current = {}
+    transientSessionMapRef.current = {}
     lastOutputByAgentRef.current = {}
     activityMarkerRef.current = new Map()
     retryPayloadRef.current = {}
@@ -297,12 +392,24 @@ export function useMissionOrchestrator() {
 
   const setAgentStatus = useCallback(
     (agentId: string, entry: AgentSessionStatusEntry) => {
-      setAgentSessionStatus((previous) => ({
+      setAgentCardStatus((previous) => ({
         ...previous,
         [agentId]: entry,
       }))
     },
-    [setAgentSessionStatus],
+    [setAgentCardStatus],
+  )
+
+  const persistCardOwner = useCallback(
+    (agentId: string, owner: AuthoritativeCardOwner, model?: string) => {
+      setAgentCardOwner(agentId, {
+        cardId: owner.cardId,
+        ...(owner.parentCardId ? { parentCardId: owner.parentCardId } : {}),
+        title: owner.title,
+        ...(model ? { model } : {}),
+      })
+    },
+    [setAgentCardOwner],
   )
 
   const attachSessionStream = useCallback(
@@ -424,6 +531,8 @@ export function useMissionOrchestrator() {
         ? ` (${options.labelSuffix})`
         : ''
       const label = `Mission: ${member.name}${labelSuffix}`
+      const model = resolveGatewayModelId(member.modelId)
+      setAgentCardOwner(member.id, null)
       setAgentStatus(member.id, {
         status: 'dispatching',
         lastSeen: Date.now(),
@@ -450,10 +559,9 @@ export function useMissionOrchestrator() {
               ? existing.key.trim()
               : ''
           if (existingKey) {
-            setAgentSessionMap((previous) => ({
-              ...previous,
-              [member.id]: existingKey,
-            }))
+            transientSessionMapRef.current[member.id] = existingKey
+            const owner = await resolveAuthoritativeCardOwner(existingKey)
+            if (owner) persistCardOwner(member.id, owner, model)
             setAgentStatus(member.id, {
               status: 'dispatching',
               lastSeen: Date.now(),
@@ -470,7 +578,6 @@ export function useMissionOrchestrator() {
         }
       }
 
-      const model = resolveGatewayModelId(member.modelId)
       const response = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -504,11 +611,8 @@ export function useMissionOrchestrator() {
         throw new Error(errorMessage)
       }
 
-      setAgentSessionMap((previous) => ({
-        ...previous,
-        [member.id]: sessionKey,
-      }))
-      setAgentSessionStatus((previous) => ({
+      transientSessionMapRef.current[member.id] = sessionKey
+      setAgentCardStatus((previous) => ({
         ...previous,
         [member.id]: {
           status: 'dispatching',
@@ -516,13 +620,6 @@ export function useMissionOrchestrator() {
           lastMessage: 'Session created',
         },
       }))
-      if (model) {
-        setAgentSessionModelMap((previous) => ({
-          ...previous,
-          [member.id]: model,
-        }))
-      }
-
       emitFeedEvent({
         type: 'agent_spawned',
         message: `spawned ${member.name}`,
@@ -530,13 +627,15 @@ export function useMissionOrchestrator() {
       })
 
       attachSessionStream(member.id, sessionKey)
+      const owner = await resolveAuthoritativeCardOwner(sessionKey)
+      if (owner) persistCardOwner(member.id, owner, model)
       return sessionKey
     },
     [
       attachSessionStream,
-      setAgentSessionMap,
-      setAgentSessionModelMap,
-      setAgentSessionStatus,
+      persistCardOwner,
+      setAgentCardOwner,
+      setAgentCardStatus,
       setAgentStatus,
     ],
   )
@@ -615,7 +714,7 @@ export function useMissionOrchestrator() {
 
   const ensureAgentSessions = useCallback(
     async (team: Array<TeamMember>) => {
-      const currentMap = { ...sessionMapRef.current }
+      const currentMap = { ...transientSessionMapRef.current }
       for (const member of team) {
         const existingSessionKey = currentMap[member.id]
         if (existingSessionKey) {
@@ -639,26 +738,47 @@ export function useMissionOrchestrator() {
   )
 
   const reconnectMission = useCallback(
-    (mission: ActiveMission) => {
+    async (mission: ActiveMission) => {
       missionRef.current = mission
-      sessionMapRef.current = { ...mission.agentSessionMap }
+      transientSessionMapRef.current = {}
       completedSessionKeysRef.current = new Set()
 
-      mission.team.forEach((member) => {
-        const sessionKey = mission.agentSessionMap[member.id]
-        if (!sessionKey) return
-        setAgentStatus(member.id, {
-          status: mission.state === 'paused' ? 'idle' : 'dispatching',
-          lastSeen: Date.now(),
-          lastMessage:
-            mission.state === 'paused'
-              ? 'Mission restored (paused)'
-              : 'Reconnecting session',
-        })
-        attachSessionStream(member.id, sessionKey)
-      })
+      await Promise.all(
+        mission.team.map(async (member) => {
+          const cardId = mission.agentCardIdMap[member.id]
+          if (!cardId) return
+          const owner = await resolveAuthoritativeCardOwner(cardId)
+          if (!owner || owner.cardId !== cardId) {
+            setAgentCardOwner(member.id, null)
+            setAgentStatus(member.id, {
+              status: 'stopped',
+              lastSeen: Date.now(),
+              lastMessage: 'Stored Card owner is no longer available',
+            })
+            return
+          }
+
+          const sessionKey = owner.canonicalSegmentKey
+          transientSessionMapRef.current[member.id] = sessionKey
+          persistCardOwner(
+            member.id,
+            owner,
+            mission.agentCardModelMap[member.id] ||
+              resolveGatewayModelId(member.modelId),
+          )
+          setAgentStatus(member.id, {
+            status: mission.state === 'paused' ? 'idle' : 'dispatching',
+            lastSeen: Date.now(),
+            lastMessage:
+              mission.state === 'paused'
+                ? 'Mission restored (paused)'
+                : 'Reconnecting Card',
+          })
+          attachSessionStream(member.id, sessionKey)
+        }),
+      )
     },
-    [attachSessionStream, setAgentStatus],
+    [attachSessionStream, persistCardOwner, setAgentCardOwner, setAgentStatus],
   )
 
   const dispatchMission = useCallback(
@@ -874,7 +994,7 @@ export function useMissionOrchestrator() {
       const payload = retryPayloadRef.current[agentId]
       if (!member || !payload) return
 
-      const currentSessionKey = sessionMapRef.current[agentId]
+      const currentSessionKey = transientSessionMapRef.current[agentId]
       if (currentSessionKey) {
         const existingStream = streamMapRef.current.get(currentSessionKey)
         if (existingStream) {
@@ -913,7 +1033,7 @@ export function useMissionOrchestrator() {
 
   const handleSetAgentPaused = useCallback(
     async (agentId: string, pause: boolean) => {
-      const sessionKey = sessionMapRef.current[agentId]
+      const sessionKey = transientSessionMapRef.current[agentId]
       if (!sessionKey) {
         throw new Error('No active session to control')
       }
@@ -923,7 +1043,7 @@ export function useMissionOrchestrator() {
       )
       const agentName = member?.name ?? agentId
       const previousStatus = getOptionalRecordValue(
-        useMissionStore.getState().agentSessionStatus,
+        useMissionStore.getState().agentCardStatus,
         agentId,
       )
 
@@ -944,7 +1064,7 @@ export function useMissionOrchestrator() {
         if (previousStatus) {
           setAgentStatus(agentId, previousStatus)
         } else {
-          setAgentSessionStatus((previous) => {
+          setAgentCardStatus((previous) => {
             const next = { ...previous }
             delete next[agentId]
             return next
@@ -953,7 +1073,7 @@ export function useMissionOrchestrator() {
         throw error
       }
     },
-    [setAgentSessionStatus, setAgentStatus],
+    [setAgentCardStatus, setAgentStatus],
   )
 
   const handleMissionPause = useCallback(
@@ -964,7 +1084,7 @@ export function useMissionOrchestrator() {
       const previousState = useMissionStore.getState().missionState
       const activeAgentIds = mission.team
         .map((member) => member.id)
-        .filter((agentId) => Boolean(sessionMapRef.current[agentId]))
+        .filter((agentId) => Boolean(transientSessionMapRef.current[agentId]))
 
       try {
         const results = await Promise.allSettled(
@@ -981,7 +1101,7 @@ export function useMissionOrchestrator() {
 
   const handleKillAgent = useCallback(
     async (agentId: string) => {
-      const sessionKey = sessionMapRef.current[agentId]
+      const sessionKey = transientSessionMapRef.current[agentId]
       if (!sessionKey) return
 
       const existingStream = streamMapRef.current.get(sessionKey)
@@ -1000,17 +1120,13 @@ export function useMissionOrchestrator() {
       try {
         await killAgentSession(sessionKey)
       } finally {
-        sessionMapRef.current = Object.fromEntries(
-          Object.entries(sessionMapRef.current).filter(
+        transientSessionMapRef.current = Object.fromEntries(
+          Object.entries(transientSessionMapRef.current).filter(
             ([key]) => key !== agentId,
           ),
         )
-        setAgentSessionMap((previous) => {
-          const next = { ...previous }
-          delete next[agentId]
-          return next
-        })
-        setAgentSessionStatus((previous) => ({
+        setAgentCardOwner(agentId, null)
+        setAgentCardStatus((previous) => ({
           ...previous,
           [agentId]: {
             status: 'error',
@@ -1025,12 +1141,12 @@ export function useMissionOrchestrator() {
         })
       }
     },
-    [setAgentSessionMap, setAgentSessionStatus],
+    [setAgentCardOwner, setAgentCardStatus],
   )
 
   const handleSteerAgent = useCallback(
     async (agentId: string, message: string) => {
-      const sessionKey = sessionMapRef.current[agentId]
+      const sessionKey = transientSessionMapRef.current[agentId]
       if (!sessionKey) {
         throw new Error('No active session to steer')
       }
@@ -1059,7 +1175,7 @@ export function useMissionOrchestrator() {
       const agentName = member?.name ?? agentId
 
       completedSessionKeysRef.current.delete(sessionKey)
-      setAgentSessionStatus((previous) => ({
+      setAgentCardStatus((previous) => ({
         ...previous,
         [agentId]: {
           status: 'active',
@@ -1073,11 +1189,13 @@ export function useMissionOrchestrator() {
         agentName,
       })
     },
-    [setAgentSessionStatus],
+    [setAgentCardStatus],
   )
 
   const abortMission = useCallback(async () => {
-    const sessionKeys = Object.values(sessionMapRef.current).filter(Boolean)
+    const sessionKeys = Object.values(transientSessionMapRef.current).filter(
+      Boolean,
+    )
     closeAllStreams()
 
     await Promise.allSettled(
@@ -1093,7 +1211,7 @@ export function useMissionOrchestrator() {
   }, [abortMissionInStore, closeAllStreams])
 
   useEffect(() => {
-    const hasSessions = Object.keys(agentSessionMap).length > 0
+    const hasSessions = Object.keys(agentCardIdMap).length > 0
     if (!activeMission || missionState !== 'running' || !hasSessions) return
 
     const controller = new AbortController()
@@ -1114,7 +1232,7 @@ export function useMissionOrchestrator() {
         const now = Date.now()
 
         for (const member of activeMission.team) {
-          const sessionKey = sessionMapRef.current[member.id]
+          const sessionKey = transientSessionMapRef.current[member.id]
           if (!sessionKey) continue
 
           const session = sessions.find(
@@ -1141,7 +1259,7 @@ export function useMissionOrchestrator() {
           const lastMessage = readSessionLastMessage(session)
           const rawStatus = readString(session.status).toLowerCase()
           const existing = getOptionalRecordValue(
-            useMissionStore.getState().agentSessionStatus,
+            useMissionStore.getState().agentCardStatus,
             member.id,
           )
           const isCompleted = completedSessionKeysRef.current.has(sessionKey)
@@ -1196,7 +1314,7 @@ export function useMissionOrchestrator() {
         }
 
         activityMarkerRef.current = nextActivityMarkers
-        setAgentSessionStatus(nextStatus)
+        setAgentCardStatus(nextStatus)
       } catch {
         /* ignore polling errors */
       }
@@ -1211,7 +1329,7 @@ export function useMissionOrchestrator() {
       controller.abort()
       window.clearInterval(intervalId)
     }
-  }, [activeMission, agentSessionMap, missionState, setAgentSessionStatus])
+  }, [activeMission, agentCardIdMap, missionState, setAgentCardStatus])
 
   useEffect(() => {
     if (missionState === 'running' || missionState === 'paused') return
@@ -1228,7 +1346,7 @@ export function useMissionOrchestrator() {
   return {
     dispatchMission,
     reconnectMission,
-    agentSessionStatus,
+    agentCardStatus,
     isDispatching,
     retryAgent,
     handleKillAgent,

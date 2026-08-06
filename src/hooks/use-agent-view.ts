@@ -263,7 +263,7 @@ export function useAgentView(
   const setQueueOpen = useAgentViewStore((state) => state.setQueueOpen)
   const setHistoryOpen = useAgentViewStore((state) => state.setHistoryOpen)
   const activeMission = useMissionStore((state) => state.activeMission)
-  const missionSessionMap = useMissionStore((state) => state.agentSessionMap)
+  const missionCardIdMap = useMissionStore((state) => state.agentCardIdMap)
 
   const [viewportWidth, setViewportWidth] = useState(() => {
     if (typeof window === 'undefined') return MIN_DESKTOP_WIDTH
@@ -308,18 +308,10 @@ export function useAgentView(
     [sessionCardList],
   )
 
-  const missionCardIds = useMemo(() => {
-    const ids = new Set<string>()
-    const response = sessionCardList
-    if (!response) return ids
-    Object.values(missionSessionMap).forEach((identity) => {
-      const target = resolveAgentSessionCardNavigation(response, {
-        sessionKey: identity,
-      })
-      if (target?.inspectedChildCardId) ids.add(target.inspectedChildCardId)
-    })
-    return ids
-  }, [missionSessionMap, sessionCardList])
+  const missionCardIds = useMemo(
+    () => new Set(Object.values(missionCardIdMap)),
+    [missionCardIdMap],
+  )
 
   const missionActiveAgents = useMemo(
     () =>

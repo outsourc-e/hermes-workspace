@@ -272,9 +272,9 @@ vi.mock('@/stores/mission-store', () => ({
   useMissionStore: (
     selector: (state: {
       activeMission: null
-      agentSessionMap: Record<string, string>
+      agentCardIdMap: Record<string, string>
     }) => unknown,
-  ) => selector({ activeMission: null, agentSessionMap: {} }),
+  ) => selector({ activeMission: null, agentCardIdMap: {} }),
 }))
 
 const reactActEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }

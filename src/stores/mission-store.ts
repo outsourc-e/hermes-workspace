@@ -10,8 +10,10 @@ import type {
 } from '@/screens/gateway/components/task-board'
 import type { MissionCheckpoint } from '@/screens/gateway/lib/mission-checkpoint'
 import {
+  MISSION_CHECKPOINT_VERSION,
   archiveMissionToHistory,
   loadMissionHistory,
+  parseMissionCheckpoint,
 } from '@/screens/gateway/lib/mission-checkpoint'
 
 export type MissionProcessType = 'sequential' | 'hierarchical' | 'parallel'
@@ -45,9 +47,11 @@ export type ActiveMission = {
   state: MissionLifecycleState
   team: Array<TeamMember>
   tasks: Array<HubTask>
-  agentSessionMap: Record<string, string>
-  agentSessionModelMap: Record<string, string>
-  agentSessionStatus: Record<string, AgentSessionStatusEntry>
+  agentCardIdMap: Record<string, string>
+  agentParentCardIdMap: Record<string, string>
+  agentCardTitleMap: Record<string, string>
+  agentCardModelMap: Record<string, string>
+  agentCardStatus: Record<string, AgentSessionStatusEntry>
   processType: MissionProcessType
   budgetLimit: string
   startedAt: number
@@ -63,15 +67,21 @@ type Updater<T> = T | ((previous: T) => T)
 type StartMissionInput = Omit<
   ActiveMission,
   | 'state'
-  | 'agentSessionMap'
-  | 'agentSessionModelMap'
-  | 'agentSessionStatus'
+  | 'agentCardIdMap'
+  | 'agentParentCardIdMap'
+  | 'agentCardTitleMap'
+  | 'agentCardModelMap'
+  | 'agentCardStatus'
   | 'artifacts'
 > & {
-  agentSessionMap?: Record<string, string>
-  agentSessionModelMap?: Record<string, string>
-  agentSessionStatus?: Record<string, AgentSessionStatusEntry>
   artifacts?: Array<MissionArtifact>
+}
+
+export type MissionCardOwner = {
+  cardId: string
+  parentCardId?: string
+  title: string
+  model?: string
 }
 
 type MissionStore = {
@@ -84,9 +94,11 @@ type MissionStore = {
   missionTasks: Array<HubTask>
   boardTasks: Array<HubTask>
   dispatchedTaskIdsByAgent: Record<string, Array<string>>
-  agentSessionMap: Record<string, string>
-  agentSessionModelMap: Record<string, string>
-  agentSessionStatus: Record<string, AgentSessionStatusEntry>
+  agentCardIdMap: Record<string, string>
+  agentParentCardIdMap: Record<string, string>
+  agentCardTitleMap: Record<string, string>
+  agentCardModelMap: Record<string, string>
+  agentCardStatus: Record<string, AgentSessionStatusEntry>
   artifacts: Array<MissionArtifact>
   restoreCheckpoint: MissionCheckpoint | null
   missionHistory: MissionHistory
@@ -99,8 +111,8 @@ type MissionStore = {
   updateAgentStatus: (
     agentId: string,
     entry: AgentSessionStatusEntry | null,
-    options?: { sessionKey?: string | null; model?: string | null },
   ) => void
+  setAgentCardOwner: (agentId: string, owner: MissionCardOwner | null) => void
   addArtifact: (artifact: MissionArtifact | Array<MissionArtifact>) => void
   setMissionState: (state: Updater<MissionStore['missionState']>) => void
   restoreMission: (checkpoint: MissionCheckpoint) => void
@@ -111,9 +123,7 @@ type MissionStore = {
     value: Updater<Record<string, Array<string>>>,
   ) => void
   setMissionTasks: (tasks: Updater<Array<HubTask>>) => void
-  setAgentSessionMap: (value: Updater<Record<string, string>>) => void
-  setAgentSessionModelMap: (value: Updater<Record<string, string>>) => void
-  setAgentSessionStatus: (
+  setAgentCardStatus: (
     value: Updater<Record<string, AgentSessionStatusEntry>>,
   ) => void
   setArtifacts: (value: Updater<Array<MissionArtifact>>) => void
@@ -123,31 +133,129 @@ type MissionStore = {
 }
 
 const MAX_HISTORY = 20
+const MISSION_STORE_STORAGE_KEY = 'clawsuite:mission-store'
+const RETIRED_PERSISTED_IDENTITY_FIELDS = new Set([
+  'agentSessionMap',
+  'agentSessions',
+  'agentSessionModelMap',
+  'agentSessionStatus',
+  'workerKey',
+  'workerKeys',
+  'workerLabels',
+  'workerOutputs',
+  'sessionKey',
+  'canonicalSegmentKey',
+  'report',
+])
 
 function applyUpdater<T>(previous: T, next: Updater<T>): T {
   return typeof next === 'function' ? (next as (value: T) => T)(previous) : next
 }
 
-function readPersistedCheckpointFields(value: unknown): {
-  goal?: string
-  name?: string
-  label?: string
-  agentSessions?: Record<string, string>
-} {
-  if (!value || typeof value !== 'object') return {}
+function isCardId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    (value.startsWith('remote:') || value.startsWith('local:'))
+  )
+}
+
+function isCardIdMap(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  return Object.entries(value).every(
+    ([agentId, cardId]) => agentId.trim().length > 0 && isCardId(cardId),
+  )
+}
+
+function containsRetiredPersistedIdentity(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(containsRetiredPersistedIdentity)
+  if (!value || typeof value !== 'object') return false
   const record = value as Record<string, unknown>
-  const agentSessions = record.agentSessions
-  return {
-    goal: typeof record.goal === 'string' ? record.goal : undefined,
-    name: typeof record.name === 'string' ? record.name : undefined,
-    label: typeof record.label === 'string' ? record.label : undefined,
-    agentSessions:
-      agentSessions &&
-      typeof agentSessions === 'object' &&
-      !Array.isArray(agentSessions)
-        ? (agentSessions as Record<string, string>)
-        : undefined,
+  if (
+    Object.keys(record).some((key) =>
+      RETIRED_PERSISTED_IDENTITY_FIELDS.has(key),
+    )
+  ) {
+    return true
   }
+  return Object.values(record).some(containsRetiredPersistedIdentity)
+}
+
+function isStringMap(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  return Object.entries(value).every(
+    ([key, entry]) => key.trim().length > 0 && typeof entry === 'string',
+  )
+}
+
+function hasSafeCardOwnershipMaps(record: Record<string, unknown>): boolean {
+  const cardIds = record.agentCardIdMap
+  const parentIds = record.agentParentCardIdMap
+  const titles = record.agentCardTitleMap
+  const models = record.agentCardModelMap
+  if (
+    !isCardIdMap(cardIds) ||
+    !isCardIdMap(parentIds) ||
+    !isStringMap(titles) ||
+    !isStringMap(models)
+  ) {
+    return false
+  }
+  const ownerKeys = new Set(Object.keys(cardIds))
+  if (
+    [
+      ...Object.keys(parentIds),
+      ...Object.keys(titles),
+      ...Object.keys(models),
+    ].some((agentId) => !ownerKeys.has(agentId))
+  ) {
+    return false
+  }
+  return Object.entries(parentIds).every(
+    ([agentId, parentCardId]) => parentCardId !== cardIds[agentId],
+  )
+}
+
+function discardPersistedMissionStore(): void {
+  try {
+    globalThis.localStorage.removeItem(MISSION_STORE_STORAGE_KEY)
+  } catch {}
+}
+
+function isSafePersistedMissionState(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  if (containsRetiredPersistedIdentity(value)) return false
+  const record = value as Record<string, unknown>
+  if (!hasSafeCardOwnershipMaps(record)) return false
+  if (
+    'missionHistory' in record ||
+    'boardTasks' in record ||
+    'dispatchedTaskIdsByAgent' in record ||
+    ('agentCardStatus' in record &&
+      Object.keys(readObject(record.agentCardStatus)).length > 0) ||
+    ('artifacts' in record && readArray(record.artifacts).length > 0)
+  ) {
+    return false
+  }
+  const activeMission = record.activeMission
+  if (activeMission === null || activeMission === undefined) return true
+  if (typeof activeMission !== 'object' || Array.isArray(activeMission))
+    return false
+  const activeRecord = activeMission as Record<string, unknown>
+  return (
+    hasSafeCardOwnershipMaps(activeRecord) &&
+    Object.keys(readObject(activeRecord.agentCardStatus)).length === 0 &&
+    readArray(activeRecord.artifacts).length === 0
+  )
+}
+
+function readObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function readArray(value: unknown): Array<unknown> {
+  return Array.isArray(value) ? value : []
 }
 
 function clampHistory(
@@ -161,6 +269,7 @@ function buildCheckpoint(state: MissionStore): MissionCheckpoint | null {
   if (!mission) return null
 
   return {
+    version: MISSION_CHECKPOINT_VERSION,
     id: mission.id,
     label: mission.name || mission.goal || 'Untitled mission',
     name: mission.name,
@@ -180,9 +289,10 @@ function buildCheckpoint(state: MissionStore): MissionCheckpoint | null {
       status: task.status,
       assignedTo: task.agentId,
     })),
-    agentSessionMap: { ...mission.agentSessionMap },
-    agentSessions: { ...mission.agentSessionMap },
-    agentSessionModelMap: { ...mission.agentSessionModelMap },
+    agentCardIdMap: { ...mission.agentCardIdMap },
+    agentParentCardIdMap: { ...mission.agentParentCardIdMap },
+    agentCardTitleMap: { ...mission.agentCardTitleMap },
+    agentCardModelMap: { ...mission.agentCardModelMap },
     status:
       mission.state === 'idle'
         ? 'paused'
@@ -204,9 +314,11 @@ function syncActiveMission(state: MissionStore): Partial<MissionStore> {
       activeMissionName: '',
       activeMissionGoal: '',
       missionTasks: [],
-      agentSessionMap: {},
-      agentSessionModelMap: {},
-      agentSessionStatus: {},
+      agentCardIdMap: {},
+      agentParentCardIdMap: {},
+      agentCardTitleMap: {},
+      agentCardModelMap: {},
+      agentCardStatus: {},
       artifacts: [],
     }
   }
@@ -218,9 +330,11 @@ function syncActiveMission(state: MissionStore): Partial<MissionStore> {
     activeMissionName: state.activeMission.name,
     activeMissionGoal: state.activeMission.goal,
     missionTasks: state.activeMission.tasks,
-    agentSessionMap: state.activeMission.agentSessionMap,
-    agentSessionModelMap: state.activeMission.agentSessionModelMap,
-    agentSessionStatus: state.activeMission.agentSessionStatus,
+    agentCardIdMap: state.activeMission.agentCardIdMap,
+    agentParentCardIdMap: state.activeMission.agentParentCardIdMap,
+    agentCardTitleMap: state.activeMission.agentCardTitleMap,
+    agentCardModelMap: state.activeMission.agentCardModelMap,
+    agentCardStatus: state.activeMission.agentCardStatus,
     artifacts: state.activeMission.artifacts,
   }
 }
@@ -234,6 +348,32 @@ function updateCheckpointSnapshot(state: MissionStore): Partial<MissionStore> {
         ? checkpoint
         : null,
   }
+}
+
+function persistedActiveMission(
+  mission: ActiveMission | null,
+): ActiveMission | null {
+  if (!mission) return null
+  return {
+    ...mission,
+    plan: mission.plan?.map((task) => ({ ...task })),
+    team: mission.team.map((member) => ({ ...member })),
+    tasks: mission.tasks.map((task) => ({ ...task })),
+    agentCardIdMap: { ...mission.agentCardIdMap },
+    agentParentCardIdMap: { ...mission.agentParentCardIdMap },
+    agentCardTitleMap: { ...mission.agentCardTitleMap },
+    agentCardModelMap: { ...mission.agentCardModelMap },
+    agentCardStatus: {},
+    artifacts: [],
+  }
+}
+
+function persistedCheckpoint(
+  checkpoint: MissionCheckpoint | null,
+): MissionCheckpoint | null {
+  if (!checkpoint) return null
+  const { report: _runtimeReport, ...withoutRuntimeReport } = checkpoint
+  return parseMissionCheckpoint(withoutRuntimeReport)
 }
 
 const initialHistory = clampHistory(loadMissionHistory())
@@ -250,9 +390,11 @@ export const useMissionStore = create<MissionStore>()(
       missionTasks: [],
       boardTasks: [],
       dispatchedTaskIdsByAgent: {},
-      agentSessionMap: {},
-      agentSessionModelMap: {},
-      agentSessionStatus: {},
+      agentCardIdMap: {},
+      agentParentCardIdMap: {},
+      agentCardTitleMap: {},
+      agentCardModelMap: {},
+      agentCardStatus: {},
       artifacts: [],
       restoreCheckpoint: null,
       missionHistory: { reports: initialHistory },
@@ -263,9 +405,11 @@ export const useMissionStore = create<MissionStore>()(
           ...mission,
           plan: mission.plan?.map((task) => ({ ...task })),
           state: 'running',
-          agentSessionMap: { ...(mission.agentSessionMap ?? {}) },
-          agentSessionModelMap: { ...(mission.agentSessionModelMap ?? {}) },
-          agentSessionStatus: { ...(mission.agentSessionStatus ?? {}) },
+          agentCardIdMap: {},
+          agentParentCardIdMap: {},
+          agentCardTitleMap: {},
+          agentCardModelMap: {},
+          agentCardStatus: {},
           artifacts: [...(mission.artifacts ?? [])],
           tasks: [...mission.tasks],
           team: mission.team.map((member) => ({ ...member })),
@@ -281,9 +425,11 @@ export const useMissionStore = create<MissionStore>()(
             activeMissionGoal: mission.goal,
             missionState: 'running',
             missionTasks: activeMission.tasks,
-            agentSessionMap: activeMission.agentSessionMap,
-            agentSessionModelMap: activeMission.agentSessionModelMap,
-            agentSessionStatus: activeMission.agentSessionStatus,
+            agentCardIdMap: activeMission.agentCardIdMap,
+            agentParentCardIdMap: activeMission.agentParentCardIdMap,
+            agentCardTitleMap: activeMission.agentCardTitleMap,
+            agentCardModelMap: activeMission.agentCardModelMap,
+            agentCardStatus: activeMission.agentCardStatus,
             artifacts: activeMission.artifacts,
             dispatchedTaskIdsByAgent: {},
             restoreCheckpoint: null,
@@ -372,9 +518,11 @@ export const useMissionStore = create<MissionStore>()(
           missionTasks: [],
           boardTasks: [],
           dispatchedTaskIdsByAgent: {},
-          agentSessionMap: {},
-          agentSessionModelMap: {},
-          agentSessionStatus: {},
+          agentCardIdMap: {},
+          agentParentCardIdMap: {},
+          agentCardTitleMap: {},
+          agentCardModelMap: {},
+          agentCardStatus: {},
           artifacts: [],
           restoreCheckpoint: null,
         })
@@ -404,49 +552,92 @@ export const useMissionStore = create<MissionStore>()(
         })
       },
 
-      updateAgentStatus: (agentId, entry, options) => {
+      updateAgentStatus: (agentId, entry) => {
         set((state) => {
           if (!state.activeMission) return state
-          const agentSessionStatus = {
-            ...state.activeMission.agentSessionStatus,
+          const agentCardStatus = {
+            ...state.activeMission.agentCardStatus,
           }
           if (entry) {
-            agentSessionStatus[agentId] = entry
+            agentCardStatus[agentId] = entry
           } else {
-            delete agentSessionStatus[agentId]
-          }
-
-          const agentSessionMap = { ...state.activeMission.agentSessionMap }
-          if (options?.sessionKey === null) {
-            delete agentSessionMap[agentId]
-          } else if (typeof options?.sessionKey === 'string') {
-            agentSessionMap[agentId] = options.sessionKey
-          }
-
-          const agentSessionModelMap = {
-            ...state.activeMission.agentSessionModelMap,
-          }
-          if (options?.model === null) {
-            delete agentSessionModelMap[agentId]
-          } else if (
-            typeof options?.model === 'string' &&
-            options.model.length > 0
-          ) {
-            agentSessionModelMap[agentId] = options.model
+            delete agentCardStatus[agentId]
           }
 
           const activeMission = {
             ...state.activeMission,
-            agentSessionStatus,
-            agentSessionMap,
-            agentSessionModelMap,
+            agentCardStatus,
           }
           const nextState: MissionStore = {
             ...state,
             activeMission,
-            agentSessionStatus,
-            agentSessionMap,
-            agentSessionModelMap,
+            agentCardStatus,
+          }
+          return {
+            ...nextState,
+            ...updateCheckpointSnapshot(nextState),
+          }
+        })
+      },
+
+      setAgentCardOwner: (agentId, owner) => {
+        set((state) => {
+          if (!state.activeMission) return state
+
+          const agentCardIdMap = { ...state.activeMission.agentCardIdMap }
+          const agentParentCardIdMap = {
+            ...state.activeMission.agentParentCardIdMap,
+          }
+          const agentCardTitleMap = {
+            ...state.activeMission.agentCardTitleMap,
+          }
+          const agentCardModelMap = {
+            ...state.activeMission.agentCardModelMap,
+          }
+
+          if (!owner) {
+            delete agentCardIdMap[agentId]
+            delete agentParentCardIdMap[agentId]
+            delete agentCardTitleMap[agentId]
+            delete agentCardModelMap[agentId]
+          } else {
+            if (
+              !isCardId(owner.cardId) ||
+              (owner.parentCardId !== undefined &&
+                (!isCardId(owner.parentCardId) ||
+                  owner.parentCardId === owner.cardId)) ||
+              !owner.title.trim()
+            ) {
+              return state
+            }
+            agentCardIdMap[agentId] = owner.cardId
+            if (owner.parentCardId) {
+              agentParentCardIdMap[agentId] = owner.parentCardId
+            } else {
+              delete agentParentCardIdMap[agentId]
+            }
+            agentCardTitleMap[agentId] = owner.title.trim()
+            if (owner.model?.trim()) {
+              agentCardModelMap[agentId] = owner.model.trim()
+            } else {
+              delete agentCardModelMap[agentId]
+            }
+          }
+
+          const activeMission = {
+            ...state.activeMission,
+            agentCardIdMap,
+            agentParentCardIdMap,
+            agentCardTitleMap,
+            agentCardModelMap,
+          }
+          const nextState: MissionStore = {
+            ...state,
+            activeMission,
+            agentCardIdMap,
+            agentParentCardIdMap,
+            agentCardTitleMap,
+            agentCardModelMap,
           }
           return {
             ...nextState,
@@ -508,7 +699,6 @@ export const useMissionStore = create<MissionStore>()(
       },
 
       restoreMission: (checkpoint) => {
-        const persistedFields = readPersistedCheckpointFields(checkpoint)
         const restoredTasks: Array<HubTask> = checkpoint.tasks.map((task) => ({
           id: task.id,
           title: task.title,
@@ -522,21 +712,23 @@ export const useMissionStore = create<MissionStore>()(
         }))
         const activeMission: ActiveMission = {
           id: checkpoint.id,
-          goal: persistedFields.goal ?? '',
-          name: persistedFields.name ?? persistedFields.label ?? '',
+          goal: checkpoint.goal,
+          name: checkpoint.name || checkpoint.label,
           state: checkpoint.status === 'paused' ? 'paused' : 'running',
           team: checkpoint.team.map((member) => ({
             ...member,
             status: 'available',
           })),
           tasks: restoredTasks,
-          agentSessionMap: {
-            ...(persistedFields.agentSessions ?? checkpoint.agentSessionMap),
+          agentCardIdMap: { ...checkpoint.agentCardIdMap },
+          agentParentCardIdMap: {
+            ...checkpoint.agentParentCardIdMap,
           },
-          agentSessionModelMap: { ...(checkpoint.agentSessionModelMap ?? {}) },
-          agentSessionStatus: {},
+          agentCardTitleMap: { ...checkpoint.agentCardTitleMap },
+          agentCardModelMap: { ...checkpoint.agentCardModelMap },
+          agentCardStatus: {},
           processType: checkpoint.processType,
-          budgetLimit: checkpoint.budgetLimit ?? '',
+          budgetLimit: checkpoint.budgetLimit || '',
           startedAt: checkpoint.startedAt,
           artifacts: [],
         }
@@ -544,14 +736,16 @@ export const useMissionStore = create<MissionStore>()(
           ...get(),
           activeMission,
           missionActive: true,
-          missionGoal: checkpoint.goal ?? '',
+          missionGoal: checkpoint.goal,
           activeMissionName: activeMission.name,
           activeMissionGoal: activeMission.goal,
           missionState: checkpoint.status === 'paused' ? 'paused' : 'running',
           missionTasks: restoredTasks,
-          agentSessionMap: activeMission.agentSessionMap,
-          agentSessionModelMap: activeMission.agentSessionModelMap,
-          agentSessionStatus: {},
+          agentCardIdMap: activeMission.agentCardIdMap,
+          agentParentCardIdMap: activeMission.agentParentCardIdMap,
+          agentCardTitleMap: activeMission.agentCardTitleMap,
+          agentCardModelMap: activeMission.agentCardModelMap,
+          agentCardStatus: {},
           artifacts: [],
           restoreCheckpoint: null,
         }
@@ -591,63 +785,19 @@ export const useMissionStore = create<MissionStore>()(
             ...updateCheckpointSnapshot(nextState),
           }
         }),
-      setAgentSessionMap: (value) =>
+      setAgentCardStatus: (value) =>
         set((state) => {
-          const agentSessionMap = applyUpdater(state.agentSessionMap, value)
+          const agentCardStatus = applyUpdater(state.agentCardStatus, value)
           const activeMission = state.activeMission
             ? {
                 ...state.activeMission,
-                agentSessionMap,
+                agentCardStatus,
               }
             : null
           const nextState: MissionStore = {
             ...state,
             activeMission,
-            agentSessionMap,
-          }
-          return {
-            ...nextState,
-            ...updateCheckpointSnapshot(nextState),
-          }
-        }),
-      setAgentSessionModelMap: (value) =>
-        set((state) => {
-          const agentSessionModelMap = applyUpdater(
-            state.agentSessionModelMap,
-            value,
-          )
-          const activeMission = state.activeMission
-            ? {
-                ...state.activeMission,
-                agentSessionModelMap,
-              }
-            : null
-          const nextState: MissionStore = {
-            ...state,
-            activeMission,
-            agentSessionModelMap,
-          }
-          return {
-            ...nextState,
-            ...updateCheckpointSnapshot(nextState),
-          }
-        }),
-      setAgentSessionStatus: (value) =>
-        set((state) => {
-          const agentSessionStatus = applyUpdater(
-            state.agentSessionStatus,
-            value,
-          )
-          const activeMission = state.activeMission
-            ? {
-                ...state.activeMission,
-                agentSessionStatus,
-              }
-            : null
-          const nextState: MissionStore = {
-            ...state,
-            activeMission,
-            agentSessionStatus,
+            agentCardStatus,
           }
           return {
             ...nextState,
@@ -707,7 +857,50 @@ export const useMissionStore = create<MissionStore>()(
         set({ beforeUnloadRegistered }),
     }),
     {
-      name: 'clawsuite:mission-store',
+      name: MISSION_STORE_STORAGE_KEY,
+      version: MISSION_CHECKPOINT_VERSION,
+      migrate: (persistedState, persistedVersion) => {
+        if (
+          persistedVersion !== MISSION_CHECKPOINT_VERSION ||
+          !isSafePersistedMissionState(persistedState)
+        ) {
+          discardPersistedMissionStore()
+          return {}
+        }
+        return persistedState
+      },
+      merge: (persistedState, currentState) => {
+        if (!isSafePersistedMissionState(persistedState)) {
+          discardPersistedMissionStore()
+          return currentState
+        }
+        return {
+          ...currentState,
+          ...(persistedState as Partial<MissionStore>),
+          missionHistory: currentState.missionHistory,
+          boardTasks: currentState.boardTasks,
+          dispatchedTaskIdsByAgent: {},
+          agentCardStatus: {},
+          artifacts: [],
+          beforeUnloadRegistered: false,
+        }
+      },
+      partialize: (state) => ({
+        activeMission: persistedActiveMission(state.activeMission),
+        missionActive: state.missionActive,
+        missionGoal: state.missionGoal,
+        activeMissionName: state.activeMissionName,
+        activeMissionGoal: state.activeMissionGoal,
+        missionState: state.missionState,
+        missionTasks: state.missionTasks.map((task) => ({ ...task })),
+        agentCardIdMap: { ...state.agentCardIdMap },
+        agentParentCardIdMap: { ...state.agentParentCardIdMap },
+        agentCardTitleMap: { ...state.agentCardTitleMap },
+        agentCardModelMap: { ...state.agentCardModelMap },
+        agentCardStatus: {},
+        artifacts: [],
+        restoreCheckpoint: persistedCheckpoint(state.restoreCheckpoint),
+      }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
         if (state.activeMission && !state.restoreCheckpoint) {

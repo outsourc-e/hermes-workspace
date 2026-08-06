@@ -206,6 +206,28 @@ function conductorCards(): SessionCardListWire {
   }
 }
 
+function persistedMissionV3(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    version: 3,
+    missionId: null,
+    missionJobId: null,
+    goal: 'A mission whose title does not match any Card',
+    phase: 'running',
+    missionStartedAt: '2026-07-27T11:59:00.000Z',
+    isPaused: false,
+    pausedElapsedMs: 0,
+    accumulatedPausedMs: 0,
+    pauseStartedAt: null,
+    orchestratorCardId: 'remote:shared-worker',
+    workerCards: [{ cardId: 'remote:shared-worker' }],
+    completedAt: null,
+    tasks: [],
+    ...overrides,
+  }
+}
+
 async function renderConductor() {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -289,22 +311,7 @@ describe('mounted /conductor Session Card inventory', () => {
   it('matches active workers by source-qualified Card identity and renders only the matched Card state', async () => {
     localStorage.setItem(
       'conductor:active-mission',
-      JSON.stringify({
-        goal: 'A mission whose title does not match any Card',
-        phase: 'running',
-        missionStartedAt: '2026-07-27T11:59:00.000Z',
-        isPaused: false,
-        pausedElapsedMs: 0,
-        accumulatedPausedMs: 0,
-        pauseStartedAt: null,
-        workerKeys: ['remote:shared-runtime-key'],
-        workerLabels: [],
-        workerOutputs: {},
-        streamText: '',
-        planText: '',
-        completedAt: null,
-        tasks: [],
-      }),
+      JSON.stringify(persistedMissionV3()),
     )
     vi.stubGlobal(
       'fetch',
@@ -320,9 +327,46 @@ describe('mounted /conductor Session Card inventory', () => {
     ).toBeGreaterThan(0)
     expect(screen.queryByText(/Local complete Card activity/)).toBeNull()
     expect(screen.getAllByText('Running').length).toBeGreaterThan(0)
-    expect(screen.getByText('1 active')).not.toBeNull()
+    // The exact root Card owner also admits its verified child Card activity.
+    expect(screen.getByText('2 active')).not.toBeNull()
     expect(container.textContent).not.toContain('remote:shared-runtime-key')
     expect(container.textContent).not.toContain('raw-incomplete-session')
+
+    const serialized = localStorage.getItem('conductor:active-mission') ?? ''
+    expect(serialized).toContain('remote:shared-worker')
+    expect(serialized).not.toContain('remote:shared-runtime-key')
+    expect(serialized).not.toContain('workerKeys')
+    expect(serialized).not.toContain('workerOutputs')
+    expect(serialized).not.toContain('streamText')
+    expect(serialized).not.toContain('planText')
+    expect(serialized).not.toContain('"output"')
+  })
+
+  it('removes legacy raw worker ownership instead of restoring it', async () => {
+    localStorage.setItem(
+      'conductor:active-mission',
+      JSON.stringify({
+        version: 2,
+        goal: 'Legacy mission',
+        phase: 'running',
+        workerKeys: ['remote:shared-runtime-key'],
+        workerOutputs: {
+          'remote:shared-runtime-key': 'legacy transcript',
+        },
+      }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() =>
+        Promise.resolve(Response.json(mocks.cardResponse)),
+      ),
+    )
+
+    const container = await renderConductor()
+
+    expect(localStorage.getItem('conductor:active-mission')).toBeNull()
+    expect(container.textContent).not.toContain('remote:shared-runtime-key')
+    expect(container.textContent).not.toContain('legacy transcript')
   })
 
   it.each([
@@ -333,24 +377,7 @@ describe('mounted /conductor Session Card inventory', () => {
     async (_case, completeness, retryable) => {
       localStorage.setItem(
         'conductor:active-mission',
-        JSON.stringify({
-          goal: 'A mission whose title does not match any Card',
-          phase: 'running',
-          missionStartedAt: '2026-07-27T11:59:00.000Z',
-          isPaused: false,
-          pausedElapsedMs: 0,
-          accumulatedPausedMs: 0,
-          pauseStartedAt: null,
-          workerKeys: ['remote:shared-runtime-key'],
-          workerLabels: [],
-          workerOutputs: {
-            'remote:shared-worker': 'persisted unsafe worker transcript',
-          },
-          streamText: '',
-          planText: '',
-          completedAt: null,
-          tasks: [],
-        }),
+        JSON.stringify(persistedMissionV3()),
       )
       const fetchMock = vi.fn<typeof fetch>((input) => {
         const url = String(input)
@@ -397,18 +424,18 @@ describe('mounted /conductor Session Card inventory', () => {
       })
 
       expect(container.textContent).not.toContain('unsafe Conductor transcript')
-      expect(container.textContent).not.toContain(
-        'persisted unsafe worker transcript',
-      )
       expect(
-        screen.getByText(
+        screen.getAllByText(
           'Worker transcript unavailable until complete history can be loaded.',
+        ).length,
+      ).toBeGreaterThan(0)
+      React.act(() =>
+        fireEvent.click(
+          screen.getAllByRole('button', {
+            name: 'Retry worker transcript',
+          })[0]!,
         ),
-      ).toBeTruthy()
-      const retry = screen.getByRole('button', {
-        name: 'Retry worker transcript',
-      })
-      React.act(() => fireEvent.click(retry))
+      )
       expect(
         fetchMock.mock.calls.filter(([input]) =>
           String(input).includes('/history'),
@@ -420,22 +447,7 @@ describe('mounted /conductor Session Card inventory', () => {
   it('renders worker output from complete non-retryable Card history', async () => {
     localStorage.setItem(
       'conductor:active-mission',
-      JSON.stringify({
-        goal: 'A mission whose title does not match any Card',
-        phase: 'running',
-        missionStartedAt: '2026-07-27T11:59:00.000Z',
-        isPaused: false,
-        pausedElapsedMs: 0,
-        accumulatedPausedMs: 0,
-        pauseStartedAt: null,
-        workerKeys: ['remote:shared-runtime-key'],
-        workerLabels: [],
-        workerOutputs: {},
-        streamText: '',
-        planText: '',
-        completedAt: null,
-        tasks: [],
-      }),
+      JSON.stringify(persistedMissionV3()),
     )
     vi.stubGlobal(
       'fetch',
