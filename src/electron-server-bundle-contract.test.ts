@@ -11,17 +11,26 @@ function bundledRoute(bundle: string, route: string): string {
   return bundle.slice(start, nextRoute < 0 ? bundle.length : nextRoute)
 }
 
+function bundledDirectChatDelivery(bundle: string): string {
+  const marker =
+    /async function sendPromptToLiveSession(?:\$\d+)?\(workerId, prompt, cardBinding\)/u
+  const match = marker.exec(bundle)
+  expect(
+    match?.index,
+    'missing bundled Card-bound direct chat delivery',
+  ).toBeTypeOf('number')
+  const start = match!.index
+  const nextFunction = bundle.indexOf('\nfunction messagesAfterBaseline', start)
+  expect(
+    nextFunction,
+    'missing end of bundled direct chat delivery',
+  ).toBeGreaterThan(start)
+  return bundle.slice(start, nextFunction)
+}
+
 describe('checked-in Electron production server bundle', () => {
   const bundle = readFileSync(
     resolve(process.cwd(), 'electron/server-bundle.cjs'),
-    'utf8',
-  )
-  const pauseRouteSource = readFileSync(
-    resolve(process.cwd(), 'src/routes/api/session-cards.$cardId.pause.ts'),
-    'utf8',
-  )
-  const routeTreeSource = readFileSync(
-    resolve(process.cwd(), 'src/routeTree.gen.ts'),
     'utf8',
   )
 
@@ -43,25 +52,26 @@ describe('checked-in Electron production server bundle', () => {
     ).toBe(false)
   })
 
-  it('keeps the Electron server source Card-bound without regenerating the checked-in bundle', () => {
-    expect(routeTreeSource).toContain(
-      "from './routes/api/session-cards.$cardId.pause'",
+  it('ships the Card-owned pause route with mutation-edge binding validation', () => {
+    const route = bundledRoute(bundle, '/api/session-cards/$cardId/pause')
+
+    expect(route).toMatch(
+      /resolveSessionCardOperationBindingByCardOwner\(\{\s*cardId:\s*params\.cardId,\s*parentCardId,/u,
     )
-    expect(pauseRouteSource).toContain(
-      "createFileRoute('/api/session-cards/$cardId/pause')",
+    expect(route).toContain('Session Card ownership is unavailable')
+    expect(route).toMatch(
+      /await resolveExactSessionCardOperationBinding\(binding\)/u,
     )
-    expect(pauseRouteSource).toContain(
-      'resolveSessionCardOperationBindingByCardOwner',
+    expect(route).toContain('Session Card ownership changed before pause')
+    expect(route).toMatch(/dashboardFetch(?:\$\d+)?\(\s*"\/api\/agent-pause"/u)
+    expect(route).toMatch(
+      /session_key:\s*binding\.canonicalSegmentKey,\s*pause:\s*body\d*\.pause/u,
     )
-    expect(pauseRouteSource).toContain(
-      'resolveExactSessionCardOperationBinding',
-    )
-    expect(pauseRouteSource).toContain("dashboardFetch('/api/agent-pause'")
-    expect(pauseRouteSource).not.toMatch(/[^A-Za-z]sessionKey\s*:/u)
   })
 
-  it('requires an exact Card binding for bundled swarm direct chat delivery', () => {
+  it('requires exact Card binding and revalidation at every direct chat mutation edge', () => {
     const route = bundledRoute(bundle, '/api/swarm-direct-chat')
+    const delivery = bundledDirectChatDelivery(bundle)
 
     expect(route).toMatch(
       /parseDirectChatCardBinding\(\s*[^,]+\.cardBinding,\s*workerId\s*\)/u,
@@ -77,6 +87,14 @@ describe('checked-in Electron production server bundle', () => {
     expect(route).not.toMatch(
       /sendPromptToLiveSession\(\s*workerId,\s*prompt\s*\)/u,
     )
+
+    const edgeRevalidations = delivery.match(
+      /await resolveExactSessionCardOperationBinding\(cardBinding\)/gu,
+    )
+    expect(edgeRevalidations).toHaveLength(3)
+    expect(delivery).toMatch(
+      /resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"send-keys"[\s\S]*?"C-u"[\s\S]*?resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"paste-buffer"[\s\S]*?resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"send-keys"[\s\S]*?"Enter"/u,
+    )
   })
 
   it('rejects raw aliases and preserves Card-bound conductor stop failures', () => {
@@ -87,6 +105,11 @@ describe('checked-in Electron production server bundle', () => {
     )
     expect(route).toMatch(/parseCardBindings\([^)]*\.cardBindings\)/u)
     expect(route).toContain('Invalid Session Card stop binding')
+    expect(route).toMatch(/missionAuthorityBinding\([\s\S]*?cardBindings\s*\)/u)
+    expect(route).toMatch(
+      /swarmMissionHasExactCardAuthority\(missionId,\s*missionBinding\)/u,
+    )
+    expect(route).toContain('Session Card is not authorized for this mission')
     expect(route).toMatch(
       /await resolveExactSessionCardOperationBinding\((?:missionBinding|binding)\)/u,
     )
