@@ -4,9 +4,10 @@ export type MessageJournalWriteResult = {
 }
 
 type JournalRecord<T> = {
-  version: 1
+  version: 2
   revision: number
   commitId: string
+  state: 'prepared' | 'committed'
   value: T
 }
 
@@ -29,10 +30,11 @@ function parseRecord<T>(raw: string): JournalRecord<T> | null {
   try {
     const parsed = JSON.parse(raw) as Partial<JournalRecord<T>>
     if (
-      parsed.version !== 1 ||
+      parsed.version !== 2 ||
       !positiveSafeInteger(parsed.revision) ||
       typeof parsed.commitId !== 'string' ||
       !parsed.commitId ||
+      (parsed.state !== 'prepared' && parsed.state !== 'committed') ||
       parsed.value === undefined
     ) {
       return null
@@ -78,8 +80,9 @@ export function readMessageJournal<T>(
       try {
         const raw = storage.getItem(key)
         const parsed = raw ? parseRecord<unknown>(raw) : null
-        const value = parsed ? validate(parsed.value) : null
-        if (!parsed || !value) {
+        const value =
+          parsed?.state === 'committed' ? validate(parsed.value) : null
+        if (!parsed || parsed.state !== 'committed' || !value) {
           storage.removeItem(key)
           continue
         }
@@ -136,22 +139,34 @@ export function writeMessageJournal<T>(
     if (!positiveSafeInteger(revision)) {
       return { anyVerified: false, persistentVerified: false }
     }
-    const serialized = JSON.stringify({
-      version: 1,
+    const record = {
+      version: 2,
       revision,
       commitId: commitId(),
       value,
+    } as const
+    const prepared = JSON.stringify({
+      ...record,
+      state: 'prepared',
+    } satisfies JournalRecord<T>)
+    const committed = JSON.stringify({
+      ...record,
+      state: 'committed',
     } satisfies JournalRecord<T>)
     let valueVerified = false
     let valuePersistent = false
     for (const storage of storages) {
       try {
-        storage.setItem(key, serialized)
-        if (storage.getItem(key) !== serialized) continue
+        // A prepared row is never recovery authority. Only promote it after an
+        // exact readback proves this mirror accepted the candidate bytes.
+        storage.setItem(key, prepared)
+        if (storage.getItem(key) !== prepared) continue
+        storage.setItem(key, committed)
         valueVerified = true
         if (isPersistentBrowserStorage(storage)) valuePersistent = true
       } catch {
-        // Keep attempting independent mirrors.
+        // A setItem that landed before readback failed leaves only a prepared
+        // row, which future readers reject instead of resurrecting the send.
       }
     }
     if (!valueVerified) return { anyVerified: false, persistentVerified: false }

@@ -18,6 +18,7 @@ import {
   cardTranscriptRecoveryStorageKey,
   clearCardTranscriptRecoveryMemory,
   readCardTranscriptRecovery,
+  replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import { ChatScreen } from './chat-screen'
 import {
@@ -1219,6 +1220,78 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       expect(screen.getByText('assistant overlay after remount')).toBeTruthy(),
     )
     expectCardOnlyTranscriptBoundary(requests)
+  })
+
+  it('does not resurrect an unverified journal write after rejected admission and a cold remount', async () => {
+    const baselineText = 'accepted baseline survives rejected admission'
+    const rejectedText = 'candidate whose journal readback fails'
+    expect(
+      replaceCardTranscriptRecoveryMessages({ cardId: parentCard.cardId }, [
+        message('user', baselineText, { clientId: 'accepted-baseline' }),
+      ]),
+    ).not.toBeNull()
+
+    const requests = mockHttp()
+    const originalSetItem = Storage.prototype.setItem
+    const originalGetItem = Storage.prototype.getItem
+    const originalRemoveItem = Storage.prototype.removeItem
+    let persistentJournalUnavailable = false
+    const setItemSpy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(function (this: Storage, key, value) {
+        originalSetItem.call(this, key, value)
+        if (
+          this === window.localStorage &&
+          key.includes(':entry:') &&
+          value.includes(rejectedText)
+        ) {
+          persistentJournalUnavailable = true
+        }
+      })
+    const getItemSpy = vi
+      .spyOn(Storage.prototype, 'getItem')
+      .mockImplementation(function (this: Storage, key) {
+        if (this === window.localStorage && persistentJournalUnavailable) {
+          throw new DOMException(
+            'persistent storage unavailable',
+            'SecurityError',
+          )
+        }
+        return originalGetItem.call(this, key)
+      })
+    const removeItemSpy = vi
+      .spyOn(Storage.prototype, 'removeItem')
+      .mockImplementation(function (this: Storage, key) {
+        if (this === window.localStorage && persistentJournalUnavailable) {
+          throw new DOMException(
+            'persistent storage unavailable',
+            'SecurityError',
+          )
+        }
+        return originalRemoveItem.call(this, key)
+      })
+
+    const mountedScreen = await mountChatScreen(defaultInput())
+    await waitFor(() => expect(screen.getByText(baselineText)).toBeTruthy())
+    submitSelection(rejectedText)
+    await waitFor(() => {
+      expect(screen.queryByText(rejectedText)).toBeNull()
+      expect(requests).not.toContain('/api/send-stream')
+    })
+
+    mountedScreen.unmount()
+    clearCardTranscriptRecoveryMemory()
+    window.sessionStorage.clear()
+    useChatStore.getState().clearCardRealtimeBuffer(parentCard.cardId)
+    useChatStore.getState().clearCardStreaming(parentCard.cardId)
+    setItemSpy.mockRestore()
+    getItemSpy.mockRestore()
+    removeItemSpy.mockRestore()
+
+    await mountChatScreen(defaultInput())
+    await waitFor(() => expect(screen.getByText(baselineText)).toBeTruthy())
+    expect(screen.queryByText(rejectedText)).toBeNull()
+    expect(requests).not.toContain('/api/send-stream')
   })
 
   it('keeps send errors retryable after refetch and a cold Card remount', async () => {
