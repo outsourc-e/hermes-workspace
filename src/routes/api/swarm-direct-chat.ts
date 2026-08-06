@@ -169,9 +169,10 @@ function tmuxHasSession(tmuxBin: string, name: string): Promise<boolean> {
 
 async function ensureLiveTmuxSession(
   workerId: string,
+  cardBinding: DirectChatCardBinding,
 ): Promise<
   | { ok: true; tmuxBin: string; sessionName: string }
-  | { ok: false; error: string }
+  | { ok: false; error: string; staleBinding?: boolean }
 > {
   const tmuxBin = resolveTmuxBin()
   if (!tmuxBin) return { ok: false, error: 'tmux not installed' }
@@ -183,6 +184,9 @@ async function ensureLiveTmuxSession(
 
   const profilePath = getProfilePath(workerId)
   const cwd = resolveWorkerCwd(workerId)
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'stale Card binding', staleBinding: true }
+  }
   const started = await execFileAsync(tmuxBin, [
     'new-session',
     '-d',
@@ -205,11 +209,15 @@ async function sendPromptToLiveSession(
   | { ok: true; delivery: 'tmux' }
   | { ok: false; error: string; staleBinding?: boolean }
 > {
-  const ensured = await ensureLiveTmuxSession(workerId)
-  if (!ensured.ok) return { ok: false, error: ensured.error }
+  const ensured = await ensureLiveTmuxSession(workerId, cardBinding)
+  if (!ensured.ok) return ensured
   const { tmuxBin, sessionName } = ensured
   const bufferName = `swarm-direct-chat-${workerId}`
   const normalizedPrompt = prompt.replace(/\r\n/g, '\n')
+
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'stale Card binding', staleBinding: true }
+  }
 
   const loaded = await execFileAsync(
     tmuxBin,

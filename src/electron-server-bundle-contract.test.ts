@@ -28,6 +28,32 @@ function bundledDirectChatDelivery(bundle: string): string {
   return bundle.slice(start, nextFunction)
 }
 
+function bundledExactCardBindingResolver(bundle: string): string {
+  const marker =
+    'async function resolveExactSessionCardOperationBinding(binding)'
+  const start = bundle.indexOf(marker)
+  expect(
+    start,
+    'missing bundled exact Card binding resolver',
+  ).toBeGreaterThanOrEqual(0)
+  const end = bundle.indexOf(
+    '\nasync function resolveSessionCardOperationBindingByUpstream',
+    start,
+  )
+  expect(
+    end,
+    'missing end of bundled exact Card binding resolver',
+  ).toBeGreaterThan(start)
+  return bundle.slice(start, end)
+}
+
+function sourceRoute(fileName: string): string {
+  return readFileSync(
+    resolve(process.cwd(), 'src/routes/api', fileName),
+    'utf8',
+  )
+}
+
 describe('checked-in Electron production server bundle', () => {
   const bundle = readFileSync(
     resolve(process.cwd(), 'electron/server-bundle.cjs'),
@@ -114,6 +140,78 @@ describe('checked-in Electron production server bundle', () => {
       expect(immediatelyBeforeMutation).not.toMatch(/\n\s*await\s/u)
     }
     expect(route).toContain('Session Card ownership changed before send')
+  })
+
+  it('keeps existing-session authority and attachment rejection ahead of send-stream source mutations', () => {
+    const route = sourceRoute('send-stream.ts')
+    const authorityFailure = route.indexOf(
+      'Session Card authority required for existing session',
+    )
+    const attachmentFailure = route.indexOf('invalid attachment data')
+    const legacyResolution = route.indexOf('resolveSessionKey({')
+    const initialExactResolution = route.indexOf(
+      'resolveExactSessionCardOperationBinding(mutationBinding)',
+    )
+    const firstProviderMutation = Math.min(
+      ...[
+        'const responsesStream = streamResponses(',
+        'const streamPending = openaiChat(',
+        'const upstreamStream = streamChat(',
+      ].map((marker) => route.indexOf(marker)),
+    )
+
+    expect(authorityFailure).toBeGreaterThanOrEqual(0)
+    expect(attachmentFailure).toBeGreaterThanOrEqual(0)
+    expect(legacyResolution).toBeGreaterThan(authorityFailure)
+    expect(initialExactResolution).toBeGreaterThan(authorityFailure)
+    expect(initialExactResolution).toBeLessThan(firstProviderMutation)
+    expect(attachmentFailure).toBeLessThan(firstProviderMutation)
+    expect(route).toContain(
+      'isExplicitSendStreamBootstrap(rawSessionKey, body.sessionKey)',
+    )
+  })
+
+  it('revalidates the direct-chat source binding immediately before runtime setup and input mutations', () => {
+    const route = sourceRoute('swarm-direct-chat.ts')
+
+    expect(route).toContain('ensureLiveTmuxSession(workerId, cardBinding)')
+    for (const mutation of [
+      'const started = await execFileAsync(',
+      'const loaded = await execFileAsync(',
+      'const cleared = await execFileAsync(',
+      'const pasted = await execFileAsync(',
+      'const entered = await execFileAsync(',
+    ]) {
+      const mutationEdge = route.indexOf(mutation)
+      const revalidation = route.lastIndexOf(
+        'resolveExactSessionCardOperationBinding(cardBinding)',
+        mutationEdge,
+      )
+      const immediatelyBeforeMutation = route.slice(revalidation, mutationEdge)
+
+      expect(mutationEdge).toBeGreaterThanOrEqual(0)
+      expect(revalidation).toBeGreaterThanOrEqual(0)
+      expect(immediatelyBeforeMutation.length).toBeLessThan(350)
+      expect(immediatelyBeforeMutation).not.toMatch(/\bawait\b/u)
+      expect(immediatelyBeforeMutation).toContain('staleBinding: true')
+    }
+  })
+
+  it('ships semantic canonical-rollover checks in the exact Card binding helper', () => {
+    const resolver = bundledExactCardBindingResolver(bundle)
+
+    expect(resolver).toContain(
+      'card.canonicalSegmentKey !== binding.canonicalSegmentKey',
+    )
+    expect(resolver).toContain(
+      'continuations.at(-1) !== card.canonicalSegmentKey',
+    )
+    expect(resolver).toContain(
+      'continuations.length !== card.continuationCount',
+    )
+    expect(resolver).toContain(
+      'resolved.collection.completeness !== "complete"',
+    )
   })
 
   it('requires exact Card binding and revalidation at every direct chat mutation edge', () => {

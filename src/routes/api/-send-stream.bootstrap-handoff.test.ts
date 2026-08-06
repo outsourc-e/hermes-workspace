@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   resolveRemoteCardByUpstreamSession: vi.fn(),
   resolveLocalCardByUpstreamSession: vi.fn(),
   resolveExactSessionCardOperationBinding: vi.fn(),
+  isExplicitSendStreamBootstrap: vi.fn(),
   ensureLocalSession: vi.fn(),
   buildResolvedSessionHeaders: vi.fn(() => ({})),
   openaiChat: vi.fn(),
@@ -102,6 +103,10 @@ vi.mock('../../server/session-card-service', () => ({
 vi.mock('../../server/session-card-operation-binding', () => ({
   resolveExactSessionCardOperationBinding:
     mocks.resolveExactSessionCardOperationBinding,
+}))
+
+vi.mock('./-send-stream-authority', () => ({
+  isExplicitSendStreamBootstrap: mocks.isExplicitSendStreamBootstrap,
 }))
 
 vi.mock('../../server/local-session-store', () => ({
@@ -253,6 +258,9 @@ describe('send-stream bootstrap session handoff', () => {
           parentCardId: binding.parentCardId,
         }),
     )
+    // Legacy lifecycle cases isolate downstream streaming behavior. Authority
+    // classification is covered directly and by focused route cases below.
+    mocks.isExplicitSendStreamBootstrap.mockReturnValue(true)
     mocks.observeCardActivity.mockResolvedValue(null)
     mocks.observeChildLifecycle.mockResolvedValue(null)
     mocks.getMessages.mockResolvedValue([])
@@ -336,9 +344,13 @@ describe('send-stream bootstrap session handoff', () => {
         collection: { completeness: 'complete', retryable: false },
       })
       const rollover = deferred<null>()
-      mocks.resolveExactSessionCardOperationBinding.mockReturnValueOnce(
-        rollover.promise,
-      )
+      mocks.resolveExactSessionCardOperationBinding
+        .mockResolvedValueOnce({
+          kind: 'session-card-owner',
+          cardId,
+          parentCardId: null,
+        })
+        .mockReturnValueOnce(rollover.promise)
 
       const responsePending = handler({
         request: new Request('http://workspace.test/api/send-stream', {
@@ -378,6 +390,111 @@ describe('send-stream bootstrap session handoff', () => {
       expect(upstream()).not.toHaveBeenCalled()
     },
   )
+
+  it('rejects a raw existing-session send without Card authority before any provider or durable mutation', async () => {
+    mocks.isExplicitSendStreamBootstrap.mockReturnValueOnce(false)
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'existing-session',
+          friendlyId: 'existing-session',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Session Card authority required for existing session',
+    })
+    expect(mocks.resolveSessionKey).not.toHaveBeenCalled()
+    expect(mocks.ensureLocalSession).not.toHaveBeenCalled()
+    expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+    expect(mocks.streamChat).not.toHaveBeenCalled()
+    expect(mocks.openaiChat).not.toHaveBeenCalled()
+    expect(mocks.streamResponses).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    '',
+    'not-a-data-url',
+    'data:image/png;base64,',
+    'data:image/png,AAAA',
+    'data:;base64,AAAA',
+    'data:image/png;base64,@@@',
+  ])(
+    'rejects malformed attachment dataUrl %j before transport acceptance',
+    async (dataUrl) => {
+      const response = await handler({
+        request: new Request('http://workspace.test/api/send-stream', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            sessionKey: 'new',
+            friendlyId: 'new',
+            message: 'hello',
+            attachments: [{ name: 'broken.png', dataUrl }],
+          }),
+        }),
+      })
+
+      expect(response.status).toBe(400)
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'invalid attachment data',
+      })
+      expect(mocks.createSession).not.toHaveBeenCalled()
+      expect(mocks.ensureLocalSession).not.toHaveBeenCalled()
+      expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+      expect(mocks.streamChat).not.toHaveBeenCalled()
+      expect(mocks.openaiChat).not.toHaveBeenCalled()
+      expect(mocks.streamResponses).not.toHaveBeenCalled()
+    },
+  )
+
+  it('rejects an initially stale local Card before local session or provider mutation', async () => {
+    mocks.getDiscoveredModels.mockReturnValue([
+      { id: 'local-model', name: 'Local Model', provider: 'local-provider' },
+    ])
+    mocks.getLocalProviderDef.mockReturnValue({
+      id: 'local-provider',
+      type: 'openai-compat',
+    })
+    mocks.resolveSessionCard.mockResolvedValueOnce({
+      card: {
+        cardId: 'local:card',
+        canonicalSegmentKey: 'local:session',
+        continuationSegmentKeys: ['local:session'],
+        continuationCount: 1,
+        canonicalSource: 'local',
+        relationshipKind: 'root',
+      },
+      collection: { completeness: 'complete', retryable: false },
+      sourceBySegmentKey: new Map([['local:session', 'local']]),
+      upstreamKeyBySegmentKey: new Map([['local:session', 'session']]),
+    })
+    mocks.resolveExactSessionCardOperationBinding.mockResolvedValueOnce(null)
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'local:session',
+          cardId: 'local:card',
+          model: 'local-model',
+          message: 'hello',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(mocks.ensureLocalSession).not.toHaveBeenCalled()
+    expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+    expect(mocks.openaiChat).not.toHaveBeenCalled()
+    expect(mocks.streamResponses).not.toHaveBeenCalled()
+  })
 
   it.each(['new', 'main'])(
     'emits the pre-stream %s-to-concrete handoff before ordinary stream events',

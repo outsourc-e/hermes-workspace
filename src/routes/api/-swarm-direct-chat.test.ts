@@ -343,7 +343,7 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
     expect(mocks.execFile).not.toHaveBeenCalled()
   })
 
-  it('re-resolves before terminal input and rejects Card rollover without clearing or pasting', async () => {
+  it('re-resolves before runtime buffer setup and rejects Card rollover without loading or terminal input', async () => {
     mocks.resolveCard
       .mockResolvedValueOnce(resolvedLocalCard())
       .mockResolvedValueOnce(
@@ -368,7 +368,8 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
       mocks.execFile.mock.calls.some(
         (call) =>
           Array.isArray(call[1]) &&
-          (call[1].includes('C-u') ||
+          (call[1][0] === 'load-buffer' ||
+            call[1].includes('C-u') ||
             call[1][0] === 'paste-buffer' ||
             call[1].includes('Enter')),
       ),
@@ -376,41 +377,6 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
   })
 
   it('re-resolves after clearing and rejects Card rollover before paste or Enter', async () => {
-    mocks.resolveCard
-      .mockResolvedValueOnce(resolvedLocalCard())
-      .mockResolvedValueOnce(resolvedLocalCard())
-      .mockResolvedValueOnce(
-        resolvedLocalCard({
-          cardId: 'local:rolled-over-before-enter',
-          continuationSegmentKeys: [
-            'local:rolled-over-before-enter',
-            'local:builder',
-          ],
-        }),
-      )
-
-    const response = await handler({ request: request() })
-
-    expect(response.status).toBe(409)
-    expect(mocks.resolveCard).toHaveBeenCalledTimes(3)
-    expect(
-      mocks.execFile.mock.calls.some(
-        (call) => Array.isArray(call[1]) && call[1].includes('C-u'),
-      ),
-    ).toBe(true)
-    expect(
-      mocks.execFile.mock.calls.some(
-        (call) => Array.isArray(call[1]) && call[1][0] === 'paste-buffer',
-      ),
-    ).toBe(false)
-    expect(
-      mocks.execFile.mock.calls.some(
-        (call) => Array.isArray(call[1]) && call[1].includes('Enter'),
-      ),
-    ).toBe(false)
-  })
-
-  it('re-resolves again at the final Enter edge after safe clear and paste setup', async () => {
     mocks.resolveCard
       .mockResolvedValueOnce(resolvedLocalCard())
       .mockResolvedValueOnce(resolvedLocalCard())
@@ -438,10 +404,102 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
       mocks.execFile.mock.calls.some(
         (call) => Array.isArray(call[1]) && call[1][0] === 'paste-buffer',
       ),
+    ).toBe(false)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1].includes('Enter'),
+      ),
+    ).toBe(false)
+  })
+
+  it('re-resolves again at the final Enter edge after safe clear and paste setup', async () => {
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(
+        resolvedLocalCard({
+          cardId: 'local:rolled-over-before-enter',
+          continuationSegmentKeys: [
+            'local:rolled-over-before-enter',
+            'local:builder',
+          ],
+        }),
+      )
+
+    const response = await handler({ request: request() })
+
+    expect(response.status).toBe(409)
+    expect(mocks.resolveCard).toHaveBeenCalledTimes(5)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1].includes('C-u'),
+      ),
+    ).toBe(true)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1][0] === 'paste-buffer',
+      ),
     ).toBe(true)
     expect(
       mocks.execFile.mock.calls.some(
         (call) => Array.isArray(call[1]) && call[1].includes('Enter'),
+      ),
+    ).toBe(false)
+  })
+
+  it('revalidates canonical Card ownership immediately before creating a missing worker runtime', async () => {
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(
+        resolvedLocalCard({
+          canonicalSegmentKey: 'local:builder-successor',
+          continuationSegmentKeys: [
+            'local:builder-card',
+            'local:builder',
+            'local:builder-successor',
+          ],
+        }),
+      )
+    mocks.execFile.mockImplementation(
+      (
+        _file: string,
+        args: Array<string>,
+        optionsOrCallback:
+          | Record<string, unknown>
+          | ((error: Error | null, stdout: string, stderr: string) => void),
+        maybeCallback?: (
+          error: Error | null,
+          stdout: string,
+          stderr: string,
+        ) => void,
+      ) => {
+        const callback =
+          typeof optionsOrCallback === 'function'
+            ? optionsOrCallback
+            : maybeCallback
+        callback?.(
+          args[0] === 'has-session' ? new Error('missing') : null,
+          '',
+          '',
+        )
+        return {} as never
+      },
+    )
+
+    const response = await handler({ request: request() })
+
+    expect(response.status).toBe(409)
+    expect(mocks.resolveCard).toHaveBeenCalledTimes(2)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1][0] === 'new-session',
+      ),
+    ).toBe(false)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1][0] === 'load-buffer',
       ),
     ).toBe(false)
   })

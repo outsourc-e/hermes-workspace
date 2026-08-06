@@ -56,6 +56,7 @@ import {
   createSyntheticLiveToolTracker,
 } from './-send-stream-live-tools'
 import { createSseHeartbeatLifecycle } from './-send-stream-heartbeat'
+import { isExplicitSendStreamBootstrap } from './-send-stream-authority'
 import {
   createRunTerminalTransitionCoordinator,
   finalizeRunTerminalStream,
@@ -89,51 +90,99 @@ function readNumber(value: unknown): number | undefined {
   return undefined
 }
 
-function stripDataUrlPrefix(value: string): string {
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-  const commaIndex = trimmed.indexOf(',')
-  if (trimmed.toLowerCase().startsWith('data:') && commaIndex >= 0) {
-    return trimmed.slice(commaIndex + 1).trim()
+function isValidBase64Payload(value: string): boolean {
+  if (
+    !value ||
+    value.length % 4 === 1 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/u.test(value)
+  ) {
+    return false
   }
-  return trimmed
+  const paddingIndex = value.indexOf('=')
+  return paddingIndex < 0 || value.length % 4 === 0
 }
 
-function normalizeAttachments(
-  attachments: unknown,
-): Array<Record<string, unknown>> | undefined {
-  if (!Array.isArray(attachments) || attachments.length === 0) {
-    return undefined
+function parseAttachmentDataUrl(
+  value: unknown,
+): { mimeType: string; content: string; dataUrl: string } | null {
+  if (typeof value !== 'string') return null
+  const dataUrl = value.trim()
+  const match = /^data:([^,;\s]+);base64,([^\s]+)$/iu.exec(dataUrl)
+  if (!match || !isValidBase64Payload(match[2]!)) return null
+  return { mimeType: match[1]!, content: match[2]!, dataUrl }
+}
+
+type AttachmentNormalization =
+  | { ok: true; attachments: Array<Record<string, unknown>> | undefined }
+  | { ok: false }
+
+function normalizeAttachments(attachments: unknown): AttachmentNormalization {
+  if (attachments === undefined || attachments === null) {
+    return { ok: true, attachments: undefined }
+  }
+  if (!Array.isArray(attachments)) return { ok: false }
+  if (attachments.length === 0) {
+    return { ok: true, attachments: undefined }
   }
 
   const normalized: Array<Record<string, unknown>> = []
   for (const attachment of attachments) {
-    if (!attachment || typeof attachment !== 'object') continue
+    if (!attachment || typeof attachment !== 'object') return { ok: false }
     const source = attachment as Record<string, unknown>
 
     const id = readString(source.id)
     const name = readString(source.name) || readString(source.fileName)
-    const mimeType =
+    let mimeType =
       readString(source.contentType) ||
       readString(source.mimeType) ||
       readString(source.mediaType)
     const size = readNumber(source.size)
+    const hasDataUrl = Object.prototype.hasOwnProperty.call(source, 'dataUrl')
 
-    const base64Raw =
-      readString(source.content) ||
-      readString(source.data) ||
-      readString(source.base64) ||
-      readString(source.dataUrl)
-    const content = stripDataUrlPrefix(base64Raw)
-    if (!content) continue
+    let content: string
+    let dataUrl: string
+    if (hasDataUrl) {
+      const parsed = parseAttachmentDataUrl(source.dataUrl)
+      if (
+        !parsed ||
+        (mimeType && mimeType.toLowerCase() !== parsed.mimeType.toLowerCase())
+      ) {
+        return { ok: false }
+      }
+      mimeType ||= parsed.mimeType
+      content = parsed.content
+      dataUrl = parsed.dataUrl
+    } else {
+      const rawContent =
+        readString(source.content) ||
+        readString(source.data) ||
+        readString(source.base64)
+      const embeddedDataUrl = rawContent.toLowerCase().startsWith('data:')
+        ? parseAttachmentDataUrl(rawContent)
+        : null
+      if (rawContent.toLowerCase().startsWith('data:') && !embeddedDataUrl) {
+        return { ok: false }
+      }
+      if (embeddedDataUrl) {
+        if (
+          mimeType &&
+          mimeType.toLowerCase() !== embeddedDataUrl.mimeType.toLowerCase()
+        ) {
+          return { ok: false }
+        }
+        mimeType ||= embeddedDataUrl.mimeType
+        content = embeddedDataUrl.content
+        dataUrl = embeddedDataUrl.dataUrl
+      } else {
+        content = rawContent
+        if (!isValidBase64Payload(content)) return { ok: false }
+        dataUrl = mimeType ? `data:${mimeType};base64,${content}` : ''
+      }
+    }
 
     const type =
       readString(source.type) ||
       (mimeType.toLowerCase().startsWith('image/') ? 'image' : 'file')
-
-    const dataUrl =
-      readString(source.dataUrl) ||
-      (mimeType ? `data:${mimeType};base64,${content}` : '')
 
     normalized.push({
       id: id || undefined,
@@ -151,7 +200,7 @@ function normalizeAttachments(
     })
   }
 
-  return normalized.length > 0 ? normalized : undefined
+  return { ok: true, attachments: normalized }
 }
 
 function getChatMessage(
@@ -463,7 +512,16 @@ export const Route = createFileRoute('/api/send-stream')({
         const message = String(body.message ?? '')
         const thinking =
           typeof body.thinking === 'string' ? body.thinking : undefined
-        const attachments = normalizeAttachments(body.attachments)
+        const normalizedAttachments = normalizeAttachments(body.attachments)
+        if (!normalizedAttachments.ok) {
+          return finishPreStreamResponse(
+            new Response(JSON.stringify({ error: 'invalid attachment data' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        }
+        const attachments = normalizedAttachments.attachments
         const history = normalizePortableHistory(body.history)
         if (
           hasRequestedCardId &&
@@ -474,6 +532,22 @@ export const Route = createFileRoute('/api/send-stream')({
           return finishPreStreamResponse(
             new Response(
               JSON.stringify({ ok: false, error: 'invalid card id' }),
+              {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+        }
+        const isExplicitBootstrapSend =
+          !hasRequestedCardId &&
+          isExplicitSendStreamBootstrap(rawSessionKey, body.sessionKey)
+        if (!requestedCardId && !isExplicitBootstrapSend) {
+          return finishPreStreamResponse(
+            new Response(
+              JSON.stringify({
+                error: 'Session Card authority required for existing session',
+              }),
               {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' },
@@ -542,7 +616,7 @@ export const Route = createFileRoute('/api/send-stream')({
             activeCardCanonicalSource = canonicalSource
             const canonicalOperationSource =
               canonicalSource === 'local' ? 'local' : 'remote'
-            requestedCardMutationBinding = {
+            const mutationBinding: SessionCardOperationBinding = {
               kind: 'session-card-owner',
               cardId: requestedCardId,
               parentCardId: null,
@@ -551,6 +625,18 @@ export const Route = createFileRoute('/api/send-stream')({
               canonicalTransport:
                 canonicalOperationSource === 'local' ? 'tmux' : 'gateway',
             }
+            const preflightOwner = await waitWithinStreamLifetime(
+              resolveExactSessionCardOperationBinding(mutationBinding),
+            )
+            ensureStreamTransportAvailable()
+            if (
+              !preflightOwner ||
+              preflightOwner.cardId !== requestedCardId ||
+              preflightOwner.parentCardId !== null
+            ) {
+              throw new Error('Session Card ownership changed before send')
+            }
+            requestedCardMutationBinding = mutationBinding
             sessionKey = upstreamKey
             resolvedFriendlyId = requestedCardId
           } else {
@@ -573,6 +659,14 @@ export const Route = createFileRoute('/api/send-stream')({
             return finishPreStreamResponse(abortedResponse())
           }
           const errorMsg = normalizeClaudeErrorMessage(err)
+          if (errorMsg === 'Session Card ownership changed before send') {
+            return finishPreStreamResponse(
+              new Response(JSON.stringify({ error: errorMsg }), {
+                status: 409,
+                headers: { 'Content-Type': 'application/json' },
+              }),
+            )
+          }
           if (errorMsg === 'session not found') {
             return finishPreStreamResponse(
               new Response(
