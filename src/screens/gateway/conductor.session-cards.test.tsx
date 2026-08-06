@@ -520,12 +520,22 @@ describe('mounted /conductor Session Card inventory', () => {
       'conductor:active-mission',
       JSON.stringify(persistedMissionV3()),
     )
-    let stopBody: { sessionKeys?: Array<string> } = {}
+    let stopBody: {
+      cardBindings?: Array<{
+        cardId?: string
+        parentCardId?: string | null
+        canonicalSegmentKey?: string
+      }>
+    } = {}
     const fetchMock = vi.fn<typeof fetch>((input, init) => {
       const url = String(input)
       if (url === '/api/conductor-stop') {
         stopBody = JSON.parse(String(init?.body)) as {
-          sessionKeys?: Array<string>
+          cardBindings?: Array<{
+            cardId?: string
+            parentCardId?: string | null
+            canonicalSegmentKey?: string
+          }>
         }
         return Promise.resolve(
           Response.json(
@@ -535,7 +545,7 @@ describe('mounted /conductor Session Card inventory', () => {
               failures: [
                 {
                   operation: 'delete-session',
-                  id: 'delegated-worker-tip',
+                  id: 'remote:delegated-worker',
                   error: 'gateway delete failed',
                 },
               ],
@@ -566,10 +576,15 @@ describe('mounted /conductor Session Card inventory', () => {
       await Promise.resolve()
     })
 
-    expect(stopBody.sessionKeys).toEqual(
-      expect.arrayContaining(['shared-runtime-key', 'delegated-worker-tip']),
+    expect(stopBody.cardBindings?.map((binding) => binding.cardId)).toEqual(
+      expect.arrayContaining([
+        'remote:shared-worker',
+        'remote:delegated-worker',
+      ]),
     )
-    expect(stopBody.sessionKeys).not.toContain('raw-incomplete-session')
+    expect(
+      stopBody.cardBindings?.map((binding) => binding.canonicalSegmentKey),
+    ).not.toContain('raw-incomplete-session')
     expect(
       screen.getByText(/Mission stop incomplete; retry Stop/),
     ).not.toBeNull()
