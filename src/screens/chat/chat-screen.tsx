@@ -141,11 +141,6 @@ import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 
-export let _localModelOverride = ''
-export function setLocalModelOverride(model: string) {
-  _localModelOverride = model
-}
-
 type ChatScreenProps = {
   activeFriendlyId: string
   activeCard?: SessionCard
@@ -656,41 +651,53 @@ export function ChatScreen({
   const [isCompacting, setIsCompacting] = useState(false)
   const [researchResetKey, setResearchResetKey] = useState(0)
   // Per-Card thinking level. Backend continuation segments never own UI state.
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
-    if (typeof window === 'undefined') return 'low'
-    const key = cardThinkingStorageKey(activeCard?.cardId)
+  // Derive the incoming Card's value during render, then commit it in a layout
+  // effect so the prior Card's level cannot be painted during a route update.
+  const thinkingOwner = activeCard?.cardId
+  const persistedThinkingLevel = useMemo(() => {
+    if (typeof window === 'undefined' || !thinkingOwner) return null
+    const key = cardThinkingStorageKey(thinkingOwner)
+    if (!key) return null
     const stored = window.sessionStorage.getItem(key)
-    if (
-      stored === 'off' ||
+    return stored === 'off' ||
       stored === 'low' ||
       stored === 'medium' ||
       stored === 'high' ||
       stored === 'adaptive'
+      ? stored
+      : null
+  }, [thinkingOwner])
+  const [thinkingState, setThinkingState] = useState<{
+    owner?: string
+    level: ThinkingLevel
+  }>(() => ({
+    owner: thinkingOwner,
+    level: persistedThinkingLevel ?? 'low',
+  }))
+  const thinkingLevel =
+    thinkingState.owner === thinkingOwner
+      ? thinkingState.level
+      : (persistedThinkingLevel ?? 'low')
+  const setThinkingLevel = useCallback(
+    (level: ThinkingLevel) => setThinkingState({ owner: thinkingOwner, level }),
+    [thinkingOwner],
+  )
+  const thinkingInitializedOwnerRef = useRef(thinkingOwner)
+  const thinkingInitializedByUserRef = useRef(persistedThinkingLevel !== null)
+  if (thinkingInitializedOwnerRef.current !== thinkingOwner) {
+    thinkingInitializedOwnerRef.current = thinkingOwner
+    thinkingInitializedByUserRef.current = persistedThinkingLevel !== null
+  }
+  useLayoutEffect(() => {
+    setThinkingState((current) =>
+      current.owner === thinkingOwner
+        ? current
+        : { owner: thinkingOwner, level: persistedThinkingLevel ?? 'low' },
     )
-      return stored
-    return 'low'
-  })
-  // Tracks whether the user has explicitly picked a thinking level for this Card.
-  // A missing/absent sessionStorage key means we should fall back to the Hermes config default.
-  const thinkingInitializedByUserRef = useRef(false)
+  }, [persistedThinkingLevel, thinkingOwner])
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const key = cardThinkingStorageKey(activeCard?.cardId)
-    const stored = window.sessionStorage.getItem(key)
-    thinkingInitializedByUserRef.current = stored !== null
-    if (
-      stored === 'off' ||
-      stored === 'low' ||
-      stored === 'medium' ||
-      stored === 'high' ||
-      stored === 'adaptive'
-    ) {
-      setThinkingLevel(stored)
-    } else {
-      setThinkingLevel('low')
-    }
     removeLegacySegmentUiStorage(activeCard?.continuationSegmentKeys ?? [])
-  }, [activeCard?.cardId, activeCard?.continuationSegmentKeys])
+  }, [activeCard?.continuationSegmentKeys])
   const { alertOpen, alertThreshold, alertPercent, dismissAlert } =
     useContextAlert()
 
@@ -1453,15 +1460,14 @@ export function ChatScreen({
   }, [modelsQuery.data])
 
   const gatewayModel = currentModelQuery.data || ''
-  // The Card model is persisted only as Card-owned browser state. Read the
-  // current snapshot here rather than subscribing to Zustand: this screen is
-  // also rendered by isolated route/handoff harnesses that intentionally
-  // replace React's dispatcher. A model selection still causes a local render
-  // through the composer/suggestion interaction that performed the change.
+  // Isolated route/handoff mounts replace React's dispatcher, so this parent
+  // intentionally reads the Card store snapshot instead of subscribing. The
+  // Composer owns its reactive label; sendMessage performs a fresh store read
+  // below so the first send after a selection cannot observe this snapshot.
   const persistedCardModel = useSessionModelStore
     .getState()
     .getModel(activeCard?.cardId)
-  const currentModel = persistedCardModel || _localModelOverride || gatewayModel
+  const currentModel = persistedCardModel || gatewayModel
 
   // Ref so sendMessage can always read latest thinkingLevel without being in deps
   const thinkingLevelRef = useRef<ThinkingLevel>(thinkingLevel)
@@ -1469,43 +1475,31 @@ export function ChatScreen({
     thinkingLevelRef.current = thinkingLevel
   }, [thinkingLevel])
 
-  // Auto-upgrade thinking to adaptive for Claude 4.6 when session first loads
-  const thinkingInitializedRef = useRef(false)
-  useEffect(() => {
-    if (!currentModel) return
-    if (thinkingInitializedRef.current) return
-    thinkingInitializedRef.current = true
-    const is46 =
-      currentModel.toLowerCase().includes('4-6') ||
-      currentModel.toLowerCase().includes('claude-4.6')
-    if (is46) {
-      const key = cardThinkingStorageKey(activeCard?.cardId)
-      const stored =
-        typeof window !== 'undefined'
-          ? window.sessionStorage.getItem(key)
-          : null
-      // Only auto-set if not explicitly configured
-      if (!stored) {
-        setThinkingLevel('adaptive')
-      }
-    }
-  }, [currentModel, activeCard?.cardId])
-
-  // If no per-Card thinking level override exists, inherit from Hermes config.
+  // A Card without an explicit override derives its initial level from the
+  // selected model first, then the Hermes config. This effect runs only for
+  // the currently mounted Card owner.
   useEffect(() => {
     if (thinkingInitializedByUserRef.current) return
+    const normalizedModel = currentModel.toLowerCase()
+    const adaptiveModel =
+      normalizedModel.includes('4-6') || normalizedModel.includes('claude-4.6')
+    if (adaptiveModel) {
+      setThinkingLevel('adaptive')
+      return
+    }
     const configEffort = reasoningEffortQuery.data
-    if (!configEffort) return
-    setThinkingLevel(configEffort)
-  }, [reasoningEffortQuery.data])
+    if (configEffort) setThinkingLevel(configEffort)
+  }, [currentModel, reasoningEffortQuery.data])
 
-  // Persist thinking level changes to Card-keyed sessionStorage.
+  // Persist only explicit Card-owned choices. Bootstrap chats keep their
+  // temporary thinking state in memory until an authoritative Card exists.
   const handleThinkingLevelChange = useCallback(
     (level: ThinkingLevel) => {
       setThinkingLevel(level)
+      thinkingInitializedByUserRef.current = true
       if (typeof window !== 'undefined') {
         const key = cardThinkingStorageKey(activeCard?.cardId)
-        window.sessionStorage.setItem(key, level)
+        if (key) window.sessionStorage.setItem(key, level)
       }
     },
     [activeCard?.cardId],
@@ -2637,6 +2631,10 @@ export function ChatScreen({
         }
       }
 
+      const requestModel = activeCard?.cardId
+        ? useSessionModelStore.getState().getModel(activeCard.cardId) ||
+          gatewayModel
+        : currentModel
       void startStreaming({
         sessionKey,
         friendlyId,
@@ -2648,7 +2646,7 @@ export function ChatScreen({
         thinking:
           currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
         fastMode,
-        model: currentModel || undefined,
+        model: requestModel || undefined,
         idempotencyKey: optimisticClientId || crypto.randomUUID(),
       }).catch((err: unknown) => {
         const messageText = err instanceof Error ? err.message : String(err)
@@ -2668,6 +2666,7 @@ export function ChatScreen({
       streamFinish,
       streamStart,
       currentModel,
+      gatewayModel,
     ],
   )
 

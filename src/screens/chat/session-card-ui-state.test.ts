@@ -23,14 +23,15 @@ describe('Session Card-owned UI state', () => {
     expect(cardThinkingStorageKey('remote:parent-card')).toBe(
       'workspace.card-thinking.v1:remote%3Aparent-card',
     )
-    expect(cardDraftStorageKey()).toBe('workspace.card-draft.v1:new')
+    expect(cardDraftStorageKey()).toBeNull()
+    expect(cardThinkingStorageKey()).toBeNull()
   })
 
   it('removes legacy state for every known continuation segment', () => {
     const fake = storage()
     fake.records.set('claude-draft-remote:root', 'old root draft')
     fake.records.set('claude-thinking-remote:tip', 'high')
-    fake.records.set(cardDraftStorageKey('remote:root'), 'Card draft')
+    fake.records.set(cardDraftStorageKey('remote:root')!, 'Card draft')
 
     removeLegacySegmentUiStorage(['remote:root', 'remote:tip'], fake.storage)
 

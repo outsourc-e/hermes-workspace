@@ -741,6 +741,7 @@ function shortPathLabel(pathValue: string): string {
 }
 
 function thinkingLabel(level: ThinkingLevel): string {
+  if (level === 'adaptive') return 'Adaptive'
   if (level === 'off') return 'None'
   if (level === 'low') return 'Low'
   if (level === 'medium') return 'Medium'
@@ -1111,7 +1112,8 @@ function ChatComposerComponent({
     }
   }, [currentModel, thinkingLevel, onThinkingLevelChange])
 
-  const isModelSwitcherDisabled = disabled
+  const hasCardOwner = typeof cardId === 'string' && cardId.trim().length > 0
+  const isModelSwitcherDisabled = disabled || !hasCardOwner
   const draftStorageKey = useMemo(() => cardDraftStorageKey(cardId), [cardId])
   // On new chat, currentModel is empty until a session is created.
   // Read the runtime model from the models query (first item is from the current provider).
@@ -1229,8 +1231,12 @@ function ChatComposerComponent({
     return () => media.removeEventListener('change', updateIsMobile)
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === 'undefined') return
+    if (!draftStorageKey) {
+      setValue('')
+      return
+    }
     const savedDraft = window.sessionStorage.getItem(draftStorageKey)
     setValue(savedDraft ?? '')
   }, [draftStorageKey])
@@ -1269,7 +1275,7 @@ function ChatComposerComponent({
 
   const persistDraft = useCallback(
     function persistDraft(nextValue: string) {
-      if (typeof window === 'undefined') return
+      if (typeof window === 'undefined' || !draftStorageKey) return
       if (nextValue.length === 0) {
         window.sessionStorage.removeItem(draftStorageKey)
         return
@@ -1281,7 +1287,7 @@ function ChatComposerComponent({
 
   const clearDraft = useCallback(
     function clearDraft() {
-      if (typeof window === 'undefined') return
+      if (typeof window === 'undefined' || !draftStorageKey) return
       window.sessionStorage.removeItem(draftStorageKey)
     },
     [draftStorageKey],
@@ -1580,7 +1586,9 @@ function ChatComposerComponent({
     handleSubmit()
   }, [attachmentProcessingCount, handleSubmit])
 
-  // ⌘+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector
+  // ⌘+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector.
+  // Bootstrap chats have no Card owner yet, so the shortcut stays inert rather
+  // than opening a picker whose selection cannot be persisted or requested.
   useEffect(() => {
     const handleModelShortcut = (event: KeyboardEvent) => {
       if (
@@ -1588,6 +1596,7 @@ function ChatComposerComponent({
         event.shiftKey &&
         event.key.toLowerCase() === 'm'
       ) {
+        if (isModelSwitcherDisabled) return
         event.preventDefault()
         event.stopPropagation()
         setIsModelMenuOpen((prev) => !prev)
@@ -1596,7 +1605,7 @@ function ChatComposerComponent({
     window.addEventListener('keydown', handleModelShortcut, true)
     return () =>
       window.removeEventListener('keydown', handleModelShortcut, true)
-  }, [])
+  }, [isModelSwitcherDisabled])
 
   const submitDisabled =
     disabled ||
@@ -2322,6 +2331,16 @@ function ChatComposerComponent({
                         <button
                           type="button"
                           disabled={isModelSwitcherDisabled}
+                          aria-label={
+                            hasCardOwner
+                              ? `Select model, current model: ${modelButtonLabel}`
+                              : 'Model selection is available after this chat becomes a Session Card'
+                          }
+                          title={
+                            hasCardOwner
+                              ? modelButtonLabel
+                              : 'Send the first message to create a Session Card before selecting a model.'
+                          }
                           onClick={(event) => {
                             event.stopPropagation()
                             if (!isModelSwitcherDisabled) {
@@ -2990,8 +3009,17 @@ function ChatComposerComponent({
                                 setIsThinkingMenuOpen(false)
                               }}
                               disabled={isModelSwitcherDisabled}
+                              aria-label={
+                                hasCardOwner
+                                  ? `Select model, current model: ${modelButtonLabel}`
+                                  : 'Model selection is available after this chat becomes a Session Card'
+                              }
                               className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-primary-100/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-primary-600 hover:bg-primary-200/80 dark:hover:bg-primary-800/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                              title={modelButtonLabel}
+                              title={
+                                hasCardOwner
+                                  ? modelButtonLabel
+                                  : 'Send the first message to create a Session Card before selecting a model.'
+                              }
                             >
                               <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
                                 {modelButtonLabel}
