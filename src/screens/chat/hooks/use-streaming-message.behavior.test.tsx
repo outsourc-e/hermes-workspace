@@ -472,10 +472,10 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
           value: encoder.encode(
             [
               'event: session_handoff',
-              `data: ${JSON.stringify({ fromSessionKey: 'new', sessionKey: 'remote:created-segment', friendlyId: 'remote:created-card', runId: 'run-bootstrap' })}`,
+              `data: ${JSON.stringify({ fromSessionKey: 'new', sessionKey: 'remote:created-segment', friendlyId: 'remote:created-card', runId: 'run-bootstrap', verifiedCardAuthority: { cardId: 'remote:created-card', canonicalSource: 'remote', canonicalSegmentKey: 'remote:created-segment', continuationSegmentKeys: ['remote:created-segment'], relationshipKind: 'root' } })}`,
               '',
               'event: card_handoff',
-              `data: ${JSON.stringify({ cardId: 'remote:created-card', fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-bootstrap' })}`,
+              `data: ${JSON.stringify({ cardId: 'remote:created-card', fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-bootstrap', verifiedContinuationSegmentKeys: ['remote:created-segment', 'remote:continuation-segment'] })}`,
               '',
               'event: chunk',
               'data: {"delta":"content after the chained handoff"}',
@@ -533,12 +533,19 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       friendlyId: 'remote:created-card',
       reason: 'bootstrap',
     })
-    expect(onCardHandoff).toHaveBeenCalledWith({
-      cardId: 'remote:created-card',
-      fromSegmentKey: 'remote:created-segment',
-      canonicalSegmentKey: 'remote:continuation-segment',
-      runId: 'run-bootstrap',
-    })
+    expect(onCardHandoff).toHaveBeenCalledWith(
+      {
+        cardId: 'remote:created-card',
+        fromSegmentKey: 'remote:created-segment',
+        canonicalSegmentKey: 'remote:continuation-segment',
+        runId: 'run-bootstrap',
+        verifiedContinuationSegmentKeys: [
+          'remote:created-segment',
+          'remote:continuation-segment',
+        ],
+      },
+      expect.anything(),
+    )
     expect(
       useChatStore
         .getState()
@@ -590,7 +597,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
             value: encoder.encode(
               [
                 'event: session_handoff',
-                `data: ${JSON.stringify({ fromSessionKey: 'new', sessionKey: 'remote:created-segment', friendlyId: 'remote:created-card', runId: 'run-bootstrap' })}`,
+                `data: ${JSON.stringify({ fromSessionKey: 'new', sessionKey: 'remote:created-segment', friendlyId: 'remote:created-card', runId: 'run-bootstrap', verifiedCardAuthority: { cardId: 'remote:created-card', canonicalSource: 'remote', canonicalSegmentKey: 'remote:created-segment', continuationSegmentKeys: ['remote:created-segment'], relationshipKind: 'root' } })}`,
                 '',
                 '',
               ].join('\n'),
@@ -663,7 +670,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
           value: encoder.encode(
             [
               'event: card_handoff',
-              `data: ${JSON.stringify({ cardId: handoffCardId, fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-bootstrap' })}`,
+              `data: ${JSON.stringify({ cardId: handoffCardId, fromSegmentKey: 'remote:created-segment', canonicalSegmentKey: 'remote:continuation-segment', runId: 'run-bootstrap', verifiedContinuationSegmentKeys: ['remote:created-segment', 'remote:continuation-segment'] })}`,
               '',
               '',
             ].join('\n'),
@@ -674,12 +681,19 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
 
       expect(onCardHandoff).toHaveBeenCalledTimes(expectedHandoffs)
       if (expectedHandoffs === 1) {
-        expect(onCardHandoff).toHaveBeenCalledWith({
-          cardId: 'remote:created-card',
-          fromSegmentKey: 'remote:created-segment',
-          canonicalSegmentKey: 'remote:continuation-segment',
-          runId: 'run-bootstrap',
-        })
+        expect(onCardHandoff).toHaveBeenCalledWith(
+          {
+            cardId: 'remote:created-card',
+            fromSegmentKey: 'remote:created-segment',
+            canonicalSegmentKey: 'remote:continuation-segment',
+            runId: 'run-bootstrap',
+            verifiedContinuationSegmentKeys: [
+              'remote:created-segment',
+              'remote:continuation-segment',
+            ],
+          },
+          expect.anything(),
+        )
       }
       expect(reader.cancel).not.toHaveBeenCalled()
       expect(onAbort).not.toHaveBeenCalled()

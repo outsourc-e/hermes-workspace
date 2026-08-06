@@ -576,6 +576,7 @@ describe('resolveAuthoritativeCardStreamHandoff', () => {
       cardId: 'remote:parent-card',
       fromSegmentKey: 'remote:parent',
       canonicalSegmentKey: 'remote:continuation',
+      verifiedContinuationSegmentKeys: ['remote:parent', 'remote:continuation'],
     })
   })
 
