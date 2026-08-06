@@ -18,9 +18,68 @@ import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { runCronJob, toggleCronJob } from '@/lib/cron-api'
-import { sendToSession } from '@/lib/gateway-api'
 import { sessionCardQueryKeys } from '@/screens/chat/chat-queries'
 import { cn } from '@/lib/utils'
+
+type OperationsRunCardOwner = {
+  kind: 'session-card-owner'
+  cardId: string
+  parentCardId: null
+}
+
+async function runOperationsCardNow(
+  target: OperationsAgent['chat'],
+): Promise<OperationsRunCardOwner> {
+  if (
+    target.status !== 'ready' ||
+    target.inspectedChildCardId ||
+    target.card.parentCardId !== undefined ||
+    (target.card.relationshipKind !== 'root' &&
+      target.card.relationshipKind !== 'orphan') ||
+    target.card.canonicalSource !== 'remote' ||
+    target.card.canonicalTransport !== 'gateway'
+  ) {
+    throw new Error('Run now requires a complete gateway Session Card')
+  }
+
+  const expectedOwner: OperationsRunCardOwner = {
+    kind: 'session-card-owner',
+    cardId: target.card.cardId,
+    parentCardId: null,
+  }
+  const response = await fetch('/api/session-send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      message: 'Run your primary task now',
+      cardBinding: {
+        ...expectedOwner,
+        canonicalSource: target.card.canonicalSource,
+        canonicalSegmentKey: target.card.canonicalSegmentKey,
+        canonicalTransport: target.card.canonicalTransport,
+      },
+    }),
+  })
+  const payload = (await response.json().catch(() => ({}))) as {
+    ok?: unknown
+    error?: unknown
+    cardOwner?: Partial<OperationsRunCardOwner>
+  }
+  if (
+    !response.ok ||
+    payload.ok !== true ||
+    payload.cardOwner?.kind !== expectedOwner.kind ||
+    payload.cardOwner.cardId !== expectedOwner.cardId ||
+    payload.cardOwner.parentCardId !== null
+  ) {
+    throw new Error(
+      typeof payload.error === 'string' && payload.error.trim()
+        ? payload.error
+        : 'Failed to run agent',
+    )
+  }
+  return expectedOwner
+}
 
 function getStatusStyles(status: OperationsAgent['status']) {
   if (status === 'error') {
@@ -233,14 +292,27 @@ export function OperationsAgentCard({
   } = useAgentChat(chatTarget)
   const cronJobCount = agent.jobs.length
   const isActive = agent.status === 'active' && !isPaused
+  const canRunNow = Boolean(
+    chatTarget &&
+    !chatTarget.inspectedChildCardId &&
+    chatTarget.card.parentCardId === undefined &&
+    (chatTarget.card.relationshipKind === 'root' ||
+      chatTarget.card.relationshipKind === 'orphan') &&
+    chatTarget.card.canonicalSource === 'remote' &&
+    chatTarget.card.canonicalTransport === 'gateway',
+  )
 
   const controlMutation = useMutation({
-    mutationFn: async () =>
-      sendToSession(agent.sessionKey, 'Run your primary task now'),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: sessionCardQueryKeys.list(false),
-      })
+    mutationFn: async () => runOperationsCardNow(agent.chat),
+    onSuccess: async (owner) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.history(owner.cardId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.list(false),
+        }),
+      ])
     },
     onError: (mutationError) => {
       toast(
@@ -354,7 +426,10 @@ export function OperationsAgentCard({
               }
               void handlePlayPause()
             }}
-            disabled={controlMutation.isPending && !isActive}
+            disabled={
+              (controlMutation.isPending && !isActive) ||
+              (!isActive && !agent.needsSetup && !canRunNow)
+            }
             title={
               agent.needsSetup
                 ? 'No model configured — open settings to set one up'

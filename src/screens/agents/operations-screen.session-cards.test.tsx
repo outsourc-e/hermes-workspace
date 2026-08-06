@@ -17,7 +17,7 @@ type QueryOptions = {
 
 type MutationOptions = {
   mutationFn: (input: any) => Promise<unknown>
-  onSuccess?: () => Promise<unknown> | unknown
+  onSuccess?: (result: unknown) => Promise<unknown> | unknown
 }
 
 type QueryResult = {
@@ -107,7 +107,7 @@ vi.mock('@tanstack/react-query', () => ({
       mutate: vi.fn((input) => void options.mutationFn(input)),
       mutateAsync: vi.fn(async (input) => {
         const result = await options.mutationFn(input)
-        await options.onSuccess?.()
+        await options.onSuccess?.(result)
         return result
       }),
     }
@@ -450,6 +450,61 @@ describe('mounted Operations Session Card activity', () => {
     ])
   })
 
+  it('sends Run now with the exact Card binding and no raw agent session alias', async () => {
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      const url = String(input)
+      if (url === '/api/session-send' && init?.method === 'POST') {
+        return Promise.resolve(
+          Response.json({
+            ok: true,
+            cardOwner: {
+              kind: 'session-card-owner',
+              cardId: 'remote:worker-card',
+              parentCardId: null,
+            },
+            queued: true,
+          }),
+        )
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await renderOperations()
+    await React.act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Run Worker now' }))
+      await Promise.resolve()
+    })
+
+    const sendCall = fetchMock.mock.calls.find(
+      ([input]) => String(input) === '/api/session-send',
+    )
+    expect(sendCall).toBeTruthy()
+    expect(JSON.parse(String(sendCall?.[1]?.body))).toEqual({
+      message: 'Run your primary task now',
+      cardBinding: {
+        kind: 'session-card-owner',
+        cardId: 'remote:worker-card',
+        parentCardId: null,
+        canonicalSource: 'remote',
+        canonicalSegmentKey: 'remote:agent%3Amain%3Aops-worker',
+        canonicalTransport: 'gateway',
+      },
+    })
+    expect(String(sendCall?.[1]?.body)).not.toContain('agent:main:ops-worker')
+    expect(mocks.invalidateQueries.mock.calls).toContainEqual([
+      {
+        queryKey: [
+          'chat',
+          'session-cards',
+          'history',
+          'remote:worker-card',
+          '',
+        ],
+      },
+    ])
+  })
+
   it('keeps the optimistic user and returned assistant rows Card-owned across stale history and remount', async () => {
     const assistantText = 'durable Operations assistant reply'
     const userText = 'durable Operations user turn'
@@ -545,6 +600,136 @@ describe('mounted Operations Session Card activity', () => {
         'workspace.operations-card-chat.v1:remote%3Aworker-card',
       ),
     ).toBeNull()
+  })
+
+  it('retains the last complete acknowledged transcript through partial refetch and remount', async () => {
+    const userText = 'acknowledged Operations user turn'
+    const assistantText = 'acknowledged Operations assistant reply'
+    const overlayKey = 'workspace.operations-card-chat.v1:remote%3Aworker-card'
+    window.localStorage.setItem(
+      overlayKey,
+      JSON.stringify({
+        version: 1,
+        owner: { cardId: 'remote:worker-card' },
+        messages: [
+          {
+            id: 'optimistic-user',
+            role: 'user',
+            content: userText,
+            acknowledgementOrdinal: 1,
+          },
+          {
+            id: 'optimistic-assistant',
+            role: 'assistant',
+            content: assistantText,
+            acknowledgementOrdinal: 1,
+          },
+        ],
+      }),
+    )
+    mocks.historyResponse = {
+      messages: [
+        {
+          id: 'server-user',
+          role: 'user',
+          content: [{ type: 'text', text: userText }],
+        },
+        {
+          id: 'server-assistant',
+          role: 'assistant',
+          content: [{ type: 'text', text: assistantText }],
+        },
+      ],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+
+    const mounted = await renderOperations()
+    const rootCard = screen
+      .getByPlaceholderText('Message Worker...')
+      .closest('article')!
+    expect(within(rootCard).getAllByText(userText)).toHaveLength(1)
+    expect(within(rootCard).getAllByText(assistantText)).toHaveLength(1)
+    expect(window.localStorage.getItem(overlayKey)).toBeNull()
+
+    mocks.historyResponse = {
+      messages: [],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: 'remote:unavailable-segment',
+          retryable: true,
+          error: 'temporary upstream failure',
+        },
+      ],
+    }
+    await mounted.rerender()
+
+    expect(within(rootCard).getAllByText(userText)).toHaveLength(1)
+    expect(within(rootCard).getAllByText(assistantText)).toHaveLength(1)
+    expect(
+      within(rootCard).getByText(
+        'Chat history unavailable until a complete transcript is available.',
+      ),
+    ).toBeTruthy()
+
+    mounted.unmount()
+    await renderOperations()
+    const remountedRootCard = screen
+      .getByPlaceholderText('Message Worker...')
+      .closest('article')!
+    expect(within(remountedRootCard).getAllByText(userText)).toHaveLength(1)
+    expect(within(remountedRootCard).getAllByText(assistantText)).toHaveLength(
+      1,
+    )
+  })
+
+  it('does not remove a matching Card overlay from a partial response', async () => {
+    const overlayKey = 'workspace.operations-card-chat.v1:remote%3Aworker-card'
+    const overlayText = 'still pending authoritative acknowledgement'
+    window.localStorage.setItem(
+      overlayKey,
+      JSON.stringify({
+        version: 1,
+        owner: { cardId: 'remote:worker-card' },
+        messages: [
+          {
+            id: 'optimistic-user',
+            role: 'user',
+            content: overlayText,
+            acknowledgementOrdinal: 1,
+          },
+        ],
+      }),
+    )
+    mocks.historyResponse = {
+      messages: [
+        {
+          id: 'partial-server-user',
+          role: 'user',
+          content: [{ type: 'text', text: overlayText }],
+        },
+      ],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: 'remote:unavailable-segment',
+          retryable: true,
+          error: 'temporary upstream failure',
+        },
+      ],
+    }
+
+    await renderOperations()
+
+    const rootCard = screen
+      .getByPlaceholderText('Message Worker...')
+      .closest('article')!
+    expect(within(rootCard).getAllByText(overlayText)).toHaveLength(1)
+    expect(window.localStorage.getItem(overlayKey)).not.toBeNull()
   })
 
   it('fails closed before send when the current Card projection no longer matches the mounted binding', async () => {

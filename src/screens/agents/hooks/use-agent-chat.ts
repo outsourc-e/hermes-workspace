@@ -29,8 +29,17 @@ type OperationsChatOverlayEnvelope = {
   messages: Array<OperationsChatOverlayMessage>
 }
 
+type OperationsChatCompleteSnapshot = {
+  version: 1
+  owner: { cardId: string }
+  messages: Array<OperationsChatMessage>
+}
+
 const OPERATIONS_CHAT_OVERLAY_PREFIX = 'workspace.operations-card-chat.v1:'
+const OPERATIONS_CHAT_COMPLETE_PREFIX =
+  'workspace.operations-card-complete-history.v1:'
 const MAX_OVERLAY_MESSAGES = 100
+const MAX_COMPLETE_MESSAGES = 250
 
 function normalizeMessage(
   message: ChatMessage,
@@ -65,6 +74,94 @@ function childForTarget(target: OperationsChatTarget) {
 
 function overlayStorageKey(cardId: string) {
   return `${OPERATIONS_CHAT_OVERLAY_PREFIX}${encodeURIComponent(cardId)}`
+}
+
+function completeSnapshotStorageKey(cardId: string) {
+  return `${OPERATIONS_CHAT_COMPLETE_PREFIX}${encodeURIComponent(cardId)}`
+}
+
+function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
+  if (typeof window === 'undefined' || !cardId) return []
+  const key = completeSnapshotStorageKey(cardId)
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return []
+    const parsedValue = JSON.parse(raw) as unknown
+    if (!parsedValue || typeof parsedValue !== 'object') {
+      window.localStorage.removeItem(key)
+      return []
+    }
+    const parsed = parsedValue as Record<string, unknown>
+    const owner =
+      parsed.owner && typeof parsed.owner === 'object'
+        ? (parsed.owner as Record<string, unknown>)
+        : undefined
+    if (
+      parsed.version !== 1 ||
+      owner?.cardId !== cardId ||
+      !Array.isArray(parsed.messages) ||
+      parsed.messages.length > MAX_COMPLETE_MESSAGES
+    ) {
+      window.localStorage.removeItem(key)
+      return []
+    }
+
+    const messages: Array<OperationsChatMessage> = []
+    for (const candidateValue of parsed.messages) {
+      if (
+        !candidateValue ||
+        typeof candidateValue !== 'object' ||
+        Array.isArray(candidateValue)
+      ) {
+        window.localStorage.removeItem(key)
+        return []
+      }
+      const candidate = candidateValue as Record<string, unknown>
+      if (
+        (candidate.role !== 'user' &&
+          candidate.role !== 'assistant' &&
+          candidate.role !== 'system') ||
+        typeof candidate.id !== 'string' ||
+        !candidate.id ||
+        typeof candidate.content !== 'string' ||
+        !candidate.content.trim()
+      ) {
+        window.localStorage.removeItem(key)
+        return []
+      }
+      messages.push({
+        id: candidate.id,
+        role: candidate.role,
+        content: candidate.content,
+        ...(typeof candidate.timestamp === 'number' &&
+        Number.isFinite(candidate.timestamp)
+          ? { timestamp: candidate.timestamp }
+          : {}),
+      })
+    }
+    return messages
+  } catch {
+    window.localStorage.removeItem(key)
+    return []
+  }
+}
+
+function writeCompleteSnapshot(
+  cardId: string,
+  messages: Array<OperationsChatMessage>,
+) {
+  if (typeof window === 'undefined' || !cardId) return
+  const key = completeSnapshotStorageKey(cardId)
+  if (messages.length === 0) {
+    window.localStorage.removeItem(key)
+    return
+  }
+  const envelope: OperationsChatCompleteSnapshot = {
+    version: 1,
+    owner: { cardId },
+    messages: messages.slice(-MAX_COMPLETE_MESSAGES),
+  }
+  window.localStorage.setItem(key, JSON.stringify(envelope))
 }
 
 function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
@@ -364,7 +461,7 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
   )
     ? historyQuery.data
     : undefined
-  const authoritativeMessages = useMemo(
+  const currentAuthoritativeMessages = useMemo(
     () =>
       (completeHistory?.messages ?? [])
         .map(normalizeMessage)
@@ -373,6 +470,10 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
         ),
     [completeHistory?.messages],
   )
+  const [completeSnapshot, setCompleteSnapshot] = useState<{
+    ownerCardId: string
+    messages: Array<OperationsChatMessage>
+  }>(() => ({ ownerCardId: cardId, messages: readCompleteSnapshot(cardId) }))
   const [overlayMessages, setOverlayMessages] = useState<
     Array<OperationsChatOverlayMessage>
   >(() => readOverlay(ownerCardId))
@@ -392,15 +493,40 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
   }
 
   useEffect(() => {
+    setCompleteSnapshot({
+      ownerCardId: cardId,
+      messages: readCompleteSnapshot(cardId),
+    })
+  }, [cardId])
+
+  useEffect(() => {
+    if (!completeHistory || !cardId) return
+    writeCompleteSnapshot(cardId, currentAuthoritativeMessages)
+    setCompleteSnapshot({
+      ownerCardId: cardId,
+      messages: currentAuthoritativeMessages,
+    })
+  }, [cardId, completeHistory, currentAuthoritativeMessages])
+
+  useEffect(() => {
     overlayOwnerRef.current = ownerCardId
     const recovered = readOverlay(ownerCardId)
     overlayRef.current = recovered
     setOverlayMessages(recovered)
   }, [ownerCardId])
 
+  const authoritativeMessages = completeHistory
+    ? currentAuthoritativeMessages
+    : completeSnapshot.ownerCardId === cardId
+      ? completeSnapshot.messages
+      : []
+
   const historySignatureCounts = useMemo(
-    () => signatureCounts(authoritativeMessages),
-    [authoritativeMessages],
+    () =>
+      completeHistory
+        ? signatureCounts(currentAuthoritativeMessages)
+        : new Map<string, number>(),
+    [completeHistory, currentAuthoritativeMessages],
   )
   const unacknowledgedOverlay = useMemo(
     () =>
@@ -414,13 +540,14 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
 
   useEffect(() => {
     if (
+      !completeHistory ||
       !ownerCardId ||
       unacknowledgedOverlay.length === overlayMessages.length
     ) {
       return
     }
     commitOverlay(unacknowledgedOverlay, ownerCardId)
-  }, [ownerCardId, overlayMessages, unacknowledgedOverlay])
+  }, [completeHistory, ownerCardId, overlayMessages, unacknowledgedOverlay])
 
   const messages = useMemo(
     () => [...authoritativeMessages, ...unacknowledgedOverlay],
