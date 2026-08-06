@@ -12,6 +12,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useChatStore } from '../../stores/chat-store'
+import { clearCardTranscriptRecoveryMemory } from './card-transcript-recovery'
 import { ChatScreen } from './chat-screen'
 import {
   appendSessionCardHistoryMessage,
@@ -496,6 +497,7 @@ function expectCardOnlyTranscriptBoundary(
 
 describe('mounted Session Card transcript recovery lifecycle', () => {
   beforeEach(() => {
+    clearCardTranscriptRecoveryMemory()
     installBrowserPolyfills()
     window.localStorage.clear()
     window.sessionStorage.clear()
@@ -518,6 +520,69 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
+
+  it.each([
+    {
+      name: 'ten seconds apart',
+      firstTimestamp: 1_000,
+      secondTimestamp: 11_000,
+    },
+    {
+      name: 'without timestamps',
+      firstTimestamp: undefined,
+      secondTimestamp: undefined,
+    },
+  ])(
+    'renders distinct persisted repeated user turns $name around an assistant turn',
+    async ({ firstTimestamp, secondTimestamp }) => {
+      const requests = mockHttp(() =>
+        completeHistory(parentCard, [
+          {
+            segmentKey: 'remote:a-root',
+            message: {
+              id: 'u1',
+              role: 'user',
+              content: 'continue',
+              ...(firstTimestamp === undefined
+                ? {}
+                : { timestamp: firstTimestamp }),
+            },
+          },
+          {
+            segmentKey: 'remote:a-root',
+            message: {
+              id: 'a1',
+              role: 'assistant',
+              content: 'acknowledged',
+              ...(firstTimestamp === undefined ? {} : { timestamp: 5_000 }),
+            },
+          },
+          {
+            segmentKey: 'remote:a-tip',
+            message: {
+              id: 'u2',
+              role: 'user',
+              content: 'continue',
+              ...(secondTimestamp === undefined
+                ? {}
+                : { timestamp: secondTimestamp }),
+            },
+          },
+        ]),
+      )
+
+      await mountChatScreen(defaultInput())
+      await waitFor(() =>
+        expect(screen.getAllByText('continue')).toHaveLength(2),
+      )
+      expect(
+        [...document.querySelectorAll('[data-chat-message-id]')]
+          .map((node) => node.getAttribute('data-chat-message-id'))
+          .sort(),
+      ).toEqual(['a1', 'u1', 'u2'])
+      expectCardOnlyTranscriptBoundary(requests)
+    },
+  )
 
   it('renders persisted messages from a retryable partial Card response beside incomplete/retry UI without raw fallback', async () => {
     const requests: Array<string> = []

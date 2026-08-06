@@ -409,46 +409,6 @@ function getMessageStatusValue(message: ChatMessage): string {
   return normalizeMessageValue((message as Record<string, unknown>).status)
 }
 
-function getMessageTimestampValue(message: ChatMessage): number | null {
-  const raw = message as Record<string, unknown>
-  const candidates = [
-    raw.timestamp,
-    raw.__createdAt,
-    raw.createdAt,
-    raw.created_at,
-  ]
-
-  for (const candidate of candidates) {
-    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-      return candidate < 1_000_000_000_000 ? candidate * 1000 : candidate
-    }
-    if (typeof candidate === 'string') {
-      const parsed = Date.parse(candidate)
-      if (!Number.isNaN(parsed)) return parsed
-    }
-  }
-
-  return null
-}
-
-function getMessageAttachmentSignature(message: ChatMessage): string {
-  if (!Array.isArray(message.attachments) || message.attachments.length === 0) {
-    return ''
-  }
-
-  return message.attachments
-    .map((attachment) => {
-      const name = typeof attachment.name === 'string' ? attachment.name : ''
-      const size =
-        typeof attachment.size === 'number' ? String(attachment.size) : ''
-      const type =
-        typeof attachment.contentType === 'string' ? attachment.contentType : ''
-      return `${name}:${size}:${type}`
-    })
-    .sort()
-    .join('|')
-}
-
 function isOptimisticUserMessage(message: ChatMessage): boolean {
   const raw = message as Record<string, unknown>
   return (
@@ -463,63 +423,64 @@ export function shouldCollapseTextDuplicate(
 ): boolean {
   if (existing.role !== candidate.role) return false
 
-  if (candidate.role === 'assistant') {
-    const identityValues = (message: ChatMessage) => {
-      const raw = message as Record<string, unknown>
-      return [
-        raw.id,
-        raw.messageId,
-        raw.message_id,
-        raw.stableId,
-        raw.stable_id,
-        raw.clientId,
-        raw.client_id,
-        raw.__optimisticId,
-      ]
-        .map(normalizeMessageValue)
-        .filter(Boolean)
-    }
-    const existingIdentities = new Set(identityValues(existing))
-    if (
-      identityValues(candidate).some((identity) =>
-        existingIdentities.has(identity),
-      )
-    ) {
-      return true
-    }
+  const identityValues = (message: ChatMessage, keys: Array<string>) => {
+    const raw = message as Record<string, unknown>
+    return new Set(
+      keys.map((key) => normalizeMessageValue(raw[key])).filter(Boolean),
+    )
+  }
+  const sharesIdentity = (left: Set<string>, right: Set<string>) =>
+    [...left].some((identity) => right.has(identity))
 
-    // A persisted history row and the completed send-stream overlay can have
-    // different message IDs. Their immutable run identity is the proof that
-    // they represent one assistant turn; equal text alone is never proof.
-    const runIdentity = (message: ChatMessage) => {
-      const raw = message as Record<string, unknown>
-      return [raw.runId, raw.run_id, raw.providerRunId, raw.provider_run_id]
-        .map(normalizeMessageValue)
-        .find(Boolean)
-    }
-    const existingRunId = runIdentity(existing)
-    return Boolean(existingRunId && existingRunId === runIdentity(candidate))
+  const existingStableIds = identityValues(existing, [
+    'stableId',
+    'stable_id',
+    'id',
+    'messageId',
+    'message_id',
+  ])
+  const candidateStableIds = identityValues(candidate, [
+    'stableId',
+    'stable_id',
+    'id',
+    'messageId',
+    'message_id',
+  ])
+
+  if (candidate.role === 'assistant') {
+    const existingRunIds = identityValues(existing, [
+      'runId',
+      'run_id',
+      'providerRunId',
+      'provider_run_id',
+    ])
+    const candidateRunIds = identityValues(candidate, [
+      'runId',
+      'run_id',
+      'providerRunId',
+      'provider_run_id',
+    ])
+    if (sharesIdentity(existingRunIds, candidateRunIds)) return true
+    if (existingRunIds.size > 0 && candidateRunIds.size > 0) return false
+    return sharesIdentity(existingStableIds, candidateStableIds)
   }
 
   if (candidate.role !== 'user') return false
-
-  const existingTs = getMessageTimestampValue(existing)
-  const candidateTs = getMessageTimestampValue(candidate)
-  if (existingTs !== null && candidateTs !== null) {
-    if (Math.abs(existingTs - candidateTs) > 15_000) return false
+  // Distinct server message IDs are immutable evidence of distinct user turns.
+  if (existingStableIds.size > 0 && candidateStableIds.size > 0) {
+    return sharesIdentity(existingStableIds, candidateStableIds)
   }
 
-  // Collapse same-turn user duplicates even after the optimistic marker has been
-  // cleared. The send path can leave us with an optimistic local message plus a
-  // confirmed/history copy after completion; requiring one side to still look
-  // optimistic misses that handoff and leaves both visible.
-  const existingSig = getMessageAttachmentSignature(existing)
-  const candidateSig = getMessageAttachmentSignature(candidate)
-  if (existingSig && candidateSig) {
-    return existingSig === candidateSig
-  }
-
-  return true
+  const clientKeys = [
+    'clientId',
+    'client_id',
+    'nonce',
+    'idempotencyKey',
+    '__optimisticId',
+  ]
+  const existingClientIds = identityValues(existing, clientKeys)
+  const candidateClientIds = identityValues(candidate, clientKeys)
+  return sharesIdentity(existingClientIds, candidateClientIds)
 }
 
 function stripQueuedWrapperFromUserMessage(message: ChatMessage): ChatMessage {

@@ -2115,6 +2115,11 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         fromSegmentKey: 'remote:backend-a',
         canonicalSegmentKey: 'remote:backend-b',
         runId: 'run-card-chain',
+        verifiedContinuationSegmentKeys: [
+          'remote:backend-parent',
+          'remote:backend-a',
+          'remote:backend-b',
+        ],
       },
     ])
     const container = document.createElement('div')

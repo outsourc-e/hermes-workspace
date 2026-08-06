@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES,
   CARD_TRANSCRIPT_RECOVERY_MAX_TEXT_CHARS,
@@ -9,6 +9,7 @@ import {
   cardTranscriptMessagesMatch,
   cardTranscriptRecoveryStorageKey,
   clearCardTranscriptRecovery,
+  clearCardTranscriptRecoveryMemory,
   mergeCardTranscriptRecoveryMessages,
   moveCardTranscriptRecovery,
   parseCardTranscriptRecovery,
@@ -16,6 +17,8 @@ import {
   removeAcknowledgedCardTranscriptRecoveryMessages,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
+import { reconcileSessionCardHistoryResponse } from './chat-queries'
+import type { SessionCardHistoryResponse } from './chat-queries'
 import type {
   CardTranscriptRecoveryEnvelope,
   CardTranscriptRecoveryOwner,
@@ -57,7 +60,13 @@ function envelope(
 
 describe('Card transcript recovery storage contract', () => {
   beforeEach(() => {
+    clearCardTranscriptRecoveryMemory()
+    clearCardTranscriptRecovery(owner)
     window.sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('uses one encoded Card-and-canonical-segment storage envelope', () => {
@@ -201,6 +210,88 @@ describe('Card transcript recovery storage contract', () => {
     expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
       first,
       second,
+    ])
+  })
+
+  it('uses run identity before fallback matching so equal assistant text from distinct runs remains durable', () => {
+    const firstOverlay = message('assistant', 'OK', {
+      stableId: 'stream-run:run-a',
+      runId: 'run-a',
+    })
+    const secondOverlay = message('assistant', 'OK', {
+      stableId: 'stream-run:run-b',
+      runId: 'run-b',
+      timestamp: now + 1_000,
+    })
+    const firstPersisted = message('assistant', 'OK', {
+      id: 'server-a',
+      runId: 'run-a',
+    })
+
+    replaceCardTranscriptRecoveryMessages(
+      owner,
+      [firstOverlay, secondOverlay],
+      {
+        now,
+      },
+    )
+    const reconciled = removeAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      [firstPersisted],
+      { now },
+    )
+
+    expect(reconciled?.messages).toEqual([secondOverlay])
+    expect(
+      mergeCardTranscriptRecoveryMessages(
+        [firstPersisted],
+        reconciled?.messages ?? [],
+      ),
+    ).toEqual([firstPersisted, secondOverlay])
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      secondOverlay,
+    ])
+  })
+
+  it('keeps user and terminal assistant overlays through a stale complete refetch when quota persistence throws', () => {
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      if (key.startsWith('workspace.card-transcript-recovery.')) {
+        throw new DOMException('quota exceeded', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, key, value)
+    })
+    const optimistic = message('user', 'continue', {
+      clientId: 'client-quota',
+      __optimisticId: 'opt-client-quota',
+    })
+    const terminal = message('assistant', 'OK', {
+      stableId: 'stream-run:run-quota',
+      runId: 'run-quota',
+    })
+
+    expect(
+      appendCardTranscriptRecoveryMessage(owner, optimistic, { now }),
+    ).toBeNull()
+    expect(
+      appendCardTranscriptRecoveryMessage(owner, terminal, { now }),
+    ).toBeNull()
+
+    const staleServer: SessionCardHistoryResponse = {
+      sessionKey: owner.canonicalSegmentKey,
+      ...owner,
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+    expect(reconcileSessionCardHistoryResponse(staleServer).messages).toEqual([
+      optimistic,
+      terminal,
     ])
   })
 

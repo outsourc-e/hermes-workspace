@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import { SessionCardService } from '../../server/session-card-service'
 import {
@@ -23,6 +23,7 @@ import {
 } from './chat-queries'
 import { isWholeCardBranchAvailable } from './types'
 import {
+  clearCardTranscriptRecoveryMemory,
   readCardTranscriptRecovery,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
@@ -77,6 +78,10 @@ function completeCardResolutions(cards: Array<{ cardId: string }>) {
     retryable: false,
   }))
 }
+
+beforeEach(() => {
+  clearCardTranscriptRecoveryMemory()
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()

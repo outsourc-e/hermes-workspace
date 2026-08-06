@@ -48,6 +48,7 @@ function StreamingHarness({
   activeCard,
   sessionCards,
   onCardHandoff,
+  onComplete,
 }: {
   onReady: (controller: StreamingController) => void
   onSessionResolved: (payload: {
@@ -62,6 +63,7 @@ function StreamingHarness({
   activeCard?: SessionCard
   sessionCards?: ReadonlyArray<SessionCard>
   onCardHandoff?: (payload: AuthoritativeCardHandoff) => boolean
+  onComplete?: (message: ChatMessage) => void
 }) {
   const streaming = useStreamingMessage({
     onSessionResolved,
@@ -71,6 +73,7 @@ function StreamingHarness({
     activeCard,
     sessionCards,
     onCardHandoff,
+    onComplete,
   })
   useEffect(() => onReady(streaming), [onReady, streaming])
   return null
@@ -119,6 +122,75 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     resetPendingSend()
+  })
+
+  it('completes an assistant overlay with immutable identity derived from the run', async () => {
+    const encoder = new TextEncoder()
+    const reader = {
+      read: vi
+        .fn()
+        .mockResolvedValueOnce({
+          done: false,
+          value: encoder.encode(
+            [
+              'event: started',
+              'data: {"runId":"run-identity","sessionKey":"remote:segment"}',
+              '',
+              'event: chunk',
+              'data: {"text":"OK","runId":"run-identity"}',
+              '',
+              'event: done',
+              'data: {"state":"complete","sessionKey":"remote:segment","runId":"run-identity"}',
+              '',
+              '',
+            ].join('\n'),
+          ),
+        })
+        .mockResolvedValueOnce({ done: true, value: undefined }),
+      cancel: vi.fn().mockResolvedValue(undefined),
+    }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+      text: () => Promise.resolve(''),
+    } as unknown as Response)
+    const onComplete = vi.fn()
+    let controller: StreamingController | null = null
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <StreamingHarness
+          onReady={(next) => {
+            controller = next
+          }}
+          onSessionResolved={vi.fn()}
+          onAbort={vi.fn()}
+          pinMainSession={false}
+          onComplete={onComplete}
+        />,
+      )
+    })
+
+    await React.act(async () => {
+      await controller!.startStreaming({
+        sessionKey: 'remote:segment',
+        friendlyId: 'remote:card',
+        cardId: 'remote:card',
+        message: 'continue',
+      })
+    })
+
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'assistant',
+        runId: 'run-identity',
+        stableId: 'stream-run:run-identity',
+      }),
+    )
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
   })
 
   it.each([

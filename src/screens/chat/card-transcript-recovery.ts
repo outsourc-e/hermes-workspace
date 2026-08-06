@@ -10,6 +10,7 @@ export const CARD_TRANSCRIPT_RECOVERY_MAX_ENVELOPE_CHARS = 2 * 1024 * 1024
 export const CARD_TRANSCRIPT_RECOVERY_MAX_ATTACHMENTS = 8
 export const CARD_TRANSCRIPT_RECOVERY_MAX_ATTACHMENT_CHARS = 512 * 1024
 export const CARD_TRANSCRIPT_RECOVERY_MAX_TEXT_CHARS = 128 * 1024
+const CARD_TRANSCRIPT_RECOVERY_MAX_MEMORY_OWNERS = 32
 
 export type CardTranscriptRecoveryOwner = {
   cardId: string
@@ -27,6 +28,47 @@ export type CardTranscriptRecoveryEnvelope = {
 type RecoveryOptions = {
   storage?: Storage
   now?: number
+}
+
+// Card/segment-owned fail-closed overlay for storage-denied writes. Existing
+// failed owners are never evicted; new owners fail closed at the hard bound.
+const memoryRecovery = new Map<string, CardTranscriptRecoveryEnvelope>()
+
+/** Test/process-lifecycle seam; normal callers clear one exact Card owner. */
+export function clearCardTranscriptRecoveryMemory(): void {
+  memoryRecovery.clear()
+}
+
+function memoryRecoveryKey(owner: CardTranscriptRecoveryOwner): string {
+  return `${owner.cardId}\u0000${owner.canonicalSegmentKey}`
+}
+
+function rememberMemoryRecovery(
+  owner: CardTranscriptRecoveryOwner,
+  envelope: CardTranscriptRecoveryEnvelope,
+): void {
+  const key = memoryRecoveryKey(owner)
+  if (
+    !memoryRecovery.has(key) &&
+    memoryRecovery.size >= CARD_TRANSCRIPT_RECOVERY_MAX_MEMORY_OWNERS
+  ) {
+    return
+  }
+  memoryRecovery.set(key, envelope)
+}
+
+function readMemoryRecovery(
+  owner: CardTranscriptRecoveryOwner,
+  now: number,
+): CardTranscriptRecoveryEnvelope | null {
+  const key = memoryRecoveryKey(owner)
+  const envelope = memoryRecovery.get(key)
+  if (!envelope) return null
+  if (now - envelope.createdAt > CARD_TRANSCRIPT_RECOVERY_TTL_MS) {
+    memoryRecovery.delete(key)
+    return null
+  }
+  return envelope
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -160,13 +202,34 @@ export function cardTranscriptMessagesMatch(
 ): boolean {
   if (!left.role || left.role !== right.role) return false
   if (!compatibleContent(left, right)) return false
-  if (!compatibleTimestamp(left, right)) return false
 
-  const stableKeys = ['stableId', 'id', 'messageId', 'message_id'] as const
+  const runKeys = [
+    'runId',
+    'run_id',
+    'providerRunId',
+    'provider_run_id',
+  ] as const
+  const leftRunIdentifiers = identifierSet(left, runKeys)
+  const rightRunIdentifiers = identifierSet(right, runKeys)
+  if (intersects(leftRunIdentifiers, rightRunIdentifiers)) return true
+  if (leftRunIdentifiers.size > 0 && rightRunIdentifiers.size > 0) {
+    return false
+  }
+
+  const stableKeys = [
+    'stableId',
+    'stable_id',
+    'id',
+    'messageId',
+    'message_id',
+  ] as const
   const leftStableIdentifiers = identifierSet(left, stableKeys)
   const rightStableIdentifiers = identifierSet(right, stableKeys)
   if (intersects(leftStableIdentifiers, rightStableIdentifiers)) {
     return true
+  }
+  if (leftStableIdentifiers.size > 0 && rightStableIdentifiers.size > 0) {
+    return false
   }
 
   const clientKeys = [
@@ -181,14 +244,16 @@ export function cardTranscriptMessagesMatch(
   if (intersects(leftClientIdentifiers, rightClientIdentifiers)) {
     return true
   }
-  if (leftStableIdentifiers.size > 0 && rightStableIdentifiers.size > 0) {
-    return false
-  }
   if (leftClientIdentifiers.size > 0 && rightClientIdentifiers.size > 0) {
     return false
   }
 
-  return timestamp(left) !== null && timestamp(right) !== null
+  if (left.role === 'user') return false
+  return (
+    compatibleTimestamp(left, right) &&
+    timestamp(left) !== null &&
+    timestamp(right) !== null
+  )
 }
 
 function hasOversizedString(value: unknown): boolean {
@@ -317,31 +382,29 @@ export function readCardTranscriptRecovery(
   options: RecoveryOptions = {},
 ): CardTranscriptRecoveryEnvelope | null {
   if (!isValidCardTranscriptRecoveryOwner(owner)) return null
+  const now = options.now ?? Date.now()
+  const memory = readMemoryRecovery(owner, now)
   const storage = resolveStorage(options.storage)
-  if (!storage) return null
+  if (!storage) return memory
   const key = cardTranscriptRecoveryStorageKey(owner)
   let raw: string | null
   try {
     raw = storage.getItem(key)
   } catch {
-    return null
+    return memory
   }
-  if (!raw) return null
+  if (!raw) return memory
   if (raw.length > CARD_TRANSCRIPT_RECOVERY_MAX_ENVELOPE_CHARS) {
     try {
       storage.removeItem(key)
     } catch {
       // Storage can become unavailable between operations.
     }
-    return null
+    return memory
   }
   try {
-    const envelope = parseCardTranscriptRecovery(
-      JSON.parse(raw),
-      owner,
-      options.now ?? Date.now(),
-    )
-    if (envelope) return envelope
+    const envelope = parseCardTranscriptRecovery(JSON.parse(raw), owner, now)
+    if (envelope) return memory ?? envelope
   } catch {
     // Remove malformed data below.
   }
@@ -350,7 +413,7 @@ export function readCardTranscriptRecovery(
   } catch {
     // Ignore unavailable storage while rejecting the record.
   }
-  return null
+  return memory
 }
 
 export function clearCardTranscriptRecovery(
@@ -358,6 +421,7 @@ export function clearCardTranscriptRecovery(
   options: Pick<RecoveryOptions, 'storage'> = {},
 ): void {
   if (!isValidCardTranscriptRecoveryOwner(owner)) return
+  memoryRecovery.delete(memoryRecoveryKey(owner))
   const storage = resolveStorage(options.storage)
   if (!storage) return
   try {
@@ -374,11 +438,9 @@ export function replaceCardTranscriptRecoveryMessages(
 ): CardTranscriptRecoveryEnvelope | null {
   if (!isValidCardTranscriptRecoveryOwner(owner)) return null
   if (messages.some((message) => !validMessage(message))) return null
-  const storage = resolveStorage(options.storage)
-  if (!storage) return null
   const deduped = dedupeMessages(messages)
   if (deduped.length === 0) {
-    clearCardTranscriptRecovery(owner, { storage })
+    clearCardTranscriptRecovery(owner, { storage: options.storage })
     return null
   }
   const envelope: CardTranscriptRecoveryEnvelope = {
@@ -388,6 +450,11 @@ export function replaceCardTranscriptRecoveryMessages(
     createdAt: options.now ?? Date.now(),
     messages: deduped,
   }
+  const storage = resolveStorage(options.storage)
+  if (!storage) {
+    rememberMemoryRecovery(owner, envelope)
+    return null
+  }
   let serialized: string
   try {
     serialized = JSON.stringify(envelope)
@@ -395,13 +462,16 @@ export function replaceCardTranscriptRecoveryMessages(
     return null
   }
   if (serialized.length > CARD_TRANSCRIPT_RECOVERY_MAX_ENVELOPE_CHARS) {
+    rememberMemoryRecovery(owner, envelope)
     return null
   }
   try {
     storage.setItem(cardTranscriptRecoveryStorageKey(owner), serialized)
   } catch {
+    rememberMemoryRecovery(owner, envelope)
     return null
   }
+  memoryRecovery.delete(memoryRecoveryKey(owner))
   return envelope
 }
 

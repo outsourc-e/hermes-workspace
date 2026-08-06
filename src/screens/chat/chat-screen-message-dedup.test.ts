@@ -11,6 +11,14 @@ function assistant(text: string, fields: Record<string, unknown>): ChatMessage {
   }
 }
 
+function user(text: string, fields: Record<string, unknown>): ChatMessage {
+  return {
+    role: 'user',
+    content: [{ type: 'text', text }],
+    ...fields,
+  }
+}
+
 describe('ChatScreen textual duplicate ownership', () => {
   it('preserves distinct assistant turns when stable identities differ', () => {
     expect(
@@ -32,6 +40,36 @@ describe('ChatScreen textual duplicate ownership', () => {
           runId: 'run-shared',
           __streamingStatus: 'complete',
         }),
+      ),
+    ).toBe(true)
+  })
+
+  it('preserves repeated persisted user turns with distinct server IDs ten seconds apart', () => {
+    expect(
+      shouldCollapseTextDuplicate(
+        user('continue', { id: 'u1', timestamp: 1_000 }),
+        user('continue', { id: 'u2', timestamp: 11_000 }),
+      ),
+    ).toBe(false)
+  })
+
+  it('preserves repeated persisted user turns with distinct server IDs and missing timestamps', () => {
+    expect(
+      shouldCollapseTextDuplicate(
+        user('continue', { id: 'u1' }),
+        user('continue', { id: 'u2' }),
+      ),
+    ).toBe(false)
+  })
+
+  it('collapses only an optimistic and confirmed user mirror sharing client identity', () => {
+    expect(
+      shouldCollapseTextDuplicate(
+        user('continue', {
+          clientId: 'client-1',
+          __optimisticId: 'opt-client-1',
+        }),
+        user('continue', { id: 'u1', client_id: 'client-1' }),
       ),
     ).toBe(true)
   })
