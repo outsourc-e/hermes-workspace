@@ -41,6 +41,68 @@ describe('Card transcript snapshot mirror arbitration', () => {
     ])
   })
 
+  it('does not destructively reject a snapshot after arbitrary clock rollback', () => {
+    const key = cardTranscriptSnapshotStorageKey(cardId)
+    window.localStorage.setItem(key, raw(9_000_000, 4, 'accepted earlier'))
+    vi.spyOn(Date, 'now').mockReturnValue(1)
+
+    expect(readCardTranscriptSnapshot(cardId)?.messages).toEqual([
+      message('accepted earlier'),
+    ])
+    expect(window.localStorage.getItem(key)).not.toBeNull()
+  })
+
+  it('unions divergent complete projections when a stale browser context commits last', () => {
+    const key = cardTranscriptSnapshotStorageKey(cardId)
+    expect(
+      writeCardTranscriptSnapshot(cardId, [message('shared baseline')], {
+        contextId: 'baseline-context',
+      }),
+    ).not.toBeNull()
+    const staleIndex = window.localStorage.getItem(key)
+    expect(
+      writeCardTranscriptSnapshot(
+        cardId,
+        [
+          message('shared baseline'),
+          { ...message('first tab accepted'), id: 'first-tab' },
+        ],
+        { contextId: 'first-tab-context' },
+      ),
+    ).not.toBeNull()
+    const originalGetItem = Storage.prototype.getItem
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (
+      this: Storage,
+      storageKey,
+    ) {
+      if (storageKey === key) return staleIndex
+      return originalGetItem.call(this, storageKey)
+    })
+
+    expect(
+      writeCardTranscriptSnapshot(
+        cardId,
+        [
+          message('shared baseline'),
+          { ...message('second tab accepted'), id: 'second-tab' },
+        ],
+        { contextId: 'second-tab-context' },
+      ),
+    ).not.toBeNull()
+    vi.mocked(Storage.prototype.getItem).mockRestore()
+
+    const texts = readCardTranscriptSnapshot(cardId)?.messages.map(
+      (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
+    )
+    expect(texts).toEqual(
+      expect.arrayContaining([
+        'shared baseline',
+        'first tab accepted',
+        'second tab accepted',
+      ]),
+    )
+  })
+
   it('writes a newer revision to every available mirror', () => {
     const key = cardTranscriptSnapshotStorageKey(cardId)
     window.localStorage.setItem(key, raw(200, 4, 'stale primary'))
@@ -106,7 +168,8 @@ describe('Card transcript snapshot mirror arbitration', () => {
     })
 
     const first = writeCardTranscriptSnapshot(cardId, [message('first write')])
-    expect(first?.revision).toBe(90_001)
+    expect(first).toBeNull()
+    expect(readCardTranscriptSnapshot(cardId)?.revision).toBe(90_001)
 
     vi.mocked(Storage.prototype.setItem).mockRestore()
     vi.spyOn(Date, 'now').mockReturnValue(25)
@@ -131,8 +194,8 @@ describe('Card transcript snapshot mirror arbitration', () => {
       storageKey,
       value,
     ) {
-      if (storageKey === key) {
-        throw new DOMException('index commit denied', 'QuotaExceededError')
+      if (storageKey === key || storageKey.startsWith(`${key}:commit:`)) {
+        throw new DOMException('interrupted commit', 'QuotaExceededError')
       }
       return originalSetItem.call(this, storageKey, value)
     })

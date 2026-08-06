@@ -49,6 +49,7 @@ function envelope(
     version: 2,
     cardId: owner.cardId,
     createdAt: now,
+    revision: 1,
     messages,
     ...fields,
   }
@@ -58,6 +59,7 @@ describe('Card transcript recovery storage contract', () => {
   beforeEach(() => {
     clearCardTranscriptRecoveryMemory()
     clearCardTranscriptRecovery(owner)
+    window.localStorage.clear()
     window.sessionStorage.clear()
   })
 
@@ -169,6 +171,93 @@ describe('Card transcript recovery storage contract', () => {
     )
 
     expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([old])
+  })
+
+  it('retains future-dated recovery after an arbitrary clock rollback', () => {
+    const future = message('user', 'accepted before the clock rolled back', {
+      clientId: 'client-clock-rollback',
+    })
+    const key = cardTranscriptRecoveryStorageKey(owner)
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({ ...envelope([future]), createdAt: now + 86_400_000 }),
+    )
+
+    expect(
+      readCardTranscriptRecovery(owner, { now: now - 365 * 86_400_000 })
+        ?.messages,
+    ).toEqual([future])
+    expect(window.localStorage.getItem(key)).not.toBeNull()
+  })
+
+  it('rejects unsafe recovery revisions without letting them dominate a valid mirror', () => {
+    const key = cardTranscriptRecoveryStorageKey(owner)
+    window.sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        ...envelope([message('assistant', 'unsafe mirror')]),
+        revision: Number.MAX_SAFE_INTEGER + 1,
+      }),
+    )
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({
+        ...envelope([message('assistant', 'valid mirror')]),
+        revision: 7,
+      }),
+    )
+
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      message('assistant', 'valid mirror'),
+    ])
+    expect(window.sessionStorage.getItem(key)).toBeNull()
+  })
+
+  it('unions divergent accepted rows even when a stale context publishes last', () => {
+    const baseline = message('user', 'baseline', {
+      clientId: 'client-baseline',
+    })
+    const fromFirstContext = message('user', 'first tab accepted', {
+      clientId: 'client-first-tab',
+    })
+    const fromSecondContext = message('user', 'second tab accepted', {
+      clientId: 'client-second-tab',
+    })
+    replaceCardTranscriptRecoveryMessages(owner, [baseline], { now })
+    const key = cardTranscriptRecoveryStorageKey(owner)
+    const staleRaw = window.localStorage.getItem(key)
+    replaceCardTranscriptRecoveryMessages(owner, [baseline, fromFirstContext], {
+      now,
+    })
+    const originalGetItem = Storage.prototype.getItem
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (
+      this: Storage,
+      storageKey,
+    ) {
+      if (this === window.localStorage && storageKey === key) return staleRaw
+      return originalGetItem.call(this, storageKey)
+    })
+
+    expect(
+      replaceCardTranscriptRecoveryMessages(
+        owner,
+        [baseline, fromSecondContext],
+        { now },
+      ),
+    ).not.toBeNull()
+    vi.mocked(Storage.prototype.getItem).mockRestore()
+    clearCardTranscriptRecoveryMemory()
+
+    const texts = readCardTranscriptRecovery(owner, { now })?.messages.map(
+      (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
+    )
+    expect(texts).toEqual(
+      expect.arrayContaining([
+        'baseline',
+        'first tab accepted',
+        'second tab accepted',
+      ]),
+    )
   })
 
   it('clears and ignores legacy segment-keyed recovery records', () => {
@@ -449,6 +538,65 @@ describe('Card transcript recovery storage contract', () => {
     const reconciled = reconcileSessionCardHistoryResponse(server)
     expect(reconciled.messages).toEqual(server.messages)
     expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
+  })
+
+  it('does not acknowledge durable recovery from a session-only snapshot before tab close', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    const accepted = message('user', 'survive the tab close', {
+      clientId: 'client-tab-close',
+      status: 'sent',
+    })
+    replaceCardTranscriptRecoveryMessages(owner, [accepted], { now })
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      if (
+        this === window.localStorage &&
+        key.startsWith('workspace.card-transcript-snapshot.')
+      ) {
+        throw new DOMException(
+          'persistent snapshot denied',
+          'QuotaExceededError',
+        )
+      }
+      return originalSetItem.call(this, key, value)
+    })
+    const complete: SessionCardHistoryResponse = {
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [
+        message('user', 'survive the tab close', { id: 'server-tab-close' }),
+      ],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+
+    reconcileSessionCardHistoryResponse(complete)
+    expect(
+      JSON.parse(
+        window.localStorage.getItem(cardTranscriptRecoveryStorageKey(owner)) ??
+          '{}',
+      ).messages,
+    ).toHaveLength(1)
+
+    vi.mocked(Storage.prototype.setItem).mockRestore()
+    window.sessionStorage.clear()
+    clearCardTranscriptRecoveryMemory()
+    const partial = reconcileSessionCardHistoryResponse({
+      ...complete,
+      messages: [],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        { segmentKey: 'remote:segment-a', retryable: true, error: 'retry' },
+      ],
+    })
+    expect(partial.messages).toEqual([accepted])
   })
 
   it('hydrates partial attachment history without clearing recovery until authoritative content is complete', () => {

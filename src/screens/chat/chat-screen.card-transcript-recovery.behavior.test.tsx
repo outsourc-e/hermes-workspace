@@ -189,6 +189,7 @@ type CardTranscriptRecoveryWire = {
   version: typeof CARD_TRANSCRIPT_RECOVERY_VERSION
   cardId: string
   createdAt: number
+  revision: number
   messages: Array<ChatMessage>
 }
 
@@ -200,6 +201,7 @@ function seedCardTranscriptRecovery(
     version: CARD_TRANSCRIPT_RECOVERY_VERSION,
     cardId: card.cardId,
     createdAt: Date.now(),
+    revision: 1,
     messages,
   }
   window.sessionStorage.setItem(

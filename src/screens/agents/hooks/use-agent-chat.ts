@@ -4,6 +4,11 @@ import { resolveOperationsChatCardId } from './use-operations'
 import type { OperationsChatTarget } from './use-operations'
 import type { ChatMessage, SessionCard } from '@/screens/chat/types'
 import {
+  readMessageJournal,
+  removeMessageJournalValues,
+  writeMessageJournal,
+} from '@/screens/chat/durable-message-journal'
+import {
   fetchCompleteSessionCardHistory,
   fetchSessionCards,
   isAuthoritativeCompleteSessionCardHistory,
@@ -161,14 +166,89 @@ function writeMirroredEnvelope(
   envelope: OperationsChatOverlayEnvelope | OperationsChatCompleteSnapshot,
 ) {
   const serialized = JSON.stringify(envelope)
-  let verified = false
+  const writtenStorages: Array<Storage> = []
+  const verifiedStorages: Array<Storage> = []
   for (const storage of storageMirrors()) {
     try {
       storage.setItem(key, serialized)
-      if (storage.getItem(key) === serialized) verified = true
+      writtenStorages.push(storage)
+      if (storage.getItem(key) === serialized) verifiedStorages.push(storage)
     } catch {}
   }
-  return verified && envelope.revision === previousRevision + 1
+  if (envelope.revision !== previousRevision + 1) {
+    return {
+      anyVerified: false,
+      persistentVerified: false,
+      writtenStorages: [],
+      verifiedStorages: [],
+    }
+  }
+  return {
+    anyVerified: verifiedStorages.length > 0,
+    persistentVerified: verifiedStorages.some((storage) => {
+      try {
+        return storage === window.localStorage
+      } catch {
+        return false
+      }
+    }),
+    writtenStorages,
+    verifiedStorages,
+  }
+}
+
+function parseCompleteMessage(value: unknown): OperationsChatMessage | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const candidate = value as Record<string, unknown>
+  if (
+    (candidate.role !== 'user' &&
+      candidate.role !== 'assistant' &&
+      candidate.role !== 'system') ||
+    typeof candidate.id !== 'string' ||
+    !candidate.id ||
+    typeof candidate.content !== 'string' ||
+    !candidate.content.trim()
+  ) {
+    return null
+  }
+  return {
+    id: candidate.id,
+    role: candidate.role,
+    content: candidate.content,
+    ...(typeof candidate.timestamp === 'number' &&
+    Number.isFinite(candidate.timestamp)
+      ? { timestamp: candidate.timestamp }
+      : {}),
+  }
+}
+
+function parseOverlayMessage(
+  value: unknown,
+): OperationsChatOverlayMessage | null {
+  const message = parseCompleteMessage(value)
+  if (!message || message.role === 'system') return null
+  const candidate = value as Record<string, unknown>
+  if (
+    typeof candidate.acknowledgementOrdinal !== 'number' ||
+    !Number.isSafeInteger(candidate.acknowledgementOrdinal) ||
+    candidate.acknowledgementOrdinal < 1
+  ) {
+    return null
+  }
+  return {
+    ...message,
+    role: message.role,
+    acknowledgementOrdinal: candidate.acknowledgementOrdinal,
+  }
+}
+
+function mergeOperationsMessages<T extends { id: string }>(
+  base: Array<T>,
+  journal: Array<T>,
+): Array<T> {
+  const merged = new Map(base.map((message) => [message.id, message]))
+  for (const message of journal) merged.set(message.id, message)
+  return [...merged.values()]
 }
 
 function parseCompleteSnapshot(
@@ -218,29 +298,57 @@ function parseCompleteSnapshot(
 
 function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
   if (!cardId) return []
-  return (
-    readMirroredMessages(completeSnapshotStorageKey(cardId), (raw) =>
-      parseCompleteSnapshot(raw, cardId),
-    )?.messages ?? []
+  const key = completeSnapshotStorageKey(cardId)
+  const mirrors = storageMirrors()
+  const base =
+    readMirroredMessages(key, (raw) => parseCompleteSnapshot(raw, cardId))
+      ?.messages ?? []
+  const journal = readMessageJournal(
+    key,
+    mirrors,
+    (message: OperationsChatMessage) => message.id,
+    parseCompleteMessage,
   )
+  return mergeOperationsMessages(base, journal)
 }
 
 function writeCompleteSnapshot(
   cardId: string,
   messages: Array<OperationsChatMessage>,
 ) {
-  if (!cardId) return false
+  if (!cardId) return { anyVerified: false, persistentVerified: false }
   const key = completeSnapshotStorageKey(cardId)
-  const previousRevision =
-    readMirroredMessages(key, (raw) => parseCompleteSnapshot(raw, cardId))
-      ?.revision ?? 0
+  const previous = readMirroredMessages(key, (raw) =>
+    parseCompleteSnapshot(raw, cardId),
+  )
+  const previousRevision = previous?.revision ?? 0
+  const revision = previousRevision + 1
+  if (!Number.isSafeInteger(revision) || revision <= 0) {
+    return { anyVerified: false, persistentVerified: false }
+  }
   const envelope: OperationsChatCompleteSnapshot = {
     version: 2,
-    revision: previousRevision + 1,
+    revision,
     owner: { cardId },
     messages,
   }
-  return writeMirroredEnvelope(key, previousRevision, envelope)
+  const envelopeWrite = writeMirroredEnvelope(key, previousRevision, envelope)
+  if (!envelopeWrite.anyVerified) {
+    return { anyVerified: false, persistentVerified: false }
+  }
+  const journalWrite = writeMessageJournal(
+    key,
+    messages,
+    envelopeWrite.writtenStorages,
+    (message) => message.id,
+  )
+  return {
+    // The compact envelope remains a safe compatibility fallback if a mirror
+    // cannot allocate the additional union-journal rows.
+    anyVerified: envelopeWrite.anyVerified,
+    persistentVerified:
+      envelopeWrite.persistentVerified || journalWrite.persistentVerified,
+  }
 }
 
 function parseOverlay(
@@ -292,28 +400,59 @@ function parseOverlay(
 
 function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
   if (!cardId) return []
-  return (
-    readMirroredMessages(overlayStorageKey(cardId), (raw) =>
-      parseOverlay(raw, cardId),
-    )?.messages ?? []
+  const key = overlayStorageKey(cardId)
+  const mirrors = storageMirrors()
+  const base =
+    readMirroredMessages(key, (raw) => parseOverlay(raw, cardId))?.messages ??
+    []
+  const journal = readMessageJournal(
+    key,
+    mirrors,
+    (message: OperationsChatOverlayMessage) => message.id,
+    parseOverlayMessage,
   )
+  return mergeOperationsMessages(base, journal)
 }
 
 function writeOverlay(
   cardId: string,
   messages: Array<OperationsChatOverlayMessage>,
+  requirePersistent = true,
+  acknowledged: Array<OperationsChatOverlayMessage> = [],
 ) {
   if (!cardId) return false
   const key = overlayStorageKey(cardId)
-  const previousRevision =
-    readMirroredMessages(key, (raw) => parseOverlay(raw, cardId))?.revision ?? 0
+  const mirrors = storageMirrors()
+  const previous = readMirroredMessages(key, (raw) => parseOverlay(raw, cardId))
+  const previousRevision = previous?.revision ?? 0
+  const revision = previousRevision + 1
+  if (!Number.isSafeInteger(revision) || revision <= 0) return false
   const envelope: OperationsChatOverlayEnvelope = {
     version: 2,
-    revision: previousRevision + 1,
+    revision,
     owner: { cardId },
     messages,
   }
-  return writeMirroredEnvelope(key, previousRevision, envelope)
+  const envelopeWrite = writeMirroredEnvelope(key, previousRevision, envelope)
+  if (!envelopeWrite.anyVerified) return false
+  const journalWrite = writeMessageJournal(
+    key,
+    messages,
+    envelopeWrite.writtenStorages,
+    (message) => message.id,
+  )
+  const persistentVerified =
+    envelopeWrite.persistentVerified || journalWrite.persistentVerified
+  if (requirePersistent && !persistentVerified) return false
+  if (acknowledged.length > 0) {
+    removeMessageJournalValues(
+      key,
+      acknowledged,
+      envelopeWrite.verifiedStorages,
+      (message) => message.id,
+    )
+  }
+  return true
 }
 
 function messageSignature(
@@ -493,6 +632,16 @@ function sameBinding(left: SessionCard, right: SessionCard) {
   )
 }
 
+export const operationsChatStorageForTests = {
+  readCompleteSnapshot,
+  writeCompleteSnapshot: (
+    cardId: string,
+    messages: Array<OperationsChatMessage>,
+  ) => writeCompleteSnapshot(cardId, messages).anyVerified,
+  readOverlay,
+  writeOverlay,
+}
+
 /** Card-only history, immediate overlay, recovery, and send transport. */
 export function useAgentChat(target: OperationsChatTarget | undefined) {
   const queryClient = useQueryClient()
@@ -540,7 +689,12 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
   const [completeSnapshot, setCompleteSnapshot] = useState<{
     ownerCardId: string
     messages: Array<OperationsChatMessage>
-  }>(() => ({ ownerCardId: cardId, messages: readCompleteSnapshot(cardId) }))
+    persistentVerified: boolean
+  }>(() => ({
+    ownerCardId: cardId,
+    messages: readCompleteSnapshot(cardId),
+    persistentVerified: false,
+  }))
   const [overlayMessages, setOverlayMessages] = useState<
     Array<OperationsChatOverlayMessage>
   >(() => readOverlay(ownerCardId))
@@ -551,9 +705,11 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
   const commitOverlay = (
     nextMessages: Array<OperationsChatOverlayMessage>,
     expectedOwner = ownerCardId,
+    requirePersistent = true,
   ) => {
     if (!expectedOwner) return false
-    if (!writeOverlay(expectedOwner, nextMessages)) return false
+    if (!writeOverlay(expectedOwner, nextMessages, requirePersistent))
+      return false
     if (overlayOwnerRef.current === expectedOwner) {
       overlayRef.current = nextMessages
       setOverlayMessages(nextMessages)
@@ -566,16 +722,22 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     setCompleteSnapshot({
       ownerCardId: cardId,
       messages: readCompleteSnapshot(cardId),
+      persistentVerified: false,
     })
   }, [cardId])
 
   useEffect(() => {
     if (!completeHistory || !cardId) return
-    if (writeCompleteSnapshot(cardId, currentAuthoritativeMessages)) {
+    const snapshotWrite = writeCompleteSnapshot(
+      cardId,
+      currentAuthoritativeMessages,
+    )
+    if (snapshotWrite.anyVerified) {
       setDurabilityError(null)
       setCompleteSnapshot({
         ownerCardId: cardId,
         messages: currentAuthoritativeMessages,
+        persistentVerified: snapshotWrite.persistentVerified,
       })
     } else {
       setDurabilityError(
@@ -624,7 +786,20 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     ) {
       return
     }
-    commitOverlay(unacknowledgedOverlay, ownerCardId)
+    const remainingIds = new Set(
+      unacknowledgedOverlay.map((message) => message.id),
+    )
+    const acknowledged = overlayMessages.filter(
+      (message) => !remainingIds.has(message.id),
+    )
+    if (!completeSnapshot.persistentVerified) return
+    if (!writeOverlay(ownerCardId, unacknowledgedOverlay, true, acknowledged)) {
+      return
+    }
+    if (overlayOwnerRef.current === ownerCardId) {
+      overlayRef.current = unacknowledgedOverlay
+      setOverlayMessages(unacknowledgedOverlay)
+    }
   }, [
     cardId,
     completeHistory,
@@ -737,7 +912,7 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
               ? { ...entry, content, acknowledgementOrdinal }
               : entry,
           )
-          if (!commitOverlay(activeSendOverlay, ownerCardId)) {
+          if (!commitOverlay(activeSendOverlay, ownerCardId, false)) {
             throw new Error(
               'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
             )
@@ -756,7 +931,7 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
           ),
         }
         activeSendOverlay = [...activeSendOverlay, assistant]
-        if (!commitOverlay(activeSendOverlay, ownerCardId)) {
+        if (!commitOverlay(activeSendOverlay, ownerCardId, false)) {
           throw new Error(
             'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
           )

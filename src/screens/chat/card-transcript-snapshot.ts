@@ -8,6 +8,8 @@ export const CARD_TRANSCRIPT_SNAPSHOT_PREFIX =
   'workspace.card-transcript-snapshot.v1'
 const CARD_TRANSCRIPT_SNAPSHOT_CHUNK_CHARS = 512 * 1024
 const CARD_TRANSCRIPT_SNAPSHOT_MAX_CHUNKS = 100_000
+const SNAPSHOT_CONTEXT_ID =
+  Math.random().toString(36).slice(2) || 'snapshot-context'
 
 export type CardTranscriptSnapshotEnvelope = {
   version: 1
@@ -48,12 +50,7 @@ function positiveSafeInteger(value: unknown): value is number {
 }
 
 function validSavedAt(value: unknown): value is number {
-  return (
-    typeof value === 'number' &&
-    Number.isFinite(value) &&
-    value > 0 &&
-    value <= Date.now() + 60_000
-  )
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
 
 function validSnapshotMessage(value: unknown): value is ChatMessage {
@@ -67,6 +64,13 @@ function validSnapshotMessage(value: unknown): value is ChatMessage {
 
 export function cardTranscriptSnapshotStorageKey(cardId: string): string {
   return `${CARD_TRANSCRIPT_SNAPSHOT_PREFIX}:${encodeURIComponent(cardId)}`
+}
+
+function cardTranscriptSnapshotCommitKey(
+  cardId: string,
+  contextId: string,
+): string {
+  return `${cardTranscriptSnapshotStorageKey(cardId)}:commit:${encodeURIComponent(contextId)}`
 }
 
 function cardTranscriptSnapshotChunkKey(
@@ -148,8 +152,8 @@ function parseSnapshotIndex(
 function readStoredSnapshot(
   storage: Storage,
   cardId: string,
+  key = cardTranscriptSnapshotStorageKey(cardId),
 ): StoredSnapshot | null {
-  const key = cardTranscriptSnapshotStorageKey(cardId)
   let raw: string | null
   try {
     raw = storage.getItem(key)
@@ -227,28 +231,101 @@ function compareSnapshots(
   return left.messages.length - right.messages.length
 }
 
+function snapshotMessageIdentity(
+  message: ChatMessage,
+  occurrence: number,
+): string {
+  const raw = message as Record<string, unknown>
+  for (const key of [
+    'runId',
+    'run_id',
+    'providerRunId',
+    'provider_run_id',
+    'stableId',
+    'stable_id',
+    'clientId',
+    'client_id',
+    'idempotencyKey',
+    'id',
+    'messageId',
+    'message_id',
+  ]) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim()) {
+      return `${message.role ?? 'unknown'}:${key}:${value.trim()}`
+    }
+  }
+  const serialized = JSON.stringify(message)
+  let hash = 2166136261
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `${message.role ?? 'unknown'}:value:${(hash >>> 0).toString(36)}:${occurrence}`
+}
+
+function unionSnapshotMessages(
+  candidates: Array<CardTranscriptSnapshotEnvelope>,
+): Array<ChatMessage> {
+  const byIdentity = new Map<string, ChatMessage>()
+  for (const candidate of [...candidates].sort(compareSnapshots)) {
+    const occurrences = new Map<string, number>()
+    for (const message of candidate.messages) {
+      const serialized = JSON.stringify(message)
+      const occurrence = occurrences.get(serialized) ?? 0
+      occurrences.set(serialized, occurrence + 1)
+      const identity = snapshotMessageIdentity(message, occurrence)
+      byIdentity.set(identity, message)
+    }
+  }
+  return [...byIdentity.values()]
+}
+
 function readSnapshotCandidates(cardId: string): {
   storages: Array<Storage>
   newest: CardTranscriptSnapshotEnvelope | null
 } {
   const storages = browserStorages()
-  const key = cardTranscriptSnapshotStorageKey(cardId)
-  let newest: CardTranscriptSnapshotEnvelope | null = null
+  const baseKey = cardTranscriptSnapshotStorageKey(cardId)
+  const commitPrefix = `${baseKey}:commit:`
+  const baseCandidates: Array<CardTranscriptSnapshotEnvelope> = []
+  const commitCandidates: Array<CardTranscriptSnapshotEnvelope> = []
   for (const storage of storages) {
-    const stored = readStoredSnapshot(storage, cardId)
-    if (stored) {
-      if (!newest || compareSnapshots(stored.envelope, newest) > 0) {
-        newest = stored.envelope
-      }
-      continue
-    }
+    let keys = [baseKey]
     try {
-      if (storage.getItem(key) !== null) storage.removeItem(key)
+      keys.push(
+        ...Array.from({ length: storage.length }, (_, index) =>
+          storage.key(index),
+        ).filter((candidate): candidate is string =>
+          Boolean(candidate?.startsWith(commitPrefix)),
+        ),
+      )
     } catch {
-      // Reject malformed data even when cleanup is denied.
+      // The base key remains independently readable when enumeration is denied.
+    }
+    keys = [...new Set(keys)]
+    for (const key of keys) {
+      const stored = readStoredSnapshot(storage, cardId, key)
+      if (stored) {
+        if (key === baseKey) baseCandidates.push(stored.envelope)
+        else commitCandidates.push(stored.envelope)
+        continue
+      }
+      try {
+        if (storage.getItem(key) !== null) storage.removeItem(key)
+      } catch {
+        // Reject malformed data even when cleanup is denied.
+      }
     }
   }
-  return { storages, newest }
+  const newestBase = [...baseCandidates].sort(compareSnapshots).at(-1)
+  const candidates = [...(newestBase ? [newestBase] : []), ...commitCandidates]
+  if (candidates.length === 0) return { storages, newest: null }
+  const newest = [...candidates].sort(compareSnapshots).at(-1)!
+  return {
+    storages,
+    newest: { ...newest, messages: unionSnapshotMessages(candidates) },
+  }
 }
 
 function transactionId(revision: number): string {
@@ -274,24 +351,28 @@ function removeChunkKeys(storage: Storage, chunkKeys: Array<string>): void {
 export function writeCardTranscriptSnapshot(
   cardId: string,
   messages: Array<ChatMessage>,
+  options: { contextId?: string } = {},
 ): CardTranscriptSnapshotEnvelope | null {
   if (!validCardId(cardId)) return null
-  const sanitized = messages.map(sanitizeCardOwnedMessage)
-  if (sanitized.some((message) => !validSnapshotMessage(message))) return null
+  const candidateMessages = messages.map(sanitizeCardOwnedMessage)
+  if (candidateMessages.some((message) => !validSnapshotMessage(message))) {
+    return null
+  }
 
   const { storages, newest } = readSnapshotCandidates(cardId)
   if (storages.length === 0) return null
   const savedAt = Date.now()
   if (!validSavedAt(savedAt)) return null
   const revision = (newest?.revision ?? 0) + 1
-  if (!Number.isSafeInteger(revision)) return null
-  const envelope: CardTranscriptSnapshotEnvelope = {
+  if (!positiveSafeInteger(revision)) return null
+  const candidateEnvelope: CardTranscriptSnapshotEnvelope = {
     version: 1,
     cardId,
     savedAt,
     revision,
-    messages: sanitized,
+    messages: candidateMessages,
   }
+  const envelope: CardTranscriptSnapshotEnvelope = candidateEnvelope
   let serialized: string
   try {
     serialized = JSON.stringify(envelope)
@@ -322,7 +403,7 @@ export function writeCardTranscriptSnapshot(
     cardId,
     savedAt,
     revision,
-    messageCount: sanitized.length,
+    messageCount: envelope.messages.length,
     chunkCount: chunks.length,
     serializedLength: serialized.length,
     chunkId,
@@ -331,9 +412,14 @@ export function writeCardTranscriptSnapshot(
     sanitizeCardOwnedValue(index) as CardTranscriptSnapshotIndex,
   )
 
-  let durable = false
+  let persistentDurable = false
+  const baseKey = cardTranscriptSnapshotStorageKey(cardId)
+  const commitKey = cardTranscriptSnapshotCommitKey(
+    cardId,
+    options.contextId ?? SNAPSHOT_CONTEXT_ID,
+  )
   for (const storage of storages) {
-    const previous = readStoredSnapshot(storage, cardId)
+    const previous = readStoredSnapshot(storage, cardId, commitKey)
     const newChunkKeys: Array<string> = []
     try {
       for (const [chunkIndex, chunk] of chunks.entries()) {
@@ -345,34 +431,43 @@ export function writeCardTranscriptSnapshot(
         storage.setItem(chunkKey, chunk)
         newChunkKeys.push(chunkKey)
       }
-      storage.setItem(cardTranscriptSnapshotStorageKey(cardId), serializedIndex)
-      const committed = readStoredSnapshot(storage, cardId)
-      if (committed?.envelope.revision !== revision) {
+      storage.setItem(commitKey, serializedIndex)
+      if (storage.getItem(commitKey) !== serializedIndex) {
+        throw new Error(
+          'Card transcript snapshot commit-token read-back failed',
+        )
+      }
+      const committed = readStoredSnapshot(storage, cardId, commitKey)
+      if (
+        committed?.envelope.revision !== revision ||
+        committed.indexRaw !== serializedIndex
+      ) {
         throw new Error('Card transcript snapshot read-back failed')
       }
-      durable = true
+      try {
+        storage.setItem(baseKey, serializedIndex)
+      } catch {
+        // The context-specific commit remains independently discoverable.
+      }
+      try {
+        if (storage === window.localStorage) persistentDurable = true
+      } catch {
+        // A tab-scoped mirror is readable but cannot acknowledge recovery.
+      }
       removeChunkKeys(storage, previous?.chunkKeys ?? [])
     } catch {
       removeChunkKeys(storage, newChunkKeys)
       try {
-        if (previous) {
-          storage.setItem(
-            cardTranscriptSnapshotStorageKey(cardId),
-            previous.indexRaw,
-          )
-        } else if (
-          storage.getItem(cardTranscriptSnapshotStorageKey(cardId)) ===
-          serializedIndex
-        ) {
-          storage.removeItem(cardTranscriptSnapshotStorageKey(cardId))
+        if (previous) storage.setItem(commitKey, previous.indexRaw)
+        else if (storage.getItem(commitKey) === serializedIndex) {
+          storage.removeItem(commitKey)
         }
       } catch {
         // Another mirror remains eligible; never report this one as durable.
       }
-      // Keep writing independent mirrors; one verified commit is usable.
     }
   }
-  return durable ? envelope : null
+  return persistentDurable ? envelope : null
 }
 
 export function readCardTranscriptSnapshot(

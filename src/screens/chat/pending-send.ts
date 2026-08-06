@@ -5,6 +5,11 @@ import {
   replaceCardTranscriptRecoveryMessages,
   sanitizeCardOwnedMessage,
 } from './card-transcript-recovery'
+import {
+  clearMessageJournal,
+  readMessageJournal,
+  writeMessageJournal,
+} from './durable-message-journal'
 import type { ChatAttachment, ChatMessage } from './types'
 
 export type PendingSendPayload = {
@@ -32,6 +37,43 @@ type PersistedPendingSendPayload = PendingSendPayload & {
 function canUseLocalStorage() {
   return (
     typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+  )
+}
+
+function pendingJournalIdentity(message: ChatMessage): string {
+  const role = message.role ?? 'unknown'
+  const runId = pendingMessageRunId(message)
+  if (runId) return `${role}:run:${runId}`
+  const clientId = pendingMessageClientId(message)
+  if (clientId) {
+    return `${role}:client:${clientId}:${JSON.stringify({ content: message.content, attachments: message.attachments ?? [] })}`
+  }
+  const raw = message as Record<string, unknown>
+  for (const key of ['stableId', 'stable_id', 'id', 'messageId']) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim()) {
+      return `${role}:${key}:${value.trim()}`
+    }
+  }
+  const serialized = JSON.stringify(message)
+  let hash = 2166136261
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `${role}:value:${(hash >>> 0).toString(36)}`
+}
+
+function readPendingJournal(key: string): Array<ChatMessage> {
+  if (!canUseLocalStorage()) return []
+  return readMessageJournal(
+    key,
+    [window.localStorage],
+    pendingJournalIdentity,
+    (value) => {
+      const message = sanitizeCardOwnedMessage(value as ChatMessage)
+      return isCardTranscriptRecoveryMessagePortable(message) ? message : null
+    },
   )
 }
 
@@ -126,10 +168,9 @@ function writePendingSendToStorage(
   // atomic, so quota failure leaves the old envelope intact and lets the caller
   // fail admission before transport instead of evicting recovery data.
   let existing: PendingSendPayload | null = null
+  const key = getPendingStorageKey(payload.sessionKey)
   try {
-    const raw = window.localStorage.getItem(
-      getPendingStorageKey(payload.sessionKey),
-    )
+    const raw = window.localStorage.getItem(key)
     existing = raw
       ? toPendingSendPayload(JSON.parse(raw) as Record<string, unknown>)
       : null
@@ -140,6 +181,7 @@ function writePendingSendToStorage(
     ...payload,
     recoveryMessages: [
       ...(existing ? getPendingRecoveryMessages(existing) : []),
+      ...readPendingJournal(key),
       ...getPendingRecoveryMessages(payload),
     ],
   })
@@ -168,10 +210,18 @@ function writePendingSendToStorage(
   }
 
   try {
-    window.localStorage.setItem(
-      getPendingStorageKey(payload.sessionKey),
-      JSON.stringify(record),
+    const journalWrite = writeMessageJournal(
+      key,
+      recoveryMessages,
+      [window.localStorage],
+      pendingJournalIdentity,
     )
+    if (!journalWrite.persistentVerified) return false
+    const serialized = JSON.stringify(record)
+    window.localStorage.setItem(key, serialized)
+    // The per-message journal is the cross-context authority. The aggregate
+    // record is retained for transport metadata and legacy readers.
+    window.localStorage.getItem(key)
     return true
   } catch {
     return false
@@ -426,7 +476,18 @@ export function readPendingMessage(
     if (friendlyId && parsed.friendlyId !== friendlyId) {
       return readPendingSendFromStorageByFriendlyId(friendlyId)
     }
-    return toPendingSendPayload(parsed)
+    const payload = toPendingSendPayload(parsed)
+    if (!payload) return null
+    return {
+      ...payload,
+      recoveryMessages: getPendingRecoveryMessages({
+        ...payload,
+        recoveryMessages: [
+          ...getPendingRecoveryMessages(payload),
+          ...readPendingJournal(getPendingStorageKey(sessionKey)),
+        ],
+      }),
+    }
   } catch {
     try {
       window.localStorage.removeItem(getPendingStorageKey(sessionKey))
@@ -440,7 +501,9 @@ export function readPendingMessage(
 export function clearPendingMessage(sessionKey: string) {
   if (!canUseLocalStorage() || !sessionKey) return
   try {
-    window.localStorage.removeItem(getPendingStorageKey(sessionKey))
+    const key = getPendingStorageKey(sessionKey)
+    clearMessageJournal(key, [window.localStorage])
+    window.localStorage.removeItem(key)
   } catch {
     // Ignore storage cleanup failures.
   }

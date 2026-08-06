@@ -318,7 +318,7 @@ export function restoreCardStreamingStates(
             Number.isFinite(parsed._savedAt)
           ? parsed._savedAt
           : null
-    if (!savedAt || savedAt > Date.now() + 60_000) {
+    if (!savedAt || savedAt <= 0) {
       sessionStorage.removeItem(storageKey)
       return []
     }

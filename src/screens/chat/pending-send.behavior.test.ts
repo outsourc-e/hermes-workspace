@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   clearCardTranscriptRecoveryMemory,
@@ -62,6 +62,7 @@ describe('bootstrap pending-send recovery ownership', () => {
     window.localStorage.clear()
     window.sessionStorage.clear()
     clearCardTranscriptRecoveryMemory()
+    vi.restoreAllMocks()
   })
 
   it('durably appends a sanitized terminal assistant without clearing provisional ownership', () => {
@@ -139,6 +140,54 @@ describe('bootstrap pending-send recovery ownership', () => {
       { text: 'second question' },
       { text: 'second answer' },
     ])
+  })
+
+  it('unions divergent provisional turns when a stale tab writes last', () => {
+    persistBootstrap()
+    const key = 'workspace.chat-provisional-send.v1:new-chat'
+    const staleRaw = window.localStorage.getItem(key)
+    const first = provisionalUser('client-first-tab', 'first tab turn', 2)
+    expect(
+      persistPendingMessage({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'first tab turn',
+        attachments: [],
+        optimisticMessage: first,
+      }),
+    ).toBe(true)
+    const originalGetItem = Storage.prototype.getItem
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (
+      this: Storage,
+      storageKey,
+    ) {
+      if (this === window.localStorage && storageKey === key) return staleRaw
+      return originalGetItem.call(this, storageKey)
+    })
+    const second = provisionalUser('client-second-tab', 'second tab turn', 3)
+    expect(
+      persistPendingMessage({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'second tab turn',
+        attachments: [],
+        optimisticMessage: second,
+      }),
+    ).toBe(true)
+    vi.mocked(Storage.prototype.getItem).mockRestore()
+
+    const texts = getPendingRecoveryMessages(
+      readPendingMessage('new', 'new')!,
+    ).map(
+      (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
+    )
+    expect(texts).toEqual(
+      expect.arrayContaining([
+        'bootstrap question',
+        'first tab turn',
+        'second tab turn',
+      ]),
+    )
   })
 
   it('fails admission before transport instead of evicting retryable recovery rows', () => {
