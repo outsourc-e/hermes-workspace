@@ -47,7 +47,7 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
       throw new Error('Electron artifact initialization network disabled');
     };
     try {
-      init_router_g_zt8Hls();
+      init_router_DKJYSCjw();
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -254,8 +254,8 @@ describe('checked-in Electron server bundle behavior', () => {
         error: 'Session Card ownership changed before send',
       },
     })
-    expect(localStoreActions.ensureLocalSession).toHaveBeenCalledOnce()
-    expect(localStoreActions.appendLocalMessage).toHaveBeenCalledOnce()
+    expect(localStoreActions.ensureLocalSession).not.toHaveBeenCalled()
+    expect(localStoreActions.appendLocalMessage).not.toHaveBeenCalled()
     expect(providerActions.openaiChat).not.toHaveBeenCalled()
     expect(providerActions.streamResponses).not.toHaveBeenCalled()
     expect(providerActions.streamChat).not.toHaveBeenCalled()

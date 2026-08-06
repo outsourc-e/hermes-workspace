@@ -132,7 +132,7 @@ describe('checked-in Electron production server bundle', () => {
         /resolveExactSessionCardOperationBinding\(binding\d*\)/gu,
       ),
     ]
-    expect(edgeRevalidations).toHaveLength(3)
+    expect(edgeRevalidations).toHaveLength(4)
     for (const mutationPattern of [
       /const responsesStream(?:\$\d+)? = streamResponses\(/u,
       /const streamPending(?:\$\d+)? = openaiChat\(/u,
