@@ -32,14 +32,17 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => mocks.navigate,
 }))
 
-vi.mock('@/screens/chat/chat-queries', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@/screens/chat/chat-queries')>()
-  return {
-    ...actual,
-    fetchSessionCards: vi.fn(async () => mocks.cardWire),
-  }
-})
+vi.mock('@/screens/chat/chat-queries', () => ({
+  fetchSessionCards: vi.fn(() => Promise.resolve(mocks.cardWire)),
+  hasExactCompleteSessionCardProjection: (
+    response: SessionCardListWire | undefined,
+    cardId: string,
+  ) =>
+    response?.cardResolutions.some(
+      (resolution) =>
+        resolution.cardId === cardId && resolution.completeness === 'complete',
+    ) ?? false,
+}))
 
 vi.mock('@hugeicons/react', () => ({
   HugeiconsIcon: () => <span aria-hidden="true" />,
