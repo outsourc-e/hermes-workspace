@@ -24,8 +24,19 @@ import { Swarm2ReportsView, buildSwarm2InboxLanes } from './swarm2-reports-view'
 import type { Swarm2InboxItem } from './swarm2-reports-view'
 import type { CSSProperties } from 'react'
 import type { CrewMember } from '@/hooks/use-crew-status'
+import type {
+  SessionCardChildWire,
+  SessionCardListWire,
+  SessionCardWire,
+} from '@/screens/chat/chat-queries'
+import type { SwarmSessionCardOwner } from '@/hooks/use-swarm-chat'
 import { toast } from '@/components/ui/toast'
 import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
+import {
+  fetchSessionCards,
+  hasExactCompleteSessionCardProjection,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
@@ -407,6 +418,158 @@ function sanitizeRuntimeEntry(entry: RuntimeEntry): RuntimeEntry {
   const sanitized: Record<string, unknown> = { ...entry }
   for (const key of RAW_ACTIVITY_RUNTIME_KEYS) delete sanitized[key]
   return sanitized as RuntimeEntry
+}
+
+function exactSourceQualifiedIdentity(
+  value: unknown,
+  source: 'local' | 'remote',
+): value is string {
+  return (
+    typeof value === 'string' &&
+    value.trim() === value &&
+    value.startsWith(`${source}:`) &&
+    value.length > source.length + 1
+  )
+}
+
+function hasSourceCompleteContinuationProjection(
+  owner: {
+    cardId: string
+    canonicalSegmentKey: string
+    continuationSegmentKeys: ReadonlyArray<string>
+    continuationCount: number
+  },
+  source: 'local' | 'remote',
+): boolean {
+  const continuations = owner.continuationSegmentKeys
+  return (
+    exactSourceQualifiedIdentity(owner.cardId, source) &&
+    exactSourceQualifiedIdentity(owner.canonicalSegmentKey, source) &&
+    continuations.length > 0 &&
+    continuations.length === owner.continuationCount &&
+    continuations.every((identity) =>
+      exactSourceQualifiedIdentity(identity, source),
+    ) &&
+    new Set(continuations).size === continuations.length &&
+    continuations[0] === owner.cardId &&
+    continuations.at(-1) === owner.canonicalSegmentKey
+  )
+}
+
+function rootHasAuthoritativeProjection(
+  response: SessionCardListWire,
+  card: SessionCardWire,
+): card is SessionCardWire & { canonicalSource: 'local' | 'remote' } {
+  const source = card.canonicalSource
+  return (
+    (source === 'local' || source === 'remote') &&
+    card.parentCardId === undefined &&
+    (card.relationshipKind === 'root' || card.relationshipKind === 'orphan') &&
+    hasExactCompleteSessionCardProjection(response, card.cardId) &&
+    hasSourceCompleteContinuationProjection(card, source)
+  )
+}
+
+function childHasAuthoritativeProjection(
+  child: SessionCardChildWire,
+  source: 'local' | 'remote',
+): boolean {
+  return hasSourceCompleteContinuationProjection(
+    {
+      cardId: child.cardId,
+      canonicalSegmentKey: child.sessionKey,
+      continuationSegmentKeys: child.continuationSegmentKeys,
+      continuationCount: child.continuationCount,
+    },
+    source,
+  )
+}
+
+function ownsExactWorkerAlias(
+  workerId: string,
+  source: 'local' | 'remote',
+  identities: ReadonlyArray<string>,
+): boolean {
+  if (!workerId || workerId.trim() !== workerId) return false
+  return identities.includes(`${source}:${workerId}`)
+}
+
+/**
+ * Project a stable Card owner from one exact source-qualified worker alias.
+ * The alias is only lookup evidence: the returned owner is always copied from
+ * a unique, source-complete Card projection and never retained in browser state.
+ */
+export function resolveSwarmWorkerCardOwner(
+  response: SessionCardListWire | undefined,
+  workerId: string,
+): SwarmSessionCardOwner | null {
+  if (
+    !response ||
+    !Array.isArray(response.cards) ||
+    !Array.isArray(response.cardResolutions)
+  ) {
+    return null
+  }
+
+  const candidates: Array<SwarmSessionCardOwner> = []
+  for (const card of response.cards) {
+    if (!rootHasAuthoritativeProjection(response, card)) continue
+    const source = card.canonicalSource
+    if (
+      ownsExactWorkerAlias(workerId, source, [
+        card.cardId,
+        card.canonicalSegmentKey,
+        ...card.continuationSegmentKeys,
+      ])
+    ) {
+      candidates.push({
+        kind: 'session-card-owner',
+        cardId: card.cardId,
+        parentCardId: null,
+      })
+    }
+
+    for (const child of card.childNodes) {
+      if (!childHasAuthoritativeProjection(child, source)) continue
+      if (
+        ownsExactWorkerAlias(workerId, source, [
+          child.cardId,
+          child.sessionKey,
+          ...child.continuationSegmentKeys,
+        ])
+      ) {
+        candidates.push({
+          kind: 'session-card-owner',
+          cardId: child.cardId,
+          parentCardId: card.cardId,
+        })
+      }
+    }
+  }
+
+  return candidates.length === 1 ? candidates[0]! : null
+}
+
+function projectUniqueSwarmWorkerCardOwners(
+  response: SessionCardListWire | undefined,
+  workerIds: ReadonlyArray<string>,
+): ReadonlyMap<string, SwarmSessionCardOwner> {
+  const projected = workerIds.flatMap((workerId) => {
+    const owner = resolveSwarmWorkerCardOwner(response, workerId)
+    return owner ? [{ workerId, owner }] : []
+  })
+  const ownerCounts = new Map<string, number>()
+  for (const { owner } of projected) {
+    const key = JSON.stringify([owner.parentCardId, owner.cardId])
+    ownerCounts.set(key, (ownerCounts.get(key) ?? 0) + 1)
+  }
+
+  return new Map(
+    projected.flatMap(({ workerId, owner }) => {
+      const key = JSON.stringify([owner.parentCardId, owner.cardId])
+      return ownerCounts.get(key) === 1 ? [[workerId, owner] as const] : []
+    }),
+  )
 }
 
 async function fetchRuntime(): Promise<RuntimeResponse> {
@@ -804,6 +967,7 @@ type ControlPlaneStageProps = {
   onOpenTui: (workerId: string) => void
   onOpenTasks: (workerId: string) => void
   runtimeByWorker: Map<string, RuntimeEntry>
+  chatCardOwnersByWorker: ReadonlyMap<string, SwarmSessionCardOwner>
   terminalTargets: Array<CrewMember>
   tmuxAvailable: boolean
   pendingTmux: Set<string>
@@ -844,6 +1008,7 @@ function ControlPlaneStage({
   onOpenTui,
   onOpenTasks,
   runtimeByWorker,
+  chatCardOwnersByWorker,
   terminalTargets,
   tmuxAvailable,
   pendingTmux,
@@ -984,6 +1149,9 @@ function ControlPlaneStage({
                         runtime?.lastResult ??
                         runtime?.blockedReason ??
                         null
+                      }
+                      chatCardOwner={
+                        chatCardOwnersByWorker.get(member.id) ?? null
                       }
                       artifacts={runtime?.artifacts ?? []}
                       previews={runtime?.previews ?? []}
@@ -1272,6 +1440,13 @@ export function Swarm2Screen() {
   >(null)
   const topRef = useRef<HTMLDivElement | null>(null)
 
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
+    retry: 1,
+    staleTime: 5_000,
+    refetchInterval: 10_000,
+  })
   const runtimeQuery = useQuery({
     queryKey: ['swarm2', 'runtime'],
     queryFn: fetchRuntime,
@@ -1448,6 +1623,14 @@ export function Swarm2Screen() {
       }))
     return sortSwarmMembers([...merged, ...extras], roomIds)
   }, [crew, roomIds, runtimeByWorker, rosterQuery.data])
+  const chatCardOwnersByWorker = useMemo(
+    () =>
+      projectUniqueSwarmWorkerCardOwners(
+        sessionCardsQuery.data,
+        members.map((member) => member.id),
+      ),
+    [members, sessionCardsQuery.data],
+  )
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1928,6 +2111,7 @@ export function Swarm2Screen() {
               setRouterOpen(true)
             }}
             runtimeByWorker={runtimeByWorker}
+            chatCardOwnersByWorker={chatCardOwnersByWorker}
             latestMission={latestMission}
             missions={missionsQuery.data ?? []}
             runtimeEntries={runtimeEntries}
