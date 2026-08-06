@@ -337,7 +337,7 @@ describe('Card transcript recovery storage contract', () => {
     expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
   })
 
-  it('does not guess which distinct repeated same-text overlay an ordinary server row acknowledges', () => {
+  it('consumes one repeated ordinary server acknowledgement and preserves the additional turn', () => {
     const first = message('user', 'repeat this exact turn', {
       clientId: 'repeat-first',
       status: 'sent',
@@ -359,7 +359,98 @@ describe('Card transcript recovery storage contract', () => {
       { now },
     )
 
-    expect(reconciled?.messages).toEqual([first, second])
+    expect(reconciled?.messages).toEqual([second])
+  })
+
+  it('acknowledges repeated equal paired turns in order without duplicate overlays', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    const overlays = [
+      message('user', 'same prompt', { clientId: 'client-a' }),
+      message('assistant', 'same acknowledgement', { runId: 'run-a' }),
+      message('user', 'same prompt', { clientId: 'client-b' }),
+      message('assistant', 'same acknowledgement', { runId: 'run-b' }),
+    ]
+    replaceCardTranscriptRecoveryMessages(owner, overlays, { now })
+
+    const server: SessionCardHistoryResponse = {
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [
+        message('user', 'same prompt', { id: 'server-user-a' }),
+        message('assistant', 'same acknowledgement', {
+          id: 'server-assistant-a',
+        }),
+        message('user', 'same prompt', { id: 'server-user-b' }),
+        message('assistant', 'same acknowledgement', {
+          id: 'server-assistant-b',
+        }),
+      ],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+
+    const reconciled = reconcileSessionCardHistoryResponse(server)
+    expect(reconciled.messages).toEqual(server.messages)
+    expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
+  })
+
+  it('hydrates acknowledged attachment history without duplicating the user turn', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    const attachment = {
+      id: 'attachment-local',
+      name: 'notes.txt',
+      contentType: 'text/plain',
+      size: 5,
+      dataUrl: 'hello',
+    }
+    replaceCardTranscriptRecoveryMessages(
+      owner,
+      [
+        {
+          ...message('user', 'review this file', { clientId: 'client-file' }),
+          attachments: [attachment],
+        },
+      ],
+      { now },
+    )
+    const server: SessionCardHistoryResponse = {
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [
+        {
+          ...message('user', 'review this file', {
+            id: 'server-file-message',
+          }),
+          attachments: [
+            {
+              id: 'attachment-server',
+              name: 'notes.txt',
+              contentType: 'text/plain',
+              size: 5,
+            },
+          ],
+        },
+      ],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+
+    const reconciled = reconcileSessionCardHistoryResponse(server)
+    expect(reconciled.messages).toHaveLength(1)
+    expect(reconciled.messages[0]).toMatchObject({
+      id: 'server-file-message',
+      attachments: [
+        {
+          ...attachment,
+          id: 'attachment-server',
+        },
+      ],
+    })
+    expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
   })
 
   it('keeps user and terminal assistant overlays through a stale complete refetch when quota persistence throws', () => {

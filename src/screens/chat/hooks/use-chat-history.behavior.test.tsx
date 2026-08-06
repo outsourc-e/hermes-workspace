@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getChatSessionSourceState } from '../chat-screen-utils'
+import { persistPendingMessage } from '../pending-send'
 import { useChatHistory } from './use-chat-history'
 import type { QueryClient as QueryClientType } from '@tanstack/react-query'
 
@@ -103,6 +104,37 @@ function HistoryHarness({
   return null
 }
 
+function PendingNewHistoryHarness({
+  queryClient,
+}: {
+  queryClient: QueryClientType
+}) {
+  const history = useChatHistory({
+    activeFriendlyId: 'new',
+    activeSessionKey: 'new',
+    forcedSessionKey: 'new',
+    isNewChat: true,
+    isRedirecting: false,
+    activeExists: false,
+    sessionsReady: true,
+    queryClient,
+  })
+  return (
+    <div data-testid="new-chat-transcript">
+      {history.displayMessages.map((message, index) => (
+        <article key={index}>
+          {message.content?.map((part) =>
+            part.type === 'text' ? part.text : '',
+          )}
+          {(message as Record<string, unknown>).status === 'error' ? (
+            <button type="button">Retry message</button>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  )
+}
+
 async function flushQueries() {
   await React.act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -197,6 +229,55 @@ describe('useChatHistory cold session source behavior', () => {
     React.act(() => root.unmount())
     document.body.removeChild(container)
     queryClient.clear()
+  })
+
+  it('restores a failed first turn from the provisional owner after /chat/new remount', async () => {
+    const optimisticMessage = {
+      role: 'user',
+      content: [{ type: 'text' as const, text: 'first turn survives' }],
+      timestamp: Date.now(),
+      clientId: 'first-turn-client',
+      client_id: 'first-turn-client',
+      __optimisticId: 'opt-first-turn-client',
+      status: 'error',
+    }
+    expect(
+      persistPendingMessage({
+        sessionKey: 'new',
+        friendlyId: 'new',
+        message: 'first turn survives',
+        attachments: [],
+        optimisticMessage,
+      }),
+    ).toBe(true)
+    expect(
+      window.localStorage.getItem(
+        'workspace.chat-provisional-send.v1:new-chat',
+      ),
+    ).toContain('first turn survives')
+    expect(window.localStorage.getItem('claude_pending_msg_new')).toBeNull()
+
+    const mount = async () => {
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      })
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+      React.act(() => {
+        root.render(<PendingNewHistoryHarness queryClient={queryClient} />)
+      })
+      await flushQueries()
+      expect(container.textContent).toContain('first turn survives')
+      expect(container.textContent).toContain('Retry message')
+      React.act(() => root.unmount())
+      document.body.removeChild(container)
+      queryClient.clear()
+    }
+
+    await mount()
+    await mount()
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('treats missing metadata after a session-list failure as remote-eligible', async () => {

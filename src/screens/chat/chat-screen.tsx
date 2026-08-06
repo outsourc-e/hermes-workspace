@@ -56,9 +56,15 @@ import {
   hasPendingGeneration,
   hasPendingSend,
   isRecentSession,
+  persistPendingMessage,
   resetPendingSend,
   setPendingGeneration,
+  updatePendingMessageByClientId,
 } from './pending-send'
+import {
+  appendCardTranscriptRecoveryMessage,
+  isCardTranscriptRecoveryMessagePortable,
+} from './card-transcript-recovery'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
@@ -1672,19 +1678,31 @@ export function ChatScreen({
       ({ runId }: { runId: string | null }) => {
         const activeSend = activeSendRef.current
         if (!activeSend?.clientId) return
-        updateHistoryMessageByClientIdEverywhere(
-          queryClient,
-          activeSend.clientId,
-          (message) => ({
-            ...message,
-            status: 'sent',
-            // Clear __optimisticId so isOptimisticUserMessage returns false.
-            // Without this the message keeps being treated as pending and
-            // gets re-persisted, causing transcript duplication. Fixes #506.
-            __optimisticId: undefined,
-            runId: runId ?? message.runId,
-          }),
-        )
+        const markAccepted = (message: ChatMessage): ChatMessage => ({
+          ...message,
+          status: 'sent',
+          // Clear __optimisticId so isOptimisticUserMessage returns false.
+          // Without this the message keeps being treated as pending and
+          // gets re-persisted, causing transcript duplication. Fixes #506.
+          __optimisticId: undefined,
+          runId: runId ?? message.runId,
+        })
+        if (activeSend.cardId) {
+          updateSessionCardTransientMessageByClientId(
+            queryClient,
+            activeSend.cardId,
+            activeSend.sessionKey,
+            activeSend.clientId,
+            markAccepted,
+          )
+        } else {
+          updateHistoryMessageByClientIdEverywhere(
+            queryClient,
+            activeSend.clientId,
+            markAccepted,
+          )
+        }
+        updatePendingMessageByClientId(activeSend.clientId, markAccepted)
         setSending(false)
       },
       [queryClient],
@@ -1770,6 +1788,7 @@ export function ChatScreen({
               markFailed,
             )
           }
+          updatePendingMessageByClientId(activeSend.clientId, markFailed)
         }
         activeSendRef.current = null
         liveStreamSessionKeyRef.current = null
@@ -2706,19 +2725,17 @@ export function ChatScreen({
 
   useLayoutEffect(() => {
     if (isNewChat || !cardTransportReady) return
-    const pending = consumePendingSend(
-      activeCard
-        ? activeCardCanonicalSegmentKey || ''
-        : isPortableMode
-          ? 'main'
-          : forcedSessionKey || resolvedSessionKey || activeSessionKey,
-      transportFriendlyId,
-    )
+    const currentSessionKey = activeCard
+      ? activeCardCanonicalSegmentKey || ''
+      : isPortableMode
+        ? 'main'
+        : forcedSessionKey || resolvedSessionKey || activeSessionKey
+    const pending = consumePendingSend(currentSessionKey, transportFriendlyId)
     if (!pending) return
     pendingStartRef.current = true
     const historyKey = activeCard
       ? sessionCardQueryKeys.history(activeCard.cardId)
-      : chatQueryKeys.history(pending.friendlyId, pending.sessionKey)
+      : chatQueryKeys.history(transportFriendlyId, currentSessionKey)
     const cached = queryClient.getQueryData(historyKey)
     const cachedMessages = Array.isArray((cached as any)?.messages)
       ? (cached as any).messages
@@ -2746,16 +2763,16 @@ export function ChatScreen({
       } else {
         appendHistoryMessage(
           queryClient,
-          pending.friendlyId,
-          pending.sessionKey,
+          transportFriendlyId,
+          currentSessionKey,
           pending.optimisticMessage,
         )
       }
     }
     setWaitingForResponse(true)
     sendMessage(
-      pending.sessionKey,
-      pending.friendlyId,
+      currentSessionKey,
+      transportFriendlyId,
       pending.message,
       pending.attachments,
       false,
@@ -3018,66 +3035,126 @@ export function ChatScreen({
       lastSendKeyRef.current = sendKey
       lastSendAtRef.current = now
 
-      // Haptic feedback on mobile when message is sent
-      if (isMobile) hapticTap()
-
-      helpers.reset()
-
-      // Scroll to bottom immediately so user sees their message + incoming response
-      requestAnimationFrame(() => scrollChatToBottom('smooth'))
-
       const attachmentPayload: Array<ChatAttachment> = attachments.map(
         (attachment) => ({
-          ...attachment,
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-          id: attachment.id ?? crypto.randomUUID(),
+          id: attachment.id || crypto.randomUUID(),
+          name: attachment.name,
+          contentType: attachment.contentType,
+          size: attachment.size,
+          dataUrl: attachment.dataUrl,
         }),
       )
+      const requiresDurableOverlay = isNewChat || attachmentPayload.length > 0
+      let durableOptimisticMessage: ChatMessage | null = null
+      let durableClientId = ''
 
-      if (isNewChat) {
-        // Every mode must stay on the accepted `new` bootstrap route. The
-        // send-stream server creates the backend session and may resolve it to
-        // a stable Card; only that authoritative handoff is allowed to replace
-        // the route. A client-generated UUID is a raw segment and is rejected
-        // by Card-only routing.
-        const threadId = 'new'
-        const { optimisticMessage } = createOptimisticMessage(
+      if (requiresDurableOverlay) {
+        const missingPortableAttachment = attachmentPayload.some(
+          (attachment) => typeof attachment.dataUrl !== 'string',
+        )
+        const optimistic = createOptimisticMessage(
           trimmedBody,
           attachmentPayload,
         )
-        appendHistoryMessage(queryClient, threadId, threadId, optimisticMessage)
-        setPendingGeneration(true)
-        setSending(true)
-        setWaitingForResponse(true)
-
-        sendMessage(
-          threadId,
-          threadId,
-          trimmedBody,
-          attachmentPayload,
-          fastMode,
-          true,
-          typeof optimisticMessage.clientId === 'string'
-            ? optimisticMessage.clientId
-            : '',
-        )
-        // Stay on new until onSessionResolved receives the server's
-        // authoritative Card ID and canonical segment key.
-        return
+        durableOptimisticMessage = optimistic.optimisticMessage
+        durableClientId = optimistic.clientId
+        if (
+          missingPortableAttachment ||
+          !isCardTranscriptRecoveryMessagePortable(optimistic.optimisticMessage)
+        ) {
+          const safeMessage =
+            attachmentPayload.length > 0
+              ? 'This message was not sent because its attachments cannot be stored safely for recovery. Remove or reduce the attachments and try again.'
+              : 'This first message was not sent because it cannot be stored safely until the new conversation is created. Reduce it and try again.'
+          setError(safeMessage)
+          toast(safeMessage, { type: 'error' })
+          showErrorToast(safeMessage)
+          return
+        }
       }
 
-      const sessionKeyForSend = activeCard
-        ? activeCardCanonicalSegmentKey || ''
-        : isPortableMode
-          ? 'main'
-          : forcedSessionKey || resolvedSessionKey || activeSessionKey || 'main'
+      const sessionKeyForSend = isNewChat
+        ? 'new'
+        : activeCard
+          ? activeCardCanonicalSegmentKey || ''
+          : isPortableMode
+            ? 'main'
+            : forcedSessionKey ||
+              resolvedSessionKey ||
+              activeSessionKey ||
+              'main'
+
+      if (durableOptimisticMessage) {
+        let persisted = false
+        if (activeCard) {
+          persisted = Boolean(
+            appendCardTranscriptRecoveryMessage(
+              { cardId: activeCard.cardId },
+              durableOptimisticMessage,
+            ),
+          )
+          if (persisted) {
+            appendSessionCardTransientMessage(
+              queryClient,
+              activeCard.cardId,
+              sessionKeyForSend,
+              durableOptimisticMessage,
+            )
+          }
+        } else {
+          persisted = persistPendingMessage({
+            sessionKey: sessionKeyForSend,
+            friendlyId: isNewChat ? 'new' : transportFriendlyId,
+            message: trimmedBody,
+            attachments: attachmentPayload,
+            optimisticMessage: durableOptimisticMessage,
+          })
+          if (persisted) {
+            appendHistoryMessage(
+              queryClient,
+              isNewChat ? 'new' : transportFriendlyId,
+              sessionKeyForSend,
+              durableOptimisticMessage,
+            )
+          }
+        }
+
+        if (!persisted) {
+          const safeMessage =
+            attachmentPayload.length > 0
+              ? 'This message was not sent because its attachments could not be saved for recovery. Free browser storage or remove the attachments, then try again.'
+              : 'This first message was not sent because it could not be saved safely. Free browser storage and try again.'
+          setError(safeMessage)
+          toast(safeMessage, { type: 'error' })
+          showErrorToast(safeMessage)
+          return
+        }
+        updateSessionLastMessage(
+          queryClient,
+          sessionKeyForSend,
+          isNewChat ? 'new' : transportFriendlyId,
+          durableOptimisticMessage,
+        )
+      }
+
+      helpers.reset()
+      // Haptic feedback on mobile only after the durable overlay is accepted.
+      if (isMobile) hapticTap()
+      requestAnimationFrame(() => scrollChatToBottom('smooth'))
+
       sendMessage(
         sessionKeyForSend,
-        transportFriendlyId,
+        isNewChat ? 'new' : transportFriendlyId,
         trimmedBody,
         attachmentPayload,
         fastMode,
+        durableOptimisticMessage !== null,
+        durableClientId,
       )
+      // New Chat stays on the bootstrap route until the stream provides the
+      // authoritative Card handoff; its provisional localStorage owner is moved
+      // only after the destination record has landed.
+      if (isNewChat) return
     },
     [
       activeCard,
@@ -3101,14 +3178,26 @@ export function ChatScreen({
   const handleAbortStreaming = useCallback(() => {
     const activeSend = activeSendRef.current
     if (activeSend?.clientId) {
-      updateHistoryMessageByClientIdEverywhere(
-        queryClient,
-        activeSend.clientId,
-        (message) => ({
-          ...message,
-          status: 'sent',
-        }),
-      )
+      const markCancelled = (message: ChatMessage): ChatMessage => ({
+        ...message,
+        status: 'error',
+      })
+      if (activeSend.cardId) {
+        updateSessionCardTransientMessageByClientId(
+          queryClient,
+          activeSend.cardId,
+          activeSend.sessionKey,
+          activeSend.clientId,
+          markCancelled,
+        )
+      } else {
+        updateHistoryMessageByClientIdEverywhere(
+          queryClient,
+          activeSend.clientId,
+          markCancelled,
+        )
+      }
+      updatePendingMessageByClientId(activeSend.clientId, markCancelled)
     }
     cancelStreaming()
     activeSendRef.current = null

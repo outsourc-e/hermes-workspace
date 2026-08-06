@@ -435,7 +435,7 @@ export function useChatHistory({
   }, [canonicalChanged, canonicalResolutionReady, historyQuery.data?.messages])
 
   useEffect(() => {
-    if (!sessionKeyForHistory || sessionKeyForHistory === 'new') return
+    if (!sessionKeyForHistory) return
 
     const optimisticMessages = rawHistoryMessages.filter(
       isOptimisticUserMessage,

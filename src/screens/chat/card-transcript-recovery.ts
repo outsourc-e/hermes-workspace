@@ -1,4 +1,4 @@
-import type { ChatMessage } from './types'
+import type { ChatAttachment, ChatMessage } from './types'
 
 export const CARD_TRANSCRIPT_RECOVERY_VERSION = 2 as const
 export const CARD_TRANSCRIPT_RECOVERY_PREFIX =
@@ -371,12 +371,15 @@ function hasAuthoritativeIdentity(message: ChatMessage): boolean {
   )
 }
 
-/**
- * Ordinary persisted rows often receive new server-side client/run IDs. They
- * may acknowledge a recovery overlay only when content, role, and timestamp
- * agree and the mapping is unique in both directions. The uniqueness gate is
- * what preserves genuinely distinct repeated same-text turns.
- */
+function messageTextSignature(message: ChatMessage): string {
+  const raw = message as Record<string, unknown>
+  const content = Array.isArray(message.content) ? message.content : []
+  const topLevelText = ['text', 'body', 'message']
+    .map((key) => (typeof raw[key] === 'string' ? raw[key] : ''))
+    .find((value) => value.length > 0)
+  return JSON.stringify({ content, text: topLevelText ?? '' })
+}
+
 function ordinaryServerAcknowledgementMatches(
   recoveryMessage: ChatMessage,
   authoritativeMessage: ChatMessage,
@@ -385,7 +388,8 @@ function ordinaryServerAcknowledgementMatches(
     recoveryMessage.role === authoritativeMessage.role &&
     isRecoveryOverlay(recoveryMessage) &&
     hasAuthoritativeIdentity(authoritativeMessage) &&
-    compatibleContent(recoveryMessage, authoritativeMessage) &&
+    messageTextSignature(recoveryMessage) ===
+      messageTextSignature(authoritativeMessage) &&
     compatibleTimestamp(recoveryMessage, authoritativeMessage)
   )
 }
@@ -634,6 +638,22 @@ export function appendCardTranscriptRecoveryMessage(
   )
 }
 
+/** Preflight the exact scrubbed message representation used for recovery. */
+export function isCardTranscriptRecoveryMessagePortable(
+  message: ChatMessage,
+): boolean {
+  const sanitized = sanitizeCardOwnedMessage(message)
+  if (!validMessage(sanitized)) return false
+  try {
+    return (
+      JSON.stringify(sanitized).length <=
+      CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGE_CHARS
+    )
+  } catch {
+    return false
+  }
+}
+
 export function mergeCardTranscriptRecoveryMessages(
   persistedMessages: Array<ChatMessage>,
   recoveryMessages: Array<ChatMessage>,
@@ -652,58 +672,121 @@ export function mergeCardTranscriptRecoveryMessages(
   return merged
 }
 
-export function removeAcknowledgedCardTranscriptRecoveryMessages(
+function mergeAcknowledgedAttachments(
+  authoritativeMessage: ChatMessage,
+  recoveryMessage: ChatMessage,
+): Array<ChatAttachment> {
+  const authoritativeAttachments = Array.isArray(
+    authoritativeMessage.attachments,
+  )
+    ? authoritativeMessage.attachments
+    : []
+  const recoveryAttachments = recoveryMessage.attachments ?? []
+  const merged = recoveryAttachments.map((recoveryAttachment, index) => ({
+    ...recoveryAttachment,
+    ...(authoritativeAttachments[index] ?? {}),
+  }))
+  if (authoritativeAttachments.length > recoveryAttachments.length) {
+    merged.push(...authoritativeAttachments.slice(recoveryAttachments.length))
+  }
+  return merged
+}
+
+type CardTranscriptAcknowledgement = {
+  authoritativeMessages: Array<ChatMessage>
+  recovery: CardTranscriptRecoveryEnvelope | null
+}
+
+/**
+ * Consume ordinary history acknowledgements as one bounded, ordered sequence.
+ * Each authoritative row can acknowledge at most one recovery row. This makes
+ * repeated equal text deterministic: two persisted pairs acknowledge two local
+ * pairs, while one persisted pair leaves the truly additional local pair.
+ */
+export function reconcileAcknowledgedCardTranscriptRecoveryMessages(
   owner: CardTranscriptRecoveryOwner,
   authoritativeMessages: Array<ChatMessage>,
   options: RecoveryOptions = {},
-): CardTranscriptRecoveryEnvelope | null {
+): CardTranscriptAcknowledgement {
   const recovery = readCardTranscriptRecovery(owner, options)
-  if (!recovery) return null
-  const acknowledgedRecoveryIndexes = new Set<number>()
-  const consumedAuthoritativeIndexes = new Set<number>()
-
-  for (const [recoveryIndex, recoveryMessage] of recovery.messages.entries()) {
-    const authoritativeIndex = authoritativeMessages.findIndex(
-      (authoritativeMessage, index) =>
-        !consumedAuthoritativeIndexes.has(index) &&
-        cardTranscriptMessagesMatch(authoritativeMessage, recoveryMessage),
-    )
-    if (authoritativeIndex < 0) continue
-    acknowledgedRecoveryIndexes.add(recoveryIndex)
-    consumedAuthoritativeIndexes.add(authoritativeIndex)
+  if (!recovery) {
+    return { authoritativeMessages, recovery: null }
   }
 
+  const boundedAuthoritativeStart = Math.max(
+    0,
+    authoritativeMessages.length - CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES * 4,
+  )
+  const acknowledgedRecoveryIndexes = new Set<number>()
+  const enrichedAuthoritativeMessages = [...authoritativeMessages]
+  let authoritativeCursor = boundedAuthoritativeStart
+
   for (const [recoveryIndex, recoveryMessage] of recovery.messages.entries()) {
-    if (acknowledgedRecoveryIndexes.has(recoveryIndex)) continue
-    const candidateAuthoritativeIndexes = authoritativeMessages
-      .map((authoritativeMessage, index) => ({ authoritativeMessage, index }))
-      .filter(
-        ({ authoritativeMessage, index }) =>
-          !consumedAuthoritativeIndexes.has(index) &&
-          ordinaryServerAcknowledgementMatches(
-            recoveryMessage,
-            authoritativeMessage,
-          ),
-      )
-      .map(({ index }) => index)
-    if (candidateAuthoritativeIndexes.length !== 1) continue
+    let authoritativeIndex = -1
 
-    const authoritativeIndex = candidateAuthoritativeIndexes[0]!
-    const authoritativeMessage = authoritativeMessages[authoritativeIndex]!
-    const candidateRecoveryCount = recovery.messages.filter(
-      (candidate, index) =>
-        !acknowledgedRecoveryIndexes.has(index) &&
-        ordinaryServerAcknowledgementMatches(candidate, authoritativeMessage),
-    ).length
-    if (candidateRecoveryCount !== 1) continue
+    for (
+      let index = authoritativeCursor;
+      index < authoritativeMessages.length;
+      index += 1
+    ) {
+      const authoritativeMessage = authoritativeMessages[index]!
+      if (
+        cardTranscriptMessagesMatch(authoritativeMessage, recoveryMessage) ||
+        ordinaryServerAcknowledgementMatches(
+          recoveryMessage,
+          authoritativeMessage,
+        )
+      ) {
+        authoritativeIndex = index
+        break
+      }
+    }
 
+    if (authoritativeIndex < 0) continue
     acknowledgedRecoveryIndexes.add(recoveryIndex)
-    consumedAuthoritativeIndexes.add(authoritativeIndex)
+    authoritativeCursor = authoritativeIndex + 1
+
+    const authoritativeMessage =
+      enrichedAuthoritativeMessages[authoritativeIndex]!
+    if (
+      Array.isArray(recoveryMessage.attachments) &&
+      recoveryMessage.attachments.length > 0
+    ) {
+      // Ordinary server history may omit portable attachment bytes. Keep the
+      // authoritative row identity/order, but hydrate its attachment projection
+      // before removing the local overlay so history does not lose the file or
+      // render a second copy of the same user turn.
+      enrichedAuthoritativeMessages[authoritativeIndex] = {
+        ...authoritativeMessage,
+        attachments: mergeAcknowledgedAttachments(
+          authoritativeMessage,
+          recoveryMessage,
+        ),
+      }
+    }
   }
 
   const remaining = recovery.messages.filter(
     (_recoveryMessage, index) => !acknowledgedRecoveryIndexes.has(index),
   )
-  if (remaining.length === recovery.messages.length) return recovery
-  return replaceCardTranscriptRecoveryMessages(owner, remaining, options)
+  const nextRecovery =
+    remaining.length === recovery.messages.length
+      ? recovery
+      : replaceCardTranscriptRecoveryMessages(owner, remaining, options)
+  return {
+    authoritativeMessages: enrichedAuthoritativeMessages,
+    recovery: nextRecovery,
+  }
+}
+
+export function removeAcknowledgedCardTranscriptRecoveryMessages(
+  owner: CardTranscriptRecoveryOwner,
+  authoritativeMessages: Array<ChatMessage>,
+  options: RecoveryOptions = {},
+): CardTranscriptRecoveryEnvelope | null {
+  return reconcileAcknowledgedCardTranscriptRecoveryMessages(
+    owner,
+    authoritativeMessages,
+    options,
+  ).recovery
 }

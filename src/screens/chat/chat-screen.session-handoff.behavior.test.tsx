@@ -20,6 +20,7 @@ import {
   persistPendingMessage,
   readPendingMessage,
   resetPendingSend,
+  stashPendingSend,
 } from './pending-send'
 import type { SessionRouteResolutionPayload } from '../../routes/chat/-session-route-state'
 import type {
@@ -28,6 +29,7 @@ import type {
   SessionCardListWire,
 } from './chat-queries'
 import type { ChatMessage, HistoryResponse, SessionCard } from './types'
+import { showErrorToast } from '@/components/error-toast'
 
 const navigate = vi.fn()
 const cardMutationMocks = vi.hoisted(() => ({
@@ -350,7 +352,13 @@ vi.mock('./components/chat-composer', () => ({
   ChatComposer: (props: {
     onSubmit: (
       body: string,
-      attachments: Array<never>,
+      attachments: Array<{
+        id: string
+        name: string
+        contentType: string
+        size: number
+        dataUrl?: string
+      }>,
       fastMode: boolean,
       helpers: {
         reset: () => void
@@ -358,21 +366,76 @@ vi.mock('./components/chat-composer', () => ({
         getValue: () => string
       },
     ) => void
-  }) => (
-    <button
-      type="button"
-      data-testid="send-message"
-      onClick={() =>
-        props.onSubmit('continue', [], false, {
-          reset() {},
-          setValue() {},
-          getValue: () => '',
-        })
-      }
-    >
-      Send
-    </button>
-  ),
+    onAbort?: () => void
+  }) => {
+    const helpers = {
+      reset() {},
+      setValue() {},
+      getValue: () => '',
+    }
+    return (
+      <div>
+        <button
+          type="button"
+          data-testid="send-message"
+          onClick={() => props.onSubmit('continue', [], false, helpers)}
+        >
+          Send
+        </button>
+        <button
+          type="button"
+          data-testid="send-safe-attachment"
+          onClick={() =>
+            props.onSubmit(
+              'continue with file',
+              [
+                {
+                  id: 'safe-file',
+                  name: 'notes.txt',
+                  contentType: 'text/plain',
+                  size: 5,
+                  dataUrl: 'hello',
+                },
+              ],
+              false,
+              helpers,
+            )
+          }
+        >
+          Send safe attachment
+        </button>
+        <button
+          type="button"
+          data-testid="send-unsafe-attachment"
+          onClick={() =>
+            props.onSubmit(
+              'continue with huge file',
+              [
+                {
+                  id: 'unsafe-file',
+                  name: 'huge.txt',
+                  contentType: 'text/plain',
+                  size: 200_000,
+                  dataUrl: 'x'.repeat(200_000),
+                },
+              ],
+              false,
+              helpers,
+            )
+          }
+        >
+          Send unsafe attachment
+        </button>
+        <button
+          type="button"
+          data-testid="stop-message"
+          onClick={props.onAbort}
+        >
+          Stop
+        </button>
+      </div>
+    )
+  },
 }))
 
 vi.mock('./hooks/use-chat-measurements', () => ({
@@ -840,6 +903,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     window.sessionStorage.clear()
     resetPendingSend()
     navigate.mockReset()
+    vi.mocked(showErrorToast).mockReset()
     cardMutationMocks.archiveSessionCard
       .mockReset()
       .mockResolvedValue(undefined)
@@ -3009,6 +3073,310 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     expect(stream.getRequestSignal()?.aborted).toBe(false)
 
     React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('keeps a failed /chat/new first turn in the provisional owner for retry', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      if (String(input) === '/api/send-stream') {
+        return Promise.resolve(
+          new Response('bootstrap unavailable', { status: 503 }),
+        )
+      }
+      return Promise.resolve(new Response('{}', { status: 200 }))
+    })
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId="new"
+            forcedSessionKey="new"
+            isNewChat
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+
+    await waitForAssertion(() => {
+      expect(readPendingMessage('new', 'new')?.optimisticMessage).toMatchObject(
+        {
+          role: 'user',
+          status: 'error',
+        },
+      )
+      expect(showErrorToast).toHaveBeenCalledWith('bootstrap unavailable')
+    })
+    expect(
+      window.localStorage.getItem(
+        'workspace.chat-provisional-send.v1:new-chat',
+      ),
+    ).toContain('continue')
+    expect(window.localStorage.getItem('claude_pending_msg_new')).toBeNull()
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('keeps a cancelled pre-handoff /chat/new first turn retryable', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const stream = createReaderHarness()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId="new"
+            forcedSessionKey="new"
+            isNewChat
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+    await waitForAssertion(() =>
+      expect(stream.getRequestSignal()).toBeDefined(),
+    )
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="stop-message"]')!
+        .click()
+    })
+
+    expect(readPendingMessage('new', 'new')?.optimisticMessage).toMatchObject({
+      role: 'user',
+      status: 'error',
+    })
+    expect(navigate).not.toHaveBeenCalled()
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('rejects an attachment before send when its recovery representation is unsafe', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard = createRootCard({
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:tip',
+    })
+    queryContext.cardHistories.set(activeCard.cardId, {
+      sessionKey: 'remote:tip',
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: 'remote:tip',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }))
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCardList={cardList([activeCard])}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-unsafe-attachment"]')!
+        .click()
+    })
+
+    expect(showErrorToast).toHaveBeenCalledWith(
+      expect.stringContaining('attachments cannot be stored safely'),
+    )
+    expect(
+      fetchSpy.mock.calls.some(
+        ([input]) => String(input) === '/api/send-stream',
+      ),
+    ).toBe(false)
+    expect(readCardTranscriptRecovery({ cardId: activeCard.cardId })).toBeNull()
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('persists a safe attachment under the Card before transport starts', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard = createRootCard({
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:tip',
+    })
+    queryContext.cardHistories.set(activeCard.cardId, {
+      sessionKey: 'remote:tip',
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: 'remote:tip',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const stream = createReaderHarness()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCardList={cardList([activeCard])}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-safe-attachment"]')!
+        .click()
+    })
+
+    await waitForAssertion(() => {
+      expect(stream.getRequestBody()).toMatchObject({
+        sessionKey: 'remote:tip',
+        friendlyId: activeCard.cardId,
+        cardId: activeCard.cardId,
+      })
+    })
+    expect(
+      readCardTranscriptRecovery({ cardId: activeCard.cardId })?.messages,
+    ).toMatchObject([
+      {
+        role: 'user',
+        attachments: [
+          {
+            id: 'safe-file',
+            name: 'notes.txt',
+            dataUrl: 'hello',
+          },
+        ],
+      },
+    ])
+
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="stop-message"]')!
+        .click()
+      root.unmount()
+    })
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('replays stale friendly-ID pending state on the current Card transport only', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const activeCard = createRootCard({
+      cardId: 'remote:parent',
+      canonicalSegmentKey: 'remote:current-tip',
+      continuationSegmentKeys: ['remote:old-tip', 'remote:current-tip'],
+    })
+    queryContext.cardHistories.set(activeCard.cardId, {
+      sessionKey: 'remote:current-tip',
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: 'remote:current-tip',
+      messages: [],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+    const optimisticMessage = {
+      role: 'user',
+      content: [{ type: 'text' as const, text: 'stale pending turn' }],
+      timestamp: 1,
+      clientId: 'stale-client',
+      client_id: 'stale-client',
+      __optimisticId: 'opt-stale-client',
+      status: 'sending',
+    }
+    stashPendingSend({
+      sessionKey: 'remote:old-tip',
+      friendlyId: activeCard.cardId,
+      message: 'stale pending turn',
+      attachments: [],
+      optimisticMessage,
+    })
+    const stream = createReaderHarness()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCardList={cardList([activeCard])}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    await waitForAssertion(() => {
+      expect(stream.getRequestBody()).toMatchObject({
+        sessionKey: 'remote:current-tip',
+        friendlyId: activeCard.cardId,
+        cardId: activeCard.cardId,
+        message: 'stale pending turn',
+      })
+    })
+    expect(JSON.stringify(stream.getRequestBody())).not.toContain(
+      'remote:old-tip',
+    )
+
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="stop-message"]')!
+        .click()
+      root.unmount()
+    })
     document.body.removeChild(container)
     queryClient.clear()
   })

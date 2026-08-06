@@ -3,7 +3,7 @@ import {
   appendCardTranscriptRecoveryMessage,
   mergeCardTranscriptRecoveryMessages,
   readCardTranscriptRecovery,
-  removeAcknowledgedCardTranscriptRecoveryMessages,
+  reconcileAcknowledgedCardTranscriptRecoveryMessages,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import type { QueryClient } from '@tanstack/react-query'
@@ -1479,23 +1479,29 @@ export function reconcileSessionCardHistoryResponse(
   options: ReconcileSessionCardHistoryOptions = {},
 ): SessionCardHistoryResponse {
   const owner = { cardId: server.cardId }
-  const persistedMessages = mergePartialPersistedCardHistory(
+  let persistedMessages = mergePartialPersistedCardHistory(
     server,
     options.previous,
     options.continuationSegmentKeys,
   )
+  let recoveryMessages: Array<ChatMessage>
+  if (options.recoveryMessages) {
+    recoveryMessages = options.recoveryMessages
+  } else if (isAuthoritativeCompleteSessionCardHistory(server)) {
+    const acknowledgement = reconcileAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      persistedMessages,
+    )
+    persistedMessages = acknowledgement.authoritativeMessages
+    recoveryMessages = acknowledgement.recovery?.messages ?? []
+  } else {
+    recoveryMessages = readCardTranscriptRecovery(owner)?.messages ?? []
+  }
   const persistedServer = {
     ...server,
     messages: persistedMessages,
     persistedMessages,
   }
-  const recoveryMessages =
-    options.recoveryMessages ??
-    (isAuthoritativeCompleteSessionCardHistory(server)
-      ? removeAcknowledgedCardTranscriptRecoveryMessages(owner, server.messages)
-          ?.messages
-      : readCardTranscriptRecovery(owner)?.messages) ??
-    []
   return mergeSessionCardHistoryResponse(persistedServer, recoveryMessages)
 }
 

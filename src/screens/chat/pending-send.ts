@@ -13,6 +13,8 @@ let pendingGeneration = false
 let recentSession: { friendlyId: string; at: number } | null = null
 
 const PENDING_MESSAGE_STORAGE_PREFIX = 'claude_pending_msg_'
+const NEW_CHAT_PROVISIONAL_STORAGE_KEY =
+  'workspace.chat-provisional-send.v1:new-chat'
 const PENDING_MESSAGE_MAX_AGE_MS = 5 * 60 * 1000
 
 type PersistedPendingSendPayload = PendingSendPayload & {
@@ -26,7 +28,15 @@ function canUseLocalStorage() {
 }
 
 function getPendingStorageKey(sessionKey: string) {
+  if (sessionKey === 'new') return NEW_CHAT_PROVISIONAL_STORAGE_KEY
   return `${PENDING_MESSAGE_STORAGE_PREFIX}${sessionKey || 'main'}`
+}
+
+function isPendingStorageKey(key: string | null): key is string {
+  return (
+    key === NEW_CHAT_PROVISIONAL_STORAGE_KEY ||
+    Boolean(key?.startsWith(PENDING_MESSAGE_STORAGE_PREFIX))
+  )
 }
 
 function isExpiredPendingPayload(payload: { storedAt?: unknown }) {
@@ -62,8 +72,8 @@ function toPendingSendPayload(
   }
 }
 
-function writePendingSendToStorage(payload: PendingSendPayload) {
-  if (!canUseLocalStorage()) return
+function writePendingSendToStorage(payload: PendingSendPayload): boolean {
+  if (!canUseLocalStorage()) return false
 
   cleanupExpiredPendingSends()
 
@@ -77,8 +87,9 @@ function writePendingSendToStorage(payload: PendingSendPayload) {
       getPendingStorageKey(payload.sessionKey),
       JSON.stringify(record),
     )
+    return true
   } catch {
-    // Ignore storage write failures.
+    return false
   }
 }
 
@@ -90,7 +101,7 @@ function readPendingSendFromStorageByFriendlyId(
   try {
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index)
-      if (!key?.startsWith(PENDING_MESSAGE_STORAGE_PREFIX)) continue
+      if (!isPendingStorageKey(key)) continue
       const raw = window.localStorage.getItem(key)
       if (!raw) continue
       try {
@@ -119,7 +130,7 @@ function removePendingSendFromStorageByFriendlyId(friendlyId: string) {
     const keysToDelete: Array<string> = []
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index)
-      if (!key?.startsWith(PENDING_MESSAGE_STORAGE_PREFIX)) continue
+      if (!isPendingStorageKey(key)) continue
       const raw = window.localStorage.getItem(key)
       if (!raw) continue
       try {
@@ -146,7 +157,7 @@ export function cleanupExpiredPendingSends() {
     const keysToDelete: Array<string> = []
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index)
-      if (!key?.startsWith(PENDING_MESSAGE_STORAGE_PREFIX)) continue
+      if (!isPendingStorageKey(key)) continue
       const raw = window.localStorage.getItem(key)
       if (!raw) {
         keysToDelete.push(key)
@@ -169,8 +180,59 @@ export function cleanupExpiredPendingSends() {
   }
 }
 
-export function persistPendingMessage(payload: PendingSendPayload) {
-  writePendingSendToStorage(payload)
+export function persistPendingMessage(payload: PendingSendPayload): boolean {
+  return writePendingSendToStorage(payload)
+}
+
+function pendingMessageClientId(message: ChatMessage): string {
+  const raw = message as Record<string, unknown>
+  for (const key of ['clientId', 'client_id', 'idempotencyKey']) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+/** Update the durable provisional/legacy overlay before a route can remount. */
+export function updatePendingMessageByClientId(
+  clientId: string,
+  updater: (message: ChatMessage) => ChatMessage,
+): boolean {
+  if (!canUseLocalStorage() || !clientId) return false
+  let updated = false
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (!isPendingStorageKey(key)) continue
+      const raw = window.localStorage.getItem(key)
+      if (!raw) continue
+      try {
+        const parsed = JSON.parse(raw) as PersistedPendingSendPayload
+        const payload = toPendingSendPayload(parsed)
+        if (
+          !payload ||
+          pendingMessageClientId(payload.optimisticMessage) !== clientId
+        ) {
+          continue
+        }
+        const optimisticMessage = updater(payload.optimisticMessage)
+        const next = { ...parsed, optimisticMessage }
+        window.localStorage.setItem(key, JSON.stringify(next))
+        if (
+          pendingSend &&
+          pendingMessageClientId(pendingSend.optimisticMessage) === clientId
+        ) {
+          pendingSend = { ...pendingSend, optimisticMessage }
+        }
+        updated = true
+      } catch {
+        // One malformed/stale sibling record must not block the provisional owner.
+      }
+    }
+  } catch {
+    return updated
+  }
+  return updated
 }
 
 export function handoffPendingSend(
@@ -194,8 +256,11 @@ export function handoffPendingSend(
     sessionKey: normalizedTo,
     friendlyId: normalizedFriendlyId,
   }
+  // Never delete the provisional owner until the authoritative destination
+  // record has landed. A quota/storage failure must leave the first turn
+  // recoverable on /chat/new rather than losing both copies during handoff.
+  if (!writePendingSendToStorage(next)) return
   pendingSend = pendingSend?.sessionKey === normalizedFrom ? next : pendingSend
-  writePendingSendToStorage(next)
   clearPendingMessage(normalizedFrom)
 }
 
