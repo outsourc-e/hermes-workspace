@@ -28,6 +28,26 @@ function bundledDirectChatDelivery(bundle: string): string {
   return bundle.slice(start, nextFunction)
 }
 
+function bundledDirectChatRuntimeSetup(bundle: string): string {
+  const marker =
+    /async function ensureLiveTmuxSession(?:\$\d+)?\(workerId, cardBinding\)/u
+  const match = marker.exec(bundle)
+  expect(
+    match?.index,
+    'missing bundled Card-bound direct chat runtime setup',
+  ).toBeTypeOf('number')
+  const start = match!.index
+  const nextFunction = bundle.indexOf(
+    '\nasync function sendPromptToLiveSession',
+    start,
+  )
+  expect(
+    nextFunction,
+    'missing end of bundled direct chat runtime setup',
+  ).toBeGreaterThan(start)
+  return bundle.slice(start, nextFunction)
+}
+
 function bundledExactCardBindingResolver(bundle: string): string {
   const marker =
     'async function resolveExactSessionCardOperationBinding(binding)'
@@ -45,13 +65,6 @@ function bundledExactCardBindingResolver(bundle: string): string {
     'missing end of bundled exact Card binding resolver',
   ).toBeGreaterThan(start)
   return bundle.slice(start, end)
-}
-
-function sourceRoute(fileName: string): string {
-  return readFileSync(
-    resolve(process.cwd(), 'src/routes/api', fileName),
-    'utf8',
-  )
 }
 
 describe('checked-in Electron production server bundle', () => {
@@ -142,12 +155,20 @@ describe('checked-in Electron production server bundle', () => {
     expect(route).toContain('Session Card ownership changed before send')
   })
 
-  it('keeps existing-session authority and attachment rejection ahead of send-stream source mutations', () => {
-    const route = sourceRoute('send-stream.ts')
+  it('rejects invalid attachments and non-bootstrap sends without exact bundled Card authority before provider mutation', () => {
+    const route = bundledRoute(bundle, '/api/send-stream')
     const authorityFailure = route.indexOf(
       'Session Card authority required for existing session',
     )
     const attachmentFailure = route.indexOf('invalid attachment data')
+    const invalidCardFailure = route.indexOf('invalid card id')
+    const explicitBootstrap =
+      /isExplicitSendStreamBootstrap(?:\$\d+)?\(rawSessionKey, body\d*\.sessionKey\)/u.exec(
+        route,
+      )?.index ?? -1
+    const nonBootstrapRejection =
+      /if \(!requestedCardId && !isExplicitBootstrapSend\)/u.exec(route)
+        ?.index ?? -1
     const legacyResolution = route.indexOf('resolveSessionKey({')
     const initialExactResolution = route.indexOf(
       'resolveExactSessionCardOperationBinding(mutationBinding)',
@@ -162,38 +183,63 @@ describe('checked-in Electron production server bundle', () => {
 
     expect(authorityFailure).toBeGreaterThanOrEqual(0)
     expect(attachmentFailure).toBeGreaterThanOrEqual(0)
+    expect(invalidCardFailure).toBeGreaterThanOrEqual(0)
+    expect(explicitBootstrap).toBeGreaterThanOrEqual(0)
+    expect(nonBootstrapRejection).toBeGreaterThan(explicitBootstrap)
     expect(legacyResolution).toBeGreaterThan(authorityFailure)
     expect(initialExactResolution).toBeGreaterThan(authorityFailure)
     expect(initialExactResolution).toBeLessThan(firstProviderMutation)
     expect(attachmentFailure).toBeLessThan(firstProviderMutation)
-    expect(route).toContain(
-      'isExplicitSendStreamBootstrap(rawSessionKey, body.sessionKey)',
-    )
+    expect(invalidCardFailure).toBeLessThan(firstProviderMutation)
   })
 
-  it('revalidates the direct-chat source binding immediately before runtime setup and input mutations', () => {
-    const route = sourceRoute('swarm-direct-chat.ts')
+  it('revalidates exact bundled Card authority immediately before every direct-chat mutation', () => {
+    const setup = bundledDirectChatRuntimeSetup(bundle)
+    const delivery = bundledDirectChatDelivery(bundle)
 
-    expect(route).toContain('ensureLiveTmuxSession(workerId, cardBinding)')
-    for (const mutation of [
-      'const started = await execFileAsync(',
-      'const loaded = await execFileAsync(',
-      'const cleared = await execFileAsync(',
-      'const pasted = await execFileAsync(',
-      'const entered = await execFileAsync(',
-    ]) {
-      const mutationEdge = route.indexOf(mutation)
-      const revalidation = route.lastIndexOf(
+    expect(delivery).toMatch(
+      /ensureLiveTmuxSession(?:\$\d+)?\(workerId, cardBinding\)/u,
+    )
+    for (const [slice, mutationPattern, command] of [
+      [
+        setup,
+        /const started\w* = await execFileAsync(?:\$\d+)?\(/u,
+        '"new-session"',
+      ],
+      [
+        delivery,
+        /const loaded\w* = await execFileAsync(?:\$\d+)?\(/u,
+        '"load-buffer"',
+      ],
+      [
+        delivery,
+        /const cleared\w* = await execFileAsync(?:\$\d+)?\(/u,
+        '"C-u"',
+      ],
+      [
+        delivery,
+        /const pasted\w* = await execFileAsync(?:\$\d+)?\(/u,
+        '"paste-buffer"',
+      ],
+      [
+        delivery,
+        /const entered\w* = await execFileAsync(?:\$\d+)?\(/u,
+        '"Enter"',
+      ],
+    ] as const) {
+      const mutationEdge = mutationPattern.exec(slice)?.index ?? -1
+      const revalidation = slice.lastIndexOf(
         'resolveExactSessionCardOperationBinding(cardBinding)',
         mutationEdge,
       )
-      const immediatelyBeforeMutation = route.slice(revalidation, mutationEdge)
+      const immediatelyBeforeMutation = slice.slice(revalidation, mutationEdge)
 
       expect(mutationEdge).toBeGreaterThanOrEqual(0)
       expect(revalidation).toBeGreaterThanOrEqual(0)
-      expect(immediatelyBeforeMutation.length).toBeLessThan(350)
+      expect(immediatelyBeforeMutation.length).toBeLessThan(500)
       expect(immediatelyBeforeMutation).not.toMatch(/\bawait\b/u)
       expect(immediatelyBeforeMutation).toContain('staleBinding: true')
+      expect(slice.slice(mutationEdge, mutationEdge + 500)).toContain(command)
     }
   })
 
@@ -236,9 +282,9 @@ describe('checked-in Electron production server bundle', () => {
     const edgeRevalidations = delivery.match(
       /await resolveExactSessionCardOperationBinding\(cardBinding\)/gu,
     )
-    expect(edgeRevalidations).toHaveLength(3)
+    expect(edgeRevalidations).toHaveLength(4)
     expect(delivery).toMatch(
-      /resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"send-keys"[\s\S]*?"C-u"[\s\S]*?resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"paste-buffer"[\s\S]*?resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"send-keys"[\s\S]*?"Enter"/u,
+      /resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"load-buffer"[\s\S]*?resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"send-keys"[\s\S]*?"C-u"[\s\S]*?resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"paste-buffer"[\s\S]*?resolveExactSessionCardOperationBinding\(cardBinding\)[\s\S]*?"send-keys"[\s\S]*?"Enter"/u,
     )
   })
 
