@@ -895,6 +895,57 @@ export const Route = createFileRoute('/api/send-stream')({
           workspaceScope,
         )
 
+        const staleCardMutationError = new Error(
+          'Session Card ownership changed before send',
+        )
+        const staleCardMutationResponse = () =>
+          finishPreStreamResponse(
+            new Response(
+              JSON.stringify({
+                ok: false,
+                error: staleCardMutationError.message,
+              }),
+              {
+                status: 409,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+
+        // A selected local Card is about to mutate the local session store before
+        // its provider edge. Revalidate its exact owner now, after every preflight
+        // await and immediately before constructing the stream whose synchronous
+        // start performs ensureLocalSession. Bootstrap sends have no Card binding
+        // yet and intentionally retain their existing local-session creation path.
+        if (
+          requestedCardMutationBinding &&
+          activeCardCanonicalSource === 'local'
+        ) {
+          try {
+            const binding = requestedCardMutationBinding
+            const owner = await waitWithinStreamLifetime(
+              resolveExactSessionCardOperationBinding(binding),
+            )
+            ensureStreamTransportAvailable()
+            if (
+              !owner ||
+              owner.cardId !== binding.cardId ||
+              owner.parentCardId !== binding.parentCardId
+            ) {
+              return staleCardMutationResponse()
+            }
+          } catch (error) {
+            if (error === streamTimeoutError) {
+              return finishPreStreamResponse(streamTimeoutResponse())
+            }
+            if (error === streamAbortError || streamTransportUnavailable()) {
+              return finishPreStreamResponse(abortedResponse())
+            }
+            closeStream()
+            throw error
+          }
+        }
+
         type CardMutationEdgeStatus = 'authorized' | 'stale' | 'not-reached'
         let settleCardMutationEdge: (
           status: CardMutationEdgeStatus,
@@ -909,10 +960,6 @@ export const Route = createFileRoute('/api/send-stream')({
               }
             })
           : null
-        const staleCardMutationError = new Error(
-          'Session Card ownership changed before send',
-        )
-
         // Create streaming response using the SHARED server connection
         const encoder = new TextEncoder()
 
@@ -2827,18 +2874,7 @@ export const Route = createFileRoute('/api/send-stream')({
         if (cardMutationEdgeStatus) {
           const mutationEdgeStatus = await cardMutationEdgeStatus
           if (mutationEdgeStatus === 'stale') {
-            return finishPreStreamResponse(
-              new Response(
-                JSON.stringify({
-                  ok: false,
-                  error: staleCardMutationError.message,
-                }),
-                {
-                  status: 409,
-                  headers: { 'Content-Type': 'application/json' },
-                },
-              ),
-            )
+            return staleCardMutationResponse()
           }
         }
         return response

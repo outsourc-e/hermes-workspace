@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   resolveLocalCardByUpstreamSession: vi.fn(),
   resolveExactSessionCardOperationBinding: vi.fn(),
   isExplicitSendStreamBootstrap: vi.fn(),
+  appendLocalMessage: vi.fn(),
   ensureLocalSession: vi.fn(),
   buildResolvedSessionHeaders: vi.fn(() => ({})),
   openaiChat: vi.fn(),
@@ -110,7 +111,7 @@ vi.mock('./-send-stream-authority', () => ({
 }))
 
 vi.mock('../../server/local-session-store', () => ({
-  appendLocalMessage: vi.fn(),
+  appendLocalMessage: mocks.appendLocalMessage,
   ensureLocalSession: mocks.ensureLocalSession,
   getLocalMessages: vi.fn(() => []),
   touchLocalSession: vi.fn(),
@@ -323,7 +324,7 @@ describe('send-stream bootstrap session handoff', () => {
       upstream: () => mocks.openaiChat,
     },
   ])(
-    'revalidates a delayed Card rollover at the $label mutation edge and returns 409',
+    'revalidates a delayed Card rollover before the $label mutation and returns 409',
     async ({ source, responses, upstream }) => {
       vi.stubEnv('HERMES_USE_RESPONSES', responses ? '1' : '0')
       const cardId = `${source}:mutation-card`
@@ -368,6 +369,9 @@ describe('send-stream bootstrap session handoff', () => {
       await vi.waitFor(() => {
         expect(
           mocks.resolveExactSessionCardOperationBinding,
+        ).toHaveBeenCalledTimes(2)
+        expect(
+          mocks.resolveExactSessionCardOperationBinding,
         ).toHaveBeenCalledWith({
           kind: 'session-card-owner',
           cardId,
@@ -388,6 +392,13 @@ describe('send-stream bootstrap session handoff', () => {
         error: 'Session Card ownership changed before send',
       })
       expect(upstream()).not.toHaveBeenCalled()
+      if (source === 'local') {
+        expect(mocks.ensureLocalSession).not.toHaveBeenCalled()
+        expect(mocks.createPersistedRun).not.toHaveBeenCalled()
+        expect(mocks.appendLocalMessage).not.toHaveBeenCalled()
+        expect(mocks.observeCardActivity).not.toHaveBeenCalled()
+        expect(mocks.publishCardActivityEvent).not.toHaveBeenCalled()
+      }
     },
   )
 
