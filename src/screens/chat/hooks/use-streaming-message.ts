@@ -266,6 +266,7 @@ type UseStreamingMessageOptions = {
   onStarted?: (payload: { runId: string | null }) => void
   onChunk?: (text: string, fullText: string) => void
   onComplete?: (message: ChatMessage) => void
+  onInterrupted?: (message: ChatMessage) => void
   onError?: (error: string) => void
   onThinking?: (thinking: string) => void
   onTool?: (tool: unknown) => void
@@ -299,6 +300,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     onStarted,
     onChunk,
     onComplete,
+    onInterrupted,
     onError,
     onThinking,
     onTool,
@@ -461,9 +463,48 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     lifecyclePhaseRef.current = 'accepted'
   }, [])
 
+  const sealInterruptedStream = useCallback((): ChatMessage | null => {
+    const partialText = fullTextRef.current
+    if (!partialText || finishedRef.current) return null
+    const runId = activeRunIdRef.current
+    const interruptedMessage: ChatMessage = {
+      role: 'assistant',
+      content: [
+        ...(thinkingRef.current
+          ? [
+              {
+                type: 'thinking' as const,
+                thinking: thinkingRef.current,
+              },
+            ]
+          : []),
+        { type: 'text' as const, text: partialText },
+      ],
+      timestamp: Date.now(),
+      __streamingStatus: 'interrupted',
+      ...stepUsageRef.current,
+      ...(runId ? { runId, stableId: `stream-run:${runId}` } : {}),
+    }
+
+    // Recovery persistence must land before the store consumes `done` and
+    // clears active streaming persistence. Otherwise a reload in that narrow
+    // terminal window can lose the accumulated assistant partial.
+    onInterrupted?.(interruptedMessage)
+    processBrowserEvent({
+      type: 'done',
+      state: 'interrupted',
+      message: interruptedMessage as Record<string, unknown>,
+      runId: runId ?? undefined,
+      sessionKey: activeSessionKeyRef.current,
+      transport: 'send-stream',
+    })
+    return interruptedMessage
+  }, [onInterrupted, processBrowserEvent])
+
   const markFailed = useCallback(
     (message: string) => {
       if (finishedRef.current) return
+      sealInterruptedStream()
       finishedRef.current = true
       eventSourceRef.current = null
       stopFrame()
@@ -484,6 +525,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       clearHandoffTimer,
       clearSendStreamRun,
       onError,
+      sealInterruptedStream,
       stopFrame,
     ],
   )
@@ -1038,6 +1080,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             time: new Date().toLocaleTimeString(),
             text: doneState === 'error' ? `Error: ${errorMessage}` : 'Complete',
           })
+          if (doneState === 'error') {
+            markFailed(errorMessage ?? 'Stream error')
+            break
+          }
           processBrowserEvent({
             type: 'done',
             state: doneState ?? 'final',
@@ -1047,10 +1093,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             sessionKey: activeSessionKeyRef.current,
             transport: 'send-stream',
           })
-          if (doneState === 'error' && errorMessage) {
-            markFailed(errorMessage)
-            break
-          }
           finishStream(payload)
           break
         }
@@ -1146,31 +1188,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       model?: string
     }) => {
       if (eventSourceRef.current) {
-        // Preserve in-progress response as a partial message before aborting
-        // so it doesn't vanish from the UI when the user interrupts
-        if (fullTextRef.current && !finishedRef.current) {
-          processBrowserEvent({
-            type: 'done',
-            state: 'interrupted',
-            sessionKey: activeSessionKeyRef.current,
-            transport: 'send-stream',
-            message: {
-              role: 'assistant',
-              content: [
-                ...(thinkingRef.current
-                  ? [
-                      {
-                        type: 'thinking' as const,
-                        thinking: thinkingRef.current,
-                      },
-                    ]
-                  : []),
-                { type: 'text' as const, text: fullTextRef.current },
-              ],
-              __streamingStatus: 'interrupted',
-            } as any,
-          })
-        }
+        // Seal in-progress response before aborting so recovery survives the
+        // old reader being superseded by a new send.
+        sealInterruptedStream()
         eventSourceRef.current.abort()
       }
 
@@ -1364,20 +1384,21 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       onAbort,
       onMessageAccepted,
       onReaderOpened,
-      processBrowserEvent,
       resetActiveStreamState,
       schedulePostAcceptanceTimeout,
+      sealInterruptedStream,
     ],
   )
 
   const cancelStreaming = useCallback(() => {
+    sealInterruptedStream()
     if (eventSourceRef.current) {
       eventSourceRef.current.abort()
       eventSourceRef.current = null
     }
     finishedRef.current = true
     resetActiveStreamState()
-  }, [resetActiveStreamState])
+  }, [resetActiveStreamState, sealInterruptedStream])
 
   const resetStreaming = useCallback(() => {
     cancelStreaming()

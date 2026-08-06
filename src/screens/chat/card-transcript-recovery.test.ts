@@ -299,6 +299,69 @@ describe('Card transcript recovery storage contract', () => {
     ])
   })
 
+  it('acknowledges uniquely matching ordinary server rows when client and run identities differ', () => {
+    const optimistic = message('user', 'ordinary user acknowledgement', {
+      clientId: 'client-local',
+      __optimisticId: 'opt-client-local',
+      status: 'sent',
+    })
+    const terminal = message(
+      'assistant',
+      'ordinary assistant acknowledgement',
+      {
+        runId: 'run-local',
+        stableId: 'stream-run:run-local',
+        __streamingStatus: 'complete',
+      },
+    )
+    replaceCardTranscriptRecoveryMessages(owner, [optimistic, terminal], {
+      now,
+    })
+
+    const reconciled = removeAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      [
+        message('user', 'ordinary user acknowledgement', {
+          id: 'server-user',
+          client_id: 'server-client',
+        }),
+        message('assistant', 'ordinary assistant acknowledgement', {
+          id: 'server-assistant',
+          run_id: 'server-run',
+        }),
+      ],
+      { now },
+    )
+
+    expect(reconciled).toBeNull()
+    expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
+  })
+
+  it('does not guess which distinct repeated same-text overlay an ordinary server row acknowledges', () => {
+    const first = message('user', 'repeat this exact turn', {
+      clientId: 'repeat-first',
+      status: 'sent',
+    })
+    const second = message('user', 'repeat this exact turn', {
+      clientId: 'repeat-second',
+      status: 'sent',
+    })
+    replaceCardTranscriptRecoveryMessages(owner, [first, second], { now })
+
+    const reconciled = removeAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      [
+        message('user', 'repeat this exact turn', {
+          id: 'server-repeat',
+          client_id: 'server-client',
+        }),
+      ],
+      { now },
+    )
+
+    expect(reconciled?.messages).toEqual([first, second])
+  })
+
   it('keeps user and terminal assistant overlays through a stale complete refetch when quota persistence throws', () => {
     const originalSetItem = Storage.prototype.setItem
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (

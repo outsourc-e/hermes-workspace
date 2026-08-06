@@ -11,8 +11,6 @@ import type {
   ToolCallContent,
 } from '../screens/chat/types'
 
-let _streamingPersistTimer: ReturnType<typeof setTimeout> | null = null
-
 export type ChatStreamEvent =
   | {
       type: 'message'
@@ -186,6 +184,17 @@ const LEGACY_CHAT_STORAGE_PREFIXES = [
   'claude_realtime_',
 ] as const
 const WAITING_TTL_MS = 120_000
+const CARD_STREAMING_PERSIST_INTERVAL_MS = 500
+const lastCardStreamingPersistAt = new Map<string, number>()
+const pendingCardStreamingPersists = new Map<
+  string,
+  {
+    generation: number
+    state: StreamingState
+    timer: ReturnType<typeof setTimeout>
+  }
+>()
+const cardStreamingPersistGenerations = new Map<string, number>()
 
 function isAuthoritativeCardId(cardId: string): boolean {
   return cardId === cardId.trim() && /^(?:local|remote):\S+$/.test(cardId)
@@ -220,28 +229,82 @@ function cardStorageKey(prefix: string, cardId: string): string {
   return `${prefix}${encodeURIComponent(cardId)}`
 }
 
-function persistCardStreamingState(
-  cardId: string,
-  state: StreamingState,
-): void {
+function writeCardStreamingState(cardId: string, state: StreamingState): void {
   if (typeof sessionStorage === 'undefined' || !isAuthoritativeCardId(cardId)) {
     return
   }
   cleanupLegacyChatStorage()
-  if (_streamingPersistTimer) clearTimeout(_streamingPersistTimer)
-  _streamingPersistTimer = setTimeout(() => {
-    try {
-      sessionStorage.setItem(
-        cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId),
-        JSON.stringify({
-          ...sanitizeCardStreamingState(state),
-          _savedAt: Date.now(),
-        }),
-      )
-    } catch {
-      // In-memory Card state remains authoritative when persistence is denied.
-    }
-  }, 500)
+  try {
+    sessionStorage.setItem(
+      cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId),
+      JSON.stringify({
+        ...sanitizeCardStreamingState(state),
+        _savedAt: Date.now(),
+      }),
+    )
+  } catch {
+    // In-memory Card state remains authoritative when persistence is denied.
+  }
+}
+
+function cardStreamingPersistGeneration(cardId: string): number {
+  return cardStreamingPersistGenerations.get(cardId) ?? 0
+}
+
+function persistCardStreamingState(
+  cardId: string,
+  state: StreamingState,
+): void {
+  if (!isAuthoritativeCardId(cardId)) return
+  const sanitized = sanitizeCardStreamingState(state)
+  const existing = pendingCardStreamingPersists.get(cardId)
+  if (existing) {
+    existing.state = sanitized
+    return
+  }
+
+  const now = Date.now()
+  const elapsed = now - (lastCardStreamingPersistAt.get(cardId) ?? 0)
+  if (elapsed >= CARD_STREAMING_PERSIST_INTERVAL_MS) {
+    writeCardStreamingState(cardId, sanitized)
+    lastCardStreamingPersistAt.set(cardId, now)
+    return
+  }
+
+  const generation = cardStreamingPersistGeneration(cardId)
+  const pending = {
+    generation,
+    state: sanitized,
+    timer: setTimeout(() => {
+      const latest = pendingCardStreamingPersists.get(cardId)
+      if (latest !== pending) return
+      pendingCardStreamingPersists.delete(cardId)
+      if (latest.generation !== cardStreamingPersistGeneration(cardId)) return
+      writeCardStreamingState(cardId, latest.state)
+      lastCardStreamingPersistAt.set(cardId, Date.now())
+    }, CARD_STREAMING_PERSIST_INTERVAL_MS - elapsed),
+  }
+  pendingCardStreamingPersists.set(cardId, pending)
+}
+
+function removePersistedCardStreamingState(cardId: string): void {
+  cardStreamingPersistGenerations.set(
+    cardId,
+    cardStreamingPersistGeneration(cardId) + 1,
+  )
+  const pending = pendingCardStreamingPersists.get(cardId)
+  if (pending) clearTimeout(pending.timer)
+  pendingCardStreamingPersists.delete(cardId)
+  lastCardStreamingPersistAt.delete(cardId)
+  if (typeof sessionStorage === 'undefined') return
+  cleanupLegacyChatStorage()
+  try {
+    sessionStorage.removeItem(
+      cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId),
+    )
+  } catch {
+    // In-memory cleanup still succeeds when persistence is denied.
+  }
 }
 
 export function restoreCardStreamingState(
@@ -1193,9 +1256,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
             timestamp: getMessageEventTime(cleanedMessage) ?? now,
             __receiveTime: now,
             __realtimeSequence: realtimeMessageSequence++,
-            __streamingStatus: (event.state === 'interrupted'
-              ? 'interrupted'
-              : 'complete') as any,
+            __streamingStatus:
+              event.state === 'interrupted'
+                ? 'interrupted'
+                : event.state === 'error'
+                  ? 'error'
+                  : 'complete',
             ...(streamToolCallsToEmbed
               ? { __streamToolCalls: streamToolCallsToEmbed }
               : {}),
@@ -1235,7 +1301,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
             timestamp: now,
             __receiveTime: now,
             __realtimeSequence: realtimeMessageSequence++,
-            __streamingStatus: 'complete',
+            __streamingStatus:
+              event.state === 'interrupted'
+                ? 'interrupted'
+                : event.state === 'error'
+                  ? 'error'
+                  : 'complete',
           }
         }
 
@@ -1332,11 +1403,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // injects an invisible streaming placeholder that causes a blank gap.
         streamingMap.delete(sessionKey)
         set({ streamingState: streamingMap, lastEventAt: now })
-        if (ownerCardId && typeof sessionStorage !== 'undefined') {
-          sessionStorage.removeItem(
-            cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, ownerCardId),
-          )
-        }
+        if (ownerCardId) removePersistedCardStreamingState(ownerCardId)
         break
       }
     }
@@ -1371,11 +1438,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!isAuthoritativeCardId(cardId)) return
     get().clearSession(cardId)
     get().clearCardWaiting(cardId)
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.removeItem(
-        cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId),
-      )
-    }
+    removePersistedCardStreamingState(cardId)
   },
 
   clearCardRealtimeBuffer: (cardId) => {
@@ -1386,11 +1449,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearCardStreaming: (cardId) => {
     if (!isAuthoritativeCardId(cardId)) return
     get().clearStreamingSession(cardId)
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.removeItem(
-        cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId),
-      )
-    }
+    removePersistedCardStreamingState(cardId)
   },
 
   mergeCardHistoryMessages: (cardId, historyMessages) => {

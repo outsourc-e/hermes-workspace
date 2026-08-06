@@ -1732,6 +1732,19 @@ export function ChatScreen({
       },
       [queryClient, streamFinish],
     ),
+    onInterrupted: useCallback(
+      (interruptedMessage: ChatMessage) => {
+        const activeSend = activeSendRef.current
+        if (!activeSend?.cardId) return
+        appendSessionCardTransientMessage(
+          queryClient,
+          activeSend.cardId,
+          activeSend.sessionKey,
+          interruptedMessage,
+        )
+      },
+      [queryClient],
+    ),
     onError: useCallback(
       (messageText: string) => {
         const activeSend = activeSendRef.current
@@ -3097,8 +3110,8 @@ export function ChatScreen({
         }),
       )
     }
-    activeSendRef.current = null
     cancelStreaming()
+    activeSendRef.current = null
     setSending(false)
     setPendingGeneration(false)
     setWaitingForResponse(false)

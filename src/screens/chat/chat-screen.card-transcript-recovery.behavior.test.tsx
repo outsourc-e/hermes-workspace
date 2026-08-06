@@ -76,7 +76,11 @@ vi.mock('./hooks/use-smooth-streaming-text', () => ({
 }))
 vi.mock('./components/chat-header', () => ({ ChatHeader: () => null }))
 vi.mock('./components/chat-composer', () => ({
-  ChatComposer: () => null,
+  ChatComposer: ({ onAbort }: { onAbort?: () => void }) => (
+    <button type="button" onClick={onAbort}>
+      Stop generating
+    </button>
+  ),
 }))
 vi.mock('./components/chat-empty-state', () => ({ ChatEmptyState: () => null }))
 vi.mock('./components/connection-status-message', () => ({
@@ -797,6 +801,83 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     mountedScreen.unmount()
   })
 
+  it('removes uniquely acknowledged optimistic and terminal overlays when ordinary Card history uses different identities', async () => {
+    const sentAt = Date.now()
+    seedCardTranscriptRecovery(parentCard, [
+      message('user', 'ordinary server user acknowledgement', {
+        timestamp: sentAt,
+        clientId: 'local-client-ack',
+        status: 'sent',
+      }),
+      message('assistant', 'ordinary server assistant acknowledgement', {
+        timestamp: sentAt + 1,
+        runId: 'local-run-ack',
+        stableId: 'stream-run:local-run-ack',
+        __streamingStatus: 'complete',
+      }),
+    ])
+    let historyAcknowledged = false
+    const requests = mockHttp(() =>
+      completeHistory(
+        parentCard,
+        historyAcknowledged
+          ? [
+              {
+                segmentKey: parentCard.canonicalSegmentKey,
+                message: {
+                  id: 'server-user-ack',
+                  client_id: 'server-client-ack',
+                  role: 'user',
+                  content: 'ordinary server user acknowledgement',
+                  timestamp: sentAt,
+                },
+              },
+              {
+                segmentKey: parentCard.canonicalSegmentKey,
+                message: {
+                  id: 'server-assistant-ack',
+                  run_id: 'server-run-ack',
+                  role: 'assistant',
+                  content: 'ordinary server assistant acknowledgement',
+                  timestamp: sentAt + 1,
+                },
+              },
+            ]
+          : [],
+      ),
+    )
+
+    const mountedScreen = await mountChatScreen(defaultInput())
+    await waitFor(() => {
+      expect(
+        screen.getByText('ordinary server user acknowledgement'),
+      ).toBeTruthy()
+      expect(
+        screen.getByText('ordinary server assistant acknowledgement'),
+      ).toBeTruthy()
+    })
+
+    historyAcknowledged = true
+    await React.act(async () => {
+      await mountedScreen.queryClient.refetchQueries({
+        queryKey: sessionCardQueryKeys.history(parentCard.cardId),
+        exact: true,
+      })
+    })
+    await waitFor(() =>
+      expect(
+        readCardTranscriptRecovery({ cardId: parentCard.cardId }),
+      ).toBeNull(),
+    )
+    expect(
+      screen.getAllByText('ordinary server user acknowledgement'),
+    ).toHaveLength(1)
+    expect(
+      screen.getAllByText('ordinary server assistant acknowledgement'),
+    ).toHaveLength(1)
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
   it('preserves terminal assistant text while complete Card history still lags', async () => {
     const requests = mockHttp()
     const store = useChatStore.getState()
@@ -828,6 +909,169 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       })
     })
     expect(screen.getByText('terminal answer survives lag')).toBeTruthy()
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
+  it('seals a chunk before a stream error and restores the interrupted assistant after remount', async () => {
+    const requests: Array<string> = []
+    const encoder = new TextEncoder()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.startsWith('/api/session-cards/')) {
+        return Promise.resolve(jsonResponse(completeHistory(parentCard)))
+      }
+      if (url === '/api/send-stream') {
+        const reader = {
+          read: vi
+            .fn()
+            .mockResolvedValueOnce({
+              done: false,
+              value: encoder.encode(
+                [
+                  'event: started',
+                  'data: {"runId":"run-chunk-error"}',
+                  '',
+                  'event: chunk',
+                  'data: {"delta":"partial answer before error"}',
+                  '',
+                  'event: error',
+                  'data: {"message":"simulated stream failure"}',
+                  '',
+                  '',
+                ].join('\n'),
+              ),
+            })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+          cancel: vi.fn().mockResolvedValue(undefined),
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          body: { getReader: () => reader },
+          text: () => Promise.resolve(''),
+          json: () => Promise.resolve({}),
+        } as unknown as Response)
+      }
+      if (url === '/api/status')
+        return Promise.resolve(jsonResponse({ ok: true, status: 200 }))
+      if (url === '/api/models')
+        return Promise.resolve(jsonResponse({ models: [] }))
+      return Promise.resolve(jsonResponse({ ok: true }))
+    })
+
+    const mountedScreen = await mountChatScreen(defaultInput())
+    submitSelection('produce a partial error response')
+    await waitFor(() => {
+      expect(screen.getByText('partial answer before error')).toBeTruthy()
+      expect(
+        readCardTranscriptRecovery({ cardId: parentCard.cardId })?.messages,
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            runId: 'run-chunk-error',
+            __streamingStatus: 'interrupted',
+          }),
+        ]),
+      )
+    })
+
+    mountedScreen.unmount()
+    clearCardTranscriptRecoveryMemory()
+    useChatStore.getState().clearCardRealtimeBuffer(parentCard.cardId)
+    useChatStore.getState().clearCardStreaming(parentCard.cardId)
+    await mountChatScreen(defaultInput())
+    await waitFor(() =>
+      expect(screen.getByText('partial answer before error')).toBeTruthy(),
+    )
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
+  it('seals a chunk before user cancellation and restores the interrupted assistant after remount', async () => {
+    const requests: Array<string> = []
+    const encoder = new TextEncoder()
+    let finishRead: (() => void) | undefined
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.startsWith('/api/session-cards/')) {
+        return Promise.resolve(jsonResponse(completeHistory(parentCard)))
+      }
+      if (url === '/api/send-stream') {
+        const pendingRead = new Promise<ReadableStreamReadResult<Uint8Array>>(
+          (resolve) => {
+            finishRead = () => resolve({ done: true, value: undefined })
+          },
+        )
+        init?.signal?.addEventListener('abort', () => finishRead?.(), {
+          once: true,
+        })
+        const reader = {
+          read: vi
+            .fn()
+            .mockResolvedValueOnce({
+              done: false,
+              value: encoder.encode(
+                [
+                  'event: started',
+                  'data: {"runId":"run-chunk-cancel"}',
+                  '',
+                  'event: chunk',
+                  'data: {"delta":"partial answer before cancel"}',
+                  '',
+                  '',
+                ].join('\n'),
+              ),
+            })
+            .mockReturnValueOnce(pendingRead),
+          cancel: vi.fn().mockResolvedValue(undefined),
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          body: { getReader: () => reader },
+          text: () => Promise.resolve(''),
+          json: () => Promise.resolve({}),
+        } as unknown as Response)
+      }
+      if (url === '/api/status')
+        return Promise.resolve(jsonResponse({ ok: true, status: 200 }))
+      if (url === '/api/models')
+        return Promise.resolve(jsonResponse({ models: [] }))
+      return Promise.resolve(jsonResponse({ ok: true }))
+    })
+
+    const mountedScreen = await mountChatScreen(defaultInput())
+    submitSelection('produce a cancellable partial response')
+    await waitFor(() =>
+      expect(screen.getByText('partial answer before cancel')).toBeTruthy(),
+    )
+    React.act(() =>
+      fireEvent.click(screen.getByRole('button', { name: 'Stop generating' })),
+    )
+    await waitFor(() =>
+      expect(
+        readCardTranscriptRecovery({ cardId: parentCard.cardId })?.messages,
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            runId: 'run-chunk-cancel',
+            __streamingStatus: 'interrupted',
+          }),
+        ]),
+      ),
+    )
+
+    mountedScreen.unmount()
+    clearCardTranscriptRecoveryMemory()
+    useChatStore.getState().clearCardRealtimeBuffer(parentCard.cardId)
+    useChatStore.getState().clearCardStreaming(parentCard.cardId)
+    await mountChatScreen(defaultInput())
+    await waitFor(() =>
+      expect(screen.getByText('partial answer before cancel')).toBeTruthy(),
+    )
     expectCardOnlyTranscriptBoundary(requests)
   })
 

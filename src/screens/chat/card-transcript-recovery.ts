@@ -329,6 +329,67 @@ export function cardTranscriptMessagesMatch(
   )
 }
 
+function isRecoveryOverlay(message: ChatMessage): boolean {
+  const raw = message as Record<string, unknown>
+  if (message.role === 'user') {
+    return (
+      identifierSet(message, [
+        'clientId',
+        'client_id',
+        'idempotencyKey',
+        'nonce',
+        '__optimisticId',
+      ]).size > 0 ||
+      ['sending', 'sent', 'error'].includes(normalizedString(raw.status))
+    )
+  }
+  if (message.role !== 'assistant') return false
+  return (
+    identifierSet(message, [
+      'runId',
+      'run_id',
+      'providerRunId',
+      'provider_run_id',
+      'stableId',
+      'stable_id',
+    ]).size > 0 ||
+    ['complete', 'interrupted', 'error'].includes(
+      normalizedString(raw.__streamingStatus),
+    )
+  )
+}
+
+function hasAuthoritativeIdentity(message: ChatMessage): boolean {
+  return (
+    identifierSet(message, [
+      'id',
+      'messageId',
+      'message_id',
+      'stableId',
+      'stable_id',
+    ]).size > 0
+  )
+}
+
+/**
+ * Ordinary persisted rows often receive new server-side client/run IDs. They
+ * may acknowledge a recovery overlay only when content, role, and timestamp
+ * agree and the mapping is unique in both directions. The uniqueness gate is
+ * what preserves genuinely distinct repeated same-text turns.
+ */
+function ordinaryServerAcknowledgementMatches(
+  recoveryMessage: ChatMessage,
+  authoritativeMessage: ChatMessage,
+): boolean {
+  return (
+    recoveryMessage.role === authoritativeMessage.role &&
+    isRecoveryOverlay(recoveryMessage) &&
+    hasAuthoritativeIdentity(authoritativeMessage) &&
+    compatibleContent(recoveryMessage, authoritativeMessage) &&
+    compatibleTimestamp(recoveryMessage, authoritativeMessage)
+  )
+}
+
 function hasOversizedString(value: unknown): boolean {
   if (typeof value === 'string') {
     return value.length > CARD_TRANSCRIPT_RECOVERY_MAX_TEXT_CHARS
@@ -598,11 +659,50 @@ export function removeAcknowledgedCardTranscriptRecoveryMessages(
 ): CardTranscriptRecoveryEnvelope | null {
   const recovery = readCardTranscriptRecovery(owner, options)
   if (!recovery) return null
-  const remaining = recovery.messages.filter(
-    (recoveryMessage) =>
-      !authoritativeMessages.some((authoritativeMessage) =>
+  const acknowledgedRecoveryIndexes = new Set<number>()
+  const consumedAuthoritativeIndexes = new Set<number>()
+
+  for (const [recoveryIndex, recoveryMessage] of recovery.messages.entries()) {
+    const authoritativeIndex = authoritativeMessages.findIndex(
+      (authoritativeMessage, index) =>
+        !consumedAuthoritativeIndexes.has(index) &&
         cardTranscriptMessagesMatch(authoritativeMessage, recoveryMessage),
-      ),
+    )
+    if (authoritativeIndex < 0) continue
+    acknowledgedRecoveryIndexes.add(recoveryIndex)
+    consumedAuthoritativeIndexes.add(authoritativeIndex)
+  }
+
+  for (const [recoveryIndex, recoveryMessage] of recovery.messages.entries()) {
+    if (acknowledgedRecoveryIndexes.has(recoveryIndex)) continue
+    const candidateAuthoritativeIndexes = authoritativeMessages
+      .map((authoritativeMessage, index) => ({ authoritativeMessage, index }))
+      .filter(
+        ({ authoritativeMessage, index }) =>
+          !consumedAuthoritativeIndexes.has(index) &&
+          ordinaryServerAcknowledgementMatches(
+            recoveryMessage,
+            authoritativeMessage,
+          ),
+      )
+      .map(({ index }) => index)
+    if (candidateAuthoritativeIndexes.length !== 1) continue
+
+    const authoritativeIndex = candidateAuthoritativeIndexes[0]!
+    const authoritativeMessage = authoritativeMessages[authoritativeIndex]!
+    const candidateRecoveryCount = recovery.messages.filter(
+      (candidate, index) =>
+        !acknowledgedRecoveryIndexes.has(index) &&
+        ordinaryServerAcknowledgementMatches(candidate, authoritativeMessage),
+    ).length
+    if (candidateRecoveryCount !== 1) continue
+
+    acknowledgedRecoveryIndexes.add(recoveryIndex)
+    consumedAuthoritativeIndexes.add(authoritativeIndex)
+  }
+
+  const remaining = recovery.messages.filter(
+    (_recoveryMessage, index) => !acknowledgedRecoveryIndexes.has(index),
   )
   if (remaining.length === recovery.messages.length) return recovery
   return replaceCardTranscriptRecoveryMessages(owner, remaining, options)

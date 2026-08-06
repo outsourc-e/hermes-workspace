@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it } from 'vitest'
-import { useChatStore } from './chat-store'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { restoreCardStreamingState, useChatStore } from './chat-store'
 import type { ChatMessage } from '../screens/chat/types'
 
 function textMessage(
@@ -22,6 +22,10 @@ function textMessage(
 beforeEach(() => {
   window.sessionStorage.clear()
   useChatStore.getState().clearCard('remote:card-owner')
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('chat-store Card ownership', () => {
@@ -126,6 +130,100 @@ describe('chat-store Card ownership', () => {
     })
     expect(window.sessionStorage.getItem(key)).not.toContain('raw-segment')
     expect(window.sessionStorage.getItem(key)).not.toContain('raw-successor')
+  })
+
+  it('persists an actual Card chunk immediately with raw identity sanitized', () => {
+    useChatStore.getState().processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'first durable chunk',
+      fullReplace: true,
+      runId: 'run-first-chunk',
+      sessionKey: 'remote:raw-segment',
+      transport: 'send-stream',
+    })
+
+    const raw = window.sessionStorage.getItem(
+      'workspace.chat-card-streaming.v1:remote%3Acard-owner',
+    )
+    expect(raw).toContain('first durable chunk')
+    expect(raw).toContain('run-first-chunk')
+    expect(raw).not.toContain('raw-segment')
+  })
+
+  it('checkpoints the latest state during continuous chunks so reload recovery is not trailing-debounce dependent', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_800_000_000_000)
+    const store = useChatStore.getState()
+
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'a',
+      fullReplace: true,
+      runId: 'run-continuous',
+      sessionKey: 'remote:raw-segment',
+      transport: 'send-stream',
+    })
+    vi.advanceTimersByTime(200)
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'ab',
+      fullReplace: true,
+      runId: 'run-continuous',
+      sessionKey: 'remote:raw-segment',
+      transport: 'send-stream',
+    })
+    vi.advanceTimersByTime(200)
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'abc',
+      fullReplace: true,
+      runId: 'run-continuous',
+      sessionKey: 'remote:raw-segment',
+      transport: 'send-stream',
+    })
+    vi.advanceTimersByTime(100)
+
+    expect(restoreCardStreamingState('remote:card-owner')).toMatchObject({
+      text: 'abc',
+      runId: 'run-continuous',
+    })
+  })
+
+  it('cancels and invalidates a pending chunk write when terminal state clears storage', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_800_000_000_000)
+    const store = useChatStore.getState()
+    const key = 'workspace.chat-card-streaming.v1:remote%3Acard-owner'
+
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'first',
+      fullReplace: true,
+      runId: 'run-terminal-race',
+      sessionKey: 'remote:raw-segment',
+      transport: 'send-stream',
+    })
+    vi.advanceTimersByTime(100)
+    store.processCardEvent('remote:card-owner', {
+      type: 'chunk',
+      text: 'newer pending chunk',
+      fullReplace: true,
+      runId: 'run-terminal-race',
+      sessionKey: 'remote:raw-segment',
+      transport: 'send-stream',
+    })
+    store.processCardEvent('remote:card-owner', {
+      type: 'done',
+      state: 'complete',
+      runId: 'run-terminal-race',
+      sessionKey: 'remote:raw-segment',
+      transport: 'send-stream',
+    })
+    expect(window.sessionStorage.getItem(key)).toBeNull()
+
+    vi.advanceTimersByTime(1_000)
+    expect(window.sessionStorage.getItem(key)).toBeNull()
+    expect(restoreCardStreamingState('remote:card-owner')).toBeNull()
   })
 
   it('scrubs raw transport identity from live Card messages and tool state', () => {
