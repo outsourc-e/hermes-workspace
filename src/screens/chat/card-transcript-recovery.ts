@@ -1028,6 +1028,66 @@ export function mergeCardTranscriptRecoveryMessages(
   return merged
 }
 
+function stableAttachmentIdentity(attachment: ChatAttachment): string {
+  return normalizedString(attachment.id)
+}
+
+/**
+ * Pair independently normalized attachment projections without relying on
+ * array position. Shared, unique attachment IDs are authoritative. The lone
+ * attachment compatibility case preserves existing browser/server ID
+ * normalization while remaining unambiguous within the matched message.
+ */
+function pairAcknowledgedAttachments(
+  authoritativeAttachments: Array<ChatAttachment>,
+  recoveryAttachments: Array<ChatAttachment>,
+): Array<number | null> {
+  const recoveryIndexesByIdentity = new Map<string, Array<number>>()
+  const authoritativeIdentityCounts = new Map<string, number>()
+  for (const [index, attachment] of recoveryAttachments.entries()) {
+    const identity = stableAttachmentIdentity(attachment)
+    if (!identity) continue
+    const indexes = recoveryIndexesByIdentity.get(identity) ?? []
+    indexes.push(index)
+    recoveryIndexesByIdentity.set(identity, indexes)
+  }
+  for (const attachment of authoritativeAttachments) {
+    const identity = stableAttachmentIdentity(attachment)
+    if (!identity) continue
+    authoritativeIdentityCounts.set(
+      identity,
+      (authoritativeIdentityCounts.get(identity) ?? 0) + 1,
+    )
+  }
+
+  const consumedRecoveryIndexes = new Set<number>()
+  const pairings = authoritativeAttachments.map((attachment) => {
+    const identity = stableAttachmentIdentity(attachment)
+    const recoveryIndexes = identity
+      ? recoveryIndexesByIdentity.get(identity)
+      : undefined
+    if (
+      identity &&
+      authoritativeIdentityCounts.get(identity) === 1 &&
+      recoveryIndexes?.length === 1 &&
+      !consumedRecoveryIndexes.has(recoveryIndexes[0]!)
+    ) {
+      consumedRecoveryIndexes.add(recoveryIndexes[0]!)
+      return recoveryIndexes[0]!
+    }
+    return null
+  })
+
+  if (
+    authoritativeAttachments.length === 1 &&
+    recoveryAttachments.length === 1 &&
+    pairings[0] === null
+  ) {
+    pairings[0] = 0
+  }
+  return pairings
+}
+
 function mergeAcknowledgedAttachments(
   authoritativeMessage: ChatMessage,
   recoveryMessage: ChatMessage,
@@ -1038,12 +1098,29 @@ function mergeAcknowledgedAttachments(
     ? authoritativeMessage.attachments
     : []
   const recoveryAttachments = recoveryMessage.attachments ?? []
-  const merged = recoveryAttachments.map((recoveryAttachment, index) => ({
-    ...recoveryAttachment,
-    ...(authoritativeAttachments[index] ?? {}),
-  }))
-  if (authoritativeAttachments.length > recoveryAttachments.length) {
-    merged.push(...authoritativeAttachments.slice(recoveryAttachments.length))
+  const pairings = pairAcknowledgedAttachments(
+    authoritativeAttachments,
+    recoveryAttachments,
+  )
+  const consumedRecoveryIndexes = new Set(
+    pairings.filter((index): index is number => index !== null),
+  )
+  const merged = authoritativeAttachments.map(
+    (authoritativeAttachment, authoritativeIndex) => {
+      const recoveryIndex = pairings[authoritativeIndex]
+      if (recoveryIndex === null || recoveryIndex === undefined) {
+        return authoritativeAttachment
+      }
+      const recoveryAttachment = recoveryAttachments[recoveryIndex]!
+      return {
+        ...authoritativeAttachment,
+        ...recoveryAttachment,
+        id: authoritativeAttachment.id ?? recoveryAttachment.id,
+      }
+    },
+  )
+  for (const [index, recoveryAttachment] of recoveryAttachments.entries()) {
+    if (!consumedRecoveryIndexes.has(index)) merged.push(recoveryAttachment)
   }
   return merged
 }
@@ -1060,9 +1137,15 @@ function authoritativeAttachmentFidelityAcknowledges(
   ) {
     return recoveryAttachments.length === 0
   }
-  return recoveryAttachments.every((recoveryAttachment, index) => {
-    const authoritativeAttachment = authoritativeAttachments[index]
-    if (!authoritativeAttachment) return false
+  const pairings = pairAcknowledgedAttachments(
+    authoritativeAttachments,
+    recoveryAttachments,
+  )
+  return pairings.every((recoveryIndex, authoritativeIndex) => {
+    if (recoveryIndex === null) return false
+    const recoveryAttachment = recoveryAttachments[recoveryIndex]
+    const authoritativeAttachment = authoritativeAttachments[authoritativeIndex]
+    if (!recoveryAttachment || !authoritativeAttachment) return false
     return (
       Object.entries(recoveryAttachment) as Array<[string, unknown]>
     ).every(

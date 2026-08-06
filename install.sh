@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/outsourc-e/hermes-workspace/main/install.sh | bash
 #
 # What it does:
-#   1. Verifies Node 22+, git, pnpm
+#   1. Verifies Node 22+ and git, then installs pinned pnpm
 #   2. Installs hermes-agent via Nous's official upstream installer
 #   3. Clones hermes-workspace
 #   4. Sets up .env, enables the Hermes API server, installs deps,
@@ -58,6 +58,33 @@ pnpm_cmd() {
     return
   fi
   npx --yes "pnpm@${PNPM_VERSION}" "$@"
+}
+
+install_pnpm_command() {
+  local pnpm_bin_dir="$HOME/.local/bin"
+  local pnpm_bin="$pnpm_bin_dir/pnpm"
+  local installed_version
+
+  mkdir -p "$pnpm_bin_dir"
+  if command -v corepack &>/dev/null; then
+    corepack enable --install-directory "$pnpm_bin_dir" pnpm
+  else
+    printf '#!/usr/bin/env bash\nexec npx --yes "pnpm@%s" "$@"\n' \
+      "$PNPM_VERSION" > "$pnpm_bin"
+    chmod 0755 "$pnpm_bin"
+  fi
+
+  ensure_path "$pnpm_bin_dir"
+  hash -r
+  if ! command -v pnpm &>/dev/null; then
+    red "Unable to install the pnpm command at $pnpm_bin"
+    exit 1
+  fi
+  installed_version="$(pnpm --version)"
+  if [[ "$installed_version" != "$PNPM_VERSION" ]]; then
+    red "pnpm $installed_version resolved from PATH; expected $PNPM_VERSION."
+    exit 1
+  fi
 }
 
 ensure_env_key() {
@@ -114,7 +141,8 @@ green "  curl ✓"
 if ! command -v corepack &>/dev/null; then
   need npm "Install npm (included with Node.js) to run pnpm ${PNPM_VERSION}."
 fi
-green "  pnpm $(pnpm_cmd --version) ✓"
+install_pnpm_command
+green "  pnpm $(pnpm --version) ✓"
 
 # ─── install hermes-agent (delegate to Nous upstream installer) ──────────
 # hermes-agent is NOT on PyPI. It installs from source via Nous's own

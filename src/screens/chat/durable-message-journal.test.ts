@@ -65,4 +65,70 @@ describe('durable message journal commit protocol', () => {
       ).filter((key) => key.startsWith(`${baseKey}:entry:`)),
     ).toEqual([])
   })
+
+  it('restores the previous committed checkpoint when a replacement promotion fails', () => {
+    const baseKey = 'journal-checkpoint-preservation'
+    const acceptedUser = { id: 'user-1', text: 'accepted user turn' }
+    const priorCheckpoint = {
+      id: 'assistant-run-1',
+      text: 'durable assistant prefix',
+    }
+    expect(
+      writeMessageJournal(
+        baseKey,
+        [acceptedUser, priorCheckpoint],
+        [window.localStorage],
+        (value) => value.id,
+      ),
+    ).toEqual({ anyVerified: true, persistentVerified: true })
+
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      const parsed = JSON.parse(value) as {
+        revision?: number
+        state?: string
+      }
+      if (
+        this === window.localStorage &&
+        key.endsWith(encodeURIComponent(priorCheckpoint.id)) &&
+        parsed.revision === 2 &&
+        parsed.state === 'committed'
+      ) {
+        // Promotion reports success but leaves the prepared replacement behind.
+        return
+      }
+      return originalSetItem.call(this, key, value)
+    })
+
+    expect(
+      writeMessageJournal(
+        baseKey,
+        [{ ...priorCheckpoint, text: 'unverified replacement' }],
+        [window.localStorage],
+        (value) => value.id,
+      ),
+    ).toEqual({ anyVerified: false, persistentVerified: false })
+
+    vi.mocked(Storage.prototype.setItem).mockRestore()
+    expect(
+      readMessageJournal<{ id: string; text: string }>(
+        baseKey,
+        [window.localStorage],
+        (value) => value.id,
+        (value) =>
+          typeof value === 'object' &&
+          value !== null &&
+          'id' in value &&
+          'text' in value &&
+          typeof value.id === 'string' &&
+          typeof value.text === 'string'
+            ? { id: value.id, text: value.text }
+            : null,
+      ),
+    ).toEqual(expect.arrayContaining([acceptedUser, priorCheckpoint]))
+  })
 })

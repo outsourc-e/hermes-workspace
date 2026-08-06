@@ -50,6 +50,28 @@ function commitId(): string {
   return `${random || 'commit'}-${Date.now().toString(36)}`
 }
 
+function restorePreviousCommittedRecord(
+  storage: Storage,
+  key: string,
+  previousCommitted: string | null,
+): void {
+  if (previousCommitted !== null) {
+    try {
+      storage.setItem(key, previousCommitted)
+      storage.getItem(key)
+    } catch {
+      // Do not delete an uncertain key: the restore may have landed before the
+      // mirror became unreadable, and deletion could erase the durable baseline.
+    }
+    return
+  }
+  try {
+    storage.removeItem(key)
+  } catch {
+    // Cleanup is best effort for an unavailable mirror.
+  }
+}
+
 export function isPersistentBrowserStorage(storage: Storage): boolean {
   if (typeof window === 'undefined') return false
   try {
@@ -157,39 +179,33 @@ export function writeMessageJournal<T>(
     let valuePersistent = false
     for (const storage of storages) {
       let preparedWritten = false
+      let previousCommitted: string | null = null
       try {
+        const previousRaw = storage.getItem(key)
+        const previousRecord = parseRecord<T>(previousRaw ?? '')
+        if (previousRecord?.state === 'committed') {
+          previousCommitted = previousRaw
+        }
         // A prepared row is never recovery authority. Only promote it after an
         // exact readback proves this mirror accepted the candidate bytes.
         storage.setItem(key, prepared)
         preparedWritten = true
         if (storage.getItem(key) !== prepared) {
-          try {
-            storage.removeItem(key)
-          } catch {
-            // Cleanup is best effort for an unavailable mirror.
-          }
+          restorePreviousCommittedRecord(storage, key, previousCommitted)
           continue
         }
         storage.setItem(key, committed)
         if (storage.getItem(key) !== committed) {
-          try {
-            storage.removeItem(key)
-          } catch {
-            // Cleanup is best effort for an unavailable mirror.
-          }
+          restorePreviousCommittedRecord(storage, key, previousCommitted)
           continue
         }
         valueVerified = true
         if (isPersistentBrowserStorage(storage)) valuePersistent = true
       } catch {
-        // If preparation landed before readback/commit failed, remove the
-        // unverified row so later recovery does not repeatedly encounter it.
+        // A failed replacement must never erase the prior committed checkpoint.
+        // Restore it when known; otherwise remove only the unverified candidate.
         if (preparedWritten) {
-          try {
-            storage.removeItem(key)
-          } catch {
-            // Cleanup is best effort for an unavailable mirror.
-          }
+          restorePreviousCommittedRecord(storage, key, previousCommitted)
         }
       }
     }

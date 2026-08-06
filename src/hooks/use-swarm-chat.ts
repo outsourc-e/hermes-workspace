@@ -4,21 +4,34 @@ import type {
   SessionCardListWire,
   SessionCardWire,
 } from '@/screens/chat/chat-queries'
-import type { ChatMessage, SessionCardChild } from '@/screens/chat/types'
+import type {
+  ChatAttachment,
+  ChatMessage,
+  SessionCardChild,
+} from '@/screens/chat/types'
 import {
   fetchCompleteSessionCardHistory,
   fetchSessionCards,
   hasExactCompleteSessionCardProjection,
   isAuthoritativeCompleteSessionCardHistory,
+  reconcileSessionCardHistoryResponse,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
 import { textFromMessage } from '@/screens/chat/utils'
+import { createOptimisticMessage } from '@/screens/chat/chat-screen-utils'
+import {
+  appendCardTranscriptRecoveryMessage,
+  isCardTranscriptRecoveryMessagePortable,
+  removeRejectedCardTranscriptRecoveryMessage,
+} from '@/screens/chat/card-transcript-recovery'
+import { parsePortableAttachmentDataUrl } from '@/screens/chat/attachment-envelope'
 
 export type SwarmChatMessage = {
   id: string
   role: 'user' | 'assistant' | 'system' | 'tool' | 'error'
   content: string
   timestamp: number | null
+  attachments?: Array<ChatAttachment>
   pending?: boolean
 }
 
@@ -38,6 +51,12 @@ type SwarmDirectChatBinding = SwarmSessionCardOwner & {
 }
 
 type SwarmDirectChatOutcome = {
+  cardOwner: SwarmSessionCardOwner
+}
+
+type SwarmDirectChatInput = {
+  prompt: string
+  attachments: Array<ChatAttachment>
   cardOwner: SwarmSessionCardOwner
 }
 
@@ -93,6 +112,8 @@ const DEFAULT_LIMIT = 30
 const UNMAPPED_HISTORY_QUERY_KEY = ['swarm', 'card-chat', 'unmapped'] as const
 const SAFE_TRANSCRIPT_ERROR = 'Session Card transcript is unavailable'
 const SAFE_SEND_ERROR = 'Unable to deliver the worker message'
+const SAFE_RECOVERY_ERROR =
+  'Unable to save this worker message for Session Card recovery'
 
 function exactSourceQualifiedIdentity(
   value: unknown,
@@ -273,6 +294,7 @@ export function resolveSwarmSessionCardTarget(
 async function sendDirectChat(
   workerId: string,
   prompt: string,
+  attachments: Array<ChatAttachment>,
   limit: number,
   cardBinding: SwarmDirectChatBinding,
 ): Promise<SwarmDirectChatOutcome> {
@@ -282,6 +304,7 @@ async function sendDirectChat(
     body: JSON.stringify({
       workerId,
       prompt,
+      attachments,
       cardBinding,
       limit,
       timeoutMs: 120_000,
@@ -329,7 +352,10 @@ function normalizeCardMessage(
   cardId: string,
 ): SwarmChatMessage | null {
   const content = textFromMessage(message).trim()
-  if (!content) return null
+  const attachments = Array.isArray(message.attachments)
+    ? message.attachments.map((attachment) => ({ ...attachment }))
+    : []
+  if (!content && attachments.length === 0) return null
   const role: SwarmChatMessage['role'] =
     message.role === 'assistant'
       ? 'assistant'
@@ -338,12 +364,42 @@ function normalizeCardMessage(
         : message.role === 'tool'
           ? 'tool'
           : 'system'
+  const optimisticIdentity =
+    typeof message.__optimisticId === 'string' && message.__optimisticId.trim()
+      ? message.__optimisticId
+      : String(index)
   return {
-    id: `card-message-${cardId}-${index}`,
+    id: `card-message-${cardId}-${optimisticIdentity}`,
     role,
     content,
     timestamp: typeof message.timestamp === 'number' ? message.timestamp : null,
+    ...(attachments.length > 0 ? { attachments } : {}),
+    pending: message.status === 'sending',
   }
+}
+
+function portableOutgoingAttachments(
+  attachments: ReadonlyArray<ChatAttachment>,
+): Array<ChatAttachment> | null {
+  const portable: Array<ChatAttachment> = []
+  for (const attachment of attachments) {
+    const parsed = parsePortableAttachmentDataUrl(
+      attachment.dataUrl,
+      attachment.contentType,
+    )
+    if (!parsed) return null
+    portable.push({
+      id:
+        typeof attachment.id === 'string' && attachment.id.trim()
+          ? attachment.id
+          : crypto.randomUUID(),
+      name: attachment.name,
+      contentType: parsed.contentType,
+      size: attachment.size,
+      dataUrl: `data:${parsed.contentType};base64,${parsed.base64}`,
+    })
+  }
+  return portable
 }
 
 function targetMatchesOwner(
@@ -411,29 +467,51 @@ async function fetchSanitizedSwarmCardTranscript(
         error: SAFE_TRANSCRIPT_ERROR,
       }
     }
-    if (!isAuthoritativeCompleteSessionCardHistory(history)) {
-      return {
-        target: mapping.target,
-        status: 'incomplete',
-        messages: [],
-        error: null,
-      }
-    }
+    const reconciled = reconcileSessionCardHistoryResponse(history, {
+      continuationSegmentKeys: mapping.continuationSegmentKeys,
+    })
+    const complete = isAuthoritativeCompleteSessionCardHistory(history)
     return {
       target: mapping.target,
-      status: 'ready',
-      messages: history.messages
+      status: complete ? 'ready' : 'incomplete',
+      messages: reconciled.messages
         .map((message, index) =>
           normalizeCardMessage(message, index, mapping.target.cardId),
         )
         .filter((message): message is SwarmChatMessage => Boolean(message)),
-      error: null,
+      error:
+        complete && reconciled.completeSnapshotDurability === 'failed'
+          ? SAFE_RECOVERY_ERROR
+          : null,
     }
   } catch {
+    const recovered = reconcileSessionCardHistoryResponse(
+      {
+        sessionKey: mapping.canonicalSegmentKey,
+        cardId: mapping.target.cardId,
+        canonicalSegmentKey: mapping.canonicalSegmentKey,
+        messages: [],
+        persistedMessages: [],
+        completeness: 'partial',
+        retryable: true,
+        missingSegments: [
+          {
+            segmentKey: mapping.canonicalSegmentKey,
+            retryable: true,
+            error: SAFE_TRANSCRIPT_ERROR,
+          },
+        ],
+      },
+      { continuationSegmentKeys: mapping.continuationSegmentKeys },
+    )
     return {
       target: mapping.target,
       status: 'unavailable',
-      messages: [],
+      messages: recovered.messages
+        .map((message, index) =>
+          normalizeCardMessage(message, index, mapping.target.cardId),
+        )
+        .filter((message): message is SwarmChatMessage => Boolean(message)),
       error: SAFE_TRANSCRIPT_ERROR,
     }
   }
@@ -544,24 +622,28 @@ export function useSwarmChat({
         parentCardId: target.parentCardId,
       }
     : undefined
-  const messages =
-    transcriptStatus === 'ready' ? (transcript?.messages ?? []) : []
+  const messages = target ? (transcript?.messages ?? []) : []
   const safeError =
     mappingState.status === 'unavailable'
       ? SAFE_TRANSCRIPT_ERROR
       : (transcript?.error ?? null)
 
   const dispatch = useMutation({
-    mutationFn: async (prompt: string) => {
-      if (!activeOwner) throw new Error(SAFE_SEND_ERROR)
+    mutationFn: async (input: SwarmDirectChatInput) => {
       try {
         const mapping = resolveSwarmSessionCardMapping(
           await fetchSessionCards(),
-          activeOwner,
+          input.cardOwner,
         )
         const cardBinding = directChatBindingForMapping(mapping, workerId)
         if (!cardBinding) throw new Error(SAFE_SEND_ERROR)
-        return await sendDirectChat(workerId, prompt, limit, cardBinding)
+        return await sendDirectChat(
+          workerId,
+          input.prompt || 'Please review the attached content.',
+          input.attachments,
+          limit,
+          cardBinding,
+        )
       } catch {
         throw new Error(SAFE_SEND_ERROR)
       }
@@ -577,6 +659,65 @@ export function useSwarmChat({
       ])
     },
   })
+
+  function sendMessage(
+    prompt: string,
+    attachments: ReadonlyArray<ChatAttachment> = [],
+  ): Promise<SwarmDirectChatOutcome> {
+    const body = prompt.trim()
+    if (!activeOwner || !target || (!body && attachments.length === 0)) {
+      throw new Error(SAFE_SEND_ERROR)
+    }
+    const portableAttachments = portableOutgoingAttachments(attachments)
+    if (!portableAttachments) throw new Error(SAFE_RECOVERY_ERROR)
+
+    const optimistic = createOptimisticMessage(body, portableAttachments)
+    if (
+      !isCardTranscriptRecoveryMessagePortable(optimistic.optimisticMessage)
+    ) {
+      throw new Error(SAFE_RECOVERY_ERROR)
+    }
+    const recoveryOwner = { cardId: activeOwner.cardId }
+    const persisted = appendCardTranscriptRecoveryMessage(
+      recoveryOwner,
+      optimistic.optimisticMessage,
+    )
+    if (!persisted) {
+      removeRejectedCardTranscriptRecoveryMessage(
+        recoveryOwner,
+        optimistic.clientId,
+      )
+      throw new Error(SAFE_RECOVERY_ERROR)
+    }
+
+    const optimisticRow = normalizeCardMessage(
+      optimistic.optimisticMessage,
+      Date.now(),
+      activeOwner.cardId,
+    )
+    if (!optimisticRow) {
+      removeRejectedCardTranscriptRecoveryMessage(
+        recoveryOwner,
+        optimistic.clientId,
+      )
+      throw new Error(SAFE_RECOVERY_ERROR)
+    }
+    queryClient.setQueryData<SwarmCardTranscript>(
+      cardOwnerHistoryQueryKey(activeOwner),
+      (current) => ({
+        target,
+        status: current?.status === 'unavailable' ? 'unavailable' : 'ready',
+        messages: [...(current?.messages ?? []), optimisticRow],
+        error: current?.error ?? null,
+      }),
+    )
+
+    return dispatch.mutateAsync({
+      prompt: body,
+      attachments: portableAttachments,
+      cardOwner: activeOwner,
+    })
+  }
 
   return {
     workerId,
@@ -598,7 +739,7 @@ export function useSwarmChat({
         setMappingEpoch((current) => current + 1)
       }
     },
-    sendMessage: dispatch.mutateAsync,
+    sendMessage,
     isSending: dispatch.isPending,
     sendError: dispatch.error instanceof Error ? SAFE_SEND_ERROR : null,
   }

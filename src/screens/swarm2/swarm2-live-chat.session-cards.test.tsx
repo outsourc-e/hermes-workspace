@@ -12,6 +12,10 @@ import type {
   SwarmSessionCardTarget,
 } from '@/hooks/use-swarm-chat'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import {
+  clearCardTranscriptRecoveryMemory,
+  readCardTranscriptRecovery,
+} from '@/screens/chat/card-transcript-recovery'
 
 const RAW_SEGMENT_ONE = 'local:raw-worker-segment-one'
 const RAW_SEGMENT_TWO = 'local:raw-worker-segment-two'
@@ -42,6 +46,65 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => mocks.navigate,
 }))
 vi.mock('@hugeicons/react', () => ({ HugeiconsIcon: () => null }))
+vi.mock('@/screens/chat/components/chat-composer', async () => {
+  type ReactActual = { createElement: typeof React.createElement }
+  const ReactModule = await vi.importActual<ReactActual>('react')
+  const attachment = {
+    id: 'swarm-attachment-1',
+    name: 'evidence.txt',
+    contentType: 'text/plain',
+    size: 5,
+    dataUrl: 'data:text/plain;base64,aGVsbG8=',
+  }
+  type ComposerProps = {
+    disabled: boolean
+    onSubmit: (
+      value: string,
+      attachments: Array<typeof attachment>,
+      fastMode: boolean,
+      helpers: {
+        reset: () => void
+        setValue: (value: string) => void
+        setAttachments: (attachments: Array<typeof attachment>) => void
+      },
+    ) => void
+  }
+  return {
+    ChatComposer: ({ disabled, onSubmit }: ComposerProps) =>
+      ReactModule.createElement(
+        'div',
+        null,
+        ReactModule.createElement(
+          'button',
+          {
+            type: 'button',
+            disabled,
+            onClick: () =>
+              onSubmit('Review the evidence', [attachment], false, {
+                reset: () => undefined,
+                setValue: () => undefined,
+                setAttachments: () => undefined,
+              }),
+          },
+          'Send attachment',
+        ),
+        ReactModule.createElement(
+          'button',
+          {
+            type: 'button',
+            disabled,
+            onClick: () =>
+              onSubmit('', [attachment], false, {
+                reset: () => undefined,
+                setValue: () => undefined,
+                setAttachments: () => undefined,
+              }),
+          },
+          'Send attachment only',
+        ),
+      ),
+  }
+})
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: QueryOptions) => {
     mocks.queryOptions.push(options)
@@ -55,19 +118,29 @@ vi.mock('@tanstack/react-query', () => ({
     }
   },
   useMutation: (options: {
-    mutationFn: (input: string) => Promise<unknown>
+    mutationFn: (input: unknown) => Promise<unknown>
     onSuccess?: (result: unknown) => Promise<void> | void
   }) => ({
     isPending: false,
     error: null,
-    mutateAsync: vi.fn(async (input: string) => {
+    mutateAsync: vi.fn(async (input: unknown) => {
       const result = await options.mutationFn(input)
       mocks.mutationResults.push(result)
       await options.onSuccess?.(result)
       return result
     }),
   }),
-  useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
+  useQueryClient: () => ({
+    invalidateQueries: mocks.invalidateQueries,
+    setQueryData: (
+      _queryKey: ReadonlyArray<unknown>,
+      updater: (
+        current: SanitizedTranscript | undefined,
+      ) => SanitizedTranscript,
+    ) => {
+      mocks.queryData = updater(mocks.queryData)
+    },
+  }),
 }))
 
 const rootOwner: SwarmSessionCardOwner = {
@@ -228,13 +301,20 @@ reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 async function mountViewer(
   owner: SwarmSessionCardOwner = rootOwner,
   surface: '/swarm' | '/swarm2' = '/swarm2',
+  nativeStyle = false,
 ) {
   const container = document.createElement('div')
   container.dataset.surface = surface
   document.body.appendChild(container)
   const root = createRoot(container)
   await React.act(async () => {
-    root.render(<Swarm2LiveChat workerId="builder" cardOwner={owner} />)
+    root.render(
+      <Swarm2LiveChat
+        workerId="builder"
+        cardOwner={owner}
+        nativeStyle={nativeStyle}
+      />,
+    )
     await Promise.resolve()
   })
   mountedRoots.push({ root, container })
@@ -248,6 +328,9 @@ function latestMappedQuery(): QueryOptions | undefined {
 }
 
 beforeEach(() => {
+  window.localStorage.clear()
+  window.sessionStorage.clear()
+  clearCardTranscriptRecoveryMemory()
   mocks.navigate.mockReset()
   mocks.invalidateQueries.mockReset()
   mocks.queryOptions.length = 0
@@ -500,6 +583,7 @@ it('binds a valid send to the current local Card and refreshes only that owner h
   expect(requestBody).toEqual({
     workerId: 'builder',
     prompt: 'Persist under this Card',
+    attachments: [],
     cardBinding: {
       ...rootOwner,
       canonicalSource: 'local',
@@ -519,6 +603,117 @@ it('binds a valid send to the current local Card and refreshes only that owner h
     queryKey: ['chat', 'session-cards', 'history', rootOwner.cardId, ''],
   })
   expect(JSON.stringify(mocks.mutationResults)).not.toContain('local:builder"')
+})
+
+it('admits embedded attachments into Card recovery before transport and sends the portable envelope', async () => {
+  const sendCardResponse = cardResponse({
+    canonicalSegmentKey: 'local:builder',
+  })
+  const fetchMock = vi.fn<typeof fetch>((input, init) => {
+    const url = String(input)
+    if (url === '/api/session-cards') {
+      return Promise.resolve(Response.json(sendCardResponse))
+    }
+    if (url === '/api/swarm-direct-chat' && init?.method === 'POST') {
+      return Promise.resolve(
+        Response.json({
+          ok: true,
+          cardOwner: rootOwner,
+          delivered: true,
+          delivery: 'tmux',
+          fetchedAt: 123,
+        }),
+      )
+    }
+    return Promise.reject(new Error(`Unexpected request: ${url}`))
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  await mountViewer(rootOwner, '/swarm2', true)
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Send attachment' }),
+    ).toBeTruthy(),
+  )
+  await React.act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Send attachment' }))
+    await Promise.resolve()
+  })
+
+  const recovery = readCardTranscriptRecovery({ cardId: rootOwner.cardId })
+  expect(recovery?.messages.at(-1)).toMatchObject({
+    role: 'user',
+    attachments: [
+      {
+        id: 'swarm-attachment-1',
+        name: 'evidence.txt',
+        contentType: 'text/plain',
+        size: 5,
+        dataUrl: 'data:text/plain;base64,aGVsbG8=',
+      },
+    ],
+  })
+  expect(mocks.queryData?.messages.at(-1)).toMatchObject({
+    role: 'user',
+    content: 'Review the evidence',
+    pending: true,
+    attachments: [{ id: 'swarm-attachment-1', name: 'evidence.txt' }],
+  })
+  const sendCall = fetchMock.mock.calls.find(
+    ([input]) => String(input) === '/api/swarm-direct-chat',
+  )
+  const requestBody = JSON.parse(String(sendCall?.[1]?.body)) as {
+    attachments?: Array<Record<string, unknown>>
+  }
+  expect(requestBody.attachments).toEqual([
+    {
+      id: 'swarm-attachment-1',
+      name: 'evidence.txt',
+      contentType: 'text/plain',
+      size: 5,
+      dataUrl: 'data:text/plain;base64,aGVsbG8=',
+    },
+  ])
+})
+
+it('fails closed before transport when Card recovery storage cannot admit the attachment', async () => {
+  const fetchMock = vi.fn<typeof fetch>((input) => {
+    const url = String(input)
+    if (url === '/api/session-cards') {
+      return Promise.resolve(
+        Response.json(cardResponse({ canonicalSegmentKey: 'local:builder' })),
+      )
+    }
+    return Promise.reject(new Error(`Unexpected request: ${url}`))
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  await mountViewer(rootOwner, '/swarm2', true)
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Send attachment' }),
+    ).toBeTruthy(),
+  )
+  const storageWrite = vi
+    .spyOn(Storage.prototype, 'setItem')
+    .mockImplementation(() => {
+      throw new DOMException('denied', 'QuotaExceededError')
+    })
+  await React.act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Send attachment' }))
+    await Promise.resolve()
+  })
+
+  expect(
+    fetchMock.mock.calls.some(
+      ([input]) => String(input) === '/api/swarm-direct-chat',
+    ),
+  ).toBe(false)
+  expect(readCardTranscriptRecovery({ cardId: rootOwner.cardId })).toBeNull()
+  expect(
+    screen.getByText('Unable to save or deliver this Session Card message'),
+  ).toBeTruthy()
+  storageWrite.mockRestore()
 })
 
 it('uses parent/child Card IDs for child history and rejects a nonmatching parent', async () => {
@@ -643,8 +838,7 @@ it('hides incomplete mapping/history and never falls back to raw worker chat', a
   })
   const incomplete = await latestMappedQuery()!.queryFn({ signal: undefined })
   expect(incomplete.status).toBe('incomplete')
-  expect(incomplete.messages).toEqual([])
-  expect(document.body.textContent).not.toContain(
+  expect(incomplete.messages.map((message) => message.content)).toContain(
     'Authoritative Card transcript',
   )
   expect(

@@ -809,6 +809,136 @@ describe('Card transcript recovery storage contract', () => {
     expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
   })
 
+  it('reconciles reordered attachments by stable identity without cross-wiring content', () => {
+    const attachmentA = {
+      id: 'attachment-a',
+      name: 'duplicate.txt',
+      contentType: 'text/plain',
+      size: 1,
+      dataUrl: 'data:text/plain;base64,QQ==',
+    }
+    const attachmentB = {
+      id: 'attachment-b',
+      name: 'duplicate.txt',
+      contentType: 'text/plain',
+      size: 1,
+      dataUrl: 'data:text/plain;base64,Qg==',
+    }
+    const recoveryMessage = {
+      ...message('user', 'review both files', { clientId: 'client-reordered' }),
+      attachments: [attachmentA, attachmentB],
+    }
+    replaceCardTranscriptRecoveryMessages(owner, [recoveryMessage], { now })
+
+    const partialAuthoritative = message('user', 'review both files', {
+      id: 'server-reordered',
+      client_id: 'client-reordered',
+      attachments: [
+        {
+          id: 'attachment-b',
+          name: 'duplicate.txt',
+          contentType: 'text/plain',
+          size: 1,
+        },
+        {
+          id: 'attachment-a',
+          name: 'duplicate.txt',
+          contentType: 'text/plain',
+          size: 1,
+        },
+      ],
+    })
+
+    expect(
+      mergeCardTranscriptRecoveryMessages(
+        [partialAuthoritative],
+        [recoveryMessage],
+      )[0]?.attachments,
+    ).toEqual([attachmentB, attachmentA])
+
+    const crossWiredAuthoritative = {
+      ...partialAuthoritative,
+      attachments: [
+        { ...attachmentB, dataUrl: attachmentA.dataUrl },
+        { ...attachmentA, dataUrl: attachmentB.dataUrl },
+      ],
+    }
+    expect(
+      mergeCardTranscriptRecoveryMessages(
+        [crossWiredAuthoritative],
+        [recoveryMessage],
+      )[0]?.attachments,
+    ).toEqual([attachmentB, attachmentA])
+    removeAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      [crossWiredAuthoritative],
+      { now },
+    )
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toHaveLength(1)
+
+    removeAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      [
+        {
+          ...partialAuthoritative,
+          attachments: [attachmentB, attachmentA],
+        },
+      ],
+      { now },
+    )
+    expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
+  })
+
+  it('does not position-match duplicate attachment names without stable IDs', () => {
+    const recoveryMessage = {
+      ...message('user', 'ambiguous files', { clientId: 'client-ambiguous' }),
+      attachments: [
+        {
+          name: 'duplicate.txt',
+          contentType: 'text/plain',
+          size: 1,
+          dataUrl: 'data:text/plain;base64,QQ==',
+        },
+        {
+          name: 'duplicate.txt',
+          contentType: 'text/plain',
+          size: 1,
+          dataUrl: 'data:text/plain;base64,Qg==',
+        },
+      ],
+    }
+    replaceCardTranscriptRecoveryMessages(owner, [recoveryMessage], { now })
+
+    removeAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      [
+        message('user', 'ambiguous files', {
+          id: 'server-ambiguous',
+          client_id: 'client-ambiguous',
+          attachments: [
+            {
+              name: 'duplicate.txt',
+              contentType: 'text/plain',
+              size: 1,
+              dataUrl: 'data:text/plain;base64,QQ==',
+            },
+            {
+              name: 'duplicate.txt',
+              contentType: 'text/plain',
+              size: 1,
+              dataUrl: 'data:text/plain;base64,Qg==',
+            },
+          ],
+        }),
+      ],
+      { now },
+    )
+
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      recoveryMessage,
+    ])
+  })
+
   it('keeps user and terminal assistant overlays through a stale complete refetch when quota persistence throws', () => {
     const originalSetItem = Storage.prototype.setItem
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (

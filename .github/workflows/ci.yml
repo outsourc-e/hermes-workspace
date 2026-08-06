@@ -43,7 +43,14 @@ jobs:
         run: pnpm build
 
       - name: Regenerate checked-in Electron server bundle
-        run: pnpm electron:bundle-server
+        run: |
+          pnpm electron:bundle-server
+          cp electron/server-bundle.cjs "$RUNNER_TEMP/server-bundle.cjs"
+
+      - name: Verify Electron server bundle is deterministic
+        run: |
+          pnpm electron:bundle-server
+          cmp --silent "$RUNNER_TEMP/server-bundle.cjs" electron/server-bundle.cjs
 
       - name: Verify checked-in Electron server bundle is current
         run: git diff --exit-code -- electron/server-bundle.cjs

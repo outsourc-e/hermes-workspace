@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Route } from './send-stream'
+import {
+  Route,
+  SEND_STREAM_MAX_AGGREGATE_ATTACHMENT_DECODED_BYTES,
+  SEND_STREAM_MAX_ATTACHMENT_COUNT,
+  SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS,
+  SEND_STREAM_MAX_REQUEST_BYTES,
+} from './send-stream'
 import { STREAM_PROVENANCE_ID_LIMIT } from './-send-stream-session-handoff'
 import type * as RunStore from '../../server/run-store'
 
@@ -879,7 +885,7 @@ describe('send-stream bootstrap session handoff', () => {
               id: 'browser-text-file',
               name: 'notes.txt',
               contentType: 'text/plain',
-              size: 7,
+              size: 8,
               dataUrl: 'data:text/plain;base64,aGVsbG8gz4A=',
             },
           ],
@@ -891,6 +897,135 @@ describe('send-stream bootstrap session handoff', () => {
     await response.text()
     expect(mocks.streamChat).toHaveBeenCalledTimes(1)
     expect(mocks.createSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a request body above the route byte limit before mutation', async () => {
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'x'.repeat(SEND_STREAM_MAX_REQUEST_BYTES),
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(413)
+    expect(mocks.createSession).not.toHaveBeenCalled()
+    expect(mocks.streamChat).not.toHaveBeenCalled()
+  })
+
+  it('rejects too many attachments before normalization or mutation', async () => {
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'bounded attachments',
+          attachments: Array.from(
+            { length: SEND_STREAM_MAX_ATTACHMENT_COUNT + 1 },
+            (_, index) => ({
+              id: `attachment-${index}`,
+              name: `${index}.txt`,
+              contentType: 'text/plain',
+              size: 1,
+              dataUrl: 'data:text/plain;base64,QQ==',
+            }),
+          ),
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(413)
+    expect(mocks.createSession).not.toHaveBeenCalled()
+    expect(mocks.streamChat).not.toHaveBeenCalled()
+  })
+
+  it('rejects oversized encoded attachment content before mutation', async () => {
+    const oversizedBase64 = 'A'.repeat(
+      SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS + 4,
+    )
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'oversized attachment',
+          attachments: [
+            {
+              name: 'oversized.bin',
+              contentType: 'application/octet-stream',
+              dataUrl: `data:application/octet-stream;base64,${oversizedBase64}`,
+            },
+          ],
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(413)
+    expect(mocks.createSession).not.toHaveBeenCalled()
+    expect(mocks.streamChat).not.toHaveBeenCalled()
+  })
+
+  it('rejects attachment content above the aggregate decoded-byte limit', async () => {
+    const decodedBytesPerAttachment =
+      Math.floor(SEND_STREAM_MAX_AGGREGATE_ATTACHMENT_DECODED_BYTES / 2) + 3
+    const encodedCharsPerAttachment =
+      Math.ceil(decodedBytesPerAttachment / 3) * 4
+    const base64 = 'A'.repeat(encodedCharsPerAttachment)
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'aggregate attachment limit',
+          attachments: ['first', 'second'].map((id) => ({
+            id,
+            name: `${id}.bin`,
+            contentType: 'application/octet-stream',
+            dataUrl: `data:application/octet-stream;base64,${base64}`,
+          })),
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(413)
+    expect(mocks.createSession).not.toHaveBeenCalled()
+    expect(mocks.streamChat).not.toHaveBeenCalled()
+  })
+
+  it('rejects declared attachment size that disagrees with decoded content', async () => {
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          friendlyId: 'new',
+          message: 'mismatched attachment',
+          attachments: [
+            {
+              name: 'one-byte.txt',
+              contentType: 'text/plain',
+              size: 2,
+              dataUrl: 'data:text/plain;base64,QQ==',
+            },
+          ],
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(mocks.createSession).not.toHaveBeenCalled()
+    expect(mocks.streamChat).not.toHaveBeenCalled()
   })
 
   it('rejects an initially stale local Card before local session or provider mutation', async () => {
@@ -4143,19 +4278,15 @@ describe('send-stream bootstrap session handoff', () => {
           })
           releasePhase = () => pending.resolve(undefined)
         } else if (phase === 'body parse') {
-          const pending = deferred<string>()
-          vi.spyOn(request, 'text').mockImplementationOnce(() => {
-            phaseStarted.resolve(undefined)
-            return pending.promise
-          })
-          releasePhase = () =>
-            pending.resolve(
-              JSON.stringify({
-                sessionKey: 'created-session',
-                friendlyId: 'created-session',
-                message: 'hello',
-              }),
-            )
+          const pending = deferred<ReadableStreamReadResult<Uint8Array>>()
+          vi.spyOn(request.body!, 'getReader').mockReturnValueOnce({
+            read: () => {
+              phaseStarted.resolve(undefined)
+              return pending.promise
+            },
+            cancel: vi.fn(),
+          } as never)
+          releasePhase = () => pending.resolve({ done: true, value: undefined })
         } else if (phase === 'session resolution') {
           const pending = deferred<{ sessionKey: string }>()
           mocks.resolveSessionKey.mockImplementationOnce(() => {
@@ -4239,19 +4370,15 @@ describe('send-stream bootstrap session handoff', () => {
           })
           releasePhase = () => pending.resolve(undefined)
         } else if (phase === 'body parse') {
-          const pending = deferred<string>()
-          vi.spyOn(request, 'text').mockImplementationOnce(() => {
-            phaseStarted.resolve(undefined)
-            return pending.promise
-          })
-          releasePhase = () =>
-            pending.resolve(
-              JSON.stringify({
-                sessionKey: 'created-session',
-                friendlyId: 'created-session',
-                message: 'hello',
-              }),
-            )
+          const pending = deferred<ReadableStreamReadResult<Uint8Array>>()
+          vi.spyOn(request.body!, 'getReader').mockReturnValueOnce({
+            read: () => {
+              phaseStarted.resolve(undefined)
+              return pending.promise
+            },
+            cancel: vi.fn(),
+          } as never)
+          releasePhase = () => pending.resolve({ done: true, value: undefined })
         } else if (phase === 'session resolution') {
           const pending = deferred<{ sessionKey: string }>()
           mocks.resolveSessionKey.mockImplementationOnce(() => {

@@ -195,14 +195,36 @@ function MessageBubble({
             ) : null}
           </div>
         ) : (
-          <pre
-            className={cn(
-              'whitespace-pre-wrap break-words font-sans text-[12px] leading-snug',
-              message.pending && isAssistant && 'animate-pulse',
-            )}
-          >
-            {message.content || '(empty)'}
-          </pre>
+          <div className="space-y-1.5">
+            {message.content ? (
+              <pre
+                className={cn(
+                  'whitespace-pre-wrap break-words font-sans text-[12px] leading-snug',
+                  message.pending && isAssistant && 'animate-pulse',
+                )}
+              >
+                {message.content}
+              </pre>
+            ) : null}
+            {message.attachments?.length ? (
+              <ul
+                aria-label="Message attachments"
+                className="space-y-1 text-[10px] text-[var(--theme-muted-2)]"
+              >
+                {message.attachments.map((attachment, index) => (
+                  <li
+                    key={
+                      attachment.id ??
+                      `${attachment.name ?? 'attachment'}-${index}`
+                    }
+                    className="truncate rounded-md border border-[var(--theme-border)]/70 px-1.5 py-1"
+                  >
+                    {attachment.name?.trim() || 'Attachment'}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         )}
       </div>
     </div>
@@ -235,6 +257,7 @@ export function Swarm2LiveChat({
     enabled: Boolean(workerId),
   })
   const [draft, setDraft] = useState('')
+  const [admissionError, setAdmissionError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -247,7 +270,7 @@ export function Swarm2LiveChat({
   }, [preview, nativeStyle, workerId])
 
   const previewMessages = preview ? messages.slice(-previewLimit) : messages
-  const allErrors = sendError || error
+  const allErrors = admissionError || sendError || error
 
   useEffect(() => {
     if (!scrollRef.current) return
@@ -258,10 +281,12 @@ export function Swarm2LiveChat({
     const text = draft.trim()
     if (!text || isSending) return
     setDraft('')
+    setAdmissionError(null)
     try {
       await sendMessage(text)
     } catch {
       setDraft(text)
+      setAdmissionError('Unable to save or deliver this Session Card message')
     }
   }
 
@@ -306,17 +331,20 @@ export function Swarm2LiveChat({
               : 'max-h-[250px] min-h-[120px]',
         )}
       >
-        {transcriptStatus === 'unmapped' ||
-        transcriptStatus === 'unavailable' ? (
+        {(transcriptStatus === 'unmapped' ||
+          transcriptStatus === 'unavailable') &&
+        previewMessages.length === 0 ? (
           <p className="text-center text-[11px] text-[var(--theme-muted)]">
             Transcript unavailable: no complete Session Card is mapped to this
             worker.
           </p>
-        ) : transcriptStatus === 'incomplete' ? (
+        ) : transcriptStatus === 'incomplete' &&
+          previewMessages.length === 0 ? (
           <p className="text-center text-[11px] text-[var(--theme-muted)]">
             Transcript unavailable: Session Card history is incomplete.
           </p>
-        ) : isLoading || transcriptStatus === 'loading' ? (
+        ) : (isLoading || transcriptStatus === 'loading') &&
+          previewMessages.length === 0 ? (
           <p className="text-center text-[11px] text-[var(--theme-muted)]">
             Loading Session Card history…
           </p>
@@ -325,14 +353,26 @@ export function Swarm2LiveChat({
             No messages yet on the authoritative Session Card.
           </p>
         ) : (
-          previewMessages.map((m) => (
-            <MessageBubble
-              key={m.id}
-              workerId={workerId}
-              message={m}
-              nativeStyle={nativeStyle}
-            />
-          ))
+          <>
+            {transcriptStatus === 'incomplete' ||
+            transcriptStatus === 'unavailable' ? (
+              <p
+                role="status"
+                className="text-center text-[10px] text-[var(--theme-muted)]"
+              >
+                Showing the last Card-durable transcript while history
+                refreshes.
+              </p>
+            ) : null}
+            {previewMessages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                workerId={workerId}
+                message={m}
+                nativeStyle={nativeStyle}
+              />
+            ))}
+          </>
         )}
       </div>
 
@@ -346,13 +386,30 @@ export function Swarm2LiveChat({
         nativeStyle ? (
           <div className="border-t border-[var(--theme-border)]/70 px-2 py-2">
             <ChatComposer
-              onSubmit={(value, _attachments, _fastMode, helpers) => {
+              onSubmit={(value, attachments, _fastMode, helpers) => {
                 const text = value.trim()
-                if (!text || isSending) return
-                helpers.reset()
-                void sendMessage(text).catch(() => {
-                  helpers.setValue(text)
-                })
+                if ((!text && attachments.length === 0) || isSending) return
+                setAdmissionError(null)
+                try {
+                  const pending = sendMessage(text, attachments)
+                  void pending.catch(() => {
+                    setAdmissionError(
+                      'Unable to save or deliver this Session Card message',
+                    )
+                    helpers.setValue(text)
+                    helpers.setAttachments(attachments)
+                  })
+                } catch {
+                  setAdmissionError(
+                    'Unable to save or deliver this Session Card message',
+                  )
+                  // ChatComposer clears after onSubmit returns. Restore on the
+                  // next microtask when durable admission failed synchronously.
+                  queueMicrotask(() => {
+                    helpers.setValue(text)
+                    helpers.setAttachments(attachments)
+                  })
+                }
               }}
               isLoading={isSending}
               disabled={!target}

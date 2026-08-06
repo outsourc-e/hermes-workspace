@@ -80,15 +80,78 @@ import type {
 import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 // Claude agent runs can take 5+ minutes with complex tool chains
 const SEND_STREAM_RUN_TIMEOUT_MS = 600_000
+export const SEND_STREAM_MAX_REQUEST_BYTES = 4 * 1024 * 1024
+export const SEND_STREAM_MAX_ATTACHMENT_COUNT = 8
+export const SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS = 2 * 1024 * 1024
+export const SEND_STREAM_MAX_ATTACHMENT_DECODED_BYTES =
+  (SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS / 4) * 3
+export const SEND_STREAM_MAX_AGGREGATE_ATTACHMENT_DECODED_BYTES =
+  2 * 1024 * 1024
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function readNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  return undefined
+function decodedBase64ByteLength(value: string): number {
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0
+  return Math.floor((value.length * 3) / 4) - padding
+}
+
+function encodedAttachmentPayloadLength(value: string): number {
+  const firstNonWhitespace = value.search(/\S/u)
+  if (
+    firstNonWhitespace >= 0 &&
+    value.slice(firstNonWhitespace, firstNonWhitespace + 5).toLowerCase() ===
+      'data:'
+  ) {
+    const comma = value.indexOf(',', firstNonWhitespace + 5)
+    if (comma >= 0) return value.length - comma - 1
+  }
+  return value.length
+}
+
+async function readBoundedRequestText(
+  request: Request,
+  signal: AbortSignal,
+): Promise<{ ok: true; text: string } | { ok: false }> {
+  const contentLength = request.headers.get('content-length')
+  if (contentLength && /^\d+$/u.test(contentLength)) {
+    const declaredBytes = Number(contentLength)
+    if (
+      !Number.isSafeInteger(declaredBytes) ||
+      declaredBytes > SEND_STREAM_MAX_REQUEST_BYTES
+    ) {
+      return { ok: false }
+    }
+  }
+  if (!request.body) return { ok: true, text: '' }
+
+  const reader = request.body.getReader()
+  const cancelReader = () => {
+    void reader.cancel()
+  }
+  signal.addEventListener('abort', cancelReader, { once: true })
+  const decoder = new TextDecoder()
+  let receivedBytes = 0
+  let text = ''
+  try {
+    let result = await reader.read()
+    while (!result.done) {
+      const { value } = result
+      receivedBytes += value.byteLength
+      if (receivedBytes > SEND_STREAM_MAX_REQUEST_BYTES) {
+        void reader.cancel()
+        return { ok: false }
+      }
+      text += decoder.decode(value, { stream: true })
+      result = await reader.read()
+    }
+    text += decoder.decode()
+    return { ok: true, text }
+  } finally {
+    signal.removeEventListener('abort', cancelReader)
+  }
 }
 
 function isValidBase64Payload(value: string): boolean {
@@ -115,21 +178,40 @@ function parseAttachmentDataUrl(
 
 type AttachmentNormalization =
   | { ok: true; attachments: Array<Record<string, unknown>> | undefined }
-  | { ok: false }
+  | { ok: false; reason: 'invalid' | 'too_large' }
 
 function normalizeAttachments(attachments: unknown): AttachmentNormalization {
   if (attachments === undefined || attachments === null) {
     return { ok: true, attachments: undefined }
   }
-  if (!Array.isArray(attachments)) return { ok: false }
+  if (!Array.isArray(attachments)) return { ok: false, reason: 'invalid' }
   if (attachments.length === 0) {
     return { ok: true, attachments: undefined }
   }
+  if (attachments.length > SEND_STREAM_MAX_ATTACHMENT_COUNT) {
+    return { ok: false, reason: 'too_large' }
+  }
 
   const normalized: Array<Record<string, unknown>> = []
+  let aggregateDecodedBytes = 0
   for (const attachment of attachments) {
-    if (!attachment || typeof attachment !== 'object') return { ok: false }
+    if (!attachment || typeof attachment !== 'object') {
+      return { ok: false, reason: 'invalid' }
+    }
     const source = attachment as Record<string, unknown>
+
+    // Reject raw envelope strings before regex parsing, normalization, or
+    // retaining the same payload under compatibility aliases.
+    for (const key of ['dataUrl', 'content', 'data', 'base64'] as const) {
+      const value = source[key]
+      if (
+        typeof value === 'string' &&
+        encodedAttachmentPayloadLength(value) >
+          SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS
+      ) {
+        return { ok: false, reason: 'too_large' }
+      }
+    }
 
     const id = readString(source.id)
     const name = readString(source.name) || readString(source.fileName)
@@ -137,7 +219,19 @@ function normalizeAttachments(attachments: unknown): AttachmentNormalization {
       readString(source.contentType) ||
       readString(source.mimeType) ||
       readString(source.mediaType)
-    const size = readNumber(source.size)
+    const hasDeclaredSize = Object.prototype.hasOwnProperty.call(source, 'size')
+    const size =
+      typeof source.size === 'number' &&
+      Number.isSafeInteger(source.size) &&
+      source.size >= 0
+        ? source.size
+        : undefined
+    if (hasDeclaredSize && size === undefined) {
+      return { ok: false, reason: 'invalid' }
+    }
+    if (size !== undefined && size > SEND_STREAM_MAX_ATTACHMENT_DECODED_BYTES) {
+      return { ok: false, reason: 'too_large' }
+    }
     const hasDataUrl = Object.prototype.hasOwnProperty.call(source, 'dataUrl')
 
     let content: string
@@ -148,7 +242,7 @@ function normalizeAttachments(attachments: unknown): AttachmentNormalization {
         !parsed ||
         (mimeType && mimeType.toLowerCase() !== parsed.mimeType.toLowerCase())
       ) {
-        return { ok: false }
+        return { ok: false, reason: 'invalid' }
       }
       mimeType ||= parsed.mimeType
       content = parsed.content
@@ -162,23 +256,48 @@ function normalizeAttachments(attachments: unknown): AttachmentNormalization {
         ? parseAttachmentDataUrl(rawContent)
         : null
       if (rawContent.toLowerCase().startsWith('data:') && !embeddedDataUrl) {
-        return { ok: false }
+        return { ok: false, reason: 'invalid' }
       }
       if (embeddedDataUrl) {
         if (
           mimeType &&
           mimeType.toLowerCase() !== embeddedDataUrl.mimeType.toLowerCase()
         ) {
-          return { ok: false }
+          return { ok: false, reason: 'invalid' }
         }
         mimeType ||= embeddedDataUrl.mimeType
         content = embeddedDataUrl.content
         dataUrl = embeddedDataUrl.dataUrl
       } else {
         content = rawContent
-        if (!isValidBase64Payload(content)) return { ok: false }
+        if (!isValidBase64Payload(content)) {
+          return { ok: false, reason: 'invalid' }
+        }
         dataUrl = mimeType ? `data:${mimeType};base64,${content}` : ''
       }
+    }
+
+    if (content.length > SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS) {
+      return { ok: false, reason: 'too_large' }
+    }
+    const decodedBytes = decodedBase64ByteLength(content)
+    if (
+      decodedBytes > SEND_STREAM_MAX_ATTACHMENT_DECODED_BYTES ||
+      (size !== undefined && size !== decodedBytes)
+    ) {
+      return {
+        ok: false,
+        reason:
+          decodedBytes > SEND_STREAM_MAX_ATTACHMENT_DECODED_BYTES
+            ? 'too_large'
+            : 'invalid',
+      }
+    }
+    aggregateDecodedBytes += decodedBytes
+    if (
+      aggregateDecodedBytes > SEND_STREAM_MAX_AGGREGATE_ATTACHMENT_DECODED_BYTES
+    ) {
+      return { ok: false, reason: 'too_large' }
     }
 
     const type =
@@ -483,13 +602,26 @@ export const Route = createFileRoute('/api/send-stream')({
           throw error
         }
 
-        // Read body manually to handle large payloads (image attachments
-        // can push the JSON body above the default ~1MB parse limit).
+        // Read and decode the body incrementally so the manual parser remains
+        // bounded even when framework JSON limits are bypassed for attachments.
         let body: Record<string, unknown> = {}
         try {
-          const rawBody = await waitWithinStreamLifetime(request.text())
+          const boundedBody = await waitWithinStreamLifetime(
+            readBoundedRequestText(request, abortController.signal),
+          )
           ensureStreamTransportAvailable()
-          body = JSON.parse(rawBody) as Record<string, unknown>
+          if (!boundedBody.ok) {
+            return finishPreStreamResponse(
+              new Response(
+                JSON.stringify({ ok: false, error: 'request body too large' }),
+                {
+                  status: 413,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              ),
+            )
+          }
+          body = JSON.parse(boundedBody.text) as Record<string, unknown>
         } catch (error) {
           if (error === streamTimeoutError) {
             return finishPreStreamResponse(streamTimeoutResponse())
@@ -515,11 +647,19 @@ export const Route = createFileRoute('/api/send-stream')({
           typeof body.thinking === 'string' ? body.thinking : undefined
         const normalizedAttachments = normalizeAttachments(body.attachments)
         if (!normalizedAttachments.ok) {
+          const tooLarge = normalizedAttachments.reason === 'too_large'
           return finishPreStreamResponse(
-            new Response(JSON.stringify({ error: 'invalid attachment data' }), {
-              status: 400,
-              headers: { 'Content-Type': 'application/json' },
-            }),
+            new Response(
+              JSON.stringify({
+                error: tooLarge
+                  ? 'attachment payload too large'
+                  : 'invalid attachment data',
+              }),
+              {
+                status: tooLarge ? 413 : 400,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
           )
         }
         const attachments = normalizedAttachments.attachments
