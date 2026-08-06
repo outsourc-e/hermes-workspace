@@ -4,6 +4,7 @@ import {
   mergeCardTranscriptRecoveryMessages,
   readCardTranscriptRecovery,
   removeAcknowledgedCardTranscriptRecoveryMessages,
+  replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import type { QueryClient } from '@tanstack/react-query'
 import type {
@@ -1606,6 +1607,45 @@ export function moveSessionCardHistoryMessages(
   return true
 }
 
+export function setSessionCardHandoffAuthority(
+  queryClient: QueryClient,
+  currentCard: SessionCard,
+  authority: SessionCardHandoffAuthority,
+): boolean {
+  if (
+    currentCard.cardId !== authority.cardId ||
+    currentCard.canonicalSource !== authority.canonicalSource ||
+    authority.continuationSegmentKeys.length === 0 ||
+    authority.continuationSegmentKeys.at(-1) !== authority.canonicalSegmentKey
+  ) {
+    return false
+  }
+
+  const queryKey = sessionCardQueryKeys.detail(authority.cardId)
+  const cached = queryClient.getQueryData<SessionCardDetailWire>(queryKey)
+  if (cached && cached.card.cardId !== authority.cardId) return false
+  const baseCard = cached?.card ?? currentCard
+  queryClient.setQueryData<SessionCardDetailWire>(queryKey, {
+    ...(cached ?? {
+      resolution: {
+        cardId: authority.cardId,
+        completeness: 'complete',
+        retryable: false,
+      },
+      completeness: 'complete',
+      retryable: false,
+      sources: [],
+    }),
+    card: {
+      ...baseCard,
+      ...authority,
+      continuationSegmentKeys: [...authority.continuationSegmentKeys],
+      continuationCount: authority.continuationSegmentKeys.length,
+    },
+  })
+  return true
+}
+
 export async function updateSessionCardMetadata(
   cardId: string,
   patch: {
@@ -2066,6 +2106,70 @@ export function updateHistoryMessageByClientIdEverywhere(
     })
     queryClient.setQueryData(queryKey, { ...current, messages: nextMessages })
   }
+}
+
+export function updateSessionCardTransientMessageByClientId(
+  queryClient: QueryClient,
+  cardId: string,
+  canonicalSegmentKey: string,
+  clientId: string,
+  updater: (message: ChatMessage) => ChatMessage,
+): boolean {
+  if (
+    !normalizeId(cardId) ||
+    !normalizeId(canonicalSegmentKey) ||
+    !normalizeId(clientId)
+  ) {
+    return false
+  }
+
+  const owner = { cardId }
+  const recovery = readCardTranscriptRecovery(owner)
+  const recoveredMatch =
+    recovery?.messages.some((message) =>
+      isMatchingClientMessage(message, clientId, clientId),
+    ) ?? false
+  if (recovery && recoveredMatch) {
+    const messages = recovery.messages.map((message) => {
+      if (!isMatchingClientMessage(message, clientId, clientId)) return message
+      return updater(message)
+    })
+    replaceCardTranscriptRecoveryMessages(owner, messages)
+  }
+
+  const cached = queryClient.getQueryData<SessionCardHistoryResponse>(
+    sessionCardQueryKeys.history(cardId),
+  )
+  const cacheMatch =
+    cached?.messages.find((message) =>
+      isMatchingClientMessage(message, clientId, clientId),
+    ) ?? null
+  if (cacheMatch) {
+    updateSessionCardHistoryMessages(
+      queryClient,
+      cardId,
+      canonicalSegmentKey,
+      (messages) =>
+        messages.map((message) =>
+          isMatchingClientMessage(message, clientId, clientId)
+            ? updater(message)
+            : message,
+        ),
+    )
+    if (!recoveredMatch) {
+      const updatedCacheMatch = queryClient
+        .getQueryData<SessionCardHistoryResponse>(
+          sessionCardQueryKeys.history(cardId),
+        )
+        ?.messages.find((message) =>
+          isMatchingClientMessage(message, clientId, clientId),
+        )
+      if (updatedCacheMatch) {
+        appendCardTranscriptRecoveryMessage(owner, updatedCacheMatch)
+      }
+    }
+  }
+  return recoveredMatch || cacheMatch !== null
 }
 
 export function removeHistoryMessageByClientId(

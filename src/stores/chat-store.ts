@@ -1,4 +1,8 @@
 import { create } from 'zustand'
+import {
+  sanitizeCardOwnedMessage,
+  sanitizeCardOwnedValue,
+} from '../screens/chat/card-transcript-recovery'
 import type {
   ChatMessage,
   MessageContent,
@@ -117,6 +121,7 @@ type ChatState = {
   processCardEvent: (cardId: string, event: ChatStreamEvent) => void
   getCardRealtimeMessages: (cardId: string) => Array<ChatMessage>
   getCardStreamingState: (cardId: string) => StreamingState | null
+  hydrateCardStreamingState: (cardId: string) => void
   clearCard: (cardId: string) => void
   clearCardRealtimeBuffer: (cardId: string) => void
   clearCardStreaming: (cardId: string) => void
@@ -174,6 +179,7 @@ const createEmptyStreamingState = (): StreamingState => ({
 
 const CARD_STREAMING_STORAGE_PREFIX = 'workspace.chat-card-streaming.v1:'
 const CARD_WAITING_STORAGE_PREFIX = 'workspace.chat-card-waiting.v1:'
+export const CARD_STREAMING_STATE_TTL_MS = 10 * 60 * 1000
 const LEGACY_CHAT_STORAGE_PREFIXES = [
   'claude_waiting_',
   'claude_streaming_',
@@ -186,11 +192,11 @@ function isAuthoritativeCardId(cardId: string): boolean {
 }
 
 function withoutTransportOwnership(message: ChatMessage): ChatMessage {
-  const sanitized = { ...message } as ChatMessage & Record<string, unknown>
-  delete sanitized.sessionKey
-  delete sanitized.session_key
-  delete sanitized.canonicalSegmentKey
-  return sanitized
+  return sanitizeCardOwnedMessage(message)
+}
+
+function sanitizeCardStreamingState(state: StreamingState): StreamingState {
+  return sanitizeCardOwnedValue(state) as StreamingState
 }
 
 function cleanupLegacyChatStorage(): void {
@@ -227,7 +233,10 @@ function persistCardStreamingState(
     try {
       sessionStorage.setItem(
         cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId),
-        JSON.stringify({ ...state, _savedAt: Date.now() }),
+        JSON.stringify({
+          ...sanitizeCardStreamingState(state),
+          _savedAt: Date.now(),
+        }),
       )
     } catch {
       // In-memory Card state remains authoritative when persistence is denied.
@@ -257,12 +266,15 @@ export function restoreCardStreamingState(
       typeof parsed._savedAt === 'number' && Number.isFinite(parsed._savedAt)
         ? parsed._savedAt
         : null
-    if (!savedAt || Date.now() - savedAt > 60_000) {
+    if (!savedAt || Date.now() - savedAt > CARD_STREAMING_STATE_TTL_MS) {
       sessionStorage.removeItem(storageKey)
       return null
     }
     const { _savedAt, ...streamingState } = parsed
-    return streamingState
+    const sanitized = sanitizeCardStreamingState(streamingState)
+    const sanitizedRaw = JSON.stringify({ ...sanitized, _savedAt: savedAt })
+    if (sanitizedRaw !== raw) sessionStorage.setItem(storageKey, sanitizedRaw)
+    return sanitized
   } catch {
     sessionStorage.removeItem(storageKey)
     return null
@@ -477,6 +489,12 @@ function getMessageId(msg: ChatMessage | null | undefined): string | undefined {
   if (typeof messageId === 'string' && messageId.trim().length > 0)
     return messageId
   return undefined
+}
+
+function getMessageRunId(msg: ChatMessage | null | undefined): string {
+  if (!msg) return ''
+  const raw = msg as Record<string, unknown>
+  return normalizeString(raw.runId) || normalizeString(raw.run_id)
 }
 
 function getClientNonce(msg: ChatMessage | null | undefined): string {
@@ -821,9 +839,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
           event.message.role === 'assistant'
             ? stripFinalTagsFromMessage(event.message)
             : event.message
-        const browserMessage = ownerCardId
+        let browserMessage = ownerCardId
           ? withoutTransportOwnership(normalizedMessage)
           : normalizedMessage
+        const incomingRunId =
+          normalizeString(event.runId) || getMessageRunId(browserMessage)
+        if (browserMessage.role === 'assistant' && incomingRunId) {
+          browserMessage = {
+            ...browserMessage,
+            runId: incomingRunId,
+            stableId:
+              normalizeString(
+                (browserMessage as Record<string, unknown>).stableId,
+              ) || `stream-run:${incomingRunId}`,
+          }
+        }
 
         const newId = getMessageId(browserMessage)
         const newClientNonce = getClientNonce(browserMessage)
@@ -886,6 +916,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         const duplicateIndex = sessionMessages.findIndex((existing) => {
           if (existing.role !== browserMessage.role) return false
+          const existingRunId = getMessageRunId(existing)
+          if (
+            incomingRunId &&
+            existingRunId &&
+            incomingRunId !== existingRunId
+          ) {
+            return false
+          }
           const existingId = getMessageId(existing)
           if (newId && existingId && newId === existingId) return true
 
@@ -1088,11 +1126,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const nextToolCalls = [...prev.toolCalls]
         const existingToolCall = nextToolCalls[existingToolIndex]
 
+        const eventArgs = ownerCardId
+          ? sanitizeCardOwnedValue(event.args)
+          : event.args
         if (existingToolCall) {
           nextToolCalls[existingToolIndex] = {
             ...existingToolCall,
             phase: event.phase,
-            args: event.args ?? existingToolCall.args,
+            args: eventArgs ?? existingToolCall.args,
             preview: (event as any).preview ?? existingToolCall.preview,
             result: (event as any).result ?? existingToolCall.result,
           }
@@ -1103,7 +1144,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             id: toolCallId,
             name: event.name,
             phase: event.phase,
-            args: event.args,
+            args: eventArgs,
             preview: (event as any).preview,
             result: (event as any).result,
           })
@@ -1114,10 +1155,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           runId: event.runId ?? prev.runId,
           toolCalls: nextToolCalls,
         }
+        const browserNext = ownerCardId
+          ? sanitizeCardStreamingState(next)
+          : next
 
-        streamingMap.set(sessionKey, next)
+        streamingMap.set(sessionKey, browserNext)
         set({ streamingState: streamingMap, lastEventAt: now })
-        if (ownerCardId) persistCardStreamingState(ownerCardId, next)
+        if (ownerCardId) persistCardStreamingState(ownerCardId, browserNext)
         break
       }
 
@@ -1195,6 +1239,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         }
 
+        const terminalRunId =
+          normalizeString(event.runId) ||
+          getMessageRunId(completeMessage) ||
+          normalizeString(streaming?.runId)
+        if (completeMessage && terminalRunId) {
+          completeMessage = {
+            ...completeMessage,
+            runId: terminalRunId,
+            stableId:
+              normalizeString(
+                (completeMessage as Record<string, unknown>).stableId,
+              ) || `stream-run:${terminalRunId}`,
+          }
+        }
+        if (completeMessage && ownerCardId) {
+          completeMessage = withoutTransportOwnership(completeMessage)
+        }
+
         if (completeMessage) {
           const messages = new Map(state.realtimeMessages)
           const sessionMessages = [...(messages.get(sessionKey) ?? [])]
@@ -1206,6 +1268,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const completeId = getMessageId(completeMessage)
           const isDuplicate = sessionMessages.some((existing) => {
             if (existing.role !== 'assistant') return false
+            const existingRunId = getMessageRunId(existing)
+            if (
+              terminalRunId &&
+              existingRunId &&
+              terminalRunId !== existingRunId
+            ) {
+              return false
+            }
             const existingId = getMessageId(existing)
             if (completeId && existingId && completeId === existingId)
               return true
@@ -1226,6 +1296,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
             // replace it with the clean final version so the UI shows clean text.
             const existingIdx = sessionMessages.findIndex((existing) => {
               if (existing.role !== 'assistant') return false
+              const existingRunId = getMessageRunId(existing)
+              if (
+                terminalRunId &&
+                existingRunId &&
+                terminalRunId !== existingRunId
+              ) {
+                return false
+              }
               const existingId = getMessageId(existing)
               if (completeId && existingId && completeId === existingId)
                 return true
@@ -1277,6 +1355,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   getCardStreamingState: (cardId) => {
     if (!isAuthoritativeCardId(cardId)) return null
     return get().streamingState.get(cardId) ?? restoreCardStreamingState(cardId)
+  },
+
+  hydrateCardStreamingState: (cardId) => {
+    if (!isAuthoritativeCardId(cardId) || get().streamingState.has(cardId))
+      return
+    const restored = restoreCardStreamingState(cardId)
+    if (!restored) return
+    const streamingState = new Map(get().streamingState)
+    streamingState.set(cardId, restored)
+    set({ streamingState, lastEventAt: Date.now() })
   },
 
   clearCard: (cardId) => {

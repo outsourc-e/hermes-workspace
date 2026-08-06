@@ -86,6 +86,49 @@ describe('Card transcript recovery storage contract', () => {
     expect(readCardTranscriptRecovery(owner, { now })).toEqual(written)
   })
 
+  it('recursively removes raw transport identities on write and repairs tainted storage on read', () => {
+    const tainted = message('assistant', 'safe transcript text', {
+      sessionKey: 'remote:raw-top',
+      canonicalSegmentKey: 'remote:raw-canonical',
+      metadata: {
+        segment_key: 'remote:raw-nested',
+        sessionId: 'remote:raw-session-id',
+        canonicalSessionIdentity: 'remote:raw-canonical-identity',
+        safe: { value: 1 },
+      },
+      toolState: [
+        {
+          args: {
+            session_key: 'remote:raw-tool',
+            segment: 'remote:raw-segment-value',
+            continuationSegmentKeys: ['remote:raw-list'],
+            kept: true,
+          },
+        },
+      ],
+    })
+
+    const written = replaceCardTranscriptRecoveryMessages(owner, [tainted], {
+      now,
+    })
+    expect(JSON.stringify(written)).not.toContain('remote:raw-')
+    expect(JSON.stringify(written)).toContain('"safe":{"value":1}')
+    expect(JSON.stringify(written)).toContain('"kept":true')
+
+    clearCardTranscriptRecoveryMemory()
+    const key = cardTranscriptRecoveryStorageKey(owner)
+    window.sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        ...envelope([tainted]),
+        sessionKey: 'remote:raw-envelope',
+      }),
+    )
+    const restored = readCardTranscriptRecovery(owner, { now })
+    expect(JSON.stringify(restored)).not.toContain('remote:raw-')
+    expect(window.sessionStorage.getItem(key)).not.toContain('remote:raw-')
+  })
+
   it.each([
     ['raw Card ID', { cardId: 'card-a' }],
     ['blank Card ID', { cardId: ' ' }],

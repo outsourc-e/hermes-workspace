@@ -140,6 +140,12 @@ export function useRealtimeChatHistory({
   const effectiveFriendlyId = portableMode ? 'main' : friendlyId
   const effectiveSessionKey = portableMode ? 'main' : sessionKey
   const effectiveCardId = portableMode ? undefined : cardId
+  const hydrateCardStreamingState = useChatStore(
+    (state) => state.hydrateCardStreamingState,
+  )
+  useEffect(() => {
+    if (effectiveCardId) hydrateCardStreamingState(effectiveCardId)
+  }, [effectiveCardId, hydrateCardStreamingState])
   const getHistoryQueryKey = useCallback(
     () =>
       effectiveCardId ? sessionCardQueryKeys.history(effectiveCardId) : null,

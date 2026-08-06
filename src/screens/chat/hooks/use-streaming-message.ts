@@ -341,9 +341,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   // card_handoff in the same reader.read() result, without weakening the exact
   // Card/segment checks for unrelated events.
   const activeStreamCardRef = useRef<SessionCardHandoffAuthority | null>(null)
-  // After one accepted Card continuation, event-derived authority cannot chain
-  // again until React supplies a mounted Card projection containing that tip.
-  const awaitingProjectedSegmentRef = useRef<string | null>(null)
   // Monotonically increasing token. Each call to startStreaming bumps this so
   // any in-flight processStream loop (or pending microtask processing chunks
   // it has already read into the SSE buffer) can detect that it's stale and
@@ -425,7 +422,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       clearBrowserStreaming()
       activeCardIdRef.current = null
       activeStreamCardRef.current = null
-      awaitingProjectedSegmentRef.current = null
       if (nextSessionKey) {
         activeSessionKeyRef.current = nextSessionKey
       }
@@ -786,21 +782,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const handoff = resolveAuthoritativeCardHandoffEvent(event, data)
           const streamCard = activeStreamCardRef.current
           const projectedCard = activeCard
-          const awaitingProjectedSegment = awaitingProjectedSegmentRef.current
-          const projectionHasAcceptedPredecessor = Boolean(
-            awaitingProjectedSegment &&
-            projectedCard &&
-            projectedCard.cardId === streamCard?.cardId &&
-            projectedCard.continuationSegmentKeys.includes(
-              awaitingProjectedSegment,
-            ),
-          )
-          if (awaitingProjectedSegment && !projectionHasAcceptedPredecessor) {
-            break
-          }
-          if (projectionHasAcceptedPredecessor) {
-            awaitingProjectedSegmentRef.current = null
-          }
           const renderCard =
             projectedCard &&
             projectedCard.cardId === streamCard?.cardId &&
@@ -838,7 +819,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           activeSessionKeyRef.current = handoff.canonicalSegmentKey
           activeCardIdRef.current = handoff.cardId
           activeStreamCardRef.current = targetCardAuthority
-          awaitingProjectedSegmentRef.current = handoff.canonicalSegmentKey
           onSessionResolved?.({
             fromSessionKey: handoff.fromSegmentKey,
             sessionKey: handoff.canonicalSegmentKey,

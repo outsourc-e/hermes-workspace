@@ -87,6 +87,85 @@ describe('chat-store Card ownership', () => {
       useChatStore.getState().getCardStreamingState('remote:raw-segment'),
     ).toBeNull()
   })
+
+  it('hydrates a persisted Card stream after remount and scrubs nested transport identity', () => {
+    const key = 'workspace.chat-card-streaming.v1:remote%3Acard-owner'
+    window.sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        text: 'persisted partial answer',
+        thinking: '',
+        runId: 'run-persisted',
+        lifecycleEvents: [],
+        toolCalls: [
+          {
+            id: 'tool-1',
+            name: 'inspect',
+            phase: 'start',
+            args: {
+              sessionKey: 'remote:raw-segment',
+              nested: {
+                canonicalSegmentKey: 'remote:raw-successor',
+                safe: true,
+              },
+            },
+          },
+        ],
+        _savedAt: Date.now() - 2 * 60 * 1000,
+      }),
+    )
+
+    useChatStore.getState().hydrateCardStreamingState('remote:card-owner')
+
+    expect(
+      useChatStore.getState().streamingState.get('remote:card-owner'),
+    ).toMatchObject({
+      text: 'persisted partial answer',
+      runId: 'run-persisted',
+      toolCalls: [{ args: { nested: { safe: true } } }],
+    })
+    expect(window.sessionStorage.getItem(key)).not.toContain('raw-segment')
+    expect(window.sessionStorage.getItem(key)).not.toContain('raw-successor')
+  })
+
+  it('scrubs raw transport identity from live Card messages and tool state', () => {
+    const store = useChatStore.getState()
+    store.processCardEvent('remote:card-owner', {
+      type: 'message',
+      message: {
+        ...textMessage('assistant-safe', 'assistant', 'safe answer', 1),
+        sessionKey: 'remote:raw-message',
+        metadata: {
+          canonicalSegmentKey: 'remote:raw-nested-message',
+          safe: 'kept',
+        },
+      } as ChatMessage,
+      runId: 'run-safe',
+      sessionKey: 'remote:raw-event',
+      transport: 'send-stream',
+    })
+    store.processCardEvent('remote:card-owner', {
+      type: 'tool',
+      name: 'inspect',
+      phase: 'start',
+      args: {
+        segmentKey: 'remote:raw-tool',
+        nested: { session_key: 'remote:raw-tool-nested', safe: 1 },
+      },
+      sessionKey: 'remote:raw-event',
+      transport: 'send-stream',
+    })
+
+    const serialized = JSON.stringify({
+      messages: store.getCardRealtimeMessages('remote:card-owner'),
+      streaming: store.getCardStreamingState('remote:card-owner'),
+    })
+    expect(serialized).not.toContain('raw-message')
+    expect(serialized).not.toContain('raw-nested-message')
+    expect(serialized).not.toContain('raw-tool')
+    expect(serialized).toContain('"safe":"kept"')
+    expect(serialized).toContain('"safe":1')
+  })
 })
 
 describe('chat-store history merge ordering', () => {
@@ -188,5 +267,30 @@ describe('chat-store session handoff', () => {
     })
     expect(next.isSessionWaiting('parent-handoff')).toBe(false)
     expect(next.isSessionWaiting('child-handoff')).toBe(true)
+  })
+
+  it('keeps equal terminal answers from separate runs as distinct messages', () => {
+    const store = useChatStore.getState()
+    store.clearSession('repeated-terminal')
+    for (const runId of ['run-first', 'run-second']) {
+      store.processEvent({
+        type: 'done',
+        state: 'complete',
+        runId,
+        sessionKey: 'repeated-terminal',
+        message: textMessage(
+          `assistant-${runId}`,
+          'assistant',
+          'The same terminal answer must remain visible.',
+          1,
+        ),
+        transport: 'send-stream',
+      })
+    }
+
+    expect(store.getRealtimeMessages('repeated-terminal')).toMatchObject([
+      { runId: 'run-first', stableId: 'stream-run:run-first' },
+      { runId: 'run-second', stableId: 'stream-run:run-second' },
+    ])
   })
 })

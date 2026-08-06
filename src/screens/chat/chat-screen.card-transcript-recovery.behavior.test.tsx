@@ -12,10 +12,12 @@ import { fireEvent, screen, waitFor } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useChatStore } from '../../stores/chat-store'
+import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
 import {
   CARD_TRANSCRIPT_RECOVERY_VERSION,
   cardTranscriptRecoveryStorageKey,
   clearCardTranscriptRecoveryMemory,
+  readCardTranscriptRecovery,
 } from './card-transcript-recovery'
 import { ChatScreen } from './chat-screen'
 import {
@@ -69,6 +71,9 @@ vi.mock('zustand', async () => {
   return { create, useStore }
 })
 
+vi.mock('./hooks/use-smooth-streaming-text', () => ({
+  useSmoothStreamingText: (text: string) => text,
+}))
 vi.mock('./components/chat-header', () => ({ ChatHeader: () => null }))
 vi.mock('./components/chat-composer', () => ({
   ChatComposer: () => null,
@@ -93,9 +98,14 @@ vi.mock('./components/message-item', () => ({
           )
           .join('')
       : ''
+    const streamingText =
+      typeof (chatMessage as Record<string, unknown>).__streamingText ===
+      'string'
+        ? String((chatMessage as Record<string, unknown>).__streamingText)
+        : ''
     return (
       <article data-chat-message-id={String(chatMessage.id ?? '')}>
-        {text}
+        {text || streamingText}
         {(chatMessage as Record<string, unknown>).status === 'error' ? (
           <button type="button" onClick={() => onRetryMessage?.(chatMessage)}>
             Retry message
@@ -488,6 +498,14 @@ function expectCardOnlyTranscriptBoundary(
   }
 }
 
+function submitSelection(text: string) {
+  React.act(() => {
+    window.dispatchEvent(
+      new CustomEvent(CHAT_SUBMIT_SELECTION_EVENT, { detail: { text } }),
+    )
+  })
+}
+
 describe('mounted Session Card transcript recovery lifecycle', () => {
   beforeEach(() => {
     clearCardTranscriptRecoveryMemory()
@@ -680,6 +698,65 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     expectCardOnlyTranscriptBoundary(requests)
   })
 
+  it('hydrates persisted partial Card streaming text after remount while history is stale and incomplete', async () => {
+    const requests = mockHttp(() => ({
+      ...completeHistory(parentCard),
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: parentCard.canonicalSegmentKey,
+          source: 'remote',
+          retryable: true,
+          error: 'history is still catching up',
+        },
+      ],
+    }))
+    const streamingStorageKey =
+      'workspace.chat-card-streaming.v1:remote%3Acard-a'
+    window.sessionStorage.setItem(
+      streamingStorageKey,
+      JSON.stringify({
+        text: 'persisted partial stream after remount',
+        thinking: '',
+        runId: 'run-remount-partial',
+        lifecycleEvents: [],
+        toolCalls: [
+          {
+            id: 'tool-remount',
+            name: 'inspect',
+            phase: 'start',
+            args: {
+              sessionId: 'remote:raw-session-id',
+              nested: {
+                canonicalSegmentKey: 'remote:raw-segment-key',
+                safe: true,
+              },
+            },
+          },
+        ],
+        _savedAt: Date.now(),
+      }),
+    )
+
+    await mountChatScreen(defaultInput())
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('persisted partial stream after remount'),
+      ).toBeTruthy()
+      expect(screen.getByRole('status').textContent).toContain(
+        'History is incomplete for this Session Card.',
+      )
+    })
+    const repairedStreamingStorage =
+      window.sessionStorage.getItem(streamingStorageKey) ?? ''
+    expect(repairedStreamingStorage).not.toContain('raw-session-id')
+    expect(repairedStreamingStorage).not.toContain('raw-segment-key')
+    expect(repairedStreamingStorage).toContain('"safe":true')
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
   it('keeps an optimistic Card user message through a pre-echo refetch and never requests raw history', async () => {
     const requests = mockHttp()
     const queryClient = new QueryClient({
@@ -781,6 +858,165 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     await mountChatScreen(defaultInput())
     await waitFor(() =>
       expect(screen.getByText('assistant overlay after remount')).toBeTruthy(),
+    )
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
+  it('keeps send errors retryable after refetch and a cold Card remount', async () => {
+    const requests: Array<string> = []
+    let sendAttempts = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.startsWith('/api/session-cards/')) {
+        return Promise.resolve(jsonResponse(completeHistory(parentCard)))
+      }
+      if (url === '/api/send-stream') {
+        sendAttempts += 1
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          text: () => Promise.resolve('simulated retryable send failure'),
+          json: () => Promise.resolve({}),
+        } as Response)
+      }
+      if (url === '/api/status')
+        return Promise.resolve(jsonResponse({ ok: true, status: 200 }))
+      if (url === '/api/models')
+        return Promise.resolve(jsonResponse({ models: [] }))
+      return Promise.resolve(jsonResponse({ ok: true }))
+    })
+
+    const mountedScreen = await mountChatScreen(defaultInput())
+    submitSelection('retry this durable Card message')
+    await waitFor(() => {
+      expect(screen.getByText('retry this durable Card message')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Retry message' })).toBeTruthy()
+      expect(sendAttempts).toBe(1)
+    })
+    expect(
+      readCardTranscriptRecovery({ cardId: parentCard.cardId })?.messages,
+    ).toMatchObject([
+      expect.objectContaining({
+        role: 'user',
+        status: 'error',
+      }),
+    ])
+
+    await React.act(async () => {
+      await mountedScreen.queryClient.refetchQueries({
+        queryKey: sessionCardQueryKeys.history(parentCard.cardId),
+        exact: true,
+      })
+    })
+    expect(screen.getByRole('button', { name: 'Retry message' })).toBeTruthy()
+    mountedScreen.unmount()
+    clearCardTranscriptRecoveryMemory()
+    useChatStore.getState().clearCardRealtimeBuffer(parentCard.cardId)
+    useChatStore.getState().clearCardStreaming(parentCard.cardId)
+
+    await mountChatScreen(defaultInput())
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Retry message' }),
+      ).toBeTruthy(),
+    )
+    React.act(() =>
+      fireEvent.click(screen.getByRole('button', { name: 'Retry message' })),
+    )
+    await waitFor(() => {
+      expect(sendAttempts).toBe(2)
+      expect(screen.getByRole('button', { name: 'Retry message' })).toBeTruthy()
+    })
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
+  it('persists equal terminal text from distinct runs separately and scrubs nested transport identities', async () => {
+    const requests: Array<string> = []
+    const runIds = ['run-repeat-first', 'run-repeat-second']
+    let sendIndex = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.startsWith('/api/session-cards/')) {
+        return Promise.resolve(jsonResponse(completeHistory(parentCard)))
+      }
+      if (url === '/api/send-stream') {
+        const runId = runIds[sendIndex++]
+        const encoder = new TextEncoder()
+        const reader = {
+          read: vi
+            .fn()
+            .mockResolvedValueOnce({
+              done: false,
+              value: encoder.encode(
+                [
+                  'event: started',
+                  `data: ${JSON.stringify({ runId, sessionKey: parentCard.canonicalSegmentKey })}`,
+                  '',
+                  'event: chunk',
+                  `data: ${JSON.stringify({ delta: 'Identical terminal answer', runId })}`,
+                  '',
+                  'event: done',
+                  `data: ${JSON.stringify({ state: 'complete', sessionKey: parentCard.canonicalSegmentKey, runId, metadata: { sessionId: `remote:raw-session-${runId}`, nested: { segmentId: `remote:raw-segment-${runId}`, canonicalSessionIdentity: `remote:raw-canonical-${runId}`, safe: runId } } })}`,
+                  '',
+                  '',
+                ].join('\n'),
+              ),
+            })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+          cancel: vi.fn().mockResolvedValue(undefined),
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          body: { getReader: () => reader },
+          text: () => Promise.resolve(''),
+          json: () => Promise.resolve({}),
+        } as unknown as Response)
+      }
+      if (url === '/api/status')
+        return Promise.resolve(jsonResponse({ ok: true, status: 200 }))
+      if (url === '/api/models')
+        return Promise.resolve(jsonResponse({ models: [] }))
+      return Promise.resolve(jsonResponse({ ok: true }))
+    })
+
+    const mountedScreen = await mountChatScreen(defaultInput())
+    submitSelection('first repeated terminal run')
+    await waitFor(() =>
+      expect(
+        readCardTranscriptRecovery({ cardId: parentCard.cardId })?.messages,
+      ).toHaveLength(2),
+    )
+    submitSelection('second repeated terminal run')
+    await waitFor(() => {
+      const recovery = readCardTranscriptRecovery({ cardId: parentCard.cardId })
+      expect(recovery?.messages).toHaveLength(4)
+      expect(
+        recovery?.messages.filter((entry) => entry.role === 'assistant'),
+      ).toMatchObject([
+        { runId: runIds[0], stableId: `stream-run:${runIds[0]}` },
+        { runId: runIds[1], stableId: `stream-run:${runIds[1]}` },
+      ])
+    })
+    const recoveryKey = cardTranscriptRecoveryStorageKey({
+      cardId: parentCard.cardId,
+    })
+    const persisted = window.sessionStorage.getItem(recoveryKey) ?? ''
+    expect(persisted).not.toContain('remote:raw-session-')
+    expect(persisted).not.toContain('remote:raw-segment-')
+    expect(persisted).not.toContain('remote:raw-canonical-')
+    expect(persisted).toContain('"safe":"run-repeat-first"')
+    expect(persisted).toContain('"safe":"run-repeat-second"')
+
+    mountedScreen.unmount()
+    clearCardTranscriptRecoveryMemory()
+    useChatStore.getState().clearCardRealtimeBuffer(parentCard.cardId)
+    useChatStore.getState().clearCardStreaming(parentCard.cardId)
+    await mountChatScreen(defaultInput())
+    await waitFor(() =>
+      expect(screen.getAllByText('Identical terminal answer')).toHaveLength(2),
     )
     expectCardOnlyTranscriptBoundary(requests)
   })

@@ -23,6 +23,7 @@ import {
 } from './pending-send'
 import type { SessionRouteResolutionPayload } from '../../routes/chat/-session-route-state'
 import type {
+  SessionCardDetailWire,
   SessionCardHistoryResponse,
   SessionCardListWire,
 } from './chat-queries'
@@ -2071,7 +2072,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
-  it('rejects a chained Card handoff when the active projection is stale without migrating transcript state', async () => {
+  it('accepts A→B then immediate B→C through mounted detail authority without splitting Card state', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -2099,6 +2100,20 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       retryable: false,
       missingSegments: [],
     })
+    queryClient.setQueryData<SessionCardDetailWire>(
+      sessionCardQueryKeys.detail(activeCard.cardId),
+      {
+        card: activeCard,
+        resolution: {
+          cardId: activeCard.cardId,
+          completeness: 'complete',
+          retryable: false,
+        },
+        completeness: 'complete',
+        retryable: false,
+        sources: [],
+      },
+    )
     const stream = createReaderHarness([
       {
         event: 'card_handoff',
@@ -2154,7 +2169,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     )
     useChatStore.getState().processCardEvent('remote:parent', {
       type: 'message',
-      message: userMessage('chain-live', 'live state stops at accepted tip'),
+      message: userMessage('chain-live', 'live state follows the Card owner'),
       sessionKey: 'remote:backend-parent',
       transport: 'send-stream',
     })
@@ -2162,11 +2177,35 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
 
     const stableCardKey = sessionCardQueryKeys.history('remote:parent')
     await waitForAssertion(() =>
-      expect(
-        queryClient.getQueryData<SessionCardHistoryResponse>(stableCardKey)
-          ?.messages,
-      ).toHaveLength(1),
+      expect(queryContext.realtimeInput).toMatchObject({
+        sessionKey: 'remote:backend-b',
+        friendlyId: activeCard.cardId,
+        enabled: true,
+      }),
     )
+    expect(
+      queryClient.getQueryData<SessionCardHistoryResponse>(stableCardKey),
+    ).toMatchObject({
+      cardId: activeCard.cardId,
+      canonicalSegmentKey: 'remote:backend-b',
+      messages: [expect.objectContaining({ role: 'user' })],
+    })
+    expect(
+      queryClient.getQueryData<SessionCardDetailWire>(
+        sessionCardQueryKeys.detail(activeCard.cardId),
+      ),
+    ).toMatchObject({
+      card: {
+        cardId: activeCard.cardId,
+        canonicalSegmentKey: 'remote:backend-b',
+        continuationSegmentKeys: [
+          'remote:backend-parent',
+          'remote:backend-a',
+          'remote:backend-b',
+        ],
+        continuationCount: 3,
+      },
+    })
     expect(
       queryClient
         .getQueryCache()
@@ -2178,7 +2217,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     expect(
       useChatStore.getState().getCardRealtimeMessages('remote:parent'),
     ).toMatchObject([
-      userMessage('chain-live', 'live state stops at accepted tip'),
+      userMessage('chain-live', 'live state follows the Card owner'),
     ])
     expect(
       useChatStore.getState().getRealtimeMessages('remote:backend-parent'),

@@ -75,6 +75,68 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+function isRawTransportIdentityKey(key: string): boolean {
+  const normalized = key.replace(/[_-]/g, '').toLowerCase()
+  const identitySuffixes = [
+    'key',
+    'keys',
+    'id',
+    'ids',
+    'identity',
+    'identities',
+  ]
+  const hasIdentitySuffix = identitySuffixes.some((suffix) =>
+    normalized.endsWith(suffix),
+  )
+  const namesSessionOrSegmentIdentity =
+    (normalized.includes('session') || normalized.includes('segment')) &&
+    hasIdentitySuffix
+  const namesCanonicalIdentity =
+    normalized.startsWith('canonical') &&
+    (normalized === 'canonical' || hasIdentitySuffix)
+  return (
+    normalized === 'session' ||
+    normalized === 'segment' ||
+    namesSessionOrSegmentIdentity ||
+    namesCanonicalIdentity
+  )
+}
+
+function sanitizeCardOwnedValueInternal(
+  value: unknown,
+  ancestors: WeakSet<object>,
+): unknown {
+  if (Array.isArray(value)) {
+    if (ancestors.has(value)) return undefined
+    ancestors.add(value)
+    const sanitized = value
+      .map((entry) => sanitizeCardOwnedValueInternal(entry, ancestors))
+      .filter((entry) => entry !== undefined)
+    ancestors.delete(value)
+    return sanitized
+  }
+  if (!record(value)) return value
+  if (ancestors.has(value)) return undefined
+  ancestors.add(value)
+  const sanitized: Record<string, unknown> = {}
+  for (const [key, entry] of Object.entries(value)) {
+    if (isRawTransportIdentityKey(key)) continue
+    const sanitizedEntry = sanitizeCardOwnedValueInternal(entry, ancestors)
+    if (sanitizedEntry !== undefined) sanitized[key] = sanitizedEntry
+  }
+  ancestors.delete(value)
+  return sanitized
+}
+
+/** Remove raw transport identities before data enters Card-owned browser state. */
+export function sanitizeCardOwnedValue(value: unknown): unknown {
+  return sanitizeCardOwnedValueInternal(value, new WeakSet<object>())
+}
+
+export function sanitizeCardOwnedMessage(message: ChatMessage): ChatMessage {
+  return sanitizeCardOwnedValue(message) as ChatMessage
+}
+
 function normalizedString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -357,19 +419,23 @@ export function parseCardTranscriptRecovery(
   ) {
     return null
   }
-  if (
-    !Array.isArray(value.messages) ||
-    value.messages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES ||
-    value.messages.some((message) => !validMessage(message))
-  ) {
+  if (!Array.isArray(value.messages)) {
     return null
   }
+  const sanitizedMessages = value.messages.map((message) =>
+    sanitizeCardOwnedMessage(message as ChatMessage),
+  )
+  if (
+    sanitizedMessages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES ||
+    sanitizedMessages.some((message) => !validMessage(message))
+  )
+    return null
 
   const envelope: CardTranscriptRecoveryEnvelope = {
     version: CARD_TRANSCRIPT_RECOVERY_VERSION,
     cardId: expectedOwner.cardId,
     createdAt: value.createdAt,
-    messages: dedupeMessages(value.messages),
+    messages: dedupeMessages(sanitizedMessages),
   }
   try {
     if (
@@ -412,7 +478,15 @@ export function readCardTranscriptRecovery(
   }
   try {
     const envelope = parseCardTranscriptRecovery(JSON.parse(raw), owner, now)
-    if (envelope) return memory ?? envelope
+    if (envelope) {
+      try {
+        const sanitizedRaw = JSON.stringify(envelope)
+        if (sanitizedRaw !== raw) storage.setItem(key, sanitizedRaw)
+      } catch {
+        // The sanitized in-memory value remains safe when storage is denied.
+      }
+      return memory ?? envelope
+    }
   } catch {
     // Remove malformed data below.
   }
@@ -446,8 +520,9 @@ export function replaceCardTranscriptRecoveryMessages(
   options: RecoveryOptions = {},
 ): CardTranscriptRecoveryEnvelope | null {
   if (!isValidCardTranscriptRecoveryOwner(owner)) return null
-  if (messages.some((message) => !validMessage(message))) return null
-  const deduped = dedupeMessages(messages)
+  const sanitizedMessages = messages.map(sanitizeCardOwnedMessage)
+  if (sanitizedMessages.some((message) => !validMessage(message))) return null
+  const deduped = dedupeMessages(sanitizedMessages)
   if (deduped.length === 0) {
     clearCardTranscriptRecovery(owner, { storage: options.storage })
     return null

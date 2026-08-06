@@ -37,10 +37,12 @@ import {
   reconcileSessionCardHistoryResponse,
   retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
+  setSessionCardHandoffAuthority,
   updateHistoryMessageByClientId,
   updateHistoryMessageByClientIdEverywhere,
   updateSessionCardHistoryMessages,
   updateSessionCardMetadata,
+  updateSessionCardTransientMessageByClientId,
   updateSessionLastMessage,
 } from './chat-queries'
 import { ChatHeader } from './components/chat-header'
@@ -891,11 +893,16 @@ export function ChatScreen({
   const sessionKeyForHistory = activeCard
     ? activeCardCanonicalSegmentKey
     : legacySessionKeyForHistory
-  // A partial transcript stays fail-closed unless the current Card is owned by
-  // this mounted local reader. That narrow exception preserves live handoff
-  // status without resurfacing stale realtime state after a remount.
+  // A partial transcript stays fail-closed unless this mounted reader owns the
+  // Card or a persisted Card stream was explicitly hydrated for it. Hydration
+  // is Card-scoped and cannot surface unrelated raw-session activity.
+  const hasOwnedCardStreamingState = useChatStore((state) =>
+    activeCard ? state.streamingState.has(activeCard.cardId) : false,
+  )
   const canShowLiveActivity =
-    displayedCardHistoryReady || isLocalLiveStreamOwner(activeCard.cardId)
+    displayedCardHistoryReady ||
+    hasOwnedCardStreamingState ||
+    isLocalLiveStreamOwner(activeCard.cardId)
 
   // --- Waiting state management (Issue #43 + #449) ---
   // resolvedSessionKey is now available (defined above from useChatHistory).
@@ -1535,6 +1542,12 @@ export function ChatScreen({
         ) {
           return false
         }
+        if (
+          activeCard &&
+          !setSessionCardHandoffAuthority(queryClient, activeCard, authority)
+        ) {
+          return false
+        }
         streamHandoffRouteRef.current = {
           sessionKey: handoff.canonicalSegmentKey,
           friendlyId: handoff.cardId,
@@ -1555,9 +1568,13 @@ export function ChatScreen({
         void queryClient.invalidateQueries({
           queryKey: sessionCardQueryKeys.lists,
         })
+        void queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.detail(handoff.cardId),
+          exact: true,
+        })
         return true
       },
-      [queryClient, sessionCards],
+      [activeCard, queryClient, sessionCards],
     ),
     onSessionResolved: useCallback(
       ({
@@ -1721,14 +1738,25 @@ export function ChatScreen({
         const failedSessionKey = activeSend?.sessionKey
         const failedCardId = activeSend?.cardId
         if (activeSend?.clientId && !isMissingAuth(messageText)) {
-          updateHistoryMessageByClientIdEverywhere(
-            queryClient,
-            activeSend.clientId,
-            (message) => ({
-              ...message,
-              status: 'error',
-            }),
-          )
+          const markFailed = (message: ChatMessage): ChatMessage => ({
+            ...message,
+            status: 'error',
+          })
+          if (activeSend.cardId) {
+            updateSessionCardTransientMessageByClientId(
+              queryClient,
+              activeSend.cardId,
+              activeSend.sessionKey,
+              activeSend.clientId,
+              markFailed,
+            )
+          } else {
+            updateHistoryMessageByClientIdEverywhere(
+              queryClient,
+              activeSend.clientId,
+              markFailed,
+            )
+          }
         }
         activeSendRef.current = null
         liveStreamSessionKeyRef.current = null
