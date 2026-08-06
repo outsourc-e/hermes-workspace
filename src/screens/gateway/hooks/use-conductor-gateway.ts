@@ -2447,13 +2447,18 @@ export function useConductorGateway() {
       const activity = cardActivities.find(
         (candidate) => candidate.cardId === cardId,
       )
-      const sessionKey = activity ? remoteControlKey(activity) : null
-      if (!sessionKey) throw new Error('Card activity cannot be controlled')
-      const response = await fetch('/api/agent-pause', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionKey: sessionKey.trim(), pause }),
-      })
+      if (!activity) throw new Error('Card activity cannot be controlled')
+      const response = await fetch(
+        `/api/session-cards/${encodeURIComponent(activity.cardId)}/pause`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pause,
+            parentCardId: activity.parentCardId,
+          }),
+        },
+      )
 
       if (!response.ok) {
         const text = await response.text().catch(() => '')

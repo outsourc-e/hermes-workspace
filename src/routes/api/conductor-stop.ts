@@ -11,7 +11,10 @@ import {
   parseSessionCardOperationBinding,
   resolveExactSessionCardOperationBinding,
 } from '../../server/session-card-operation-binding'
-import { cancelSwarmMission } from '../../server/swarm-missions'
+import {
+  cancelSwarmMission,
+  swarmMissionHasExactCardAuthority,
+} from '../../server/swarm-missions'
 import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 
@@ -123,6 +126,21 @@ export const Route = createFileRoute('/api/conductor-stop')({
             return json(
               { ok: false, error: 'Invalid Session Card stop binding' },
               { status: 400 },
+            )
+          }
+          if (
+            missionBinding &&
+            missionIds.some(
+              (missionId) =>
+                !swarmMissionHasExactCardAuthority(missionId, missionBinding),
+            )
+          ) {
+            return json(
+              {
+                ok: false,
+                error: 'Session Card is not authorized for this mission',
+              },
+              { status: 409 },
             )
           }
 

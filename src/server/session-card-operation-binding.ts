@@ -115,3 +115,101 @@ export async function resolveExactSessionCardOperationBinding(
     return null
   }
 }
+
+/**
+ * Resolve a server-observed upstream runtime identity to an exact root Card
+ * binding. This is intentionally server-only: browser callers never need to
+ * receive or echo the mutable upstream key.
+ */
+export async function resolveSessionCardOperationBindingByUpstream(input: {
+  source: 'local' | 'remote'
+  upstreamKey: string
+}): Promise<SessionCardOperationBinding | null> {
+  const upstreamKey = input.upstreamKey.trim()
+  if (!upstreamKey || upstreamKey !== input.upstreamKey) return null
+  try {
+    const resolved =
+      input.source === 'remote'
+        ? await sessionCardService.resolveRemoteCardByUpstreamSession(
+            upstreamKey,
+          )
+        : await sessionCardService.resolveLocalCardByUpstreamSession(
+            upstreamKey,
+          )
+    const card = resolved.card
+    const binding = parseSessionCardOperationBinding(
+      {
+        kind: 'session-card-owner',
+        cardId: card.cardId,
+        parentCardId: null,
+        canonicalSource: input.source,
+        canonicalSegmentKey: card.canonicalSegmentKey,
+        canonicalTransport: input.source === 'remote' ? 'gateway' : 'tmux',
+      },
+      {
+        source: input.source,
+        transport: input.source === 'remote' ? 'gateway' : 'tmux',
+      },
+    )
+    if (
+      !binding ||
+      resolved.collection.completeness !== 'complete' ||
+      resolved.collection.retryable ||
+      card.parentCardId !== undefined ||
+      (card.relationshipKind !== 'root' && card.relationshipKind !== 'orphan')
+    ) {
+      return null
+    }
+    return (await resolveExactSessionCardOperationBinding(binding))
+      ? binding
+      : null
+  } catch {
+    return null
+  }
+}
+
+/** Resolve a browser-visible Card owner to a server-derived exact binding. */
+export async function resolveSessionCardOperationBindingByCardOwner(input: {
+  cardId: string
+  parentCardId?: string | null
+  source: 'local' | 'remote'
+  transport: 'gateway' | 'tmux'
+}): Promise<SessionCardOperationBinding | null> {
+  const cardId = isExactSourceIdentity(input.cardId, input.source)
+    ? input.cardId
+    : null
+  const parentCardId = input.parentCardId
+    ? isExactSourceIdentity(input.parentCardId, input.source)
+      ? input.parentCardId
+      : null
+    : null
+  if (!cardId || (input.parentCardId && !parentCardId)) return null
+  if (
+    (input.source === 'remote' && input.transport !== 'gateway') ||
+    (input.source === 'local' && input.transport !== 'tmux')
+  ) {
+    return null
+  }
+  try {
+    const resolved = parentCardId
+      ? await sessionCardService.resolveChildCard(parentCardId, cardId)
+      : await sessionCardService.resolveCard(cardId)
+    const card = resolved.card
+    const binding = parseSessionCardOperationBinding(
+      {
+        kind: 'session-card-owner',
+        cardId,
+        parentCardId,
+        canonicalSource: input.source,
+        canonicalSegmentKey: card.canonicalSegmentKey,
+        canonicalTransport: input.transport,
+      },
+      { source: input.source, transport: input.transport },
+    )
+    return binding && (await resolveExactSessionCardOperationBinding(binding))
+      ? binding
+      : null
+  } catch {
+    return null
+  }
+}

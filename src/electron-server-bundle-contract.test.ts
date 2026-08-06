@@ -16,6 +16,14 @@ describe('checked-in Electron production server bundle', () => {
     resolve(process.cwd(), 'electron/server-bundle.cjs'),
     'utf8',
   )
+  const pauseRouteSource = readFileSync(
+    resolve(process.cwd(), 'src/routes/api/session-cards.$cardId.pause.ts'),
+    'utf8',
+  )
+  const routeTreeSource = readFileSync(
+    resolve(process.cwd(), 'src/routeTree.gen.ts'),
+    'utf8',
+  )
 
   it('ships only the Card-owned active-run abandonment route', () => {
     expect(
@@ -33,6 +41,23 @@ describe('checked-in Electron production server bundle', () => {
         bundle,
       ),
     ).toBe(false)
+  })
+
+  it('keeps the Electron server source Card-bound without regenerating the checked-in bundle', () => {
+    expect(routeTreeSource).toContain(
+      "from './routes/api/session-cards.$cardId.pause'",
+    )
+    expect(pauseRouteSource).toContain(
+      "createFileRoute('/api/session-cards/$cardId/pause')",
+    )
+    expect(pauseRouteSource).toContain(
+      'resolveSessionCardOperationBindingByCardOwner',
+    )
+    expect(pauseRouteSource).toContain(
+      'resolveExactSessionCardOperationBinding',
+    )
+    expect(pauseRouteSource).toContain("dashboardFetch('/api/agent-pause'")
+    expect(pauseRouteSource).not.toMatch(/[^A-Za-z]sessionKey\s*:/u)
   })
 
   it('requires an exact Card binding for bundled swarm direct chat delivery', () => {

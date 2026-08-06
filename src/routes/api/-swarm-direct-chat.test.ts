@@ -343,7 +343,7 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
     expect(mocks.execFile).not.toHaveBeenCalled()
   })
 
-  it('re-resolves after setup and rejects Card rollover before Enter delivery', async () => {
+  it('re-resolves before terminal input and rejects Card rollover without clearing or pasting', async () => {
     mocks.resolveCard
       .mockResolvedValueOnce(resolvedLocalCard())
       .mockResolvedValueOnce(
@@ -364,6 +364,81 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
       fetchedAt: expect.any(Number),
     })
     expect(mocks.resolveCard).toHaveBeenCalledTimes(2)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) =>
+          Array.isArray(call[1]) &&
+          (call[1].includes('C-u') ||
+            call[1][0] === 'paste-buffer' ||
+            call[1].includes('Enter')),
+      ),
+    ).toBe(false)
+  })
+
+  it('re-resolves after clearing and rejects Card rollover before paste or Enter', async () => {
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(
+        resolvedLocalCard({
+          cardId: 'local:rolled-over-before-enter',
+          continuationSegmentKeys: [
+            'local:rolled-over-before-enter',
+            'local:builder',
+          ],
+        }),
+      )
+
+    const response = await handler({ request: request() })
+
+    expect(response.status).toBe(409)
+    expect(mocks.resolveCard).toHaveBeenCalledTimes(3)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1].includes('C-u'),
+      ),
+    ).toBe(true)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1][0] === 'paste-buffer',
+      ),
+    ).toBe(false)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1].includes('Enter'),
+      ),
+    ).toBe(false)
+  })
+
+  it('re-resolves again at the final Enter edge after safe clear and paste setup', async () => {
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(
+        resolvedLocalCard({
+          cardId: 'local:rolled-over-before-enter',
+          continuationSegmentKeys: [
+            'local:rolled-over-before-enter',
+            'local:builder',
+          ],
+        }),
+      )
+
+    const response = await handler({ request: request() })
+
+    expect(response.status).toBe(409)
+    expect(mocks.resolveCard).toHaveBeenCalledTimes(4)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1].includes('C-u'),
+      ),
+    ).toBe(true)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1][0] === 'paste-buffer',
+      ),
+    ).toBe(true)
     expect(
       mocks.execFile.mock.calls.some(
         (call) => Array.isArray(call[1]) && call[1].includes('Enter'),

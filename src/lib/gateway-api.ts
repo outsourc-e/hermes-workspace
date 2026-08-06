@@ -92,6 +92,13 @@ export type GatewayAgentActionResponse = {
 
 export type GatewayAgentPauseResponse = GatewayAgentActionResponse & {
   paused?: boolean
+  cardId?: string
+  parentCardId?: string | null
+}
+
+export type GatewayAgentPauseCardOwner = {
+  cardId: string
+  parentCardId?: string | null
 }
 
 async function readError(response: Response): Promise<string> {
@@ -467,19 +474,27 @@ export async function resolveGatewayApproval(
 }
 
 export async function toggleAgentPause(
-  sessionKey: string,
+  owner: GatewayAgentPauseCardOwner,
   pause: boolean,
 ): Promise<GatewayAgentPauseResponse> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), 12000)
 
   try {
-    const response = await fetch(makeEndpoint('/api/agent-pause'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionKey, pause }),
-      signal: controller.signal,
-    })
+    const response = await fetch(
+      makeEndpoint(
+        `/api/session-cards/${encodeURIComponent(owner.cardId)}/pause`,
+      ),
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          pause,
+          parentCardId: owner.parentCardId ?? null,
+        }),
+        signal: controller.signal,
+      },
+    )
 
     const payload = (await response
       .json()

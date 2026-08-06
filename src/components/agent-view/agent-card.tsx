@@ -66,6 +66,8 @@ export type AgentNode = {
   statusBubble?: AgentStatusBubble
   isMain?: boolean
   sessionKey?: string
+  cardId?: string
+  parentCardId?: string | null
 }
 
 type AgentCardProps = {
@@ -183,6 +185,8 @@ export function AgentCard({
   // Fail closed unless the caller supplies a distinct control session key.
   const sessionKey = (node.sessionKey || '').trim()
   const canWardenControl = showActions && !isQueued && sessionKey.length > 0
+  const cardId = (node.cardId || '').trim()
+  const canPauseControl = showActions && !isQueued && cardId.length > 0
   const [showDetail, setShowDetail] = useState(false)
   const [steerOpen, setSteerOpen] = useState(false)
   const [killConfirmOpen, setKillConfirmOpen] = useState(false)
@@ -211,12 +215,15 @@ export function AgentCard({
   }
 
   async function handleTogglePause() {
-    if (!canWardenControl || isPausePending) return
+    if (!canPauseControl || isPausePending) return
     const nextPaused = !isPaused
 
     setIsPausePending(true)
     try {
-      const payload = await toggleAgentPause(sessionKey, nextPaused)
+      const payload = await toggleAgentPause(
+        { cardId, parentCardId: node.parentCardId },
+        nextPaused,
+      )
       const paused =
         typeof payload.paused === 'boolean' ? payload.paused : nextPaused
       setPausedOverride(paused)
@@ -266,7 +273,7 @@ export function AgentCard({
             onClick={function onClickPauseToggle() {
               void handleTogglePause()
             }}
-            disabled={isPausePending}
+            disabled={isPausePending || !canPauseControl}
             className="data-disabled:pointer-events-none data-disabled:opacity-50"
           >
             <HugeiconsIcon

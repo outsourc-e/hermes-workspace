@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   ensureGatewayProbed: vi.fn(),
   dashboardFetch: vi.fn(),
   cancelSwarmMission: vi.fn(),
+  swarmMissionHasExactCardAuthority: vi.fn(),
   resetSwarmWorkerRuntime: vi.fn(),
   resolveCard: vi.fn(),
   resolveChildCard: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock('../../server/session-card-service', () => ({
 }))
 vi.mock('../../server/swarm-missions', () => ({
   cancelSwarmMission: mocks.cancelSwarmMission,
+  swarmMissionHasExactCardAuthority: mocks.swarmMissionHasExactCardAuthority,
 }))
 vi.mock('../../server/swarm-runtime-reset', () => ({
   resetSwarmWorkerRuntime: mocks.resetSwarmWorkerRuntime,
@@ -88,6 +90,7 @@ beforeEach(() => {
     dashboard: { available: true },
   })
   mocks.cancelSwarmMission.mockReturnValue(null)
+  mocks.swarmMissionHasExactCardAuthority.mockReturnValue(true)
   mocks.dashboardFetch.mockResolvedValue(new Response(null, { status: 204 }))
   mocks.deleteSession.mockResolvedValue(undefined)
   mocks.resolveCard.mockResolvedValue(resolvedRemoteCard())
@@ -176,6 +179,33 @@ describe('POST /api/conductor-stop Card authority', () => {
     })
 
     expect(response.status).toBe(409)
+    expect(mocks.cancelSwarmMission).not.toHaveBeenCalled()
+    expect(mocks.dashboardFetch).not.toHaveBeenCalled()
+    expect(mocks.deleteSession).not.toHaveBeenCalled()
+  })
+
+  it('rejects Card A paired with server-owned mission B before any cancellation or dashboard deletion', async () => {
+    mocks.swarmMissionHasExactCardAuthority.mockReturnValue(false)
+
+    const response = await handler({
+      request: request({
+        cardBindings: [binding],
+        missionIds: ['mission-b'],
+        missionCardId: binding.cardId,
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Session Card is not authorized for this mission',
+    })
+    expect(mocks.swarmMissionHasExactCardAuthority).toHaveBeenCalledWith(
+      'mission-b',
+      binding,
+    )
+    expect(mocks.ensureGatewayProbed).not.toHaveBeenCalled()
+    expect(mocks.resolveCard).not.toHaveBeenCalled()
     expect(mocks.cancelSwarmMission).not.toHaveBeenCalled()
     expect(mocks.dashboardFetch).not.toHaveBeenCalled()
     expect(mocks.deleteSession).not.toHaveBeenCalled()

@@ -1166,9 +1166,11 @@ export function AgentsScreen({
     agent: AgentRegistryCardData,
     nextPaused: boolean,
   ) {
-    const controlKey = readString(agent.controlKey)
-    if (!controlKey) {
-      toast('No control key available for this agent', { type: 'warning' })
+    const navigation = agent.cardNavigation
+    if (!navigation) {
+      toast('No Card control owner available for this agent', {
+        type: 'warning',
+      })
       return
     }
 
@@ -1184,7 +1186,15 @@ export function AgentsScreen({
     }))
 
     try {
-      const payload = await toggleAgentPause(controlKey, nextPaused)
+      const payload = await toggleAgentPause(
+        navigation.inspectedChildCardId
+          ? {
+              cardId: navigation.inspectedChildCardId,
+              parentCardId: navigation.cardId,
+            }
+          : { cardId: navigation.cardId },
+        nextPaused,
+      )
       const paused =
         typeof payload.paused === 'boolean' ? payload.paused : nextPaused
 

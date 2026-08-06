@@ -36,6 +36,67 @@ describe('swarm-missions', () => {
     }
   })
 
+  it('persists exact mission Card authority and refuses an anchor rollover to another Card', async () => {
+    const mod = await loadModule()
+    const binding = {
+      kind: 'session-card-owner' as const,
+      cardId: 'remote:mission-a-card',
+      parentCardId: null,
+      canonicalSource: 'remote' as const,
+      canonicalSegmentKey: 'remote:mission-a-tip',
+      canonicalTransport: 'gateway' as const,
+    }
+
+    expect(
+      mod.bindSwarmMissionCardAuthority({
+        missionId: 'mission-a',
+        anchorSource: 'remote',
+        anchorKey: 'dashboard-session-a',
+        binding,
+      }),
+    ).toBe(true)
+    expect(mod.swarmMissionHasExactCardAuthority('mission-a', binding)).toBe(
+      true,
+    )
+    expect(mod.swarmMissionHasExactCardAuthority('mission-b', binding)).toBe(
+      false,
+    )
+
+    const continuedBinding = {
+      ...binding,
+      canonicalSegmentKey: 'remote:mission-a-successor',
+    }
+    expect(
+      mod.bindSwarmMissionCardAuthority({
+        missionId: 'mission-a',
+        anchorSource: 'remote',
+        anchorKey: 'dashboard-session-a',
+        binding: continuedBinding,
+      }),
+    ).toBe(true)
+    expect(mod.swarmMissionHasExactCardAuthority('mission-a', binding)).toBe(
+      false,
+    )
+    expect(
+      mod.swarmMissionHasExactCardAuthority('mission-a', continuedBinding),
+    ).toBe(true)
+
+    expect(
+      mod.bindSwarmMissionCardAuthority({
+        missionId: 'mission-a',
+        anchorSource: 'remote',
+        anchorKey: 'dashboard-session-a',
+        binding: {
+          ...continuedBinding,
+          cardId: 'remote:hostile-rollover-card',
+        },
+      }),
+    ).toBe(false)
+    expect(mod.getSwarmMissionCardAuthorityBindings('mission-a')).toEqual([
+      continuedBinding,
+    ])
+  })
+
   it('records checkpoints by assignment id, stores report metadata, and exposes flattened reports', async () => {
     const mod = await loadModule()
     const mission = mod.createOrUpdateMission({

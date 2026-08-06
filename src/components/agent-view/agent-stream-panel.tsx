@@ -113,11 +113,19 @@ export function AgentStreamPanel({
   }, [chatNavigation, sessionCardsQuery.data])
 
   async function onPauseToggle() {
-    if (pausePending) return
+    if (pausePending || !chatNavigation) return
     setPausePending(true)
     const nextPaused = !isPaused
     try {
-      await toggleAgentPause(sessionKey, nextPaused)
+      await toggleAgentPause(
+        chatNavigation.inspectedChildCardId
+          ? {
+              cardId: chatNavigation.inspectedChildCardId,
+              parentCardId: chatNavigation.cardId,
+            }
+          : { cardId: chatNavigation.cardId },
+        nextPaused,
+      )
       setIsPaused(nextPaused)
       toast(`${agentName} ${nextPaused ? 'paused' : 'resumed'}`, {
         type: 'success',
@@ -273,7 +281,7 @@ export function AgentStreamPanel({
                     <button
                       type="button"
                       onClick={() => void onPauseToggle()}
-                      disabled={pausePending}
+                      disabled={pausePending || !chatNavigation}
                       className="flex w-full rounded-md px-2 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-100 disabled:opacity-60 dark:text-neutral-200 dark:hover:bg-neutral-800"
                     >
                       {pausePending

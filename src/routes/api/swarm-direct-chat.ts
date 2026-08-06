@@ -219,6 +219,13 @@ async function sendPromptToLiveSession(
   )
   if (!loaded.ok) return { ok: false, error: loaded.error }
 
+  // Session startup and buffer loading are awaitable setup. Re-resolve at the
+  // first terminal-input edge so a worker/Card rollover cannot clear or paste
+  // into a newly assigned runtime.
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'stale Card binding', staleBinding: true }
+  }
+
   const cleared = await execFileAsync(tmuxBin, [
     'send-keys',
     '-t',
@@ -226,6 +233,10 @@ async function sendPromptToLiveSession(
     'C-u',
   ])
   if (!cleared.ok) return { ok: false, error: cleared.error }
+
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'stale Card binding', staleBinding: true }
+  }
 
   const pasted = await execFileAsync(tmuxBin, [
     'paste-buffer',

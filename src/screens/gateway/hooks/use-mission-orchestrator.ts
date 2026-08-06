@@ -1212,7 +1212,10 @@ export function useMissionOrchestrator() {
 
   const handleSetAgentPaused = useCallback(
     async (agentId: string, pause: boolean) => {
-      const sessionKey = await refreshAgentTransport(agentId)
+      const cardId = missionRef.current?.agentCardIdMap[agentId]
+      if (!cardId) throw new Error('Agent Card ownership is unavailable')
+      const parentCardId =
+        missionRef.current?.agentParentCardIdMap[agentId] ?? null
 
       const member = missionRef.current?.team.find(
         (entry) => entry.id === agentId,
@@ -1230,7 +1233,7 @@ export function useMissionOrchestrator() {
       })
 
       try {
-        await toggleAgentPause(sessionKey, pause)
+        await toggleAgentPause({ cardId, parentCardId }, pause)
         emitFeedEvent({
           type: pause ? 'agent_paused' : 'agent_active',
           message: `${agentName} ${pause ? 'paused' : 'resumed'}`,
@@ -1249,7 +1252,7 @@ export function useMissionOrchestrator() {
         throw error
       }
     },
-    [refreshAgentTransport, setAgentCardStatus, setAgentStatus],
+    [setAgentCardStatus, setAgentStatus],
   )
 
   const handleMissionPause = useCallback(
