@@ -767,6 +767,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
         fromSegmentKey: parentCard.canonicalSegmentKey,
         canonicalSegmentKey: successorCard.canonicalSegmentKey,
         runId: 'run-card-handoff',
+        verifiedContinuationSegmentKeys: successorCard.continuationSegmentKeys,
       },
       parentCard,
       [parentCard],

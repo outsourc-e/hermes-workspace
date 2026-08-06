@@ -467,15 +467,54 @@ export function moveCardTranscriptRecovery(
   ) {
     return false
   }
-  const from = readCardTranscriptRecovery(fromOwner, options)
+  const storage = resolveStorage(options.storage)
+  if (!storage) return false
+  const sourceKey = cardTranscriptRecoveryStorageKey(fromOwner)
+  let previousSourceRaw: string | null
+  try {
+    previousSourceRaw = storage.getItem(sourceKey)
+  } catch {
+    return false
+  }
+  if (previousSourceRaw === null) return false
+  const from = readCardTranscriptRecovery(fromOwner, { ...options, storage })
   if (!from) return false
-  const to = readCardTranscriptRecovery(toOwner, options)
+  const to = readCardTranscriptRecovery(toOwner, { ...options, storage })
+  const targetKey = cardTranscriptRecoveryStorageKey(toOwner)
+  let previousTargetRaw: string | null
+  try {
+    previousTargetRaw = storage.getItem(targetKey)
+  } catch {
+    return false
+  }
   const moved = replaceCardTranscriptRecoveryMessages(
     toOwner,
     [...from.messages, ...(to?.messages ?? [])],
-    options,
+    { ...options, storage },
   )
   if (!moved) return false
-  clearCardTranscriptRecovery(fromOwner, options)
-  return true
+
+  try {
+    storage.removeItem(sourceKey)
+    if (storage.getItem(sourceKey) === null) return true
+  } catch {
+    // Restore the source and roll back the target below. This also covers a
+    // storage implementation that removed the source but failed while the
+    // removal was being verified.
+  }
+  try {
+    storage.setItem(sourceKey, previousSourceRaw)
+  } catch {
+    // Best effort; the caller still fails closed.
+  }
+
+  // Best effort rollback. Returning false prevents cache and live-stream state
+  // from advancing even if storage becomes unavailable during compensation.
+  try {
+    if (previousTargetRaw === null) storage.removeItem(targetKey)
+    else storage.setItem(targetKey, previousTargetRaw)
+  } catch {
+    // The caller still fails closed and must not advance Card ownership.
+  }
+  return false
 }

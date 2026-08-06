@@ -82,6 +82,7 @@ import {
 import { findSessionCardDescendant } from './session-cards'
 import type { AuthoritativeCardHandoff } from './hooks/use-streaming-message'
 import type {
+  SessionCardHandoffAuthority,
   SessionCardHistoryResponse,
   SessionCardListWire,
 } from './chat-queries'
@@ -461,14 +462,48 @@ function isOptimisticUserMessage(message: ChatMessage): boolean {
   )
 }
 
-function shouldCollapseTextDuplicate(
+export function shouldCollapseTextDuplicate(
   existing: ChatMessage,
   candidate: ChatMessage,
 ): boolean {
   if (existing.role !== candidate.role) return false
 
   if (candidate.role === 'assistant') {
-    return true
+    const identityValues = (message: ChatMessage) => {
+      const raw = message as Record<string, unknown>
+      return [
+        raw.id,
+        raw.messageId,
+        raw.message_id,
+        raw.stableId,
+        raw.stable_id,
+        raw.clientId,
+        raw.client_id,
+        raw.__optimisticId,
+      ]
+        .map(normalizeMessageValue)
+        .filter(Boolean)
+    }
+    const existingIdentities = new Set(identityValues(existing))
+    if (
+      identityValues(candidate).some((identity) =>
+        existingIdentities.has(identity),
+      )
+    ) {
+      return true
+    }
+
+    // A persisted history row and the completed send-stream overlay can have
+    // different message IDs. Their immutable run identity is the proof that
+    // they represent one assistant turn; equal text alone is never proof.
+    const runIdentity = (message: ChatMessage) => {
+      const raw = message as Record<string, unknown>
+      return [raw.runId, raw.run_id, raw.providerRunId, raw.provider_run_id]
+        .map(normalizeMessageValue)
+        .find(Boolean)
+    }
+    const existingRunId = runIdentity(existing)
+    return Boolean(existingRunId && existingRunId === runIdentity(candidate))
   }
 
   if (candidate.role !== 'user') return false
@@ -1502,12 +1537,14 @@ export function ChatScreen({
     activeCard,
     sessionCards,
     onCardHandoff: useCallback(
-      (handoff: AuthoritativeCardHandoff) => {
+      (
+        handoff: AuthoritativeCardHandoff,
+        authority: SessionCardHandoffAuthority,
+      ) => {
         const activeSend = activeSendRef.current
         if (
           !activeSend ||
-          !activeCard ||
-          activeCard.cardId !== handoff.cardId ||
+          authority.cardId !== handoff.cardId ||
           activeSend.cardId !== handoff.cardId ||
           activeSend.sessionKey !== handoff.fromSegmentKey
         ) {
@@ -1517,7 +1554,7 @@ export function ChatScreen({
           !moveSessionCardHistoryMessages(
             queryClient,
             handoff,
-            activeCard,
+            authority,
             sessionCards,
           )
         ) {
@@ -1544,7 +1581,7 @@ export function ChatScreen({
         })
         return true
       },
-      [activeCard, queryClient, sessionCards],
+      [queryClient, sessionCards],
     ),
     onSessionResolved: useCallback(
       ({

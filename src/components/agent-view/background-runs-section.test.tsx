@@ -167,6 +167,14 @@ describe('BackgroundRunsSection Card-only mounting', () => {
           }),
         )
       }
+      if (url === '/api/session-cards/remote%3Achild-card/active-run/abandon') {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
 
       return Promise.resolve(new Response('{}', { status: 404 }))
     })
@@ -198,6 +206,11 @@ describe('BackgroundRunsSection Card-only mounting', () => {
       search: { inspect: 'remote:child-card' },
     })
 
+    await React.act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Mark dead' }))
+      await Promise.resolve()
+    })
+
     const queryKeys = new Set(
       mocks.queryOptions.map((options) => JSON.stringify(options.queryKey)),
     )
@@ -207,5 +220,24 @@ describe('BackgroundRunsSection Card-only mounting', () => {
     expect(urls).not.toContain('/api/session-cards')
     expect(urls.some((url) => url.startsWith('/api/history'))).toBe(false)
     expect(urls).not.toContain('/api/sessions/send')
+    expect(urls).toContain(
+      '/api/session-cards/remote%3Achild-card/active-run/abandon',
+    )
+    const abandonCall = fetchMock.mock.calls.find(
+      ([input]) =>
+        String(input) ===
+        '/api/session-cards/remote%3Achild-card/active-run/abandon',
+    )
+    expect(abandonCall?.[1]).toMatchObject({
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ runId: 'mapped-run' }),
+    })
+    expect(
+      urls.some(
+        (url) =>
+          url.includes('remote%3Achild-old') || url.includes('mapped-run'),
+      ),
+    ).toBe(false)
   })
 })

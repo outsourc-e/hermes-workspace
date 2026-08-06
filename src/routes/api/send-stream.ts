@@ -699,6 +699,34 @@ export const Route = createFileRoute('/api/send-stream')({
           sessionKey
         const publicFriendlyId =
           activeCardId ?? portableBootstrapSessionKey ?? resolvedFriendlyId
+        const getVerifiedBootstrapCardAuthority = () => {
+          const card = activeCardResolution?.card
+          if (
+            !card ||
+            !activeCardId ||
+            !activeCardCanonicalSegmentKey ||
+            card.cardId !== activeCardId ||
+            card.canonicalSegmentKey !== activeCardCanonicalSegmentKey ||
+            card.relationshipKind !== 'root' ||
+            card.parentCardId !== undefined ||
+            (card.canonicalSource !== 'local' &&
+              card.canonicalSource !== 'remote') ||
+            card.continuationSegmentKeys.length === 0 ||
+            new Set(card.continuationSegmentKeys).size !==
+              card.continuationSegmentKeys.length ||
+            card.continuationSegmentKeys.at(-1) !==
+              activeCardCanonicalSegmentKey
+          ) {
+            return null
+          }
+          return {
+            cardId: activeCardId,
+            canonicalSource: card.canonicalSource,
+            canonicalSegmentKey: activeCardCanonicalSegmentKey,
+            continuationSegmentKeys: [...card.continuationSegmentKeys],
+            relationshipKind: 'root' as const,
+          }
+        }
 
         let emitCardActivityToStream = (
           _payload: Record<string, unknown>,
@@ -1141,11 +1169,14 @@ export const Route = createFileRoute('/api/send-stream')({
                         portableClientSessionKey,
                       )
                     : null
-                if (bootstrapHandoff) {
+                const verifiedCardAuthority =
+                  getVerifiedBootstrapCardAuthority()
+                if (bootstrapHandoff && verifiedCardAuthority) {
                   sendEvent('session_handoff', {
                     ...bootstrapHandoff,
                     friendlyId: portableClientFriendlyId,
                     runId,
+                    verifiedCardAuthority,
                   })
                 }
 
@@ -1670,11 +1701,13 @@ export const Route = createFileRoute('/api/send-stream')({
                 enhancedBootstrapSessionKey
                   ? activeCardCanonicalSegmentKey
                   : getEnhancedClientSessionKey()
-              if (bootstrapHandoff) {
+              const verifiedCardAuthority = getVerifiedBootstrapCardAuthority()
+              if (bootstrapHandoff && verifiedCardAuthority) {
                 sendEvent('session_handoff', {
                   ...bootstrapHandoff,
                   friendlyId: getEnhancedClientFriendlyId(),
                   runId: activeRunId,
+                  verifiedCardAuthority,
                 })
               }
 

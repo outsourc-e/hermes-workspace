@@ -280,6 +280,41 @@ describe('Card transcript recovery storage contract', () => {
     ])
   })
 
+  it('fails and rolls back the target when source removal fails', () => {
+    const successor = {
+      cardId: owner.cardId,
+      canonicalSegmentKey: 'remote:segment-b',
+    }
+    const records = new Map<string, string>()
+    const sourceKey = cardTranscriptRecoveryStorageKey(owner)
+    const targetKey = cardTranscriptRecoveryStorageKey(successor)
+    const storage: Storage = {
+      get length() {
+        return records.size
+      },
+      clear: () => records.clear(),
+      getItem: (key) => records.get(key) ?? null,
+      key: (index) => [...records.keys()][index] ?? null,
+      removeItem: (key) => {
+        if (key === sourceKey) throw new Error('source remove failed')
+        records.delete(key)
+      },
+      setItem: (key, value) => records.set(key, value),
+    }
+    const overlay = message('assistant', 'must stay at source', {
+      id: 'assistant-rollback',
+    })
+    replaceCardTranscriptRecoveryMessages(owner, [overlay], { storage, now })
+
+    expect(moveCardTranscriptRecovery(owner, successor, { storage, now })).toBe(
+      false,
+    )
+    expect(
+      readCardTranscriptRecovery(owner, { storage, now })?.messages,
+    ).toEqual([overlay])
+    expect(storage.getItem(targetKey)).toBeNull()
+  })
+
   it('clears the exact owner and parse rejects a cross-Card envelope', () => {
     const overlay = message('user', 'clear me', { clientId: 'clear-1' })
     replaceCardTranscriptRecoveryMessages(owner, [overlay], { now })

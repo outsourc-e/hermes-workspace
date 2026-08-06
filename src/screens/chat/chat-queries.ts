@@ -300,6 +300,7 @@ export type SessionCardHandoffTransition = {
   fromSegmentKey: string
   canonicalSegmentKey: string
   runId: string
+  verifiedContinuationSegmentKeys: ReadonlyArray<string>
 }
 
 export type SessionCardHandoffAuthority = Pick<
@@ -341,8 +342,9 @@ function sessionCardOwnsIdentity(card: SessionCard, identity: string): boolean {
 
 /**
  * Validate the browser-side half of a server-authoritative Card transition.
- * The successor may be absent from a lagging active projection, but it must be
- * source-qualified and cannot cross into any known Card or child boundary.
+ * A successor absent from the rendered projection is accepted only with the
+ * complete same-Card continuation projection freshly verified by the server.
+ * Absence from the paginated browser inventory never establishes ownership.
  */
 export function isValidSessionCardHandoffTransition({
   handoff,
@@ -380,6 +382,30 @@ export function isValidSessionCardHandoffTransition({
   ) {
     return false
   }
+
+  const verifiedSegments = handoff.verifiedContinuationSegmentKeys
+  const fromIndex = verifiedSegments.indexOf(handoff.fromSegmentKey)
+  const successorIndex = verifiedSegments.indexOf(handoff.canonicalSegmentKey)
+  const activeProjectionIndexes = activeCard.continuationSegmentKeys.map(
+    (segmentKey) => verifiedSegments.indexOf(segmentKey),
+  )
+  const verifiedSuccessorOwned =
+    verifiedSegments.length >= 2 &&
+    new Set(verifiedSegments).size === verifiedSegments.length &&
+    verifiedSegments.at(-1) === handoff.canonicalSegmentKey &&
+    fromIndex >= 0 &&
+    successorIndex > fromIndex &&
+    activeProjectionIndexes.every(
+      (index, position) =>
+        index >= 0 &&
+        (position === 0 ||
+          index > (activeProjectionIndexes[position - 1] ?? -1)),
+    ) &&
+    verifiedSegments.every(
+      (segmentKey) =>
+        exactSourceQualifiedIdentity(segmentKey)?.source === card.source,
+    )
+  if (!verifiedSuccessorOwned) return false
 
   // A newer projection makes an older event stale. An already-acknowledged
   // successor remains valid only when it is the projection's canonical tip.

@@ -693,6 +693,13 @@ type HandoffEvent =
       sessionKey: string
       friendlyId: string
       runId: string
+      verifiedCardAuthority?: {
+        cardId: string
+        canonicalSource: 'local' | 'remote'
+        canonicalSegmentKey: string
+        continuationSegmentKeys: Array<string>
+        relationshipKind: 'root'
+      }
     }
   | {
       event: 'card_handoff'
@@ -700,6 +707,7 @@ type HandoffEvent =
       fromSegmentKey: string
       canonicalSegmentKey: string
       runId: string
+      verifiedContinuationSegmentKeys?: Array<string>
     }
 
 function createReaderHarness(
@@ -1787,6 +1795,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         fromSegmentKey: 'remote:a',
         canonicalSegmentKey: 'remote:b',
         runId: 'run-card-advance',
+        verifiedContinuationSegmentKeys: ['remote:a', 'remote:b'],
       },
     ])
     const container = document.createElement('div')
@@ -1925,6 +1934,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         fromSegmentKey: 'remote:a',
         canonicalSegmentKey: 'remote:b',
         runId: 'run-before-switch',
+        verifiedContinuationSegmentKeys: ['remote:a', 'remote:b'],
       },
     ])
     const container = document.createElement('div')
@@ -2094,6 +2104,10 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         fromSegmentKey: 'remote:backend-parent',
         canonicalSegmentKey: 'remote:backend-a',
         runId: 'run-card-chain',
+        verifiedContinuationSegmentKeys: [
+          'remote:backend-parent',
+          'remote:backend-a',
+        ],
       },
       {
         event: 'card_handoff',
@@ -2214,6 +2228,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         fromSegmentKey: 'remote:a',
         canonicalSegmentKey: 'remote:b',
         runId: 'run-live-handoff',
+        verifiedContinuationSegmentKeys: ['remote:a', 'remote:b'],
       },
     ])
     const container = document.createElement('div')
@@ -2599,6 +2614,93 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     await waitForAssertion(() => {
       expect(useChatStore.getState().isSessionWaiting('backend-b')).toBe(false)
     })
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('commits a source-verified Card handoff coalesced with bootstrap before the Card prop rerenders', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    queryContext.newRouteResolvesLegacyMain = true
+    const sourceHistoryKey = chatQueryKeys.history('new', 'new')
+    const targetHistoryKey = sessionCardQueryKeys.history(
+      'remote:created-card',
+      'remote:continuation-segment',
+    )
+    const stream = createReaderHarness([
+      {
+        fromSessionKey: 'new',
+        sessionKey: 'remote:created-segment',
+        friendlyId: 'remote:created-card',
+        runId: 'run-coalesced-card',
+        verifiedCardAuthority: {
+          cardId: 'remote:created-card',
+          canonicalSource: 'remote',
+          canonicalSegmentKey: 'remote:created-segment',
+          continuationSegmentKeys: ['remote:created-segment'],
+          relationshipKind: 'root',
+        },
+      },
+      {
+        event: 'card_handoff',
+        cardId: 'remote:created-card',
+        fromSegmentKey: 'remote:created-segment',
+        canonicalSegmentKey: 'remote:continuation-segment',
+        runId: 'run-coalesced-card',
+        verifiedContinuationSegmentKeys: [
+          'remote:created-segment',
+          'remote:continuation-segment',
+        ],
+      },
+    ])
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatRouteHarness
+            initialRoute={{ friendlyId: 'new', sessionKey: 'new' }}
+          />
+        </QueryClientProvider>,
+      )
+    })
+
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+    await waitForAssertion(() => {
+      expect(stream.getRequestSignal()).toBeDefined()
+      expect(
+        queryClient.getQueryData<HistoryResponse>(sourceHistoryKey)?.messages,
+      ).toHaveLength(1)
+    })
+    stream.releaseHandoff()
+
+    await waitForAssertion(() => {
+      expect(
+        container
+          .querySelector('[data-testid="route-state"]')
+          ?.getAttribute('data-session-key'),
+      ).toBe('remote:continuation-segment')
+    })
+    expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
+    expect(
+      queryClient.getQueryData<SessionCardHistoryResponse>(targetHistoryKey),
+    ).toMatchObject({
+      cardId: 'remote:created-card',
+      canonicalSegmentKey: 'remote:continuation-segment',
+      messages: [expect.objectContaining({ role: 'user' })],
+    })
+    expect(
+      useChatStore.getState().getRealtimeMessages('remote:created-segment'),
+    ).toEqual([])
+
+    React.act(() => root.unmount())
     document.body.removeChild(container)
     queryClient.clear()
   })

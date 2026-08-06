@@ -55,6 +55,10 @@ function resolveBackgroundRunCardActivity(
   return { run, navigation, title: title.trim() }
 }
 
+type BackgroundRunActivity = NonNullable<
+  ReturnType<typeof resolveBackgroundRunCardActivity>
+>
+
 const POLL_INTERVAL_MS = 10_000
 const STALE_THRESHOLD_MS = 5 * 60 * 1000
 
@@ -112,15 +116,22 @@ export function BackgroundRunsSection({
     }
   }, [refresh])
 
-  const handleAbandon = useCallback(async (run: BackgroundRun) => {
-    setBusyRunId(run.runId)
+  const handleAbandon = useCallback(async (activity: BackgroundRunActivity) => {
+    const cardId =
+      activity.navigation.inspectedChildCardId ?? activity.navigation.cardId
+    setBusyRunId(activity.run.runId)
     try {
-      await fetch(
-        `/api/runs/${encodeURIComponent(run.sessionKey)}/${encodeURIComponent(run.runId)}/abandon`,
-        { method: 'POST' },
+      const response = await fetch(
+        `/api/session-cards/${encodeURIComponent(cardId)}/active-run/abandon`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ runId: activity.run.runId }),
+        },
       )
+      if (!response.ok) return
       // Optimistic removal — server poll will catch up.
-      setRuns((prev) => prev.filter((r) => r.runId !== run.runId))
+      setRuns((prev) => prev.filter((run) => run.runId !== activity.run.runId))
     } catch {
       /* surface via reload */
     } finally {
@@ -187,7 +198,8 @@ export function BackgroundRunsSection({
         </div>
         <CollapsiblePanel contentClassName="pt-1">
           <div className="space-y-1">
-            {resolvedRuns.map(({ run, navigation, title }) => {
+            {resolvedRuns.map((activity) => {
+              const { run, navigation, title } = activity
               const isStale = run.stalenessMs >= STALE_THRESHOLD_MS
               const isBusy = busyRunId === run.runId
               const snippet =
@@ -236,7 +248,7 @@ export function BackgroundRunsSection({
                     <button
                       type="button"
                       disabled={isBusy}
-                      onClick={() => handleAbandon(run)}
+                      onClick={() => handleAbandon(activity)}
                       className="rounded px-1.5 py-0.5 text-[10px] font-medium text-red-500 hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
                       title="Mark this run as failed and remove it from the active list"
                     >

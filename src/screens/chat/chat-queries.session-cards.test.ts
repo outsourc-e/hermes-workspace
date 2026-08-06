@@ -1751,6 +1751,11 @@ describe('Session Card fetchers', () => {
         fromSegmentKey: 'remote:tip',
         canonicalSegmentKey: 'remote:next',
         runId: 'run-1',
+        verifiedContinuationSegmentKeys: [
+          'remote:root',
+          'remote:tip',
+          'remote:next',
+        ],
       },
       {
         ...card,
@@ -1821,6 +1826,11 @@ describe('Session Card fetchers', () => {
           fromSegmentKey: 'remote:tip',
           canonicalSegmentKey: 'remote:next',
           runId: 'run-1',
+          verifiedContinuationSegmentKeys: [
+            'remote:root',
+            'remote:tip',
+            'remote:next',
+          ],
         },
         card,
         [card],
@@ -1861,72 +1871,95 @@ describe('Session Card fetchers', () => {
     queryClient.clear()
   })
 
-  it('does not advance Card history when recovery persistence cannot move', () => {
-    const queryClient = new QueryClient()
-    const sourceKey = sessionCardQueryKeys.history('remote:root', 'remote:tip')
-    const targetKey = sessionCardQueryKeys.history('remote:root', 'remote:next')
-    const records = new Map<string, string>()
-    const storage: Storage = {
-      get length() {
-        return records.size
-      },
-      clear: () => records.clear(),
-      getItem: (key) => records.get(key) ?? null,
-      key: (index) => [...records.keys()][index] ?? null,
-      removeItem: (key) => {
-        records.delete(key)
-      },
-      setItem: (key, value) => {
-        if (key.includes(encodeURIComponent('remote:next'))) {
-          throw new DOMException('Quota exceeded', 'QuotaExceededError')
-        }
-        records.set(key, value)
-      },
-    }
-    const overlay = {
-      role: 'user' as const,
-      content: [{ type: 'text' as const, text: 'must survive' }],
-      clientId: 'client-recovery',
-    }
-    replaceCardTranscriptRecoveryMessages(
-      { cardId: 'remote:root', canonicalSegmentKey: 'remote:tip' },
-      [overlay],
-      { storage, now: 100 },
-    )
-    queryClient.setQueryData(sourceKey, {
-      sessionKey: 'remote:tip',
-      cardId: 'remote:root',
-      canonicalSegmentKey: 'remote:tip',
-      messages: [overlay],
-      completeness: 'partial',
-      retryable: true,
-      missingSegments: [],
-    } satisfies SessionCardHistoryResponse)
-
-    expect(
-      moveSessionCardHistoryMessages(
-        queryClient,
-        {
-          cardId: 'remote:root',
-          fromSegmentKey: 'remote:tip',
-          canonicalSegmentKey: 'remote:next',
-          runId: 'run-1',
+  it.each(['target write', 'source removal'])(
+    'does not advance Card history when recovery %s fails',
+    (failure) => {
+      const queryClient = new QueryClient()
+      const sourceKey = sessionCardQueryKeys.history(
+        'remote:root',
+        'remote:tip',
+      )
+      const targetKey = sessionCardQueryKeys.history(
+        'remote:root',
+        'remote:next',
+      )
+      const records = new Map<string, string>()
+      const storage: Storage = {
+        get length() {
+          return records.size
         },
-        card,
-        [card],
-        { recoveryStorage: storage, now: 100 },
-      ),
-    ).toBe(false)
-    expect(queryClient.getQueryData(sourceKey)).toBeDefined()
-    expect(queryClient.getQueryData(targetKey)).toBeUndefined()
-    expect(
-      readCardTranscriptRecovery(
+        clear: () => records.clear(),
+        getItem: (key) => records.get(key) ?? null,
+        key: (index) => [...records.keys()][index] ?? null,
+        removeItem: (key) => {
+          if (
+            failure === 'source removal' &&
+            key.includes(encodeURIComponent('remote:tip'))
+          ) {
+            return
+          }
+          records.delete(key)
+        },
+        setItem: (key, value) => {
+          if (
+            failure === 'target write' &&
+            key.includes(encodeURIComponent('remote:next'))
+          ) {
+            throw new DOMException('Quota exceeded', 'QuotaExceededError')
+          }
+          records.set(key, value)
+        },
+      }
+      const overlay = {
+        role: 'user' as const,
+        content: [{ type: 'text' as const, text: 'must survive' }],
+        clientId: 'client-recovery',
+      }
+      replaceCardTranscriptRecoveryMessages(
         { cardId: 'remote:root', canonicalSegmentKey: 'remote:tip' },
+        [overlay],
         { storage, now: 100 },
-      )?.messages,
-    ).toEqual([overlay])
-    queryClient.clear()
-  })
+      )
+      queryClient.setQueryData(sourceKey, {
+        sessionKey: 'remote:tip',
+        cardId: 'remote:root',
+        canonicalSegmentKey: 'remote:tip',
+        messages: [overlay],
+        completeness: 'partial',
+        retryable: true,
+        missingSegments: [],
+      } satisfies SessionCardHistoryResponse)
+
+      expect(
+        moveSessionCardHistoryMessages(
+          queryClient,
+          {
+            cardId: 'remote:root',
+            fromSegmentKey: 'remote:tip',
+            canonicalSegmentKey: 'remote:next',
+            runId: 'run-1',
+            verifiedContinuationSegmentKeys: [
+              'remote:root',
+              'remote:tip',
+              'remote:next',
+            ],
+          },
+          card,
+          [card],
+          { recoveryStorage: storage, now: 100 },
+        ),
+      ).toBe(false)
+      expect(queryClient.getQueryData(sourceKey)).toBeDefined()
+      expect(queryClient.getQueryData(targetKey)).toBeUndefined()
+      expect(
+        readCardTranscriptRecovery(
+          { cardId: 'remote:root', canonicalSegmentKey: 'remote:tip' },
+          { storage, now: 100 },
+        )?.messages,
+      ).toEqual([overlay])
+      queryClient.clear()
+    },
+  )
 
   it.each([
     [

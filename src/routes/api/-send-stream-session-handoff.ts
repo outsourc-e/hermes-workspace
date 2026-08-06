@@ -9,6 +9,7 @@ export type AuthoritativeCardStreamHandoff = {
   cardId: string
   fromSegmentKey: string
   canonicalSegmentKey: string
+  verifiedContinuationSegmentKeys: ReadonlyArray<string>
 }
 
 export type VerifiedStreamCard = {
@@ -432,5 +433,6 @@ export function resolveAuthoritativeCardStreamHandoff(
     cardId: currentCard.cardId,
     fromSegmentKey,
     canonicalSegmentKey,
+    verifiedContinuationSegmentKeys: [...successorCard.continuationSegmentKeys],
   }
 }

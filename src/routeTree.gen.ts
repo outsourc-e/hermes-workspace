@@ -165,7 +165,7 @@ import { Route as ApiSessionCardsCardIdBranchRouteImport } from './routes/api/se
 import { Route as ApiSessionCardsCardIdArchiveRouteImport } from './routes/api/session-cards.$cardId.archive'
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
-import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
+import { Route as ApiSessionCardsCardIdActiveRunAbandonRouteImport } from './routes/api/session-cards.$cardId.active-run.abandon'
 
 const VtCapitalRoute = VtCapitalRouteImport.update({
   id: '/vt-capital',
@@ -957,11 +957,11 @@ const ApiMcpNameLogsRoute = ApiMcpNameLogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => ApiMcpNameRoute,
 } as any)
-const ApiRunsSessionKeyRunIdAbandonRoute =
-  ApiRunsSessionKeyRunIdAbandonRouteImport.update({
-    id: '/api/runs/$sessionKey/$runId/abandon',
-    path: '/api/runs/$sessionKey/$runId/abandon',
-    getParentRoute: () => rootRouteImport,
+const ApiSessionCardsCardIdActiveRunAbandonRoute =
+  ApiSessionCardsCardIdActiveRunAbandonRouteImport.update({
+    id: '/active-run/abandon',
+    path: '/active-run/abandon',
+    getParentRoute: () => ApiSessionCardsCardIdRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -1121,7 +1121,7 @@ export interface FileRoutesByFullPath {
   '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
   '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
-  '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
+  '/api/session-cards/$cardId/active-run/abandon': typeof ApiSessionCardsCardIdActiveRunAbandonRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1279,7 +1279,7 @@ export interface FileRoutesByTo {
   '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
   '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
-  '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
+  '/api/session-cards/$cardId/active-run/abandon': typeof ApiSessionCardsCardIdActiveRunAbandonRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1439,7 +1439,7 @@ export interface FileRoutesById {
   '/api/sessions/$sessionKey/fork': typeof ApiSessionsSessionKeyForkRoute
   '/api/sessions/$sessionKey/latest-descendant': typeof ApiSessionsSessionKeyLatestDescendantRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
-  '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
+  '/api/session-cards/$cardId/active-run/abandon': typeof ApiSessionCardsCardIdActiveRunAbandonRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1600,7 +1600,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/fork'
     | '/api/sessions/$sessionKey/latest-descendant'
     | '/api/sessions/$sessionKey/status'
-    | '/api/runs/$sessionKey/$runId/abandon'
+    | '/api/session-cards/$cardId/active-run/abandon'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1758,7 +1758,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/fork'
     | '/api/sessions/$sessionKey/latest-descendant'
     | '/api/sessions/$sessionKey/status'
-    | '/api/runs/$sessionKey/$runId/abandon'
+    | '/api/session-cards/$cardId/active-run/abandon'
   id:
     | '__root__'
     | '/'
@@ -1917,7 +1917,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/fork'
     | '/api/sessions/$sessionKey/latest-descendant'
     | '/api/sessions/$sessionKey/status'
-    | '/api/runs/$sessionKey/$runId/abandon'
+    | '/api/session-cards/$cardId/active-run/abandon'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2042,7 +2042,6 @@ export interface RootRouteChildren {
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
   ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
-  ApiRunsSessionKeyRunIdAbandonRoute: typeof ApiRunsSessionKeyRunIdAbandonRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -3139,12 +3138,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMcpNameLogsRouteImport
       parentRoute: typeof ApiMcpNameRoute
     }
-    '/api/runs/$sessionKey/$runId/abandon': {
-      id: '/api/runs/$sessionKey/$runId/abandon'
-      path: '/api/runs/$sessionKey/$runId/abandon'
-      fullPath: '/api/runs/$sessionKey/$runId/abandon'
-      preLoaderRoute: typeof ApiRunsSessionKeyRunIdAbandonRouteImport
-      parentRoute: typeof rootRouteImport
+    '/api/session-cards/$cardId/active-run/abandon': {
+      id: '/api/session-cards/$cardId/active-run/abandon'
+      path: '/active-run/abandon'
+      fullPath: '/api/session-cards/$cardId/active-run/abandon'
+      preLoaderRoute: typeof ApiSessionCardsCardIdActiveRunAbandonRouteImport
+      parentRoute: typeof ApiSessionCardsCardIdRoute
     }
   }
 }
@@ -3279,12 +3278,15 @@ interface ApiSessionCardsCardIdRouteChildren {
   ApiSessionCardsCardIdArchiveRoute: typeof ApiSessionCardsCardIdArchiveRoute
   ApiSessionCardsCardIdBranchRoute: typeof ApiSessionCardsCardIdBranchRoute
   ApiSessionCardsCardIdHistoryRoute: typeof ApiSessionCardsCardIdHistoryRoute
+  ApiSessionCardsCardIdActiveRunAbandonRoute: typeof ApiSessionCardsCardIdActiveRunAbandonRoute
 }
 
 const ApiSessionCardsCardIdRouteChildren: ApiSessionCardsCardIdRouteChildren = {
   ApiSessionCardsCardIdArchiveRoute: ApiSessionCardsCardIdArchiveRoute,
   ApiSessionCardsCardIdBranchRoute: ApiSessionCardsCardIdBranchRoute,
   ApiSessionCardsCardIdHistoryRoute: ApiSessionCardsCardIdHistoryRoute,
+  ApiSessionCardsCardIdActiveRunAbandonRoute:
+    ApiSessionCardsCardIdActiveRunAbandonRoute,
 }
 
 const ApiSessionCardsCardIdRouteWithChildren =
@@ -3491,7 +3493,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,
   ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,
-  ApiRunsSessionKeyRunIdAbandonRoute: ApiRunsSessionKeyRunIdAbandonRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

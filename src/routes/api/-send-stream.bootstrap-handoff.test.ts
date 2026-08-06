@@ -283,6 +283,7 @@ describe('send-stream bootstrap session handoff', () => {
         card: {
           cardId: 'remote:created-card',
           canonicalSegmentKey: 'remote:created-segment',
+          canonicalSource: 'remote',
           continuationSegmentKeys: ['remote:created-segment'],
           relationshipKind: 'root',
         },
@@ -313,6 +314,13 @@ describe('send-stream bootstrap session handoff', () => {
           sessionKey: 'remote:created-segment',
           friendlyId: 'remote:created-card',
           runId: null,
+          verifiedCardAuthority: {
+            cardId: 'remote:created-card',
+            canonicalSource: 'remote',
+            canonicalSegmentKey: 'remote:created-segment',
+            continuationSegmentKeys: ['remote:created-segment'],
+            relationshipKind: 'root',
+          },
         },
       })
       expect(
@@ -4755,6 +4763,13 @@ describe('send-stream bootstrap session handoff', () => {
           sessionKey: 'local:created-segment',
           friendlyId: 'local:created-card',
           runId: expect.any(String),
+          verifiedCardAuthority: {
+            cardId: 'local:created-card',
+            canonicalSource: 'local',
+            canonicalSegmentKey: 'local:created-segment',
+            continuationSegmentKeys: ['local:created-segment'],
+            relationshipKind: 'root',
+          },
         },
       },
       {
@@ -5132,6 +5147,10 @@ describe('send-stream bootstrap session handoff', () => {
           fromSegmentKey: 'remote:created-session',
           canonicalSegmentKey: 'remote:successor-session',
           runId: 'card-run',
+          verifiedContinuationSegmentKeys: [
+            'remote:created-session',
+            'remote:successor-session',
+          ],
         },
       },
     ])
@@ -5248,6 +5267,10 @@ describe('send-stream bootstrap session handoff', () => {
           fromSegmentKey: 'remote:created-session',
           canonicalSegmentKey: 'remote:successor-session',
           runId: 'card-run',
+          verifiedContinuationSegmentKeys: [
+            'remote:created-session',
+            'remote:successor-session',
+          ],
         },
       },
     ])
