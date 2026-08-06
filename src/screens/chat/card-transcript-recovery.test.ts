@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES,
   CARD_TRANSCRIPT_RECOVERY_MAX_TEXT_CHARS,
-  CARD_TRANSCRIPT_RECOVERY_TTL_MS,
   appendCardTranscriptRecoveryMessage,
   cardTranscriptMessagesMatch,
   cardTranscriptRecoveryStorageKey,
@@ -143,16 +142,12 @@ describe('Card transcript recovery storage contract', () => {
     expect(window.sessionStorage.length).toBe(0)
   })
 
-  it('rejects malformed, wrong-version, mismatched, and expired records', () => {
+  it('rejects malformed, wrong-version, and mismatched records', () => {
     const key = cardTranscriptRecoveryStorageKey(owner)
     const rejected = [
       '{',
       JSON.stringify({ ...envelope([]), version: 1 }),
       JSON.stringify({ ...envelope([]), cardId: 'remote:other-card' }),
-      JSON.stringify({
-        ...envelope([]),
-        createdAt: now - CARD_TRANSCRIPT_RECOVERY_TTL_MS - 1,
-      }),
       JSON.stringify(envelope([{ role: 'system', content: [] }])),
     ]
 
@@ -161,6 +156,19 @@ describe('Card transcript recovery storage contract', () => {
       expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
       expect(window.sessionStorage.getItem(key)).toBeNull()
     }
+  })
+
+  it('never expires unacknowledged recovery turns by age', () => {
+    const old = message('assistant', 'retryable assistant prefix')
+    window.sessionStorage.setItem(
+      cardTranscriptRecoveryStorageKey(owner),
+      JSON.stringify({
+        ...envelope([old]),
+        createdAt: now - 365 * 24 * 60 * 60 * 1_000,
+      }),
+    )
+
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([old])
   })
 
   it('clears and ignores legacy segment-keyed recovery records', () => {
@@ -396,7 +404,7 @@ describe('Card transcript recovery storage contract', () => {
     expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
   })
 
-  it('hydrates acknowledged attachment history without duplicating the user turn', () => {
+  it('hydrates partial attachment history without clearing recovery until authoritative content is complete', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now)
     const attachment = {
       id: 'attachment-local',
@@ -450,6 +458,34 @@ describe('Card transcript recovery storage contract', () => {
         },
       ],
     })
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      expect.objectContaining({
+        clientId: 'client-file',
+        attachments: [attachment],
+      }),
+    ])
+
+    const completeAttachmentServer = {
+      ...server,
+      messages: [
+        {
+          ...server.messages[0]!,
+          attachments: [
+            {
+              id: 'attachment-server',
+              name: 'notes.txt',
+              contentType: 'text/plain',
+              size: 5,
+              dataUrl: 'hello',
+            },
+          ],
+        },
+      ],
+    }
+    const acknowledged = reconcileSessionCardHistoryResponse(
+      completeAttachmentServer,
+    )
+    expect(acknowledged.messages).toEqual(completeAttachmentServer.messages)
     expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
   })
 

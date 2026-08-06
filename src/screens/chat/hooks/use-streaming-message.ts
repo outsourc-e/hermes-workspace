@@ -265,6 +265,8 @@ type UseStreamingMessageOptions = {
   pinMainSession?: boolean
   onStarted?: (payload: { runId: string | null }) => void
   onChunk?: (text: string, fullText: string) => void
+  /** Must durably checkpoint the full assistant prefix before it is displayed. */
+  onCheckpoint?: (message: ChatMessage) => boolean
   onComplete?: (message: ChatMessage) => void
   onInterrupted?: (message: ChatMessage) => void
   onError?: (error: string) => void
@@ -299,6 +301,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     pinMainSession = false,
     onStarted,
     onChunk,
+    onCheckpoint,
     onComplete,
     onInterrupted,
     onError,
@@ -330,6 +333,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const finishedRef = useRef(false)
   const thinkingRef = useRef<string>('')
   const activeRunIdRef = useRef<string | null>(null)
+  const recoveryIdRef = useRef<string>('')
   const delayedUnregisterTimerRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null)
@@ -424,6 +428,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       clearBrowserStreaming()
       activeCardIdRef.current = null
       activeStreamCardRef.current = null
+      recoveryIdRef.current = ''
       if (nextSessionKey) {
         activeSessionKeyRef.current = nextSessionKey
       }
@@ -482,6 +487,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       ],
       timestamp: Date.now(),
       __streamingStatus: 'interrupted',
+      recoveryId: recoveryIdRef.current,
       ...stepUsageRef.current,
       ...(runId ? { runId, stableId: `stream-run:${runId}` } : {}),
     }
@@ -506,6 +512,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       if (finishedRef.current) return
       sealInterruptedStream()
       finishedRef.current = true
+      eventSourceRef.current?.abort()
       eventSourceRef.current = null
       stopFrame()
       lifecyclePhaseRef.current = 'error'
@@ -705,6 +712,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         ],
         timestamp: Date.now(),
         __streamingStatus: 'complete',
+        recoveryId: recoveryIdRef.current,
         ...stepUsageRef.current,
         ...(payload as Record<string, unknown>),
         ...(completedRunId
@@ -888,6 +896,26 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         case 'assistant': {
           const text = (payload as { text?: string }).text ?? ''
           if (text) {
+            if (
+              onCheckpoint?.({
+                role: 'assistant',
+                content: [{ type: 'text', text }],
+                timestamp: Date.now(),
+                __streamingStatus: 'streaming',
+                recoveryId: recoveryIdRef.current,
+                ...(activeRunIdRef.current
+                  ? {
+                      runId: activeRunIdRef.current,
+                      stableId: `stream-run:${activeRunIdRef.current}`,
+                    }
+                  : {}),
+              }) === false
+            ) {
+              markFailed(
+                'Response stopped because recovery storage is unavailable',
+              )
+              break
+            }
             markActivity()
             processBrowserEvent({
               type: 'chunk',
@@ -907,10 +935,30 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const newText =
             chunk.delta ?? chunk.text ?? chunk.content ?? chunk.chunk ?? ''
           if (newText) {
-            markActivity()
             const accumulated = fullReplace
               ? newText
               : fullTextRef.current + newText
+            if (
+              onCheckpoint?.({
+                role: 'assistant',
+                content: [{ type: 'text', text: accumulated }],
+                timestamp: Date.now(),
+                __streamingStatus: 'streaming',
+                recoveryId: recoveryIdRef.current,
+                ...(activeRunIdRef.current
+                  ? {
+                      runId: activeRunIdRef.current,
+                      stableId: `stream-run:${activeRunIdRef.current}`,
+                    }
+                  : {}),
+              }) === false
+            ) {
+              markFailed(
+                'Response stopped because recovery storage is unavailable',
+              )
+              break
+            }
+            markActivity()
             pushTargetText(accumulated)
             processBrowserEvent({
               type: 'chunk',
@@ -1156,6 +1204,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       finishStream,
       markFailed,
       onCardHandoff,
+      onCheckpoint,
       onStarted,
       onThinking,
       onTool,
@@ -1218,6 +1267,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       const mySessionKey = params.sessionKey
 
       const messageId = `streaming-${Date.now()}`
+      recoveryIdRef.current = messageId
 
       setState({
         isStreaming: true,

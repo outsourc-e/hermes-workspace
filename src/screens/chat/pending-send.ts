@@ -23,7 +23,6 @@ let recentSession: { friendlyId: string; at: number } | null = null
 const PENDING_MESSAGE_STORAGE_PREFIX = 'claude_pending_msg_'
 const NEW_CHAT_PROVISIONAL_STORAGE_KEY =
   'workspace.chat-provisional-send.v1:new-chat'
-const PENDING_MESSAGE_MAX_AGE_MS = 5 * 60 * 1000
 
 type PersistedPendingSendPayload = PendingSendPayload & {
   storedAt: number
@@ -45,16 +44,6 @@ function isPendingStorageKey(key: string | null): key is string {
     key === NEW_CHAT_PROVISIONAL_STORAGE_KEY ||
     Boolean(key?.startsWith(PENDING_MESSAGE_STORAGE_PREFIX))
   )
-}
-
-function isExpiredPendingPayload(payload: { storedAt?: unknown }) {
-  if (
-    typeof payload.storedAt !== 'number' ||
-    !Number.isFinite(payload.storedAt)
-  ) {
-    return true
-  }
-  return Date.now() - payload.storedAt > PENDING_MESSAGE_MAX_AGE_MS
 }
 
 function toPendingSendPayload(
@@ -160,10 +149,6 @@ function readPendingSendFromStorageByFriendlyId(
       if (!raw) continue
       try {
         const parsed = JSON.parse(raw) as PersistedPendingSendPayload
-        if (isExpiredPendingPayload(parsed)) {
-          window.localStorage.removeItem(key)
-          continue
-        }
         if (parsed.friendlyId !== friendlyId) continue
         return toPendingSendPayload(parsed)
       } catch {
@@ -205,33 +190,8 @@ function removePendingSendFromStorageByFriendlyId(friendlyId: string) {
 }
 
 export function cleanupExpiredPendingSends() {
-  if (!canUseLocalStorage()) return
-
-  try {
-    const keysToDelete: Array<string> = []
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index)
-      if (!isPendingStorageKey(key)) continue
-      const raw = window.localStorage.getItem(key)
-      if (!raw) {
-        keysToDelete.push(key)
-        continue
-      }
-      try {
-        const parsed = JSON.parse(raw) as PersistedPendingSendPayload
-        if (isExpiredPendingPayload(parsed)) {
-          keysToDelete.push(key)
-        }
-      } catch {
-        keysToDelete.push(key)
-      }
-    }
-    for (const key of keysToDelete) {
-      window.localStorage.removeItem(key)
-    }
-  } catch {
-    // Ignore storage cleanup failures.
-  }
+  // Intentionally retained as a compatibility no-op. Pending, failed,
+  // cancelled, and retryable turns have no safe time-based deletion point.
 }
 
 export function persistPendingMessage(payload: PendingSendPayload): boolean {
@@ -252,6 +212,44 @@ export function appendPendingRecoveryMessage(
     ...source,
     recoveryMessages: [...getPendingRecoveryMessages(source), sanitized],
   })
+}
+
+function pendingMessageRunId(message: ChatMessage): string {
+  const raw = message as Record<string, unknown>
+  for (const key of [
+    'recoveryId',
+    'runId',
+    'run_id',
+    'providerRunId',
+    'provider_run_id',
+  ]) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+/** Persist the newest bootstrap assistant prefix without accumulating copies. */
+export function checkpointPendingRecoveryMessage(
+  sessionKey: string,
+  friendlyId: string,
+  message: ChatMessage,
+): boolean {
+  const source = readPendingMessage(sessionKey, friendlyId)
+  if (!source) return false
+  const sanitized = sanitizeCardOwnedMessage(message)
+  if (!isCardTranscriptRecoveryMessagePortable(sanitized)) return false
+  const runId = pendingMessageRunId(sanitized)
+  const recoveryMessages = getPendingRecoveryMessages(source)
+  const index = recoveryMessages.findIndex(
+    (candidate) =>
+      candidate.role === 'assistant' &&
+      Boolean(runId) &&
+      pendingMessageRunId(candidate) === runId,
+  )
+  if (index >= 0) recoveryMessages[index] = sanitized
+  else recoveryMessages.push(sanitized)
+  return writePendingSendToStorage({ ...source, recoveryMessages })
 }
 
 function pendingMessageClientId(message: ChatMessage): string {
@@ -383,10 +381,6 @@ export function readPendingMessage(
         : null
     }
     const parsed = JSON.parse(raw) as PersistedPendingSendPayload
-    if (isExpiredPendingPayload(parsed)) {
-      window.localStorage.removeItem(getPendingStorageKey(sessionKey))
-      return null
-    }
     if (friendlyId && parsed.friendlyId !== friendlyId) {
       return readPendingSendFromStorageByFriendlyId(friendlyId)
     }

@@ -51,21 +51,25 @@ import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
 import { ConnectionStatusMessage } from './components/connection-status-message'
 import {
-  appendPendingRecoveryMessage,
+  checkpointPendingRecoveryMessage,
   clearPendingSendForSession,
   consumePendingSend,
+  getPendingRecoveryMessages,
   hasPendingGeneration,
   hasPendingSend,
   isRecentSession,
   persistPendingMessage,
+  readPendingMessage,
   resetPendingSend,
   setPendingGeneration,
   updatePendingMessageByClientId,
 } from './pending-send'
 import {
   appendCardTranscriptRecoveryMessage,
+  checkpointCardTranscriptRecoveryMessage,
   clearCardTranscriptRecovery,
   isCardTranscriptRecoveryMessagePortable,
+  mergeCardTranscriptRecoveryMessages,
   readCardTranscriptRecovery,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
@@ -873,9 +877,18 @@ export function ChatScreen({
     refetchOnWindowFocus: true,
   })
   const historyQuery = activeCard ? cardHistoryQuery : legacyHistoryQuery
+  const bootstrapPending = isNewChat ? readPendingMessage('new', 'new') : null
+  const bootstrapRecoveryMessages = bootstrapPending
+    ? getPendingRecoveryMessages(bootstrapPending)
+    : []
   const historyMessages = activeCard
     ? (cardHistoryQuery.data?.messages ?? [])
-    : legacyHistoryMessages
+    : isNewChat
+      ? mergeCardTranscriptRecoveryMessages(
+          legacyHistoryMessages,
+          bootstrapRecoveryMessages,
+        )
+      : legacyHistoryMessages
   const messageCount = activeCard ? historyMessages.length : legacyMessageCount
   const historyError = activeCard
     ? (cardSourceError ?? cardHistoryQuery.error?.message ?? null)
@@ -1712,6 +1725,23 @@ export function ChatScreen({
       },
       [queryClient],
     ),
+    onCheckpoint: useCallback((checkpointMessage: ChatMessage) => {
+      const activeSend = activeSendRef.current
+      if (!activeSend) return false
+      if (activeSend.cardId) {
+        return Boolean(
+          checkpointCardTranscriptRecoveryMessage(
+            { cardId: activeSend.cardId },
+            checkpointMessage,
+          ),
+        )
+      }
+      return checkpointPendingRecoveryMessage(
+        activeSend.sessionKey,
+        activeSend.friendlyId,
+        checkpointMessage,
+      )
+    }, []),
     onComplete: useCallback(
       (completedMessage: ChatMessage) => {
         const activeSend = activeSendRef.current
@@ -1728,27 +1758,40 @@ export function ChatScreen({
           )
         }
         if (activeSend?.sessionKey) {
+          let terminalPersisted = true
           if (activeSend.cardId) {
+            terminalPersisted = Boolean(
+              checkpointCardTranscriptRecoveryMessage(
+                { cardId: activeSend.cardId },
+                completedMessage,
+              ),
+            )
             appendSessionCardTransientMessage(
               queryClient,
               activeSend.cardId,
               activeSend.sessionKey,
               completedMessage,
+              { persistRecovery: false },
             )
           }
           if (activeSend.provisionalOwner === 'new' && !activeSend.cardId) {
             // A successful bootstrap stream may complete before any Card
             // handoff. Retain both sides of the turn until a verified Card
             // migration owns them, so remounting cannot erase the answer.
-            if (!appendPendingRecoveryMessage('new', 'new', completedMessage)) {
-              setError(
-                'The response completed, but could not be saved for recovery. Keep this tab open while you copy the result.',
-              )
-            }
+            terminalPersisted = checkpointPendingRecoveryMessage(
+              'new',
+              'new',
+              completedMessage,
+            )
           } else {
             clearPendingSendForSession(
               activeSend.sessionKey,
               activeSend.friendlyId,
+            )
+          }
+          if (!terminalPersisted) {
+            setError(
+              'The response completed, but its terminal recovery update could not be saved. The last durable assistant prefix remains available after reload.',
             )
           }
         }
@@ -1769,13 +1812,33 @@ export function ChatScreen({
     onInterrupted: useCallback(
       (interruptedMessage: ChatMessage) => {
         const activeSend = activeSendRef.current
-        if (!activeSend?.cardId) return
-        appendSessionCardTransientMessage(
-          queryClient,
-          activeSend.cardId,
-          activeSend.sessionKey,
-          interruptedMessage,
-        )
+        if (!activeSend) return
+        const persisted = activeSend.cardId
+          ? Boolean(
+              checkpointCardTranscriptRecoveryMessage(
+                { cardId: activeSend.cardId },
+                interruptedMessage,
+              ),
+            )
+          : checkpointPendingRecoveryMessage(
+              activeSend.sessionKey,
+              activeSend.friendlyId,
+              interruptedMessage,
+            )
+        if (activeSend.cardId) {
+          appendSessionCardTransientMessage(
+            queryClient,
+            activeSend.cardId,
+            activeSend.sessionKey,
+            interruptedMessage,
+            { persistRecovery: false },
+          )
+        }
+        if (!persisted) {
+          setError(
+            'The stream was interrupted after recovery storage became unavailable. The last durable assistant prefix remains available after reload.',
+          )
+        }
       },
       [queryClient],
     ),
@@ -2075,7 +2138,9 @@ export function ChatScreen({
       if (msg.__streamingStatus === 'streaming') return false
       const messageRunId =
         typeof msg.runId === 'string' && msg.runId.trim() ? msg.runId : null
-      if (streamingRunId && messageRunId && streamingRunId !== messageRunId) {
+      // Suppression requires a shared immutable run identity. Prefix text or
+      // matching tool names alone cannot hide an authoritative transcript row.
+      if (!streamingRunId || !messageRunId || streamingRunId !== messageRunId) {
         return false
       }
       // Only a same-run assistant in the active user turn can acknowledge the
@@ -3076,34 +3141,26 @@ export function ChatScreen({
           dataUrl: attachment.dataUrl,
         }),
       )
-      const requiresDurableOverlay =
-        isNewChat || Boolean(activeCard) || attachmentPayload.length > 0
-      let durableOptimisticMessage: ChatMessage | null = null
-      let durableClientId = ''
-
-      if (requiresDurableOverlay) {
-        const missingPortableAttachment = attachmentPayload.some(
-          (attachment) => typeof attachment.dataUrl !== 'string',
-        )
-        const optimistic = createOptimisticMessage(
-          trimmedBody,
-          attachmentPayload,
-        )
-        durableOptimisticMessage = optimistic.optimisticMessage
-        durableClientId = optimistic.clientId
-        if (
-          missingPortableAttachment ||
-          !isCardTranscriptRecoveryMessagePortable(optimistic.optimisticMessage)
-        ) {
-          const safeMessage =
-            attachmentPayload.length > 0
-              ? 'This message was not sent because its attachments cannot be stored safely for recovery. Remove or reduce the attachments and try again.'
-              : 'This first message was not sent because it cannot be stored safely until the new conversation is created. Reduce it and try again.'
-          setError(safeMessage)
-          toast(safeMessage, { type: 'error' })
-          showErrorToast(safeMessage)
-          return
-        }
+      // Every accepted send needs a durable owner before transport starts;
+      // post-accept assistant checkpoints depend on this admission record.
+      const missingPortableAttachment = attachmentPayload.some(
+        (attachment) => typeof attachment.dataUrl !== 'string',
+      )
+      const optimistic = createOptimisticMessage(trimmedBody, attachmentPayload)
+      const durableOptimisticMessage = optimistic.optimisticMessage
+      const durableClientId = optimistic.clientId
+      if (
+        missingPortableAttachment ||
+        !isCardTranscriptRecoveryMessagePortable(optimistic.optimisticMessage)
+      ) {
+        const safeMessage =
+          attachmentPayload.length > 0
+            ? 'This message was not sent because its attachments cannot be stored safely for recovery. Remove or reduce the attachments and try again.'
+            : 'This first message was not sent because it cannot be stored safely until the new conversation is created. Reduce it and try again.'
+        setError(safeMessage)
+        toast(safeMessage, { type: 'error' })
+        showErrorToast(safeMessage)
+        return
       }
 
       const sessionKeyForSend = isNewChat
@@ -3117,74 +3174,72 @@ export function ChatScreen({
               activeSessionKey ||
               'main'
 
-      if (durableOptimisticMessage) {
-        let persisted = false
-        if (activeCard) {
-          const priorRecovery = readCardTranscriptRecovery({
-            cardId: activeCard.cardId,
-          })
-          persisted = Boolean(
-            appendCardTranscriptRecoveryMessage(
-              { cardId: activeCard.cardId },
-              durableOptimisticMessage,
-            ),
-          )
-          if (persisted) {
-            appendSessionCardTransientMessage(
-              queryClient,
-              activeCard.cardId,
-              sessionKeyForSend,
-              durableOptimisticMessage,
-              { persistRecovery: false },
-            )
-          } else if (priorRecovery) {
-            // The recovery helper intentionally retains an in-memory fallback
-            // for post-transport failures. This is a pre-transport admission
-            // gate, so roll that candidate back to the last durable snapshot.
-            replaceCardTranscriptRecoveryMessages(
-              { cardId: activeCard.cardId },
-              priorRecovery.messages,
-            )
-          } else {
-            clearCardTranscriptRecovery({ cardId: activeCard.cardId })
-          }
-        } else {
-          persisted = persistPendingMessage({
-            sessionKey: sessionKeyForSend,
-            friendlyId: isNewChat ? 'new' : transportFriendlyId,
-            message: trimmedBody,
-            attachments: attachmentPayload,
-            optimisticMessage: durableOptimisticMessage,
-          })
-          if (persisted) {
-            appendHistoryMessage(
-              queryClient,
-              isNewChat ? 'new' : transportFriendlyId,
-              sessionKeyForSend,
-              durableOptimisticMessage,
-            )
-          }
-        }
-
-        if (!persisted) {
-          const safeMessage =
-            attachmentPayload.length > 0
-              ? 'This message was not sent because its attachments could not be saved for recovery. Free browser storage or remove the attachments, then try again.'
-              : activeCard
-                ? 'This message was not sent because it could not be saved safely. Free browser storage and try again.'
-                : 'This first message was not sent because it could not be saved safely. Free browser storage and try again.'
-          setError(safeMessage)
-          toast(safeMessage, { type: 'error' })
-          showErrorToast(safeMessage)
-          return
-        }
-        updateSessionLastMessage(
-          queryClient,
-          sessionKeyForSend,
-          isNewChat ? 'new' : transportFriendlyId,
-          durableOptimisticMessage,
+      let persisted = false
+      if (activeCard) {
+        const priorRecovery = readCardTranscriptRecovery({
+          cardId: activeCard.cardId,
+        })
+        persisted = Boolean(
+          appendCardTranscriptRecoveryMessage(
+            { cardId: activeCard.cardId },
+            durableOptimisticMessage,
+          ),
         )
+        if (persisted) {
+          appendSessionCardTransientMessage(
+            queryClient,
+            activeCard.cardId,
+            sessionKeyForSend,
+            durableOptimisticMessage,
+            { persistRecovery: false },
+          )
+        } else if (priorRecovery) {
+          // The recovery helper intentionally retains an in-memory fallback
+          // for post-transport failures. This is a pre-transport admission
+          // gate, so roll that candidate back to the last durable snapshot.
+          replaceCardTranscriptRecoveryMessages(
+            { cardId: activeCard.cardId },
+            priorRecovery.messages,
+          )
+        } else {
+          clearCardTranscriptRecovery({ cardId: activeCard.cardId })
+        }
+      } else {
+        persisted = persistPendingMessage({
+          sessionKey: sessionKeyForSend,
+          friendlyId: isNewChat ? 'new' : transportFriendlyId,
+          message: trimmedBody,
+          attachments: attachmentPayload,
+          optimisticMessage: durableOptimisticMessage,
+        })
+        if (persisted) {
+          appendHistoryMessage(
+            queryClient,
+            isNewChat ? 'new' : transportFriendlyId,
+            sessionKeyForSend,
+            durableOptimisticMessage,
+          )
+        }
       }
+
+      if (!persisted) {
+        const safeMessage =
+          attachmentPayload.length > 0
+            ? 'This message was not sent because its attachments could not be saved for recovery. Free browser storage or remove the attachments, then try again.'
+            : activeCard
+              ? 'This message was not sent because it could not be saved safely. Free browser storage and try again.'
+              : 'This first message was not sent because it could not be saved safely. Free browser storage and try again.'
+        setError(safeMessage)
+        toast(safeMessage, { type: 'error' })
+        showErrorToast(safeMessage)
+        return
+      }
+      updateSessionLastMessage(
+        queryClient,
+        sessionKeyForSend,
+        isNewChat ? 'new' : transportFriendlyId,
+        durableOptimisticMessage,
+      )
 
       helpers.reset()
       // Haptic feedback on mobile only after the durable overlay is accepted.
@@ -3197,7 +3252,7 @@ export function ChatScreen({
         trimmedBody,
         attachmentPayload,
         fastMode,
-        durableOptimisticMessage !== null,
+        true,
         durableClientId,
       )
       // New Chat stays on the bootstrap route until the stream provides the

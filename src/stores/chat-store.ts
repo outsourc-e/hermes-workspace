@@ -177,7 +177,6 @@ const createEmptyStreamingState = (): StreamingState => ({
 
 const CARD_STREAMING_STORAGE_PREFIX = 'workspace.chat-card-streaming.v1:'
 const CARD_WAITING_STORAGE_PREFIX = 'workspace.chat-card-waiting.v1:'
-export const CARD_STREAMING_STATE_TTL_MS = 10 * 60 * 1000
 const LEGACY_CHAT_STORAGE_PREFIXES = [
   'claude_waiting_',
   'claude_streaming_',
@@ -329,7 +328,7 @@ export function restoreCardStreamingState(
       typeof parsed._savedAt === 'number' && Number.isFinite(parsed._savedAt)
         ? parsed._savedAt
         : null
-    if (!savedAt || Date.now() - savedAt > CARD_STREAMING_STATE_TTL_MS) {
+    if (!savedAt || savedAt > Date.now() + 60_000) {
       sessionStorage.removeItem(storageKey)
       return null
     }

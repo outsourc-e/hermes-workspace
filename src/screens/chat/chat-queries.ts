@@ -6,6 +6,10 @@ import {
   reconcileAcknowledgedCardTranscriptRecoveryMessages,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
+import {
+  readCardTranscriptSnapshot,
+  writeCardTranscriptSnapshot,
+} from './card-transcript-snapshot'
 import type { QueryClient } from '@tanstack/react-query'
 import type {
   ChatMessage,
@@ -1479,21 +1483,48 @@ export function reconcileSessionCardHistoryResponse(
   options: ReconcileSessionCardHistoryOptions = {},
 ): SessionCardHistoryResponse {
   const owner = { cardId: server.cardId }
+  const isComplete = isAuthoritativeCompleteSessionCardHistory(server)
   let persistedMessages = mergePartialPersistedCardHistory(
     server,
     options.previous,
     options.continuationSegmentKeys,
   )
+
+  // Query memory is not a reload boundary. A partial response must retain the
+  // last scrubbed complete Card projection even after a fresh QueryClient.
+  if (!isComplete) {
+    const snapshotMessages =
+      readCardTranscriptSnapshot(server.cardId)?.messages ?? []
+    persistedMessages = mergeCardHistoryMessages(
+      snapshotMessages,
+      persistedMessages,
+    )
+  }
+
   let recoveryMessages: Array<ChatMessage>
   if (options.recoveryMessages) {
     recoveryMessages = options.recoveryMessages
-  } else if (isAuthoritativeCompleteSessionCardHistory(server)) {
-    const acknowledgement = reconcileAcknowledgedCardTranscriptRecoveryMessages(
-      owner,
+  } else if (isComplete) {
+    // A complete projection must survive outside query memory before it is
+    // allowed to acknowledge and remove any durable recovery overlay.
+    const snapshot = writeCardTranscriptSnapshot(
+      server.cardId,
       persistedMessages,
     )
-    persistedMessages = acknowledgement.authoritativeMessages
-    recoveryMessages = acknowledgement.recovery?.messages ?? []
+    if (!snapshot) {
+      recoveryMessages = readCardTranscriptRecovery(owner)?.messages ?? []
+    } else {
+      const acknowledgement =
+        reconcileAcknowledgedCardTranscriptRecoveryMessages(
+          owner,
+          persistedMessages,
+        )
+      persistedMessages = acknowledgement.authoritativeMessages
+      recoveryMessages = acknowledgement.recovery?.messages ?? []
+      // Keep attachment-enriched rows as the newest complete baseline. The raw
+      // complete baseline above remains durable if this best-effort update fails.
+      writeCardTranscriptSnapshot(server.cardId, persistedMessages)
+    }
   } else {
     recoveryMessages = readCardTranscriptRecovery(owner)?.messages ?? []
   }
