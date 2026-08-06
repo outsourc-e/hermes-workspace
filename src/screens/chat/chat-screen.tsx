@@ -68,11 +68,9 @@ import {
 import {
   appendCardTranscriptRecoveryMessage,
   checkpointCardTranscriptRecoveryMessage,
-  clearCardTranscriptRecovery,
   isCardTranscriptRecoveryMessagePortable,
   mergeCardTranscriptRecoveryMessages,
-  readCardTranscriptRecovery,
-  replaceCardTranscriptRecoveryMessages,
+  removeRejectedCardTranscriptRecoveryMessage,
 } from './card-transcript-recovery'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
@@ -3145,9 +3143,6 @@ export function ChatScreen({
 
       let persisted = false
       if (activeCard) {
-        const priorRecovery = readCardTranscriptRecovery({
-          cardId: activeCard.cardId,
-        })
         persisted = Boolean(
           appendCardTranscriptRecoveryMessage(
             { cardId: activeCard.cardId },
@@ -3162,16 +3157,14 @@ export function ChatScreen({
             durableOptimisticMessage,
             { persistRecovery: false },
           )
-        } else if (priorRecovery) {
-          // The recovery helper intentionally retains an in-memory fallback
-          // for post-transport failures. This is a pre-transport admission
-          // gate, so roll that candidate back to the last durable snapshot.
-          replaceCardTranscriptRecoveryMessages(
-            { cardId: activeCard.cardId },
-            priorRecovery.messages,
-          )
         } else {
-          clearCardTranscriptRecovery({ cardId: activeCard.cardId })
+          // A failed admission may still have reached session/memory recovery
+          // before the persistent-mirror verification failed. Remove only this
+          // rejected client identity; normal union writers would resurrect it.
+          removeRejectedCardTranscriptRecoveryMessage(
+            { cardId: activeCard.cardId },
+            durableClientId,
+          )
         }
       } else {
         persisted = persistPendingMessage({

@@ -13,6 +13,7 @@ import {
   parseCardTranscriptRecovery,
   readCardTranscriptRecovery,
   removeAcknowledgedCardTranscriptRecoveryMessages,
+  removeRejectedCardTranscriptRecoveryMessage,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import { reconcileSessionCardHistoryResponse } from './chat-queries'
@@ -258,6 +259,67 @@ describe('Card transcript recovery storage contract', () => {
         'second tab accepted',
       ]),
     )
+  })
+
+  it('removes one rejected client identity from every recovery authority while preserving the accepted baseline', () => {
+    const baseline = message('user', 'accepted baseline', {
+      clientId: 'client-baseline',
+    })
+    const rejected = message('user', 'rejected before transport', {
+      clientId: 'client-rejected',
+      __optimisticId: 'opt-client-rejected',
+      status: 'sending',
+    })
+    expect(
+      replaceCardTranscriptRecoveryMessages(owner, [baseline], { now }),
+    ).not.toBeNull()
+
+    let denyRejectedPersistentWrite = true
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      if (
+        denyRejectedPersistentWrite &&
+        this === window.localStorage &&
+        key.includes(':entry:') &&
+        value.includes('client-rejected')
+      ) {
+        denyRejectedPersistentWrite = false
+        throw new DOMException('transient quota failure', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, key, value)
+    })
+
+    expect(
+      appendCardTranscriptRecoveryMessage(owner, rejected, { now }),
+    ).toBeNull()
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      baseline,
+      rejected,
+    ])
+
+    expect(
+      removeRejectedCardTranscriptRecoveryMessage(owner, 'client-rejected', {
+        now,
+      })?.messages,
+    ).toEqual([baseline])
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      baseline,
+    ])
+
+    clearCardTranscriptRecoveryMemory()
+    window.sessionStorage.clear()
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toEqual([
+      baseline,
+    ])
+    expect(
+      Array.from({ length: window.localStorage.length }, (_, index) =>
+        window.localStorage.getItem(window.localStorage.key(index) ?? ''),
+      ).join('\n'),
+    ).not.toContain('client-rejected')
   })
 
   it('clears and ignores legacy segment-keyed recovery records', () => {

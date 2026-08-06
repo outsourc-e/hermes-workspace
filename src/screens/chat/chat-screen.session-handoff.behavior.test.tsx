@@ -14,6 +14,7 @@ import { useChatStore } from '../../stores/chat-store'
 import {
   clearCardTranscriptRecoveryMemory,
   readCardTranscriptRecovery,
+  replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
 import { chatQueryKeys, sessionCardQueryKeys } from './chat-queries'
@@ -3361,7 +3362,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
-  it('fails closed before transport when a text turn cannot be durably overlaid on its Card', () => {
+  it('never resurrects a rejected pre-transport turn after transient storage recovery and remount', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -3370,23 +3371,42 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       cardId: 'remote:parent',
       canonicalSegmentKey: 'remote:tip',
     })
+    const baseline: ChatMessage = {
+      id: 'accepted-baseline',
+      role: 'user',
+      content: [{ type: 'text', text: 'accepted durable baseline' }],
+      clientId: 'client-baseline',
+      timestamp: 1,
+    }
     queryContext.cardHistories.set(activeCard.cardId, {
       sessionKey: 'remote:tip',
       cardId: activeCard.cardId,
       canonicalSegmentKey: 'remote:tip',
-      messages: [],
+      messages: [baseline],
       completeness: 'complete',
       retryable: false,
       missingSegments: [],
     })
+    expect(
+      replaceCardTranscriptRecoveryMessages({ cardId: activeCard.cardId }, [
+        baseline,
+      ]),
+    ).not.toBeNull()
     const originalSetItem = Storage.prototype.setItem
+    let denyRejectedPersistentWrite = true
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
       this: Storage,
       key,
       value,
     ) {
-      if (key.startsWith('workspace.card-transcript-recovery.')) {
-        throw new DOMException('quota exceeded', 'QuotaExceededError')
+      if (
+        denyRejectedPersistentWrite &&
+        this === window.localStorage &&
+        key.includes(':entry:') &&
+        value.includes('"text":"continue"')
+      ) {
+        denyRejectedPersistentWrite = false
+        throw new DOMException('transient quota failure', 'QuotaExceededError')
       }
       return originalSetItem.call(this, key, value)
     })
@@ -3423,11 +3443,49 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         ([input]) => String(input) === '/api/send-stream',
       ),
     ).toBe(false)
-    expect(readCardTranscriptRecovery({ cardId: activeCard.cardId })).toBeNull()
+    expect(
+      readCardTranscriptRecovery({ cardId: activeCard.cardId })?.messages,
+    ).toEqual([baseline])
 
     React.act(() => root.unmount())
     document.body.removeChild(container)
     queryClient.clear()
+
+    clearCardTranscriptRecoveryMemory()
+    window.sessionStorage.clear()
+    const remountClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = remountClient
+    const remountContainer = document.createElement('div')
+    document.body.appendChild(remountContainer)
+    const remountRoot = createRoot(remountContainer)
+    React.act(() => {
+      remountRoot.render(
+        <QueryClientProvider client={remountClient}>
+          <ChatScreen
+            activeFriendlyId={activeCard.cardId}
+            activeCard={activeCard}
+            sessionCardList={cardList([activeCard])}
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+    const transcript = remountContainer.querySelector(
+      '[data-testid="chat-transcript"]',
+    )?.textContent
+    expect(transcript).toContain('accepted durable baseline')
+    expect(transcript).not.toContain('"text":"continue"')
+    expect(
+      fetchSpy.mock.calls.some(
+        ([input]) => String(input) === '/api/send-stream',
+      ),
+    ).toBe(false)
+
+    React.act(() => remountRoot.unmount())
+    document.body.removeChild(remountContainer)
+    remountClient.clear()
   })
 
   it.each([

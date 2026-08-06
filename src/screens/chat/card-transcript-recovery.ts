@@ -727,6 +727,117 @@ function nextRecoveryRevision(previousRevision: number): number | null {
   return next
 }
 
+function hasRecoveryClientIdentity(
+  message: ChatMessage,
+  clientId: string,
+): boolean {
+  return (
+    message.role === 'user' &&
+    identifierSet(message, [
+      'clientId',
+      'client_id',
+      'idempotencyKey',
+      'nonce',
+      '__optimisticId',
+    ]).has(clientId)
+  )
+}
+
+/**
+ * Roll back one user turn that failed the pre-transport durability gate.
+ *
+ * This intentionally bypasses the normal unioning writer: a rejected turn is
+ * not accepted recovery state and must be removed by immutable client identity
+ * from every in-process and browser-owned recovery authority without replacing
+ * or evicting previously accepted rows.
+ */
+export function removeRejectedCardTranscriptRecoveryMessage(
+  owner: CardTranscriptRecoveryOwner,
+  clientId: string,
+  options: RecoveryOptions = {},
+): CardTranscriptRecoveryEnvelope | null {
+  const normalizedClientId = normalizedString(clientId)
+  if (!isValidCardTranscriptRecoveryOwner(owner) || !normalizedClientId) {
+    return null
+  }
+
+  const key = cardTranscriptRecoveryStorageKey(owner)
+  const storages = resolveDefaultRecoveryStorages(options.storage)
+  const journalMessages = readMessageJournal(
+    key,
+    storages,
+    recoveryMessageIdentity,
+    (value) => {
+      const sanitized = sanitizeCardOwnedMessage(value as ChatMessage)
+      return validMessage(sanitized) ? sanitized : null
+    },
+  )
+  removeMessageJournalValues(
+    key,
+    journalMessages.filter((message) =>
+      hasRecoveryClientIdentity(message, normalizedClientId),
+    ),
+    storages,
+    recoveryMessageIdentity,
+  )
+
+  const memoryKey = memoryRecoveryKey(owner)
+  const memory = memoryRecovery.get(memoryKey)
+  if (memory) {
+    const remaining = memory.messages.filter(
+      (message) => !hasRecoveryClientIdentity(message, normalizedClientId),
+    )
+    if (remaining.length === 0) memoryRecovery.delete(memoryKey)
+    else if (remaining.length !== memory.messages.length) {
+      memoryRecovery.set(memoryKey, { ...memory, messages: remaining })
+    }
+  }
+
+  for (const storage of storages) {
+    let envelope: CardTranscriptRecoveryEnvelope | null = null
+    try {
+      const raw = storage.getItem(key)
+      envelope = raw
+        ? parseCardTranscriptRecovery(JSON.parse(raw), owner, options.now)
+        : null
+    } catch {
+      continue
+    }
+    if (!envelope) continue
+    const remaining = envelope.messages.filter(
+      (message) => !hasRecoveryClientIdentity(message, normalizedClientId),
+    )
+    if (remaining.length === envelope.messages.length) continue
+    if (remaining.length === 0) {
+      try {
+        storage.removeItem(key)
+      } catch {
+        // A denied mirror must not block cleanup in independent mirrors.
+      }
+      continue
+    }
+    const revision = nextRecoveryRevision(envelope.revision ?? 0)
+    if (revision === null) continue
+    const rollbackTime = options.now ?? Date.now()
+    const nextEnvelope: CardTranscriptRecoveryEnvelope = {
+      ...envelope,
+      createdAt:
+        Number.isFinite(rollbackTime) && rollbackTime > 0
+          ? rollbackTime
+          : envelope.createdAt,
+      messages: remaining,
+      revision,
+    }
+    try {
+      storage.setItem(key, JSON.stringify(nextEnvelope))
+    } catch {
+      // Continue removing the rejected identity from independent mirrors.
+    }
+  }
+
+  return readCardTranscriptRecovery(owner, options)
+}
+
 export function replaceCardTranscriptRecoveryMessages(
   owner: CardTranscriptRecoveryOwner,
   messages: Array<ChatMessage>,
