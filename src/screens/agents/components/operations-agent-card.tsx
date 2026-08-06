@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight01Icon,
@@ -148,12 +148,10 @@ export function OperationsInlineChat({
   const [draft, setDraft] = useState('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
-  const renderedMessages = useMemo(() => messages.slice(-50), [messages])
-
   useEffect(() => {
     if (!scrollRef.current) return
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [renderedMessages])
+  }, [messages])
 
   async function handleSend() {
     const message = draft.trim()
@@ -172,9 +170,9 @@ export function OperationsInlineChat({
         ref={scrollRef}
         className="flex min-h-[100px] max-h-[160px] flex-1 flex-col justify-center overflow-y-auto px-3 py-3"
       >
-        {renderedMessages.length > 0 ? (
+        {messages.length > 0 ? (
           <div className="space-y-2">
-            {renderedMessages.map((message) => {
+            {messages.map((message) => {
               const isUser = message.role === 'user'
 
               return (

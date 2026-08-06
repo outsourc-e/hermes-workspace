@@ -24,22 +24,27 @@ type OperationsChatOverlayMessage = OperationsChatMessage & {
 }
 
 type OperationsChatOverlayEnvelope = {
-  version: 1
+  version: 2
+  revision: number
   owner: { cardId: string }
   messages: Array<OperationsChatOverlayMessage>
 }
 
 type OperationsChatCompleteSnapshot = {
-  version: 1
+  version: 2
+  revision: number
   owner: { cardId: string }
   messages: Array<OperationsChatMessage>
+}
+
+type StoredMessages<T> = {
+  revision: number
+  messages: Array<T>
 }
 
 const OPERATIONS_CHAT_OVERLAY_PREFIX = 'workspace.operations-card-chat.v1:'
 const OPERATIONS_CHAT_COMPLETE_PREFIX =
   'workspace.operations-card-complete-history.v1:'
-const MAX_OVERLAY_MESSAGES = 100
-const MAX_COMPLETE_MESSAGES = 250
 
 function normalizeMessage(
   message: ChatMessage,
@@ -80,51 +85,108 @@ function completeSnapshotStorageKey(cardId: string) {
   return `${OPERATIONS_CHAT_COMPLETE_PREFIX}${encodeURIComponent(cardId)}`
 }
 
-function removeStoredValue(key: string) {
-  if (typeof window === 'undefined') return false
+function storageMirrors() {
+  if (typeof window === 'undefined') return []
+  const mirrors: Array<Storage> = []
   try {
-    window.localStorage.removeItem(key)
-    return true
-  } catch {
-    return false
-  }
+    mirrors.push(window.localStorage)
+  } catch {}
+  try {
+    if (!mirrors.includes(window.sessionStorage)) {
+      mirrors.push(window.sessionStorage)
+    }
+  } catch {}
+  return mirrors
 }
 
-function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
-  if (typeof window === 'undefined' || !cardId) return []
-  const key = completeSnapshotStorageKey(cardId)
+function removeInvalidStoredValue(storage: Storage, key: string) {
   try {
-    const raw = window.localStorage.getItem(key)
-    if (!raw) return []
-    const parsedValue = JSON.parse(raw) as unknown
-    if (!parsedValue || typeof parsedValue !== 'object') {
-      removeStoredValue(key)
-      return []
-    }
-    const parsed = parsedValue as Record<string, unknown>
-    const owner =
-      parsed.owner && typeof parsed.owner === 'object'
-        ? (parsed.owner as Record<string, unknown>)
-        : undefined
-    if (
-      parsed.version !== 1 ||
-      owner?.cardId !== cardId ||
-      !Array.isArray(parsed.messages) ||
-      parsed.messages.length > MAX_COMPLETE_MESSAGES
-    ) {
-      removeStoredValue(key)
-      return []
-    }
+    storage.removeItem(key)
+  } catch {}
+}
 
+function parseEnvelope(
+  raw: string,
+  cardId: string,
+): { parsed: Record<string, unknown>; revision: number } | undefined {
+  const parsedValue = JSON.parse(raw) as unknown
+  if (!parsedValue || typeof parsedValue !== 'object') return undefined
+  const parsed = parsedValue as Record<string, unknown>
+  const owner =
+    parsed.owner && typeof parsed.owner === 'object'
+      ? (parsed.owner as Record<string, unknown>)
+      : undefined
+  const revision =
+    parsed.version === 1
+      ? 0
+      : parsed.version === 2 &&
+          typeof parsed.revision === 'number' &&
+          Number.isSafeInteger(parsed.revision) &&
+          parsed.revision > 0
+        ? parsed.revision
+        : undefined
+  if (
+    revision === undefined ||
+    owner?.cardId !== cardId ||
+    !Array.isArray(parsed.messages)
+  ) {
+    return undefined
+  }
+  return { parsed, revision }
+}
+
+function readMirroredMessages<T>(
+  key: string,
+  parse: (raw: string) => StoredMessages<T> | undefined,
+): StoredMessages<T> | undefined {
+  let newest: StoredMessages<T> | undefined
+  for (const storage of storageMirrors()) {
+    try {
+      const raw = storage.getItem(key)
+      if (!raw) continue
+      const candidate = parse(raw)
+      if (!candidate) {
+        removeInvalidStoredValue(storage, key)
+        continue
+      }
+      if (!newest || candidate.revision > newest.revision) newest = candidate
+    } catch {}
+  }
+  return newest
+}
+
+function writeMirroredEnvelope(
+  key: string,
+  previousRevision: number,
+  envelope: OperationsChatOverlayEnvelope | OperationsChatCompleteSnapshot,
+) {
+  const serialized = JSON.stringify(envelope)
+  let verified = false
+  for (const storage of storageMirrors()) {
+    try {
+      storage.setItem(key, serialized)
+      if (storage.getItem(key) === serialized) verified = true
+    } catch {}
+  }
+  return verified && envelope.revision === previousRevision + 1
+}
+
+function parseCompleteSnapshot(
+  raw: string,
+  cardId: string,
+): StoredMessages<OperationsChatMessage> | undefined {
+  try {
+    const envelope = parseEnvelope(raw, cardId)
+    if (!envelope) return undefined
+    const { parsed, revision } = envelope
     const messages: Array<OperationsChatMessage> = []
-    for (const candidateValue of parsed.messages) {
+    for (const candidateValue of parsed.messages as Array<unknown>) {
       if (
         !candidateValue ||
         typeof candidateValue !== 'object' ||
         Array.isArray(candidateValue)
       ) {
-        removeStoredValue(key)
-        return []
+        return undefined
       }
       const candidate = candidateValue as Record<string, unknown>
       if (
@@ -136,8 +198,7 @@ function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
         typeof candidate.content !== 'string' ||
         !candidate.content.trim()
       ) {
-        removeStoredValue(key)
-        return []
+        return undefined
       }
       messages.push({
         id: candidate.id,
@@ -149,68 +210,55 @@ function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
           : {}),
       })
     }
-    return messages
+    return { revision, messages }
   } catch {
-    removeStoredValue(key)
-    return []
+    return undefined
   }
+}
+
+function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
+  if (!cardId) return []
+  return (
+    readMirroredMessages(completeSnapshotStorageKey(cardId), (raw) =>
+      parseCompleteSnapshot(raw, cardId),
+    )?.messages ?? []
+  )
 }
 
 function writeCompleteSnapshot(
   cardId: string,
   messages: Array<OperationsChatMessage>,
 ) {
-  if (typeof window === 'undefined' || !cardId) return false
+  if (!cardId) return false
   const key = completeSnapshotStorageKey(cardId)
-  if (messages.length === 0) return removeStoredValue(key)
+  const previousRevision =
+    readMirroredMessages(key, (raw) => parseCompleteSnapshot(raw, cardId))
+      ?.revision ?? 0
   const envelope: OperationsChatCompleteSnapshot = {
-    version: 1,
+    version: 2,
+    revision: previousRevision + 1,
     owner: { cardId },
-    messages: messages.slice(-MAX_COMPLETE_MESSAGES),
+    messages,
   }
-  try {
-    window.localStorage.setItem(key, JSON.stringify(envelope))
-    return true
-  } catch {
-    return false
-  }
+  return writeMirroredEnvelope(key, previousRevision, envelope)
 }
 
-function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
-  if (typeof window === 'undefined' || !cardId) return []
-  const key = overlayStorageKey(cardId)
+function parseOverlay(
+  raw: string,
+  cardId: string,
+): StoredMessages<OperationsChatOverlayMessage> | undefined {
   try {
-    const raw = window.localStorage.getItem(key)
-    if (!raw) return []
-    const parsedValue = JSON.parse(raw) as unknown
-    if (!parsedValue || typeof parsedValue !== 'object') {
-      removeStoredValue(key)
-      return []
-    }
-    const parsed = parsedValue as Record<string, unknown>
-    const owner =
-      parsed.owner && typeof parsed.owner === 'object'
-        ? (parsed.owner as Record<string, unknown>)
-        : undefined
-    if (
-      parsed.version !== 1 ||
-      owner?.cardId !== cardId ||
-      !Array.isArray(parsed.messages) ||
-      parsed.messages.length > MAX_OVERLAY_MESSAGES
-    ) {
-      removeStoredValue(key)
-      return []
-    }
-
+    const envelope = parseEnvelope(raw, cardId)
+    if (!envelope) return undefined
+    const { parsed, revision } = envelope
     const messages: Array<OperationsChatOverlayMessage> = []
-    for (const candidateValue of parsed.messages) {
+    for (const candidateValue of parsed.messages as Array<unknown>) {
       if (
         !candidateValue ||
         typeof candidateValue !== 'object' ||
         Array.isArray(candidateValue)
       ) {
-        removeStoredValue(key)
-        return []
+        return undefined
       }
       const candidate = candidateValue as Record<string, unknown>
       if (
@@ -223,8 +271,7 @@ function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
         !Number.isSafeInteger(candidate.acknowledgementOrdinal) ||
         candidate.acknowledgementOrdinal < 1
       ) {
-        removeStoredValue(key)
-        return []
+        return undefined
       }
       messages.push({
         id: candidate.id,
@@ -237,31 +284,36 @@ function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
           : {}),
       })
     }
-    return messages
+    return { revision, messages }
   } catch {
-    removeStoredValue(key)
-    return []
+    return undefined
   }
+}
+
+function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
+  if (!cardId) return []
+  return (
+    readMirroredMessages(overlayStorageKey(cardId), (raw) =>
+      parseOverlay(raw, cardId),
+    )?.messages ?? []
+  )
 }
 
 function writeOverlay(
   cardId: string,
   messages: Array<OperationsChatOverlayMessage>,
 ) {
-  if (typeof window === 'undefined' || !cardId) return false
+  if (!cardId) return false
   const key = overlayStorageKey(cardId)
-  if (messages.length === 0) return removeStoredValue(key)
+  const previousRevision =
+    readMirroredMessages(key, (raw) => parseOverlay(raw, cardId))?.revision ?? 0
   const envelope: OperationsChatOverlayEnvelope = {
-    version: 1,
+    version: 2,
+    revision: previousRevision + 1,
     owner: { cardId },
-    messages: messages.slice(-MAX_OVERLAY_MESSAGES),
+    messages,
   }
-  try {
-    window.localStorage.setItem(key, JSON.stringify(envelope))
-    return true
-  } catch {
-    return false
-  }
+  return writeMirroredEnvelope(key, previousRevision, envelope)
 }
 
 function messageSignature(
@@ -492,6 +544,7 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
   const [overlayMessages, setOverlayMessages] = useState<
     Array<OperationsChatOverlayMessage>
   >(() => readOverlay(ownerCardId))
+  const [durabilityError, setDurabilityError] = useState<string | null>(null)
   const overlayRef = useRef(overlayMessages)
   const overlayOwnerRef = useRef(ownerCardId)
 
@@ -500,15 +553,16 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     expectedOwner = ownerCardId,
   ) => {
     if (!expectedOwner) return false
-    const bounded = nextMessages.slice(-MAX_OVERLAY_MESSAGES)
+    if (!writeOverlay(expectedOwner, nextMessages)) return false
     if (overlayOwnerRef.current === expectedOwner) {
-      overlayRef.current = bounded
-      setOverlayMessages(bounded)
+      overlayRef.current = nextMessages
+      setOverlayMessages(nextMessages)
     }
-    return writeOverlay(expectedOwner, bounded)
+    return true
   }
 
   useEffect(() => {
+    setDurabilityError(null)
     setCompleteSnapshot({
       ownerCardId: cardId,
       messages: readCompleteSnapshot(cardId),
@@ -517,11 +571,17 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
 
   useEffect(() => {
     if (!completeHistory || !cardId) return
-    setCompleteSnapshot({
-      ownerCardId: cardId,
-      messages: currentAuthoritativeMessages,
-    })
-    writeCompleteSnapshot(cardId, currentAuthoritativeMessages)
+    if (writeCompleteSnapshot(cardId, currentAuthoritativeMessages)) {
+      setDurabilityError(null)
+      setCompleteSnapshot({
+        ownerCardId: cardId,
+        messages: currentAuthoritativeMessages,
+      })
+    } else {
+      setDurabilityError(
+        'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
+      )
+    }
   }, [cardId, completeHistory, currentAuthoritativeMessages])
 
   useEffect(() => {
@@ -558,12 +618,22 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     if (
       !completeHistory ||
       !ownerCardId ||
+      completeSnapshot.ownerCardId !== cardId ||
+      completeSnapshot.messages !== currentAuthoritativeMessages ||
       unacknowledgedOverlay.length === overlayMessages.length
     ) {
       return
     }
     commitOverlay(unacknowledgedOverlay, ownerCardId)
-  }, [completeHistory, ownerCardId, overlayMessages, unacknowledgedOverlay])
+  }, [
+    cardId,
+    completeHistory,
+    completeSnapshot,
+    currentAuthoritativeMessages,
+    ownerCardId,
+    overlayMessages,
+    unacknowledgedOverlay,
+  ])
 
   const messages = useMemo(
     () => [...authoritativeMessages, ...unacknowledgedOverlay],
@@ -667,7 +737,11 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
               ? { ...entry, content, acknowledgementOrdinal }
               : entry,
           )
-          commitOverlay(activeSendOverlay, ownerCardId)
+          if (!commitOverlay(activeSendOverlay, ownerCardId)) {
+            throw new Error(
+              'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
+            )
+          }
           return
         }
         const assistant: OperationsChatOverlayMessage = {
@@ -682,7 +756,11 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
           ),
         }
         activeSendOverlay = [...activeSendOverlay, assistant]
-        commitOverlay(activeSendOverlay, ownerCardId)
+        if (!commitOverlay(activeSendOverlay, ownerCardId)) {
+          throw new Error(
+            'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
+          )
+        }
       })
     },
     onSuccess: async () => {
@@ -707,6 +785,7 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
         ? 'Direct child transcript · read-only'
         : (historyQuery.error instanceof Error && historyQuery.error.message) ||
           (sendMutation.error instanceof Error && sendMutation.error.message) ||
+          durabilityError ||
           null
 
   return {

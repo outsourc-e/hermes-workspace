@@ -190,10 +190,12 @@ function rejectOperationsStorageWrites({
   keyPrefix,
   afterSuccessfulWrites = 0,
   exceptionName,
+  storageArea,
 }: {
   keyPrefix: string
   afterSuccessfulWrites?: number
   exceptionName: 'QuotaExceededError' | 'SecurityError'
+  storageArea?: Storage
 }) {
   const originalSetItem = Storage.prototype.setItem
   let matchingWrites = 0
@@ -202,7 +204,7 @@ function rejectOperationsStorageWrites({
     key,
     value,
   ) {
-    if (key.startsWith(keyPrefix)) {
+    if (key.startsWith(keyPrefix) && (!storageArea || this === storageArea)) {
       matchingWrites += 1
       if (matchingWrites > afterSuccessfulWrites) {
         throw new DOMException('Operations storage unavailable', exceptionName)
@@ -328,6 +330,7 @@ async function renderOperations() {
 
 beforeEach(() => {
   window.localStorage.clear()
+  window.sessionStorage.clear()
   mocks.navigate.mockReset()
   mocks.invalidateQueries.mockReset()
   mocks.historyRefetch.mockReset()
@@ -628,10 +631,12 @@ describe('mounted Operations Session Card activity', () => {
       1,
     )
     expect(
-      window.localStorage.getItem(
-        'workspace.operations-card-chat.v1:remote%3Aworker-card',
-      ),
-    ).toBeNull()
+      JSON.parse(
+        window.localStorage.getItem(
+          'workspace.operations-card-chat.v1:remote%3Aworker-card',
+        ) ?? '{}',
+      ).messages,
+    ).toEqual([])
   })
 
   it.each(['QuotaExceededError', 'SecurityError'] as const)(
@@ -670,7 +675,7 @@ describe('mounted Operations Session Card activity', () => {
   )
 
   it.each(['QuotaExceededError', 'SecurityError'] as const)(
-    'keeps accepted stream chunks visible when the recovery update raises %s',
+    'recovers accepted stream chunks after remount when local recovery raises %s mid-stream',
     async (exceptionName) => {
       const userText = `accepted ${exceptionName} user turn`
       const assistantText = `accepted ${exceptionName} assistant chunk`
@@ -678,6 +683,7 @@ describe('mounted Operations Session Card activity', () => {
         keyPrefix: 'workspace.operations-card-chat.',
         afterSuccessfulWrites: 1,
         exceptionName,
+        storageArea: window.localStorage,
       })
       const fetchMock = vi.fn<typeof fetch>((input, init) => {
         const url = String(input)
@@ -737,11 +743,72 @@ describe('mounted Operations Session Card activity', () => {
 
       expect(screen.getByText(userText)).toBeTruthy()
       expect(screen.getByText(assistantText)).toBeTruthy()
+
+      mounted.unmount()
+      await renderOperations()
+      expect(screen.getByText(userText)).toBeTruthy()
+      expect(screen.getByText(assistantText)).toBeTruthy()
     },
   )
 
   it.each(['QuotaExceededError', 'SecurityError'] as const)(
-    'keeps complete history visible through %s and preserves the prior durable snapshot on remount',
+    'does not expose a non-durable chunk when every mirror raises %s mid-stream',
+    async (exceptionName) => {
+      const userText = `durable ${exceptionName} checkpoint`
+      const assistantText = `non-durable ${exceptionName} chunk`
+      rejectOperationsStorageWrites({
+        keyPrefix: 'workspace.operations-card-chat.',
+        afterSuccessfulWrites: 2,
+        exceptionName,
+      })
+      const fetchMock = vi.fn<typeof fetch>((input, init) => {
+        const url = String(input)
+        if (url === '/api/session-cards') {
+          return Promise.resolve(Response.json(mocks.cardResponse))
+        }
+        if (url === '/api/send-stream' && init?.method === 'POST') {
+          return Promise.resolve(
+            new Response(
+              `event: chunk\ndata: ${JSON.stringify({ text: assistantText, fullReplace: true })}\n\n`,
+            ),
+          )
+        }
+        return Promise.reject(new Error(`Unexpected request: ${url}`))
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const mounted = await renderOperations()
+      const input =
+        screen.getByPlaceholderText<HTMLInputElement>('Message Worker...')
+      await React.act(async () => {
+        fireEvent.change(input, { target: { value: userText } })
+        fireEvent.keyDown(input, { key: 'Enter' })
+        await Promise.resolve()
+      })
+
+      expect(screen.getByText(userText)).toBeTruthy()
+      expect(screen.queryByText(assistantText)).toBeNull()
+      expect(
+        fetchMock.mock.calls.some(
+          ([request]) => String(request) === '/api/send-stream',
+        ),
+      ).toBe(true)
+
+      mocks.historyResponse = {
+        messages: [],
+        completeness: 'partial',
+        retryable: true,
+        missingSegments: [],
+      }
+      mounted.unmount()
+      await renderOperations()
+      expect(screen.getByText(userText)).toBeTruthy()
+      expect(screen.queryByText(assistantText)).toBeNull()
+    },
+  )
+
+  it.each(['QuotaExceededError', 'SecurityError'] as const)(
+    'falls back durably when the complete snapshot local write raises %s',
     async (exceptionName) => {
       const priorAssistantText = `prior durable ${exceptionName} assistant reply`
       const userText = `complete ${exceptionName} user turn`
@@ -780,6 +847,7 @@ describe('mounted Operations Session Card activity', () => {
       const storageSpy = rejectOperationsStorageWrites({
         keyPrefix: 'workspace.operations-card-complete-history.',
         exceptionName,
+        storageArea: window.localStorage,
       })
 
       const mounted = await renderOperations()
@@ -816,10 +884,187 @@ describe('mounted Operations Session Card activity', () => {
         .getByPlaceholderText('Message Worker...')
         .closest('article')!
       expect(
-        within(remountedRootCard).getByText(priorAssistantText),
-      ).toBeTruthy()
+        within(remountedRootCard).queryByText(priorAssistantText),
+      ).toBeNull()
+      expect(within(remountedRootCard).getByText(userText)).toBeTruthy()
+      expect(within(remountedRootCard).getByText(assistantText)).toBeTruthy()
     },
   )
+
+  it.each(['QuotaExceededError', 'SecurityError'] as const)(
+    'does not promote a complete snapshot when every mirror raises %s',
+    async (exceptionName) => {
+      const priorText = `last durable ${exceptionName} snapshot`
+      const rejectedText = `non-durable ${exceptionName} snapshot transition`
+      window.localStorage.setItem(
+        operationsCompleteSnapshotKey,
+        JSON.stringify({
+          version: 1,
+          owner: { cardId: 'remote:worker-card' },
+          messages: [
+            { id: 'prior-durable', role: 'assistant', content: priorText },
+          ],
+        }),
+      )
+      mocks.historyResponse = {
+        messages: [
+          {
+            id: 'new-server-message',
+            role: 'assistant',
+            content: [{ type: 'text', text: rejectedText }],
+          },
+        ],
+        completeness: 'complete',
+        retryable: false,
+        missingSegments: [],
+      }
+      rejectOperationsStorageWrites({
+        keyPrefix: 'workspace.operations-card-complete-history.',
+        exceptionName,
+      })
+
+      const mounted = await renderOperations()
+      expect(screen.getAllByText(rejectedText).length).toBeGreaterThan(0)
+      expect(
+        screen.getByText(
+          'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
+        ),
+      ).toBeTruthy()
+
+      mocks.historyResponse = {
+        messages: [],
+        completeness: 'partial',
+        retryable: true,
+        missingSegments: [],
+      }
+      await mounted.rerender()
+      const rootCard = screen
+        .getByPlaceholderText('Message Worker...')
+        .closest('article')!
+      expect(within(rootCard).getByText(priorText)).toBeTruthy()
+      expect(within(rootCard).queryByText(rejectedText)).toBeNull()
+
+      mounted.unmount()
+      await renderOperations()
+      const remountedRootCard = screen
+        .getByPlaceholderText('Message Worker...')
+        .closest('article')!
+      expect(within(remountedRootCard).getByText(priorText)).toBeTruthy()
+      expect(within(remountedRootCard).queryByText(rejectedText)).toBeNull()
+    },
+  )
+
+  it('does not evict accepted overlay rows at the former retention boundary', async () => {
+    const retainedText = 'oldest unacknowledged accepted Operations turn'
+    const existingMessages = Array.from({ length: 100 }, (_, index) => ({
+      id: `accepted-${index}`,
+      role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
+      content: index === 0 ? retainedText : `accepted Operations row ${index}`,
+      acknowledgementOrdinal: 1,
+    }))
+    window.localStorage.setItem(
+      operationsOverlayKey,
+      JSON.stringify({
+        version: 1,
+        owner: { cardId: 'remote:worker-card' },
+        messages: existingMessages,
+      }),
+    )
+    const newUserText = 'accepted turn beyond the former overlay cap'
+    const newAssistantText = 'accepted reply beyond the former overlay cap'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>((input, init) => {
+        const url = String(input)
+        if (url === '/api/session-cards') {
+          return Promise.resolve(Response.json(mocks.cardResponse))
+        }
+        if (url === '/api/send-stream' && init?.method === 'POST') {
+          return Promise.resolve(
+            new Response(
+              `event: chunk\ndata: ${JSON.stringify({ text: newAssistantText, fullReplace: true })}\n\nevent: done\ndata: {"state":"final"}\n\n`,
+            ),
+          )
+        }
+        return Promise.reject(new Error(`Unexpected request: ${url}`))
+      }),
+    )
+
+    const mounted = await renderOperations()
+    const input =
+      screen.getByPlaceholderText<HTMLInputElement>('Message Worker...')
+    await React.act(async () => {
+      fireEvent.change(input, { target: { value: newUserText } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await Promise.resolve()
+    })
+
+    const stored = JSON.parse(
+      window.localStorage.getItem(operationsOverlayKey) ?? '{}',
+    ) as { messages?: Array<{ content?: string }> }
+    expect(stored.messages).toHaveLength(102)
+    expect(stored.messages?.[0]?.content).toBe(retainedText)
+
+    mocks.historyResponse = {
+      messages: [],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [],
+    }
+    mounted.unmount()
+    await renderOperations()
+    expect(screen.getByText(newUserText)).toBeTruthy()
+    expect(screen.getByText(newAssistantText)).toBeTruthy()
+  })
+
+  it('persists complete transcripts beyond the former snapshot cap for partial-history remounts', async () => {
+    const firstText = 'first accepted Operations history row'
+    const lastText = 'last accepted Operations history row'
+    mocks.historyResponse = {
+      messages: Array.from({ length: 251 }, (_, index) => ({
+        id: `server-${index}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: [
+          {
+            type: 'text',
+            text:
+              index === 0
+                ? firstText
+                : index === 250
+                  ? lastText
+                  : `Operations history row ${index}`,
+          },
+        ],
+      })),
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+
+    const mounted = await renderOperations()
+    const stored = JSON.parse(
+      window.localStorage.getItem(operationsCompleteSnapshotKey) ?? '{}',
+    ) as { messages?: Array<{ content?: string }> }
+    expect(stored.messages).toHaveLength(251)
+    expect(stored.messages?.[0]?.content).toBe(firstText)
+    expect(stored.messages?.at(-1)?.content).toBe(lastText)
+
+    mocks.historyResponse = {
+      messages: [],
+      completeness: 'partial',
+      retryable: true,
+      missingSegments: [],
+    }
+    mounted.unmount()
+    await renderOperations()
+    expect(screen.getAllByText(firstText).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(lastText).length).toBeGreaterThan(0)
+    expect(
+      JSON.parse(
+        window.localStorage.getItem(operationsCompleteSnapshotKey) ?? '{}',
+      ).messages,
+    ).toHaveLength(251)
+  })
 
   it('retains the last complete acknowledged transcript through partial refetch and remount', async () => {
     const userText = 'acknowledged Operations user turn'
@@ -870,7 +1115,9 @@ describe('mounted Operations Session Card activity', () => {
       .closest('article')!
     expect(within(rootCard).getAllByText(userText)).toHaveLength(1)
     expect(within(rootCard).getAllByText(assistantText)).toHaveLength(1)
-    expect(window.localStorage.getItem(overlayKey)).toBeNull()
+    expect(
+      JSON.parse(window.localStorage.getItem(overlayKey) ?? '{}').messages,
+    ).toEqual([])
 
     mocks.historyResponse = {
       messages: [],
