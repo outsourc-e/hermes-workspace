@@ -911,6 +911,63 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     expectCardOnlyTranscriptBoundary(requests)
   })
 
+  it('keeps a sibling run mounted when another same-Card run ends through the production realtime hook', async () => {
+    const requests = mockHttp()
+    await mountChatScreen(defaultInput())
+    const store = useChatStore.getState()
+
+    React.act(() => {
+      store.processCardEvent(parentCard.cardId, {
+        type: 'chunk',
+        text: 'first concurrent production stream',
+        fullReplace: true,
+        runId: 'run-production-a',
+        sessionKey: parentCard.canonicalSegmentKey,
+        transport: 'chat-events',
+      })
+      store.processCardEvent(parentCard.cardId, {
+        type: 'chunk',
+        text: 'second concurrent production stream',
+        fullReplace: true,
+        runId: 'run-production-b',
+        sessionKey: parentCard.canonicalSegmentKey,
+        transport: 'chat-events',
+      })
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('first concurrent production stream'),
+      ).toBeTruthy()
+      expect(
+        screen.getByText('second concurrent production stream'),
+      ).toBeTruthy()
+    })
+
+    React.act(() => {
+      store.processCardEvent(parentCard.cardId, {
+        type: 'done',
+        state: 'complete',
+        runId: 'run-production-a',
+        sessionKey: parentCard.canonicalSegmentKey,
+        transport: 'chat-events',
+      })
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('second concurrent production stream'),
+      ).toBeTruthy()
+      expect(
+        useChatStore
+          .getState()
+          .getCardStreamingStates(parentCard.cardId)
+          .map((state) => state.runId),
+      ).toEqual(['run-production-b'])
+    })
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
   it('seals a chunk before a stream error and restores the interrupted assistant after remount', async () => {
     const requests: Array<string> = []
     const encoder = new TextEncoder()
