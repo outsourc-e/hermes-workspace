@@ -15,12 +15,14 @@ type SessionCardServiceBoundary = {
 
 type ElectronArtifactBoundaries = {
   appendLocalMessage: ArtifactFunction
+  dashboardFetch: ArtifactFunction
   ensureGatewayProbed: ArtifactFunction
   ensureLocalSession: ArtifactFunction
   execFile: ArtifactFunction
   loadWorkspaceCatalog: ArtifactFunction
   openaiChat: ArtifactFunction
   readWorkerMessages: ArtifactFunction
+  requireLocalOrAuth: ArtifactFunction
   streamChat: ArtifactFunction
   streamResponses: ArtifactFunction
 }
@@ -39,6 +41,12 @@ type ElectronServerArtifact = {
 function loadExecutableElectronArtifact(): ElectronServerArtifact {
   const bundlePath = resolve(process.cwd(), 'electron/server-bundle.cjs')
   const bundle = readFileSync(bundlePath, 'utf8')
+  const routerInitializer = /var (init_router_[A-Za-z0-9_]+) = __esm\(/u.exec(
+    bundle,
+  )?.[1]
+  if (!routerInitializer) {
+    throw new Error('Generated Electron artifact router initializer not found')
+  }
   const instrumented = `${bundle}
 ;module.exports.__artifactContract = {
   initializeRoutes() {
@@ -47,7 +55,7 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
       throw new Error('Electron artifact initialization network disabled');
     };
     try {
-      init_router_DKJYSCjw();
+      ${routerInitializer}();
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -57,6 +65,7 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
   },
   replaceBoundaries(boundaries) {
     appendLocalMessage = boundaries.appendLocalMessage;
+    dashboardFetch$1 = boundaries.dashboardFetch;
     ensureGatewayProbed = boundaries.ensureGatewayProbed;
     ensureLocalSession = boundaries.ensureLocalSession;
     import_node_child_process = {
@@ -66,6 +75,7 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
     loadWorkspaceCatalog = boundaries.loadWorkspaceCatalog;
     openaiChat = boundaries.openaiChat;
     readWorkerMessages = boundaries.readWorkerMessages;
+    requireLocalOrAuth = boundaries.requireLocalOrAuth;
     streamChat = boundaries.streamChat;
     streamResponses = boundaries.streamResponses;
   },
@@ -101,6 +111,16 @@ const localCardBinding = {
   canonicalSegmentKey: localSegmentKey,
   canonicalTransport: 'tmux',
 }
+const remoteCardId = 'remote:mission-card'
+const remoteSegmentKey = 'remote:private-upstream-tip'
+const remoteCardBinding = {
+  kind: 'session-card-owner',
+  cardId: remoteCardId,
+  parentCardId: null,
+  canonicalSource: 'remote',
+  canonicalSegmentKey: remoteSegmentKey,
+  canonicalTransport: 'gateway',
+}
 
 function resolvedLocalCard(cardId = localCardId) {
   return {
@@ -122,6 +142,33 @@ function resolvedLocalCard(cardId = localCardId) {
     sourceBySegmentKey: new Map([[localSegmentKey, 'local']]),
     upstreamKeyBySegmentKey: new Map([[localSegmentKey, 'builder']]),
     pinEligible: false,
+    collection: { completeness: 'complete', retryable: false, sources: [] },
+  }
+}
+
+function resolvedRemoteCard(cardId = remoteCardId) {
+  return {
+    card: {
+      cardId,
+      canonicalSource: 'remote',
+      canonicalTransport: 'gateway',
+      title: 'Mission Card',
+      titleSource: 'manual',
+      canonicalSegmentKey: remoteSegmentKey,
+      continuationSegmentKeys: [cardId, remoteSegmentKey],
+      continuationCount: 2,
+      relationshipKind: 'root',
+      childNodes: [],
+      updatedAt: 10,
+      archived: false,
+      pinned: false,
+    },
+    aliases: [cardId],
+    sourceBySegmentKey: new Map([[remoteSegmentKey, 'remote']]),
+    upstreamKeyBySegmentKey: new Map([
+      [remoteSegmentKey, 'private-upstream-tip'],
+    ]),
+    pinEligible: true,
     collection: { completeness: 'complete', retryable: false, sources: [] },
   }
 }
@@ -151,6 +198,20 @@ function sendStreamRequest() {
       message: 'Do not reach a provider after rollover',
     }),
   })
+}
+
+function sessionCardControlRequest(action: 'steer' | 'kill') {
+  return new Request(
+    `http://workspace.test/api/session-cards/${encodeURIComponent(remoteCardId)}/${action}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        cardBinding: remoteCardBinding,
+        ...(action === 'steer' ? { message: 'Continue carefully' } : {}),
+      }),
+    },
+  )
 }
 
 function successfulExecFile(
@@ -213,18 +274,29 @@ describe('checked-in Electron server bundle behavior', () => {
     appendLocalMessage: vi.fn(),
     ensureLocalSession: vi.fn(),
   }
+  const gatewayActions = {
+    dashboardFetch: vi.fn(),
+    ensureGatewayProbed: vi.fn(),
+  }
   const execFile = vi.fn(successfulExecFile)
 
   beforeEach(() => {
     vi.clearAllMocks()
     artifact.__artifactContract.replaceBoundaries({
       appendLocalMessage: localStoreActions.appendLocalMessage,
-      ensureGatewayProbed: vi.fn().mockResolvedValue(undefined),
+      dashboardFetch: gatewayActions.dashboardFetch,
+      ensureGatewayProbed: gatewayActions.ensureGatewayProbed.mockResolvedValue(
+        {
+          dashboard: { available: true },
+          enhancedChat: false,
+        },
+      ),
       ensureLocalSession: localStoreActions.ensureLocalSession,
       execFile,
       loadWorkspaceCatalog: vi.fn().mockResolvedValue(null),
       openaiChat: providerActions.openaiChat,
       readWorkerMessages: workerMessagesWithImmediateReply(),
+      requireLocalOrAuth: vi.fn().mockReturnValue(true),
       streamChat: providerActions.streamChat,
       streamResponses: providerActions.streamResponses,
     })
@@ -259,6 +331,88 @@ describe('checked-in Electron server bundle behavior', () => {
     expect(providerActions.openaiChat).not.toHaveBeenCalled()
     expect(providerActions.streamResponses).not.toHaveBeenCalled()
     expect(providerActions.streamChat).not.toHaveBeenCalled()
+  })
+
+  it('executes retirement of raw session sends without touching gateway or provider mutations', async () => {
+    const response = await artifact.default.fetch(
+      new Request('http://workspace.test/api/sessions/send', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'remote:ghost-runtime',
+          message: 'Do not deliver this raw mutation',
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(410)
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Legacy session send is retired; use a Session Card operation',
+    })
+    expect(gatewayActions.ensureGatewayProbed).not.toHaveBeenCalled()
+    expect(gatewayActions.dashboardFetch).not.toHaveBeenCalled()
+    expect(providerActions.openaiChat).not.toHaveBeenCalled()
+    expect(providerActions.streamResponses).not.toHaveBeenCalled()
+    expect(providerActions.streamChat).not.toHaveBeenCalled()
+    expect(execFile).not.toHaveBeenCalled()
+  })
+
+  it.each(['steer', 'kill'] as const)(
+    'rejects generated Card %s rollover at the final gateway mutation edge',
+    async (action) => {
+      const resolveCard = vi
+        .fn()
+        .mockResolvedValueOnce(resolvedRemoteCard())
+        .mockResolvedValueOnce(resolvedRemoteCard('remote:rolled-over-card'))
+      artifact.__artifactContract.replaceSessionCardService({
+        resolveCard,
+        resolveChildCard: vi.fn(),
+        observeCardActivity: vi.fn().mockResolvedValue(null),
+        observeChildLifecycle: vi.fn().mockResolvedValue(null),
+      })
+
+      const response = await artifact.default.fetch(
+        sessionCardControlRequest(action),
+      )
+
+      expect(response.status).toBe(409)
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        error: `Session Card ownership changed before ${action}`,
+      })
+      expect(resolveCard).toHaveBeenCalledTimes(2)
+      expect(gatewayActions.ensureGatewayProbed).toHaveBeenCalledTimes(1)
+      expect(gatewayActions.dashboardFetch).not.toHaveBeenCalled()
+    },
+  )
+
+  it('rejects raw Swarm tmux start and scroll before executing any command', async () => {
+    const [start, scroll] = await Promise.all([
+      artifact.default.fetch(
+        new Request('http://workspace.test/api/swarm-tmux-start', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ workerId: 'builder' }),
+        }),
+      ),
+      artifact.default.fetch(
+        new Request('http://localhost/api/swarm-tmux-scroll', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ workerId: 'builder', direction: 'up' }),
+        }),
+      ),
+    ])
+
+    expect([start.status, scroll.status]).toEqual([400, 400])
+    await expect(start.json()).resolves.toMatchObject({
+      error: 'Invalid Session Card start binding',
+    })
+    await expect(scroll.json()).resolves.toMatchObject({
+      error: 'Invalid Session Card scroll binding',
+    })
+    expect(execFile).not.toHaveBeenCalled()
   })
 
   it('rejects direct-chat rollover before any tmux mutation in the generated route', async () => {

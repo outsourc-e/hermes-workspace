@@ -13,7 +13,7 @@ function bundledRoute(bundle: string, route: string): string {
 
 function bundledDirectChatDelivery(bundle: string): string {
   const marker =
-    /async function sendPromptToLiveSession(?:\$\d+)?\(workerId, prompt, cardBinding\)/u
+    /async function sendPromptToLiveSession\(workerId, prompt, cardBinding\)/u
   const match = marker.exec(bundle)
   expect(
     match?.index,
@@ -30,7 +30,7 @@ function bundledDirectChatDelivery(bundle: string): string {
 
 function bundledDirectChatRuntimeSetup(bundle: string): string {
   const marker =
-    /async function ensureLiveTmuxSession(?:\$\d+)?\(workerId, cardBinding\)/u
+    /async function ensureLiveTmuxSession\(workerId, cardBinding\)/u
   const match = marker.exec(bundle)
   expect(
     match?.index,
@@ -64,6 +64,15 @@ function bundledExactCardBindingResolver(bundle: string): string {
     end,
     'missing end of bundled exact Card binding resolver',
   ).toBeGreaterThan(start)
+  return bundle.slice(start, end)
+}
+
+function bundledSwarmDispatcher(bundle: string): string {
+  const marker = 'async function dispatchSwarmAssignments('
+  const start = bundle.indexOf(marker)
+  expect(start, 'missing bundled Swarm dispatcher').toBeGreaterThanOrEqual(0)
+  const end = bundle.indexOf('\nfunction validateWorkerId', start)
+  expect(end, 'missing end of bundled Swarm dispatcher').toBeGreaterThan(start)
   return bundle.slice(start, end)
 }
 
@@ -311,6 +320,118 @@ describe('checked-in Electron production server bundle', () => {
     )
     expect(route).not.toMatch(
       /return json\(\{\s*ok:\s*true,\s*deleted,\s*stoppedMissions/u,
+    )
+  })
+
+  it('retires the ghost raw session-send path without any gateway mutation fallback', () => {
+    const route = bundledRoute(bundle, '/api/sessions/send')
+
+    expect(route).toContain(
+      'Legacy session send is retired; use a Session Card operation',
+    )
+    expect(route).toContain(
+      'Attachments are not supported by the retired session endpoint',
+    )
+    expect(route).toContain('Object.prototype.hasOwnProperty.call')
+    expect(route).toContain('"attachments"')
+    expect(route).not.toMatch(/ensureGatewayProbed\(/u)
+    expect(route).not.toMatch(/resolveSessionKey\(/u)
+    expect(route).not.toMatch(/sendChat\(/u)
+  })
+
+  it.each(['steer', 'kill'] as const)(
+    'ships Card-owned %s with rollover rejection immediately before the gateway edge',
+    (action) => {
+      const route = bundledRoute(bundle, `/api/session-cards/$cardId/${action}`)
+      const exactResolutions = [
+        ...route.matchAll(
+          /resolveExactSessionCardOperationBinding\(binding\d*\)/gu,
+        ),
+      ]
+      const gatewayMutation =
+        /dashboardFetch(?:\$\d+)?\(\s*"\/api\/agent-(?:steer|kill)/u.exec(route)
+          ?.index ?? -1
+
+      expect(route).toMatch(
+        /parseSessionCardOperationBinding\([^,]+,\s*\{\s*source:\s*"remote",\s*transport:\s*"gateway"/u,
+      )
+      expect(exactResolutions).toHaveLength(2)
+      expect(gatewayMutation).toBeGreaterThanOrEqual(0)
+      expect(exactResolutions.at(-1)?.index).toBeLessThan(gatewayMutation)
+      expect(
+        route.slice(exactResolutions.at(-1)!.index, gatewayMutation),
+      ).not.toMatch(/\n\s*await\s/u)
+      expect(route).toContain(`Session Card ownership changed before ${action}`)
+      expect(route).toMatch(/session_key:\s*binding\d*\.canonicalSegmentKey/u)
+      expect(route).not.toMatch(/body\d*\.sessionKey/u)
+    },
+  )
+
+  it('fails closed when enhanced main may already have a Card owner', () => {
+    const route = bundledRoute(bundle, '/api/send-stream')
+    const listExisting = route.indexOf('listSessions(30, 0)')
+    const resolveExisting = route.indexOf(
+      'sessionCardService.resolveRemoteCardByUpstreamSession(',
+    )
+    const createNew = route.indexOf('createSession()')
+    const firstProviderMutation = Math.min(
+      ...[
+        'const responsesStream = streamResponses(',
+        'const streamPending = openaiChat(',
+        'const upstreamStream = streamChat(',
+      ].map((marker) => route.indexOf(marker)),
+    )
+
+    expect(route).toContain(
+      'Unable to verify existing main Session Card ownership',
+    )
+    expect(route).toContain(
+      'Existing main Session Card ownership is unavailable',
+    )
+    expect(listExisting).toBeGreaterThanOrEqual(0)
+    expect(resolveExisting).toBeGreaterThan(listExisting)
+    expect(createNew).toBeGreaterThan(listExisting)
+    expect(resolveExisting).toBeLessThan(firstProviderMutation)
+    expect(createNew).toBeLessThan(firstProviderMutation)
+  })
+
+  it('ships raw Swarm hardening across dispatch, lifecycle, start, and scroll routes', () => {
+    const dispatch = bundledSwarmDispatcher(bundle)
+    expect(dispatch).toContain('Raw workerIds dispatch is unsupported')
+    expect(dispatch).toContain('Session Card dispatch binding is unavailable')
+    expect(dispatch).toMatch(
+      /resolveExactSessionCardOperationBinding\(assignment\.cardBinding\)/u,
+    )
+    expect(bundle).toContain('Invalid Session Card dispatch binding')
+
+    const lifecycle = bundledRoute(bundle, '/api/swarm-lifecycle')
+    expect(lifecycle).toContain(
+      'targets[] with exact Session Card bindings required',
+    )
+    expect(lifecycle).toContain('Invalid Session Card lifecycle binding')
+    expect(lifecycle).toMatch(
+      /requestWorkerHandoff\(workerId,\s*cardBinding\)/u,
+    )
+    expect(lifecycle).toMatch(/renewWorker\(workerId,\s*cardBinding\)/u)
+    expect(lifecycle).toMatch(
+      /notifyHandoffWritten\(workerId,\s*cardBinding\)/u,
+    )
+
+    for (const [path, label, expectedRevalidations] of [
+      ['/api/swarm-tmux-start', 'start', 2],
+      ['/api/swarm-tmux-scroll', 'scroll', 3],
+    ] as const) {
+      const route = bundledRoute(bundle, path)
+      expect(route).toContain(`Invalid Session Card ${label} binding`)
+      expect(route).toContain(`Session Card ${label} binding is unavailable`)
+      expect(
+        route.match(
+          /resolveExactSessionCardOperationBinding\(cardBinding\d*\)/gu,
+        ),
+      ).toHaveLength(expectedRevalidations)
+    }
+    expect(bundledRoute(bundle, '/api/swarm-tmux-scroll')).not.toMatch(
+      /body\d*\.session\b/u,
     )
   })
 })
