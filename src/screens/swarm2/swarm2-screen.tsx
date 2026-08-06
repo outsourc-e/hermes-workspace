@@ -965,6 +965,7 @@ type ControlPlaneStageProps = {
   onToggleFocusedRuntimeWorker: (workerId: string) => void
   onClearFocusedRuntimeWorker: () => void
   onStartAgentSession: (workerId: string) => void
+  onStopAgentSession: (workerId: string) => void
   onScrollTmuxSession: (
     workerId: string,
     direction: 'up' | 'down',
@@ -1006,6 +1007,7 @@ function ControlPlaneStage({
   onToggleFocusedRuntimeWorker,
   onClearFocusedRuntimeWorker,
   onStartAgentSession,
+  onStopAgentSession,
   onScrollTmuxSession,
 }: ControlPlaneStageProps) {
   const stageRef = useRef<HTMLDivElement | null>(null)
@@ -1288,6 +1290,17 @@ function ControlPlaneStage({
                                   ? '⛶'
                                   : '⤢'}
                               </button>
+                              <button
+                                type="button"
+                                disabled={pendingTmux.has(member.id)}
+                                onClick={() => onStopAgentSession(member.id)}
+                                className="rounded-full border border-red-400/40 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-red-300 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                                title={`Stop live agent session swarm-${member.id}`}
+                              >
+                                {pendingTmux.has(member.id)
+                                  ? 'Stopping…'
+                                  : 'Stop'}
+                              </button>
                             </>
                           ) : (
                             <button
@@ -1506,10 +1519,28 @@ export function Swarm2Screen() {
     async (workerId: string) => {
       setPendingTmux((prev) => new Set(prev).add(workerId))
       try {
+        const cardOwner = resolveSwarmWorkerCardOwner(
+          await fetchSessionCards(),
+          workerId,
+        )
+        if (!cardOwner) {
+          toast(`Unable to stop ${workerId}: Session Card ownership changed`, {
+            type: 'error',
+          })
+          return
+        }
         const res = await fetch('/api/swarm-tmux-stop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workerId }),
+          body: JSON.stringify({
+            workerId,
+            cardBinding: {
+              ...cardOwner,
+              canonicalSource: 'local',
+              canonicalSegmentKey: `local:${workerId}`,
+              canonicalTransport: 'tmux',
+            },
+          }),
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
@@ -2121,6 +2152,9 @@ export function Swarm2Screen() {
             onClearFocusedRuntimeWorker={() => setFocusedRuntimeWorkerId(null)}
             onStartAgentSession={(workerId) => {
               void startAgentSession(workerId)
+            }}
+            onStopAgentSession={(workerId) => {
+              void stopAgentSession(workerId)
             }}
             onScrollTmuxSession={(workerId, direction, session) => {
               void scrollTmuxSession(workerId, direction, session)

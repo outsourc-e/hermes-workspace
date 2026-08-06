@@ -7,8 +7,78 @@ import {
   dashboardFetch,
   ensureGatewayProbed,
 } from '../../server/gateway-capabilities'
+import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
 import { cancelSwarmMission } from '../../server/swarm-missions'
 import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
+import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
+
+function parseMissionIds(value: unknown): Array<string> | null {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) return null
+  const ids: Array<string> = []
+  for (const candidate of value) {
+    if (
+      typeof candidate !== 'string' ||
+      candidate.trim() !== candidate ||
+      candidate.length === 0
+    ) {
+      return null
+    }
+    if (!ids.includes(candidate)) ids.push(candidate)
+  }
+  return ids
+}
+
+function parseCardBindings(
+  value: unknown,
+): Array<SessionCardOperationBinding> | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+  const bindings: Array<SessionCardOperationBinding> = []
+  for (const candidate of value) {
+    const record =
+      candidate && typeof candidate === 'object' && !Array.isArray(candidate)
+        ? (candidate as Record<string, unknown>)
+        : null
+    const source = record?.canonicalSource
+    const transport = record?.canonicalTransport
+    if (
+      (source !== 'local' && source !== 'remote') ||
+      (source === 'local' && transport !== 'tmux') ||
+      (source === 'remote' && transport !== 'gateway')
+    ) {
+      return null
+    }
+    const binding = parseSessionCardOperationBinding(candidate, {
+      source,
+      transport: source === 'local' ? 'tmux' : 'gateway',
+    })
+    if (!binding) return null
+    if (!bindings.some((entry) => entry.cardId === binding.cardId)) {
+      bindings.push(binding)
+    }
+  }
+  return bindings
+}
+
+function missionAuthorityBinding(
+  body: Record<string, unknown>,
+  missionIds: ReadonlyArray<string>,
+  bindings: ReadonlyArray<SessionCardOperationBinding>,
+): SessionCardOperationBinding | null {
+  if (missionIds.length === 0) return null
+  if (
+    typeof body.missionCardId !== 'string' ||
+    body.missionCardId.trim() !== body.missionCardId
+  ) {
+    return null
+  }
+  return (
+    bindings.find((binding) => binding.cardId === body.missionCardId) ?? null
+  )
+}
 
 export const Route = createFileRoute('/api/conductor-stop')({
   server: {
@@ -21,38 +91,45 @@ export const Route = createFileRoute('/api/conductor-stop')({
         if (csrfCheck) return csrfCheck
 
         try {
-          const body = (await request.json().catch(() => ({}))) as Record<
+          const body = (await request.json().catch(() => null)) as Record<
             string,
             unknown
-          >
-          const sessionKeys = Array.isArray(body.sessionKeys)
-            ? Array.from(
-                new Set(
-                  body.sessionKeys
-                    .filter(
-                      (value): value is string =>
-                        typeof value === 'string' && value.trim().length > 0,
-                    )
-                    .map((value) => value.trim()),
-                ),
-              )
-            : []
-          const missionIds = Array.isArray(body.missionIds)
-            ? Array.from(
-                new Set(
-                  body.missionIds
-                    .filter(
-                      (value): value is string =>
-                        typeof value === 'string' && value.trim().length > 0,
-                    )
-                    .map((value) => value.trim()),
-                ),
-              )
-            : []
+          > | null
+          // Raw gateway aliases are never an authorization boundary. Legacy or
+          // injected sessionKeys requests must fail closed rather than no-op.
+          if (
+            !body ||
+            Object.prototype.hasOwnProperty.call(body, 'sessionKeys')
+          ) {
+            return json(
+              { ok: false, error: 'Invalid Session Card stop binding' },
+              { status: 400 },
+            )
+          }
+          const cardBindings = parseCardBindings(body.cardBindings)
+          const missionIds = parseMissionIds(body.missionIds)
+          if (!cardBindings || !missionIds) {
+            return json(
+              { ok: false, error: 'Invalid Session Card stop binding' },
+              { status: 400 },
+            )
+          }
+          const missionBinding = missionAuthorityBinding(
+            body,
+            missionIds,
+            cardBindings,
+          )
+          if (missionIds.length > 0 && !missionBinding) {
+            return json(
+              { ok: false, error: 'Invalid Session Card stop binding' },
+              { status: 400 },
+            )
+          }
 
           let deleted = 0
           let stoppedMissions = 0
           let cancelledNativeMissions = 0
+          let staleAuthority = false
           const failures: Array<{
             operation: 'delete-session' | 'stop-mission'
             id: string
@@ -60,6 +137,20 @@ export const Route = createFileRoute('/api/conductor-stop')({
           }> = []
           const capabilities = await ensureGatewayProbed()
           for (const missionId of missionIds) {
+            // Re-resolve after capability probing and immediately before the
+            // destructive mission operation.
+            if (
+              !missionBinding ||
+              !(await resolveExactSessionCardOperationBinding(missionBinding))
+            ) {
+              staleAuthority = true
+              failures.push({
+                operation: 'stop-mission',
+                id: missionId,
+                error: 'Session Card stop binding is unavailable',
+              })
+              continue
+            }
             let nativeError: string | null = null
             try {
               const cancelled = cancelSwarmMission({
@@ -82,7 +173,7 @@ export const Route = createFileRoute('/api/conductor-stop')({
                       reason: `Cancelled native Conductor mission ${missionId}`,
                     })
                   } catch {
-                    // Runtime reset is best-effort; cancellation state is still durable.
+                    // Runtime reset is best-effort; cancellation state is durable.
                   }
                 }
                 continue
@@ -90,7 +181,6 @@ export const Route = createFileRoute('/api/conductor-stop')({
             } catch (error) {
               nativeError =
                 error instanceof Error ? error.message : String(error)
-              // Fall through to dashboard cleanup.
             }
 
             if (capabilities.dashboard.available && capabilities.conductor) {
@@ -127,15 +217,32 @@ export const Route = createFileRoute('/api/conductor-stop')({
             }
           }
 
-          for (const sessionKey of sessionKeys) {
+          for (const binding of cardBindings.filter(
+            (candidate) => candidate.canonicalSource === 'remote',
+          )) {
+            // There is no await between this exact fresh resolution and invoking
+            // deletion with the canonical segment it authorized.
+            const owner = await resolveExactSessionCardOperationBinding(binding)
+            if (!owner) {
+              staleAuthority = true
+              failures.push({
+                operation: 'delete-session',
+                id: binding.cardId,
+                error: 'Session Card stop binding is unavailable',
+              })
+              continue
+            }
+            const sessionKey = binding.canonicalSegmentKey.slice(
+              'remote:'.length,
+            )
             try {
               await deleteSession(sessionKey)
               deleted += 1
-            } catch (error) {
+            } catch {
               failures.push({
                 operation: 'delete-session',
-                id: sessionKey,
-                error: error instanceof Error ? error.message : String(error),
+                id: owner.cardId,
+                error: 'Unable to delete Session Card runtime',
               })
             }
           }
@@ -148,7 +255,9 @@ export const Route = createFileRoute('/api/conductor-stop')({
               cancelledNativeMissions,
               failures,
             },
-            { status: failures.length === 0 ? 200 : 502 },
+            {
+              status: failures.length === 0 ? 200 : staleAuthority ? 409 : 502,
+            },
           )
         } catch (error) {
           return json(

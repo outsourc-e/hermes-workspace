@@ -6,6 +6,10 @@ import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
+import {
   getSwarmProfilePath,
   patchSwarmRuntimeFile,
 } from '../../server/swarm-foundation'
@@ -19,6 +23,7 @@ import {
 
 type StopRequest = {
   workerId?: unknown
+  cardBinding?: unknown
 }
 
 const TMUX_BIN_CANDIDATES = [
@@ -94,6 +99,23 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
         if (!workerId || !validateWorkerId(workerId)) {
           return json({ error: 'workerId required' }, { status: 400 })
         }
+        const cardBinding = parseSessionCardOperationBinding(body.cardBinding, {
+          source: 'local',
+          transport: 'tmux',
+          canonicalSegmentKey: `local:${workerId}`,
+        })
+        if (!cardBinding) {
+          return json(
+            { error: 'Invalid Session Card stop binding' },
+            { status: 400 },
+          )
+        }
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card stop binding is unavailable' },
+            { status: 409 },
+          )
+        }
 
         const tmuxBin = resolveTmuxBin()
         if (!tmuxBin) {
@@ -114,6 +136,14 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
           })
         }
 
+        // has-session is an awaitable TOCTOU window. Re-resolve the exact Card
+        // at the final destructive edge before targeting this mutable alias.
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card stop binding is unavailable' },
+            { status: 409 },
+          )
+        }
         const result = await killSession(tmuxBin, sessionName)
         if (!result.ok) {
           return json(

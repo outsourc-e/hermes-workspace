@@ -5,7 +5,10 @@ import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { sessionCardService } from '../../server/session-card-service'
+import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import type { SwarmChatMessage } from '../../server/swarm-chat-reader'
@@ -55,90 +58,15 @@ function validateWorkerId(workerId: string): boolean {
   return /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(workerId)
 }
 
-function isExactLocalIdentity(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.trim() === value &&
-    value.startsWith('local:') &&
-    value.length > 'local:'.length
-  )
-}
-
 function parseDirectChatCardBinding(
   value: unknown,
   workerId: string,
 ): DirectChatCardBinding | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  const binding = value as Partial<Record<keyof DirectChatCardBinding, unknown>>
-  if (
-    binding.kind !== 'session-card-owner' ||
-    !isExactLocalIdentity(binding.cardId) ||
-    !Object.prototype.hasOwnProperty.call(binding, 'parentCardId') ||
-    binding.canonicalSource !== 'local' ||
-    binding.canonicalTransport !== 'tmux' ||
-    binding.canonicalSegmentKey !== `local:${workerId}`
-  ) {
-    return null
-  }
-  const parentCardId = binding.parentCardId
-  if (
-    parentCardId !== null &&
-    (!isExactLocalIdentity(parentCardId) || parentCardId === binding.cardId)
-  ) {
-    return null
-  }
-  return {
-    kind: 'session-card-owner',
-    cardId: binding.cardId,
-    parentCardId,
-    canonicalSource: 'local',
-    canonicalSegmentKey: binding.canonicalSegmentKey,
-    canonicalTransport: 'tmux',
-  }
-}
-
-async function verifyDirectChatCardBinding(
-  binding: DirectChatCardBinding,
-): Promise<DirectChatCardOwner | null> {
-  try {
-    const resolved = binding.parentCardId
-      ? await sessionCardService.resolveChildCard(
-          binding.parentCardId,
-          binding.cardId,
-        )
-      : await sessionCardService.resolveCard(binding.cardId)
-    const card = resolved.card
-    const continuations = card.continuationSegmentKeys
-    const relationshipMatches = binding.parentCardId
-      ? card.parentCardId === binding.parentCardId &&
-        (card.relationshipKind === 'child' ||
-          card.relationshipKind === 'branch')
-      : card.parentCardId === undefined &&
-        (card.relationshipKind === 'root' || card.relationshipKind === 'orphan')
-    if (
-      resolved.collection.completeness !== 'complete' ||
-      resolved.collection.retryable ||
-      card.cardId !== binding.cardId ||
-      card.canonicalSource !== binding.canonicalSource ||
-      card.canonicalTransport !== undefined ||
-      card.canonicalSegmentKey !== binding.canonicalSegmentKey ||
-      continuations.length === 0 ||
-      continuations.length !== card.continuationCount ||
-      continuations[0] !== card.cardId ||
-      continuations.at(-1) !== card.canonicalSegmentKey ||
-      new Set(continuations).size !== continuations.length ||
-      !relationshipMatches
-    ) {
-      return null
-    }
-    return {
-      kind: 'session-card-owner',
-      cardId: card.cardId,
-      parentCardId: binding.parentCardId,
-    }
-  } catch {
-    return null
-  }
+  return parseSessionCardOperationBinding(value, {
+    source: 'local',
+    transport: 'tmux',
+    canonicalSegmentKey: `local:${workerId}`,
+  }) as DirectChatCardBinding | null
 }
 
 function getProfilesDir(): string {
@@ -272,7 +200,11 @@ async function ensureLiveTmuxSession(
 async function sendPromptToLiveSession(
   workerId: string,
   prompt: string,
-): Promise<{ ok: true; delivery: 'tmux' } | { ok: false; error: string }> {
+  cardBinding: DirectChatCardBinding,
+): Promise<
+  | { ok: true; delivery: 'tmux' }
+  | { ok: false; error: string; staleBinding?: boolean }
+> {
   const ensured = await ensureLiveTmuxSession(workerId)
   if (!ensured.ok) return { ok: false, error: ensured.error }
   const { tmuxBin, sessionName } = ensured
@@ -306,6 +238,11 @@ async function sendPromptToLiveSession(
   if (!pasted.ok) return { ok: false, error: pasted.error }
 
   await sleep(120)
+  // Everything above is setup and may await long enough for the worker alias to
+  // roll to another Card. Re-resolve the exact owner at the final delivery edge.
+  if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+    return { ok: false, error: 'stale Card binding', staleBinding: true }
+  }
   const entered = await execFileAsync(tmuxBin, [
     'send-keys',
     '-t',
@@ -437,7 +374,8 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
             },
           )
         }
-        const cardOwner = await verifyDirectChatCardBinding(cardBinding)
+        const cardOwner =
+          await resolveExactSessionCardOperationBinding(cardBinding)
         if (!cardOwner) {
           return json(
             { error: 'Session Card delivery binding is unavailable' },
@@ -449,7 +387,11 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
         const baselineChat = readWorkerMessages(profilePath, limit)
         const baselineLastId = baselineChat.messages.at(-1)?.id ?? null
 
-        const delivered = await sendPromptToLiveSession(workerId, prompt)
+        const delivered = await sendPromptToLiveSession(
+          workerId,
+          prompt,
+          cardBinding,
+        )
         if (!delivered.ok) {
           return json(
             {
@@ -459,7 +401,7 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
               error: 'Unable to deliver the worker message',
               fetchedAt: Date.now(),
             } satisfies DirectChatResponse,
-            { status: 500 },
+            { status: delivered.staleBinding ? 409 : 500 },
           )
         }
 

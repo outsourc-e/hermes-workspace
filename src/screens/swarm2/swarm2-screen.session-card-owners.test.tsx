@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { screen, waitFor } from '@testing-library/dom'
+import { fireEvent, screen, waitFor } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Swarm2Screen, resolveSwarmWorkerCardOwner } from './swarm2-screen'
@@ -61,6 +61,7 @@ const mocks = vi.hoisted(() => ({
   sessionCards: undefined as SessionCardListWire | undefined,
   fetch: vi.fn<typeof fetch>(),
   queryOptions: [] as Array<QueryOptions>,
+  runtime: { entries: [], tmuxAvailable: false } as Record<string, unknown>,
 }))
 
 vi.mock('@tanstack/react-query', () => ({
@@ -71,7 +72,7 @@ vi.mock('@tanstack/react-query', () => ({
       key === 'chat:session-cards:list:false:0'
         ? mocks.sessionCards
         : key === 'swarm2:runtime'
-          ? { entries: [], tmuxAvailable: false }
+          ? mocks.runtime
           : key === 'swarm2:health'
             ? {
                 workspaceModel: 'test-model',
@@ -260,6 +261,7 @@ async function mountScreen() {
 
 beforeEach(() => {
   mocks.sessionCards = completeProjection()
+  mocks.runtime = { entries: [], tmuxAvailable: false }
   mocks.queryOptions.length = 0
   mocks.fetch.mockReset()
   mocks.fetch.mockImplementation((input) => {
@@ -268,9 +270,7 @@ beforeEach(() => {
       return Promise.resolve(Response.json(mocks.sessionCards))
     }
     if (url === '/api/swarm-runtime') {
-      return Promise.resolve(
-        Response.json({ entries: [], tmuxAvailable: false }),
-      )
+      return Promise.resolve(Response.json(mocks.runtime))
     }
     if (url === '/api/swarm-health') {
       return Promise.resolve(
@@ -293,6 +293,9 @@ beforeEach(() => {
     }
     if (url.startsWith('/api/swarm-project?')) {
       return Promise.resolve(Response.json({}))
+    }
+    if (url === '/api/swarm-tmux-stop') {
+      return Promise.resolve(Response.json({ killed: true }))
     }
     return Promise.reject(new Error(`Unexpected request: ${url}`))
   })
@@ -361,6 +364,54 @@ it('passes unique complete root/child Card owners through the mounted worker car
   expect(mocks.fetch).toHaveBeenCalledWith('/api/session-cards')
   expect(document.body.textContent).not.toContain(ROOT_WORKER_ALIAS)
   expect(document.body.textContent).not.toContain(CHILD_WORKER_ALIAS)
+})
+
+it('submits an exact fresh Card binding when stopping a live worker', async () => {
+  mocks.runtime = {
+    tmuxAvailable: true,
+    entries: [
+      {
+        workerId: 'root-worker',
+        currentTask: null,
+        pid: 123,
+        startedAt: 1,
+        lastOutputAt: 2,
+        cwd: '/tmp',
+        tmuxSession: 'swarm-root-worker',
+        tmuxAttachable: true,
+        state: 'running',
+      },
+    ],
+  }
+  await mountScreen()
+
+  const stopButton = await screen.findByTitle(
+    'Stop live agent session swarm-root-worker',
+  )
+  await React.act(async () => {
+    fireEvent.click(stopButton)
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+
+  await waitFor(() => {
+    const call = mocks.fetch.mock.calls.find(
+      ([input]) => String(input) === '/api/swarm-tmux-stop',
+    )
+    expect(call).toBeTruthy()
+    const init = call![1] as RequestInit
+    expect(JSON.parse(String(init.body))).toEqual({
+      workerId: 'root-worker',
+      cardBinding: {
+        kind: 'session-card-owner',
+        cardId: ROOT_CARD_ID,
+        parentCardId: null,
+        canonicalSource: 'local',
+        canonicalSegmentKey: ROOT_WORKER_ALIAS,
+        canonicalTransport: 'tmux',
+      },
+    })
+  })
 })
 
 it('rejects ambiguous complete Card owners for the same worker alias', () => {

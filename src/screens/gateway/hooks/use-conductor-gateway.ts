@@ -154,6 +154,8 @@ type ConductorCardActivity = {
   key: string
   cardId: string
   canonicalSegmentKey: string
+  canonicalSource: 'local' | 'remote'
+  canonicalTransport: 'tmux' | 'gateway'
   parentCardId?: string
   title: string
   label: string
@@ -736,12 +738,15 @@ function projectChildSessionCardActivities(
   children: SessionCardListWire['cards'][number]['childNodes'],
   parentCardId: string,
   parentTitle: string,
+  canonicalSource: 'local' | 'remote',
 ): Array<ConductorCardActivity> {
   return children.flatMap((child) => {
     const activity: ConductorCardActivity = {
       key: child.cardId,
       cardId: child.cardId,
       canonicalSegmentKey: child.sessionKey,
+      canonicalSource,
+      canonicalTransport: canonicalSource === 'remote' ? 'gateway' : 'tmux',
       parentCardId,
       title: child.title,
       label: child.title,
@@ -761,6 +766,7 @@ function projectChildSessionCardActivities(
         child.childNodes ?? [],
         child.cardId,
         child.title,
+        canonicalSource,
       ),
     ]
   })
@@ -772,10 +778,16 @@ function projectSessionCardActivities(
   const complete = retainCompleteSessionCardProjections(response)
   if (!complete) return []
   return complete.cards.flatMap((card) => {
+    if (card.canonicalSource !== 'local' && card.canonicalSource !== 'remote') {
+      return []
+    }
+    const canonicalSource = card.canonicalSource
     const root: ConductorCardActivity = {
       key: card.cardId,
       cardId: card.cardId,
       canonicalSegmentKey: card.canonicalSegmentKey,
+      canonicalSource,
+      canonicalTransport: canonicalSource === 'remote' ? 'gateway' : 'tmux',
       title: card.title,
       label: card.title,
       kind: card.relationshipKind,
@@ -792,6 +804,7 @@ function projectSessionCardActivities(
         card.childNodes,
         card.cardId,
         card.title,
+        canonicalSource,
       ),
     ]
   })
@@ -831,6 +844,22 @@ function activityMatchesCardOwner(
       owner.cardId === activity.cardId &&
       owner.parentCardId === activity.parentCardId,
   )
+}
+
+export function buildConductorStopCardBindings(
+  response: SessionCardListWire | undefined,
+  owners: ReadonlyArray<PersistedConductorCardOwner>,
+) {
+  return projectSessionCardActivities(response)
+    .filter((activity) => activityMatchesCardOwner(activity, owners))
+    .map((activity) => ({
+      kind: 'session-card-owner' as const,
+      cardId: activity.cardId,
+      parentCardId: activity.parentCardId ?? null,
+      canonicalSource: activity.canonicalSource,
+      canonicalSegmentKey: activity.canonicalSegmentKey,
+      canonicalTransport: activity.canonicalTransport,
+    }))
 }
 
 function projectUniqueActivityForIdentity(
@@ -2453,19 +2482,13 @@ export function useConductorGateway() {
   })
 
   const stopMission = async () => {
-    const ownedActivities = cardActivities.filter((activity) =>
-      activityMatchesCardOwner(activity, missionCardOwners),
+    const cardBindings = buildConductorStopCardBindings(
+      sessionCardsQuery.data,
+      missionCardOwners,
     )
-    const sessionKeys = [
-      ...new Set(
-        ownedActivities
-          .map(remoteControlKey)
-          .filter((key): key is string => Boolean(key)),
-      ),
-    ]
     const missionIds = missionId ? [missionId] : []
 
-    if (sessionKeys.length === 0 && missionIds.length === 0) {
+    if (cardBindings.length === 0) {
       setStreamError(
         'Mission stop incomplete; retry Stop. No authoritative mission ownership is available yet.',
       )
@@ -2476,7 +2499,13 @@ export function useConductorGateway() {
       const response = await fetch('/api/conductor-stop', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionKeys, missionIds }),
+        body: JSON.stringify({
+          cardBindings,
+          missionIds,
+          ...(missionIds.length > 0
+            ? { missionCardId: orchestratorCardId ?? cardBindings[0]!.cardId }
+            : {}),
+        }),
       })
       const payload = (await response.json().catch(() => ({}))) as {
         ok?: boolean
@@ -2486,24 +2515,15 @@ export function useConductorGateway() {
       if (!response.ok || payload.ok !== true) {
         const failures = payload.failures ?? []
         if (failures.length > 0) {
-          const failedSessionKeys = new Set(
+          const failedCardIds = new Set(
             failures
               .filter((failure) => failure.operation === 'delete-session')
               .map((failure) => failure.id)
               .filter((id): id is string => Boolean(id)),
           )
-          const successfulSessionKeys = new Set(
-            sessionKeys.filter((key) => !failedSessionKeys.has(key)),
+          const retainedOwners = missionCardOwners.filter((owner) =>
+            failedCardIds.has(owner.cardId),
           )
-          const retainedOwners = missionCardOwners.filter((owner) => {
-            const activity = ownedActivities.find(
-              (candidate) =>
-                candidate.cardId === owner.cardId &&
-                candidate.parentCardId === owner.parentCardId,
-            )
-            const key = activity ? remoteControlKey(activity) : null
-            return !key || !successfulSessionKeys.has(key)
-          })
           setMissionCardOwners(retainedOwners)
           setOrchestratorCardId((current) =>
             current && retainedOwners.some((owner) => owner.cardId === current)

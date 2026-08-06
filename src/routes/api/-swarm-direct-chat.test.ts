@@ -343,6 +343,34 @@ describe('POST /api/swarm-direct-chat Card-authoritative delivery', () => {
     expect(mocks.execFile).not.toHaveBeenCalled()
   })
 
+  it('re-resolves after setup and rejects Card rollover before Enter delivery', async () => {
+    mocks.resolveCard
+      .mockResolvedValueOnce(resolvedLocalCard())
+      .mockResolvedValueOnce(
+        resolvedLocalCard({
+          cardId: 'local:rolled-over-card',
+          continuationSegmentKeys: ['local:rolled-over-card', 'local:builder'],
+        }),
+      )
+
+    const response = await handler({ request: request() })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({
+      ok: false,
+      cardOwner: owner,
+      delivered: false,
+      error: 'Unable to deliver the worker message',
+      fetchedAt: expect.any(Number),
+    })
+    expect(mocks.resolveCard).toHaveBeenCalledTimes(2)
+    expect(
+      mocks.execFile.mock.calls.some(
+        (call) => Array.isArray(call[1]) && call[1].includes('Enter'),
+      ),
+    ).toBe(false)
+  })
+
   it('rejects a missing or malformed Card binding before delivery', async () => {
     for (const cardBindingValue of [
       undefined,

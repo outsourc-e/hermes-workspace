@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildConductorStopCardBindings,
   resolveAuthoritativeConductorCardOwner,
   shouldPersistActiveConductorMission,
 } from './use-conductor-gateway'
@@ -66,6 +67,23 @@ function cardProjection(): SessionCardListWire {
 }
 
 describe('Conductor stream event authority', () => {
+  it('builds destructive requests from exact Card owners and canonical bindings', () => {
+    expect(
+      buildConductorStopCardBindings(cardProjection(), [
+        { cardId: 'remote:mission-card' },
+      ]),
+    ).toEqual([
+      {
+        kind: 'session-card-owner',
+        cardId: 'remote:mission-card',
+        parentCardId: null,
+        canonicalSource: 'remote',
+        canonicalSegmentKey: 'remote:mission-successor',
+        canonicalTransport: 'gateway',
+      },
+    ])
+  })
+
   it('rejects a hostile started-event key projected to an unrelated Card', () => {
     expect(
       resolveAuthoritativeConductorCardOwner(
