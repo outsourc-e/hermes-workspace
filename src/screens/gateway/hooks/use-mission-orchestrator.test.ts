@@ -320,14 +320,17 @@ describe('authoritative Mission gateway transport', () => {
     await React.act(async () => {
       await harness.current.handleMissionPause(true)
     })
-    expect(gatewayMocks.toggleAgentPause).toHaveBeenCalledWith('root-c', true)
+    expect(gatewayMocks.toggleAgentPause).toHaveBeenCalledWith(
+      { cardId: 'remote:card-root', parentCardId: null },
+      true,
+    )
 
     await React.act(async () => {
       await expect(harness.current.handleKillAgent('agent-1')).rejects.toThrow(
         'kill failed',
       )
     })
-    expect(gatewayMocks.killAgentSession).toHaveBeenCalledWith('root-d')
+    expect(gatewayMocks.killAgentSession).toHaveBeenCalledWith('root-c')
     expect(useMissionStore.getState().agentCardIdMap).toEqual({
       'agent-1': ROOT_CARD_ID,
     })
