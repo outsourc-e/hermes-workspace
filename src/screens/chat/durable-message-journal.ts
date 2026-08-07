@@ -50,55 +50,6 @@ function commitId(): string {
   return `${random || 'commit'}-${Date.now().toString(36)}`
 }
 
-const CARD_TRANSCRIPT_SNAPSHOT_PREFIX = 'workspace.card-transcript-snapshot.v1:'
-
-function isQuotaExceeded(error: unknown): boolean {
-  return (
-    error instanceof DOMException &&
-    (error.name === 'QuotaExceededError' || error.code === 22)
-  )
-}
-
-/**
- * Complete transcript snapshots are a reconstructable cache, unlike this
- * journal's admitted-message records. When a browser quota blocks an admission,
- * remove only that cache so the mandatory recovery record gets one safe retry.
- */
-function clearDisposableTranscriptSnapshots(storage: Storage): void {
-  let keys: Array<string> = []
-  try {
-    keys = Array.from({ length: storage.length }, (_, index) =>
-      storage.key(index),
-    ).filter((key): key is string =>
-      Boolean(key?.startsWith(CARD_TRANSCRIPT_SNAPSHOT_PREFIX)),
-    )
-  } catch {
-    return
-  }
-  for (const key of keys) {
-    try {
-      storage.removeItem(key)
-    } catch {
-      // Best effort: a denied mirror will still fail the durable admission.
-    }
-  }
-}
-
-function setItemWithQuotaRecovery(
-  storage: Storage,
-  key: string,
-  value: string,
-): void {
-  try {
-    storage.setItem(key, value)
-    return
-  } catch (error) {
-    if (!isQuotaExceeded(error)) throw error
-  }
-  clearDisposableTranscriptSnapshots(storage)
-  storage.setItem(key, value)
-}
-
 function restorePreviousCommittedRecord(
   storage: Storage,
   key: string,
@@ -237,13 +188,13 @@ export function writeMessageJournal<T>(
         }
         // A prepared row is never recovery authority. Only promote it after an
         // exact readback proves this mirror accepted the candidate bytes.
-        setItemWithQuotaRecovery(storage, key, prepared)
+        storage.setItem(key, prepared)
         preparedWritten = true
         if (storage.getItem(key) !== prepared) {
           restorePreviousCommittedRecord(storage, key, previousCommitted)
           continue
         }
-        setItemWithQuotaRecovery(storage, key, committed)
+        storage.setItem(key, committed)
         if (storage.getItem(key) !== committed) {
           restorePreviousCommittedRecord(storage, key, previousCommitted)
           continue

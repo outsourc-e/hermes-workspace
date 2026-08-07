@@ -131,41 +131,4 @@ describe('durable message journal commit protocol', () => {
       ),
     ).toEqual(expect.arrayContaining([acceptedUser, priorCheckpoint]))
   })
-
-  it('reclaims only disposable transcript snapshots before retrying a quota-blocked admission', () => {
-    const baseKey = 'journal-quota-recovery'
-    const snapshotKey =
-      'workspace.card-transcript-snapshot.v1:remote%3Aold-card:commit:stale-context'
-    const unrelatedKey = 'workspace.unrelated-preference'
-    window.localStorage.setItem(snapshotKey, 'large stale snapshot cache')
-    window.localStorage.setItem(unrelatedKey, 'must survive')
-
-    const originalSetItem = Storage.prototype.setItem
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      key,
-      value,
-    ) {
-      if (
-        this === window.localStorage &&
-        key.startsWith(`${baseKey}:entry:`) &&
-        window.localStorage.getItem(snapshotKey) !== null
-      ) {
-        throw new DOMException('storage quota exceeded', 'QuotaExceededError')
-      }
-      return originalSetItem.call(this, key, value)
-    })
-
-    expect(
-      writeMessageJournal(
-        baseKey,
-        [{ id: 'new-user-turn', text: 'must be admitted safely' }],
-        [window.localStorage],
-        (value) => value.id,
-      ),
-    ).toEqual({ anyVerified: true, persistentVerified: true })
-
-    expect(window.localStorage.getItem(snapshotKey)).toBeNull()
-    expect(window.localStorage.getItem(unrelatedKey)).toBe('must survive')
-  })
 })

@@ -276,6 +276,7 @@ describe('Card transcript recovery storage contract', () => {
       replaceCardTranscriptRecoveryMessages(owner, [baseline], { now }),
     ).not.toBeNull()
 
+    let denyRejectedPersistentWrite = true
     const originalSetItem = Storage.prototype.setItem
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
       this: Storage,
@@ -283,10 +284,12 @@ describe('Card transcript recovery storage contract', () => {
       value,
     ) {
       if (
+        denyRejectedPersistentWrite &&
         this === window.localStorage &&
         key.includes(':entry:') &&
         value.includes('client-rejected')
       ) {
+        denyRejectedPersistentWrite = false
         throw new DOMException('transient quota failure', 'QuotaExceededError')
       }
       return originalSetItem.call(this, key, value)
@@ -319,41 +322,6 @@ describe('Card transcript recovery storage contract', () => {
         window.localStorage.getItem(window.localStorage.key(index) ?? ''),
       ).join('\n'),
     ).not.toContain('client-rejected')
-  })
-
-  it('admits a Card-owned turn after reclaiming only complete transcript snapshots', () => {
-    const snapshotKey =
-      'workspace.card-transcript-snapshot.v1:remote%3Aold-card:commit:stale-context'
-    window.localStorage.setItem(
-      snapshotKey,
-      'reconstructable cached transcript',
-    )
-    const originalSetItem = Storage.prototype.setItem
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      key,
-      value,
-    ) {
-      if (
-        this === window.localStorage &&
-        key.includes(':entry:') &&
-        window.localStorage.getItem(snapshotKey) !== null
-      ) {
-        throw new DOMException('quota exceeded', 'QuotaExceededError')
-      }
-      return originalSetItem.call(this, key, value)
-    })
-
-    expect(
-      appendCardTranscriptRecoveryMessage(
-        owner,
-        message('user', 'admitted after cache reclamation', {
-          clientId: 'reclaimed-quota-client',
-        }),
-        { now },
-      ),
-    ).not.toBeNull()
-    expect(window.localStorage.getItem(snapshotKey)).toBeNull()
   })
 
   it('clears and ignores legacy segment-keyed recovery records', () => {
