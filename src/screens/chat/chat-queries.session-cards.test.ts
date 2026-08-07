@@ -1677,6 +1677,7 @@ describe('Session Card fetchers', () => {
 
     const retainedThird = {
       id: 'third-original-row',
+      stableId: 'shared-delivery',
       role: 'tool' as const,
       content: [],
       timestamp: 3,
@@ -1684,10 +1685,16 @@ describe('Session Card fetchers', () => {
       __segmentKey: 'remote:third',
     }
     const refreshedFourthClone = {
-      id: 'fourth-cloned-row',
+      id: 'shared-delivery',
+      stableId: ' ',
       role: 'tool' as const,
       content: [],
-      timestamp: 3,
+      // A retried delivery can be persisted after its original attempt.
+      timestamp: 63,
+      createdAt: 64,
+      created_at: 65,
+      updatedAt: 66,
+      updated_at: 67,
       tool: { beta: 2, alpha: 1 },
       __segmentKey: 'remote:fourth',
     }
@@ -1741,6 +1748,59 @@ describe('Session Card fetchers', () => {
       'third-original-row',
       'fourth-refreshed-tail',
       'fifth-refreshed-after-clone',
+    ])
+
+    const ambiguousParent = {
+      id: 'parent-distinct-row',
+      role: 'user' as const,
+      content: [{ type: 'text' as const, text: 'repeat this' }],
+      timestamp: 10,
+      __segmentKey: 'remote:third',
+    }
+    const ambiguousChild = {
+      id: 'child-distinct-row',
+      role: 'user' as const,
+      content: [{ type: 'text' as const, text: 'repeat this' }],
+      timestamp: 20,
+      __segmentKey: 'remote:fourth',
+    }
+    const retainedAmbiguousRefresh =
+      mergeRefreshedRecentSessionCardHistoryWindows(
+        {
+          ...current,
+          messages: [
+            ambiguousChild,
+            message('fifth-after-ambiguous-repeat', 'remote:fifth'),
+          ],
+          persistedMessages: [
+            ambiguousChild,
+            message('fifth-after-ambiguous-repeat', 'remote:fifth'),
+          ],
+        },
+        {
+          ...merged,
+          messages: [
+            message('second', 'remote:second'),
+            ambiguousParent,
+            message('fourth', 'remote:fourth'),
+            message('fifth', 'remote:fifth'),
+          ],
+          persistedMessages: [
+            message('second', 'remote:second'),
+            ambiguousParent,
+            message('fourth', 'remote:fourth'),
+            message('fifth', 'remote:fifth'),
+          ],
+        },
+        topology,
+      )
+    expect(
+      retainedAmbiguousRefresh.persistedMessages?.map((entry) => entry.id),
+    ).toEqual([
+      'second',
+      'parent-distinct-row',
+      'child-distinct-row',
+      'fifth-after-ambiguous-repeat',
     ])
 
     const terminalWindow = {

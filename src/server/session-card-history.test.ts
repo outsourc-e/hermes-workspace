@@ -258,12 +258,21 @@ describe('SessionCardHistoryService', () => {
     const messages = source({
       first: [{ id: 'first', content: 'first' }],
       second: [{ id: 'second', content: 'second' }],
-      third: [{ id: 'third', role: 'user', content: 'third', timestamp: 3 }],
+      third: [
+        {
+          id: 'third',
+          clientId: 'delivery-third',
+          role: 'user',
+          content: 'third',
+          timestamp: 3,
+        },
+      ],
       fourth: [
-        // A cloned prefix with a changed row ID can only be proven duplicate
-        // by reading the already-visible boundary segment.
+        // A cloned prefix with a changed row ID is safe to collapse because
+        // the platform delivery identity matches the visible boundary row.
         {
           id: 'third-clone',
+          clientId: 'delivery-third',
           role: 'user',
           content: 'third',
           timestamp: 3,
@@ -328,6 +337,7 @@ describe('SessionCardHistoryService', () => {
     messages.setMessages('fourth', [
       {
         id: 'third-clone',
+        clientId: 'delivery-third',
         role: 'user',
         content: 'third',
         timestamp: 3,
@@ -349,6 +359,7 @@ describe('SessionCardHistoryService', () => {
     messages.setMessages('fourth', [
       {
         id: 'third-clone',
+        clientId: 'delivery-third',
         role: 'user',
         content: 'third',
         timestamp: 3,
@@ -563,7 +574,7 @@ describe('SessionCardHistoryService', () => {
     ])
   })
 
-  it('collapses adjacent Gateway retry copies within one segment', async () => {
+  it('retains adjacent repeated rows without independent replay correlation', async () => {
     const messages = source({
       first: [
         {
@@ -604,11 +615,80 @@ describe('SessionCardHistoryService', () => {
 
     expect(result.messages.map((entry) => entry.message.id)).toEqual([
       'slack-delivery-first-write',
+      'slack-delivery-retry-write',
       'assistant-first-write',
+      'assistant-retry-write',
     ])
   })
 
-  it('retains a colliding ID when the timestamp differs', async () => {
+  it('collapses an adjacent replayed delivery block within one segment', async () => {
+    const firstDelivery = [
+      {
+        id: 'assistant-first-write',
+        role: 'assistant',
+        content: 'I will check the final-image boundary.',
+        timestamp: 100,
+      },
+      {
+        id: 'user-first-write',
+        role: 'user',
+        content: 'Mark test-runner as skipped.',
+        timestamp: 101,
+      },
+      {
+        id: 'tool-call-first-write',
+        role: 'assistant',
+        content: 'update_pr',
+        toolCallId: 'delivery-tool-call',
+        timestamp: 102,
+      },
+      {
+        id: 'tool-result-first-write',
+        role: 'tool',
+        content: 'PR description updated.',
+        toolCallId: 'delivery-tool-call',
+        timestamp: 103,
+      },
+    ]
+    const replayedDelivery = firstDelivery.map((message) => ({
+      ...message,
+      id: message.id.replace('first', 'retry'),
+      // The delivery retry can complete later than its first submission.
+      timestamp: message.timestamp + 60,
+      createdAt: message.timestamp + 61,
+      created_at: message.timestamp + 62,
+      updatedAt: message.timestamp + 63,
+      updated_at: message.timestamp + 64,
+    }))
+    const messages = source({
+      first: [
+        ...firstDelivery,
+        ...replayedDelivery,
+        {
+          id: 'after-replay',
+          role: 'assistant',
+          content: 'The next distinct turn must remain.',
+          timestamp: 104,
+        },
+      ],
+      second: [],
+      third: [],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => chain()),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'first' })
+
+    expect(result.messages.map((entry) => entry.message.id)).toEqual([
+      ...firstDelivery.map((message) => message.id),
+      'after-replay',
+    ])
+  })
+
+  it('collapses an adjacent retry copy when only the timestamp differs', async () => {
     const messages = source({
       first: [{ id: 'boundary', role: 'user', content: 'same', timestamp: 10 }],
       second: [
@@ -624,8 +704,8 @@ describe('SessionCardHistoryService', () => {
 
     const result = await history.fetch({ cardId: 'first' })
 
-    expect(result.messages.map((entry) => entry.message.timestamp)).toEqual([
-      10, 11,
+    expect(result.messages.map((entry) => entry.message.id)).toEqual([
+      'boundary',
     ])
   })
 
@@ -665,7 +745,7 @@ describe('SessionCardHistoryService', () => {
     ])
   })
 
-  it('removes a cloned continuation prefix even when persisted row IDs change', async () => {
+  it('retains an ambiguous cloned continuation prefix when persisted row IDs change', async () => {
     const messages = source({
       first: [
         { id: 'parent-1', role: 'user', content: 'first', timestamp: 10 },
@@ -699,6 +779,8 @@ describe('SessionCardHistoryService', () => {
     expect(result.messages.map((entry) => entry.message.id)).toEqual([
       'parent-1',
       'parent-2',
+      'child-1',
+      'child-2',
       'child-3',
     ])
   })

@@ -1754,9 +1754,38 @@ function continuationMessageEvidence(
     session_id: _wireSessionId,
     sessionKey: _sessionKey,
     __segmentKey: _segmentKey,
+    timestamp: _timestamp,
+    createdAt: _createdAt,
+    created_at: _createdAtSnake,
+    updatedAt: _updatedAt,
+    updated_at: _updatedAtSnake,
     ...evidence
   } = message as ChatMessage & Record<string, unknown>
   return evidence
+}
+
+function hasMeaningfulContinuationEvidence(
+  evidence: Record<string, unknown>,
+): boolean {
+  const content = evidence.content
+  if (typeof content === 'string' && content.trim().length > 0) return true
+  if (Array.isArray(content) && content.length > 0) return true
+  if (
+    content !== null &&
+    content !== undefined &&
+    typeof content !== 'string' &&
+    !Array.isArray(content)
+  )
+    return true
+  if (evidence.role === 'tool') return true
+
+  return Object.entries(evidence).some(
+    ([key, value]) =>
+      key !== 'role' &&
+      key !== 'content' &&
+      value !== null &&
+      value !== undefined,
+  )
 }
 
 function normalizedContinuationMessageId(value: unknown): string | undefined {
@@ -1764,6 +1793,50 @@ function normalizedContinuationMessageId(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const normalized = value.trim()
   return normalized || undefined
+}
+
+function stableContinuationMessageId(message: ChatMessage): string | undefined {
+  const candidate = message as ChatMessage & Record<string, unknown>
+  return (
+    normalizedContinuationMessageId(candidate.stableId) ??
+    normalizedContinuationMessageId(candidate.id)
+  )
+}
+
+const REPLAY_CORRELATION_FIELDS = [
+  'clientId',
+  'client_id',
+  'toolCallId',
+  'tool_call_id',
+  'runId',
+  'run_id',
+  'deliveryId',
+  'delivery_id',
+  'requestId',
+  'request_id',
+] as const
+
+function matchingReplayCorrelation(
+  previous: ChatMessage,
+  next: ChatMessage,
+): boolean {
+  const previousId = stableContinuationMessageId(previous)
+  if (
+    previousId !== undefined &&
+    previousId === stableContinuationMessageId(next)
+  ) {
+    return true
+  }
+
+  const previousRecord = previous as ChatMessage & Record<string, unknown>
+  const nextRecord = next as ChatMessage & Record<string, unknown>
+  return REPLAY_CORRELATION_FIELDS.some((field) => {
+    const previousValue = normalizedContinuationMessageId(previousRecord[field])
+    return (
+      previousValue !== undefined &&
+      previousValue === normalizedContinuationMessageId(nextRecord[field])
+    )
+  })
 }
 
 function canonicalContinuationEvidence(value: unknown): unknown {
@@ -1790,12 +1863,8 @@ function continuationMessagesMatch(
   )
     return false
 
-  const previousId = normalizedContinuationMessageId(
-    (previous as Record<string, unknown>).stableId ?? previous.id,
-  )
-  const nextId = normalizedContinuationMessageId(
-    (next as Record<string, unknown>).stableId ?? next.id,
-  )
+  const previousId = stableContinuationMessageId(previous)
+  const nextId = stableContinuationMessageId(next)
   if (previousId && nextId && previousId === nextId) {
     return Object.keys(previousEvidence).length > 0
   }
@@ -1810,9 +1879,7 @@ function continuationMessagesMatch(
   return (
     typeof previous.role === 'string' &&
     previous.role.length > 0 &&
-    Object.prototype.hasOwnProperty.call(previous, 'content') &&
-    typeof (previous as Record<string, unknown>).timestamp === 'number' &&
-    Number.isFinite((previous as Record<string, unknown>).timestamp)
+    hasMeaningfulContinuationEvidence(previousEvidence)
   )
 }
 
@@ -1827,6 +1894,11 @@ function adjacentContinuationOverlap(
         .slice(previous.length - overlap)
         .every((message, index) =>
           continuationMessagesMatch(message, next[index]!),
+        ) &&
+      previous
+        .slice(previous.length - overlap)
+        .some((message, index) =>
+          matchingReplayCorrelation(message, next[index]!),
         )
     ) {
       return overlap

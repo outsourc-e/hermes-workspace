@@ -18,6 +18,10 @@ const CURSOR_VERSION = 6 as const
 const DEFAULT_HISTORY_LIMIT = 100
 const MAX_HISTORY_LIMIT = 500
 const RECENT_SEGMENT_WINDOW_SIZE = 2
+// A platform delivery transaction is short (the reported replay was seven
+// rows). Bound retry inference so a large exact export cannot turn a history
+// read into quadratic deep-equality work before pagination is applied.
+const MAX_ADJACENT_REPLAY_BLOCK_LENGTH = 64
 const defaultCursorSecret = randomBytes(32)
 
 export type SessionCardUpstreamMessage = Record<string, unknown> & {
@@ -321,9 +325,7 @@ function decodeCursor(cursor: string, secret: Uint8Array): CursorPayload {
   }
 }
 
-function normalizedMessageId(
-  candidate: string | number | null | undefined,
-): string | undefined {
+function normalizedMessageId(candidate: unknown): string | undefined {
   if (typeof candidate === 'number' && Number.isFinite(candidate)) {
     return String(candidate)
   }
@@ -340,19 +342,80 @@ function stableMessageId(
   )
 }
 
+const REPLAY_CORRELATION_FIELDS = [
+  'clientId',
+  'client_id',
+  'toolCallId',
+  'tool_call_id',
+  'runId',
+  'run_id',
+  'deliveryId',
+  'delivery_id',
+  'requestId',
+  'request_id',
+] as const
+
+function matchingReplayCorrelation(
+  previous: SessionCardUpstreamMessage,
+  next: SessionCardUpstreamMessage,
+): boolean {
+  const previousId = stableMessageId(previous)
+  if (previousId !== undefined && previousId === stableMessageId(next)) {
+    return true
+  }
+
+  return REPLAY_CORRELATION_FIELDS.some((field) => {
+    const previousValue = normalizedMessageId(previous[field])
+    return (
+      previousValue !== undefined &&
+      previousValue === normalizedMessageId(next[field])
+    )
+  })
+}
+
 function continuationMessageEvidence(
   message: SessionCardUpstreamMessage,
 ): Record<string, unknown> {
   // Compression can clone a retained prefix into the child with new database
   // row IDs. Discard only transport/session identities that change during the
-  // clone; role, content, timestamp, tool, and client identity remain evidence.
+  // clone; role, content, tool, and client identity remain evidence. Delivery
+  // retries can arrive after a round trip, so timestamps are not identity.
   const {
     id: _id,
     stableId: _stableId,
     session_id: _sessionId,
+    timestamp: _timestamp,
+    createdAt: _createdAt,
+    created_at: _createdAtSnake,
+    updatedAt: _updatedAt,
+    updated_at: _updatedAtSnake,
     ...value
   } = message
   return value
+}
+
+function hasMeaningfulContinuationEvidence(
+  evidence: Record<string, unknown>,
+): boolean {
+  const content = evidence.content
+  if (typeof content === 'string' && content.trim().length > 0) return true
+  if (Array.isArray(content) && content.length > 0) return true
+  if (
+    content !== null &&
+    content !== undefined &&
+    typeof content !== 'string' &&
+    !Array.isArray(content)
+  )
+    return true
+  if (evidence.role === 'tool') return true
+
+  return Object.entries(evidence).some(
+    ([key, value]) =>
+      key !== 'role' &&
+      key !== 'content' &&
+      value !== null &&
+      value !== undefined,
+  )
 }
 
 function continuationMessagesMatch(
@@ -376,13 +439,13 @@ function continuationMessagesMatch(
   if (previousStableId || nextStableId) return false
 
   // Persisted row IDs may change when a continuation clones its retained
-  // prefix. In that case require the full role/content/timestamp tuple.
+  // prefix. In that case require meaningful non-time evidence. Do not use the
+  // timestamp to distinguish retry copies, but retain empty placeholders when
+  // there is otherwise no safe way to tell two different rows apart.
   return (
     typeof previous.role === 'string' &&
     previous.role.length > 0 &&
-    Object.prototype.hasOwnProperty.call(previous, 'content') &&
-    typeof previous.timestamp === 'number' &&
-    Number.isFinite(previous.timestamp)
+    hasMeaningfulContinuationEvidence(previousEvidence)
   )
 }
 
@@ -404,29 +467,98 @@ function adjacentContinuationOverlap(
         break
       }
     }
-    if (matches) return overlap
+    if (
+      matches &&
+      Array.from({ length: overlap }, (_, index) =>
+        matchingReplayCorrelation(
+          previous[previous.length - overlap + index]!.message,
+          next[index]!,
+        ),
+      ).some(Boolean)
+    ) {
+      return overlap
+    }
   }
   return 0
 }
 
 /**
- * Gateway-originated conversations can contain an immediately repeated
- * persistence row when an inbound platform retries the same delivery. The
- * database row IDs differ, but the Card receives no platform delivery ID, so
- * the complete role/content/timestamp evidence is the strongest available
- * proof. Collapse only adjacent exact equivalents within one authoritative
- * segment: intentional repeated turns remain intact unless they are
- * indistinguishable retry copies.
+ * Gateway-originated conversations can contain an immediately replayed
+ * persistence block when an inbound platform retries the same delivery. The
+ * database row IDs differ. Collapse only an adjacent exact multi-row block
+ * that also contains an independent delivery/client/run/tool correlation; a
+ * timestamp is transport timing, not replay identity. This preserves an
+ * ambiguous repeated user/assistant exchange instead of discarding a turn.
  */
 function collapseAdjacentSegmentDuplicates(
   messages: Array<SessionCardUpstreamMessage>,
 ): Array<SessionCardUpstreamMessage> {
   const retained: Array<SessionCardUpstreamMessage> = []
+
   for (const message of messages) {
-    const previous = retained.at(-1)
-    if (previous && continuationMessagesMatch(previous, message)) continue
     retained.push(message)
+
+    // A retry can replay a complete delivery transaction rather than only its
+    // final row: assistant, user, tool call, and tool results. Check the
+    // longest adjacent trailing block first so a replayed multi-row delivery
+    // is collapsed as one transaction instead of being mistaken for separate
+    // intentional turns. Limit this to a delivery-sized block so a large
+    // source export cannot cause quadratic deep-equality work before response
+    // pagination. A single row needs a matching stable identity; a multi-row
+    // replay needs at least one matching independent delivery correlation.
+    for (
+      let blockLength = Math.min(
+        Math.floor(retained.length / 2),
+        MAX_ADJACENT_REPLAY_BLOCK_LENGTH,
+      );
+      blockLength > 0;
+      blockLength -= 1
+    ) {
+      if (
+        !continuationMessagesMatch(
+          retained[retained.length - 1]!,
+          retained[retained.length - 1 - blockLength]!,
+        )
+      ) {
+        continue
+      }
+
+      let isReplay = true
+      for (let index = 0; index < blockLength; index += 1) {
+        if (
+          !continuationMessagesMatch(
+            retained[retained.length - 2 * blockLength + index]!,
+            retained[retained.length - blockLength + index]!,
+          )
+        ) {
+          isReplay = false
+          break
+        }
+      }
+      const firstReplayMessage = retained[retained.length - 2 * blockLength]!
+      const secondReplayMessage = retained[retained.length - blockLength]!
+      const hasReplayCorrelation = Array.from(
+        { length: blockLength },
+        (_, index) =>
+          matchingReplayCorrelation(
+            retained[retained.length - 2 * blockLength + index]!,
+            retained[retained.length - blockLength + index]!,
+          ),
+      ).some(Boolean)
+      const firstReplayId = stableMessageId(firstReplayMessage)
+      const hasMatchingStableIdentity =
+        firstReplayId !== undefined &&
+        firstReplayId === stableMessageId(secondReplayMessage)
+      if (
+        isReplay &&
+        (blockLength === 1 ? hasMatchingStableIdentity : hasReplayCorrelation)
+      ) {
+        retained.splice(retained.length - blockLength, blockLength)
+        break
+      }
+    }
   }
+
   return retained
 }
 
