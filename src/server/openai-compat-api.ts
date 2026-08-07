@@ -40,47 +40,6 @@ export function getBearerToken(): string {
   return ''
 }
 
-/** Cached first available model from /v1/models — used as fallback when no model is specified. */
-let _cachedDefaultModel: string | null = null
-
-async function getDefaultModel(): Promise<string> {
-  if (_cachedDefaultModel) return _cachedDefaultModel
-  if (process.env.CLAUDE_DEFAULT_MODEL) {
-    _cachedDefaultModel = process.env.CLAUDE_DEFAULT_MODEL
-    return _cachedDefaultModel
-  }
-  try {
-    const headers: Record<string, string> = {}
-    const bearer = getBearerToken()
-    if (bearer) headers['Authorization'] = `Bearer ${bearer}`
-    const res = await fetch(`${CLAUDE_API}/v1/models`, {
-      headers,
-      signal: AbortSignal.timeout(3_000),
-    })
-    if (res.ok) {
-      const data = (await res.json()) as { data?: Array<{ id: string }> }
-      if (data.data && data.data.length > 0) {
-        // Prefer a known-good chat model over the first alphabetical one
-        const preferred = data.data.find((m) =>
-          /qwen|llama|mistral|gemma/i.test(m.id),
-        )
-        const first = data.data[0]
-        if (preferred) {
-          _cachedDefaultModel = preferred.id
-          return _cachedDefaultModel
-        }
-        if (first) {
-          _cachedDefaultModel = first.id
-          return _cachedDefaultModel
-        }
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return 'default'
-}
-
 export type OpenAICompatContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } }
@@ -101,7 +60,7 @@ export type OpenAIChatOptions = {
 }
 
 type OpenAIChatRequest = {
-  model: string
+  model?: string
   messages: Array<{
     role: string
     content: string | Array<OpenAICompatContentPart>
@@ -118,16 +77,18 @@ type OpenAIChatCompletionResponse = {
   }>
 }
 
-export async function buildRequestBody(
+export function buildRequestBody(
   messages: Array<OpenAICompatMessage>,
   options: OpenAIChatOptions,
-): Promise<OpenAIChatRequest> {
+): OpenAIChatRequest {
+  // Hermes Gateway advertises a virtual `hermes-agent` model for generic
+  // OpenAI clients. Sending that alias back to a provider (notably Codex OAuth)
+  // is invalid; leave an unselected/default model absent so Gateway resolves its
+  // configured primary model. Explicit caller choices still pass through.
   const model =
-    options.model && options.model !== 'default'
-      ? options.model
-      : await getDefaultModel()
+    options.model && options.model !== 'default' ? options.model : undefined
   return {
-    model,
+    ...(model ? { model } : {}),
     messages,
     stream: options.stream === true,
     temperature: options.temperature,
