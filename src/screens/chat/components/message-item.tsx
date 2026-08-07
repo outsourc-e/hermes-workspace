@@ -8,6 +8,11 @@ import {
 } from '../utils'
 import { MessageActionsBar } from './message-actions-bar'
 import {
+  CollapsedMessageNotice,
+  getCollapsedMessageNotice,
+  rawTextForCollapseDetection,
+} from './collapsed-message-notice'
+import {
   buildHermesActivitySummary,
   shouldAutoExpandHermesActivityCard,
 } from './streaming-activity-ui'
@@ -2537,6 +2542,30 @@ function MessageItemComponent({
     const timer = window.setTimeout(() => setIsStuckSending(true), remaining)
     return () => window.clearTimeout(timer)
   }, [isUser, message, message.status])
+
+  const rawMessageText = rawTextForCollapseDetection(message)
+  const collapsedMessageNotice = getCollapsedMessageNotice(rawMessageText)
+
+  if (collapsedMessageNotice) {
+    return (
+      <div
+        ref={wrapperRef}
+        data-chat-message-role={role}
+        data-chat-message-id={wrapperDataMessageId}
+        style={
+          typeof wrapperScrollMarginTop === 'number'
+            ? { scrollMarginTop: `${wrapperScrollMarginTop}px` }
+            : undefined
+        }
+        className={cn('flex flex-col items-start', wrapperClassName)}
+      >
+        <CollapsedMessageNotice
+          text={rawMessageText}
+          notice={collapsedMessageNotice}
+        />
+      </div>
+    )
+  }
 
   if (execNotification) {
     const isSuccess = execNotification.ok ?? execNotification.exitCode === 0
