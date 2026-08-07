@@ -16,6 +16,7 @@ import {
   hasExactCompleteSessionCardProjection,
   isAuthoritativeCompleteSessionCardHistory,
   reconcileSessionCardHistoryResponse,
+  reconcileSessionCardHistoryResponseDurably,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
 import { textFromMessage } from '@/screens/chat/utils'
@@ -510,9 +511,12 @@ async function fetchSanitizedSwarmCardTranscript(
         error: SAFE_TRANSCRIPT_ERROR,
       }
     }
-    const reconciled = reconcileSessionCardHistoryResponse(history, {
-      continuationSegmentKeys: mapping.continuationSegmentKeys,
-    })
+    const reconciled = await reconcileSessionCardHistoryResponseDurably(
+      history,
+      {
+        continuationSegmentKeys: mapping.continuationSegmentKeys,
+      },
+    )
     const complete = isAuthoritativeCompleteSessionCardHistory(history)
     return {
       target: mapping.target,

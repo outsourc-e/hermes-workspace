@@ -773,7 +773,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       .mockImplementation(function (this: Storage, key, value) {
         if (
           this === window.localStorage &&
-          key.startsWith('workspace.card-transcript-snapshot.v1:')
+          key.startsWith('workspace.card-transcript-snapshot.v3:')
         ) {
           throw new DOMException(
             'persistent transcript snapshot denied',
@@ -841,7 +841,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       .mockImplementation(function (this: Storage, key, value) {
         if (
           this === window.localStorage &&
-          key.startsWith('workspace.card-transcript-snapshot.v1:')
+          key.startsWith('workspace.card-transcript-snapshot.v3:')
         ) {
           snapshotWriteAttempts += 1
           throw new DOMException(

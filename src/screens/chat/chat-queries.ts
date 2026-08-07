@@ -1,9 +1,10 @@
 import { normalizeSessions, readError } from './utils'
 import {
+  acknowledgeProjectedCardTranscriptRecoveryMessages,
   appendCardTranscriptRecoveryMessage,
   mergeCardTranscriptRecoveryMessages,
+  projectAcknowledgedCardTranscriptRecoveryMessages,
   readCardTranscriptRecovery,
-  reconcileAcknowledgedCardTranscriptRecoveryMessages,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import {
@@ -2040,16 +2041,14 @@ type ReconcileSessionCardHistoryOptions = {
 }
 
 /**
- * Reconcile one Card-history response with only same-owner persisted rows and
- * the exact Card recovery envelope. Complete history replaces retained
- * persisted rows and may acknowledge overlays; partial history keeps prior
- * validated rows visible and cannot clear recovery.
+ * Reconcile one Card-history response without crossing an asynchronous durable
+ * snapshot boundary. Partial/retryable readers use this path for cold v3
+ * hydration; complete production writers must use the durable variant below.
  */
 export function reconcileSessionCardHistoryResponse(
   server: SessionCardHistoryResponse,
   options: ReconcileSessionCardHistoryOptions = {},
 ): SessionCardHistoryResponse {
-  const owner = { cardId: server.cardId }
   const isComplete = isAuthoritativeCompleteSessionCardHistory(server)
   const isIntentionalRecentWindow =
     isDisplayableRecentSessionCardHistory(server)
@@ -2058,64 +2057,90 @@ export function reconcileSessionCardHistoryResponse(
     options.previous,
     options.continuationSegmentKeys,
   )
-  let completeSnapshotDurability = options.previous?.completeSnapshotDurability
-
-  // Query memory is not a reload boundary. A partial response must retain the
-  // last scrubbed complete Card projection even after a fresh QueryClient.
   if (!isComplete && !isIntentionalRecentWindow) {
-    const snapshotMessages =
-      readCardTranscriptSnapshot(server.cardId)?.messages ?? []
     persistedMessages = mergeCardHistoryMessages(
-      snapshotMessages,
+      readCardTranscriptSnapshot(server.cardId)?.messages ?? [],
       persistedMessages,
     )
   }
-
-  let recoveryMessages: Array<ChatMessage>
-  if (options.recoveryMessages) {
-    recoveryMessages = options.recoveryMessages
-  } else if (isComplete) {
-    // A complete projection must survive outside query memory before it is
-    // allowed to acknowledge and remove any durable recovery overlay.
-    const recoveryBeforeSnapshot = readCardTranscriptRecovery(owner)
-    const snapshot = writeCardTranscriptSnapshot(
-      server.cardId,
-      persistedMessages,
-    )
-    // A browser snapshot is only a recovery requirement while this browser has
-    // a locally accepted overlay which the Gateway has not yet fully proven.
-    // External/gateway-originated Cards already have a complete authoritative
-    // source projection, so a quota-denied optional cache must not claim their
-    // transcript is at risk on reload.
-    completeSnapshotDurability = snapshot
-      ? 'verified'
-      : recoveryBeforeSnapshot?.messages.length
-        ? 'failed'
-        : undefined
-    if (!snapshot) {
-      recoveryMessages = recoveryBeforeSnapshot?.messages ?? []
-    } else {
-      const acknowledgement =
-        reconcileAcknowledgedCardTranscriptRecoveryMessages(
-          owner,
-          persistedMessages,
-        )
-      persistedMessages = acknowledgement.authoritativeMessages
-      recoveryMessages = acknowledgement.recovery?.messages ?? []
-      // Keep attachment-enriched rows as the newest complete baseline. The raw
-      // complete baseline above remains durable if this best-effort update fails.
-      writeCardTranscriptSnapshot(server.cardId, persistedMessages)
-    }
-  } else {
-    recoveryMessages = readCardTranscriptRecovery(owner)?.messages ?? []
-  }
+  const recoveryMessages =
+    options.recoveryMessages ??
+    readCardTranscriptRecovery({ cardId: server.cardId })?.messages ??
+    []
   const persistedServer = {
     ...server,
     messages: persistedMessages,
     persistedMessages,
-    ...(completeSnapshotDurability ? { completeSnapshotDurability } : {}),
+    ...(options.previous?.completeSnapshotDurability
+      ? {
+          completeSnapshotDurability:
+            options.previous.completeSnapshotDurability,
+        }
+      : {}),
   }
   return mergeSessionCardHistoryResponse(persistedServer, recoveryMessages)
+}
+
+/**
+ * Persist and cold-read verify the fully attachment-enriched authoritative
+ * projection before acknowledging any recovery row. A failed final write leaves
+ * the recovery journal untouched and reports failed durability.
+ */
+export async function reconcileSessionCardHistoryResponseDurably(
+  server: SessionCardHistoryResponse,
+  options: ReconcileSessionCardHistoryOptions = {},
+): Promise<SessionCardHistoryResponse> {
+  if (
+    !isAuthoritativeCompleteSessionCardHistory(server) ||
+    options.recoveryMessages
+  ) {
+    return reconcileSessionCardHistoryResponse(server, options)
+  }
+
+  const owner = { cardId: server.cardId }
+  const authoritativeMessages = mergePartialPersistedCardHistory(
+    server,
+    options.previous,
+    options.continuationSegmentKeys,
+  )
+  const recoveryBeforeSnapshot = readCardTranscriptRecovery(owner)
+  const projection = projectAcknowledgedCardTranscriptRecoveryMessages(
+    owner,
+    authoritativeMessages,
+  )
+  const snapshot = await writeCardTranscriptSnapshot(
+    server.cardId,
+    projection.authoritativeMessages,
+  )
+  if (!snapshot) {
+    const persistedServer = {
+      ...server,
+      messages: authoritativeMessages,
+      persistedMessages: authoritativeMessages,
+      ...(recoveryBeforeSnapshot?.messages.length
+        ? { completeSnapshotDurability: 'failed' as const }
+        : {}),
+    }
+    return mergeSessionCardHistoryResponse(
+      persistedServer,
+      recoveryBeforeSnapshot?.messages ?? [],
+    )
+  }
+
+  const acknowledgement = acknowledgeProjectedCardTranscriptRecoveryMessages(
+    owner,
+    projection,
+  )
+  const persistedServer = {
+    ...server,
+    messages: projection.authoritativeMessages,
+    persistedMessages: projection.authoritativeMessages,
+    completeSnapshotDurability: 'verified' as const,
+  }
+  return mergeSessionCardHistoryResponse(
+    persistedServer,
+    acknowledgement.recovery?.messages ?? [],
+  )
 }
 
 export function updateSessionCardHistoryMessages(

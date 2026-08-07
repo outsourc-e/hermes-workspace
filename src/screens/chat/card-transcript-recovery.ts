@@ -1379,25 +1379,35 @@ function authoritativeAttachmentFidelityAcknowledges(
   })
 }
 
-type CardTranscriptAcknowledgement = {
+export type CardTranscriptAcknowledgement = {
   authoritativeMessages: Array<ChatMessage>
   recovery: CardTranscriptRecoveryEnvelope | null
 }
 
+export type CardTranscriptAcknowledgementProjection =
+  CardTranscriptAcknowledgement & {
+    sourceRecovery: CardTranscriptRecoveryEnvelope | null
+    acknowledgedMessages: Array<ChatMessage>
+  }
+
 /**
- * Consume ordinary history acknowledgements as one bounded, ordered sequence.
- * Each authoritative row can acknowledge at most one recovery row. This makes
- * repeated equal text deterministic: two persisted pairs acknowledge two local
- * pairs, while one persisted pair leaves the truly additional local pair.
+ * Compute attachment-enriched authoritative rows and acknowledgement candidates
+ * without changing recovery storage. Durable snapshot callers use this exact
+ * projection before crossing the recovery-removal boundary.
  */
-export function reconcileAcknowledgedCardTranscriptRecoveryMessages(
+export function projectAcknowledgedCardTranscriptRecoveryMessages(
   owner: CardTranscriptRecoveryOwner,
   authoritativeMessages: Array<ChatMessage>,
   options: RecoveryOptions = {},
-): CardTranscriptAcknowledgement {
-  const recovery = readCardTranscriptRecovery(owner, options)
-  if (!recovery) {
-    return { authoritativeMessages, recovery: null }
+): CardTranscriptAcknowledgementProjection {
+  const sourceRecovery = readCardTranscriptRecovery(owner, options)
+  if (!sourceRecovery) {
+    return {
+      authoritativeMessages,
+      recovery: null,
+      sourceRecovery: null,
+      acknowledgedMessages: [],
+    }
   }
 
   const boundedAuthoritativeStart = Math.max(
@@ -1408,9 +1418,11 @@ export function reconcileAcknowledgedCardTranscriptRecoveryMessages(
   const enrichedAuthoritativeMessages = [...authoritativeMessages]
   let authoritativeCursor = boundedAuthoritativeStart
 
-  for (const [recoveryIndex, recoveryMessage] of recovery.messages.entries()) {
+  for (const [
+    recoveryIndex,
+    recoveryMessage,
+  ] of sourceRecovery.messages.entries()) {
     let authoritativeIndex = -1
-
     for (
       let index = authoritativeCursor;
       index < authoritativeMessages.length;
@@ -1429,16 +1441,11 @@ export function reconcileAcknowledgedCardTranscriptRecoveryMessages(
         break
       }
     }
-
     if (authoritativeIndex < 0) continue
     authoritativeCursor = authoritativeIndex + 1
 
     const authoritativeMessage =
       enrichedAuthoritativeMessages[authoritativeIndex]!
-    // Ordinary server history may omit portable attachment bytes. Keep the
-    // authoritative row identity/order and hydrate its attachment projection
-    // without rendering a second copy. A direct Swarm acknowledgement also
-    // replaces the file-path transport prompt with the original user text.
     enrichedAuthoritativeMessages[authoritativeIndex] =
       mergeAcknowledgedRecoveryProjection(authoritativeMessage, recoveryMessage)
     if (
@@ -1451,39 +1458,105 @@ export function reconcileAcknowledgedCardTranscriptRecoveryMessages(
     }
   }
 
-  const remaining = recovery.messages.filter(
+  const remaining = sourceRecovery.messages.filter(
     (_recoveryMessage, index) => !acknowledgedRecoveryIndexes.has(index),
   )
-  let nextRecovery: CardTranscriptRecoveryEnvelope | null = recovery
-  if (remaining.length !== recovery.messages.length) {
-    const acknowledged = recovery.messages.filter((_message, index) =>
-      acknowledgedRecoveryIndexes.has(index),
-    )
-    const storages = resolveDefaultRecoveryStorages(options.storage)
-    const key = cardTranscriptRecoveryStorageKey(owner)
-    removeMessageJournalValues(
-      key,
-      acknowledged,
-      storages,
-      recoveryMessageIdentity,
-    )
-    memoryRecovery.delete(memoryRecoveryKey(owner))
-    for (const storage of storages) {
-      try {
-        storage.removeItem(key)
-      } catch {
-        // Journal rows remain the authority if compact-envelope cleanup fails.
-      }
-    }
-    nextRecovery =
-      remaining.length > 0
-        ? replaceCardTranscriptRecoveryMessages(owner, remaining, options)
-        : readCardTranscriptRecovery(owner, options)
-  }
   return {
     authoritativeMessages: enrichedAuthoritativeMessages,
+    recovery:
+      remaining.length > 0 ? { ...sourceRecovery, messages: remaining } : null,
+    sourceRecovery,
+    acknowledgedMessages: sourceRecovery.messages.filter((_message, index) =>
+      acknowledgedRecoveryIndexes.has(index),
+    ),
+  }
+}
+
+function sameRecoveryEnvelope(
+  left: CardTranscriptRecoveryEnvelope | null,
+  right: CardTranscriptRecoveryEnvelope | null,
+): boolean {
+  if (!left || !right) return left === right
+  try {
+    return JSON.stringify(left) === JSON.stringify(right)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Apply only the acknowledgement decision whose exact enriched projection was
+ * already verified durable. A recovery change since projection keeps the newer
+ * journal intact instead of acknowledging data outside that durability proof.
+ */
+export function acknowledgeProjectedCardTranscriptRecoveryMessages(
+  owner: CardTranscriptRecoveryOwner,
+  projection: CardTranscriptAcknowledgementProjection,
+  options: RecoveryOptions = {},
+): CardTranscriptAcknowledgement {
+  const recovery = projection.sourceRecovery
+  const currentRecovery = readCardTranscriptRecovery(owner, options)
+  if (!sameRecoveryEnvelope(currentRecovery, recovery)) {
+    return {
+      authoritativeMessages: projection.authoritativeMessages,
+      recovery: currentRecovery,
+    }
+  }
+  if (!recovery || projection.acknowledgedMessages.length === 0) {
+    return {
+      authoritativeMessages: projection.authoritativeMessages,
+      recovery,
+    }
+  }
+
+  const storages = resolveDefaultRecoveryStorages(options.storage)
+  const key = cardTranscriptRecoveryStorageKey(owner)
+  removeMessageJournalValues(
+    key,
+    projection.acknowledgedMessages,
+    storages,
+    recoveryMessageIdentity,
+  )
+  memoryRecovery.delete(memoryRecoveryKey(owner))
+  for (const storage of storages) {
+    try {
+      storage.removeItem(key)
+    } catch {
+      // Journal rows remain the authority if compact-envelope cleanup fails.
+    }
+  }
+  const remaining = projection.recovery?.messages ?? []
+  const nextRecovery =
+    remaining.length > 0
+      ? replaceCardTranscriptRecoveryMessages(owner, remaining, options)
+      : readCardTranscriptRecovery(owner, options)
+  return {
+    authoritativeMessages: projection.authoritativeMessages,
     recovery: nextRecovery,
   }
+}
+
+/**
+ * Consume ordinary history acknowledgements as one bounded, ordered sequence.
+ * Each authoritative row can acknowledge at most one recovery row. This makes
+ * repeated equal text deterministic: two persisted pairs acknowledge two local
+ * pairs, while one persisted pair leaves the truly additional local pair.
+ */
+export function reconcileAcknowledgedCardTranscriptRecoveryMessages(
+  owner: CardTranscriptRecoveryOwner,
+  authoritativeMessages: Array<ChatMessage>,
+  options: RecoveryOptions = {},
+): CardTranscriptAcknowledgement {
+  const projection = projectAcknowledgedCardTranscriptRecoveryMessages(
+    owner,
+    authoritativeMessages,
+    options,
+  )
+  return acknowledgeProjectedCardTranscriptRecoveryMessages(
+    owner,
+    projection,
+    options,
+  )
 }
 
 export function removeAcknowledgedCardTranscriptRecoveryMessages(

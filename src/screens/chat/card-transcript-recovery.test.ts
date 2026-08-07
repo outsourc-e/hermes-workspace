@@ -17,7 +17,11 @@ import {
   removeRejectedCardTranscriptRecoveryMessage,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
-import { reconcileSessionCardHistoryResponse } from './chat-queries'
+import {
+  reconcileSessionCardHistoryResponse,
+  reconcileSessionCardHistoryResponseDurably,
+} from './chat-queries'
+import { readCardTranscriptSnapshot } from './card-transcript-snapshot'
 import type { SessionCardHistoryResponse } from './chat-queries'
 import type {
   CardTranscriptRecoveryEnvelope,
@@ -626,7 +630,7 @@ describe('Card transcript recovery storage contract', () => {
     ).toEqual([staleAuthoritative, newer])
   })
 
-  it('reconciles a server-observed Swarm delivery without duplicating or losing attachment recovery', () => {
+  it('reconciles a server-observed Swarm delivery without duplicating or losing attachment recovery', async () => {
     const deliveredContent =
       '[User attached file: /tmp/swarm/evidence.txt]\nReview the evidence'
     const attachment = {
@@ -665,7 +669,7 @@ describe('Card transcript recovery storage contract', () => {
     })
     replaceCardTranscriptRecoveryMessages(owner, [optimistic], { now })
 
-    const first = reconcileSessionCardHistoryResponse({
+    const first = await reconcileSessionCardHistoryResponseDurably({
       sessionKey: 'remote:segment-a',
       ...owner,
       canonicalSegmentKey: 'remote:segment-a',
@@ -870,7 +874,7 @@ describe('Card transcript recovery storage contract', () => {
     ).toBeNull()
   })
 
-  it('acknowledges repeated equal paired turns in order without duplicate overlays', () => {
+  it('acknowledges repeated equal paired turns in order without duplicate overlays', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(now)
     const overlays = [
       message('user', 'same prompt', { clientId: 'client-a' }),
@@ -905,12 +909,12 @@ describe('Card transcript recovery storage contract', () => {
       missingSegments: [],
     }
 
-    const reconciled = reconcileSessionCardHistoryResponse(server)
+    const reconciled = await reconcileSessionCardHistoryResponseDurably(server)
     expect(reconciled.messages).toEqual(server.messages)
     expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
   })
 
-  it('keeps complete-history durability verified on an unchanged refetch when storage writes are denied', () => {
+  it('keeps complete-history durability verified on an unchanged refetch when storage writes are denied', async () => {
     const complete: SessionCardHistoryResponse = {
       sessionKey: 'remote:segment-a',
       ...owner,
@@ -921,7 +925,8 @@ describe('Card transcript recovery storage contract', () => {
       missingSegments: [],
     }
     expect(
-      reconcileSessionCardHistoryResponse(complete).completeSnapshotDurability,
+      (await reconcileSessionCardHistoryResponseDurably(complete))
+        .completeSnapshotDurability,
     ).toBe('verified')
 
     const blockedWrite = vi
@@ -933,13 +938,13 @@ describe('Card transcript recovery storage contract', () => {
         )
       })
 
-    const repeated = reconcileSessionCardHistoryResponse(complete)
+    const repeated = await reconcileSessionCardHistoryResponseDurably(complete)
 
     expect(repeated.completeSnapshotDurability).toBe('verified')
     expect(blockedWrite).not.toHaveBeenCalled()
   })
 
-  it('does not mark a Gateway-complete transcript at risk when only its optional browser snapshot is denied', () => {
+  it('does not mark a Gateway-complete transcript at risk when only its optional browser snapshot is denied', async () => {
     const originalSetItem = Storage.prototype.setItem
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
       this: Storage,
@@ -948,7 +953,7 @@ describe('Card transcript recovery storage contract', () => {
     ) {
       if (
         this === window.localStorage &&
-        key.startsWith('workspace.card-transcript-snapshot.v1:')
+        key.startsWith('workspace.card-transcript-snapshot.v3:')
       ) {
         throw new DOMException('optional snapshot denied', 'QuotaExceededError')
       }
@@ -964,13 +969,14 @@ describe('Card transcript recovery storage contract', () => {
       missingSegments: [],
     }
 
-    const reconciled = reconcileSessionCardHistoryResponse(complete)
+    const reconciled =
+      await reconcileSessionCardHistoryResponseDurably(complete)
 
     expect(reconciled.completeSnapshotDurability).toBeUndefined()
     expect(reconciled.messages).toEqual(complete.messages)
   })
 
-  it('does not acknowledge durable recovery from a session-only snapshot before tab close', () => {
+  it('does not acknowledge durable recovery when persistent v3 snapshot storage is denied', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(now)
     const accepted = message('user', 'survive the tab close', {
       clientId: 'client-tab-close',
@@ -1006,7 +1012,7 @@ describe('Card transcript recovery storage contract', () => {
       missingSegments: [],
     }
 
-    reconcileSessionCardHistoryResponse(complete)
+    await reconcileSessionCardHistoryResponseDurably(complete)
     expect(
       JSON.parse(
         window.localStorage.getItem(cardTranscriptRecoveryStorageKey(owner)) ??
@@ -1029,7 +1035,7 @@ describe('Card transcript recovery storage contract', () => {
     expect(partial.messages).toEqual([accepted])
   })
 
-  it('hydrates partial attachment history without clearing recovery until authoritative content is complete', () => {
+  it('hydrates partial attachment history without clearing recovery until authoritative content is complete', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(now)
     const attachment = {
       id: 'attachment-local',
@@ -1108,10 +1114,32 @@ describe('Card transcript recovery storage contract', () => {
         },
       ],
     }
-    const acknowledged = reconcileSessionCardHistoryResponse(
+    const originalSetItem = Storage.prototype.setItem
+    const deniedSnapshot = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(function (this: Storage, key, value) {
+        if (
+          this === window.localStorage &&
+          key.startsWith('workspace.card-transcript-snapshot.v3:')
+        ) {
+          throw new DOMException('final snapshot denied', 'QuotaExceededError')
+        }
+        originalSetItem.call(this, key, value)
+      })
+    const failed = await reconcileSessionCardHistoryResponseDurably(
+      completeAttachmentServer,
+    )
+    expect(failed.completeSnapshotDurability).toBe('failed')
+    expect(readCardTranscriptRecovery(owner, { now })?.messages).toHaveLength(1)
+    deniedSnapshot.mockRestore()
+
+    const acknowledged = await reconcileSessionCardHistoryResponseDurably(
       completeAttachmentServer,
     )
     expect(acknowledged.messages).toEqual(completeAttachmentServer.messages)
+    expect(readCardTranscriptSnapshot(owner.cardId)?.messages).toEqual(
+      completeAttachmentServer.messages,
+    )
     expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
   })
 

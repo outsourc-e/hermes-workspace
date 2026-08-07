@@ -40,7 +40,7 @@ import {
   moveSessionCardHistoryMessages,
   moveSessionCardHistoryToCard,
   recentSessionCardHistoryWindowSignature,
-  reconcileSessionCardHistoryResponse,
+  reconcileSessionCardHistoryResponseDurably,
   retainCompleteSessionCardProjections,
   sessionCardQueryKeys,
   setSessionCardHandoffAuthority,
@@ -844,7 +844,7 @@ export function ChatScreen({
         queryClient.getQueryData<SessionCardHistoryResponse>(
           cardHistoryQueryKey,
         )
-      return reconcileSessionCardHistoryResponse(
+      return reconcileSessionCardHistoryResponseDurably(
         previous
           ? mergeRefreshedRecentSessionCardHistoryWindows(
               server,
@@ -882,7 +882,7 @@ export function ChatScreen({
         continuationSegmentKeys: inspectedChildCard.continuationSegmentKeys,
         signal,
       })
-      return reconcileSessionCardHistoryResponse(server, {
+      return reconcileSessionCardHistoryResponseDurably(server, {
         previous: queryClient.getQueryData<SessionCardHistoryResponse>(
           inspectedChildHistoryQueryKey,
         ),
@@ -955,22 +955,31 @@ export function ChatScreen({
         continuationSegmentKeys: activeCard.continuationSegmentKeys,
         cursor: previousCursor,
       })
-      let didPrepend = false
-      queryClient.setQueryData<SessionCardHistoryResponse>(
-        cardHistoryQueryKey,
-        (latest) => {
-          const merged = mergeFetchedOlderRecentSessionCardHistoryWindow(
-            older,
-            latest,
-            activeCard.continuationSegmentKeys,
-            previousCursor,
-            requestedWindowSignature,
-          )
-          didPrepend = merged !== latest
-          return merged
-        },
+      const latest =
+        queryClient.getQueryData<SessionCardHistoryResponse>(
+          cardHistoryQueryKey,
+        )
+      const merged = mergeFetchedOlderRecentSessionCardHistoryWindow(
+        older,
+        latest,
+        activeCard.continuationSegmentKeys,
+        previousCursor,
+        requestedWindowSignature,
       )
-      return didPrepend
+      if (!merged || merged === latest) return false
+      const durable = await reconcileSessionCardHistoryResponseDurably(merged, {
+        previous: latest,
+        continuationSegmentKeys: activeCard.continuationSegmentKeys,
+      })
+      if (
+        queryClient.getQueryData<SessionCardHistoryResponse>(
+          cardHistoryQueryKey,
+        ) !== latest
+      ) {
+        return false
+      }
+      queryClient.setQueryData(cardHistoryQueryKey, durable)
+      return true
     } finally {
       setLoadingOlderCardHistory(false)
     }
