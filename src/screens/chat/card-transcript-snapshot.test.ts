@@ -140,6 +140,65 @@ describe('Card transcript snapshot mirror arbitration', () => {
     expect(readCardTranscriptSnapshot(cardId)?.messages).toEqual(messages)
   })
 
+  it('keeps a complete multi-context union durable before a contributor replaces its commit', () => {
+    const a = { ...message('context A contribution'), id: 'context-a' }
+    const b = { ...message('context B contribution'), id: 'context-b' }
+    const c = { ...message('context A replacement'), id: 'context-c' }
+
+    expect(
+      writeCardTranscriptSnapshot(cardId, [a], { contextId: 'context-a' }),
+    ).not.toBeNull()
+    expect(
+      writeCardTranscriptSnapshot(cardId, [b], { contextId: 'context-b' }),
+    ).not.toBeNull()
+    expect(
+      writeCardTranscriptSnapshot(cardId, [a, b], { contextId: 'context-c' }),
+    ).not.toBeNull()
+    expect(
+      writeCardTranscriptSnapshot(cardId, [c], { contextId: 'context-a' }),
+    ).not.toBeNull()
+
+    expect(readCardTranscriptSnapshot(cardId)?.messages).toEqual(
+      expect.arrayContaining([a, b, c]),
+    )
+  })
+
+  it('reuses a durable complete projection when equivalent message fields are reordered', () => {
+    const first = {
+      role: 'assistant' as const,
+      id: 'key-order-message',
+      content: [
+        {
+          type: 'text' as const,
+          text: 'same content in a different object-key order',
+        },
+      ],
+    }
+    const reordered = {
+      content: [
+        {
+          text: 'same content in a different object-key order',
+          type: 'text' as const,
+        },
+      ],
+      id: 'key-order-message',
+      role: 'assistant' as const,
+    }
+    expect(writeCardTranscriptSnapshot(cardId, [first])).not.toBeNull()
+
+    const blockedWrite = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(function () {
+        throw new DOMException(
+          'storage is temporarily unavailable',
+          'QuotaExceededError',
+        )
+      })
+
+    expect(writeCardTranscriptSnapshot(cardId, [reordered])).not.toBeNull()
+    expect(blockedWrite).not.toHaveBeenCalled()
+  })
+
   it('round-trips complete histories beyond the former message and single-value caps', () => {
     const messages = Array.from({ length: 2_101 }, (_, index) => ({
       ...message(`history row ${index}`),
