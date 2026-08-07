@@ -9,6 +9,7 @@ import { requireSessionCardJsonContentType } from './-session-card-http'
 import { Route as ListRoute } from './session-cards'
 import { Route as MetadataRoute } from './session-cards.$cardId'
 import { Route as ArchiveRoute } from './session-cards.$cardId.archive'
+import { Route as DiscardRoute } from './session-cards.$cardId.discard'
 import { Route as BranchRoute } from './session-cards.$cardId.branch'
 import { Route as HistoryRoute } from './session-cards.$cardId.history'
 
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   ensureGatewayProbed: vi.fn(),
   forkSession: vi.fn(),
   deleteSession: vi.fn(),
+  deleteEmptyGatewaySession: vi.fn(),
   readBranchReplay: vi.fn(),
   reserveBranchReplay: vi.fn(),
   completeBranchReplay: vi.fn(),
@@ -86,6 +88,7 @@ vi.mock('../../server/claude-api', () => ({
   createSession: mocks.createSession,
   forkSession: mocks.forkSession,
   deleteSession: mocks.deleteSession,
+  deleteEmptyGatewaySession: mocks.deleteEmptyGatewaySession,
 }))
 
 type GetHandler = (context: {
@@ -101,6 +104,7 @@ type MetadataTestRoute = {
   server: { handlers: { GET: GetHandler; PATCH: MutationHandler } }
 }
 type ArchiveTestRoute = { server: { handlers: { POST: MutationHandler } } }
+type DiscardTestRoute = { server: { handlers: { POST: MutationHandler } } }
 type BranchTestRoute = {
   server: { handlers: { POST: MutationHandler; PATCH: MutationHandler } }
 }
@@ -114,6 +118,8 @@ const metadataHandler = (MetadataRoute as unknown as MetadataTestRoute).server
 const detailHandler = (MetadataRoute as unknown as MetadataTestRoute).server
   .handlers.GET
 const archiveHandler = (ArchiveRoute as unknown as ArchiveTestRoute).server
+  .handlers.POST
+const discardHandler = (DiscardRoute as unknown as DiscardTestRoute).server
   .handlers.POST
 const branchHandler = (BranchRoute as unknown as BranchTestRoute).server
   .handlers.POST
@@ -202,6 +208,18 @@ function resolvedCard() {
     ]),
     collection: { completeness: 'complete', retryable: false, sources: [] },
   }
+}
+
+function resolvedNewSessionCard() {
+  const resolved = resolvedCard()
+  resolved.card.title = 'New conversation'
+  resolved.card.titleSource = 'default'
+  resolved.card.canonicalSegmentKey = 'remote:root'
+  resolved.card.continuationSegmentKeys = ['remote:root']
+  resolved.card.continuationCount = 1
+  resolved.sourceBySegmentKey.delete('remote:tip')
+  resolved.upstreamKeyBySegmentKey.delete('remote:tip')
+  return resolved
 }
 
 function resolvedOrphanCard() {
@@ -504,6 +522,90 @@ describe('POST /api/session-cards', () => {
     expect(invalidBody.status).toBe(400)
     expect(wrongMediaType.status).toBe(415)
     expect(mocks.createSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/session-cards/$cardId/discard', () => {
+  async function createDiscardCapability() {
+    mocks.resolveRemoteCardByUpstreamSession.mockResolvedValue(
+      resolvedNewSessionCard(),
+    )
+    const created = await createHandler({
+      request: jsonRequest('/api/session-cards', 'POST', '{}'),
+      params: {},
+    })
+    expect(created.status).toBe(200)
+    const body = (await created.json()) as { discardToken?: string }
+    expect(body.discardToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    return body.discardToken!
+  }
+
+  it('deletes only a freshly created, still-empty root Card through the Gateway writer', async () => {
+    const discardToken = await createDiscardCapability()
+    mocks.resolveCard.mockResolvedValue(resolvedNewSessionCard())
+    mocks.deleteEmptyGatewaySession.mockResolvedValue(true)
+
+    const response = await discardHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/discard',
+        'POST',
+        JSON.stringify({ discardToken }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, discarded: true })
+    expect(mocks.resolveCard).toHaveBeenCalledWith('remote:root')
+    expect(mocks.deleteEmptyGatewaySession).toHaveBeenCalledWith(
+      'root-upstream',
+    )
+    expect(mocks.invalidateTopology).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps a Card when server state shows it was changed or has messages', async () => {
+    const discardToken = await createDiscardCapability()
+    mocks.resolveCard.mockResolvedValue(resolvedCard())
+
+    const unsafeResponse = await discardHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/discard',
+        'POST',
+        JSON.stringify({ discardToken }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+
+    expect(unsafeResponse.status).toBe(200)
+    expect(await unsafeResponse.json()).toEqual({ ok: true, discarded: false })
+    expect(mocks.deleteEmptyGatewaySession).not.toHaveBeenCalled()
+  })
+
+  it('rejects unauthenticated or unowned discard requests before deletion', async () => {
+    mocks.isAuthenticated.mockReturnValue(false)
+    const unauthenticated = await discardHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/discard',
+        'POST',
+        JSON.stringify({ discardToken: 'a'.repeat(43) }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+    expect(unauthenticated.status).toBe(401)
+    expect(mocks.resolveCard).not.toHaveBeenCalled()
+
+    mocks.isAuthenticated.mockReturnValue(true)
+    const unowned = await discardHandler({
+      request: jsonRequest(
+        '/api/session-cards/remote%3Aroot/discard',
+        'POST',
+        JSON.stringify({ discardToken: 'a'.repeat(43) }),
+      ),
+      params: { cardId: 'remote:root' },
+    })
+    expect(unowned.status).toBe(200)
+    expect(await unowned.json()).toEqual({ ok: true, discarded: false })
+    expect(mocks.deleteEmptyGatewaySession).not.toHaveBeenCalled()
   })
 })
 

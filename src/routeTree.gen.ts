@@ -164,6 +164,7 @@ import { Route as ApiSessionCardsCardIdSteerRouteImport } from './routes/api/ses
 import { Route as ApiSessionCardsCardIdPauseRouteImport } from './routes/api/session-cards.$cardId.pause'
 import { Route as ApiSessionCardsCardIdKillRouteImport } from './routes/api/session-cards.$cardId.kill'
 import { Route as ApiSessionCardsCardIdHistoryRouteImport } from './routes/api/session-cards.$cardId.history'
+import { Route as ApiSessionCardsCardIdDiscardRouteImport } from './routes/api/session-cards.$cardId.discard'
 import { Route as ApiSessionCardsCardIdBranchRouteImport } from './routes/api/session-cards.$cardId.branch'
 import { Route as ApiSessionCardsCardIdArchiveRouteImport } from './routes/api/session-cards.$cardId.archive'
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
@@ -956,6 +957,12 @@ const ApiSessionCardsCardIdHistoryRoute =
     path: '/history',
     getParentRoute: () => ApiSessionCardsCardIdRoute,
   } as any)
+const ApiSessionCardsCardIdDiscardRoute =
+  ApiSessionCardsCardIdDiscardRouteImport.update({
+    id: '/discard',
+    path: '/discard',
+    getParentRoute: () => ApiSessionCardsCardIdRoute,
+  } as any)
 const ApiSessionCardsCardIdBranchRoute =
   ApiSessionCardsCardIdBranchRouteImport.update({
     id: '/branch',
@@ -1137,6 +1144,7 @@ export interface FileRoutesByFullPath {
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/session-cards/$cardId/archive': typeof ApiSessionCardsCardIdArchiveRoute
   '/api/session-cards/$cardId/branch': typeof ApiSessionCardsCardIdBranchRoute
+  '/api/session-cards/$cardId/discard': typeof ApiSessionCardsCardIdDiscardRoute
   '/api/session-cards/$cardId/history': typeof ApiSessionCardsCardIdHistoryRoute
   '/api/session-cards/$cardId/kill': typeof ApiSessionCardsCardIdKillRoute
   '/api/session-cards/$cardId/pause': typeof ApiSessionCardsCardIdPauseRoute
@@ -1298,6 +1306,7 @@ export interface FileRoutesByTo {
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/session-cards/$cardId/archive': typeof ApiSessionCardsCardIdArchiveRoute
   '/api/session-cards/$cardId/branch': typeof ApiSessionCardsCardIdBranchRoute
+  '/api/session-cards/$cardId/discard': typeof ApiSessionCardsCardIdDiscardRoute
   '/api/session-cards/$cardId/history': typeof ApiSessionCardsCardIdHistoryRoute
   '/api/session-cards/$cardId/kill': typeof ApiSessionCardsCardIdKillRoute
   '/api/session-cards/$cardId/pause': typeof ApiSessionCardsCardIdPauseRoute
@@ -1461,6 +1470,7 @@ export interface FileRoutesById {
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/session-cards/$cardId/archive': typeof ApiSessionCardsCardIdArchiveRoute
   '/api/session-cards/$cardId/branch': typeof ApiSessionCardsCardIdBranchRoute
+  '/api/session-cards/$cardId/discard': typeof ApiSessionCardsCardIdDiscardRoute
   '/api/session-cards/$cardId/history': typeof ApiSessionCardsCardIdHistoryRoute
   '/api/session-cards/$cardId/kill': typeof ApiSessionCardsCardIdKillRoute
   '/api/session-cards/$cardId/pause': typeof ApiSessionCardsCardIdPauseRoute
@@ -1625,6 +1635,7 @@ export interface FileRouteTypes {
     | '/api/mcp/hub-sources/$id'
     | '/api/session-cards/$cardId/archive'
     | '/api/session-cards/$cardId/branch'
+    | '/api/session-cards/$cardId/discard'
     | '/api/session-cards/$cardId/history'
     | '/api/session-cards/$cardId/kill'
     | '/api/session-cards/$cardId/pause'
@@ -1786,6 +1797,7 @@ export interface FileRouteTypes {
     | '/api/mcp/hub-sources/$id'
     | '/api/session-cards/$cardId/archive'
     | '/api/session-cards/$cardId/branch'
+    | '/api/session-cards/$cardId/discard'
     | '/api/session-cards/$cardId/history'
     | '/api/session-cards/$cardId/kill'
     | '/api/session-cards/$cardId/pause'
@@ -1948,6 +1960,7 @@ export interface FileRouteTypes {
     | '/api/mcp/hub-sources/$id'
     | '/api/session-cards/$cardId/archive'
     | '/api/session-cards/$cardId/branch'
+    | '/api/session-cards/$cardId/discard'
     | '/api/session-cards/$cardId/history'
     | '/api/session-cards/$cardId/kill'
     | '/api/session-cards/$cardId/pause'
@@ -3170,6 +3183,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionCardsCardIdHistoryRouteImport
       parentRoute: typeof ApiSessionCardsCardIdRoute
     }
+    '/api/session-cards/$cardId/discard': {
+      id: '/api/session-cards/$cardId/discard'
+      path: '/discard'
+      fullPath: '/api/session-cards/$cardId/discard'
+      preLoaderRoute: typeof ApiSessionCardsCardIdDiscardRouteImport
+      parentRoute: typeof ApiSessionCardsCardIdRoute
+    }
     '/api/session-cards/$cardId/branch': {
       id: '/api/session-cards/$cardId/branch'
       path: '/branch'
@@ -3337,6 +3357,7 @@ const ApiMemoryRouteWithChildren = ApiMemoryRoute._addFileChildren(
 interface ApiSessionCardsCardIdRouteChildren {
   ApiSessionCardsCardIdArchiveRoute: typeof ApiSessionCardsCardIdArchiveRoute
   ApiSessionCardsCardIdBranchRoute: typeof ApiSessionCardsCardIdBranchRoute
+  ApiSessionCardsCardIdDiscardRoute: typeof ApiSessionCardsCardIdDiscardRoute
   ApiSessionCardsCardIdHistoryRoute: typeof ApiSessionCardsCardIdHistoryRoute
   ApiSessionCardsCardIdKillRoute: typeof ApiSessionCardsCardIdKillRoute
   ApiSessionCardsCardIdPauseRoute: typeof ApiSessionCardsCardIdPauseRoute
@@ -3347,6 +3368,7 @@ interface ApiSessionCardsCardIdRouteChildren {
 const ApiSessionCardsCardIdRouteChildren: ApiSessionCardsCardIdRouteChildren = {
   ApiSessionCardsCardIdArchiveRoute: ApiSessionCardsCardIdArchiveRoute,
   ApiSessionCardsCardIdBranchRoute: ApiSessionCardsCardIdBranchRoute,
+  ApiSessionCardsCardIdDiscardRoute: ApiSessionCardsCardIdDiscardRoute,
   ApiSessionCardsCardIdHistoryRoute: ApiSessionCardsCardIdHistoryRoute,
   ApiSessionCardsCardIdKillRoute: ApiSessionCardsCardIdKillRoute,
   ApiSessionCardsCardIdPauseRoute: ApiSessionCardsCardIdPauseRoute,

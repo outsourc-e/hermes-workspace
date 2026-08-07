@@ -284,6 +284,30 @@ export async function deleteSession(sessionId: string): Promise<void> {
   return claudeDeleteReq(`/api/sessions/${sessionId}`)
 }
 
+/**
+ * Discard only a freshly created, still-empty Gateway row. This always targets
+ * the Gateway writer rather than the Dashboard read projection. The caller
+ * supplies an additional Card-owned capability and revalidates the Card before
+ * invoking this conservative final check.
+ */
+export async function deleteEmptyGatewaySession(
+  sessionId: string,
+): Promise<boolean> {
+  const session = await claudeGet<{ session: ClaudeSession }>(
+    `/api/sessions/${sessionId}`,
+  )
+  const current = session.session
+  if (
+    current.id !== sessionId ||
+    current.message_count !== 0 ||
+    (typeof current.title === 'string' && current.title.trim().length > 0)
+  ) {
+    return false
+  }
+  await claudeDeleteReq(`/api/sessions/${sessionId}`)
+  return true
+}
+
 export async function getMessagesResult(
   sessionId: string,
   pinnedSource?: ClaudeSessionSource,

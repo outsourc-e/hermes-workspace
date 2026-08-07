@@ -31,6 +31,10 @@ import {
   createSessionCard,
   sessionCardQueryKeys,
 } from '@/screens/chat/chat-queries'
+import {
+  discardAbandonedNewSessionCards,
+  registerNewSessionCardForDiscard,
+} from '@/screens/chat/new-session-discard'
 import { showErrorToast } from '@/components/error-toast'
 import {
   CHAT_BOOTSTRAP_CARD_ID,
@@ -241,23 +245,55 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (routeChatCardId !== null) setActiveChatCardId(routeChatCardId)
   }, [routeChatCardId, setActiveChatCardId])
 
+  useEffect(() => {
+    let cancelled = false
+    void discardAbandonedNewSessionCards(routeChatCardId).then((discarded) => {
+      if (cancelled || discarded.length === 0) return
+      void queryClient.invalidateQueries({
+        queryKey: sessionCardQueryKeys.lists,
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [queryClient, routeChatCardId])
+
+  useEffect(() => {
+    const discardOnPageHide = () => {
+      void discardAbandonedNewSessionCards(null, { keepalive: true })
+    }
+    window.addEventListener('pagehide', discardOnPageHide)
+    return () => window.removeEventListener('pagehide', discardOnPageHide)
+  }, [])
+
   const startNewChat = useCallback(async () => {
     if (creatingSession) return
     setCreatingSession(true)
     try {
-      const { card } = await createSessionCard()
+      const { card, discardToken } = await createSessionCard()
+      if (discardToken) {
+        registerNewSessionCardForDiscard(card.cardId, discardToken)
+      }
       await queryClient.invalidateQueries({
         queryKey: sessionCardQueryKeys.lists,
       })
       await navigate(buildChatCardNavigation(card.cardId))
     } catch (error) {
+      void discardAbandonedNewSessionCards(routeChatCardId).then(
+        (discarded) => {
+          if (discarded.length === 0) return
+          void queryClient.invalidateQueries({
+            queryKey: sessionCardQueryKeys.lists,
+          })
+        },
+      )
       const message =
         error instanceof Error ? error.message : 'Unable to create Session Card'
       showErrorToast(message)
     } finally {
       setCreatingSession(false)
     }
-  }, [creatingSession, navigate, queryClient])
+  }, [creatingSession, navigate, queryClient, routeChatCardId])
 
   const handleSelectSession = useCallback(() => {
     // On mobile, collapse sidebar after selecting

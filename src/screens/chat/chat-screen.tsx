@@ -51,6 +51,7 @@ import {
   updateSessionCardTransientMessageByClientId,
   updateSessionLastMessage,
 } from './chat-queries'
+import { retainNewSessionCard } from './new-session-discard'
 import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatEmptyState } from './components/chat-empty-state'
@@ -2691,6 +2692,10 @@ export function ChatScreen({
       existingClientId = '',
       provisionalOwnerId = '',
     ) {
+      // A send is now in flight for this exact Card. Remove its browser-owned
+      // discard capability before any optimistic or network work can race with
+      // route navigation.
+      if (activeCard) retainNewSessionCard(activeCard.cardId)
       // Read from ref so we always get the latest value without capturing it in deps
       const currentThinkingLevel = thinkingLevelRef.current
       setLocalActivity('reading')

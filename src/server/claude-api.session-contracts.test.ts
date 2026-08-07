@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   SessionForkUnavailableError,
   createSession,
+  deleteEmptyGatewaySession,
   forkSession,
   getLatestDescendant,
   getMessages,
@@ -101,6 +102,58 @@ describe('Session Card adapter foundations', () => {
       body: '{}',
     })
     expect(dashboardMocks.createSession).not.toHaveBeenCalled()
+  })
+
+  it('uses the Gateway writer only after verifying the target remains empty', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            session: { id: 'empty-gateway-session', message_count: 0 },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      deleteEmptyGatewaySession('empty-gateway-session'),
+    ).resolves.toBe(true)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://gateway.test/api/sessions/empty-gateway-session',
+      { headers: { Authorization: 'Bearer test-token' } },
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://gateway.test/api/sessions/empty-gateway-session',
+      { method: 'DELETE', headers: { Authorization: 'Bearer test-token' } },
+    )
+    expect(dashboardMocks.deleteSession).not.toHaveBeenCalled()
+  })
+
+  it('refuses deletion when the Gateway observes a message or manual title', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: 'retained-gateway-session',
+            message_count: 1,
+            title: 'Keep this',
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      deleteEmptyGatewaySession('retained-gateway-session'),
+    ).resolves.toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('normalizes raw transport lineage fields through toSessionSummary', () => {

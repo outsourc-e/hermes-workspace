@@ -164,6 +164,8 @@ export type SessionCardDetailWire = {
   completeness: SessionCardListWire['completeness']
   retryable: boolean
   sources: Array<SessionCardSourceStatusWire>
+  /** Present only for a newly created Card; never persisted or displayed. */
+  discardToken?: string
 }
 
 export class SessionCardLookupError extends Error {
@@ -957,6 +959,9 @@ function parseSessionCardDetail(value: unknown): SessionCardDetailWire {
   const card = parseSessionCard(value.card)
   const resolution = parseCardResolution(value.resolution)
   const sources = value.sources.map(parseSourceStatus)
+  const discardToken = nonblankWireString(value.discardToken)
+  const hasDiscardToken =
+    discardToken !== null && /^[A-Za-z0-9_-]{32,128}$/.test(discardToken)
   const hasIncompleteSource = sources.some(
     (source) => source.status !== 'complete',
   )
@@ -978,6 +983,7 @@ function parseSessionCardDetail(value: unknown): SessionCardDetailWire {
     completeness: value.completeness,
     retryable: value.retryable,
     sources,
+    ...(hasDiscardToken ? { discardToken } : {}),
   }
 }
 

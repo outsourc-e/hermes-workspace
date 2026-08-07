@@ -6,6 +6,7 @@ import {
   sessionCardService,
 } from '../../server/session-card-service'
 import { createSession } from '../../server/claude-api'
+import { issueNewSessionCardDiscardCapability } from '../../server/new-session-card-discard'
 import {
   internalFailure,
   invalidRequest,
@@ -136,6 +137,9 @@ export const Route = createFileRoute('/api/session-cards')({
           ) {
             return projectionUnavailable()
           }
+          const discardToken = issueNewSessionCardDiscardCapability(
+            resolved.card.cardId,
+          )
           return json(
             sanitizeSourceDiagnostics({
               card: resolved.card,
@@ -144,6 +148,7 @@ export const Route = createFileRoute('/api/session-cards')({
                 completeness: resolved.collection.completeness,
                 retryable: resolved.collection.retryable,
               },
+              discardToken,
               completeness: resolved.collection.completeness,
               retryable: resolved.collection.retryable,
               sources: resolved.collection.sources,
