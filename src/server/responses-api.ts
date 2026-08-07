@@ -121,7 +121,18 @@ export async function* streamResponses(
   if (req.conversationHistory)
     body.conversation_history = req.conversationHistory
   if (req.instructions) body.instructions = req.instructions
-  if (req.model) body.model = req.model
+  // Gateway's advertised `hermes-agent` is a virtual default, not a provider
+  // model. A persisted Workspace picker value must therefore be omitted so the
+  // Gateway, rather than Codex OAuth, resolves the configured primary model.
+  const requestedModel = req.model?.trim()
+  const normalizedModel = requestedModel?.toLowerCase()
+  if (
+    requestedModel &&
+    normalizedModel !== 'default' &&
+    normalizedModel !== 'hermes-agent'
+  ) {
+    body.model = requestedModel
+  }
   if (req.sessionId) body.session_id = req.sessionId
 
   const res = await fetch(`${CLAUDE_API}/v1/responses`, {
