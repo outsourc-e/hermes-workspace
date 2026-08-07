@@ -34,6 +34,7 @@ import {
 import {
   discardAbandonedNewSessionCards,
   registerNewSessionCardForDiscard,
+  registerNewSessionCardForPrimaryModel,
 } from '@/screens/chat/new-session-discard'
 import { showErrorToast } from '@/components/error-toast'
 import {
@@ -271,6 +272,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     setCreatingSession(true)
     try {
       const { card, discardToken } = await createSessionCard()
+      registerNewSessionCardForPrimaryModel(card.cardId)
       if (discardToken) {
         registerNewSessionCardForDiscard(card.cardId, discardToken)
       }

@@ -51,8 +51,23 @@ export function createNewSessionDiscardLifecycle(
   request: NewSessionDiscardRequest = requestDiscard,
 ) {
   const candidates = new Map<string, NewSessionDiscardCandidate>()
+  const primaryModelCandidates = new Set<string>()
 
   return {
+    /** Track an exact browser-created Card until its first send chooses a model. */
+    registerPrimaryModelCandidate(cardId: string): void {
+      if (cardId.trim()) primaryModelCandidates.add(cardId)
+    },
+
+    /**
+     * Claims the first-send default-model exemption for a Card created by this
+     * browser's New Session control. The claim is single-use so later sends use
+     * the Card's resolved gateway model as usual.
+     */
+    consumePrimaryModelCandidate(cardId: string): boolean {
+      return primaryModelCandidates.delete(cardId)
+    },
+
     register(cardId: string, discardToken: string): void {
       const candidate = { cardId, discardToken }
       if (isCandidate(candidate)) candidates.set(cardId, candidate)
@@ -61,6 +76,7 @@ export function createNewSessionDiscardLifecycle(
     /** A send has begun, so this Card must be retained even if navigation races. */
     retain(cardId: string): void {
       candidates.delete(cardId)
+      primaryModelCandidates.delete(cardId)
     },
 
     /**
@@ -78,6 +94,7 @@ export function createNewSessionDiscardLifecycle(
         const outcome = await request(candidate, options.keepalive === true)
         if (outcome === 'retry') continue
         candidates.delete(cardId)
+        primaryModelCandidates.delete(cardId)
         if (outcome === 'discarded') discarded.push(cardId)
       }
       return discarded
@@ -89,6 +106,10 @@ const newSessionDiscardLifecycle = createNewSessionDiscardLifecycle()
 
 export const registerNewSessionCardForDiscard =
   newSessionDiscardLifecycle.register
+export const registerNewSessionCardForPrimaryModel =
+  newSessionDiscardLifecycle.registerPrimaryModelCandidate
+export const consumeNewSessionCardPrimaryModel =
+  newSessionDiscardLifecycle.consumePrimaryModelCandidate
 export const retainNewSessionCard = newSessionDiscardLifecycle.retain
 export const discardAbandonedNewSessionCards =
   newSessionDiscardLifecycle.discardAbandoned

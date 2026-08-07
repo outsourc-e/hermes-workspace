@@ -6,6 +6,15 @@ const secondCardId = 'remote:second-card'
 const token = 'a'.repeat(43)
 
 describe('New Session discard lifecycle', () => {
+  it('marks only Cards created by New Session for a one-shot primary-model default', () => {
+    const lifecycle = createNewSessionDiscardLifecycle()
+    lifecycle.registerPrimaryModelCandidate(firstCardId)
+
+    expect(lifecycle.consumePrimaryModelCandidate(secondCardId)).toBe(false)
+    expect(lifecycle.consumePrimaryModelCandidate(firstCardId)).toBe(true)
+    expect(lifecycle.consumePrimaryModelCandidate(firstCardId)).toBe(false)
+  })
+
   it('discards only an abandoned Card and retains the active one', async () => {
     const request = vi.fn(() => Promise.resolve('discarded' as const))
     const lifecycle = createNewSessionDiscardLifecycle(request)

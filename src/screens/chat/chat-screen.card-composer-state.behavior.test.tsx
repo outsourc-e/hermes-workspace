@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useChatStore } from '../../stores/chat-store'
 import { useSessionModelStore } from '../../stores/session-model-store'
 import { ChatScreen } from './chat-screen'
+import { registerNewSessionCardForPrimaryModel } from './new-session-discard'
 import {
   cardDraftStorageKey,
   cardThinkingStorageKey,
@@ -254,7 +255,7 @@ type CapturedRequest = {
   body: Record<string, unknown>
 }
 
-function installHttp() {
+function installHttp(statusModels: Record<string, string> = {}) {
   const requests: Array<CapturedRequest> = []
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     await Promise.resolve()
@@ -290,9 +291,10 @@ function installHttp() {
     if (url.startsWith('/api/session-status?cardId=')) {
       const cardId = decodeURIComponent(url.split('=')[1] ?? '')
       const model =
-        cardId === cardB.cardId
+        statusModels[cardId] ??
+        (cardId === cardB.cardId
           ? 'anthropic/claude-4.6-sonnet'
-          : 'openrouter/model-a'
+          : 'openrouter/model-a')
       return jsonResponse({
         payload: {
           cards: [
@@ -429,8 +431,9 @@ describe('mounted Card-owned ChatScreen composer state', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses the model selected in the real Composer on the immediately following real ChatScreen request', async () => {
+  it('sends an explicit Composer model even for a New Session Card', async () => {
     const requests = installHttp()
+    registerNewSessionCardForPrimaryModel(cardA.cardId)
     await mountChatScreen(inputForCard(cardA))
 
     const controls = await screen.findByRole('button', {
@@ -450,6 +453,47 @@ describe('mounted Card-owned ChatScreen composer state', () => {
 
     await waitFor(() => expect(requests).toHaveLength(1))
     expect(requests[0]!.body.model).toBe('openrouter/model-b')
+    expect(requests[0]!.body.cardId).toBe(cardA.cardId)
+  })
+
+  it('omits a New Session Card model so Hermes selects its configured primary model', async () => {
+    const requests = installHttp({ [cardA.cardId]: 'hermes-agent' })
+    registerNewSessionCardForPrimaryModel(cardA.cardId)
+    await mountChatScreen(inputForCard(cardA))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', {
+          name: /Chat controls, current model:.*hermes-agent/i,
+        }),
+      ).toBeTruthy(),
+    )
+
+    const textbox = await screen.findByRole('textbox')
+    change(textbox, 'first default-model send')
+    click(screen.getByRole('button', { name: 'Send message' }))
+
+    await waitFor(() => expect(requests).toHaveLength(1))
+    expect(requests[0]!.body).not.toHaveProperty('model')
+    expect(requests[0]!.body.cardId).toBe(cardA.cardId)
+  })
+
+  it('keeps a pre-existing empty Card resolved model on its first send', async () => {
+    const requests = installHttp({ [cardA.cardId]: 'hermes-agent' })
+    await mountChatScreen(inputForCard(cardA))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', {
+          name: /Chat controls, current model:.*hermes-agent/i,
+        }),
+      ).toBeTruthy(),
+    )
+
+    const textbox = await screen.findByRole('textbox')
+    change(textbox, 'existing empty Card send')
+    click(screen.getByRole('button', { name: 'Send message' }))
+
+    await waitFor(() => expect(requests).toHaveLength(1))
+    expect(requests[0]!.body.model).toBe('hermes-agent')
     expect(requests[0]!.body.cardId).toBe(cardA.cardId)
   })
 

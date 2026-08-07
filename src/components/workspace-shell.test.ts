@@ -508,6 +508,9 @@ describe('workspace shell Session Card cutover', () => {
     expect(queryContext.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['chat', 'session-cards', 'list'],
     })
+    const { consumeNewSessionCardPrimaryModel } =
+      await import('../screens/chat/new-session-discard')
+    expect(consumeNewSessionCardPrimaryModel(createdCard.cardId)).toBe(true)
     expect(
       routerContext.navigate.mock.calls.some(
         ([target]) => target?.params?.sessionKey === 'new',
