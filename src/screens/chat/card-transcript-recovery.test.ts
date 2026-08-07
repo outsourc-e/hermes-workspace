@@ -910,6 +910,35 @@ describe('Card transcript recovery storage contract', () => {
     expect(readCardTranscriptRecovery(owner, { now })).toBeNull()
   })
 
+  it('keeps complete-history durability verified on an unchanged refetch when storage writes are denied', () => {
+    const complete: SessionCardHistoryResponse = {
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [message('assistant', 'already durable complete transcript')],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+    expect(
+      reconcileSessionCardHistoryResponse(complete).completeSnapshotDurability,
+    ).toBe('verified')
+
+    const blockedWrite = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(function () {
+        throw new DOMException(
+          'storage is temporarily unavailable',
+          'QuotaExceededError',
+        )
+      })
+
+    const repeated = reconcileSessionCardHistoryResponse(complete)
+
+    expect(repeated.completeSnapshotDurability).toBe('verified')
+    expect(blockedWrite).not.toHaveBeenCalled()
+  })
+
   it('does not acknowledge durable recovery from a session-only snapshot before tab close', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now)
     const accepted = message('user', 'survive the tab close', {

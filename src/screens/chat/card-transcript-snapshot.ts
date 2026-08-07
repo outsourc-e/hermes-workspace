@@ -281,16 +281,39 @@ function unionSnapshotMessages(
   return [...byIdentity.values()]
 }
 
+function newestSnapshot(
+  baseCandidates: Array<CardTranscriptSnapshotEnvelope>,
+  commitCandidates: Array<CardTranscriptSnapshotEnvelope>,
+): CardTranscriptSnapshotEnvelope | null {
+  const newestBase = [...baseCandidates].sort(compareSnapshots).at(-1)
+  const candidates = [...(newestBase ? [newestBase] : []), ...commitCandidates]
+  if (candidates.length === 0) return null
+  const newest = [...candidates].sort(compareSnapshots).at(-1)!
+  return { ...newest, messages: unionSnapshotMessages(candidates) }
+}
+
+function isPersistentStorage(storage: Storage): boolean {
+  try {
+    return storage === window.localStorage
+  } catch {
+    return false
+  }
+}
+
 function readSnapshotCandidates(cardId: string): {
   storages: Array<Storage>
   newest: CardTranscriptSnapshotEnvelope | null
+  persistentNewest: CardTranscriptSnapshotEnvelope | null
 } {
   const storages = browserStorages()
   const baseKey = cardTranscriptSnapshotStorageKey(cardId)
   const commitPrefix = `${baseKey}:commit:`
   const baseCandidates: Array<CardTranscriptSnapshotEnvelope> = []
   const commitCandidates: Array<CardTranscriptSnapshotEnvelope> = []
+  const persistentBaseCandidates: Array<CardTranscriptSnapshotEnvelope> = []
+  const persistentCommitCandidates: Array<CardTranscriptSnapshotEnvelope> = []
   for (const storage of storages) {
+    const persistent = isPersistentStorage(storage)
     let keys = [baseKey]
     try {
       keys.push(
@@ -307,8 +330,15 @@ function readSnapshotCandidates(cardId: string): {
     for (const key of keys) {
       const stored = readStoredSnapshot(storage, cardId, key)
       if (stored) {
-        if (key === baseKey) baseCandidates.push(stored.envelope)
-        else commitCandidates.push(stored.envelope)
+        const targets =
+          key === baseKey
+            ? persistent
+              ? [baseCandidates, persistentBaseCandidates]
+              : [baseCandidates]
+            : persistent
+              ? [commitCandidates, persistentCommitCandidates]
+              : [commitCandidates]
+        for (const target of targets) target.push(stored.envelope)
         continue
       }
       try {
@@ -318,13 +348,24 @@ function readSnapshotCandidates(cardId: string): {
       }
     }
   }
-  const newestBase = [...baseCandidates].sort(compareSnapshots).at(-1)
-  const candidates = [...(newestBase ? [newestBase] : []), ...commitCandidates]
-  if (candidates.length === 0) return { storages, newest: null }
-  const newest = [...candidates].sort(compareSnapshots).at(-1)!
   return {
     storages,
-    newest: { ...newest, messages: unionSnapshotMessages(candidates) },
+    newest: newestSnapshot(baseCandidates, commitCandidates),
+    persistentNewest: newestSnapshot(
+      persistentBaseCandidates,
+      persistentCommitCandidates,
+    ),
+  }
+}
+
+function sameSnapshotMessages(
+  left: Array<ChatMessage>,
+  right: Array<ChatMessage>,
+): boolean {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right)
+  } catch {
+    return false
   }
 }
 
@@ -359,8 +400,19 @@ export function writeCardTranscriptSnapshot(
     return null
   }
 
-  const { storages, newest } = readSnapshotCandidates(cardId)
+  const { storages, newest, persistentNewest } = readSnapshotCandidates(cardId)
   if (storages.length === 0) return null
+  // A complete Card response is commonly revalidated without changing its
+  // projection. Rewriting the same snapshot consumes a second copy of browser
+  // quota during the transaction and can turn an already durable transcript
+  // into a spurious storage warning. Reuse only a verified persistent mirror;
+  // a session-scoped snapshot must never authorize durable recovery.
+  if (
+    persistentNewest &&
+    sameSnapshotMessages(persistentNewest.messages, candidateMessages)
+  ) {
+    return persistentNewest
+  }
   const savedAt = Date.now()
   if (!validSavedAt(savedAt)) return null
   const revision = (newest?.revision ?? 0) + 1

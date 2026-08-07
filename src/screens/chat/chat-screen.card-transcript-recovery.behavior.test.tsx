@@ -800,6 +800,64 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     expectCardOnlyTranscriptBoundary(requests)
   })
 
+  it('does not warn again when an unchanged complete transcript already has a verified persistent snapshot', async () => {
+    const completeText =
+      'already durable complete transcript after revalidation'
+    const requests = mockHttp(() =>
+      completeHistory(parentCard, [
+        {
+          segmentKey: parentCard.canonicalSegmentKey,
+          message: {
+            id: 'already-durable-complete-transcript',
+            role: 'assistant',
+            content: completeText,
+          },
+        },
+      ]),
+    )
+    const mountedChat = await mountChatScreen(defaultInput())
+
+    await waitFor(() => expect(screen.getByText(completeText)).toBeTruthy())
+    expect(
+      screen.queryByText(
+        'Transcript recovery storage is unavailable. This complete transcript is not guaranteed to survive a reload until storage recovers.',
+      ),
+    ).toBeNull()
+
+    const originalSetItem = Storage.prototype.setItem
+    let snapshotWriteAttempts = 0
+    const storageSpy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(function (this: Storage, key, value) {
+        if (
+          this === window.localStorage &&
+          key.startsWith('workspace.card-transcript-snapshot.v1:')
+        ) {
+          snapshotWriteAttempts += 1
+          throw new DOMException(
+            'persistent transcript snapshot denied after it was already saved',
+            'QuotaExceededError',
+          )
+        }
+        return originalSetItem.call(this, key, value)
+      })
+
+    await React.act(async () => {
+      await mountedChat.queryClient.refetchQueries({
+        queryKey: sessionCardQueryKeys.history(parentCard.cardId),
+      })
+    })
+
+    expect(snapshotWriteAttempts).toBe(0)
+    expect(
+      screen.queryByText(
+        'Transcript recovery storage is unavailable. This complete transcript is not guaranteed to survive a reload until storage recovers.',
+      ),
+    ).toBeNull()
+    storageSpy.mockRestore()
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
   it('hydrates persisted partial Card streaming text after remount while history is stale and incomplete', async () => {
     const requests = mockHttp(() => ({
       ...completeHistory(parentCard),

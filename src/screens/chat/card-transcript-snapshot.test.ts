@@ -119,6 +119,27 @@ describe('Card transcript snapshot mirror arbitration', () => {
     ])
   })
 
+  it('reuses an unchanged verified persistent projection when later writes are denied', () => {
+    const messages = [message('already durable complete transcript')]
+    const first = writeCardTranscriptSnapshot(cardId, messages)
+    expect(first).not.toBeNull()
+
+    const blockedWrite = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(function () {
+        throw new DOMException(
+          'storage is temporarily unavailable',
+          'QuotaExceededError',
+        )
+      })
+
+    const repeated = writeCardTranscriptSnapshot(cardId, messages)
+
+    expect(repeated).toEqual(first)
+    expect(blockedWrite).not.toHaveBeenCalled()
+    expect(readCardTranscriptSnapshot(cardId)?.messages).toEqual(messages)
+  })
+
   it('round-trips complete histories beyond the former message and single-value caps', () => {
     const messages = Array.from({ length: 2_101 }, (_, index) => ({
       ...message(`history row ${index}`),
