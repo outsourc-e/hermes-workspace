@@ -141,4 +141,27 @@ describe('models route', () => {
     expect(json.models[0].id).toBe('nest-model')
     expect(json.models[0].provider).toBe('anthropic')
   })
+
+  it('uses the gateway model-options catalog for every model of the current provider', async () => {
+    const { modelsFromCurrentProviderOptions } = await importModels()
+
+    expect(
+      modelsFromCurrentProviderOptions(
+        {
+          providers: [
+            {
+              slug: 'openai-codex',
+              models: ['gpt-5.6-terra', 'gpt-5.6-codex', 'gpt-5.5'],
+            },
+            { slug: 'anthropic', models: ['claude-sonnet'] },
+          ],
+        },
+        'openai-codex',
+      ),
+    ).toEqual([
+      { id: 'gpt-5.6-terra', name: 'gpt-5.6-terra', provider: 'openai-codex' },
+      { id: 'gpt-5.6-codex', name: 'gpt-5.6-codex', provider: 'openai-codex' },
+      { id: 'gpt-5.5', name: 'gpt-5.5', provider: 'openai-codex' },
+    ])
+  })
 })
