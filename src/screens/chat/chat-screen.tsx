@@ -51,7 +51,10 @@ import {
   updateSessionCardTransientMessageByClientId,
   updateSessionLastMessage,
 } from './chat-queries'
-import { retainNewSessionCard } from './new-session-discard'
+import {
+  consumeNewSessionCardPrimaryModel,
+  retainNewSessionCard,
+} from './new-session-discard'
 import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatEmptyState } from './components/chat-empty-state'
@@ -2692,9 +2695,12 @@ export function ChatScreen({
       existingClientId = '',
       provisionalOwnerId = '',
     ) {
-      // A send is now in flight for this exact Card. Remove its browser-owned
-      // discard capability before any optimistic or network work can race with
-      // route navigation.
+      // Claim New Session's one-shot primary-model default before retaining the
+      // Card. Retaining removes the browser-owned creation/discard lifecycle
+      // before optimistic or network work can race with route navigation.
+      const isFirstSendFromNewSession = activeCard
+        ? consumeNewSessionCardPrimaryModel(activeCard.cardId)
+        : false
       if (activeCard) retainNewSessionCard(activeCard.cardId)
       // Read from ref so we always get the latest value without capturing it in deps
       const currentThinkingLevel = thinkingLevelRef.current
@@ -2827,9 +2833,16 @@ export function ChatScreen({
         }
       }
 
-      const requestModel = activeCard?.cardId
-        ? useSessionModelStore.getState().getModel(activeCard.cardId) ||
-          gatewayModel
+      // Only the browser-owned New Session flow gets a one-shot default-model
+      // exemption. An empty pre-existing Card still uses its resolved gateway
+      // model, and an explicit Card-owned selection always wins.
+      const cardId = activeCard?.cardId
+      const explicitCardModel = cardId
+        ? useSessionModelStore.getState().getModel(cardId)
+        : ''
+      const requestModel = cardId
+        ? explicitCardModel ||
+          (isFirstSendFromNewSession ? undefined : gatewayModel)
         : currentModel
       void startStreaming({
         sessionKey,
