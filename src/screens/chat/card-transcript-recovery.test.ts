@@ -939,6 +939,37 @@ describe('Card transcript recovery storage contract', () => {
     expect(blockedWrite).not.toHaveBeenCalled()
   })
 
+  it('does not mark a Gateway-complete transcript at risk when only its optional browser snapshot is denied', () => {
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      if (
+        this === window.localStorage &&
+        key.startsWith('workspace.card-transcript-snapshot.v1:')
+      ) {
+        throw new DOMException('optional snapshot denied', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, key, value)
+    })
+    const complete: SessionCardHistoryResponse = {
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [message('assistant', 'persisted by the external source')],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+
+    const reconciled = reconcileSessionCardHistoryResponse(complete)
+
+    expect(reconciled.completeSnapshotDurability).toBeUndefined()
+    expect(reconciled.messages).toEqual(complete.messages)
+  })
+
   it('does not acknowledge durable recovery from a session-only snapshot before tab close', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now)
     const accepted = message('user', 'survive the tab close', {

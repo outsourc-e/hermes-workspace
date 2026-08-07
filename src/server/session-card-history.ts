@@ -409,6 +409,27 @@ function adjacentContinuationOverlap(
   return 0
 }
 
+/**
+ * Gateway-originated conversations can contain an immediately repeated
+ * persistence row when an inbound platform retries the same delivery. The
+ * database row IDs differ, but the Card receives no platform delivery ID, so
+ * the complete role/content/timestamp evidence is the strongest available
+ * proof. Collapse only adjacent exact equivalents within one authoritative
+ * segment: intentional repeated turns remain intact unless they are
+ * indistinguishable retry copies.
+ */
+function collapseAdjacentSegmentDuplicates(
+  messages: Array<SessionCardUpstreamMessage>,
+): Array<SessionCardUpstreamMessage> {
+  const retained: Array<SessionCardUpstreamMessage> = []
+  for (const message of messages) {
+    const previous = retained.at(-1)
+    if (previous && continuationMessagesMatch(previous, message)) continue
+    retained.push(message)
+  }
+  return retained
+}
+
 type AggregatedCardHistory = {
   messages: Array<SessionCardHistoryEntry>
   missingSegments: Array<SessionCardHistoryMissingSegment>
@@ -472,7 +493,9 @@ async function aggregateCardSegmentHistory(
         hasContiguousLoadedHistory = false
         continue
       }
-      const segmentMessages = [...fetchedBatch.messages]
+      const segmentMessages = collapseAdjacentSegmentDuplicates(
+        fetchedBatch.messages,
+      )
       const batch = { ...fetchedBatch, messages: segmentMessages }
       retrievedSegments.push({ segmentKey, source, upstreamKey, batch })
       truncated ||= batch.truncated === true

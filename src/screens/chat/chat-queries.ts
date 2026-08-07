@@ -2077,13 +2077,23 @@ export function reconcileSessionCardHistoryResponse(
   } else if (isComplete) {
     // A complete projection must survive outside query memory before it is
     // allowed to acknowledge and remove any durable recovery overlay.
+    const recoveryBeforeSnapshot = readCardTranscriptRecovery(owner)
     const snapshot = writeCardTranscriptSnapshot(
       server.cardId,
       persistedMessages,
     )
-    completeSnapshotDurability = snapshot ? 'verified' : 'failed'
+    // A browser snapshot is only a recovery requirement while this browser has
+    // a locally accepted overlay which the Gateway has not yet fully proven.
+    // External/gateway-originated Cards already have a complete authoritative
+    // source projection, so a quota-denied optional cache must not claim their
+    // transcript is at risk on reload.
+    completeSnapshotDurability = snapshot
+      ? 'verified'
+      : recoveryBeforeSnapshot?.messages.length
+        ? 'failed'
+        : undefined
     if (!snapshot) {
-      recoveryMessages = readCardTranscriptRecovery(owner)?.messages ?? []
+      recoveryMessages = recoveryBeforeSnapshot?.messages ?? []
     } else {
       const acknowledgement =
         reconcileAcknowledgedCardTranscriptRecoveryMessages(

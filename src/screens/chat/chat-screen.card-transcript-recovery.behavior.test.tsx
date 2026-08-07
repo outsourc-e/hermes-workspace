@@ -745,6 +745,16 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
   it('warns when a complete transcript is visible but its durable snapshot fails, then clears after a verified retry', async () => {
     const completeText = 'complete transcript visible before durable retry'
+    replaceCardTranscriptRecoveryMessages({ cardId: parentCard.cardId }, [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'locally accepted message still recovering' },
+        ],
+        clientId: 'recovery-warning-client',
+        status: 'sent',
+      },
+    ])
     const requests = mockHttp(() =>
       completeHistory(parentCard, [
         {

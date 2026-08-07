@@ -563,6 +563,51 @@ describe('SessionCardHistoryService', () => {
     ])
   })
 
+  it('collapses adjacent Gateway retry copies within one segment', async () => {
+    const messages = source({
+      first: [
+        {
+          id: 'slack-delivery-first-write',
+          role: 'user',
+          content: 'please summarize this thread',
+          timestamp: 10,
+        },
+        {
+          id: 'slack-delivery-retry-write',
+          role: 'user',
+          content: 'please summarize this thread',
+          timestamp: 10,
+        },
+        {
+          id: 'assistant-first-write',
+          role: 'assistant',
+          content: 'Here is the summary.',
+          timestamp: 11,
+        },
+        {
+          id: 'assistant-retry-write',
+          role: 'assistant',
+          content: 'Here is the summary.',
+          timestamp: 11,
+        },
+      ],
+      second: [],
+      third: [],
+    })
+    const history = new SessionCardHistoryService({
+      cardService: cardService(() => chain()),
+      messageSource: messages,
+      cursorSecret: Buffer.from('history-test-secret'),
+    })
+
+    const result = await history.fetch({ cardId: 'first' })
+
+    expect(result.messages.map((entry) => entry.message.id)).toEqual([
+      'slack-delivery-first-write',
+      'assistant-first-write',
+    ])
+  })
+
   it('retains a colliding ID when the timestamp differs', async () => {
     const messages = source({
       first: [{ id: 'boundary', role: 'user', content: 'same', timestamp: 10 }],
