@@ -54,7 +54,7 @@ function ContextBarComponent({
     if (!cardId) return
     try {
       const res = await fetch(
-        `/api/session-status?cardId=${encodeURIComponent(cardId)}`,
+        `/api/session-status?cardId=${encodeURIComponent(cardId)}&usageScope=latest-continuation`,
       )
       if (!res.ok) return
       const usage = parseSessionCardStatusUsage(await res.json(), cardId)

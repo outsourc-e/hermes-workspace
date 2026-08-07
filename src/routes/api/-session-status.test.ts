@@ -154,6 +154,29 @@ describe('GET /api/session-status Card projection', () => {
     expect(serialized).not.toContain('segment')
   })
 
+  it('projects only the latest continuation segment when the Context Window scope is requested', async () => {
+    const response = await handler({
+      request: new Request(
+        'http://workspace.test/api/session-status?cardId=card%3Aalpha&usageScope=latest-continuation',
+      ),
+    })
+
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.payload.cards[0].usage).toEqual({
+      model: 'gpt-4.1',
+      modelProvider: 'openai',
+      inputTokens: 30,
+      outputTokens: 12,
+      totalTokens: 42,
+      contextPercent: 35,
+      maxTokens: 1000,
+      usedTokens: 350,
+    })
+    expect(mocks.getSession).toHaveBeenCalledTimes(1)
+    expect(mocks.getSession).toHaveBeenCalledWith('raw-tip-secret')
+  })
+
   it('omits a source-mismatched record instead of leaking or aggregating it', async () => {
     const resolved = resolvedRemoteCard()
     resolved.sourceBySegmentKey.set('remote:tip', 'dashboard')

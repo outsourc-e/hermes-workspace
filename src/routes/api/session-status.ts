@@ -49,6 +49,8 @@ type CardUsageProjection = {
   }
 }
 
+type CardUsageScope = 'aggregate' | 'latest-continuation'
+
 function estimateTokensFromText(text: string): number {
   const chars = text.trim().length
   return chars > 0 ? Math.max(1, Math.ceil(chars / 4)) : 0
@@ -149,6 +151,7 @@ async function readLocalSegmentUsage(
 
 async function projectCardUsage(
   resolved: ResolvedSessionCard,
+  scope: CardUsageScope = 'aggregate',
 ): Promise<CardUsageProjection | null> {
   if (!isExactCardProjection(resolved)) return null
 
@@ -156,8 +159,12 @@ async function projectCardUsage(
   const activeTransport = capabilities.dashboard.available
     ? 'dashboard'
     : 'gateway'
+  const segmentKeys =
+    scope === 'latest-continuation'
+      ? [resolved.card.canonicalSegmentKey]
+      : resolved.card.continuationSegmentKeys
   const segments = await Promise.all(
-    resolved.card.continuationSegmentKeys.map((segmentKey) =>
+    segmentKeys.map((segmentKey) =>
       resolved.card.canonicalSource === 'remote'
         ? capabilities.sessions
           ? readRemoteSegmentUsage(resolved, segmentKey, activeTransport)
@@ -236,7 +243,8 @@ export const Route = createFileRoute('/api/session-status')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
 
-        const cardId = new URL(request.url).searchParams.get('cardId')?.trim()
+        const searchParams = new URL(request.url).searchParams
+        const cardId = searchParams.get('cardId')?.trim()
         if (!cardId) {
           return json({ ok: true, payload: { cards: [] } })
         }
@@ -244,7 +252,12 @@ export const Route = createFileRoute('/api/session-status')({
         try {
           await ensureGatewayProbed()
           const resolved = await sessionCardService.resolveCard(cardId)
-          const card = await projectCardUsage(resolved)
+          const card = await projectCardUsage(
+            resolved,
+            searchParams.get('usageScope') === 'latest-continuation'
+              ? 'latest-continuation'
+              : 'aggregate',
+          )
           if (!card) {
             return json(
               { ok: false, error: 'Card usage unavailable' },
