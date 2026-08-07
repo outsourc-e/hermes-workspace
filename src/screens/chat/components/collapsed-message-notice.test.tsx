@@ -91,6 +91,8 @@ describe('CollapsedMessageNotice', () => {
     const details = container.querySelector('details')
     expect(details).not.toBeNull()
     expect(details?.open).toBe(false)
+    expect(details?.className).toContain('w-fit')
+    expect(details?.className).toContain('open:w-full')
     expect(screen.getByText('Delegation batch_7f20 Result')).toBeTruthy()
 
     const summary = container.querySelector('summary')

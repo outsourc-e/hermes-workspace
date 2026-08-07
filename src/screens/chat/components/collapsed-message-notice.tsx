@@ -65,7 +65,7 @@ export function CollapsedMessageNotice({
   return (
     <details
       className={cn(
-        'group/collapsed-message w-full max-w-[var(--chat-content-max-width)] overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]',
+        'group/collapsed-message w-fit max-w-[var(--chat-content-max-width)] overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] open:w-full',
         className,
       )}
       data-chat-collapsed-message={notice.kind}
