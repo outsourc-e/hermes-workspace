@@ -58,6 +58,26 @@ describe('openaiChat', () => {
     expect(JSON.parse(String(init.body))).not.toHaveProperty('model')
   })
 
+  it('omits the Gateway virtual hermes-agent alias even when stale Composer state sends it', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await openaiChat([{ role: 'user', content: 'hello' }], {
+      model: 'hermes-agent',
+      stream: false,
+    })
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('model')
+  })
+
   it('sends Hermes session continuity headers with authentication when available', async () => {
     process.env.HERMES_API_TOKEN = 'test-token'
     const fetchMock = vi
@@ -71,7 +91,7 @@ describe('openaiChat', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await openaiChat([{ role: 'user', content: 'hello' }], {
-      model: 'hermes-agent',
+      model: 'gpt-5.6-terra',
       sessionId: 'workspace-session-1',
     })
 
@@ -80,7 +100,7 @@ describe('openaiChat', () => {
     expect(headers.Authorization).toBe('Bearer test-token')
     expect(headers['X-Hermes-Session-Id']).toBe('workspace-session-1')
     expect(headers['X-Claude-Session-Id']).toBe('workspace-session-1')
-    expect(JSON.parse(String(init.body)).model).toBe('hermes-agent')
+    expect(JSON.parse(String(init.body)).model).toBe('gpt-5.6-terra')
   })
 
   it('sends Hermes session continuity headers even without a bearer token', async () => {

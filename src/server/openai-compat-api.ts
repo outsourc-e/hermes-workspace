@@ -83,10 +83,17 @@ export function buildRequestBody(
 ): OpenAIChatRequest {
   // Hermes Gateway advertises a virtual `hermes-agent` model for generic
   // OpenAI clients. Sending that alias back to a provider (notably Codex OAuth)
-  // is invalid; leave an unselected/default model absent so Gateway resolves its
-  // configured primary model. Explicit caller choices still pass through.
+  // is invalid, including when stale persisted Composer state supplies it. Leave
+  // the virtual alias and unselected/default models absent so Gateway resolves
+  // its configured primary model; other explicit caller choices still pass through.
+  const requestedModel = options.model?.trim()
+  const normalizedModel = requestedModel?.toLowerCase()
   const model =
-    options.model && options.model !== 'default' ? options.model : undefined
+    requestedModel &&
+    normalizedModel !== 'default' &&
+    normalizedModel !== 'hermes-agent'
+      ? requestedModel
+      : undefined
   return {
     ...(model ? { model } : {}),
     messages,
