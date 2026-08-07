@@ -594,6 +594,18 @@ function publishCandidate(
   cleanupOnFailure: boolean,
 ): PublishResult {
   const previous = readAggregateState(storage, cardId)
+  let existingAggregateRaw: string | null
+  try {
+    existingAggregateRaw = storage.getItem(aggregateKey(cardId))
+  } catch {
+    return { ok: false, quota: false }
+  }
+  // A nonempty v3 aggregate is authoritative even when one of its commits or
+  // chunks can no longer be read. Do not replace that reference set with a new
+  // one: callers must retain recovery and fail closed instead.
+  if (!previous && existingAggregateRaw !== null) {
+    return { ok: false, quota: false }
+  }
   const previousRaw = previous?.raw ?? null
   const payloadRaw = canonicalSerialized(messages)
   if (!payloadRaw || payloadRaw === '[]') return { ok: false, quota: false }

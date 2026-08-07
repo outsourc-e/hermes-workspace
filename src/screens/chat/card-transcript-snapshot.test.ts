@@ -234,6 +234,27 @@ describe('Card transcript snapshot v3', () => {
     expect(readCardTranscriptSnapshot(cardId)?.messages).toEqual(projection)
   })
 
+  it('fails closed and retains the aggregate when existing v3 chunks are unreadable', async () => {
+    installLocks()
+    const original = [message('known good', { id: 'good' })]
+    expect(await writeCardTranscriptSnapshot(cardId, original)).not.toBeNull()
+    const aggregate = `${cardTranscriptSnapshotStorageKey(cardId)}:aggregate`
+    const aggregateBefore = window.localStorage.getItem(aggregate)
+    const [chunkKey] = cardKeys('chunk')
+    expect(chunkKey).toBeDefined()
+    window.localStorage.setItem(chunkKey!, '{"corrupt":true}')
+
+    expect(
+      await writeCardTranscriptSnapshot(cardId, [
+        message('must not replace unreadable state', { id: 'new' }),
+      ]),
+    ).toBeNull()
+
+    expect(window.localStorage.getItem(aggregate)).toBe(aggregateBefore)
+    expect(cardKeys('commit')).toHaveLength(1)
+    expect(readCardTranscriptSnapshot(cardId)).toBeNull()
+  })
+
   it('rolls quota compaction back when the one retry still cannot fit', async () => {
     const duplicate = [message('reclaimable duplicate', { id: 'duplicate' })]
     expect(
