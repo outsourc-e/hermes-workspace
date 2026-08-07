@@ -15,7 +15,6 @@ import {
   probeGateway,
 } from './gateway-capabilities'
 import {
-  createSession as createDashboardSession,
   deleteSession as deleteDashboardSession,
   getLatestDescendant as getDashboardLatestDescendant,
   getSession as getDashboardSession,
@@ -250,10 +249,11 @@ export async function createSession(opts?: {
   title?: string
   model?: string
 }): Promise<ClaudeSession> {
-  if (getCapabilities().dashboard.available) {
-    const resp = await createDashboardSession(opts || {})
-    return resp.session as ClaudeSession
-  }
+  // The Dashboard owns the read projection but deliberately has no
+  // POST /api/sessions route. Creating through it returns 405 even when its
+  // session list is healthy. The Gateway is the authoritative session writer
+  // and persists an empty row immediately, which lets the Card resolver find
+  // it before the first chat message.
   const resp = await claudePost<{ session: ClaudeSession }>(
     '/api/sessions',
     opts || {},

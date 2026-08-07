@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   SessionForkUnavailableError,
+  createSession,
   forkSession,
   getLatestDescendant,
   getMessages,
@@ -76,6 +77,32 @@ beforeEach(() => {
 })
 
 describe('Session Card adapter foundations', () => {
+  it('creates a persisted session through the gateway when the dashboard is available for reads', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ session: { id: 'created-through-gateway' } }),
+          { status: 201, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createSession()).resolves.toEqual({
+      id: 'created-through-gateway',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('http://gateway.test/api/sessions', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer test-token',
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(dashboardMocks.createSession).not.toHaveBeenCalled()
+  })
+
   it('normalizes raw transport lineage fields through toSessionSummary', () => {
     const continuation = [
       {
