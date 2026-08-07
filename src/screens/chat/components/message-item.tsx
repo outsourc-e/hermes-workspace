@@ -2559,10 +2559,20 @@ function MessageItemComponent({
         }
         className={cn('flex flex-col items-start', wrapperClassName)}
       >
-        <CollapsedMessageNotice
-          text={rawMessageText}
-          notice={collapsedMessageNotice}
-        />
+        <div
+          data-chat-collapsed-message-row
+          className="group/collapsed-message-row grid w-full grid-cols-[24px_minmax(0,1fr)] items-start gap-x-2 md:gap-x-3"
+        >
+          <AssistantAvatar
+            size={24}
+            className="mt-0.5 group-has-[details[open]]/collapsed-message-row:hidden"
+          />
+          <CollapsedMessageNotice
+            text={rawMessageText}
+            notice={collapsedMessageNotice}
+            className="open:col-span-2"
+          />
+        </div>
       </div>
     )
   }
