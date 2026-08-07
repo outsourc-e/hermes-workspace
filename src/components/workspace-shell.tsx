@@ -21,11 +21,17 @@ import {
   useState,
 } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import type { AuthStatus } from '@/lib/claude-auth'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
+import {
+  createSessionCard,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
+import { showErrorToast } from '@/components/error-toast'
 import {
   CHAT_BOOTSTRAP_CARD_ID,
   buildChatCardNavigation,
@@ -90,6 +96,7 @@ type WorkspaceShellProps = {
 
 export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
@@ -234,14 +241,23 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (routeChatCardId !== null) setActiveChatCardId(routeChatCardId)
   }, [routeChatCardId, setActiveChatCardId])
 
-  const startNewChat = useCallback(() => {
+  const startNewChat = useCallback(async () => {
+    if (creatingSession) return
     setCreatingSession(true)
-    navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } }).then(
-      () => {
-        setCreatingSession(false)
-      },
-    )
-  }, [navigate])
+    try {
+      const { card } = await createSessionCard()
+      await queryClient.invalidateQueries({
+        queryKey: sessionCardQueryKeys.lists,
+      })
+      await navigate(buildChatCardNavigation(card.cardId))
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to create Session Card'
+      showErrorToast(message)
+    } finally {
+      setCreatingSession(false)
+    }
+  }, [creatingSession, navigate, queryClient])
 
   const handleSelectSession = useCallback(() => {
     // On mobile, collapse sidebar after selecting

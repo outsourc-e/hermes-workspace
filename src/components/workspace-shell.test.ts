@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { screen, waitFor, within } from '@testing-library/dom'
+import { fireEvent, screen, waitFor, within } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MOBILE_HAMBURGER_NAV_ITEMS } from './mobile-hamburger-menu'
@@ -445,6 +445,74 @@ describe('workspace shell Session Card cutover', () => {
     })
     expect(requestedPaths).not.toContain('/api/session-cards')
     expect(requestedPaths).not.toContain('/api/sessions')
+  })
+
+  it('creates a Session Card before routing New Session away from the bootstrap route', async () => {
+    installDesktopViewport()
+    routerContext.navigate.mockClear()
+    queryContext.invalidateQueries.mockClear()
+    const createdCard = {
+      ...sessionCardList.cards[0],
+      cardId: 'remote:created',
+      canonicalSegmentKey: 'remote:created',
+      continuationSegmentKeys: ['remote:created'],
+      continuationCount: 1,
+    }
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path =
+        typeof input === 'string'
+          ? input
+          : input instanceof Request
+            ? input.url
+            : input.toString()
+      if (path === '/api/session-cards' && init?.method === 'POST') {
+        return jsonResponse({
+          card: createdCard,
+          resolution: {
+            cardId: createdCard.cardId,
+            completeness: 'complete',
+            retryable: false,
+          },
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        })
+      }
+      if (path === '/api/session-cards?view=chat') {
+        return jsonResponse({ ...sessionCardList, totalCards: 1 })
+      }
+      if (path === '/api/auth-check') {
+        return jsonResponse({ authenticated: true, authRequired: false })
+      }
+      return jsonResponse({})
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await mountWorkspaceShell('/chat/new')
+    await React.act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'New Session' }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/session-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      expect(routerContext.navigate).toHaveBeenCalledWith(
+        buildChatCardNavigation('remote:created'),
+      )
+    })
+    expect(queryContext.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['chat', 'session-cards', 'list'],
+    })
+    expect(
+      routerContext.navigate.mock.calls.some(
+        ([target]) => target?.params?.sessionKey === 'new',
+      ),
+    ).toBe(false)
   })
 })
 

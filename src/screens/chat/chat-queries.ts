@@ -981,6 +981,18 @@ function parseSessionCardDetail(value: unknown): SessionCardDetailWire {
   }
 }
 
+export async function createSessionCard(): Promise<SessionCardDetailWire> {
+  return fetchAndParseSessionCardResponse(
+    () =>
+      fetch('/api/session-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      }),
+    parseSessionCardDetail,
+  )
+}
+
 export async function fetchSessionCard(
   cardId: string,
 ): Promise<SessionCardDetailWire> {

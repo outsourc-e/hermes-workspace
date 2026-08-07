@@ -5,11 +5,25 @@ import {
   SessionCardChatCursorError,
   sessionCardService,
 } from '../../server/session-card-service'
+import { createSession } from '../../server/claude-api'
 import {
   internalFailure,
   invalidRequest,
+  readJsonObject,
+  requireSessionCardJsonContentType,
   sanitizeSourceDiagnostics,
 } from './-session-card-http'
+
+function projectionUnavailable(): Response {
+  return json(
+    {
+      ok: false,
+      error: 'Session Card inventory is temporarily unavailable',
+      retryable: true,
+    },
+    { status: 503 },
+  )
+}
 
 function listCardsInput(
   request: Request,
@@ -92,6 +106,51 @@ export const Route = createFileRoute('/api/session-cards')({
             return invalidRequest('Invalid Session Card chat cursor')
           }
           return internalFailure('Unable to list Session Cards')
+        }
+      },
+      POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const contentTypeError = requireSessionCardJsonContentType(request)
+        if (contentTypeError) return contentTypeError
+        const body = await readJsonObject(request)
+        if (!body || Object.keys(body).length !== 0) {
+          return invalidRequest('Request body must be an empty JSON object')
+        }
+
+        try {
+          const session = await createSession()
+          const upstreamSessionKey = session.id.trim()
+          if (!upstreamSessionKey) {
+            return internalFailure('Unable to create Session Card')
+          }
+          sessionCardService.invalidateTopology()
+          const resolved =
+            await sessionCardService.resolveRemoteCardByUpstreamSession(
+              upstreamSessionKey,
+            )
+          if (
+            resolved.collection.completeness !== 'complete' ||
+            resolved.collection.retryable
+          ) {
+            return projectionUnavailable()
+          }
+          return json(
+            sanitizeSourceDiagnostics({
+              card: resolved.card,
+              resolution: {
+                cardId: resolved.card.cardId,
+                completeness: resolved.collection.completeness,
+                retryable: resolved.collection.retryable,
+              },
+              completeness: resolved.collection.completeness,
+              retryable: resolved.collection.retryable,
+              sources: resolved.collection.sources,
+            }),
+          )
+        } catch {
+          return internalFailure('Unable to create Session Card')
         }
       },
     },

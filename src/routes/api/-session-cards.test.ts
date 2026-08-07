@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   listCards: vi.fn(),
   listChatCards: vi.fn(),
   lookupCard: vi.fn(),
+  resolveRemoteCardByUpstreamSession: vi.fn(),
   resolveCard: vi.fn(),
   updateCardMetadata: vi.fn(),
   archiveCard: vi.fn(),
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   reserveBranchReplay: vi.fn(),
   completeBranchReplay: vi.fn(),
   reconcileBranchReplay: vi.fn(),
+  createSession: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -56,6 +58,8 @@ vi.mock('../../server/session-card-service', () => ({
     listCards: mocks.listCards,
     listChatCards: mocks.listChatCards,
     lookupCard: mocks.lookupCard,
+    resolveRemoteCardByUpstreamSession:
+      mocks.resolveRemoteCardByUpstreamSession,
     resolveCard: mocks.resolveCard,
     updateCardMetadata: mocks.updateCardMetadata,
     archiveCard: mocks.archiveCard,
@@ -79,6 +83,7 @@ vi.mock('../../server/session-card-history', () => ({
 vi.mock('../../server/claude-api', () => ({
   SessionForkUnavailableError: class SessionForkUnavailableError extends Error {},
   ensureGatewayProbed: mocks.ensureGatewayProbed,
+  createSession: mocks.createSession,
   forkSession: mocks.forkSession,
   deleteSession: mocks.deleteSession,
 }))
@@ -89,7 +94,9 @@ type GetHandler = (context: {
 }) => Promise<Response>
 type MutationHandler = GetHandler
 
-type ListTestRoute = { server: { handlers: { GET: GetHandler } } }
+type ListTestRoute = {
+  server: { handlers: { GET: GetHandler; POST: MutationHandler } }
+}
 type MetadataTestRoute = {
   server: { handlers: { GET: GetHandler; PATCH: MutationHandler } }
 }
@@ -100,6 +107,8 @@ type BranchTestRoute = {
 type HistoryTestRoute = { server: { handlers: { GET: GetHandler } } }
 
 const listHandler = (ListRoute as unknown as ListTestRoute).server.handlers.GET
+const createHandler = (ListRoute as unknown as ListTestRoute).server.handlers
+  .POST
 const metadataHandler = (MetadataRoute as unknown as MetadataTestRoute).server
   .handlers.PATCH
 const detailHandler = (MetadataRoute as unknown as MetadataTestRoute).server
@@ -296,6 +305,8 @@ beforeEach(() => {
     retryable: false,
     sources: [],
   })
+  mocks.resolveRemoteCardByUpstreamSession.mockResolvedValue(resolvedCard())
+  mocks.createSession.mockResolvedValue({ id: 'created-upstream-session' })
   mocks.ensureGatewayProbed.mockResolvedValue({ sessionFork: true })
   mocks.readBranchReplay.mockImplementation(
     (_cardId: string, requestKeyHash: string) =>
@@ -452,6 +463,47 @@ describe('GET /api/session-cards', () => {
       params: {},
     })
     expect(mixed.status).toBe(400)
+  })
+})
+
+describe('POST /api/session-cards', () => {
+  it('creates and returns one authoritative Session Card without exposing the upstream session key', async () => {
+    const response = await createHandler({
+      request: jsonRequest('/api/session-cards', 'POST', '{}'),
+      params: {},
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.createSession).toHaveBeenCalledWith()
+    expect(mocks.invalidateTopology).toHaveBeenCalledTimes(1)
+    expect(mocks.resolveRemoteCardByUpstreamSession).toHaveBeenCalledWith(
+      'created-upstream-session',
+    )
+    const body = await response.json()
+    expect(body).toMatchObject({
+      card: { cardId: 'remote:root' },
+      resolution: {
+        cardId: 'remote:root',
+        completeness: 'complete',
+        retryable: false,
+      },
+    })
+    expect(JSON.stringify(body)).not.toContain('created-upstream-session')
+  })
+
+  it('requires an empty JSON object before creating a Session Card', async () => {
+    const invalidBody = await createHandler({
+      request: jsonRequest('/api/session-cards', 'POST', '{"title":"ignored"}'),
+      params: {},
+    })
+    const wrongMediaType = await createHandler({
+      request: jsonRequest('/api/session-cards', 'POST', '{}', 'text/plain'),
+      params: {},
+    })
+
+    expect(invalidBody.status).toBe(400)
+    expect(wrongMediaType.status).toBe(415)
+    expect(mocks.createSession).not.toHaveBeenCalled()
   })
 })
 
