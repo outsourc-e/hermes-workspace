@@ -764,7 +764,11 @@ export const Route = createFileRoute('/api/send-stream')({
               canonicalSource: canonicalOperationSource,
               canonicalSegmentKey,
               canonicalTransport:
-                canonicalOperationSource === 'local' ? 'tmux' : 'gateway',
+                canonicalOperationSource === 'local'
+                  ? 'tmux'
+                  : resolved.card.canonicalTransport === 'dashboard'
+                    ? 'dashboard'
+                    : 'gateway',
             }
             const preflightOwner = await waitWithinStreamLifetime(
               resolveExactSessionCardOperationBinding(mutationBinding),
@@ -1042,7 +1046,8 @@ export const Route = createFileRoute('/api/send-stream')({
                 resolution.collection.completeness === 'complete' &&
                 !resolution.collection.retryable &&
                 resolution.card.canonicalSource === 'remote' &&
-                resolution.card.canonicalTransport === 'gateway' &&
+                (resolution.card.canonicalTransport === 'gateway' ||
+                  resolution.card.canonicalTransport === 'dashboard') &&
                 (resolution.card.relationshipKind === 'root' ||
                   resolution.card.relationshipKind === 'orphan') &&
                 resolution.card.parentCardId === undefined
@@ -1071,7 +1076,10 @@ export const Route = createFileRoute('/api/send-stream')({
                 parentCardId: null,
                 canonicalSource: 'remote',
                 canonicalSegmentKey,
-                canonicalTransport: 'gateway',
+                canonicalTransport:
+                  resolution.card.canonicalTransport === 'dashboard'
+                    ? 'dashboard'
+                    : 'gateway',
               }
               const preflightOwner = await waitWithinStreamLifetime(
                 resolveExactSessionCardOperationBinding(mutationBinding),

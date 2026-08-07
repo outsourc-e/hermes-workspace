@@ -64,6 +64,25 @@ describe('Session Card operation binding resolution', () => {
     expect(mocks.resolveCard).toHaveBeenCalledWith(binding.cardId)
   })
 
+  it('accepts a remote Card projected through the dashboard for gateway mutation', async () => {
+    const projected = resolvedCard()
+    mocks.resolveCard.mockResolvedValueOnce({
+      ...projected,
+      card: { ...projected.card, canonicalTransport: 'dashboard' },
+    })
+
+    await expect(
+      resolveExactSessionCardOperationBinding({
+        ...binding,
+        canonicalTransport: 'dashboard',
+      }),
+    ).resolves.toEqual({
+      kind: 'session-card-owner',
+      cardId: binding.cardId,
+      parentCardId: null,
+    })
+  })
+
   it('rejects the same Card after its canonical continuation rolls over', async () => {
     mocks.resolveCard.mockResolvedValueOnce(
       resolvedCard('remote:segment-b', [

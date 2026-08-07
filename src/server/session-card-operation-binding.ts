@@ -6,7 +6,7 @@ export type SessionCardOperationBinding = {
   parentCardId: string | null
   canonicalSource: 'local' | 'remote'
   canonicalSegmentKey: string
-  canonicalTransport: 'tmux' | 'gateway'
+  canonicalTransport: 'tmux' | 'gateway' | 'dashboard'
 }
 
 export type SessionCardOperationOwner = Pick<
@@ -34,7 +34,7 @@ export function parseSessionCardOperationBinding(
   value: unknown,
   expected: {
     source: 'local' | 'remote'
-    transport: 'tmux' | 'gateway'
+    transport: 'tmux' | 'gateway' | 'dashboard'
     canonicalSegmentKey?: string
   },
 ): SessionCardOperationBinding | null {
@@ -93,7 +93,7 @@ export async function resolveExactSessionCardOperationProjection(
     const transportMatches =
       binding.canonicalTransport === 'tmux'
         ? card.canonicalTransport === undefined
-        : card.canonicalTransport === 'gateway'
+        : card.canonicalTransport === binding.canonicalTransport
     if (
       resolved.collection.completeness !== 'complete' ||
       resolved.collection.retryable ||
@@ -155,6 +155,14 @@ export async function resolveSessionCardOperationBindingByUpstream(input: {
             upstreamKey,
           )
     const card = resolved.card
+    const canonicalTransport =
+      input.source === 'local'
+        ? 'tmux'
+        : card.canonicalTransport === 'gateway' ||
+            card.canonicalTransport === 'dashboard'
+          ? card.canonicalTransport
+          : null
+    if (!canonicalTransport) return null
     const binding = parseSessionCardOperationBinding(
       {
         kind: 'session-card-owner',
@@ -162,11 +170,11 @@ export async function resolveSessionCardOperationBindingByUpstream(input: {
         parentCardId: null,
         canonicalSource: input.source,
         canonicalSegmentKey: card.canonicalSegmentKey,
-        canonicalTransport: input.source === 'remote' ? 'gateway' : 'tmux',
+        canonicalTransport,
       },
       {
         source: input.source,
-        transport: input.source === 'remote' ? 'gateway' : 'tmux',
+        transport: canonicalTransport,
       },
     )
     if (
@@ -191,7 +199,7 @@ export async function resolveSessionCardOperationBindingByCardOwner(input: {
   cardId: string
   parentCardId?: string | null
   source: 'local' | 'remote'
-  transport: 'gateway' | 'tmux'
+  transport: 'gateway' | 'dashboard' | 'tmux'
 }): Promise<SessionCardOperationBinding | null> {
   const cardId = isExactSourceIdentity(input.cardId, input.source)
     ? input.cardId
@@ -203,7 +211,9 @@ export async function resolveSessionCardOperationBindingByCardOwner(input: {
     : null
   if (!cardId || (input.parentCardId && !parentCardId)) return null
   if (
-    (input.source === 'remote' && input.transport !== 'gateway') ||
+    (input.source === 'remote' &&
+      input.transport !== 'gateway' &&
+      input.transport !== 'dashboard') ||
     (input.source === 'local' && input.transport !== 'tmux')
   ) {
     return null

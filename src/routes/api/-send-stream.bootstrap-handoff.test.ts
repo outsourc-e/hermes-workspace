@@ -322,6 +322,13 @@ describe('send-stream bootstrap session handoff', () => {
       upstream: () => mocks.streamChat,
     },
     {
+      label: 'dashboard-projected gateway streamChat',
+      source: 'remote' as const,
+      canonicalTransport: 'dashboard' as const,
+      responses: false,
+      upstream: () => mocks.streamChat,
+    },
+    {
       label: 'local Responses',
       source: 'local' as const,
       responses: true,
@@ -335,7 +342,7 @@ describe('send-stream bootstrap session handoff', () => {
     },
   ])(
     'revalidates a delayed Card rollover before the $label mutation and returns 409',
-    async ({ source, responses, upstream }) => {
+    async ({ source, canonicalTransport, responses, upstream }) => {
       vi.stubEnv('HERMES_USE_RESPONSES', responses ? '1' : '0')
       const cardId = `${source}:mutation-card`
       const segmentKey = `${source}:mutation-segment`
@@ -345,7 +352,8 @@ describe('send-stream bootstrap session handoff', () => {
           cardId,
           canonicalSegmentKey: segmentKey,
           canonicalSource: source,
-          canonicalTransport: source === 'remote' ? 'gateway' : undefined,
+          canonicalTransport:
+            source === 'remote' ? (canonicalTransport ?? 'gateway') : undefined,
           continuationSegmentKeys: [cardId, segmentKey],
           continuationCount: 2,
           relationshipKind: 'root',
@@ -388,7 +396,8 @@ describe('send-stream bootstrap session handoff', () => {
           parentCardId: null,
           canonicalSource: source,
           canonicalSegmentKey: segmentKey,
-          canonicalTransport: source === 'remote' ? 'gateway' : 'tmux',
+          canonicalTransport:
+            source === 'remote' ? (canonicalTransport ?? 'gateway') : 'tmux',
         })
       })
       expect(upstream()).not.toHaveBeenCalled()
@@ -762,13 +771,13 @@ describe('send-stream bootstrap session handoff', () => {
     expect(mocks.createPersistedRun).not.toHaveBeenCalled()
   })
 
-  it('binds an existing enhanced main runtime to its exact remote Card before streaming', async () => {
+  it('binds a dashboard-projected enhanced main runtime to its exact remote Card before streaming', async () => {
     mocks.listSessions.mockResolvedValueOnce([{ id: 'existing-main-runtime' }])
     mocks.resolveRemoteCardByUpstreamSession.mockResolvedValueOnce({
       card: {
         cardId: 'remote:main-card',
         canonicalSource: 'remote',
-        canonicalTransport: 'gateway',
+        canonicalTransport: 'dashboard',
         canonicalSegmentKey: 'remote:main-tip',
         continuationSegmentKeys: ['remote:main-card', 'remote:main-tip'],
         continuationCount: 2,
@@ -827,6 +836,13 @@ describe('send-stream bootstrap session handoff', () => {
     })
     expect(mocks.resolveExactSessionCardOperationBinding).toHaveBeenCalledTimes(
       3,
+    )
+    expect(mocks.resolveExactSessionCardOperationBinding).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cardId: 'remote:main-card',
+        canonicalSegmentKey: 'remote:main-tip',
+        canonicalTransport: 'dashboard',
+      }),
     )
     expect(mocks.buildResolvedSessionHeaders).toHaveBeenCalledWith({
       sessionKey: 'remote:main-tip',
