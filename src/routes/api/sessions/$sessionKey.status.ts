@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import { withRenewedSession } from '../../../server/session-renewal'
 import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   ensureGatewayProbed,
@@ -36,11 +37,11 @@ export const Route = createFileRoute('/api/sessions/$sessionKey/status')({
         try {
           const session = await getSession(sessionKey)
           const result = toSessionSummary(session)
-          return json({
+          return withRenewedSession(request, json({
             ok: true,
             status: result.status ?? 'idle',
             ...result,
-          })
+          }))
         } catch (err) {
           return json(
             {

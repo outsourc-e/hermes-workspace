@@ -3,6 +3,7 @@ import { buildResolvedSessionHeaders } from '../../lib/send-stream-session-heade
 import { buildWorkspaceScopedTextMessage } from '../../lib/workspace-message-scope'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { withRenewedSession } from '../../server/session-renewal'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
 import {
@@ -1535,18 +1536,21 @@ export const Route = createFileRoute('/api/send-stream')({
           },
         })
 
-        return new Response(stream, {
-          headers: {
-            'Content-Type': 'text/event-stream; charset=utf-8',
-            'Cache-Control': 'no-cache, no-transform',
-            Connection: 'keep-alive',
-            'X-Accel-Buffering': 'no',
-            ...buildResolvedSessionHeaders({
-              sessionKey,
-              friendlyId: resolvedFriendlyId,
-            }),
-          },
-        })
+        return withRenewedSession(
+          request,
+          new Response(stream, {
+            headers: {
+              'Content-Type': 'text/event-stream; charset=utf-8',
+              'Cache-Control': 'no-cache, no-transform',
+              Connection: 'keep-alive',
+              'X-Accel-Buffering': 'no',
+              ...buildResolvedSessionHeaders({
+                sessionKey,
+                friendlyId: resolvedFriendlyId,
+              }),
+            },
+          }),
+        )
       },
     },
   },

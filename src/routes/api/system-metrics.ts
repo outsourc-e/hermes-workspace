@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { withRenewedSession } from '../../server/session-renewal'
 import {
   ensureGatewayProbed,
   getConnectionStatus,
@@ -173,7 +174,7 @@ export const Route = createFileRoute('/api/system-metrics')({
           },
         }
 
-        return Response.json(body)
+        return withRenewedSession(request, Response.json(body))
       },
     },
   },

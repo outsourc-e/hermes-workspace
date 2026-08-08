@@ -22,6 +22,8 @@ import {
 } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
+import { primeAuthSession } from '@/lib/auth-session-store'
+import { useAuthSession } from '@/hooks/use-auth-session'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
@@ -115,19 +117,19 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, [])
 
   const isClient = typeof window !== 'undefined'
+  const authSession = useAuthSession()
   // Both SSR and client start with the same value to avoid hydration mismatch.
   // The ConnectionStartupScreen overlay verifies the real status on mount.
-  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
   const [connectionVerified, setConnectionVerified] = useState(false)
 
   const authState = {
-    checked: !isClient || connectionVerified,
-    authenticated: authStatus?.authenticated ?? true,
-    authRequired: authStatus?.authRequired ?? false,
+    checked: !isClient || connectionVerified || authSession.lastCheckedAt !== null,
+    authenticated: authSession.status?.authenticated ?? true,
+    authRequired: authSession.status?.authRequired ?? false,
   }
 
   const handleStartupConnected = useCallback((status: AuthStatus) => {
-    setAuthStatus(status)
+    primeAuthSession(status)
     setConnectionVerified(true)
   }, [])
 
@@ -142,7 +144,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       try {
         const status = await fetchClaudeAuthStatus(3000)
         if (cancelled) return
-        setAuthStatus(status)
+        primeAuthSession(status)
         setConnectionVerified(true)
         return
       } catch {
@@ -158,7 +160,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           modelConfigured?: boolean
         }
         if (data?.ok || (data?.chatReady && data?.modelConfigured)) {
-          setAuthStatus({ authenticated: true, authRequired: false })
+          primeAuthSession({ authenticated: true, authRequired: false })
           setConnectionVerified(true)
         }
       } catch {

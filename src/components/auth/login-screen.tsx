@@ -1,10 +1,43 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { useAuthSession } from '@/hooks/use-auth-session'
 
 export function LoginScreen() {
+  const authSession = useAuthSession()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Reverse-proxy mode (no HERMES_PASSWORD): the server never requires a
+  // password, so /api/auth would just reject any submission with 400
+  // ("Authentication not required" — see src/routes/api/auth.ts). If this
+  // screen renders anyway (e.g. a transient markSessionExpired() bascule
+  // ahead of its own confirmation check, §7.2), show a reload prompt instead
+  // of a dead-end password field.
+  if (authSession.status?.authRequired === false) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 px-4">
+        <div className="w-full max-w-md text-center">
+          <div className="rounded-2xl bg-primary-100 px-8 py-10 shadow-xl shadow-primary-900/5 ring-1 ring-primary-200">
+            <h2 className="mb-2 text-lg font-semibold text-primary-900">
+              Session expired
+            </h2>
+            <p className="mb-6 text-sm text-primary-600">
+              Your authentication session has expired. Reload the page to
+              reconnect.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="w-full rounded-lg bg-accent-500 px-4 py-2.5 font-medium text-white transition-all hover:bg-accent-600 focus:outline-none focus:ring-2 focus:ring-accent-500/50"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { withRenewedSession } from '../../server/session-renewal'
 import {
   ensureBusStarted,
   subscribeToChatEvents,
@@ -100,14 +101,17 @@ export const Route = createFileRoute('/api/chat-events')({
           },
         })
 
-        return new Response(stream, {
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache, no-transform',
-            Connection: 'keep-alive',
-            'X-Accel-Buffering': 'no',
-          },
-        })
+        return withRenewedSession(
+          request,
+          new Response(stream, {
+            headers: {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache, no-transform',
+              Connection: 'keep-alive',
+              'X-Accel-Buffering': 'no',
+            },
+          }),
+        )
       },
     },
   },

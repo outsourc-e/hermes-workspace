@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react'
-import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
-
-const POLL_INTERVAL = 30_000
+import { useAuthSession } from '@/hooks/use-auth-session'
+import { checkAuthNow } from '@/lib/auth-session-store'
 
 type ClaudeHealthBannerProps = {
   enabled?: boolean
@@ -10,42 +8,17 @@ type ClaudeHealthBannerProps = {
 export function ClaudeHealthBanner({
   enabled = false,
 }: ClaudeHealthBannerProps) {
-  const [status, setStatus] = useState<'ok' | 'error' | 'checking'>('checking')
-  const [lastError, setLastError] = useState<string | null>(null)
+  const authSession = useAuthSession()
 
-  useEffect(() => {
-    if (!enabled) {
-      setStatus('checking')
-      setLastError(null)
-      return
-    }
+  if (!enabled) return null
+  if (authSession.phase !== 'unreachable' && authSession.phase !== 'suspended') {
+    return null
+  }
 
-    let cancelled = false
-
-    async function check() {
-      try {
-        await fetchClaudeAuthStatus()
-        if (!cancelled) {
-          setStatus('ok')
-          setLastError(null)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setStatus('error')
-          setLastError(err instanceof Error ? err.message : 'Connection failed')
-        }
-      }
-    }
-
-    check()
-    const interval = setInterval(check, POLL_INTERVAL)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [enabled])
-
-  if (!enabled || status === 'ok' || status === 'checking') return null
+  const suspended = authSession.phase === 'suspended'
+  const message = suspended
+    ? 'Hermes Agent unreachable — automatic retries suspended'
+    : `Hermes Agent unreachable${authSession.lastError ? ` — ${authSession.lastError}` : ''}`
 
   return (
     <div
@@ -56,22 +29,11 @@ export function ClaudeHealthBanner({
       }}
     >
       <span className="inline-block h-2 w-2 rounded-full bg-white/60 animate-pulse" />
-      <span>Hermes Agent unreachable{lastError ? ` — ${lastError}` : ''}</span>
+      <span>{message}</span>
       <button
         type="button"
         onClick={() => {
-          setStatus('checking')
-          fetchClaudeAuthStatus()
-            .then(() => {
-              setStatus('ok')
-              setLastError(null)
-            })
-            .catch((err) => {
-              setStatus('error')
-              setLastError(
-                err instanceof Error ? err.message : 'Connection failed',
-              )
-            })
+          void checkAuthNow('banner-retry')
         }}
         className="ml-2 rounded px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80"
         style={{ background: 'rgba(255,255,255,0.2)' }}
