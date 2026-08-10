@@ -244,7 +244,14 @@ export const Route = createFileRoute('/api/session-status')({
         }
 
         const searchParams = new URL(request.url).searchParams
-        const cardId = searchParams.get('cardId')?.trim()
+        const requestedCardId = searchParams.get('cardId')?.trim()
+        // Older Workspace bundles sent route bootstrap aliases as Card IDs.
+        // They do not identify Cards, but treating them as the aggregate request
+        // keeps an already-loaded client from surfacing a false usage error.
+        const cardId =
+          requestedCardId === 'main' || requestedCardId === 'new'
+            ? undefined
+            : requestedCardId
         if (!cardId) {
           return json({ ok: true, payload: { cards: [] } })
         }
