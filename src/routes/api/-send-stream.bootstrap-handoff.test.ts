@@ -409,6 +409,28 @@ describe('send-stream bootstrap session handoff', () => {
     )
   })
 
+  it('preserves an explicit New Session model without loading Hermes config', async () => {
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          message: 'keep my explicit model',
+          model: 'picked-model',
+        }),
+      }),
+    })
+    await response.text()
+
+    expect(mocks.resolveCurrentGatewayModel).not.toHaveBeenCalled()
+    expect(mocks.resolveSessionGatewayModel).toHaveBeenCalledWith(
+      'new',
+      'picked-model',
+    )
+    expect(mocks.createSession).toHaveBeenCalledWith({ model: 'picked-model' })
+  })
+
   it.each([
     {
       label: 'gateway streamChat',

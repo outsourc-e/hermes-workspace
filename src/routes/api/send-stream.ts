@@ -851,8 +851,7 @@ export const Route = createFileRoute('/api/send-stream')({
         // the active Hermes default once; later messages reuse the concrete model
         // remembered for their session. Explicit picker values always stay exact.
         const requestedModel =
-          rawSessionKey === 'new' ||
-          (!rawSessionKey && isConfiguredDefaultModelRequest(body.model))
+          isExplicitBootstrapSend && isConfiguredDefaultModelRequest(body.model)
             ? resolveCurrentGatewayModel(body.model)
             : resolveSessionGatewayModel(sessionKey, body.model)
         const requestModel = requestedModel ?? ''
