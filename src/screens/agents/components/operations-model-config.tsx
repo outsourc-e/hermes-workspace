@@ -254,16 +254,20 @@ export function OperationsModelConfig({
   routeRef,
   reasoningEffort,
   maxOutputTokens,
+  codexRuntime = 'hermes_default',
   onRouteChange,
   onReasoningEffortChange,
   onMaxOutputTokensChange,
+  onCodexRuntimeChange,
 }: {
   routeRef: string
   reasoningEffort?: string
   maxOutputTokens?: number
+  codexRuntime?: 'hermes_default' | 'codex_app_server'
   onRouteChange: (value: string) => void
   onReasoningEffortChange: (value: string | undefined) => void
   onMaxOutputTokensChange: (value: number | undefined) => void
+  onCodexRuntimeChange?: (value: 'hermes_default' | 'codex_app_server') => void
 }) {
   const [search, setSearch] = useState('')
   const [showPreviousVersions, setShowPreviousVersions] = useState(false)
@@ -345,6 +349,23 @@ export function OperationsModelConfig({
           ))}
         </select>
       </label>
+
+      {selected?.provider === 'openai-codex' ? (
+        <label className="block space-y-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
+          <span className="text-sm font-medium text-[var(--theme-text)]">Codex runtime</span>
+          <select
+            value={codexRuntime}
+            onChange={(event) => onCodexRuntimeChange?.(event.target.value as 'hermes_default' | 'codex_app_server')}
+            className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm text-[var(--theme-text)]"
+          >
+            <option value="hermes_default">Hermes default — Hermes owns tools and the agent loop</option>
+            <option value="codex_app_server">Codex app-server — native threads, approvals, steering, and interrupts</option>
+          </select>
+          <p className="text-xs text-[var(--theme-muted-2)]">
+            Applies on the next session or worker restart; this does not hot-swap a running process.
+          </p>
+        </label>
+      ) : null}
 
       {catalog.isLoading ? (
         <p className="text-xs text-[var(--theme-muted)]">

@@ -23,6 +23,7 @@ type ClaudeProfileSummary = {
   routeRef?: string
   reasoningEffort?: string
   maxOutputTokens?: number
+  codexRuntime?: 'hermes_default' | 'codex_app_server'
   description?: string
   systemPrompt?: string
   skillCount: number
@@ -37,6 +38,7 @@ export type GatewayConfigAgent = {
   model: string
   reasoningEffort?: string
   maxOutputTokens?: number
+  codexRuntime?: 'hermes_default' | 'codex_app_server'
   workspace?: string
   agentDir?: string
   description?: string
@@ -224,6 +226,7 @@ function normalizeAgentList(input: unknown): Array<GatewayConfigAgent> {
         typeof row.maxOutputTokens === 'number'
           ? row.maxOutputTokens
           : undefined,
+      codexRuntime: row.codexRuntime === 'codex_app_server' ? 'codex_app_server' : 'hermes_default',
       workspace: readString(row.workspace) || undefined,
       agentDir: readString(row.agentDir) || undefined,
       description: readString(row.description) || undefined,
@@ -267,6 +270,7 @@ async function fetchOperationsConfig(): Promise<ConfigPayload> {
     model: profile.routeRef || profile.model || '',
     reasoningEffort: profile.reasoningEffort,
     maxOutputTokens: profile.maxOutputTokens,
+    codexRuntime: profile.codexRuntime ?? 'hermes_default',
     workspace: profile.path,
     agentDir: profile.path,
     description: profile.description || '',
@@ -290,6 +294,7 @@ async function createClaudeProfile(input: {
     routeRef: string
     reasoningEffort?: string
     maxOutputTokens?: number
+    codexRuntime?: 'hermes_default' | 'codex_app_server'
   }
   cloneFrom?: string
 }) {
@@ -316,6 +321,7 @@ async function updateClaudeProfile(
     routeRef: string
     reasoningEffort?: string
     maxOutputTokens?: number
+    codexRuntime?: 'hermes_default' | 'codex_app_server'
   },
 ) {
   const response = await fetch('/api/profiles/update', {
@@ -690,6 +696,7 @@ export function useOperations() {
       model: string
       reasoningEffort?: string
       maxOutputTokens?: number
+      codexRuntime?: 'hermes_default' | 'codex_app_server'
       emoji: string
       systemPrompt: string
       description?: string
@@ -713,6 +720,7 @@ export function useOperations() {
               routeRef: input.model.trim(),
               reasoningEffort: input.reasoningEffort,
               maxOutputTokens: input.maxOutputTokens,
+              codexRuntime: input.codexRuntime,
             }
           : undefined,
       })
@@ -754,6 +762,7 @@ export function useOperations() {
       model: string
       reasoningEffort?: string
       maxOutputTokens?: number
+      codexRuntime?: 'hermes_default' | 'codex_app_server'
       emoji: string
       systemPrompt: string
     }) => {
@@ -768,6 +777,7 @@ export function useOperations() {
               routeRef: input.model.trim(),
               reasoningEffort: input.reasoningEffort,
               maxOutputTokens: input.maxOutputTokens,
+              codexRuntime: input.codexRuntime,
             }
           : undefined,
       )

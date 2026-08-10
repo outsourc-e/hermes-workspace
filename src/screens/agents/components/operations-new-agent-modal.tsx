@@ -49,6 +49,7 @@ export function OperationsNewAgentModal({
     model: string
     reasoningEffort?: string
     maxOutputTokens?: number
+    codexRuntime?: 'hermes_default' | 'codex_app_server'
     systemPrompt: string
     description?: string
   }) => Promise<unknown>
@@ -60,6 +61,7 @@ export function OperationsNewAgentModal({
   const [model, setModel] = useState(defaultModel)
   const [reasoningEffort, setReasoningEffort] = useState<string>()
   const [maxOutputTokens, setMaxOutputTokens] = useState<number>()
+  const [codexRuntime, setCodexRuntime] = useState<'hermes_default' | 'codex_app_server'>('hermes_default')
   const [description, setDescription] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
 
@@ -71,6 +73,7 @@ export function OperationsNewAgentModal({
     setModel(defaultModel)
     setReasoningEffort(undefined)
     setMaxOutputTokens(undefined)
+    setCodexRuntime('hermes_default')
     setDescription('')
     setSystemPrompt('')
   }, [defaultModel, open])
@@ -178,9 +181,11 @@ export function OperationsNewAgentModal({
             routeRef={model}
             reasoningEffort={reasoningEffort}
             maxOutputTokens={maxOutputTokens}
+            codexRuntime={codexRuntime}
             onRouteChange={setModel}
             onReasoningEffortChange={setReasoningEffort}
             onMaxOutputTokensChange={setMaxOutputTokens}
+            onCodexRuntimeChange={setCodexRuntime}
           />
         </div>
 
@@ -225,6 +230,7 @@ export function OperationsNewAgentModal({
                 model,
                 reasoningEffort,
                 maxOutputTokens,
+                codexRuntime,
                 systemPrompt,
                 description,
               }).then(() => onClose())

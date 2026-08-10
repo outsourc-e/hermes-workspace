@@ -27,6 +27,7 @@ export function OperationsAgentDetail({
     model: string
     reasoningEffort?: string
     maxOutputTokens?: number
+    codexRuntime?: 'hermes_default' | 'codex_app_server'
     emoji: string
     systemPrompt: string
   }) => Promise<unknown>
@@ -39,6 +40,7 @@ export function OperationsAgentDetail({
   const [model, setModel] = useState('')
   const [reasoningEffort, setReasoningEffort] = useState<string>()
   const [maxOutputTokens, setMaxOutputTokens] = useState<number>()
+  const [codexRuntime, setCodexRuntime] = useState<'hermes_default' | 'codex_app_server'>('hermes_default')
   const [systemPrompt, setSystemPrompt] = useState('')
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export function OperationsAgentDetail({
     setModel(agent.model || '')
     setReasoningEffort(agent.reasoningEffort)
     setMaxOutputTokens(agent.maxOutputTokens)
+    setCodexRuntime(agent.codexRuntime ?? 'hermes_default')
     setSystemPrompt(agent.meta.systemPrompt)
   }, [agent, open])
 
@@ -122,9 +125,11 @@ export function OperationsAgentDetail({
             routeRef={model}
             reasoningEffort={reasoningEffort}
             maxOutputTokens={maxOutputTokens}
+            codexRuntime={codexRuntime}
             onRouteChange={setModel}
             onReasoningEffortChange={setReasoningEffort}
             onMaxOutputTokensChange={setMaxOutputTokens}
+            onCodexRuntimeChange={setCodexRuntime}
           />
         </div>
 
@@ -162,6 +167,7 @@ export function OperationsAgentDetail({
                   model,
                   reasoningEffort,
                   maxOutputTokens,
+                  codexRuntime,
                   emoji,
                   systemPrompt,
                 })
