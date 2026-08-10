@@ -90,6 +90,7 @@
     "electron-builder": "^26.8.1",
     "esbuild": "^0.28.1",
     "eslint": "9.37.0",
+    "fake-indexeddb": "6.2.5",
     "jsdom": "^27.0.0",
     "prettier": "^3.5.3",
     "tsx": "^4.21.0",
