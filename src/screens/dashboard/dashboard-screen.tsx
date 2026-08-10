@@ -9,7 +9,7 @@ import {
   Sun02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -696,6 +696,7 @@ export function DashboardScreen() {
     if (n === 7 || n === 14 || n === 30) return n
     return 30
   })
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('dashboard.analyticsPeriod', String(period))
@@ -709,16 +710,23 @@ export function DashboardScreen() {
   const overviewQuery = useQuery<DashboardOverview>({
     queryKey: ['dashboard', 'overview', period],
     queryFn: async () => {
-      // achievements=5 (instead of 3) gives the Achievements rail
-      // card enough vertical mass to fill the gap below Top Models.
+      const res = await fetch(`/api/dashboard/overview?days=${period}`)
+      if (!res.ok) throw new Error(`overview ${res.status}`)
+      return (await res.json()) as DashboardOverview
+    },
+    staleTime: 5_000,
+    refetchInterval: 30_000,
+  })
+  // Achievement endpoints can initiate a full history scan.  They are an
+  // explicit, one-shot operator action rather than part of the polling query.
+  const achievementsMutation = useMutation<DashboardOverview, Error>({
+    mutationFn: async () => {
       const res = await fetch(
         `/api/dashboard/overview?days=${period}&achievements=5`,
       )
       if (!res.ok) throw new Error(`overview ${res.status}`)
       return (await res.json()) as DashboardOverview
     },
-    staleTime: 5_000,
-    refetchInterval: 30_000,
   })
   const overview = overviewQuery.data ?? null
   const stats = {
@@ -1086,7 +1094,29 @@ export function DashboardScreen() {
             we don't get the dangling gap Eric flagged in iter 007. */}
           <div className="flex min-h-full flex-col gap-3 lg:col-span-4">
             <WidgetShell id="achievements" layout={layout}>
-              <AchievementsCard achievements={overview?.achievements ?? null} />
+              {achievementsMutation.isSuccess ? (
+                <AchievementsCard
+                  achievements={achievementsMutation.data.achievements}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => achievementsMutation.mutate()}
+                  disabled={achievementsMutation.isPending}
+                  className="w-full rounded-xl border px-4 py-3 text-left text-xs transition-colors hover:bg-[var(--theme-card)]/80"
+                  style={{
+                    background: 'var(--theme-card)',
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-muted)',
+                  }}
+                >
+                  {achievementsMutation.isPending
+                    ? 'Loading achievements…'
+                    : achievementsMutation.isError
+                      ? 'Retry loading achievements'
+                      : 'Load achievements'}
+                </button>
+              )}
             </WidgetShell>
             <WidgetShell id="skills_usage" layout={layout}>
               <SkillsUsageCard

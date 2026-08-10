@@ -12,9 +12,15 @@ type QueryOptions = {
   queryFn: () => Promise<unknown>
 }
 
+type MutationOptions = {
+  mutationFn: () => Promise<unknown>
+}
+
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   queryOptions: [] as Array<QueryOptions>,
+  mutationOptions: [] as Array<MutationOptions>,
+  mutateAchievements: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-query', () => ({
@@ -27,6 +33,16 @@ vi.mock('@tanstack/react-query', () => ({
       status: 'success',
       isError: false,
       isFetching: false,
+    }
+  },
+  useMutation: (options: MutationOptions) => {
+    mocks.mutationOptions.push(options)
+    return {
+      mutate: mocks.mutateAchievements,
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+      data: undefined,
     }
   },
 }))
@@ -145,6 +161,8 @@ async function renderDashboard() {
 beforeEach(() => {
   mocks.navigate.mockReset()
   mocks.queryOptions.length = 0
+  mocks.mutationOptions.length = 0
+  mocks.mutateAchievements.mockReset()
   window.localStorage.clear()
 })
 
@@ -162,5 +180,40 @@ describe('Dashboard mounted Session Card inventory', () => {
     )
     expect(inventoryQueries).toEqual([])
     expect(screen.queryByText(/Recent Sessions/i)).toBeNull()
+  })
+
+  it('defers achievement requests until the operator explicitly loads them', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => new Response('{}'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await renderDashboard()
+
+    const initialOverviewQuery = mocks.queryOptions.find(
+      (option) =>
+        option.queryKey[0] === 'dashboard' && option.queryKey[1] === 'overview',
+    )
+    expect(initialOverviewQuery).toBeDefined()
+    await initialOverviewQuery?.queryFn()
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/dashboard/overview?days=30',
+    )
+
+    await React.act(async () => {
+      screen.getByRole('button', { name: 'Load achievements' }).click()
+      await Promise.resolve()
+    })
+
+    expect(mocks.mutateAchievements).toHaveBeenCalledTimes(1)
+    expect(initialOverviewQuery?.queryKey).toEqual([
+      'dashboard',
+      'overview',
+      30,
+    ])
+
+    const achievementMutation = mocks.mutationOptions.at(-1)
+    await achievementMutation?.mutationFn()
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/dashboard/overview?days=30&achievements=5',
+    )
   })
 })

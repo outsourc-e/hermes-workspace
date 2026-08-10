@@ -231,6 +231,12 @@ export type BuildOverviewOptions = {
   analyticsWindowDays?: number
   /** How many recent achievement unlocks to surface. Default 3. */
   achievementsLimit?: number
+  /**
+   * Achievement endpoints can start a full history scan in older Dashboard
+   * plugins. Keep them out of the routine overview refresh; callers opt in
+   * only after an operator asks to view the optional widget.
+   */
+  includeAchievements?: boolean
   /** How many log tail lines to surface. Default 24. */
   logsLimit?: number
 }
@@ -240,6 +246,7 @@ const DEFAULT_OPTIONS = {
   // window and gives the sparkline enough breathing room.
   analyticsWindowDays: 30,
   achievementsLimit: 3,
+  includeAchievements: false,
   logsLimit: 24,
 }
 
@@ -1106,7 +1113,13 @@ export async function buildDashboardOverview(
   options: BuildOverviewOptions & BuildOverviewExtraFetchers,
 ): Promise<DashboardOverview> {
   const opts = { ...DEFAULT_OPTIONS, ...options }
-  const { fetcher, analyticsWindowDays, achievementsLimit, logsLimit } = opts
+  const {
+    fetcher,
+    analyticsWindowDays,
+    achievementsLimit,
+    includeAchievements,
+    logsLimit,
+  } = opts
 
   const [
     statusRaw,
@@ -1128,11 +1141,18 @@ export async function buildDashboardOverview(
       ? safeJson<unknown>(options.gatewayFetcher, '/health/detailed')
       : Promise.resolve(null),
     safeJson<unknown>(fetcher, '/api/cron/jobs'),
-    safeJson<unknown>(
-      fetcher,
-      `/api/plugins/hermes-achievements/recent-unlocks?limit=${achievementsLimit}`,
-    ),
-    safeJson<unknown>(fetcher, '/api/plugins/hermes-achievements/achievements'),
+    includeAchievements
+      ? safeJson<unknown>(
+          fetcher,
+          `/api/plugins/hermes-achievements/recent-unlocks?limit=${achievementsLimit}`,
+        )
+      : Promise.resolve(null),
+    includeAchievements
+      ? safeJson<unknown>(
+          fetcher,
+          '/api/plugins/hermes-achievements/achievements',
+        )
+      : Promise.resolve(null),
     safeJson<unknown>(fetcher, '/api/model/info'),
     safeJson<unknown>(
       fetcher,
