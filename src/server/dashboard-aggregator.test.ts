@@ -35,6 +35,22 @@ describe('buildDashboardOverview', () => {
     expect(overview.analytics).toBeNull()
   })
 
+  it('does not trigger achievement scans for the standard dashboard overview', async () => {
+    const requestedPaths: Array<string> = []
+    const fetcher: DashboardFetcher = async (path) => {
+      requestedPaths.push(path)
+      return new Response('not found', { status: 404 })
+    }
+
+    await buildDashboardOverview({ fetcher })
+
+    expect(
+      requestedPaths.some((path) =>
+        path.startsWith('/api/plugins/hermes-achievements/'),
+      ),
+    ).toBe(false)
+  })
+
   it('parses /api/status into status + platforms', async () => {
     const fetcher = makeFetcher({
       '/api/status': {
@@ -305,6 +321,7 @@ describe('buildDashboardOverview', () => {
     const overview = await buildDashboardOverview({
       fetcher,
       achievementsLimit: 2,
+      includeAchievements: true,
     })
     expect(overview.achievements?.recentUnlocks).toHaveLength(2)
     expect(overview.achievements?.recentUnlocks[0]).toMatchObject({
