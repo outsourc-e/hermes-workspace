@@ -1202,6 +1202,103 @@ describe('SessionCardService collection and resolution', () => {
     )
   })
 
+  it('bubbles running validated child work to the owning root Card only while it remains active', async () => {
+    const rows = [
+      session('parent', { source: 'cli' }, 10),
+      session(
+        'child-a',
+        {
+          parentSessionId: 'parent',
+          relationshipType: 'child_session',
+          source: 'cli',
+          startedAt: 20,
+        },
+        20,
+      ),
+      session(
+        'child-b',
+        {
+          parentSessionId: 'parent',
+          relationshipType: 'child_session',
+          source: 'cli',
+          startedAt: 30,
+        },
+        30,
+      ),
+    ]
+    let now = 100
+    const service = new SessionCardService({
+      remoteSource: {
+        source: 'remote',
+        listPage: () => Promise.resolve(page(rows, 0, rows.length)),
+      },
+      localSource: null,
+      metadataStore: metadataStore(),
+      now: () => now,
+      projectionCacheTtlMs: 60_000,
+    })
+
+    await service.observeCardActivity({
+      cardId: 'remote:parent',
+      upstreamSessionKey: 'parent',
+      runId: 'parent-run',
+      state: 'running',
+    })
+    now = 200
+    await service.observeCardActivity({
+      cardId: 'remote:parent',
+      upstreamSessionKey: 'parent',
+      runId: 'parent-run',
+      state: 'completed',
+    })
+    now = 300
+    await service.observeChildLifecycle({
+      parentCardId: 'remote:parent',
+      childUpstreamSessionKey: 'child-a',
+      runId: 'child-a-run',
+      status: 'running',
+    })
+
+    expect((await service.listCards()).cards[0]).toMatchObject({
+      cardId: 'remote:parent',
+      activity: { state: 'running', updatedAt: 300 },
+      childNodes: expect.arrayContaining([
+        expect.objectContaining({ cardId: 'remote:child-a', status: 'running' }),
+      ]),
+    })
+
+    now = 400
+    await service.observeChildLifecycle({
+      parentCardId: 'remote:parent',
+      childUpstreamSessionKey: 'child-b',
+      runId: 'child-b-run',
+      status: 'running',
+    })
+    now = 500
+    await service.observeChildLifecycle({
+      parentCardId: 'remote:parent',
+      childUpstreamSessionKey: 'child-a',
+      runId: 'child-a-run',
+      status: 'complete',
+    })
+    expect((await service.listCards()).cards[0]?.activity).toEqual({
+      state: 'running',
+      updatedAt: 400,
+    })
+
+    now = 600
+    await service.observeChildLifecycle({
+      parentCardId: 'remote:parent',
+      childUpstreamSessionKey: 'child-b',
+      runId: 'child-b-run',
+      status: 'complete',
+    })
+    expect((await service.listCards()).cards[0]?.activity).toEqual({
+      state: 'completed',
+      updatedAt: 200,
+    })
+  })
+
   it('rejects superseded terminals and terminal-to-running regressions for one child binding', async () => {
     const rows = [
       session('parent', { source: 'cli' }, 10),

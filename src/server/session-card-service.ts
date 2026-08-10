@@ -2004,6 +2004,47 @@ export class SessionCardService {
     return activityByCardId
   }
 
+  /**
+   * A direct child run remains owned by its child Card, but its parent is the
+   * user-facing Session Card. Surface a running child on that parent so a
+   * delegated/subagent run cannot disappear simply because the parent stream
+   * has reached a terminal event. Terminal child states deliberately do not
+   * become parent activity: after the last child stops, the parent's own
+   * authoritative activity (if any) is shown again.
+   */
+  private bubbledRootActivity(
+    directActivityByCardId: ReadonlyMap<string, SessionCardActivity>,
+    childActivityByParentCardId: ReadonlyMap<
+      string,
+      ReadonlyMap<string, { status: SessionCardChildStatus; updatedAt: number }>
+    >,
+  ): ReadonlyMap<string, SessionCardActivity> {
+    const activityByCardId = new Map(directActivityByCardId)
+    for (const [parentCardId, childActivity] of childActivityByParentCardId) {
+      let latestRunningChildAt: number | undefined
+      for (const child of childActivity.values()) {
+        if (
+          child.status === 'running' &&
+          (latestRunningChildAt === undefined ||
+            child.updatedAt > latestRunningChildAt)
+        ) {
+          latestRunningChildAt = child.updatedAt
+        }
+      }
+      if (latestRunningChildAt === undefined) continue
+
+      const direct = activityByCardId.get(parentCardId)
+      if (direct?.state === 'running' && direct.updatedAt >= latestRunningChildAt) {
+        continue
+      }
+      activityByCardId.set(parentCardId, {
+        state: 'running',
+        updatedAt: latestRunningChildAt,
+      })
+    }
+    return activityByCardId
+  }
+
   private async freshProjection(): Promise<FreshProjection> {
     const cached = this.projectionCache
     if (cached && cached.expiresAt > this.now()) return cached.value
@@ -2041,12 +2082,16 @@ export class SessionCardService {
       baseProjection,
       collection,
     )
+    const bubbledActivityByCardId = this.bubbledRootActivity(
+      activityByCardId,
+      childActivityByParentCardId,
+    )
     const projection =
-      childActivityByParentCardId.size || activityByCardId.size
+      childActivityByParentCardId.size || bubbledActivityByCardId.size
         ? projectSessionCards(collection.sessions, {
             cardMetadata,
             childActivityByParentCardId,
-            activityByCardId,
+            activityByCardId: bubbledActivityByCardId,
           })
         : baseProjection
     return {
@@ -2340,6 +2385,7 @@ export class SessionCardService {
       binding,
       supersededRunIds,
     })
+    this.invalidateProjectionCache()
     return observation
   }
 

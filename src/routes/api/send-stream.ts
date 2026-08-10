@@ -2498,6 +2498,18 @@ export const Route = createFileRoute('/api/send-stream')({
                           }
                           sendEvent('card_child_activity', childActivity)
                           publishChatEvent('card_child_activity', childActivity)
+                          // The Card inventory is the root Card's public
+                          // activity projection. A child lifecycle mutation can
+                          // make that root busy (or clear the final busy child),
+                          // so wake every mounted inventory immediately rather
+                          // than waiting for its polling fallback.
+                          const cardActivityInvalidation = {
+                            ...childObservation,
+                            activity: event,
+                            source: 'child_lifecycle',
+                          }
+                          emitCardActivityToStream(cardActivityInvalidation)
+                          publishCardActivityEvent(cardActivityInvalidation)
                           return
                         }
                       }

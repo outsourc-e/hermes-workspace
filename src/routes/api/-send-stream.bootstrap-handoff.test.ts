@@ -1953,6 +1953,43 @@ describe('send-stream bootstrap session handoff', () => {
       { status: 'error', activity: 'error' },
     ])
     expect(mocks.publishChatEvent).toHaveBeenCalledTimes(4)
+    expect(mocks.publishCardActivityEvent.mock.calls.map(([payload]) => ({
+      cardId: payload.cardId,
+      childCardId: payload.childCardId,
+      source: payload.source,
+    }))).toEqual([
+      {
+        cardId: 'remote:parent-card',
+        childCardId: 'remote:child-card',
+        source: 'child_lifecycle',
+      },
+      {
+        cardId: 'remote:parent-card',
+        childCardId: 'remote:child-card',
+        source: 'child_lifecycle',
+      },
+      {
+        cardId: 'remote:parent-card',
+        childCardId: 'remote:child-card',
+        source: 'child_lifecycle',
+      },
+      {
+        cardId: 'remote:parent-card',
+        childCardId: 'remote:child-card',
+        source: 'child_lifecycle',
+      },
+    ])
+    expect(
+      events.filter(({ event }) => event === 'card_activity').map(({ data }) => ({
+        cardId: data.cardId,
+        childCardId: data.childCardId,
+        source: data.source,
+      })),
+    ).toEqual(mocks.publishCardActivityEvent.mock.calls.map(([payload]) => ({
+      cardId: payload.cardId,
+      childCardId: payload.childCardId,
+      source: payload.source,
+    })))
     expect(events.some(({ event }) => event === 'card_handoff')).toBe(false)
     expect(events.some(({ event }) => event === 'session_handoff')).toBe(false)
     expect(events.filter(({ event }) => event === 'chunk')).toEqual([
