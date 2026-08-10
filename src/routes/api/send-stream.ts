@@ -2643,6 +2643,10 @@ export const Route = createFileRoute('/api/send-stream')({
                           // upstream run to completion, but it cannot establish a
                           // public or durable identity for an unresolved bootstrap.
                           sessionKey = sessionHandoff.sessionKey
+                          rememberConfiguredSessionModel(
+                            sessionKey,
+                            requestedModel,
+                          )
                           liveBaselineSessionKey = sessionHandoff.sessionKey
                           liveBaselineCount = 0
                           parentLifecycleEligible = true
@@ -2675,6 +2679,10 @@ export const Route = createFileRoute('/api/send-stream')({
                             return
                           }
                           sessionKey = successorUpstreamSessionKey
+                          rememberConfiguredSessionModel(
+                            sessionKey,
+                            requestedModel,
+                          )
                           liveBaselineSessionKey = successorUpstreamSessionKey
                           liveBaselineCount = 0
                           resolvedFriendlyId = successorFriendlyId
