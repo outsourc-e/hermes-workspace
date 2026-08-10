@@ -4,6 +4,18 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Stable launches are reserved for the persistent integration checkout. A linked
+# worktree uses a .git file, and any other branch could serve unreviewed code.
+if [[ ! -d "$ROOT/.git" ]]; then
+  echo "[stable] refusing non-canonical Workspace checkout: $ROOT" >&2
+  exit 1
+fi
+BRANCH="$(git -C "$ROOT" branch --show-current 2>/dev/null || true)"
+if [[ "$BRANCH" != "picknik-fixes" ]]; then
+  echo "[stable] refusing Workspace branch ${BRANCH:-detached-or-unknown}; expected picknik-fixes" >&2
+  exit 1
+fi
+
 # Load workspace configuration before deriving runtime settings or building.
 # Services and non-interactive shells often do not export the .env values, which
 # can leave the stable launcher without Hermes API/dashboard tokens or URLs.
