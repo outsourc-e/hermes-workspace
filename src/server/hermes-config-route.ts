@@ -9,6 +9,7 @@ import { isAuthenticated } from './auth-middleware'
 import {
   ensureGatewayProbed,
   getCapabilities,
+  isLocalhostDeployment,
 } from './gateway-capabilities'
 import { normalizeHermesConfigState } from './hermes-config-migration'
 import {
@@ -23,6 +24,7 @@ import {
   getDiscoveredModels,
   getDiscoveryStatus,
 } from './local-provider-discovery'
+import { isOpenRouterModelRef } from './orchestration-policy'
 
 type AuthResult = Response | true
 
@@ -35,6 +37,8 @@ const ACTION_MESSAGES: Record<string, string> = {
 }
 
 const LEGACY_SAVE_MESSAGE = 'Saved.'
+const OPENROUTER_REJECTED = 'OpenRouter assignments are not permitted.'
+const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 
 const PatchActionSchema = z.discriminatedUnion('action', [
   z.object({
@@ -90,6 +94,10 @@ function unavailablePayload(extra: Record<string, unknown> = {}): Response {
   })
 }
 
+function configIsReachable(): boolean {
+  return getCapabilities().config || isLocalhostDeployment()
+}
+
 export async function handleHermesConfigGet({
   request,
 }: {
@@ -99,7 +107,7 @@ export async function handleHermesConfigGet({
   if (auth !== true) return auth
 
   const paths = resolveHermesConfigPaths()
-  if (!getCapabilities().config) {
+  if (!configIsReachable()) {
     return unavailablePayload({ paths, claudeHome: paths.hermesHome })
   }
 
@@ -132,6 +140,7 @@ function deepMerge(
   source: Record<string, unknown>,
 ): void {
   for (const [key, value] of Object.entries(source)) {
+    if (UNSAFE_OBJECT_KEYS.has(key)) continue
     if (
       value &&
       typeof value === 'object' &&
@@ -191,6 +200,74 @@ function applyLegacyEnvBody(
   fs.writeFileSync(envPath, stringifyEnv(current), 'utf-8')
 }
 
+function isOpenRouterUrl(value: string): boolean {
+  try {
+    const trimmed = value.trim().replace(/\\/g, '/')
+    let parsed: URL
+    try {
+      parsed = new URL(trimmed)
+    } catch {
+      parsed = new URL(
+        trimmed.startsWith('//') ? `https:${trimmed}` : `https://${trimmed}`,
+      )
+    }
+    const hostname = parsed.hostname.toLowerCase().replace(/\.+$/, '')
+    return hostname === 'openrouter.ai' || hostname.endsWith('.openrouter.ai')
+  } catch {
+    return false
+  }
+}
+
+function containsUnsafeObjectKey(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(containsUnsafeObjectKey)
+  if (!value || typeof value !== 'object') return false
+  return Object.entries(value).some(
+    ([key, child]) =>
+      UNSAFE_OBJECT_KEYS.has(key) || containsUnsafeObjectKey(child),
+  )
+}
+
+const OPENROUTER_ASSIGNMENT_PATH =
+  /(?:provider|model|route|fallback|base_?url|api_?base)/i
+
+function containsOpenRouter(value: unknown, path: string[] = []): boolean {
+  if (typeof value === 'string') {
+    if (!path.some((segment) => OPENROUTER_ASSIGNMENT_PATH.test(segment))) {
+      return false
+    }
+    return isOpenRouterModelRef(value) || isOpenRouterUrl(value)
+  }
+  if (Array.isArray(value)) {
+    return value.some((child) => containsOpenRouter(child, path))
+  }
+  if (!value || typeof value !== 'object') return false
+  return Object.entries(value).some(([key, child]) => {
+    const parentIsProviderMap = path.some((segment) =>
+      /^(?:providers|custom_providers)$/i.test(segment),
+    )
+    if (parentIsProviderMap && /^openrouter$/i.test(key)) return true
+    return containsOpenRouter(child, [...path, key])
+  })
+}
+
+function patchAssignsOpenRouter(
+  patch: z.infer<typeof PatchActionSchema>,
+): boolean {
+  if (patch.action === 'set-default-model') {
+    return (
+      /^openrouter$/i.test(patch.providerId.trim()) ||
+      isOpenRouterModelRef(patch.modelId)
+    )
+  }
+  if (patch.action === 'set-custom-provider') {
+    return (
+      /^openrouter$/i.test(patch.provider.name.trim()) ||
+      isOpenRouterUrl(patch.provider.baseUrl)
+    )
+  }
+  return false
+}
+
 export async function handleHermesConfigPatch({
   request,
 }: {
@@ -199,7 +276,7 @@ export async function handleHermesConfigPatch({
   const auth = await authorize(request)
   if (auth !== true) return auth
 
-  if (!getCapabilities().config) {
+  if (!configIsReachable()) {
     return new Response(
       JSON.stringify(
         createCapabilityUnavailablePayload('config', {
@@ -231,6 +308,12 @@ export async function handleHermesConfigPatch({
         { status: 400 },
       )
     }
+    if (patchAssignsOpenRouter(parsed.data)) {
+      return Response.json(
+        { ok: false, error: OPENROUTER_REJECTED },
+        { status: 400 },
+      )
+    }
     const result = applyHermesConfigPatch(paths, parsed.data)
     return Response.json({ ...result, message: ACTION_MESSAGES[parsed.data.action] })
   }
@@ -239,6 +322,20 @@ export async function handleHermesConfigPatch({
   if (!legacy.success) {
     return Response.json(
       { ok: false, error: 'Invalid request body', issues: legacy.error.issues },
+      { status: 400 },
+    )
+  }
+
+  if (legacy.data.config && containsUnsafeObjectKey(legacy.data.config)) {
+    return Response.json(
+      { ok: false, error: 'Unsafe configuration key' },
+      { status: 400 },
+    )
+  }
+
+  if (legacy.data.config && containsOpenRouter(legacy.data.config)) {
+    return Response.json(
+      { ok: false, error: OPENROUTER_REJECTED },
       { status: 400 },
     )
   }

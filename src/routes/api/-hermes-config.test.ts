@@ -3,6 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const gatewayState = vi.hoisted(() => ({ config: true, local: true }))
+
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: (_path: string) => (opts: any) => opts,
 }))
@@ -13,7 +15,8 @@ vi.mock('../../server/auth-middleware', () => ({
 
 vi.mock('../../server/gateway-capabilities', () => ({
   ensureGatewayProbed: vi.fn(),
-  getCapabilities: () => ({ config: true }),
+  getCapabilities: () => ({ config: gatewayState.config }),
+  isLocalhostDeployment: () => gatewayState.local,
 }))
 
 vi.mock('../../server/local-provider-discovery', () => ({
@@ -32,6 +35,8 @@ function setEnv(key: string, value: string | undefined) {
 }
 
 beforeEach(() => {
+  gatewayState.config = true
+  gatewayState.local = true
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-config-route-'))
   setEnv('HERMES_HOME', tmpHome)
   setEnv('CLAUDE_HOME', undefined)
@@ -87,8 +92,8 @@ describe('canonical /api/hermes-config route', () => {
         method: 'PATCH',
         body: JSON.stringify({
           action: 'set-default-model',
-          providerId: 'openrouter',
-          modelId: 'auto',
+          providerId: 'openai-codex',
+          modelId: 'gpt-5.6-sol',
         }),
       }),
     })
@@ -97,7 +102,138 @@ describe('canonical /api/hermes-config route', () => {
     expect(body).toMatchObject({ ok: true, message: 'Default model updated.' })
     expect(
       fs.readFileSync(path.join(tmpHome, 'config.yaml'), 'utf-8'),
-    ).toMatch(/provider: openrouter/)
+    ).toMatch(/provider: openai-codex/)
+  })
+
+  it('PATCH rejects OpenRouter action writes without touching config', async () => {
+    const handlers = await loadHandlers('./hermes-config')
+    for (const payload of [
+      {
+        action: 'set-default-model',
+        providerId: 'OpenRouter',
+        modelId: 'anthropic/claude-opus',
+      },
+      {
+        action: 'set-custom-provider',
+        provider: {
+          name: 'gateway',
+          baseUrl: 'https://openrouter.ai/api/v1',
+        },
+      },
+      {
+        action: 'set-custom-provider',
+        provider: {
+          name: 'gateway-fqdn',
+          baseUrl: 'https://openrouter.ai./api/v1',
+        },
+      },
+      {
+        action: 'set-custom-provider',
+        provider: {
+          name: 'gateway-schemeless',
+          baseUrl: 'openrouter.ai/api/v1',
+        },
+      },
+      {
+        action: 'set-custom-provider',
+        provider: {
+          name: 'gateway-missing-slashes',
+          baseUrl: 'https:openrouter.ai/api/v1',
+        },
+      },
+      {
+        action: 'set-custom-provider',
+        provider: {
+          name: 'gateway-one-slash',
+          baseUrl: 'https:/openrouter.ai/api/v1',
+        },
+      },
+      {
+        action: 'set-custom-provider',
+        provider: {
+          name: 'gateway-backslash',
+          baseUrl: 'https:\\openrouter.ai/api/v1',
+        },
+      },
+    ]) {
+      const res = await handlers.PATCH({
+        request: new Request('http://localhost/api/hermes-config', {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        }),
+      })
+      expect(res.status).toBe(400)
+    }
+    expect(fs.existsSync(path.join(tmpHome, 'config.yaml'))).toBe(false)
+  })
+
+  it('PATCH rejects OpenRouter assignments in the legacy config body', async () => {
+    const handlers = await loadHandlers('./claude-config')
+    const res = await handlers.PATCH({
+      request: new Request('http://localhost/api/claude-config', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          config: {
+            provider: 'openrouter',
+            model: 'openrouter/anthropic/claude-opus',
+          },
+        }),
+      }),
+    })
+
+    expect(res.status).toBe(400)
+    expect(fs.existsSync(path.join(tmpHome, 'config.yaml'))).toBe(false)
+  })
+
+  it('PATCH rejects a schemeless OpenRouter URL in the legacy config body', async () => {
+    const handlers = await loadHandlers('./claude-config')
+    const res = await handlers.PATCH({
+      request: new Request('http://localhost/api/claude-config', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          config: {
+            custom_providers: [
+              { name: 'gateway', base_url: 'api.openrouter.ai/v1' },
+            ],
+          },
+        }),
+      }),
+    })
+
+    expect(res.status).toBe(400)
+    expect(fs.existsSync(path.join(tmpHome, 'config.yaml'))).toBe(false)
+  })
+
+  it('PATCH allows benign OpenRouter text outside routing fields', async () => {
+    const handlers = await loadHandlers('./claude-config')
+    const res = await handlers.PATCH({
+      request: new Request('http://localhost/api/claude-config', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          config: {
+            agent: {
+              system_prompt: 'openrouter/example must not be used as a fallback.',
+            },
+          },
+        }),
+      }),
+    })
+
+    expect(res.status).toBe(200)
+  })
+
+  it('PATCH rejects prototype-polluting legacy config keys', async () => {
+    const handlers = await loadHandlers('./claude-config')
+    const res = await handlers.PATCH({
+      request: new Request('http://localhost/api/claude-config', {
+        method: 'PATCH',
+        body: '{"config":{"memory":{"__proto__":{"confirmApiBilling":true}}}}',
+      }),
+    })
+
+    expect(res.status).toBe(400)
+    expect(({} as { confirmApiBilling?: boolean }).confirmApiBilling).toBeUndefined()
+    expect(fs.existsSync(path.join(tmpHome, 'config.yaml'))).toBe(false)
   })
 
   it('PATCH legacy { config } body deep-merges and preserves siblings', async () => {
@@ -132,10 +268,8 @@ describe('canonical /api/hermes-config route', () => {
   })
 
   it('PATCH returns 503 when the gateway capability is unavailable', async () => {
-    vi.doMock('../../server/gateway-capabilities', () => ({
-      ensureGatewayProbed: vi.fn(),
-      getCapabilities: () => ({ config: false }),
-    }))
+    gatewayState.config = false
+    gatewayState.local = false
     const handlers = await loadHandlers('./hermes-config')
     const res = await handlers.PATCH({
       request: new Request('http://localhost/api/hermes-config', {
@@ -144,7 +278,26 @@ describe('canonical /api/hermes-config route', () => {
       }),
     })
     expect(res.status).toBe(503)
-    vi.doUnmock('../../server/gateway-capabilities')
+  })
+
+  it('GET uses the local Hermes config when the loopback gateway lacks config endpoints', async () => {
+    gatewayState.config = false
+    gatewayState.local = true
+    fs.writeFileSync(
+      path.join(tmpHome, 'config.yaml'),
+      'provider: custom\nmodel: claude-cwm4tx/sonnet\n',
+      'utf-8',
+    )
+
+    const handlers = await loadHandlers('./hermes-config')
+    const res = await handlers.GET({
+      request: new Request('http://localhost/api/hermes-config'),
+    })
+    const body = await res.json()
+
+    expect(body.ok).toBe(true)
+    expect(body.activeProvider).toBe('custom')
+    expect(body.activeModel).toBe('claude-cwm4tx/sonnet')
   })
 })
 

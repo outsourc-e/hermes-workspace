@@ -9,6 +9,7 @@ import {
   parseEnvFile,
   resolveHermesConfigPaths,
   stringifyEnv,
+  writeHermesConfigFile,
 } from './hermes-config-store'
 
 let tmpHome = ''
@@ -126,7 +127,10 @@ describe('applyHermesConfigPatch', () => {
       { name: 'gw', base_url: 'https://b.test/v1' },
     ])
 
-    applyHermesConfigPatch(paths, { action: 'remove-custom-provider', name: 'gw' })
+    applyHermesConfigPatch(paths, {
+      action: 'remove-custom-provider',
+      name: 'gw',
+    })
     parsed = YAML.parse(
       fs.readFileSync(path.join(tmpHome, 'config.yaml'), 'utf-8'),
     )
@@ -148,5 +152,29 @@ describe('env value round-tripping', () => {
 
   it('refuses to write values containing newlines', () => {
     expect(() => stringifyEnv({ BAD: 'one\ntwo' })).toThrow(/newlines/)
+  })
+})
+
+describe('atomic Hermes config writes', () => {
+  it('replaces config.yaml atomically, keeps the previous file as a backup, and removes temp files', () => {
+    const paths = resolveHermesConfigPaths()
+    writeHermesConfigFile(paths, {
+      model: { provider: 'openai-codex', default: 'gpt-5.4' },
+    })
+    writeHermesConfigFile(paths, {
+      model: { provider: 'openai-codex', default: 'gpt-5.6-sol' },
+    })
+
+    expect(YAML.parse(fs.readFileSync(paths.configPath, 'utf8'))).toEqual({
+      model: { provider: 'openai-codex', default: 'gpt-5.6-sol' },
+    })
+    expect(
+      YAML.parse(fs.readFileSync(`${paths.configPath}.bak`, 'utf8')),
+    ).toEqual({
+      model: { provider: 'openai-codex', default: 'gpt-5.4' },
+    })
+    expect(
+      fs.readdirSync(tmpHome).filter((name) => name.includes('.tmp')),
+    ).toEqual([])
   })
 })

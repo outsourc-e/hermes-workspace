@@ -104,9 +104,11 @@ function quoteEnvValue(value: string): string {
 }
 
 export function stringifyEnv(env: Record<string, string>): string {
-  return Object.entries(env)
-    .map(([k, v]) => `${k}=${quoteEnvValue(v)}`)
-    .join('\n') + '\n'
+  return (
+    Object.entries(env)
+      .map(([k, v]) => `${k}=${quoteEnvValue(v)}`)
+      .join('\n') + '\n'
+  )
 }
 
 function readYamlConfig(configPath: string): Record<string, unknown> {
@@ -121,9 +123,41 @@ function readYamlConfig(configPath: string): Record<string, unknown> {
   }
 }
 
-function writeYamlConfig(configPath: string, config: Record<string, unknown>): void {
-  fs.mkdirSync(path.dirname(configPath), { recursive: true })
-  fs.writeFileSync(configPath, YAML.stringify(config), 'utf-8')
+export function writeFileAtomicWithBackup(
+  filePath: string,
+  contents: string,
+): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  const nonce = `${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}`
+  const tempPath = `${filePath}.${nonce}.tmp`
+  const backupPath = `${filePath}.bak`
+  const backupTempPath = `${backupPath}.${nonce}.tmp`
+
+  try {
+    const descriptor = fs.openSync(tempPath, 'wx')
+    try {
+      fs.writeFileSync(descriptor, contents, 'utf8')
+      fs.fsyncSync(descriptor)
+    } finally {
+      fs.closeSync(descriptor)
+    }
+
+    if (fs.existsSync(filePath)) {
+      fs.copyFileSync(filePath, backupTempPath)
+      fs.renameSync(backupTempPath, backupPath)
+    }
+    fs.renameSync(tempPath, filePath)
+  } finally {
+    fs.rmSync(tempPath, { force: true })
+    fs.rmSync(backupTempPath, { force: true })
+  }
+}
+
+function writeYamlConfig(
+  configPath: string,
+  config: Record<string, unknown>,
+): void {
+  writeFileAtomicWithBackup(configPath, YAML.stringify(config))
 }
 
 function readEnv(envPath: string): Record<string, string> {
@@ -151,7 +185,9 @@ function readAuthProfiles(authProfilesPath: string): Record<string, unknown> {
   }
 }
 
-export function readHermesConfigFiles(paths: HermesConfigPaths): HermesConfigFiles {
+export function readHermesConfigFiles(
+  paths: HermesConfigPaths,
+): HermesConfigFiles {
   return {
     config: readYamlConfig(paths.configPath),
     env: readEnv(paths.envPath),
@@ -159,11 +195,22 @@ export function readHermesConfigFiles(paths: HermesConfigPaths): HermesConfigFil
   }
 }
 
-function readCustomProvidersList(config: Record<string, unknown>): Array<Record<string, unknown>> {
+export function writeHermesConfigFile(
+  paths: HermesConfigPaths,
+  config: Record<string, unknown>,
+): void {
+  writeYamlConfig(paths.configPath, config)
+}
+
+function readCustomProvidersList(
+  config: Record<string, unknown>,
+): Array<Record<string, unknown>> {
   const entries = config.custom_providers
   return Array.isArray(entries)
     ? entries.filter((entry): entry is Record<string, unknown> => {
-        return Boolean(entry && typeof entry === 'object' && !Array.isArray(entry))
+        return Boolean(
+          entry && typeof entry === 'object' && !Array.isArray(entry),
+        )
       })
     : []
 }
