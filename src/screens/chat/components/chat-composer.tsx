@@ -128,6 +128,12 @@ function isClaude46Model(model: string): boolean {
   return normalized.includes('4-6') || normalized.includes('claude-4.6')
 }
 
+/** `hermes-agent` is a Gateway routing alias, never a provider model choice. */
+function isGatewayDefaultAlias(model: string | undefined): boolean {
+  const normalized = model?.trim().toLowerCase()
+  return normalized === 'hermes-agent' || normalized === 'default'
+}
+
 type GatewayStatusApiResponse = {
   mode?: string
 }
@@ -1128,7 +1134,12 @@ function ChatComposerComponent({
   // Derive the label directly from the store so navigation between sessions
   // updates without a render-window flash from a stale React-state mirror.
   const modelButtonLabel =
-    persistedSessionModel || currentModel || configuredModel || '⚕ Hermes Agent'
+    (!isGatewayDefaultAlias(persistedSessionModel)
+      ? persistedSessionModel
+      : '') ||
+    (!isGatewayDefaultAlias(currentModel) ? currentModel : '') ||
+    configuredModel ||
+    '⚕ Hermes Agent'
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {

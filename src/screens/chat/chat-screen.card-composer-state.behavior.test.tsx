@@ -456,14 +456,14 @@ describe('mounted Card-owned ChatScreen composer state', () => {
     expect(requests[0]!.body.cardId).toBe(cardA.cardId)
   })
 
-  it('omits a New Session Card model so Hermes selects its configured primary model', async () => {
+  it('uses the configured concrete label and omits a New Session Card virtual default', async () => {
     const requests = installHttp({ [cardA.cardId]: 'hermes-agent' })
     registerNewSessionCardForPrimaryModel(cardA.cardId)
     await mountChatScreen(inputForCard(cardA))
     await waitFor(() =>
       expect(
         screen.getByRole('button', {
-          name: /Chat controls, current model:.*hermes-agent/i,
+          name: /Chat controls, current model:.*model-a/i,
         }),
       ).toBeTruthy(),
     )
@@ -477,13 +477,13 @@ describe('mounted Card-owned ChatScreen composer state', () => {
     expect(requests[0]!.body.cardId).toBe(cardA.cardId)
   })
 
-  it('keeps a pre-existing empty Card resolved model on its first send', async () => {
+  it('never forwards a virtual Card model as an explicit provider selection', async () => {
     const requests = installHttp({ [cardA.cardId]: 'hermes-agent' })
     await mountChatScreen(inputForCard(cardA))
     await waitFor(() =>
       expect(
         screen.getByRole('button', {
-          name: /Chat controls, current model:.*hermes-agent/i,
+          name: /Chat controls, current model:.*model-a/i,
         }),
       ).toBeTruthy(),
     )
@@ -493,7 +493,7 @@ describe('mounted Card-owned ChatScreen composer state', () => {
     click(screen.getByRole('button', { name: 'Send message' }))
 
     await waitFor(() => expect(requests).toHaveLength(1))
-    expect(requests[0]!.body.model).toBe('hermes-agent')
+    expect(requests[0]!.body).not.toHaveProperty('model')
     expect(requests[0]!.body.cardId).toBe(cardA.cardId)
   })
 

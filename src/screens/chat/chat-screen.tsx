@@ -208,6 +208,12 @@ type PortableHistoryMessage = {
   content: string
 }
 
+/** The Gateway default is a routing alias, not an explicit provider model. */
+function isGatewayDefaultAlias(model: string | undefined): boolean {
+  const normalized = model?.trim().toLowerCase()
+  return normalized === 'hermes-agent' || normalized === 'default'
+}
+
 function normalizeMimeType(value: unknown): string {
   if (typeof value !== 'string') return ''
   return value.trim().toLowerCase()
@@ -2849,10 +2855,19 @@ export function ChatScreen({
       const explicitCardModel = cardId
         ? useSessionModelStore.getState().getModel(cardId)
         : ''
+      // `hermes-agent`/`default` are Gateway routing aliases. They may survive
+      // in a Card status or old localStorage, but must never be sent as an
+      // explicit provider model to Codex.
       const requestModel = cardId
-        ? explicitCardModel ||
-          (isFirstSendFromNewSession ? undefined : gatewayModel)
-        : currentModel
+        ? (!isGatewayDefaultAlias(explicitCardModel)
+            ? explicitCardModel
+            : '') ||
+          (isFirstSendFromNewSession || isGatewayDefaultAlias(gatewayModel)
+            ? undefined
+            : gatewayModel)
+        : isGatewayDefaultAlias(currentModel)
+          ? undefined
+          : currentModel
       void startStreaming({
         sessionKey,
         friendlyId,
