@@ -6,17 +6,24 @@ import {
   WORKSPACE_CHAT_DATABASE_NAME,
   WORKSPACE_CHAT_DATABASE_VERSION,
   WORKSPACE_CHAT_STORE_NAMES,
+  applyDurableJournalDeltaAtomically,
+  encodeWorkspaceChatV4Record,
   deleteCardRecovery,
   deleteLatestCardSnapshot,
   deletePendingSend,
   getWorkspaceChatStorageHealth,
+  handoffPendingSendAtomically,
+  handoffPendingSendToCardRecoveryAtomically,
   initializeWorkspaceChatIndexedDb,
   isObsoleteWorkspaceChatStorageKey,
   movePendingSend,
+  mutateCardRecoveryAtomically,
+  mutatePendingSendAtomically,
   openWorkspaceChatIndexedDb,
   readCardRecovery,
   readDurableJournal,
   readLatestCardSnapshot,
+  readOrderedDurableJournal,
   readPendingSend,
   removeDurableJournal,
   replaceCardRecovery,
@@ -25,6 +32,7 @@ import {
   writeDurableJournalEntry,
   writeLatestCardSnapshot,
   writePendingSend,
+  writeSnapshotAndAcknowledgeRecoveryAtomically,
 } from './card-transcript-indexeddb'
 
 function deleteDatabase(): Promise<void> {
@@ -41,6 +49,15 @@ function storageKeys(storage: Storage): Array<string> {
   return Array.from({ length: storage.length }, (_, index) =>
     storage.key(index),
   ).filter((key): key is string => key !== null)
+}
+
+function v4Metadata(writeId: string, revision = 1) {
+  return {
+    schema: 4 as const,
+    revision,
+    writeId,
+    updatedAt: 1_700_000_000_000 + revision,
+  }
 }
 
 describe('Workspace chat IndexedDB v4 authority', () => {
@@ -344,6 +361,429 @@ describe('Workspace chat IndexedDB v4 authority', () => {
 
     await expect(readPendingSend(source.ownerKey)).resolves.toEqual(source)
     await expect(readPendingSend(destinationOwnerKey)).resolves.toBeNull()
+  })
+
+  it('fails closed for nonportable, sparse, non-finite, and over-limit new v4 records', () => {
+    const valid = {
+      ...v4Metadata('codec-valid'),
+      payload: { nested: [null, true, 4, 'portable'] },
+    }
+    const encoded = encodeWorkspaceChatV4Record(valid)
+    expect(encoded).toEqual(valid)
+    expect(encoded).not.toBe(valid)
+
+    const sparse = Array<unknown>(2)
+    sparse[1] = 'present'
+    for (const payload of [
+      { value: Number.NaN },
+      sparse,
+      { value: undefined },
+      { value: new Date(0) },
+    ]) {
+      expect(() =>
+        encodeWorkspaceChatV4Record({
+          ...v4Metadata('codec-invalid'),
+          payload,
+        }),
+      ).toThrow(/portable|sparse|finite/i)
+    }
+
+    expect(() =>
+      encodeWorkspaceChatV4Record(
+        {
+          ...v4Metadata('codec-over-limit'),
+          payload: { text: 'x'.repeat(512) },
+        },
+        { maxSerializedBytes: 128 },
+      ),
+    ).toThrow(/size|bytes|limit/i)
+  })
+
+  it('rejects a recovery CAS after a late append without overwriting the winner', async () => {
+    const initial = {
+      cardId: 'card-recovery-cas',
+      ...v4Metadata('recovery-write-1', 1),
+      payload: { messages: ['initial'] },
+    }
+    const lateAppend = {
+      cardId: initial.cardId,
+      ...v4Metadata('recovery-write-2', 2),
+      payload: { messages: ['initial', 'late'] },
+    }
+    await writeCardRecovery(initial)
+    await mutateCardRecoveryAtomically({
+      cardId: initial.cardId,
+      expectedWriteId: initial.writeId,
+      mutation: { type: 'append', record: lateAppend },
+    })
+
+    await expect(
+      mutateCardRecoveryAtomically({
+        cardId: initial.cardId,
+        expectedWriteId: initial.writeId,
+        mutation: {
+          type: 'append',
+          record: {
+            cardId: initial.cardId,
+            ...v4Metadata('stale-write', 2),
+            payload: { messages: ['initial', 'stale'] },
+          },
+        },
+      }),
+    ).rejects.toThrow(/compare-and-swap|writeId/i)
+    await expect(readCardRecovery(initial.cardId)).resolves.toEqual(lateAppend)
+  })
+
+  it('rolls back both records when snapshot plus recovery acknowledgement verification fails', async () => {
+    const cardId = 'card-snapshot-ack-rollback'
+    const oldSnapshot = {
+      cardId,
+      ...v4Metadata('snapshot-old', 1),
+      payload: { messages: ['old snapshot'] },
+    }
+    const recovery = {
+      cardId,
+      ...v4Metadata('recovery-old', 1),
+      payload: { messages: ['recover me'] },
+    }
+    await writeLatestCardSnapshot(oldSnapshot)
+    await writeCardRecovery(recovery)
+
+    const originalGet = IDBObjectStore.prototype.get
+    let recoveryReads = 0
+    const getSpy = vi
+      .spyOn(IDBObjectStore.prototype, 'get')
+      .mockImplementation(function (this: IDBObjectStore, query) {
+        if (
+          this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+          query === cardId &&
+          ++recoveryReads === 2
+        ) {
+          throw new Error('forced recovery acknowledgement readback failure')
+        }
+        return originalGet.call(this, query)
+      })
+
+    await expect(
+      writeSnapshotAndAcknowledgeRecoveryAtomically({
+        snapshot: {
+          cardId,
+          ...v4Metadata('snapshot-new', 2),
+          payload: { messages: ['durable snapshot'] },
+        },
+        expectedRecoveryWriteId: recovery.writeId,
+        recoveryMutation: {
+          type: 'replace',
+          record: {
+            cardId,
+            ...v4Metadata('recovery-replacement', 2),
+            payload: { messages: ['remaining'] },
+          },
+        },
+      }),
+    ).rejects.toThrow('forced recovery acknowledgement readback failure')
+    getSpy.mockRestore()
+
+    await expect(readLatestCardSnapshot(cardId)).resolves.toEqual(oldSnapshot)
+    await expect(readCardRecovery(cardId)).resolves.toEqual(recovery)
+  })
+
+  it('requires explicit destination merge output for pending handoff and never retains stale ownership fields', async () => {
+    const source = {
+      ownerKey: 'bootstrap:pending-handoff',
+      ...v4Metadata('pending-source', 1),
+      payload: { embeddedOwner: 'bootstrap:pending-handoff', text: 'new' },
+    }
+    const existingDestination = {
+      ownerKey: 'remote:pending-handoff',
+      ...v4Metadata('pending-destination-old', 1),
+      payload: { embeddedOwner: 'stale-owner', text: 'old' },
+    }
+    const transformedDestination = {
+      ownerKey: existingDestination.ownerKey,
+      ...v4Metadata('pending-destination-new', 2),
+      payload: { embeddedOwner: existingDestination.ownerKey, text: 'new' },
+    }
+    const mergedDestination = {
+      ownerKey: existingDestination.ownerKey,
+      ...v4Metadata('pending-destination-merged', 3),
+      payload: {
+        embeddedOwner: existingDestination.ownerKey,
+        text: 'old + new',
+      },
+    }
+    await writePendingSend(source)
+    await writePendingSend(existingDestination)
+
+    await expect(
+      handoffPendingSendAtomically({
+        sourceOwnerKey: source.ownerKey,
+        expectedSourceWriteId: source.writeId,
+        destination: transformedDestination,
+      }),
+    ).rejects.toThrow(/merge output/i)
+    await expect(readPendingSend(source.ownerKey)).resolves.toEqual(source)
+    await expect(readPendingSend(existingDestination.ownerKey)).resolves.toEqual(
+      existingDestination,
+    )
+
+    await handoffPendingSendAtomically({
+      sourceOwnerKey: source.ownerKey,
+      expectedSourceWriteId: source.writeId,
+      destination: transformedDestination,
+      existingDestinationMerge: {
+        expectedWriteId: existingDestination.writeId,
+        record: mergedDestination,
+      },
+    })
+    await expect(readPendingSend(source.ownerKey)).resolves.toBeNull()
+    await expect(readPendingSend(existingDestination.ownerKey)).resolves.toEqual(
+      mergedDestination,
+    )
+  })
+
+  it('atomically mutates pending records by writeId', async () => {
+    const initial = {
+      ownerKey: 'pending-cas',
+      ...v4Metadata('pending-write-1', 1),
+      payload: { text: 'first' },
+    }
+    const replacement = {
+      ownerKey: initial.ownerKey,
+      ...v4Metadata('pending-write-2', 2),
+      payload: { text: 'second' },
+    }
+    await writePendingSend(initial)
+    await mutatePendingSendAtomically({
+      ownerKey: initial.ownerKey,
+      expectedWriteId: initial.writeId,
+      mutation: { type: 'replace', record: replacement },
+    })
+    await expect(
+      mutatePendingSendAtomically({
+        ownerKey: initial.ownerKey,
+        expectedWriteId: initial.writeId,
+        mutation: { type: 'delete' },
+      }),
+    ).rejects.toThrow(/compare-and-swap|writeId/i)
+    await expect(readPendingSend(initial.ownerKey)).resolves.toEqual(replacement)
+  })
+
+  it('retains pending source when pending to recovery destination verification fails', async () => {
+    const source = {
+      ownerKey: 'bootstrap:pending-to-recovery',
+      ...v4Metadata('pending-to-recovery-source', 1),
+      payload: { embeddedOwner: 'bootstrap:pending-to-recovery', text: 'send' },
+    }
+    const recoveryCardId = 'remote:pending-to-recovery'
+    await writePendingSend(source)
+
+    const originalGet = IDBObjectStore.prototype.get
+    let recoveryReads = 0
+    const getSpy = vi
+      .spyOn(IDBObjectStore.prototype, 'get')
+      .mockImplementation(function (this: IDBObjectStore, query) {
+        if (
+          this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+          query === recoveryCardId &&
+          ++recoveryReads === 2
+        ) {
+          throw new Error('forced recovery destination verification failure')
+        }
+        return originalGet.call(this, query)
+      })
+
+    await expect(
+      handoffPendingSendToCardRecoveryAtomically({
+        sourceOwnerKey: source.ownerKey,
+        expectedPendingWriteId: source.writeId,
+        recoveryCardId,
+        expectedRecoveryWriteId: null,
+        recoveryMutation: {
+          type: 'replace',
+          record: {
+            cardId: recoveryCardId,
+            ...v4Metadata('pending-to-recovery-destination', 1),
+            payload: {
+              embeddedOwner: recoveryCardId,
+              messages: ['send'],
+            },
+          },
+        },
+      }),
+    ).rejects.toThrow('forced recovery destination verification failure')
+    getSpy.mockRestore()
+
+    await expect(readPendingSend(source.ownerKey)).resolves.toEqual(source)
+    await expect(readCardRecovery(recoveryCardId)).resolves.toBeNull()
+  })
+
+  it('rolls back every entry when one write in a multi-entry journal delta fails', async () => {
+    const ownerKey = 'journal-delta-rollback'
+    const existing = {
+      ownerKey,
+      entryKey: 'existing',
+      ordinal: 0,
+      ...v4Metadata('journal-existing', 1),
+      payload: { text: 'keep' },
+    }
+    await writeDurableJournalEntry(existing)
+
+    const originalPut = IDBObjectStore.prototype.put
+    let journalPuts = 0
+    const putSpy = vi
+      .spyOn(IDBObjectStore.prototype, 'put')
+      .mockImplementation(function (this: IDBObjectStore, value, key) {
+        if (
+          this.name === WORKSPACE_CHAT_STORE_NAMES.durableJournal &&
+          ++journalPuts === 2
+        ) {
+          throw new Error('forced second journal write failure')
+        }
+        return key === undefined
+          ? originalPut.call(this, value)
+          : originalPut.call(this, value, key)
+      })
+
+    await expect(
+      applyDurableJournalDeltaAtomically({
+        ownerKey,
+        removals: [existing.entryKey],
+        upserts: [
+          {
+            ownerKey,
+            entryKey: 'entry-a',
+            ordinal: 1,
+            ...v4Metadata('journal-a', 2),
+            payload: { text: 'a' },
+          },
+          {
+            ownerKey,
+            entryKey: 'entry-b',
+            ordinal: 2,
+            ...v4Metadata('journal-b', 2),
+            payload: { text: 'b' },
+          },
+        ],
+      }),
+    ).rejects.toThrow('forced second journal write failure')
+    putSpy.mockRestore()
+
+    await expect(readDurableJournal(ownerKey)).resolves.toEqual([existing])
+  })
+
+  it('orders generic journal post-state by explicit ordinal independently of entry IDs', async () => {
+    const ownerKey = 'journal-explicit-order'
+    const result = await applyDurableJournalDeltaAtomically({
+      ownerKey,
+      removals: [],
+      upserts: [
+        {
+          ownerKey,
+          entryKey: 'entry-a-sorts-first',
+          ordinal: 20,
+          ...v4Metadata('journal-later', 1),
+          payload: { text: 'later' },
+        },
+        {
+          ownerKey,
+          entryKey: 'entry-z-sorts-last',
+          ordinal: 10,
+          ...v4Metadata('journal-earlier', 1),
+          payload: { text: 'earlier' },
+        },
+      ],
+    })
+
+    expect(result.map(({ entryKey }) => entryKey)).toEqual([
+      'entry-z-sorts-last',
+      'entry-a-sorts-first',
+    ])
+    await expect(readOrderedDurableJournal(ownerKey)).resolves.toEqual(result)
+  })
+
+  it('queues every dependent CAS write and readback synchronously inside request callbacks', async () => {
+    const cardId = 'callback-queued-recovery-cas'
+    const initial = {
+      cardId,
+      ...v4Metadata('callback-write-1', 1),
+      payload: { messages: ['first'] },
+    }
+    await writeCardRecovery(initial)
+
+    const events: Array<string> = []
+    const originalGet = IDBObjectStore.prototype.get
+    const originalPut = IDBObjectStore.prototype.put
+    let recoveryGets = 0
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(function (
+      this: IDBObjectStore,
+      query,
+    ) {
+      if (
+        this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+        query === cardId
+      ) {
+        recoveryGets += 1
+        const getNumber = recoveryGets
+        events.push(`get-${getNumber}-call`)
+        const request = originalGet.call(this, query)
+        request.addEventListener(
+          'success',
+          () => {
+            events.push(`get-${getNumber}-success`)
+            queueMicrotask(() => events.push(`get-${getNumber}-microtask`))
+          },
+          { once: true },
+        )
+        return request
+      }
+      return originalGet.call(this, query)
+    })
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value,
+      key,
+    ) {
+      if (this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery) {
+        events.push('put-call')
+        const request =
+          key === undefined
+            ? originalPut.call(this, value)
+            : originalPut.call(this, value, key)
+        request.addEventListener(
+          'success',
+          () => {
+            events.push('put-success')
+            queueMicrotask(() => events.push('put-microtask'))
+          },
+          { once: true },
+        )
+        return request
+      }
+      return key === undefined
+        ? originalPut.call(this, value)
+        : originalPut.call(this, value, key)
+    })
+
+    await mutateCardRecoveryAtomically({
+      cardId,
+      expectedWriteId: initial.writeId,
+      mutation: {
+        type: 'merge',
+        record: {
+          cardId,
+          ...v4Metadata('callback-write-2', 2),
+          payload: { messages: ['first', 'second'] },
+        },
+      },
+    })
+
+    expect(events.indexOf('put-call')).toBeLessThan(
+      events.indexOf('get-1-microtask'),
+    )
+    expect(events.indexOf('get-2-call')).toBeLessThan(
+      events.indexOf('put-microtask'),
+    )
   })
 
   it('reports content-free health metrics only', async () => {

@@ -45,6 +45,50 @@ export type PendingSendRecord<TPayload extends PortableValue = PortableValue> =
     payload: TPayload
   }
 
+export type WorkspaceChatV4RecordMetadata = {
+  schema: 4
+  revision: number
+  writeId: string
+  updatedAt: number
+}
+
+export type WorkspaceChatV4RecordCodecOptions = {
+  maxSerializedBytes?: number
+}
+
+export const WORKSPACE_CHAT_DEFAULT_MAX_RECORD_BYTES = 1024 * 1024
+export const WORKSPACE_CHAT_HARD_MAX_RECORD_BYTES = 16 * 1024 * 1024
+
+export type V4LatestCardSnapshotRecord<
+  TPayload extends PortableValue = PortableValue,
+> = LatestCardSnapshotRecord<TPayload> & WorkspaceChatV4RecordMetadata
+
+export type V4CardRecoveryRecord<
+  TPayload extends PortableValue = PortableValue,
+> = CardRecoveryRecord<TPayload> & WorkspaceChatV4RecordMetadata
+
+export type V4DurableJournalRecord<
+  TPayload extends PortableValue = PortableValue,
+> = DurableJournalRecord<TPayload> &
+  WorkspaceChatV4RecordMetadata & {
+    ordinal: number
+  }
+
+export type V4PendingSendRecord<
+  TPayload extends PortableValue = PortableValue,
+> = PendingSendRecord<TPayload> & WorkspaceChatV4RecordMetadata
+
+export type V4RecoveryMutation<TPayload extends PortableValue = PortableValue> =
+  | {
+      type: 'append' | 'merge' | 'replace'
+      record: V4CardRecoveryRecord<TPayload>
+    }
+  | { type: 'delete' }
+
+export type V4PendingMutation<TPayload extends PortableValue = PortableValue> =
+  | { type: 'merge' | 'replace'; record: V4PendingSendRecord<TPayload> }
+  | { type: 'delete' }
+
 export type WorkspaceChatStoreHealth = {
   recordCount: number
   serializedBytes: number
@@ -373,6 +417,242 @@ function requireKey(label: string, value: string): void {
   }
 }
 
+function portableRecordError(path: string, reason: string): Error {
+  return new Error(`Workspace chat v4 record is not portable at ${path}: ${reason}`)
+}
+
+function assertPortableValue(
+  value: unknown,
+  path: string,
+  ancestors: WeakSet<object>,
+): void {
+  if (
+    value === null ||
+    typeof value === 'boolean' ||
+    typeof value === 'string'
+  ) {
+    return
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw portableRecordError(path, 'numbers must be finite')
+    }
+    return
+  }
+  if (typeof value !== 'object') {
+    throw portableRecordError(path, `unsupported ${typeof value} value`)
+  }
+  if (ancestors.has(value)) {
+    throw portableRecordError(path, 'cyclic values are unsupported')
+  }
+  ancestors.add(value)
+  try {
+    if (Array.isArray(value)) {
+      const ownKeys = Reflect.ownKeys(value)
+      if (
+        ownKeys.some((key) => {
+          if (key === 'length') return false
+          if (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key)) {
+            return true
+          }
+          const index = Number(key)
+          return (
+            !Number.isSafeInteger(index) ||
+            index < 0 ||
+            index >= value.length ||
+            String(index) !== key
+          )
+        })
+      ) {
+        throw portableRecordError(path, 'arrays cannot have custom properties')
+      }
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.prototype.hasOwnProperty.call(value, index)) {
+          throw portableRecordError(path, 'sparse arrays are unsupported')
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
+        if (
+          descriptor === undefined ||
+          !descriptor.enumerable ||
+          !('value' in descriptor)
+        ) {
+          throw portableRecordError(path, 'array entries must be plain values')
+        }
+        assertPortableValue(descriptor.value, `${path}[${index}]`, ancestors)
+      }
+      return
+    }
+
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw portableRecordError(path, 'objects must be plain objects')
+    }
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== 'string') {
+        throw portableRecordError(path, 'symbol keys are unsupported')
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key)
+      if (
+        descriptor === undefined ||
+        !descriptor.enumerable ||
+        !('value' in descriptor)
+      ) {
+        throw portableRecordError(
+          `${path}.${key}`,
+          'properties must be enumerable plain values',
+        )
+      }
+      assertPortableValue(descriptor.value, `${path}.${key}`, ancestors)
+    }
+  } finally {
+    ancestors.delete(value)
+  }
+}
+
+function requireOwnProperty(
+  record: Record<string, unknown>,
+  property: string,
+): void {
+  if (!Object.prototype.hasOwnProperty.call(record, property)) {
+    throw new Error(`Workspace chat v4 record requires ${property}`)
+  }
+}
+
+function maxSerializedRecordBytes(
+  options?: WorkspaceChatV4RecordCodecOptions,
+): number {
+  const maximum =
+    options?.maxSerializedBytes ?? WORKSPACE_CHAT_DEFAULT_MAX_RECORD_BYTES
+  if (
+    !Number.isSafeInteger(maximum) ||
+    maximum <= 0 ||
+    maximum > WORKSPACE_CHAT_HARD_MAX_RECORD_BYTES
+  ) {
+    throw new Error(
+      `Workspace chat v4 record size limit must be between 1 and ${WORKSPACE_CHAT_HARD_MAX_RECORD_BYTES} bytes`,
+    )
+  }
+  return maximum
+}
+
+/**
+ * Validates and JSON-round-trips only new v4 records. This intentionally has no
+ * legacy decoder: callers must supply explicit v4 metadata and portable values.
+ */
+export function encodeWorkspaceChatV4Record<TRecord>(
+  record: TRecord,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): TRecord {
+  assertPortableValue(record, '$', new WeakSet())
+  if (record === null || Array.isArray(record) || typeof record !== 'object') {
+    throw new Error('Workspace chat v4 record must be a plain object')
+  }
+  const candidate = record as Record<string, unknown>
+  for (const property of [
+    'schema',
+    'revision',
+    'writeId',
+    'updatedAt',
+    'payload',
+  ]) {
+    requireOwnProperty(candidate, property)
+  }
+  if (candidate.schema !== WORKSPACE_CHAT_DATABASE_VERSION) {
+    throw new Error('Workspace chat v4 record schema must be 4')
+  }
+  if (
+    !Number.isSafeInteger(candidate.revision) ||
+    (candidate.revision as number) < 0
+  ) {
+    throw new Error(
+      'Workspace chat v4 record revision must be a non-negative safe integer',
+    )
+  }
+  requireKey('writeId', candidate.writeId as string)
+  if (
+    !Number.isSafeInteger(candidate.updatedAt) ||
+    (candidate.updatedAt as number) < 0
+  ) {
+    throw new Error(
+      'Workspace chat v4 record updatedAt must be a non-negative safe integer',
+    )
+  }
+
+  const serialized = JSON.stringify(record)
+  const serializedBytes = new TextEncoder().encode(serialized).byteLength
+  const maximum = maxSerializedRecordBytes(options)
+  if (serializedBytes > maximum) {
+    throw new Error(
+      `Workspace chat v4 record size ${serializedBytes} bytes exceeds limit ${maximum} bytes`,
+    )
+  }
+  return JSON.parse(serialized) as TRecord
+}
+
+function requireExpectedWriteId(value: string | null): void {
+  if (value !== null) requireKey('expectedWriteId', value)
+}
+
+function prepareLatestSnapshotRecord<TPayload extends PortableValue>(
+  record: V4LatestCardSnapshotRecord<TPayload>,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): V4LatestCardSnapshotRecord<TPayload> {
+  const encoded = encodeWorkspaceChatV4Record(record, options)
+  requireKey('cardId', encoded.cardId)
+  return encoded
+}
+
+function prepareRecoveryRecord<TPayload extends PortableValue>(
+  record: V4CardRecoveryRecord<TPayload>,
+  cardId: string,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): V4CardRecoveryRecord<TPayload> {
+  const encoded = encodeWorkspaceChatV4Record(record, options)
+  requireKey('cardId', encoded.cardId)
+  if (encoded.cardId !== cardId) {
+    throw new Error('Card recovery record cardId does not match mutation cardId')
+  }
+  return encoded
+}
+
+function encodePendingRecord<TPayload extends PortableValue>(
+  record: V4PendingSendRecord<TPayload>,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): V4PendingSendRecord<TPayload> {
+  const encoded = encodeWorkspaceChatV4Record(record, options)
+  requireKey('ownerKey', encoded.ownerKey)
+  return encoded
+}
+
+function preparePendingRecord<TPayload extends PortableValue>(
+  record: V4PendingSendRecord<TPayload>,
+  ownerKey: string,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): V4PendingSendRecord<TPayload> {
+  const encoded = encodePendingRecord(record, options)
+  if (encoded.ownerKey !== ownerKey) {
+    throw new Error('Pending-send record ownerKey does not match destination')
+  }
+  return encoded
+}
+
+function prepareJournalRecord<TPayload extends PortableValue>(
+  record: V4DurableJournalRecord<TPayload>,
+  ownerKey: string,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): V4DurableJournalRecord<TPayload> {
+  const encoded = encodeWorkspaceChatV4Record(record, options)
+  requireKey('ownerKey', encoded.ownerKey)
+  requireKey('entryKey', encoded.entryKey)
+  if (encoded.ownerKey !== ownerKey) {
+    throw new Error('Journal record ownerKey does not match delta ownerKey')
+  }
+  if (!Number.isSafeInteger(encoded.ordinal) || encoded.ordinal < 0) {
+    throw new Error('Journal ordinal must be a non-negative safe integer')
+  }
+  return encoded
+}
+
 function semanticEquivalent(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true
   if (Array.isArray(left) || Array.isArray(right)) {
@@ -470,6 +750,82 @@ function deleteAndVerify(
             return
           }
           controls.complete(undefined)
+        })
+    })
+}
+
+function queueVerifiedPut<TResult>(
+  store: IDBObjectStore,
+  record: unknown,
+  key: IDBValidKey,
+  controls: TransactionControls<TResult>,
+  onVerified: () => void,
+): void {
+  const putRequest = store.put(record)
+  putRequest.onerror = () =>
+    controls.abort(
+      requestFailure(putRequest, 'Workspace chat IndexedDB atomic write failed'),
+    )
+  putRequest.onsuccess = () =>
+    runTransactionCallback(controls, () => {
+      const readRequest = store.get(key)
+      readRequest.onerror = () =>
+        controls.abort(
+          requestFailure(
+            readRequest,
+            'Workspace chat IndexedDB atomic write readback failed',
+          ),
+        )
+      readRequest.onsuccess = () =>
+        runTransactionCallback(controls, () => {
+          if (!semanticEquivalent(readRequest.result, record)) {
+            controls.abort(
+              new Error(
+                'Workspace chat IndexedDB atomic write verification failed',
+              ),
+            )
+            return
+          }
+          onVerified()
+        })
+    })
+}
+
+function queueVerifiedDelete<TResult>(
+  store: IDBObjectStore,
+  key: IDBValidKey,
+  controls: TransactionControls<TResult>,
+  onVerified: () => void,
+): void {
+  const deleteRequest = store.delete(key)
+  deleteRequest.onerror = () =>
+    controls.abort(
+      requestFailure(
+        deleteRequest,
+        'Workspace chat IndexedDB atomic deletion failed',
+      ),
+    )
+  deleteRequest.onsuccess = () =>
+    runTransactionCallback(controls, () => {
+      const readRequest = store.get(key)
+      readRequest.onerror = () =>
+        controls.abort(
+          requestFailure(
+            readRequest,
+            'Workspace chat IndexedDB atomic deletion readback failed',
+          ),
+        )
+      readRequest.onsuccess = () =>
+        runTransactionCallback(controls, () => {
+          if (readRequest.result !== undefined) {
+            controls.abort(
+              new Error(
+                'Workspace chat IndexedDB atomic deletion verification failed',
+              ),
+            )
+            return
+          }
+          onVerified()
         })
     })
 }
@@ -900,6 +1256,662 @@ export async function deletePendingSend(ownerKey: string): Promise<void> {
         ownerKey,
         controls,
       ),
+  )
+}
+
+function decodeStoredRecoveryRecord(
+  value: unknown,
+  cardId: string,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): V4CardRecoveryRecord {
+  const record = encodeWorkspaceChatV4Record(
+    value,
+    options,
+  ) as V4CardRecoveryRecord
+  requireKey('stored recovery cardId', record.cardId)
+  if (record.cardId !== cardId) {
+    throw new Error('Stored Card recovery record has the wrong cardId')
+  }
+  return record
+}
+
+function decodeStoredPendingRecord(
+  value: unknown,
+  ownerKey: string,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): V4PendingSendRecord {
+  const record = encodeWorkspaceChatV4Record(
+    value,
+    options,
+  ) as V4PendingSendRecord
+  requireKey('stored pending ownerKey', record.ownerKey)
+  if (record.ownerKey !== ownerKey) {
+    throw new Error('Stored pending-send record has the wrong ownerKey')
+  }
+  return record
+}
+
+function decodeStoredJournalRecord(
+  value: unknown,
+  ownerKey: string,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): V4DurableJournalRecord {
+  const record = encodeWorkspaceChatV4Record(
+    value,
+    options,
+  ) as V4DurableJournalRecord
+  requireKey('stored journal ownerKey', record.ownerKey)
+  requireKey('stored journal entryKey', record.entryKey)
+  if (record.ownerKey !== ownerKey) {
+    throw new Error('Stored journal record has the wrong ownerKey')
+  }
+  if (!Number.isSafeInteger(record.ordinal) || record.ordinal < 0) {
+    throw new Error('Stored journal ordinal is invalid')
+  }
+  return record
+}
+
+function requireCompareAndSwap(
+  current: WorkspaceChatV4RecordMetadata | undefined,
+  expectedWriteId: string | null,
+  label: string,
+): void {
+  if (
+    (current === undefined && expectedWriteId !== null) ||
+    (current !== undefined && current.writeId !== expectedWriteId)
+  ) {
+    throw new Error(`${label} compare-and-swap failed for expected writeId`)
+  }
+}
+
+export async function mutateCardRecoveryAtomically<
+  TPayload extends PortableValue = PortableValue,
+>(
+  input: {
+    cardId: string
+    expectedWriteId: string | null
+    mutation: V4RecoveryMutation<TPayload>
+  },
+  options?: WorkspaceChatV4RecordCodecOptions,
+): Promise<void> {
+  requireKey('cardId', input.cardId)
+  requireExpectedWriteId(input.expectedWriteId)
+  const replacement =
+    input.mutation.type === 'delete'
+      ? null
+      : prepareRecoveryRecord(input.mutation.record, input.cardId, options)
+
+  await withTransaction(
+    WORKSPACE_CHAT_STORE_NAMES.cardRecovery,
+    'readwrite',
+    (transaction, controls) => {
+      const store = transaction.objectStore(
+        WORKSPACE_CHAT_STORE_NAMES.cardRecovery,
+      )
+      const readRequest = store.get(input.cardId)
+      readRequest.onerror = () =>
+        controls.abort(
+          requestFailure(readRequest, 'Card recovery CAS read failed'),
+        )
+      readRequest.onsuccess = () =>
+        runTransactionCallback(controls, () => {
+          const current =
+            readRequest.result === undefined
+              ? undefined
+              : decodeStoredRecoveryRecord(
+                  readRequest.result,
+                  input.cardId,
+                  options,
+                )
+          requireCompareAndSwap(
+            current,
+            input.expectedWriteId,
+            'Card recovery',
+          )
+          if (replacement === null) {
+            queueVerifiedDelete(store, input.cardId, controls, () =>
+              controls.complete(undefined),
+            )
+          } else {
+            queueVerifiedPut(store, replacement, input.cardId, controls, () =>
+              controls.complete(undefined),
+            )
+          }
+        })
+    },
+  )
+}
+
+export async function writeSnapshotAndAcknowledgeRecoveryAtomically<
+  TSnapshotPayload extends PortableValue = PortableValue,
+  TRecoveryPayload extends PortableValue = PortableValue,
+>(
+  input: {
+    snapshot: V4LatestCardSnapshotRecord<TSnapshotPayload>
+    expectedRecoveryWriteId: string | null
+    recoveryMutation: V4RecoveryMutation<TRecoveryPayload>
+  },
+  options?: WorkspaceChatV4RecordCodecOptions,
+): Promise<void> {
+  const snapshot = prepareLatestSnapshotRecord(input.snapshot, options)
+  requireExpectedWriteId(input.expectedRecoveryWriteId)
+  const recoveryReplacement =
+    input.recoveryMutation.type === 'delete'
+      ? null
+      : prepareRecoveryRecord(
+          input.recoveryMutation.record,
+          snapshot.cardId,
+          options,
+        )
+
+  await withTransaction(
+    [
+      WORKSPACE_CHAT_STORE_NAMES.latestCardSnapshots,
+      WORKSPACE_CHAT_STORE_NAMES.cardRecovery,
+    ],
+    'readwrite',
+    (transaction, controls) => {
+      const snapshotStore = transaction.objectStore(
+        WORKSPACE_CHAT_STORE_NAMES.latestCardSnapshots,
+      )
+      const recoveryStore = transaction.objectStore(
+        WORKSPACE_CHAT_STORE_NAMES.cardRecovery,
+      )
+      const recoveryRead = recoveryStore.get(snapshot.cardId)
+      recoveryRead.onerror = () =>
+        controls.abort(
+          requestFailure(
+            recoveryRead,
+            'Snapshot acknowledgement recovery CAS read failed',
+          ),
+        )
+      recoveryRead.onsuccess = () =>
+        runTransactionCallback(controls, () => {
+          const currentRecovery =
+            recoveryRead.result === undefined
+              ? undefined
+              : decodeStoredRecoveryRecord(
+                  recoveryRead.result,
+                  snapshot.cardId,
+                  options,
+                )
+          requireCompareAndSwap(
+            currentRecovery,
+            input.expectedRecoveryWriteId,
+            'Snapshot acknowledgement recovery',
+          )
+          queueVerifiedPut(
+            snapshotStore,
+            snapshot,
+            snapshot.cardId,
+            controls,
+            () => {
+              if (recoveryReplacement === null) {
+                queueVerifiedDelete(
+                  recoveryStore,
+                  snapshot.cardId,
+                  controls,
+                  () => controls.complete(undefined),
+                )
+              } else {
+                queueVerifiedPut(
+                  recoveryStore,
+                  recoveryReplacement,
+                  snapshot.cardId,
+                  controls,
+                  () => controls.complete(undefined),
+                )
+              }
+            },
+          )
+        })
+    },
+  )
+}
+
+export async function mutatePendingSendAtomically<
+  TPayload extends PortableValue = PortableValue,
+>(
+  input: {
+    ownerKey: string
+    expectedWriteId: string | null
+    mutation: V4PendingMutation<TPayload>
+  },
+  options?: WorkspaceChatV4RecordCodecOptions,
+): Promise<void> {
+  requireKey('ownerKey', input.ownerKey)
+  requireExpectedWriteId(input.expectedWriteId)
+  const replacement =
+    input.mutation.type === 'delete'
+      ? null
+      : preparePendingRecord(input.mutation.record, input.ownerKey, options)
+
+  await withTransaction(
+    WORKSPACE_CHAT_STORE_NAMES.pendingSends,
+    'readwrite',
+    (transaction, controls) => {
+      const store = transaction.objectStore(
+        WORKSPACE_CHAT_STORE_NAMES.pendingSends,
+      )
+      const readRequest = store.get(input.ownerKey)
+      readRequest.onerror = () =>
+        controls.abort(requestFailure(readRequest, 'Pending-send CAS read failed'))
+      readRequest.onsuccess = () =>
+        runTransactionCallback(controls, () => {
+          const current =
+            readRequest.result === undefined
+              ? undefined
+              : decodeStoredPendingRecord(
+                  readRequest.result,
+                  input.ownerKey,
+                  options,
+                )
+          requireCompareAndSwap(current, input.expectedWriteId, 'Pending send')
+          if (replacement === null) {
+            queueVerifiedDelete(store, input.ownerKey, controls, () =>
+              controls.complete(undefined),
+            )
+          } else {
+            queueVerifiedPut(store, replacement, input.ownerKey, controls, () =>
+              controls.complete(undefined),
+            )
+          }
+        })
+    },
+  )
+}
+
+export async function handoffPendingSendAtomically<
+  TPayload extends PortableValue = PortableValue,
+>(
+  input: {
+    sourceOwnerKey: string
+    expectedSourceWriteId: string
+    destination: V4PendingSendRecord<TPayload>
+    existingDestinationMerge?: {
+      expectedWriteId: string
+      record: V4PendingSendRecord<TPayload>
+    }
+  },
+  options?: WorkspaceChatV4RecordCodecOptions,
+): Promise<void> {
+  requireKey('sourceOwnerKey', input.sourceOwnerKey)
+  requireKey('expectedSourceWriteId', input.expectedSourceWriteId)
+  const destination = encodePendingRecord(input.destination, options)
+  const destinationOwnerKey = destination.ownerKey
+  if (destinationOwnerKey === input.sourceOwnerKey) {
+    throw new Error('Pending-send handoff destination must differ from source')
+  }
+  const merge = input.existingDestinationMerge
+  if (merge !== undefined) requireKey('merge expectedWriteId', merge.expectedWriteId)
+  const mergedDestination =
+    merge === undefined
+      ? undefined
+      : preparePendingRecord(merge.record, destinationOwnerKey, options)
+
+  await withTransaction(
+    WORKSPACE_CHAT_STORE_NAMES.pendingSends,
+    'readwrite',
+    (transaction, controls) => {
+      const store = transaction.objectStore(
+        WORKSPACE_CHAT_STORE_NAMES.pendingSends,
+      )
+      const sourceRead = store.get(input.sourceOwnerKey)
+      sourceRead.onerror = () =>
+        controls.abort(
+          requestFailure(sourceRead, 'Pending-send handoff source read failed'),
+        )
+      sourceRead.onsuccess = () =>
+        runTransactionCallback(controls, () => {
+          const source =
+            sourceRead.result === undefined
+              ? undefined
+              : decodeStoredPendingRecord(
+                  sourceRead.result,
+                  input.sourceOwnerKey,
+                  options,
+                )
+          requireCompareAndSwap(
+            source,
+            input.expectedSourceWriteId,
+            'Pending-send handoff source',
+          )
+
+          const destinationRead = store.get(destinationOwnerKey)
+          destinationRead.onerror = () =>
+            controls.abort(
+              requestFailure(
+                destinationRead,
+                'Pending-send handoff destination read failed',
+              ),
+            )
+          destinationRead.onsuccess = () =>
+            runTransactionCallback(controls, () => {
+              let output = destination
+              if (destinationRead.result === undefined) {
+                if (merge !== undefined) {
+                  controls.abort(
+                    new Error(
+                      'Pending-send handoff merge output supplied for a missing destination',
+                    ),
+                  )
+                  return
+                }
+              } else {
+                const currentDestination = decodeStoredPendingRecord(
+                  destinationRead.result,
+                  destinationOwnerKey,
+                  options,
+                )
+                if (merge === undefined || mergedDestination === undefined) {
+                  controls.abort(
+                    new Error(
+                      'Pending-send handoff requires explicit destination merge output',
+                    ),
+                  )
+                  return
+                }
+                requireCompareAndSwap(
+                  currentDestination,
+                  merge.expectedWriteId,
+                  'Pending-send handoff destination',
+                )
+                output = mergedDestination
+              }
+
+              queueVerifiedPut(
+                store,
+                output,
+                destinationOwnerKey,
+                controls,
+                () =>
+                  queueVerifiedDelete(
+                    store,
+                    input.sourceOwnerKey,
+                    controls,
+                    () => controls.complete(undefined),
+                  ),
+              )
+            })
+        })
+    },
+  )
+}
+
+export async function handoffPendingSendToCardRecoveryAtomically<
+  TPayload extends PortableValue = PortableValue,
+>(
+  input: {
+    sourceOwnerKey: string
+    expectedPendingWriteId: string
+    recoveryCardId: string
+    expectedRecoveryWriteId: string | null
+    recoveryMutation: Exclude<V4RecoveryMutation<TPayload>, { type: 'delete' }>
+  },
+  options?: WorkspaceChatV4RecordCodecOptions,
+): Promise<void> {
+  requireKey('sourceOwnerKey', input.sourceOwnerKey)
+  requireKey('expectedPendingWriteId', input.expectedPendingWriteId)
+  requireKey('recoveryCardId', input.recoveryCardId)
+  requireExpectedWriteId(input.expectedRecoveryWriteId)
+  const recoveryDestination = prepareRecoveryRecord(
+    input.recoveryMutation.record,
+    input.recoveryCardId,
+    options,
+  )
+
+  await withTransaction(
+    [
+      WORKSPACE_CHAT_STORE_NAMES.pendingSends,
+      WORKSPACE_CHAT_STORE_NAMES.cardRecovery,
+    ],
+    'readwrite',
+    (transaction, controls) => {
+      const pendingStore = transaction.objectStore(
+        WORKSPACE_CHAT_STORE_NAMES.pendingSends,
+      )
+      const recoveryStore = transaction.objectStore(
+        WORKSPACE_CHAT_STORE_NAMES.cardRecovery,
+      )
+      const pendingRead = pendingStore.get(input.sourceOwnerKey)
+      pendingRead.onerror = () =>
+        controls.abort(
+          requestFailure(
+            pendingRead,
+            'Pending-to-recovery source read failed',
+          ),
+        )
+      pendingRead.onsuccess = () =>
+        runTransactionCallback(controls, () => {
+          const pending =
+            pendingRead.result === undefined
+              ? undefined
+              : decodeStoredPendingRecord(
+                  pendingRead.result,
+                  input.sourceOwnerKey,
+                  options,
+                )
+          requireCompareAndSwap(
+            pending,
+            input.expectedPendingWriteId,
+            'Pending-to-recovery source',
+          )
+
+          const recoveryRead = recoveryStore.get(input.recoveryCardId)
+          recoveryRead.onerror = () =>
+            controls.abort(
+              requestFailure(
+                recoveryRead,
+                'Pending-to-recovery destination CAS read failed',
+              ),
+            )
+          recoveryRead.onsuccess = () =>
+            runTransactionCallback(controls, () => {
+              const currentRecovery =
+                recoveryRead.result === undefined
+                  ? undefined
+                  : decodeStoredRecoveryRecord(
+                      recoveryRead.result,
+                      input.recoveryCardId,
+                      options,
+                    )
+              requireCompareAndSwap(
+                currentRecovery,
+                input.expectedRecoveryWriteId,
+                'Pending-to-recovery destination',
+              )
+              queueVerifiedPut(
+                recoveryStore,
+                recoveryDestination,
+                input.recoveryCardId,
+                controls,
+                () =>
+                  queueVerifiedDelete(
+                    pendingStore,
+                    input.sourceOwnerKey,
+                    controls,
+                    () => controls.complete(undefined),
+                  ),
+              )
+            })
+        })
+    },
+  )
+}
+
+function sortJournalRecords(
+  records: Array<V4DurableJournalRecord>,
+): Array<V4DurableJournalRecord> {
+  return records.sort(
+    (left, right) =>
+      left.ordinal - right.ordinal || left.entryKey.localeCompare(right.entryKey),
+  )
+}
+
+function requireUniqueJournalOrdinals(
+  records: Array<V4DurableJournalRecord>,
+): void {
+  const ordinals = new Set<number>()
+  for (const record of records) {
+    if (ordinals.has(record.ordinal)) {
+      throw new Error('Journal owner post-state has duplicate ordinals')
+    }
+    ordinals.add(record.ordinal)
+  }
+}
+
+export async function applyDurableJournalDeltaAtomically<
+  TPayload extends PortableValue = PortableValue,
+>(
+  input: {
+    ownerKey: string
+    upserts: Array<V4DurableJournalRecord<TPayload>>
+    removals: Array<string>
+  },
+  options?: WorkspaceChatV4RecordCodecOptions,
+): Promise<Array<V4DurableJournalRecord<TPayload>>> {
+  requireKey('ownerKey', input.ownerKey)
+  const upserts = input.upserts.map((record) =>
+    prepareJournalRecord(record, input.ownerKey, options),
+  )
+  const upsertKeys = new Set<string>()
+  for (const record of upserts) {
+    if (upsertKeys.has(record.entryKey)) {
+      throw new Error('Journal delta has duplicate upsert entryKey values')
+    }
+    upsertKeys.add(record.entryKey)
+  }
+  const removalKeys = new Set<string>()
+  for (const entryKey of input.removals) {
+    requireKey('journal removal entryKey', entryKey)
+    if (removalKeys.has(entryKey)) {
+      throw new Error('Journal delta has duplicate removal entryKey values')
+    }
+    if (upsertKeys.has(entryKey)) {
+      throw new Error('Journal delta cannot upsert and remove the same entryKey')
+    }
+    removalKeys.add(entryKey)
+  }
+
+  return withTransaction(
+    WORKSPACE_CHAT_STORE_NAMES.durableJournal,
+    'readwrite',
+    (transaction, controls) => {
+      const store = transaction.objectStore(
+        WORKSPACE_CHAT_STORE_NAMES.durableJournal,
+      )
+      const initialRead = store.index(JOURNAL_OWNER_INDEX).getAll(input.ownerKey)
+      initialRead.onerror = () =>
+        controls.abort(
+          requestFailure(initialRead, 'Journal delta initial read failed'),
+        )
+      initialRead.onsuccess = () =>
+        runTransactionCallback(controls, () => {
+          const expectedByKey = new Map<string, V4DurableJournalRecord>()
+          for (const value of initialRead.result as Array<unknown>) {
+            const record = decodeStoredJournalRecord(
+              value,
+              input.ownerKey,
+              options,
+            )
+            expectedByKey.set(record.entryKey, record)
+          }
+          for (const entryKey of removalKeys) expectedByKey.delete(entryKey)
+          for (const record of upserts) expectedByKey.set(record.entryKey, record)
+          const expected = sortJournalRecords([...expectedByKey.values()])
+          requireUniqueJournalOrdinals(expected)
+
+          const verifyExactPostState = (): void => {
+            const readback = store
+              .index(JOURNAL_OWNER_INDEX)
+              .getAll(input.ownerKey)
+            readback.onerror = () =>
+              controls.abort(
+                requestFailure(readback, 'Journal delta readback failed'),
+              )
+            readback.onsuccess = () =>
+              runTransactionCallback(controls, () => {
+                const actual = sortJournalRecords(
+                  (readback.result as Array<unknown>).map((value) =>
+                    decodeStoredJournalRecord(value, input.ownerKey, options),
+                  ),
+                )
+                requireUniqueJournalOrdinals(actual)
+                if (!semanticEquivalent(actual, expected)) {
+                  controls.abort(
+                    new Error('Journal delta exact post-state verification failed'),
+                  )
+                  return
+                }
+                controls.complete(
+                  actual as Array<V4DurableJournalRecord<TPayload>>,
+                )
+              })
+          }
+
+          const requestCount = removalKeys.size + upserts.length
+          if (requestCount === 0) {
+            verifyExactPostState()
+            return
+          }
+          let completedRequests = 0
+          const requestCompleted = (): void => {
+            completedRequests += 1
+            if (completedRequests === requestCount) verifyExactPostState()
+          }
+          for (const entryKey of removalKeys) {
+            const request = store.delete([input.ownerKey, entryKey])
+            request.onerror = () =>
+              controls.abort(
+                requestFailure(request, 'Journal delta removal failed'),
+              )
+            request.onsuccess = () =>
+              runTransactionCallback(controls, requestCompleted)
+          }
+          for (const record of upserts) {
+            const request = store.put(record)
+            request.onerror = () =>
+              controls.abort(requestFailure(request, 'Journal delta upsert failed'))
+            request.onsuccess = () =>
+              runTransactionCallback(controls, requestCompleted)
+          }
+        })
+    },
+  )
+}
+
+export async function readOrderedDurableJournal<
+  TPayload extends PortableValue = PortableValue,
+>(
+  ownerKey: string,
+  options?: WorkspaceChatV4RecordCodecOptions,
+): Promise<Array<V4DurableJournalRecord<TPayload>>> {
+  requireKey('ownerKey', ownerKey)
+  return withTransaction(
+    WORKSPACE_CHAT_STORE_NAMES.durableJournal,
+    'readonly',
+    (transaction, controls) => {
+      const request = transaction
+        .objectStore(WORKSPACE_CHAT_STORE_NAMES.durableJournal)
+        .index(JOURNAL_OWNER_INDEX)
+        .getAll(ownerKey)
+      request.onerror = () =>
+        controls.abort(
+          requestFailure(request, 'Ordered journal read failed'),
+        )
+      request.onsuccess = () =>
+        runTransactionCallback(controls, () => {
+          const records = sortJournalRecords(
+            (request.result as Array<unknown>).map((value) =>
+              decodeStoredJournalRecord(value, ownerKey, options),
+            ),
+          )
+          requireUniqueJournalOrdinals(records)
+          controls.complete(
+            records as Array<V4DurableJournalRecord<TPayload>>,
+          )
+        })
+    },
   )
 }
 
