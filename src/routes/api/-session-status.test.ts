@@ -241,4 +241,39 @@ describe('GET /api/session-status Card projection', () => {
     expect(mocks.resolveCard).not.toHaveBeenCalled()
     expect(mocks.getSession).not.toHaveBeenCalled()
   })
+
+  it.each(['main', 'new'])(
+    'treats the legacy %s bootstrap alias as aggregate status',
+    async (cardId) => {
+      const response = await handler({
+        request: new Request(
+          `http://workspace.test/api/session-status?cardId=${cardId}`,
+        ),
+      })
+
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual({
+        ok: true,
+        payload: { cards: [] },
+      })
+      expect(mocks.resolveCard).not.toHaveBeenCalled()
+      expect(mocks.getSession).not.toHaveBeenCalled()
+    },
+  )
+
+  it('continues rejecting unknown Card IDs', async () => {
+    mocks.resolveCard.mockRejectedValue(new Error('missing Card'))
+
+    const response = await handler({
+      request: new Request(
+        'http://workspace.test/api/session-status?cardId=unknown-card',
+      ),
+    })
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Card usage unavailable',
+    })
+  })
 })
