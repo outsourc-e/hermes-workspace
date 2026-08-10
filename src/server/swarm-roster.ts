@@ -15,7 +15,20 @@ export function isSwarmWorkerId(value: unknown): value is string {
 const WorkerIdSchema = z
   .string()
   .trim()
-  .regex(WORKER_ID_PATTERN, 'worker id must look like swarm13 or a semantic profile id')
+  .regex(
+    WORKER_ID_PATTERN,
+    'worker id must look like swarm13 or a semantic profile id',
+  )
+
+const WrapperNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(128)
+  .regex(
+    /^[a-z0-9][a-z0-9_.:-]*$/i,
+    'wrapper must be a managed wrapper name without path separators',
+  )
 
 export const SwarmRosterWorkerSchema = z.object({
   id: WorkerIdSchema,
@@ -31,7 +44,7 @@ export const SwarmRosterWorkerSchema = z.object({
   plugins: z.array(z.string()).default([]),
   pluginToolsets: z.array(z.string()).default([]),
   mcpServers: z.array(z.string()).default([]),
-  wrapper: z.string().optional(),
+  wrapper: WrapperNameSchema.optional(),
   capabilities: z.array(z.string()).default([]),
   defaultCwd: z.string().optional(),
   preferredTaskTypes: z.array(z.string()).default([]),
@@ -54,6 +67,25 @@ export const SwarmRosterUpsertSchema = SwarmRosterWorkerSchema.extend({
 })
 
 export type SwarmRosterUpsert = z.infer<typeof SwarmRosterUpsertSchema>
+
+export function applySwarmWorkerModel(
+  roster: SwarmRoster,
+  workerId: string,
+  modelRef: string,
+): SwarmRoster {
+  const id = WorkerIdSchema.parse(workerId)
+  const model = z.string().trim().min(1).max(300).parse(modelRef)
+  const parsed = SwarmRosterSchema.parse(roster)
+  if (!parsed.workers.some((worker) => worker.id === id)) {
+    throw new Error(`Unknown swarm worker: ${id}`)
+  }
+  return {
+    ...parsed,
+    workers: parsed.workers.map((worker) =>
+      worker.id === id ? { ...worker, model } : worker,
+    ),
+  }
+}
 
 function titleCase(value: string): string {
   return value
@@ -134,7 +166,10 @@ export function writeSwarmRoster(roster: SwarmRoster): void {
   writeFileSync(SWARM_ROSTER_PATH, doc)
 }
 
-export function upsertSwarmRosterWorker(input: SwarmRosterUpsert, ids: Array<string> = []): SwarmRoster {
+export function upsertSwarmRosterWorker(
+  input: SwarmRosterUpsert,
+  ids: Array<string> = [],
+): SwarmRoster {
   const nextWorker = SwarmRosterUpsertSchema.parse(input)
   const current = readSwarmRoster(ids)
   const byId = new Map(current.workers.map((worker) => [worker.id, worker]))
@@ -151,12 +186,31 @@ export function upsertSwarmRosterWorker(input: SwarmRosterUpsert, ids: Array<str
   return next
 }
 
-export function rosterByWorkerId(ids: Array<string> = []): Map<string, SwarmRosterWorker> {
-  return new Map(readSwarmRoster(ids).workers.map((worker) => [worker.id, worker]))
+export function updateSwarmRosterWorkerModel(
+  workerId: string,
+  modelRef: string,
+  ids: Array<string> = [],
+): SwarmRoster {
+  const next = applySwarmWorkerModel(readSwarmRoster(ids), workerId, modelRef)
+  writeSwarmRoster(next)
+  return next
 }
 
-export function resolveSwarmWorkerDisplayName(workerId: string, worker?: Pick<SwarmRosterWorker, 'name'> | null): string {
-  return worker ? worker.name.trim() || titleCase(workerId) : titleCase(workerId)
+export function rosterByWorkerId(
+  ids: Array<string> = [],
+): Map<string, SwarmRosterWorker> {
+  return new Map(
+    readSwarmRoster(ids).workers.map((worker) => [worker.id, worker]),
+  )
+}
+
+export function resolveSwarmWorkerDisplayName(
+  workerId: string,
+  worker?: Pick<SwarmRosterWorker, 'name'> | null,
+): string {
+  return worker
+    ? worker.name.trim() || titleCase(workerId)
+    : titleCase(workerId)
 }
 
 export function formatSwarmWorkerLabel(
@@ -164,6 +218,8 @@ export function formatSwarmWorkerLabel(
   worker?: Pick<SwarmRosterWorker, 'name' | 'role'> | null,
 ): string {
   const displayName = resolveSwarmWorkerDisplayName(workerId, worker)
-  const role = worker ? worker.role.trim() || defaultRoleFromId(workerId) : defaultRoleFromId(workerId)
+  const role = worker
+    ? worker.role.trim() || defaultRoleFromId(workerId)
+    : defaultRoleFromId(workerId)
   return `${displayName} — ${role}`
 }

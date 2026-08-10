@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { resolveManagedPythonBin } from './managed-python'
 
 export type SwarmChatMessage = {
   id: string
@@ -139,7 +140,10 @@ print(json.dumps({
 }))
 `
 
-export function readWorkerMessages(profilePath: string, limit: number): SwarmChatReadResult {
+export function readWorkerMessages(
+  profilePath: string,
+  limit: number,
+): SwarmChatReadResult {
   const dbPath = join(profilePath, 'state.db')
   if (!existsSync(dbPath)) {
     return {
@@ -151,7 +155,7 @@ export function readWorkerMessages(profilePath: string, limit: number): SwarmCha
   }
   try {
     const raw = execFileSync(
-      'python3',
+      resolveManagedPythonBin(),
       ['-c', PYTHON_SCRIPT, dbPath, String(limit)],
       { encoding: 'utf-8', timeout: 5_000 },
     )

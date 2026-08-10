@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   buildHermesChatQueryArgs,
@@ -7,6 +8,7 @@ import {
   dispatchBlockReason,
   runtimeCheckpointSignature,
   runtimeSnapshotIsFresh,
+  syncWorkerProfileModel,
 } from './swarm-dispatch'
 
 describe('checkpointFromRuntimeSnapshot', () => {
@@ -26,7 +28,9 @@ describe('checkpointFromRuntimeSnapshot', () => {
     expect(checkpoint).not.toBeNull()
     expect(checkpoint?.stateLabel).toBe('DONE')
     expect(checkpoint?.checkpointStatus).toBe('done')
-    expect(checkpoint?.result).toBe('Structured checkpoint returned to RouterChat')
+    expect(checkpoint?.result).toBe(
+      'Structured checkpoint returned to RouterChat',
+    )
     expect(checkpoint?.nextAction).toBe('Verify in UI flow')
     expect(checkpoint?.raw).toContain('STATE: DONE')
   })
@@ -50,9 +54,30 @@ describe('checkpointFromRuntimeSnapshot', () => {
 
 describe('dispatchBlockReason', () => {
   it('turns failed or timed-out dispatch results into mission blocker text', () => {
-    expect(dispatchBlockReason({ ok: false, error: 'Command failed: worker exited', output: '', checkpointStatus: undefined })).toBe('Command failed: worker exited')
-    expect(dispatchBlockReason({ ok: true, error: null, output: 'Delivered', checkpointStatus: 'timeout' })).toBe('No fresh checkpoint before poll timeout.')
-    expect(dispatchBlockReason({ ok: true, error: null, output: 'Checkpoint DONE', checkpointStatus: 'checkpointed' })).toBeNull()
+    expect(
+      dispatchBlockReason({
+        ok: false,
+        error: 'Command failed: worker exited',
+        output: '',
+        checkpointStatus: undefined,
+      }),
+    ).toBe('Command failed: worker exited')
+    expect(
+      dispatchBlockReason({
+        ok: true,
+        error: null,
+        output: 'Delivered',
+        checkpointStatus: 'timeout',
+      }),
+    ).toBe('No fresh checkpoint before poll timeout.')
+    expect(
+      dispatchBlockReason({
+        ok: true,
+        error: null,
+        output: 'Checkpoint DONE',
+        checkpointStatus: 'checkpointed',
+      }),
+    ).toBeNull()
   })
 })
 
@@ -71,7 +96,13 @@ describe('runtimeSnapshotIsFresh', () => {
     }
     const dispatchedAt = 1_746_000_000_000
 
-    expect(runtimeSnapshotIsFresh(baseline, runtimeCheckpointSignature(baseline), dispatchedAt)).toBe(false)
+    expect(
+      runtimeSnapshotIsFresh(
+        baseline,
+        runtimeCheckpointSignature(baseline),
+        dispatchedAt,
+      ),
+    ).toBe(false)
 
     const updated = {
       ...baseline,
@@ -82,7 +113,13 @@ describe('runtimeSnapshotIsFresh', () => {
       lastOutputAt: 1_746_000_001_000,
     }
 
-    expect(runtimeSnapshotIsFresh(updated, runtimeCheckpointSignature(baseline), dispatchedAt)).toBe(true)
+    expect(
+      runtimeSnapshotIsFresh(
+        updated,
+        runtimeCheckpointSignature(baseline),
+        dispatchedAt,
+      ),
+    ).toBe(true)
   })
 })
 
@@ -105,17 +142,57 @@ describe('checkpoint filtering', () => {
 })
 
 describe('buildHermesTmuxLaunchCommand', () => {
+  it('leaves the existing profile model untouched for the default Worker label', () => {
+    expect(
+      syncWorkerProfileModel('new-worker', 'unused-profile', {
+        id: 'new-worker',
+        model: 'Worker',
+      } as never),
+    ).toEqual({ ok: true, skipped: true })
+  })
+
+  it('synchronizes the roster route into the worker profile before starting a live session', () => {
+    const source = readFileSync(
+      new URL('./swarm-dispatch.ts', import.meta.url),
+      'utf8',
+    )
+    expect(source).toContain('syncWorkerProfileModel(workerId, profilePath)')
+  })
+
   it('keeps the tmux shell alive so startup failures leave readable output', () => {
     const command = buildHermesTmuxLaunchCommand({
       profilePath: '/tmp/hermes profiles/swarm1',
+      cwd: '/tmp/workspace',
       hermesBin: '/opt/homebrew/bin/hermes',
-      ghToken: 'ghp_te...3456',
+      platform: 'linux',
     })
 
     expect(command).toContain("HERMES_HOME='/tmp/hermes profiles/swarm1'")
     expect(command).toContain("'/opt/homebrew/bin/hermes' chat --tui")
     expect(command).toContain('[Hermes worker exited with status %s]')
     expect(command).not.toContain('exec ')
+    expect(command).not.toContain('GH_TOKEN=')
+    expect(command).not.toContain('GITHUB_TOKEN=')
+  })
+
+  it('settles unexpected async dispatch failures instead of using an async Promise executor', () => {
+    const source = readFileSync(
+      new URL('./swarm-dispatch.ts', import.meta.url),
+      'utf8',
+    )
+    expect(source).not.toContain('new Promise(async')
+    expect(source).toContain('unexpected dispatch failure')
+  })
+
+  it('publishes runtime checkpoint updates with an atomic rename', () => {
+    const source = readFileSync(
+      new URL('./swarm-dispatch.ts', import.meta.url),
+      'utf8',
+    )
+    expect(source).toContain('renameSync(runtimeTempPath, runtimePath)')
+    expect(source).not.toContain(
+      "writeFileSync(runtimePath, JSON.stringify(next, null, 2) + '\\n')",
+    )
   })
 })
 
@@ -165,8 +242,12 @@ describe('buildWorkerPrompt', () => {
 
     expect(prompt).toContain('Worker: Builder — Primary Builder')
     expect(prompt).toContain('Machine ID: swarm5')
-    expect(prompt).toContain('Mission: Ship focused product slices with tests and clean diffs.')
-    expect(prompt).toContain('Capabilities: code-editing, ui-implementation, build-verification')
+    expect(prompt).toContain(
+      'Mission: Ship focused product slices with tests and clean diffs.',
+    )
+    expect(prompt).toContain(
+      'Capabilities: code-editing, ui-implementation, build-verification',
+    )
     expect(prompt).toContain('Skills: swarm-ui-worker, swarm-worker-core')
   })
 

@@ -178,7 +178,6 @@ function formatAssignedModel(model?: string | null, provider?: string | null): s
 type WorkerCardSettings = {
   displayName?: string
   role?: string
-  modelLabel?: string
   avatarGlyph?: string
 }
 
@@ -196,18 +195,7 @@ const ROLE_OPTIONS = [
   'Hackathon',
   'Worker',
 ]
-const MODEL_OPTIONS = [
-  'GPT-5.5',
-  'GPT-5.4',
-  'GPT-5.3',
-  'Opus 4.7',
-  'Opus 4.6',
-  'Opus 4.5',
-  'MiniMax',
-  'Qwen3 8B',
-  'Qwen3 14B',
-  'Worker',
-]
+
 const AVATAR_OPTIONS = ['','🤖','🧠','🛠️','📊','🧪','📝','⚙️','🔬','🚀']
 
 export type OperationalWorkerCardProps = {
@@ -251,7 +239,7 @@ export function OperationalWorkerCard({
   const [settings, setSettings] = useState<WorkerCardSettings>({})
   const [draftName, setDraftName] = useState('')
   const [draftRole, setDraftRole] = useState('')
-  const [draftModel, setDraftModel] = useState('')
+
   const [draftAvatar, setDraftAvatar] = useState('')
   const [taskComposerOpen, setTaskComposerOpen] = useState(false)
   const state = deriveWorkerState(member, currentTask, checkpointStatus, runtimeState)
@@ -278,7 +266,7 @@ export function OperationalWorkerCard({
   const progressValue =
     state === 'idle' || state === 'offline' ? 8 : state === 'waiting' ? 38 : 68
   const baseModelLabel = formatAssignedModel(member.model, member.provider)
-  const modelLabel = settings.modelLabel || baseModelLabel
+  const modelLabel = baseModelLabel
   const avatarGlyph = settings.avatarGlyph || ''
   const outputFreshness = relativeOutputTime(recentOutputAt)
   const focusPanels = useMemo(() => {
@@ -343,9 +331,8 @@ export function OperationalWorkerCard({
     if (!settingsOpen) return
     setDraftName(settings.displayName || member.displayName || '')
     setDraftRole(settings.role || member.role || roleFromId(member.id))
-    setDraftModel(settings.modelLabel || baseModelLabel)
     setDraftAvatar(settings.avatarGlyph || '')
-  }, [settingsOpen, settings, member.displayName, member.role, member.id, baseModelLabel])
+  }, [settingsOpen, settings, member.displayName, member.role, member.id])
 
   useEffect(() => {
     if (!selected) return
@@ -662,20 +649,15 @@ export function OperationalWorkerCard({
                   ))}
                 </select>
               </label>
-              <label className="block">
-                <span className="mb-1 block text-[var(--theme-muted)]">Model label</span>
-                <select
-                  value={draftModel}
-                  onChange={(event) => setDraftModel(event.target.value)}
-                  className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
-                >
-                  {Array.from(new Set([draftModel || baseModelLabel, ...MODEL_OPTIONS].filter(Boolean))).map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2">
+                <span className="block text-[var(--theme-muted)]">Runtime model</span>
+                <code className="mt-1 block break-all text-[11px] text-[var(--theme-text)]">
+                  {baseModelLabel}
+                </code>
+                <span className="mt-1 block text-[10px] text-[var(--theme-muted)]">
+                  Change this canonical OAuth route in Settings → Orchestration.
+                </span>
+              </div>
             </div>
             <div className="mt-4 flex items-center justify-between gap-2">
               <button
@@ -710,7 +692,7 @@ export function OperationalWorkerCard({
                       displayName: draftName.trim() || undefined,
                       avatarGlyph: draftAvatar.trim() || undefined,
                       role: draftRole.trim() || undefined,
-                      modelLabel: draftModel.trim() || undefined,
+
                     }
                     setSettings(next)
                     try {

@@ -76,6 +76,17 @@ describe('resolveSwarmModelLabel', () => {
     })
   })
 
+  it('routes account-specific Claude Max OAuth refs through the configured relay', () => {
+    expect(resolveSwarmModelLabel('claude-cwm4tx/sonnet')).toEqual({
+      provider: 'custom',
+      default: 'claude-cwm4tx/sonnet',
+    })
+    expect(resolveSwarmModelLabel('claude-gp/opus')).toEqual({
+      provider: 'custom',
+      default: 'claude-gp/opus',
+    })
+  })
+
   it('returns null for unknown labels (so the worker is left alone)', () => {
     expect(resolveSwarmModelLabel('Unknown 9000')).toBeNull()
     expect(resolveSwarmModelLabel('typo opus')).toBeNull()

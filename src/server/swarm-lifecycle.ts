@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'n
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
+import { resolveManagedPythonBin } from './managed-python'
 import { SWARM_MEMORY_ROOT } from './swarm-environment'
 import { appendSwarmMemoryEvent } from './swarm-memory'
 import type {ChildProcess} from 'node:child_process';
@@ -102,7 +103,7 @@ export function getSwarmLifecycleStatus(workerId: string, policy = DEFAULT_POLIC
   const profilePath = join(getProfilesDir(), workerId)
   let parsed: Record<string, unknown> = {}
   try {
-    const raw = execFileSync('python3', ['-c', PYTHON_STATUS, profilePath], { encoding: 'utf8', timeout: 5_000 })
+    const raw = execFileSync(resolveManagedPythonBin(), ['-c', PYTHON_STATUS, profilePath], { encoding: 'utf8', timeout: 5_000 })
     parsed = JSON.parse(raw) as Record<string, unknown>
   } catch {
     parsed = { ok: false }

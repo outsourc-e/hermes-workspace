@@ -50,6 +50,7 @@ workers:
   - credential-change
   maxConcurrentTasks: 1
   acceptsBroadcast: true
+  reviewRequired: false
   plugins: []
   pluginToolsets: []
   mcpServers:
@@ -102,6 +103,7 @@ workers:
   - source-of-record-change
   maxConcurrentTasks: 1
   acceptsBroadcast: true
+  reviewRequired: false
   plugins: []
   pluginToolsets: []
   mcpServers:
@@ -152,6 +154,7 @@ workers:
   - external-write
   maxConcurrentTasks: 1
   acceptsBroadcast: true
+  reviewRequired: false
   plugins: []
   pluginToolsets: []
   mcpServers:
@@ -245,6 +248,7 @@ workers:
   - external-write
   maxConcurrentTasks: 1
   acceptsBroadcast: true
+  reviewRequired: false
   plugins: []
   pluginToolsets: []
   mcpServers:
@@ -299,6 +303,7 @@ workers:
   - long-running-loop
   maxConcurrentTasks: 1
   acceptsBroadcast: true
+  reviewRequired: false
   plugins: []
   pluginToolsets: []
   mcpServers:
@@ -347,6 +352,7 @@ workers:
   - credential-change
   maxConcurrentTasks: 1
   acceptsBroadcast: true
+  reviewRequired: false
   plugins: []
   pluginToolsets: []
   mcpServers:
@@ -397,6 +403,7 @@ workers:
   - fork-reset
   maxConcurrentTasks: 1
   acceptsBroadcast: true
+  reviewRequired: false
   plugins: []
   pluginToolsets: []
   mcpServers:
@@ -443,6 +450,7 @@ workers:
   - irreversible-decision
   maxConcurrentTasks: 1
   acceptsBroadcast: true
+  reviewRequired: false
   plugins: []
   pluginToolsets: []
   mcpServers:
@@ -491,6 +499,7 @@ workers:
   - external-send
   maxConcurrentTasks: 1
   acceptsBroadcast: true
+  reviewRequired: false
   plugins: []
   pluginToolsets: []
   mcpServers:

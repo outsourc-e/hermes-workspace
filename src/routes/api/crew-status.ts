@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import * as yaml from 'yaml'
 import { BEARER_TOKEN, CLAUDE_API, ensureGatewayProbed } from '../../server/gateway-capabilities'
 import { getClaudeRoot, getProfileClaudeHome, getWorkspaceClaudeHome } from '../../server/claude-paths'
+import { resolveManagedPythonBin } from '../../server/managed-python'
 import { formatSwarmWorkerLabel, rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
 
 type CrewDefinition = {
@@ -163,7 +164,7 @@ if last_row is not None:
 conn.close()
 print(json.dumps(out))
 `
-    const raw = execFileSync('python3', ['-c', script, dbPath], {
+    const raw = execFileSync(resolveManagedPythonBin(), ['-c', script, dbPath], {
       encoding: 'utf-8',
       timeout: 3_000,
     })

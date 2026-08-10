@@ -101,6 +101,13 @@ export function resolveSwarmModelLabel(
     return { provider: 'ollama-pc1', default: 'qwen3-30b-a3b-fixed:latest' }
   }
 
+  // Account-specific Claude Max routes are served through the configured
+  // OpenAI-compatible relay. Keep the full route id as the model so account
+  // identity remains deterministic inside independently configured workers.
+  if (/^claude-[\w.-]+\/.+/.test(label.trim())) {
+    return { provider: 'custom', default: label.trim() }
+  }
+
   // Provider-prefixed full id (already in canonical form). Pass through.
   const slashMatch = label.trim().match(/^([\w.-]+)\/(.+)$/)
   if (slashMatch) {
