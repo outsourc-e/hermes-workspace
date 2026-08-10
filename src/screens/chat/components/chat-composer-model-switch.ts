@@ -1,9 +1,30 @@
 export const MODEL_SWITCH_BLOCKED_TOAST =
   'Model switching requires the enhanced runtime. Set a default via `claude config set model <id>` — the displayed model reflects your config.'
 
+export const ROLE_MODEL_CATALOG_ENDPOINT = '/api/orchestration-catalog'
+
 export type ZeroForkModelInfoFlags = {
   vanillaAgent: boolean
   supportsRuntimeSwitching: boolean
+}
+
+export function resolveChatRequestModel(input: {
+  localOverride?: string | null
+  sessionRoute?: string | null
+  gatewayModel?: string | null
+}): string {
+  return (
+    input.localOverride?.trim() ||
+    input.sessionRoute?.trim() ||
+    input.gatewayModel?.trim() ||
+    ''
+  )
+}
+
+export function getModelAvailabilityBadge(
+  availability: string | null | undefined,
+): string {
+  return availability === 'quota_limited' ? 'quota limited' : ''
 }
 
 function readBoolean(value: unknown): boolean | null {

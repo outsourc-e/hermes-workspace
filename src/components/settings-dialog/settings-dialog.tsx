@@ -49,6 +49,7 @@ import { applyAccentColor } from '@/lib/accent-colors'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { ProviderLogo } from '@/components/provider-logo'
+import { OrchestrationSettings } from '@/components/settings/orchestration-settings'
 import {
   DialogClose,
   DialogContent,
@@ -65,6 +66,7 @@ import { LOCALE_LABELS,  getLocale, setLocale } from '@/lib/i18n'
 
 type SectionId =
   | 'claude'
+  | 'orchestration'
   | 'agent'
   | 'voice'
   | 'display'
@@ -73,8 +75,13 @@ type SectionId =
   | 'notifications'
   | 'language'
 
-const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
+export const SETTINGS_DIALOG_SECTIONS: Array<{
+  id: SectionId
+  label: string
+  icon: any
+}> = [
   { id: 'claude', label: 'Model & Provider', icon: CloudIcon },
+  { id: 'orchestration', label: 'Orchestration', icon: MessageMultiple01Icon },
   { id: 'agent', label: 'Agent', icon: Settings02Icon },
   { id: 'voice', label: 'Voice', icon: VolumeHighIcon },
   { id: 'display', label: 'Display', icon: PaintBoardIcon },
@@ -2475,6 +2482,7 @@ function LanguageContent() {
 
 const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
   claude: HermesContent,
+  orchestration: OrchestrationSettings,
   agent: AgentBehaviorContent,
   voice: VoiceContent,
   display: DisplayContent,
@@ -2551,7 +2559,7 @@ export function SettingsDialog({
                 )}
               >
                 <nav className="space-y-1">
-                  {SECTIONS.map((s) => (
+                  {SETTINGS_DIALOG_SECTIONS.map((s) => (
                     <button
                       key={s.id}
                       type="button"

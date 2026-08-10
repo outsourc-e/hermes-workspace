@@ -81,6 +81,8 @@ import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-np
 import { Route as ApiPlaygroundAdminRouteImport } from './routes/api/playground-admin'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiOrchestrationPolicyRouteImport } from './routes/api/orchestration-policy'
+import { Route as ApiOrchestrationCatalogRouteImport } from './routes/api/orchestration-catalog'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiMediaRouteImport } from './routes/api/media'
@@ -529,6 +531,16 @@ const ApiPingRoute = ApiPingRouteImport.update({
 const ApiPathsRoute = ApiPathsRouteImport.update({
   id: '/api/paths',
   path: '/api/paths',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrchestrationPolicyRoute = ApiOrchestrationPolicyRouteImport.update({
+  id: '/api/orchestration-policy',
+  path: '/api/orchestration-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrchestrationCatalogRoute = ApiOrchestrationCatalogRouteImport.update({
+  id: '/api/orchestration-catalog',
+  path: '/api/orchestration-catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
@@ -1035,6 +1047,8 @@ export interface FileRoutesByFullPath {
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/orchestration-catalog': typeof ApiOrchestrationCatalogRoute
+  '/api/orchestration-policy': typeof ApiOrchestrationPolicyRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1196,6 +1210,8 @@ export interface FileRoutesByTo {
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/orchestration-catalog': typeof ApiOrchestrationCatalogRoute
+  '/api/orchestration-policy': typeof ApiOrchestrationPolicyRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1359,6 +1375,8 @@ export interface FileRoutesById {
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/orchestration-catalog': typeof ApiOrchestrationCatalogRoute
+  '/api/orchestration-policy': typeof ApiOrchestrationPolicyRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1523,6 +1541,8 @@ export interface FileRouteTypes {
     | '/api/media'
     | '/api/memory'
     | '/api/models'
+    | '/api/orchestration-catalog'
+    | '/api/orchestration-policy'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1684,6 +1704,8 @@ export interface FileRouteTypes {
     | '/api/media'
     | '/api/memory'
     | '/api/models'
+    | '/api/orchestration-catalog'
+    | '/api/orchestration-policy'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1846,6 +1868,8 @@ export interface FileRouteTypes {
     | '/api/media'
     | '/api/memory'
     | '/api/models'
+    | '/api/orchestration-catalog'
+    | '/api/orchestration-policy'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -2009,6 +2033,8 @@ export interface RootRouteChildren {
   ApiMediaRoute: typeof ApiMediaRoute
   ApiMemoryRoute: typeof ApiMemoryRouteWithChildren
   ApiModelsRoute: typeof ApiModelsRoute
+  ApiOrchestrationCatalogRoute: typeof ApiOrchestrationCatalogRoute
+  ApiOrchestrationPolicyRoute: typeof ApiOrchestrationPolicyRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiPlaygroundAdminRoute: typeof ApiPlaygroundAdminRoute
@@ -2589,6 +2615,20 @@ declare module '@tanstack/react-router' {
       path: '/api/paths'
       fullPath: '/api/paths'
       preLoaderRoute: typeof ApiPathsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/orchestration-policy': {
+      id: '/api/orchestration-policy'
+      path: '/api/orchestration-policy'
+      fullPath: '/api/orchestration-policy'
+      preLoaderRoute: typeof ApiOrchestrationPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/orchestration-catalog': {
+      id: '/api/orchestration-catalog'
+      path: '/api/orchestration-catalog'
+      fullPath: '/api/orchestration-catalog'
+      preLoaderRoute: typeof ApiOrchestrationCatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/models': {
@@ -3478,6 +3518,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMediaRoute: ApiMediaRoute,
   ApiMemoryRoute: ApiMemoryRouteWithChildren,
   ApiModelsRoute: ApiModelsRoute,
+  ApiOrchestrationCatalogRoute: ApiOrchestrationCatalogRoute,
+  ApiOrchestrationPolicyRoute: ApiOrchestrationPolicyRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiPlaygroundAdminRoute: ApiPlaygroundAdminRoute,

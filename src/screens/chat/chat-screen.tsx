@@ -38,6 +38,10 @@ import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
+import {
+  ROLE_MODEL_CATALOG_ENDPOINT,
+  resolveChatRequestModel,
+} from './components/chat-composer-model-switch'
 import { ConnectionStatusMessage } from './components/connection-status-message'
 import {
   clearPendingSendForSession,
@@ -989,7 +993,7 @@ export function ChatScreen({
   const modelsQuery = useQuery({
     queryKey: ['models'],
     queryFn: async () => {
-      const res = await fetch('/api/models')
+      const res = await fetch(ROLE_MODEL_CATALOG_ENDPOINT)
       if (!res.ok) return { models: [] }
       const data = await res.json()
       return data
@@ -1057,8 +1061,25 @@ export function ChatScreen({
     return models.map((m: any) => m.id).filter((id: string) => id)
   }, [modelsQuery.data])
 
+  const modelSessionKey = isNewChat
+    ? 'new'
+    : forcedSessionKey ||
+      resolvedSessionKey ||
+      activeCanonicalKey ||
+      activeSessionKey ||
+      activeFriendlyId ||
+      'main'
+  const persistedSessionModel = useSessionModelStore(
+    (state) => state.models[modelSessionKey],
+  )
+  const setPersistedSessionModel = useSessionModelStore((state) => state.setModel)
+  const clearPersistedSessionModel = useSessionModelStore((state) => state.clearModel)
   const gatewayModel = currentModelQuery.data || ''
-  const currentModel = _localModelOverride || gatewayModel
+  const currentModel = resolveChatRequestModel({
+    localOverride: _localModelOverride,
+    sessionRoute: persistedSessionModel,
+    gatewayModel,
+  })
 
   // Ref so sendMessage can always read latest thinkingLevel without being in deps
   const thinkingLevelRef = useRef<ThinkingLevel>(thinkingLevel)
@@ -1138,6 +1159,10 @@ export function ChatScreen({
         sessionKey: string
         friendlyId: string
       }) => {
+        if (isNewChat && persistedSessionModel) {
+          setPersistedSessionModel(sessionKey, persistedSessionModel)
+          clearPersistedSessionModel(modelSessionKey)
+        }
         const activeSend = activeSendRef.current
         if (activeSend) {
           activeSendRef.current = {
@@ -1154,7 +1179,15 @@ export function ChatScreen({
         }
         onSessionResolved?.({ sessionKey, friendlyId })
       },
-      [activeFriendlyId, onSessionResolved],
+      [
+        activeFriendlyId,
+        clearPersistedSessionModel,
+        isNewChat,
+        modelSessionKey,
+        onSessionResolved,
+        persistedSessionModel,
+        setPersistedSessionModel,
+      ],
     ),
     onStarted: useCallback(
       ({ runId }: { runId: string | null }) => {
@@ -2903,14 +2936,7 @@ export function ChatScreen({
               onAbort={handleAbortStreaming}
               isLoading={sending || waitingForResponse}
               disabled={sending || hideUi}
-              sessionKey={
-                isNewChat
-                  ? undefined
-                  : forcedSessionKey ||
-                    resolvedSessionKey ||
-                    activeCanonicalKey ||
-                    activeSessionKey
-              }
+              sessionKey={modelSessionKey}
               wrapperRef={composerRef}
               composerRef={composerHandleRef}
               embedded={embedded}

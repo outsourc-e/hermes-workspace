@@ -10,6 +10,9 @@ export type ProfileSummary = {
   exists: boolean
   model?: string
   provider?: string
+  routeRef?: string
+  reasoningEffort?: string
+  maxOutputTokens?: number
   description?: string
   systemPrompt?: string
   skillCount: number
@@ -47,6 +50,65 @@ const TEXT_REWRITE_EXTENSIONS = new Set([
   '.ts',
   '.tsx',
 ])
+
+export function extractProfileModelSettings(config: Record<string, unknown>): {
+  model?: string
+  provider?: string
+  routeRef?: string
+  reasoningEffort?: string
+  maxOutputTokens?: number
+} {
+  let model: string | undefined
+  let provider: string | undefined
+  let maxOutputTokens: number | undefined
+  if (typeof config.model === 'string') {
+    model = config.model
+  } else if (
+    config.model &&
+    typeof config.model === 'object' &&
+    !Array.isArray(config.model)
+  ) {
+    const modelConfig = config.model as Record<string, unknown>
+    if (typeof modelConfig.default === 'string') model = modelConfig.default
+    if (typeof modelConfig.provider === 'string')
+      provider = modelConfig.provider
+    if (
+      typeof modelConfig.max_tokens === 'number' &&
+      Number.isInteger(modelConfig.max_tokens) &&
+      modelConfig.max_tokens > 0
+    ) {
+      maxOutputTokens = modelConfig.max_tokens
+    }
+  }
+  if (!provider && typeof config.provider === 'string')
+    provider = config.provider
+
+  const workspace =
+    config.workspace &&
+    typeof config.workspace === 'object' &&
+    !Array.isArray(config.workspace)
+      ? (config.workspace as Record<string, unknown>)
+      : {}
+  const agent =
+    config.agent &&
+    typeof config.agent === 'object' &&
+    !Array.isArray(config.agent)
+      ? (config.agent as Record<string, unknown>)
+      : {}
+  const persistedRoute =
+    typeof workspace.route_ref === 'string' ? workspace.route_ref.trim() : ''
+  const routeRef =
+    persistedRoute ||
+    (provider && provider !== 'custom' && model
+      ? `${provider}/${model}`
+      : model)
+  const reasoningEffort =
+    typeof agent.reasoning_effort === 'string'
+      ? agent.reasoning_effort.trim() || undefined
+      : undefined
+
+  return { model, provider, routeRef, reasoningEffort, maxOutputTokens }
+}
 
 function getHermesRoot(): string {
   return (
@@ -333,7 +395,8 @@ export async function readProfileWithFallback(
           }>
         }
         const match = data.profiles?.find(
-          (p) => p.name === normalized || (normalized === 'default' && p.is_default),
+          (p) =>
+            p.name === normalized || (normalized === 'default' && p.is_default),
         )
         if (match) {
           const active = getActiveProfileName()
@@ -409,30 +472,17 @@ export function listProfiles(): Array<ProfileSummary> {
       const sessionCount = countFilesRecursive(sessionsDir, (full) =>
         /\.(jsonl|json|sqlite|db)$/i.test(full),
       )
-      // Resolve model/provider from nested or flat config structure
-      let modelName: string | undefined
-      let providerName: string | undefined
-      if (typeof config.model === 'string') {
-        modelName = config.model
-      } else if (
-        config.model &&
-        typeof config.model === 'object' &&
-        !Array.isArray(config.model)
-      ) {
-        const m = config.model as Record<string, unknown>
-        if (typeof m.default === 'string') modelName = m.default
-        if (typeof m.provider === 'string') providerName = m.provider
-      }
-      if (!providerName && typeof config.provider === 'string') {
-        providerName = config.provider
-      }
+      const modelSettings = extractProfileModelSettings(config)
       results.push({
         name,
         path: profilePath,
         active: name === activeProfile,
         exists: true,
-        model: modelName,
-        provider: providerName,
+        model: modelSettings.model,
+        provider: modelSettings.provider,
+        routeRef: modelSettings.routeRef,
+        reasoningEffort: modelSettings.reasoningEffort,
+        maxOutputTokens: modelSettings.maxOutputTokens,
         description: extractDescription(config) || undefined,
         systemPrompt: extractSystemPrompt(config, profilePath) || undefined,
         skillCount,
@@ -451,30 +501,17 @@ export function listProfiles(): Array<ProfileSummary> {
 
   const root = getClaudeRoot()
   const config = readYamlConfig(path.join(root, 'config.yaml'))
-  // Resolve model/provider for default profile too
-  let defaultModel: string | undefined
-  let defaultProvider: string | undefined
-  if (typeof config.model === 'string') {
-    defaultModel = config.model
-  } else if (
-    config.model &&
-    typeof config.model === 'object' &&
-    !Array.isArray(config.model)
-  ) {
-    const m = config.model as Record<string, unknown>
-    if (typeof m.default === 'string') defaultModel = m.default
-    if (typeof m.provider === 'string') defaultProvider = m.provider
-  }
-  if (!defaultProvider && typeof config.provider === 'string') {
-    defaultProvider = config.provider
-  }
+  const defaultModelSettings = extractProfileModelSettings(config)
   results.unshift({
     name: 'default',
     path: root,
     active: activeProfile === 'default',
     exists: true,
-    model: defaultModel,
-    provider: defaultProvider,
+    model: defaultModelSettings.model,
+    provider: defaultModelSettings.provider,
+    routeRef: defaultModelSettings.routeRef,
+    reasoningEffort: defaultModelSettings.reasoningEffort,
+    maxOutputTokens: defaultModelSettings.maxOutputTokens,
     description: extractDescription(config) || undefined,
     systemPrompt: extractSystemPrompt(config, root) || undefined,
     skillCount: countFilesRecursive(

@@ -11,7 +11,7 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireLocalOrAuth } from '../../../server/auth-middleware'
 import {
   dashboardFetch,
   ensureGatewayProbed,
@@ -25,7 +25,7 @@ export const Route = createFileRoute('/api/profiles/toggle-skill')({
   server: {
     handlers: {
       PUT: async ({ request }) => {
-        if (!isAuthenticated(request)) {
+        if (!requireLocalOrAuth(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         const capabilities = await ensureGatewayProbed()

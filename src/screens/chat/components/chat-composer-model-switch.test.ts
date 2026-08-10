@@ -1,11 +1,36 @@
 import { describe, expect, it } from 'vitest'
 import {
   MODEL_SWITCH_BLOCKED_TOAST,
+  ROLE_MODEL_CATALOG_ENDPOINT,
+  getModelAvailabilityBadge,
   getZeroForkModelInfoFlags,
+  resolveChatRequestModel,
   shouldBlockZeroForkModelSwitch,
 } from './chat-composer-model-switch'
 
 describe('zero-fork model switch guard', () => {
+  it('uses the persisted session route for runtime requests before the gateway default', () => {
+    expect(
+      resolveChatRequestModel({
+        localOverride: '',
+        sessionRoute: 'claude-gp/sonnet',
+        gatewayModel: 'claude-cwm4tx/sonnet',
+      }),
+    ).toBe('claude-gp/sonnet')
+
+    expect(
+      resolveChatRequestModel({
+        localOverride: 'local/qwen',
+        sessionRoute: 'claude-gp/sonnet',
+        gatewayModel: 'claude-cwm4tx/sonnet',
+      }),
+    ).toBe('local/qwen')
+  })
+
+  it('uses the subscription-only role catalog for the chat picker', () => {
+    expect(ROLE_MODEL_CATALOG_ENDPOINT).toBe('/api/orchestration-catalog')
+  })
+
   it('blocks picker swaps only for zero-fork vanilla agents', () => {
     expect(
       shouldBlockZeroForkModelSwitch('zero-fork', {
@@ -49,5 +74,10 @@ describe('zero-fork model switch guard', () => {
     expect(MODEL_SWITCH_BLOCKED_TOAST).toBe(
       'Model switching requires the enhanced runtime. Set a default via `claude config set model <id>` — the displayed model reflects your config.',
     )
+  })
+
+  it('keeps quota-limited subscription routes visible with a warning badge', () => {
+    expect(getModelAvailabilityBadge('quota_limited')).toBe('quota limited')
+    expect(getModelAvailabilityBadge('available')).toBe('')
   })
 })

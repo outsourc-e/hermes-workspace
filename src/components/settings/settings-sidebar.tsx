@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 export type SettingsNavId =
   | 'connection'
   | 'claude'
+  | 'orchestration'
   | 'agent'
   | 'voice'
   | 'display'
@@ -17,6 +18,7 @@ type NavItem = { id: SettingsNavId; label: string }
 export const SETTINGS_NAV_ITEMS: Array<NavItem> = [
   { id: 'connection', label: 'Connection' },
   { id: 'claude', label: 'Model & Provider' },
+  { id: 'orchestration', label: 'Orchestration' },
   { id: 'agent', label: 'Agent Behavior' },
   { id: 'voice', label: 'Voice' },
   { id: 'display', label: 'Display' },

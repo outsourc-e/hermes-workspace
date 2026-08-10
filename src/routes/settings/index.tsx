@@ -40,6 +40,7 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { UserAvatar } from '@/components/avatars'
+import { OrchestrationSettings } from '@/components/settings/orchestration-settings'
 import { Input } from '@/components/ui/input'
 import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
@@ -353,6 +354,15 @@ function SettingsRoute() {
           {/* ── Hermes Agent ──────────────────────────────────── */}
           {activeSection === 'claude' && (
             <ClaudeConfigSection activeView="claude" />
+          )}
+          {activeSection === 'orchestration' && (
+            <SettingsSection
+              title="Multi-model orchestration"
+              description="Choose subscription-backed orchestrators and subagents, context and memory policy, recursion limits, fallbacks, and optional worker presets."
+              icon={MessageMultiple01Icon}
+            >
+              <OrchestrationSettings />
+            </SettingsSection>
           )}
           {activeSection === 'agent' && (
             <ClaudeConfigSection activeView="agent" />

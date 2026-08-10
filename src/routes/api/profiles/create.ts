@@ -1,14 +1,24 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
-import { createProfile } from '../../../server/profiles-browser'
+import { requireLocalOrAuth } from '../../../server/auth-middleware'
+import {
+
+  operationsModelSelectionPatch
+} from '../../../server/operations-agent-config'
+import {
+  createProfile,
+  readProfile,
+  updateProfileConfig,
+} from '../../../server/profiles-browser'
 import { requireJsonContentType } from '../../../server/rate-limit'
+import { loadSubscriptionCatalog } from '../../../server/subscription-model-catalog'
+import type {OperationsModelSelection} from '../../../server/operations-agent-config';
 
 export const Route = createFileRoute('/api/profiles/create')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
+        if (!requireLocalOrAuth(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
         const csrfCheck = requireJsonContentType(request)
@@ -18,16 +28,27 @@ export const Route = createFileRoute('/api/profiles/create')({
             name?: string
             cloneFrom?: string
             model?: string
-            provider?: string
+            modelSelection?: OperationsModelSelection
           }
-          return json({
-            ok: true,
-            profile: createProfile(body.name || '', {
-              cloneFrom: body.cloneFrom,
-              model: body.model,
-              provider: body.provider,
-            }),
-          })
+          const selection =
+            body.modelSelection ??
+            (body.model?.trim() ? { routeRef: body.model.trim() } : undefined)
+          let modelPatch: Record<string, unknown> = {}
+          if (selection) {
+            const baseConfig = readProfile(body.cloneFrom || 'default').config
+            modelPatch = operationsModelSelectionPatch(
+              selection,
+              baseConfig,
+              await loadSubscriptionCatalog(),
+            )
+          }
+
+          createProfile(body.name || '', { cloneFrom: body.cloneFrom })
+          const profile =
+            Object.keys(modelPatch).length > 0
+              ? updateProfileConfig(body.name || '', modelPatch)
+              : readProfile(body.name || '')
+          return json({ ok: true, profile })
         } catch (error) {
           return json(
             {
@@ -36,7 +57,7 @@ export const Route = createFileRoute('/api/profiles/create')({
                   ? error.message
                   : 'Failed to create profile',
             },
-            { status: 500 },
+            { status: 400 },
           )
         }
       },

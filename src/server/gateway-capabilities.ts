@@ -258,8 +258,44 @@ let lastLoggedSummary = ''
 let dashboardTokenPromise: Promise<string> | null = null
 let dashboardTokenCache = ''
 
+function parseDotEnvValue(text: string, key: string): string {
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const separator = line.indexOf('=')
+    if (separator < 0 || line.slice(0, separator).trim() !== key) continue
+    const value = line.slice(separator + 1).trim()
+    if (
+      value.length >= 2 &&
+      ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'")))
+    ) {
+      return value.slice(1, -1)
+    }
+    return value
+  }
+  return ''
+}
+
+function readLocalGatewayKey(): string {
+  if (!isLocalhostDeployment()) return ''
+  try {
+    const hermesHome =
+      process.env.HERMES_HOME || path.join(os.homedir(), '.hermes')
+    const text = fs.readFileSync(path.join(hermesHome, '.env'), 'utf-8')
+    return parseDotEnvValue(text, 'API_SERVER_KEY')
+  } catch {
+    return ''
+  }
+}
+
 /** Optional bearer token for authenticated gateway endpoints. */
-export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
+export const BEARER_TOKEN =
+  process.env.HERMES_API_TOKEN ||
+  process.env.CLAUDE_API_TOKEN ||
+  process.env.API_SERVER_KEY ||
+  readLocalGatewayKey() ||
+  ''
 
 /**
  * Dashboard API auth uses the ephemeral session token injected into the
@@ -885,7 +921,10 @@ export async function probeGateway(options?: {
       // memory/*.md + memories/*.md directly from the local filesystem.
       // No remote gateway endpoint is required.
       memory: true,
-      config: dashboard.available || legacyConfig,
+      // The Workspace server can safely read/write its own Hermes config when
+      // it and the gateway are co-located on loopback. Do not require the
+      // optional port-9119 dashboard merely to unlock local settings.
+      config: dashboard.available || legacyConfig || isLocalhostDeployment(),
       jobs: dashboard.available || legacyJobs,
       mcp,
       mcpFallback,

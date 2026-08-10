@@ -4,7 +4,7 @@ import os from 'node:os'
 import YAML from 'yaml'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
-import { isAuthenticated } from '../../server/auth-middleware'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
 import {
   ensureGatewayProbed,
   getGatewayCapabilities,
@@ -15,6 +15,7 @@ import {
   ensureProviderInConfig,
   getDiscoveredModels,
 } from '../../server/local-provider-discovery'
+import { loadSubscriptionCatalog } from '../../server/subscription-model-catalog'
 
 const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
 const MODELS_PATH = path.join(CLAUDE_HOME, 'models.json')
@@ -27,6 +28,12 @@ type ModelEntry = {
   [key: string]: unknown
 }
 
+type NormalizedModelEntry = ModelEntry & {
+  id: string
+  name: string
+  provider: string
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value))
     return value as Record<string, unknown>
@@ -37,14 +44,14 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function normalizeModel(entry: unknown): ModelEntry | null {
+function normalizeModel(entry: unknown): NormalizedModelEntry | null {
   if (typeof entry === 'string') {
     const id = entry.trim()
     if (!id) return null
     return {
       id,
       name: id,
-      provider: id.includes('/') ? id.split('/')[0] : 'unknown',
+      provider: id.includes('/') ? (id.split('/')[0] ?? 'unknown') : 'unknown',
     }
   }
   const record = asRecord(entry)
@@ -62,24 +69,45 @@ function normalizeModel(entry: unknown): ModelEntry | null {
     provider:
       readString(record.provider) ||
       readString(record.owned_by) ||
-      (id.includes('/') ? id.split('/')[0] : 'unknown'),
+      (id.includes('/') ? (id.split('/')[0] ?? 'unknown') : 'unknown'),
   }
 }
 
 export function mergeModelEntries(...sources: Array<Array<ModelEntry>>): Array<ModelEntry> {
   const merged: Array<ModelEntry> = []
-  const seen = new Set<string>()
+  const indexById = new Map<string, number>()
 
   for (const source of sources) {
     for (const model of source) {
       const normalized = normalizeModel(model)
-      if (!normalized || seen.has(normalized.id)) continue
+      if (!normalized) continue
+      const existingIndex = indexById.get(normalized.id)
+      if (existingIndex !== undefined) {
+        // Keep the first configured entry authoritative for identity and display
+        // fields while allowing later live sources to fill metadata that the
+        // configured entry did not provide (availability, quota, warnings).
+        merged[existingIndex] = { ...normalized, ...merged[existingIndex] }
+        continue
+      }
+      indexById.set(normalized.id, merged.length)
       merged.push(normalized)
-      seen.add(normalized.id)
     }
   }
 
   return merged
+}
+
+export function subscriptionModelToEntry(
+  model: unknown,
+): ModelEntry {
+  const record = asRecord(model)
+  const id = readString(record.id)
+  return {
+    ...record,
+    id,
+    name: readString(record.name) || id,
+    availability: readString(record.status),
+  }
 }
 
 /**
@@ -288,7 +316,7 @@ async function fetchConfiguredLiveModels(): Promise<Array<ModelEntry>> {
             : []
         models = rawModels
           .map(normalizeModel)
-          .filter((entry): entry is ModelEntry => entry !== null)
+          .filter((entry): entry is NormalizedModelEntry => entry !== null)
           .map((entry) => ({
             ...entry,
             provider: readString(entry.provider) || endpoint.provider,
@@ -402,14 +430,14 @@ async function fetchClaudeModels(): Promise<Array<ModelEntry>> {
       : []
   return rawModels
     .map(normalizeModel)
-    .filter((e): e is ModelEntry => e !== null)
+    .filter((e): e is NormalizedModelEntry => e !== null)
 }
 
 export const Route = createFileRoute('/api/models')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
+        if (!requireLocalOrAuth(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         await ensureGatewayProbed()
@@ -444,9 +472,15 @@ export const Route = createFileRoute('/api/models')({
           // Operations picker only showed the local Workspace subset and drifted
           // from the CLI/backend model universe.
           if (getGatewayCapabilities().models) {
-            const hermesModels = await fetchClaudeModels()
-            models = mergeModelEntries(models, hermesModels)
-            source = source === 'models.json' ? 'models.json+hermes-agent' : 'hermes-agent'
+            try {
+              const hermesModels = await fetchClaudeModels()
+              models = mergeModelEntries(models, hermesModels)
+              source = source === 'models.json' ? 'models.json+hermes-agent' : 'hermes-agent'
+            } catch {
+              // A stale/missing gateway bearer token must not hide the local
+              // subscription catalog. Continue with configured and OAuth
+              // sources instead of failing the entire picker.
+            }
           }
 
           // Merge live OpenAI-compatible catalogs from base_url entries that
@@ -459,12 +493,33 @@ export const Route = createFileRoute('/api/models')({
             source = `${source}+live-proxy`
           }
 
+          // Merge every model exposed by an authenticated subscription
+          // transport. The catalog applies the API-billing visibility policy
+          // before entries reach any dashboard picker.
+          const subscriptionCatalog = await loadSubscriptionCatalog()
+          if (subscriptionCatalog.models.length > 0) {
+            models = mergeModelEntries(
+              models,
+              subscriptionCatalog.models.map(subscriptionModelToEntry),
+            )
+            source = `${source}+subscription-oauth`
+          }
+
           // Merge auto-discovered local models (Ollama, Atomic Chat, etc.)
           await ensureDiscovery()
           const localModels = getDiscoveredModels()
           models = mergeModelEntries(models, localModels)
           for (const m of localModels) {
             ensureProviderInConfig(m.provider)
+          }
+
+          // Merges append new entries. Re-assert the configured default at the
+          // front after every catalog source has been considered.
+          if (defaultModel) {
+            const enrichedDefault =
+              models.find((model) => model.id === defaultModel.id) ?? defaultModel
+            models = models.filter((model) => model.id !== defaultModel.id)
+            models.unshift({ ...defaultModel, ...enrichedDefault })
           }
 
           const configuredProviders = Array.from(
@@ -489,10 +544,11 @@ export const Route = createFileRoute('/api/models')({
             ...streamTimeouts,
           })
         } catch (err) {
+          console.error('[models] request failed', err)
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: 'Model catalog unavailable.',
             },
             { status: 503 },
           )

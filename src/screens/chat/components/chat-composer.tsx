@@ -23,6 +23,8 @@ import {
 } from 'react'
 import {
   MODEL_SWITCH_BLOCKED_TOAST,
+  ROLE_MODEL_CATALOG_ENDPOINT,
+  getModelAvailabilityBadge,
   getZeroForkModelInfoFlags,
   shouldBlockZeroForkModelSwitch,
 } from './chat-composer-model-switch'
@@ -257,11 +259,9 @@ async function fetchModels(): Promise<{
   providerLabels?: Record<string, string>
   providers?: Array<ClaudeProviderOption>
 }> {
-  // Use the curated /api/models endpoint which returns only models
-  // actually configured and available (OCPlatform gateway + local providers).
-  // Previously this hit /api/claude-proxy/api/available-models which returned
-  // every upstream provider model — flooding the picker with unusable options.
-  const response = await fetch('/api/models')
+  // Role selection is subscription-only unless the orchestration billing gate
+  // has been explicitly opened. Chat shares that same account-aware registry.
+  const response = await fetch(ROLE_MODEL_CATALOG_ENDPOINT)
   if (!response.ok) {
     throw new Error(`Models request failed (${response.status})`)
   }
@@ -349,10 +349,23 @@ async function fetchModelsForProvider(
 
 const LOCAL_PROVIDERS_SET = new Set(['ollama', 'atomic-chat'])
 
+function confirmLimitedModelSelection(entry: {
+  name: string
+  availability?: string
+  warning?: string
+  resetAt?: string | null
+}): boolean {
+  if (entry.availability !== 'quota_limited') return true
+  const reset = entry.resetAt ? `\nKnown reset: ${entry.resetAt}` : ''
+  return window.confirm(
+    `${entry.name} is currently quota-limited.${reset}\n\n${entry.warning || 'The subscription provider reported an exhausted usage window.'}\n\nChoose Cancel to select another subscription model, or OK to try this route anyway.`,
+  )
+}
+
 async function switchModel(
   model: string,
   provider?: string,
-  _sessionKey?: string,
+  sessionKey?: string,
 ): Promise<ModelSwitchResponse> {
   const modelId = model.trim()
   const modelProvider =
@@ -377,14 +390,25 @@ async function switchModel(
   // Switching to a cloud model — clear any local override
   setLocalModelOverride('')
 
-  // Write the model change to ~/.hermes/config.yaml via the webapi
-  const patch: Record<string, string> = { model: modelId }
-  if (modelProvider) patch.provider = modelProvider
-
-  const response = await fetch('/api/claude-proxy/api/config', {
+  // A picker change is scoped to this conversation. Global defaults are
+  // managed explicitly in Settings → Orchestration and never rewritten by a
+  // session-level model choice.
+  const modelRef =
+    modelId.startsWith('claude-') ||
+    (modelProvider && modelId.startsWith(`${modelProvider}/`))
+      ? modelId
+      : modelProvider
+        ? `${modelProvider}/${modelId}`
+        : modelId
+  const normalizedSessionKey = sessionKey?.trim() || ''
+  const response = await fetch('/api/orchestration-policy', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(patch),
+    body: JSON.stringify({
+      scope: normalizedSessionKey ? 'session' : 'global',
+      ...(normalizedSessionKey ? { sessionKey: normalizedSessionKey } : {}),
+      patch: { orchestratorModelRef: modelRef },
+    }),
   })
 
   if (!response.ok) {
@@ -395,7 +419,7 @@ async function switchModel(
     ok: true,
     resolved: {
       modelProvider: modelProvider || 'hermes-agent',
-      model: modelId,
+      model: modelRef,
     },
   }
 }
@@ -2586,6 +2610,18 @@ function ChatComposerComponent({
                               name: mName,
                               provider: mProvider,
                               isLocal,
+                              availability:
+                                typeof m === 'string'
+                                  ? ''
+                                  : String((m as Record<string, unknown>).availability || ''),
+                              warning:
+                                typeof m === 'string'
+                                  ? ''
+                                  : String((m as Record<string, unknown>).warning || ''),
+                              resetAt:
+                                typeof m === 'string'
+                                  ? null
+                                  : ((m as Record<string, unknown>).resetAt as string | null) ?? null,
                             }
                           })
                           // Split pinned vs unpinned, group unpinned by provider
@@ -2617,6 +2653,7 @@ function ChatComposerComponent({
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    if (!confirmLimitedModelSelection(entry)) return
                                     handleModelSelect(
                                       entry.id,
                                       entry.provider || undefined,
@@ -2635,6 +2672,21 @@ function ChatComposerComponent({
                                   {entry.isLocal && (
                                     <span className="text-[10px] text-neutral-400 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800">
                                       local
+                                    </span>
+                                  )}
+                                  {getModelAvailabilityBadge(
+                                    entry.availability,
+                                  ) && (
+                                    <span
+                                      className="mr-6 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                                      title={
+                                        entry.warning ||
+                                        'Subscription quota is currently limited'
+                                      }
+                                    >
+                                      {getModelAvailabilityBadge(
+                                        entry.availability,
+                                      )}
                                     </span>
                                   )}
                                   {isActive && (
@@ -2975,8 +3027,21 @@ function ChatComposerComponent({
                                         const mId = String(typeof m === 'string' ? m : m.id || m.model || m.name || 'unknown')
                                         const mName = String(typeof m === 'string' ? m : m.name || m.displayName || m.label || m.id || m.model || m)
                                         const mProvider = typeof m === 'string' ? defaultProvider : ((m as Record<string, unknown>).provider as string) || defaultProvider
-                                        const isLocal = typeof m !== 'string' && (m as Record<string, unknown>).description === 'local'
-                                        return { id: mId, name: mName, provider: mProvider, isLocal }
+                                        const record = typeof m === 'string' ? null : m as Record<string, unknown>
+                                        const isLocal = record?.description === 'local'
+                                        return {
+                                          id: mId,
+                                          name: mName,
+                                          provider: mProvider,
+                                          isLocal,
+                                          availability: String(
+                                            record?.availability || record?.status || '',
+                                          ),
+                                          warning: String(
+                                            record?.warning || record?.statusMessage || '',
+                                          ),
+                                          resetAt: (record?.resetAt as string | null) ?? null,
+                                        }
                                       })
                                       const pinnedEntries = parsed.filter((e) => isPinned(e.id))
                                       const unpinnedGroups = new Map<string, typeof parsed>()
@@ -2997,6 +3062,7 @@ function ChatComposerComponent({
                                             <button
                                               type="button"
                                               onClick={() => {
+                                                if (!confirmLimitedModelSelection(entry)) return
                                                 handleModelSelect(entry.id, entry.provider || undefined)
                                                 setIsModelMenuOpen(false)
                                               }}
@@ -3008,6 +3074,14 @@ function ChatComposerComponent({
                                             >
                                               <span className="flex-1 truncate">{entry.name}</span>
                                               {entry.isLocal ? <span className="text-[10px] text-neutral-400 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-700">local</span> : null}
+                                              {getModelAvailabilityBadge(entry.availability) ? (
+                                                <span
+                                                  className="text-[10px] text-amber-600"
+                                                  title={entry.warning || 'Subscription quota is currently limited'}
+                                                >
+                                                  {getModelAvailabilityBadge(entry.availability)}
+                                                </span>
+                                              ) : null}
                                               {isActive ? <span className="h-1.5 w-1.5 rounded-full bg-accent-500" /> : null}
                                             </button>
                                             <button
