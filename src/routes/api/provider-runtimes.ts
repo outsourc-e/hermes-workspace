@@ -76,7 +76,7 @@ export const Route = createFileRoute('/api/provider-runtimes')({
         if (runtimeId.startsWith('codex:') && route.account !== 'openai-codex') {
           return Response.json({ ok: false, error: 'Codex runtime requires an OpenAI Codex subscription route' }, { status: 400 })
         }
-        const result = await getProviderRuntimeService().mutate(raw)
+        const result = await getProviderRuntimeService().mutate({ ...raw, providerModel: route.model })
         if (!result || typeof result !== 'object' || (result as { ok?: unknown }).ok !== true) {
           return Response.json({ ok: false, result }, { status: 409 })
         }

@@ -106,6 +106,20 @@ const MAX_OUTPUT_CHARS = 200_000
 const DEFAULT_TIMEOUT_S = 240
 const MAX_TIMEOUT_S = 600
 
+export type DispatchBookkeepingFailure = { label: string; error: string }
+
+export function runBestEffortDispatchBookkeeping(
+  operations: Array<{ label: string; run: () => void }>,
+): DispatchBookkeepingFailure[] {
+  const failures: DispatchBookkeepingFailure[] = []
+  for (const operation of operations) {
+    try { operation.run() } catch (error) {
+      failures.push({ label: operation.label, error: error instanceof Error ? error.message : String(error) })
+    }
+  }
+  return failures
+}
+
 function getProfilesDir(): string {
   const base = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME
   if (base) {
@@ -973,41 +987,64 @@ function runWorker(
       const baselineRuntimeSignature = runtimeCheckpointSignature(
         runtimeBeforeDispatch,
       )
-      markDispatchStarted(
-        workerId,
-        assignment.task,
-        options?.missionId ?? null,
-        assignment.assignmentId ?? null,
-        options?.notifySessionKey ?? 'main',
-      )
-      if (options?.missionId) {
-        markMissionAssignmentDispatched({
-          missionId: options.missionId,
-          workerId,
-          task: assignment.task,
-          source: 'swarm-dispatch',
-          author: 'aurora',
-        })
-      }
-      appendSwarmMemoryEvent({
-        workerId,
-        missionId: options?.missionId ?? null,
-        assignmentId: assignment.assignmentId ?? null,
-        type: 'dispatch',
-        summary: `Dispatched task: ${assignment.task.slice(0, 240)}`,
-        event: {
-          task: assignment.task,
-          rationale: assignment.rationale ?? null,
-          direct: assignment.direct ?? false,
-          deliveryTarget: 'tmux',
-        },
-      })
+      const recordAcceptedDispatch = (): DispatchBookkeepingFailure[] =>
+        runBestEffortDispatchBookkeeping([
+          {
+            label: 'runtime',
+            run: () => markDispatchStarted(
+              workerId,
+              assignment.task,
+              options?.missionId ?? null,
+              assignment.assignmentId ?? null,
+              options?.notifySessionKey ?? 'main',
+            ),
+          },
+          ...(options?.missionId ? [{
+            label: 'mission',
+            run: () => markMissionAssignmentDispatched({
+              missionId: options.missionId!,
+              workerId,
+              task: assignment.task,
+              source: 'swarm-dispatch',
+              author: 'aurora',
+            }),
+          }] : []),
+          {
+            label: 'memory',
+            run: () => appendSwarmMemoryEvent({
+              workerId,
+              missionId: options?.missionId ?? null,
+              assignmentId: assignment.assignmentId ?? null,
+              type: 'dispatch',
+              summary: `Dispatched task: ${assignment.task.slice(0, 240)}`,
+              event: {
+                task: assignment.task,
+                rationale: assignment.rationale ?? null,
+                direct: assignment.direct ?? false,
+                deliveryTarget: 'worker-process-host',
+              },
+            }),
+          },
+        ])
       const wrapperPath = getWrapperPath(workerId)
 
       // Prefer the persistent live agent session when available/startable.
       const liveResult = await sendPromptToLiveSession(workerId, prompt)
       if (liveResult) {
-        markDispatchResult(workerId, liveResult)
+        const bookkeepingFailures = liveResult.ok ? recordAcceptedDispatch() : []
+        bookkeepingFailures.push(...runBestEffortDispatchBookkeeping([{
+          label: 'runtime-result',
+          run: () => markDispatchResult(workerId, liveResult),
+        }]))
+        if (bookkeepingFailures.length > 0) {
+          console.error('[swarm-dispatch] post-delivery bookkeeping failed', {
+            workerId,
+            failures: bookkeepingFailures,
+          })
+          if (liveResult.ok) {
+            liveResult.output = `${liveResult.output}\nDelivered; bookkeeping incomplete (${bookkeepingFailures.map(({ label }) => label).join(', ')}).`
+          }
+        }
         if (options?.waitForCheckpoint && liveResult.ok) {
           const checkpoint = await waitForFreshCheckpoint(
             workerId,

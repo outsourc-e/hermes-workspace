@@ -1,9 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { EventEmitter } from 'node:events'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { buildSafeChildEnv, createWorkerProcessHost } from './worker-process-host'
+import { buildSafeChildEnv, createWorkerProcessHost, withStartupRecovery } from './worker-process-host'
 
 let stateDir: string
 
@@ -115,6 +116,110 @@ describe('WorkerProcessHost durable registry', () => {
     expect(calls[2]?.join(' ')).toContain("'/bin/hermes' chat --tui")
   })
 
+  it('handles synchronous spawn exceptions without leaving an unknown reservation', async () => {
+    const host = createWorkerProcessHost({
+      platform: 'win32', registryFile: registryFile(),
+      spawn: () => { throw new Error('invalid cwd') },
+    })
+    expect(await host.start(startSpec('sync-spawn-error'))).toMatchObject({ ok: false })
+    expect(await host.status('sync-spawn-error')).toMatchObject({ status: 'stopped', pid: null })
+  })
+
+  it('handles asynchronous native spawn errors and marks an owned PID stopped', async () => {
+    const child = Object.assign(new EventEmitter(), { pid: 4301, stdin: { writable: true, write: () => true } })
+    const host = createWorkerProcessHost({
+      platform: 'win32', registryFile: registryFile(), spawn: () => child as never,
+    })
+    expect((await host.start(startSpec('spawn-error'))).ok).toBe(true)
+    expect(() => child.emit('error', new Error('missing executable'))).not.toThrow()
+    expect(await host.status('spawn-error')).toMatchObject({ status: 'stopped', pid: null })
+  })
+
+  it('retains recoverable PID ownership when registration cleanup cannot verify exit', async () => {
+    const taskkill = vi.fn(async () => ({ ok: false, stdout: '', stderr: 'access denied' }))
+    let writes = 0
+    const host = createWorkerProcessHost({
+      platform: 'win32', registryFile: registryFile(), isPidAlive: () => true, runCommand: taskkill,
+      cleanupPollMs: 0, cleanupTimeoutMs: 0,
+      spawn: () => ({ pid: 4302, on: () => {} }),
+      writeRegistry: (file, registry) => {
+        writes += 1
+        if (writes >= 2) throw new Error('simulated persistent registry failure')
+        writeFileSync(file, JSON.stringify(registry), 'utf8')
+      },
+    })
+    const result = await host.start(startSpec('registration-cleanup'))
+    expect(result).toMatchObject({
+      ok: false,
+      record: { pid: 4302, status: 'unknown', lastError: expect.stringMatching(/cleanup.*not verified/i) },
+    })
+    expect(taskkill).toHaveBeenCalledWith('taskkill.exe', ['/PID', '4302', '/T', '/F'])
+    const fresh = createWorkerProcessHost({
+      platform: 'win32', registryFile: registryFile(), isPidAlive: () => true, runCommand: taskkill,
+    })
+    expect(await fresh.status('registration-cleanup')).toMatchObject({ pid: 4302, status: 'unknown' })
+    expect(await fresh.stop('registration-cleanup')).toMatchObject({ ok: false, record: { pid: 4302, status: 'unknown' } })
+    const reconciler = createWorkerProcessHost({
+      platform: 'win32', registryFile: registryFile(), isPidAlive: () => false,
+      runCommand: async () => ({ ok: true, stdout: '', stderr: '' }),
+    })
+    expect(await reconciler.stop('registration-cleanup')).toMatchObject({ ok: true, record: { pid: null, status: 'stopped' } })
+    expect(await reconciler.status('registration-cleanup')).toMatchObject({ pid: null, status: 'stopped' })
+  })
+
+  it('retains a durable start lock containing PID ownership when emergency persistence fails', async () => {
+    let writes = 0
+    const file = registryFile()
+    const workerId = 'emergency-write-failure'
+    const host = createWorkerProcessHost({
+      platform: 'win32', registryFile: file,
+      spawn: () => ({ pid: 4303, on: () => {} }),
+      isPidAlive: () => true,
+      runCommand: async () => ({ ok: false, stdout: '', stderr: 'access denied' }),
+      writeRegistry: (path, registry) => {
+        writes += 1
+        if (writes >= 2) throw new Error('primary registry unavailable')
+        writeFileSync(path, JSON.stringify(registry), 'utf8')
+      },
+      writeEmergencyOwnership: () => { throw new Error('emergency registry unavailable') },
+    })
+    const result = await host.start(startSpec(workerId))
+    expect(result).toMatchObject({ ok: false, retainStartLock: true, record: { pid: 4303 } })
+    const lockFile = `${file}.${Buffer.from(workerId).toString('base64url')}.start.lock`
+    expect(existsSync(lockFile)).toBe(true)
+    expect(JSON.parse(readFileSync(lockFile, 'utf8'))).toMatchObject({ workerId, pid: 4303, status: 'unknown' })
+    const fresh = createWorkerProcessHost({ platform: 'win32', registryFile: file })
+    expect(await fresh.status(workerId)).toMatchObject({ workerId, pid: 4303, status: 'unknown' })
+    expect(await fresh.list()).toContainEqual(expect.objectContaining({ workerId, pid: 4303, status: 'unknown' }))
+    expect((await fresh.start(startSpec(workerId))).ok).toBe(false)
+    const reconciler = createWorkerProcessHost({
+      platform: 'win32', registryFile: file, isPidAlive: () => false,
+      runCommand: async () => ({ ok: true, stdout: '', stderr: '' }),
+    })
+    expect(await reconciler.stop(workerId)).toMatchObject({ ok: true, record: { pid: null, status: 'stopped' } })
+    expect(await reconciler.status(workerId)).toMatchObject({ pid: null, status: 'stopped' })
+    expect(await reconciler.list()).toContainEqual(expect.objectContaining({ workerId, pid: null, status: 'stopped' }))
+  })
+
+  it('recovers durable worker state exactly once before serving singleton operations', async () => {
+    let recoveries = 0
+    let starts = 0
+    const base = {
+      hostKind: 'native' as const,
+      recover: async () => { recoveries += 1; return [] },
+      start: async () => { starts += 1; return { ok: true } },
+      stop: async () => ({ ok: true }),
+      send: async () => ({ ok: true }),
+      capture: async () => ({ ok: true }),
+      status: async () => ({ workerId: 'x' }),
+      list: async () => [],
+    }
+    const host = withStartupRecovery(base as never)
+    await host.start(startSpec('first'))
+    await host.list()
+    expect({ recoveries, starts }).toEqual({ recoveries: 1, starts: 1 })
+  })
+
   it('constructs a minimal child environment and strips paid-provider credentials', () => {
     expect(buildSafeChildEnv(
       { PATH: 'safe', ANTHROPIC_API_KEY: 'paid', OPENAI_API_KEY: 'paid', RANDOM_SECRET: 'drop' },
@@ -130,6 +235,31 @@ describe('WorkerProcessHost durable registry', () => {
     const persisted = readFileSync(registryFile(), 'utf8')
     expect(persisted).not.toContain('--prompt')
     expect(persisted).not.toContain('do-not-store')
+  })
+
+  it('recovers emergency ownership through the production startup wrapper when the primary registry is corrupt', async () => {
+    const file = registryFile()
+    const workerId = 'wrapped-corrupt-primary'
+    writeFileSync(file, '{broken', 'utf8')
+    writeFileSync(`${file}.${Buffer.from(workerId).toString('base64url')}.emergency.json`, JSON.stringify({
+      workerId, hostKind: 'native', status: 'unknown', pid: 4304, sessionName: null,
+      cwd: 'C:\\repo', profile: null, runtime: null, startedAt: 1,
+      updatedAt: 2, lastError: 'manual reconciliation required',
+    }), 'utf8')
+
+    const wrapped = withStartupRecovery(createWorkerProcessHost({
+      platform: 'win32', registryFile: file, isPidAlive: () => true,
+    }))
+    await expect(wrapped.status(workerId)).resolves.toMatchObject({ pid: 4304, status: 'unknown' })
+    await expect(wrapped.list()).resolves.toContainEqual(expect.objectContaining({ workerId, pid: 4304, status: 'unknown' }))
+    await expect(wrapped.stop(workerId)).resolves.toMatchObject({ ok: false, record: { pid: 4304, status: 'unknown' } })
+  })
+
+  it('ignores malformed emergency ownership records', async () => {
+    const file = registryFile()
+    const workerId = 'malformed-emergency'
+    writeFileSync(`${file}.${Buffer.from(workerId).toString('base64url')}.emergency.json`, JSON.stringify({ workerId, pid: 'not-a-pid', status: 'unknown' }), 'utf8')
+    expect(await createWorkerProcessHost({ platform: 'win32', registryFile: file }).status(workerId)).toMatchObject({ workerId, pid: null, status: 'unknown' })
   })
 
   it('fails closed when the durable registry is corrupt', async () => {

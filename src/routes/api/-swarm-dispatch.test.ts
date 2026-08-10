@@ -8,6 +8,7 @@ import {
   dispatchBlockReason,
   runtimeCheckpointSignature,
   runtimeSnapshotIsFresh,
+  runBestEffortDispatchBookkeeping,
   syncWorkerProfileModel,
 } from './swarm-dispatch'
 
@@ -183,6 +184,30 @@ describe('buildHermesTmuxLaunchCommand', () => {
     expect(source).not.toContain('new Promise(async')
     expect(source).toContain('unexpected dispatch failure')
   })
+
+  it('records mission dispatch only after process delivery succeeds', () => {
+    const source = readFileSync(new URL('./swarm-dispatch.ts', import.meta.url), 'utf8')
+    expect(source.indexOf('const bookkeepingFailures = liveResult.ok ? recordAcceptedDispatch() : []')).toBeGreaterThan(source.indexOf('await sendPromptToLiveSession(workerId, prompt)'))
+  })
+
+  it.each(['runtime', 'mission', 'memory'] as const)(
+    'preserves successful delivery when %s bookkeeping fails',
+    (failedWriter) => {
+      const calls: string[] = []
+      const failures = runBestEffortDispatchBookkeeping(
+        (['runtime', 'mission', 'memory'] as const).map((label) => ({
+          label,
+          run: () => {
+            calls.push(label)
+            if (label === failedWriter) throw new Error(`${label} unavailable`)
+          },
+        })),
+      )
+
+      expect(calls).toEqual(['runtime', 'mission', 'memory'])
+      expect(failures).toEqual([{ label: failedWriter, error: `${failedWriter} unavailable` }])
+    },
+  )
 
   it('publishes runtime checkpoint updates with an atomic rename', () => {
     const source = readFileSync(

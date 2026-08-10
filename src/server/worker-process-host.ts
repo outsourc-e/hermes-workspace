@@ -1,7 +1,7 @@
 import { execFile, execFileSync, spawn as nodeSpawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 
 import {
   buildSwarmTmuxLaunchCommand,
@@ -43,6 +43,7 @@ export type WorkerProcessResult = {
   ok: boolean
   error?: string
   record?: WorkerProcessRecord
+  retainStartLock?: boolean
 }
 
 export type WorkerStartSpec = {
@@ -83,6 +84,10 @@ export type WorkerProcessHostDeps = {
   tmuxBin?: string
   isPidAlive?: (pid: number) => boolean
   now?: () => number
+  cleanupPollMs?: number
+  cleanupTimeoutMs?: number
+  writeRegistry?: (file: string, registry: { version: number; workers: Record<string, WorkerProcessRecord> }) => void
+  writeEmergencyOwnership?: (record: WorkerProcessRecord) => void
 }
 
 type RegistryFile = {
@@ -233,6 +238,9 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
   const now = deps.now ?? (() => Date.now())
   const runCommand = deps.runCommand ?? defaultRunCommand()
   const isPidAlive = deps.isPidAlive ?? defaultIsPidAlive
+  const cleanupPollMs = deps.cleanupPollMs ?? 25
+  const cleanupTimeoutMs = deps.cleanupTimeoutMs ?? 1_000
+  const writeAll = deps.writeRegistry ?? writeRegistry
   const spawnProcess: SpawnLike =
     deps.spawn ?? ((command, args, options) => nodeSpawn(command, args, options as never) as SpawnedChild)
 
@@ -261,6 +269,59 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
     return `${registryFile}::${workerId}`
   }
 
+  function emergencyOwnershipFile(workerId: string): string {
+    return `${registryFile}.${Buffer.from(workerId).toString('base64url')}.emergency.json`
+  }
+
+  function startLockFile(workerId: string): string {
+    return `${registryFile}.${Buffer.from(workerId).toString('base64url')}.start.lock`
+  }
+
+  function persistEmergencyOwnership(record: WorkerProcessRecord): void {
+    const file = emergencyOwnershipFile(record.workerId)
+    const temp = `${file}.${process.pid}.${randomUUID()}.tmp`
+    writeFileSync(temp, `${JSON.stringify(record)}\n`, 'utf8')
+    renameSync(temp, file)
+  }
+  const writeEmergencyOwnership = deps.writeEmergencyOwnership ?? persistEmergencyOwnership
+
+  function readEmergencyOwnership(workerId: string): WorkerProcessRecord | null {
+    try { return normalizeRecord(workerId, JSON.parse(readFileSync(emergencyOwnershipFile(workerId), 'utf8'))) } catch { return null }
+  }
+
+  function clearEmergencyOwnership(workerId: string): void {
+    try { unlinkSync(emergencyOwnershipFile(workerId)) } catch { /* absent or already reconciled */ }
+    try { unlinkSync(startLockFile(workerId)) } catch { /* absent or already reconciled */ }
+  }
+
+  function readRetainedStartOwnership(workerId: string): WorkerProcessRecord | null {
+    try { return normalizeRecord(workerId, JSON.parse(readFileSync(startLockFile(workerId), 'utf8'))) } catch { return null }
+  }
+
+  function listIndependentOwnership(): WorkerProcessRecord[] {
+    const records = new Map<string, { priority: number; record: WorkerProcessRecord }>()
+    const directory = dirname(registryFile)
+    const prefix = `${basename(registryFile)}.`
+    let names: string[]
+    try { names = readdirSync(directory) } catch { return [] }
+    for (const name of names) {
+      const emergency = name.startsWith(prefix) && name.endsWith('.emergency.json')
+      const retained = name.startsWith(prefix) && name.endsWith('.start.lock')
+      if (!emergency && !retained) continue
+      try {
+        const raw = JSON.parse(readFileSync(join(directory, name), 'utf8')) as Record<string, unknown>
+        if (typeof raw.workerId !== 'string') continue
+        const expected = emergency ? emergencyOwnershipFile(raw.workerId) : startLockFile(raw.workerId)
+        if (join(directory, name) !== expected) continue
+        const record = normalizeRecord(raw.workerId, raw)
+        if (!record) continue
+        const priority = emergency ? 2 : 1
+        if ((records.get(record.workerId)?.priority ?? 0) < priority) records.set(record.workerId, { priority, record })
+      } catch { /* malformed independent records are ignored */ }
+    }
+    return [...records.values()].map(({ record }) => record)
+  }
+
   function readAll(): RegistryFile {
     return readRegistry(registryFile)
   }
@@ -268,7 +329,7 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
   function persist(record: WorkerProcessRecord): WorkerProcessRecord {
     const registry = readAll()
     registry.workers[record.workerId] = record
-    writeRegistry(registryFile, registry)
+    writeAll(registryFile, registry)
     return record
   }
 
@@ -287,14 +348,40 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
   }
 
   async function startNative(spec: WorkerStartSpec): Promise<WorkerProcessResult> {
-    const child = spawnProcess(spec.command, spec.args, {
-      cwd: spec.cwd,
-      env: buildSafeChildEnv(process.env, spec.env),
-      detached: platform === 'win32',
-      windowsHide: platform === 'win32',
-      stdio: ['pipe', 'ignore', 'ignore'],
+    const reservedAt = now()
+    const reservation = persist({
+      workerId: spec.workerId, hostKind: 'native', pid: null, sessionName: null,
+      cwd: spec.cwd, status: 'unknown', startedAt: reservedAt, updatedAt: reservedAt,
+      lastError: 'Native process start reserved',
+    })
+    let child: SpawnedChild
+    try {
+      child = spawnProcess(spec.command, spec.args, {
+        cwd: spec.cwd,
+        env: buildSafeChildEnv(process.env, spec.env),
+        detached: platform === 'win32',
+        windowsHide: platform === 'win32',
+        stdio: ['pipe', 'ignore', 'ignore'],
+      })
+    } catch (error) {
+      const stopped = persist({
+        ...reservation,
+        status: 'stopped',
+        updatedAt: now(),
+        lastError: error instanceof Error ? error.message : 'native spawn failed',
+      })
+      return { ok: false, error: stopped.lastError ?? 'native spawn failed', record: stopped }
+    }
+    // Node emits spawn failures asynchronously even when `pid` is absent. Attach
+    // before inspecting the PID so a missing executable cannot crash Workspace.
+    child.on?.('error', (error) => {
+      if (child.pid) markExited(spec.workerId, child.pid)
+      else {
+        try { persist({ ...reservation, status: 'stopped', updatedAt: now(), lastError: error instanceof Error ? error.message : 'native spawn failed' }) } catch { /* reservation remains fail-closed */ }
+      }
     })
     if (!child.pid) {
+      persist({ ...reservation, status: 'stopped', updatedAt: now(), lastError: `Failed to spawn worker process for ${spec.workerId}` })
       return { ok: false, error: `Failed to spawn worker process for ${spec.workerId}` }
     }
     liveChildren.set(childKey(spec.workerId), child)
@@ -303,18 +390,57 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
       markExited(spec.workerId, child.pid!)
     })
     const timestamp = now()
-    const record = persist({
-      workerId: spec.workerId,
-      hostKind: 'native',
-      pid: child.pid,
-      sessionName: null,
-      cwd: spec.cwd,
-      status: 'running',
-      startedAt: timestamp,
-      updatedAt: timestamp,
-      lastError: null,
-    })
-    return { ok: true, record }
+    try {
+      const record = persist({
+        workerId: spec.workerId,
+        hostKind: 'native',
+        pid: child.pid,
+        sessionName: null,
+        cwd: spec.cwd,
+        status: 'running',
+        startedAt: timestamp,
+        updatedAt: timestamp,
+        lastError: null,
+      })
+      return { ok: true, record }
+    } catch (error) {
+      const recoverable = {
+        ...reservation,
+        pid: child.pid,
+        updatedAt: now(),
+        lastError: 'Native registration failed and process-tree cleanup was not verified',
+      }
+      // Independent durable ownership survives corruption/unavailability of the
+      // primary registry and is written before attempting destructive cleanup.
+      try { writeEmergencyOwnership(recoverable) } catch {
+        return {
+          ok: false,
+          error: 'Worker ownership registration and emergency persistence failed; start lock retained for manual recovery',
+          record: recoverable,
+          retainStartLock: true,
+        }
+      }
+      const terminationAccepted = platform === 'win32'
+        ? (await runCommand('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'])).ok
+        : child.kill?.('SIGTERM') !== false
+      const deadline = Date.now() + cleanupTimeoutMs
+      while (isPidAlive(child.pid) && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, cleanupPollMs))
+      }
+      const cleanupVerified = terminationAccepted && !isPidAlive(child.pid)
+      if (cleanupVerified) {
+        liveChildren.delete(childKey(spec.workerId))
+        try { unlinkSync(emergencyOwnershipFile(spec.workerId)) } catch { /* already absent */ }
+      }
+      if (!cleanupVerified) {
+        try { persist(recoverable) } catch { /* retain the live handle and PID in the result */ }
+      }
+      return {
+        ok: false,
+        error: `Worker ownership registration failed: ${error instanceof Error ? error.message : 'unknown error'}${cleanupVerified ? '' : '; process-tree cleanup was not verified'}`,
+        record: cleanupVerified ? reservation : recoverable,
+      }
+    }
   }
 
   function markExited(workerId: string, expectedPid: number): void {
@@ -323,7 +449,7 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
       const existing = registry.workers[workerId]
       if (!existing || existing.pid !== expectedPid) return
       registry.workers[workerId] = { ...existing, status: 'stopped', pid: null, updatedAt: now() }
-      writeRegistry(registryFile, registry)
+      writeAll(registryFile, registry)
     } catch {
       // Registry writes are best-effort on process teardown.
     }
@@ -376,36 +502,43 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
     hostKind,
 
     async start(spec) {
-      const lockFile = `${registryFile}.${Buffer.from(spec.workerId).toString('base64url')}.start.lock`
+      const lockFile = startLockFile(spec.workerId)
       let lockFd: number
       try { lockFd = openSync(lockFile, 'wx') } catch {
-        return { ok: false, error: `Worker ${spec.workerId} start is already owned by another Workspace process` }
+        return { ok: false, error: `Worker ${spec.workerId} start is already owned by another Workspace process`, record: readRetainedStartOwnership(spec.workerId) ?? undefined }
       }
+      let retainStartLock = false
       try {
-        const current = readAll().workers[spec.workerId]
+        const current = readEmergencyOwnership(spec.workerId) ?? readAll().workers[spec.workerId]
         if (current?.status === 'running' || current?.status === 'unknown') {
           return { ok: false, error: `Worker ${spec.workerId} already has an active process`, record: current }
         }
-        return hostKind === 'tmux' ? await startTmux(spec) : await startNative(spec)
+        const result = hostKind === 'tmux' ? await startTmux(spec) : await startNative(spec)
+        retainStartLock = result.retainStartLock === true
+        if (retainStartLock && result.record) writeFileSync(lockFd, `${JSON.stringify(result.record)}\n`, 'utf8')
+        return result
       } finally {
         closeSync(lockFd)
-        try { unlinkSync(lockFile) } catch { /* a leftover lock fails closed */ }
+        if (!retainStartLock) try { unlinkSync(lockFile) } catch { /* a leftover lock fails closed */ }
       }
     },
 
     async stop(workerId) {
-      const record = readAll().workers[workerId]
+      const record = readEmergencyOwnership(workerId) ?? readRetainedStartOwnership(workerId) ?? readAll().workers[workerId]
       if (!record) return { ok: false, error: `Worker ${workerId} is not registered` }
       if (record.hostKind === 'tmux') {
         const killed = await runCommand(tmuxBin(), ['kill-session', '-t', record.sessionName ?? tmuxSessionNameForWorker(workerId)])
         if (!killed.ok) return { ok: false, error: killed.stderr.trim() || 'tmux kill-session failed', record }
         const stopped = persist({ ...record, status: 'stopped', pid: null, updatedAt: now() })
+        clearEmergencyOwnership(workerId)
         return { ok: true, record: stopped }
       }
       const child = liveChildren.get(childKey(workerId))
       if (!child) {
         if (record.pid && isPidAlive(record.pid)) return { ok: false, error: 'Recovered native PID ownership cannot be verified; refusing possible PID reuse', record }
-        return { ok: true, record: persist({ ...record, status: 'stopped', pid: null, updatedAt: now() }) }
+        const stopped = persist({ ...record, status: 'stopped', pid: null, updatedAt: now() })
+        clearEmergencyOwnership(workerId)
+        return { ok: true, record: stopped }
       }
       if (platform === 'win32' && record.pid) {
         const tree = await runCommand('taskkill.exe', ['/PID', String(record.pid), '/T', '/F'])
@@ -417,7 +550,9 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
       for (let attempt = 0; attempt < 40 && record.pid && isPidAlive(record.pid); attempt += 1) await new Promise((resolve) => setTimeout(resolve, 50))
       if (record.pid && isPidAlive(record.pid)) return { ok: false, error: 'Worker process tree did not exit; restart refused', record }
       liveChildren.delete(childKey(workerId))
-      return { ok: true, record: persist({ ...record, status: 'stopped', pid: null, updatedAt: now(), lastError: null }) }
+      const stopped = persist({ ...record, status: 'stopped', pid: null, updatedAt: now(), lastError: null })
+      clearEmergencyOwnership(workerId)
+      return { ok: true, record: stopped }
     },
 
     async send(workerId, text) {
@@ -473,11 +608,24 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
     },
 
     async status(workerId) {
-      return readAll().workers[workerId] ?? unknownRecord(workerId)
+      try { return readEmergencyOwnership(workerId) ?? readRetainedStartOwnership(workerId) ?? readAll().workers[workerId] ?? unknownRecord(workerId) }
+      catch (error) {
+        const emergency = readEmergencyOwnership(workerId)
+        if (emergency) return emergency
+        throw error
+      }
     },
 
     async list() {
-      return Object.values(readAll().workers).sort((a, b) => a.workerId.localeCompare(b.workerId))
+      const independent = listIndependentOwnership()
+      let primary: WorkerProcessRecord[]
+      try { primary = Object.values(readAll().workers) } catch (error) {
+        if (independent.length === 0) throw error
+        return independent.sort((a, b) => a.workerId.localeCompare(b.workerId))
+      }
+      const merged = new Map(primary.map((record) => [record.workerId, record]))
+      for (const record of independent) merged.set(record.workerId, record)
+      return [...merged.values()].sort((a, b) => a.workerId.localeCompare(b.workerId))
     },
 
     async recover() {
@@ -505,7 +653,7 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
         registry.workers[record.workerId] = next
         reconciled.push(next)
       }
-      writeRegistry(registryFile, registry)
+      writeAll(registryFile, registry)
       return reconciled.sort((a, b) => a.workerId.localeCompare(b.workerId))
     },
   }
@@ -513,9 +661,33 @@ export function createWorkerProcessHost(deps: WorkerProcessHostDeps = {}): Worke
 
 let singletonHost: WorkerProcessHost | null = null
 
+export function withStartupRecovery(base: WorkerProcessHost): WorkerProcessHost {
+  let recovery: Promise<unknown> | null = null
+  const ready = () => { recovery ??= base.recover(); return recovery }
+  return {
+    get hostKind() { return base.hostKind },
+    async start(spec) { await ready(); return base.start(spec) },
+    async stop(workerId) {
+      try { await ready() } catch { return base.stop(workerId) }
+      return base.stop(workerId)
+    },
+    async send(workerId, prompt) { await ready(); return base.send(workerId, prompt) },
+    async capture(workerId, options) { await ready(); return base.capture(workerId, options) },
+    async status(workerId) {
+      try { await ready() } catch { return base.status(workerId) }
+      return base.status(workerId)
+    },
+    async list() {
+      try { await ready() } catch { return base.list() }
+      return base.list()
+    },
+    async recover() { await ready(); return base.list() },
+  }
+}
+
 /** Process-wide host. Routes and lifecycle helpers must share this authority. */
 export function getWorkerProcessHost(): WorkerProcessHost {
-  singletonHost ??= createWorkerProcessHost()
+  singletonHost ??= withStartupRecovery(createWorkerProcessHost())
   return singletonHost
 }
 

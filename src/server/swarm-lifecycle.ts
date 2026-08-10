@@ -153,6 +153,8 @@ export async function startWorkerProcess(workerId: string): Promise<{ ok: boolea
   const profilePath = join(getProfilesDir(), workerId)
   if (!existsSync(profilePath)) return { ok: false, error: `Profile not found: ${profilePath}` }
   const hermesBin = process.env.HERMES_CLI_PATH || resolveSwarmHermesBin()
+  // Hermes consumes model.openai_runtime from this profile's config.yaml on
+  // process start; dashboard runtime changes intentionally apply after restart.
   const result = await getWorkerProcessHost().start({
     workerId,
     command: hermesBin,

@@ -7,7 +7,13 @@ export type CapabilityState = 'supported' | 'degraded' | 'experimental' | 'unsup
 export type RuntimeOperation = 'create' | 'resume' | 'fork' | 'send' | 'steer' | 'interrupt' | 'status' | 'list' | 'archive' | 'attach' | 'discoverPeers' | 'crossSessionMessage'
 export type RuntimeCapability = { state: CapabilityState; explanation: string; deferred?: boolean }
 export type RuntimeCapabilities = Record<RuntimeOperation, RuntimeCapability>
-export type RuntimeLeaseMetadata = { owner: string; expiresAt: number; acquiredAt: number; processId?: number }
+export type RuntimeLeaseMetadata = {
+  owner: string
+  expiresAt: number
+  acquiredAt: number
+  processId?: number
+  abandoned?: boolean
+}
 
 export type ProviderRuntimeRecord = {
   runtimeId: string
@@ -15,6 +21,7 @@ export type ProviderRuntimeRecord = {
   routeRef: string | null
   accountAlias: string
   externalId: string
+  model?: string | null
   cwd: string | null
   worktree: string | null
   hostKind: 'native' | 'tmux' | 'stdio' | 'external' | 'unknown'
@@ -67,7 +74,7 @@ function atomicWrite(path: string, value: unknown): void {
 function safeRecord(value: ProviderRuntimeRecord): ProviderRuntimeRecord {
   return {
     runtimeId: value.runtimeId, kind: value.kind, routeRef: value.routeRef, accountAlias: value.accountAlias,
-    externalId: value.externalId, cwd: value.cwd, worktree: value.worktree, hostKind: value.hostKind,
+    externalId: value.externalId, model: value.model ?? null, cwd: value.cwd, worktree: value.worktree, hostKind: value.hostKind,
     hostStatus: value.hostStatus, capabilities: value.capabilities, lease: value.lease,
     parentRuntimeId: value.parentRuntimeId, kanbanTaskId: value.kanbanTaskId,
     createdAt: value.createdAt, updatedAt: value.updatedAt,
@@ -92,6 +99,15 @@ export class ProviderRuntimeRegistry {
   }
   replace(records: Array<ProviderRuntimeRecord>): void {
     this.locked(() => atomicWrite(this.file, { version: 1, runtimes: records.map(safeRecord) }))
+  }
+  upsert(record: ProviderRuntimeRecord): void { this.merge([record]) }
+  insertIfAbsent(record: ProviderRuntimeRecord): boolean {
+    return this.locked(() => {
+      const current = this.list()
+      if (current.some((entry) => entry.runtimeId === record.runtimeId)) return false
+      atomicWrite(this.file, { version: 1, runtimes: [...current, safeRecord(record)] })
+      return true
+    })
   }
   merge(records: Array<ProviderRuntimeRecord>): void {
     this.locked(() => {
@@ -162,7 +178,7 @@ export class DurableRuntimeLeases {
     try {
       const current = this.get(identity)
       if (!current || current.owner !== owner) return false
-      atomicWrite(leaseFile(this.root, identity), { ...current, processId: undefined, expiresAt: this.now() + ttlMs })
+      atomicWrite(leaseFile(this.root, identity), { ...current, abandoned: true, processId: undefined, expiresAt: this.now() + ttlMs })
       return true
     } finally { releaseLock() }
   }
@@ -191,7 +207,7 @@ export function normalizeClaudeAgents(input: unknown, options: NormalizeOptions)
     const raw = item as Record<string, unknown>; const id = text(raw.id) ?? text(raw.session_id) ?? text(raw.sessionId)
     if (!id) return []
     return [{ runtimeId: `claude:${options.accountAlias}:${id}`, kind: 'claude_session' as const, routeRef: options.routeRef, accountAlias: options.accountAlias,
-      externalId: id, cwd: text(raw.cwd), worktree: text(raw.worktree) ?? text(raw.cwd), hostKind: 'external' as const,
+      externalId: id, model: text(raw.model), cwd: text(raw.cwd), worktree: text(raw.worktree) ?? text(raw.cwd), hostKind: 'external' as const,
       hostStatus: status(raw.status), capabilities: capabilityMatrix('claude_session', options.platform), lease: null,
       parentRuntimeId: text(raw.parentRuntimeId), kanbanTaskId: text(raw.kanbanTaskId), createdAt: Number(raw.createdAt) || now, updatedAt: now }]
   })
@@ -205,7 +221,7 @@ export function normalizeCodexThreads(input: unknown, options: NormalizeOptions)
     const raw = item as Record<string, unknown>; const id = text(raw.id) ?? text(raw.threadId)
     if (!id) return []
     return [{ runtimeId: `codex:${id}`, kind: 'codex_thread' as const, routeRef: options.routeRef, accountAlias: options.accountAlias,
-      externalId: id, cwd: text(raw.cwd), worktree: text(raw.worktree) ?? text(raw.cwd), hostKind: 'stdio' as const,
+      externalId: id, model: text(raw.model), cwd: text(raw.cwd), worktree: text(raw.worktree) ?? text(raw.cwd), hostKind: 'stdio' as const,
       hostStatus: status(raw.status), capabilities: capabilityMatrix('codex_thread'), lease: null,
       parentRuntimeId: text(raw.parentRuntimeId), kanbanTaskId: text(raw.kanbanTaskId), createdAt: Number(raw.createdAt) || now, updatedAt: now }]
   })
@@ -228,7 +244,7 @@ export async function importClaudeAgents(input: {
   home: string
   platform?: NodeJS.Platform
 }): Promise<{ ok: boolean; count: number; error?: string }> {
-  const env = { ...process.env, HOME: input.home, USERPROFILE: input.home }
+  const env: Record<string, string | undefined> = { ...process.env, HOME: input.home, USERPROFILE: input.home }
   delete env.ANTHROPIC_API_KEY
   delete env.ANTHROPIC_AUTH_TOKEN
   delete env.CLAUDE_CODE_OAUTH_TOKEN
@@ -277,12 +293,25 @@ export class CodexRuntimeAdapter {
       params = { threadId, turnId }
     } else {
       method = { resume: 'thread/resume', fork: 'thread/fork', archive: 'thread/archive' }[action]
-      params = { threadId }
+      const model = text(input.providerModel)
+      params = action === 'archive' || !model ? { threadId } : { threadId, model }
     }
     const acquired = this.deps.leases.acquire(runtimeId, this.deps.ownerToken, this.deps.ttlMs ?? 30_000)
     if (!acquired.ok) return acquired
-    try { return await this.deps.invoke(method, params) }
-    finally { this.deps.leases.release(runtimeId, this.deps.ownerToken) }
+    let releaseLease = true
+    try {
+      const result = await this.deps.invoke(method, params)
+      if (result.ok && action === 'fork' && typeof input.onForkCreated === 'function') {
+        try { await (input.onForkCreated as (result: unknown) => unknown)(result.result) } catch {
+          releaseLease = false
+          this.deps.leases.abandon(runtimeId, this.deps.ownerToken)
+          return { ok: false, error: 'Codex fork succeeded but durable registration failed; lease retained for explicit recovery' }
+        }
+      }
+      return result
+    } finally {
+      if (releaseLease) this.deps.leases.release(runtimeId, this.deps.ownerToken)
+    }
   }
 }
 
@@ -301,10 +330,10 @@ export class ClaudeRuntimeAdapter {
     const env = this.env(accountAlias); if (!env) return { ok: false, error: 'Account alias is not allowlisted' }
     return this.deps.run({ command: this.deps.claudeBin ?? 'claude', args: ['agents', '--json', '--all'], cwd: env.HOME ?? '.', env })
   }
-  async create(input: { accountAlias: string; cwd: string; prompt: string; background?: boolean; sessionId?: string; onCreated?: (sessionId: string, runtimeId: string) => void }) {
+  async create(input: { accountAlias: string; cwd: string; prompt: string; model: string; background?: boolean; sessionId?: string; onCreated?: (sessionId: string, runtimeId: string) => void }) {
     if (input.background) return { ok: false, error: 'Background launch requires durable process ownership and is not enabled' }
     const env = this.env(input.accountAlias); if (!env) return { ok: false, error: 'Account alias is not allowlisted' }
-    if (!input.cwd || input.cwd.length > 1024 || !input.prompt || input.prompt.length > 32_000) return { ok: false, error: 'Invalid Claude request' }
+    if (!input.cwd || input.cwd.length > 1024 || !input.prompt || input.prompt.length > 32_000 || !input.model || input.model.length > 200) return { ok: false, error: 'Invalid Claude request' }
     const sessionId = input.sessionId ?? (this.deps.uuid ?? randomUUID)()
     const identity = `claude:${input.accountAlias}:${sessionId}`
     const acquired = this.deps.leases.acquire(identity, this.deps.ownerToken, 30_000); if (!acquired.ok) return acquired
@@ -312,7 +341,7 @@ export class ClaudeRuntimeAdapter {
     const heartbeat = setInterval(() => { try { this.deps.leases.renew(identity, this.deps.ownerToken, 30_000) } catch { /* live owner PID keeps stale recovery fail-closed */ } }, 10_000)
     heartbeat.unref?.()
     try {
-      const args = ['-p', '--session-id', sessionId, '--output-format', 'json']
+      const args = ['-p', '--session-id', sessionId, '--model', input.model, '--output-format', 'json']
       const result = await this.deps.run({ command: this.deps.claudeBin ?? 'claude', args, cwd: input.cwd, env, stdin: input.prompt })
       if (!result.ok) return { ok: false, error: result.stderr.slice(0, 2_000) }
       try { input.onCreated?.(sessionId, identity) } catch {
@@ -326,17 +355,17 @@ export class ClaudeRuntimeAdapter {
       if (releaseLease) this.deps.leases.release(identity, this.deps.ownerToken)
     }
   }
-  async mutate(runtimeId: string, action: 'resume' | 'fork' | 'attach', input: { accountAlias: string; cwd: string; prompt?: string }) {
+  async mutate(runtimeId: string, action: 'resume' | 'fork' | 'attach', input: { accountAlias: string; cwd: string; prompt?: string; model: string }) {
     if (capabilityMatrix('claude_session')[action].state === 'unsupported') return { ok: false, error: capabilityMatrix('claude_session')[action].explanation }
     const env = this.env(input.accountAlias); if (!env) return { ok: false, error: 'Account alias is not allowlisted' }
     const externalId = runtimeId.split(':').at(-1) ?? ''
-    if (!externalId || externalId.length > 256 || (input.prompt?.length ?? 0) > 32_000) return { ok: false, error: 'Invalid Claude runtime request' }
+    if (!externalId || externalId.length > 256 || (input.prompt?.length ?? 0) > 32_000 || !input.model || input.model.length > 200) return { ok: false, error: 'Invalid Claude runtime request' }
     const acquired = this.deps.leases.acquire(runtimeId, this.deps.ownerToken, 30_000); if (!acquired.ok) return acquired
     if (action === 'attach') {
       this.deps.leases.release(runtimeId, this.deps.ownerToken)
-      return { ok: true, attach: { command: this.deps.claudeBin ?? 'claude', args: ['--resume', externalId], cwd: input.cwd } }
+      return { ok: true, attach: { command: this.deps.claudeBin ?? 'claude', args: ['--resume', externalId, '--model', input.model], cwd: input.cwd } }
     }
-    const args = ['-p', '--resume', externalId]
+    const args = ['-p', '--resume', externalId, '--model', input.model]
     if (action === 'fork') args.push('--fork-session')
     args.push('--output-format', 'json')
     const heartbeat = setInterval(() => { try { this.deps.leases.renew(runtimeId, this.deps.ownerToken, 30_000) } catch { /* live owner PID keeps stale recovery fail-closed */ } }, 10_000)

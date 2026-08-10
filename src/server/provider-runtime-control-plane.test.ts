@@ -24,7 +24,7 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const record: ProviderRuntimeRecord = {
   runtimeId: 'claude:session-1', kind: 'claude_session', routeRef: 'claude-cwm4tx/opus-5',
-  accountAlias: 'Claude Max CWM', externalId: 'session-1', cwd: 'C:/repo', worktree: 'C:/repo',
+  accountAlias: 'Claude Max CWM', externalId: 'session-1', model: null, cwd: 'C:/repo', worktree: 'C:/repo',
   hostKind: 'native', hostStatus: 'running', capabilities: capabilityMatrix('claude_session', 'win32'),
   lease: null, parentRuntimeId: null, kanbanTaskId: 'task-1', createdAt: 1, updatedAt: 2,
 }
@@ -34,8 +34,17 @@ describe('provider runtime durable registry', () => {
     const registry = new ProviderRuntimeRegistry(join(dir, 'runtimes.json'))
     registry.replace([record])
     expect(registry.list()).toEqual([record])
+    registry.upsert({ ...record, hostStatus: 'idle', updatedAt: 3 })
+    expect(registry.get(record.runtimeId)).toMatchObject({ hostStatus: 'idle', updatedAt: 3 })
     const text = readFileSync(join(dir, 'runtimes.json'), 'utf8')
     for (const forbidden of ['prompt', 'transcript', 'argv', 'token', 'credential']) expect(text.toLowerCase()).not.toContain(`"${forbidden}`)
+  })
+
+  it('inserts a new runtime without overwriting an existing identity', () => {
+    const registry = new ProviderRuntimeRegistry(join(dir, 'runtimes.json'))
+    expect(registry.insertIfAbsent(record)).toBe(true)
+    expect(registry.insertIfAbsent({ ...record, accountAlias: 'collision', updatedAt: 99 })).toBe(false)
+    expect(registry.get(record.runtimeId)).toMatchObject({ accountAlias: record.accountAlias, updatedAt: 2 })
   })
 
   it('normalizes partial Claude and Codex discovery records with provenance', () => {
@@ -91,20 +100,32 @@ describe('capabilities and explicit Codex runtime selection', () => {
 describe('provider lifecycle adapters', () => {
   it('enables bounded one-shot Codex thread lifecycle while keeping active-turn controls disabled', async () => {
     const leases = new DurableRuntimeLeases(join(dir, 'leases'), () => 10)
-    const invoke = vi.fn(async () => ({ ok: true, result: { id: 'thread-1' } }))
+    const invoke = vi.fn(async () => ({ ok: true, result: { thread: { id: 'thread-fork' } } }))
     const adapter = new CodexRuntimeAdapter({ invoke, leases, ownerToken: 'server' })
     expect(await adapter.status('thread-1')).toMatchObject({ ok: true })
     expect(invoke).toHaveBeenLastCalledWith('thread/read', { threadId: 'thread-1', includeTurns: false })
-    expect(await adapter.mutate('codex:thread-1', 'resume', {})).toMatchObject({ ok: true })
-    expect(await adapter.mutate('codex:thread-1', 'fork', {})).toMatchObject({ ok: true })
+    expect(await adapter.mutate('codex:thread-1', 'resume', { providerModel: 'gpt-5.6-sol' })).toMatchObject({ ok: true })
+    let forkRegisteredWhileLeased = false
+    expect(await adapter.mutate('codex:thread-1', 'fork', {
+      providerModel: 'gpt-5.6-sol',
+      onForkCreated: () => { forkRegisteredWhileLeased = leases.get('codex:thread-1') !== null },
+    })).toMatchObject({ ok: true })
+    expect(forkRegisteredWhileLeased).toBe(true)
     expect(await adapter.mutate('codex:thread-1', 'archive', {})).toMatchObject({ ok: true })
-    expect(invoke).toHaveBeenNthCalledWith(2, 'thread/resume', { threadId: 'thread-1' })
-    expect(invoke).toHaveBeenNthCalledWith(3, 'thread/fork', { threadId: 'thread-1' })
+    expect(invoke).toHaveBeenNthCalledWith(2, 'thread/resume', { threadId: 'thread-1', model: 'gpt-5.6-sol' })
+    expect(invoke).toHaveBeenNthCalledWith(3, 'thread/fork', { threadId: 'thread-1', model: 'gpt-5.6-sol' })
     expect(invoke).toHaveBeenNthCalledWith(4, 'thread/archive', { threadId: 'thread-1' })
     expect(await adapter.mutate('codex:thread-1', 'steer', { text: 'bounded', turnId: 'turn-7' })).toMatchObject({ ok: false })
     expect(await adapter.mutate('codex:thread-1', 'interrupt', { turnId: 'turn-7' })).toMatchObject({ ok: false })
     expect(invoke).toHaveBeenCalledTimes(4)
     expect(leases.get('codex:thread-1')).toBeNull()
+  })
+
+  it('retains an abandoned Codex lease when fork registration is ambiguous', async () => {
+    const leases = new DurableRuntimeLeases(join(dir, 'leases'), () => 10)
+    const adapter = new CodexRuntimeAdapter({ invoke: vi.fn(async () => ({ ok: true, result: {} })), leases, ownerToken: 'server' })
+    expect(await adapter.mutate('codex:thread-2', 'fork', { onForkCreated: () => { throw new Error('registry unavailable') } })).toMatchObject({ ok: false })
+    expect(leases.get('codex:thread-2')).toMatchObject({ abandoned: true })
   })
 
   it('passes Claude prompts via stdin with official UUID resume/fork flags and strips API credentials', async () => {
@@ -115,16 +136,17 @@ describe('provider lifecycle adapters', () => {
       accountHomes: { cwm4tx: 'C:/claude-cwm' }, uuid: () => '11111111-1111-4111-8111-111111111111',
       baseEnv: { ANTHROPIC_API_KEY: 'x', ANTHROPIC_AUTH_TOKEN: 'y', CLAUDE_CODE_OAUTH_TOKEN: 'z', SAFE: '1' },
     })
-    expect((await adapter.create({ accountAlias: 'not-allowed', cwd: 'C:/repo', prompt: 'secret' })).ok).toBe(false)
+    expect((await adapter.create({ accountAlias: 'not-allowed', cwd: 'C:/repo', prompt: 'secret', model: 'opus' })).ok).toBe(false)
     expect(run).not.toHaveBeenCalled()
     let registeredWhileLeased = false
     expect((await adapter.create({
       accountAlias: 'cwm4tx', cwd: 'C:/repo', prompt: 'secret',
+      model: 'opus',
       onCreated: (_sessionId, runtimeId) => { registeredWhileLeased = claudeLeases.get(runtimeId) !== null },
     })).ok).toBe(true)
     expect(registeredWhileLeased).toBe(true)
     const created = run.mock.calls[0][0]
-    expect(created.args).toEqual(['-p', '--session-id', '11111111-1111-4111-8111-111111111111', '--output-format', 'json'])
+    expect(created.args).toEqual(['-p', '--session-id', '11111111-1111-4111-8111-111111111111', '--model', 'opus', '--output-format', 'json'])
     expect(created.args).not.toContain('secret')
     expect(created.stdin).toBe('secret')
     expect(created.env).toMatchObject({ HOME: 'C:/claude-cwm', USERPROFILE: 'C:/claude-cwm' })
@@ -133,12 +155,12 @@ describe('provider lifecycle adapters', () => {
     expect(created.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
     expect(created.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
 
-    await adapter.mutate('claude:cwm4tx:22222222-2222-4222-8222-222222222222', 'resume', { accountAlias: 'cwm4tx', cwd: 'C:/repo', prompt: 'continue' })
+    await adapter.mutate('claude:cwm4tx:22222222-2222-4222-8222-222222222222', 'resume', { accountAlias: 'cwm4tx', cwd: 'C:/repo', prompt: 'continue', model: 'opus' })
     expect(run.mock.calls[1][0]).toMatchObject({
-      args: ['-p', '--resume', '22222222-2222-4222-8222-222222222222', '--output-format', 'json'],
+      args: ['-p', '--resume', '22222222-2222-4222-8222-222222222222', '--model', 'opus', '--output-format', 'json'],
       stdin: 'continue',
     })
-    expect((await adapter.mutate('claude:cwm4tx:22222222-2222-4222-8222-222222222222', 'fork', { accountAlias: 'cwm4tx', cwd: 'C:/repo', prompt: 'branch' })).ok).toBe(false)
+    expect((await adapter.mutate('claude:cwm4tx:22222222-2222-4222-8222-222222222222', 'fork', { accountAlias: 'cwm4tx', cwd: 'C:/repo', prompt: 'branch', model: 'opus' })).ok).toBe(false)
     expect(run).toHaveBeenCalledTimes(2)
   })
 })

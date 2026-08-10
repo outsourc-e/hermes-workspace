@@ -1,8 +1,8 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, lstatSync, realpathSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, win32 } from 'node:path'
+import { join, posix, win32 } from 'node:path'
 
 import { getStateDir } from './workspace-state-dir'
 import { buildSafeChildEnv, getWorkerProcessHost } from './worker-process-host'
@@ -20,8 +20,29 @@ import {
 } from './provider-runtime-control-plane'
 
 const MAX_DIAGNOSTIC = 2_000
-const MAX_STDIO = 2_000_000
+const MAX_STDIO = 2 * 1024 * 1024
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+export function codexThreadIdFromResult(result: unknown): string | null {
+  if (!result || typeof result !== 'object') return null
+  const thread = (result as { thread?: unknown }).thread
+  if (!thread || typeof thread !== 'object') return null
+  const id = (thread as { id?: unknown }).id
+  return typeof id === 'string' && id.trim() ? id.trim() : null
+}
+
+export function validateCodexForkThreadId(
+  sourceThreadId: string,
+  candidateThreadId: string,
+  runtimeExists: (runtimeId: string) => boolean,
+): string {
+  if (!candidateThreadId || candidateThreadId.length > 256 || !/^[A-Za-z0-9._:-]+$/.test(candidateThreadId)) {
+    throw new Error('Invalid Codex fork thread identity')
+  }
+  if (candidateThreadId === sourceThreadId) throw new Error('Codex fork returned the source thread identity')
+  if (runtimeExists(`codex:${candidateThreadId}`)) throw new Error('Codex fork thread is already registered')
+  return candidateThreadId
+}
 
 function verifiedWorktree(path: string): string | null {
   try {
@@ -65,6 +86,11 @@ export function resolveConfiguredAccountHomes(
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
   pathExists: (path: string) => boolean = existsSync,
+  validation: {
+    canonicalize?: (path: string) => string
+    isDirectory?: (path: string) => boolean
+    isLink?: (path: string) => boolean
+  } = {},
 ): Record<string, string> {
   const candidates: Record<string, string> = {}
   try {
@@ -82,9 +108,30 @@ export function resolveConfiguredAccountHomes(
     candidates.cwm4tx ||= 'D:\\ClaudeHomes\\cwm4tx'
     candidates.gp ||= 'D:\\ClaudeHomes\\gp'
   }
-  return Object.fromEntries(
-    Object.entries(candidates).filter(([, home]) => home.length > 0 && home.length <= 1024 && pathExists(home)),
-  )
+  const pathApi = platform === 'win32' ? win32 : posix
+  const canonicalize = validation.canonicalize ?? ((path: string) => realpathSync.native(path))
+  const isDirectory = validation.isDirectory ?? ((path: string) => statSync(path).isDirectory())
+  const isLink = validation.isLink ?? ((path: string) => lstatSync(path).isSymbolicLink())
+  const resolved: Record<string, string> = {}
+  const identities = new Set<string>()
+  for (const [alias, home] of Object.entries(candidates)) {
+    if (!home || home.length > 1024 || !pathApi.isAbsolute(home) || !pathExists(home) || !isDirectory(home)) continue
+    const absolute = pathApi.resolve(home)
+    const root = pathApi.parse(absolute).root
+    let current = root
+    let linked = false
+    for (const segment of absolute.slice(root.length).split(pathApi.sep).filter(Boolean)) {
+      current = pathApi.join(current, segment)
+      if (isLink(current)) { linked = true; break }
+    }
+    if (linked) continue
+    const canonical = canonicalize(absolute)
+    const identity = platform === 'win32' ? canonical.toLowerCase() : canonical
+    if (identities.has(identity)) throw new Error('Claude account homes must resolve to distinct canonical directories')
+    identities.add(identity)
+    resolved[alias] = canonical
+  }
+  return resolved
 }
 
 function claudeRunner(): ClaudeRun {
@@ -183,15 +230,15 @@ export function getProviderRuntimeService(): RuntimeService {
     recoverLease: (runtimeId) => leases.recoverExpired(runtimeId),
     async refresh() {
       const workerRecords = await getWorkerProcessHost().list()
-      for (const worker of workerRecords) registry.upsert({
+      for (const worker of workerRecords) registry.merge([{
         runtimeId: `hermes:${worker.workerId}`,
         kind: 'hermes_profile', routeRef: null, accountAlias: 'hermes', externalId: worker.workerId,
         cwd: worker.cwd, worktree: worker.cwd, hostKind: worker.hostKind,
-        hostStatus: worker.status === 'starting' ? 'unknown' : worker.status,
+        hostStatus: worker.status,
         capabilities: capabilityMatrix('hermes_profile'), lease: null,
         parentRuntimeId: null, kanbanTaskId: null,
         createdAt: worker.startedAt ?? worker.updatedAt, updatedAt: worker.updatedAt,
-      })
+      }])
       const claudeImports = Object.entries(accountHomes).map(async ([accountAlias, home]) => ({
         source: `claude:${accountAlias}`,
         ...(await importClaudeAgents({ run: runClaude, registry, accountAlias, routeRef: null, home })),
@@ -210,6 +257,7 @@ export function getProviderRuntimeService(): RuntimeService {
       if (action === 'background') return { ok: false, error: 'Background Claude launch is disabled until durable writer ownership can be tracked' }
       const routeRef = typeof body.routeRef === 'string' ? body.routeRef : ''
       const accountAlias = typeof body.accountAlias === 'string' ? body.accountAlias : ''
+      const providerModel = typeof body.providerModel === 'string' ? body.providerModel.trim() : ''
       const existing = runtimeId ? registry.get(runtimeId) : null
       if (runtimeId && !existing) return { ok: false, error: 'Runtime must be imported or created before lifecycle mutation' }
       if (action === 'link_kanban' && existing) {
@@ -220,6 +268,7 @@ export function getProviderRuntimeService(): RuntimeService {
       }
       if (existing?.routeRef && existing.routeRef !== routeRef) return { ok: false, error: 'Runtime routeRef does not match the requested route' }
       if (existing?.kind === 'claude_session' && existing.accountAlias !== accountAlias) return { ok: false, error: 'Runtime account identity does not match' }
+      if (!providerModel || providerModel.length > 200) return { ok: false, error: 'A validated provider model is required' }
 
       const requestedCwd = typeof body.cwd === 'string' ? body.cwd : ''
       const requestedWorktree = typeof body.worktree === 'string' ? body.worktree : ''
@@ -231,11 +280,40 @@ export function getProviderRuntimeService(): RuntimeService {
       }
 
       if (runtimeId.startsWith('codex:') && ['resume', 'fork', 'steer', 'interrupt', 'archive'].includes(action)) {
+        let forkRuntimeId: string | null = null
         const result = await codex.mutate(runtimeId, action as 'resume' | 'fork' | 'steer' | 'interrupt' | 'archive', {
+          providerModel,
           ...(typeof body.text === 'string' ? { text: body.text } : {}),
           ...(typeof body.turnId === 'string' ? { turnId: body.turnId } : {}),
+          ...(action === 'fork' && existing ? { onForkCreated: (providerResult: unknown) => {
+            const returnedForkId = codexThreadIdFromResult(providerResult)
+            if (!returnedForkId) throw new Error('Codex fork response did not include a thread identity')
+            const forkId = validateCodexForkThreadId(existing.externalId, returnedForkId, (id) => registry.get(id) !== null)
+            const now = Date.now()
+            forkRuntimeId = `codex:${forkId}`
+            const inserted = registry.insertIfAbsent({
+              ...existing, runtimeId: forkRuntimeId, externalId: forkId, routeRef, model: providerModel,
+              cwd: cwd || existing.cwd, worktree: worktree || existing.worktree, hostStatus: 'idle',
+              parentRuntimeId: existing.runtimeId, createdAt: now, updatedAt: now,
+            })
+            if (!inserted) throw new Error('Codex fork thread is already registered')
+          } } : {}),
         })
-        if (result.ok && existing) registry.merge([{ ...existing, routeRef, cwd: cwd || existing.cwd, worktree: worktree || existing.worktree, updatedAt: Date.now() }])
+        if (result.ok && existing) {
+          if (action === 'fork') {
+            if (!forkRuntimeId) return { ok: false, error: 'Codex fork registration was not confirmed' }
+            return { ...result, runtimeId: forkRuntimeId }
+          }
+          registry.merge([{
+            ...existing,
+            routeRef: action === 'archive' ? existing.routeRef : routeRef,
+            model: action === 'archive' ? existing.model : providerModel,
+            cwd: cwd || existing.cwd,
+            worktree: worktree || existing.worktree,
+            hostStatus: action === 'archive' ? 'stopped' : existing.hostStatus,
+            updatedAt: Date.now(),
+          }])
+        }
         return result
       }
       const prompt = typeof body.prompt === 'string' ? body.prompt : (typeof body.text === 'string' ? body.text : '')
@@ -249,6 +327,7 @@ export function getProviderRuntimeService(): RuntimeService {
           accountAlias,
           cwd,
           prompt,
+          model: providerModel,
           background: action === 'background',
           sessionId: requestId,
           onCreated: (sessionId, createdRuntimeId) => {
@@ -259,6 +338,7 @@ export function getProviderRuntimeService(): RuntimeService {
               routeRef,
               accountAlias,
               externalId: sessionId,
+              model: providerModel,
               cwd,
               worktree,
               hostKind: 'external',
@@ -275,8 +355,8 @@ export function getProviderRuntimeService(): RuntimeService {
         return result
       }
       if (runtimeId.startsWith('claude:') && ['resume', 'fork', 'attach'].includes(action)) {
-        const result = await claude.mutate(runtimeId, action as 'resume' | 'fork' | 'attach', { accountAlias, cwd, prompt })
-        if (result.ok && existing) registry.merge([{ ...existing, routeRef, cwd, worktree, updatedAt: Date.now() }])
+        const result = await claude.mutate(runtimeId, action as 'resume' | 'fork' | 'attach', { accountAlias, cwd, prompt, model: providerModel })
+        if (result.ok && existing) registry.merge([{ ...existing, routeRef, model: providerModel, cwd, worktree, updatedAt: Date.now() }])
         return result
       }
       return { ok: false, error: 'Unsupported runtime lifecycle action' }

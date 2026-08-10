@@ -8,6 +8,7 @@ type RuntimeRecord = {
   routeRef: string | null
   accountAlias: string
   externalId: string
+  model?: string | null
   cwd: string | null
   worktree: string | null
   hostStatus: string
@@ -157,9 +158,9 @@ export function ProviderRuntimePanel() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="font-medium text-[var(--theme-text)]">{runtime.kind} · {runtime.externalId.slice(0, 12)}</p>
-                  <p className="text-xs text-[var(--theme-muted)]">{runtime.accountAlias} · {runtime.hostStatus} · {runtime.worktree || 'no worktree'} · Kanban {runtime.kanbanTaskId || 'unlinked'}</p>
+                  <p className="text-xs text-[var(--theme-muted)]">{runtime.accountAlias} · {runtime.model || runtime.routeRef || 'model unknown'} · {runtime.hostStatus} · {runtime.worktree || 'no worktree'} · Kanban {runtime.kanbanTaskId || 'unlinked'}</p>
                 </div>
-                <span className="rounded-full border border-[var(--theme-border)] px-2 py-1 text-xs">one writer</span>
+                <span className="rounded-full border border-[var(--theme-border)] px-2 py-1 text-xs" title="Writer leases are acquired and checked atomically for each mutation">writer lease: enforced</span>
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-3">
                 <select className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm" value={routeRef} onChange={(event) => setRouteByRuntime((value) => ({ ...value, [runtime.runtimeId]: event.target.value }))}>

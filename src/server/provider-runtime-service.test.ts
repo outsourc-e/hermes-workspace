@@ -2,10 +2,29 @@ import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  codexThreadIdFromResult,
   createCodexStdioInvoker,
   resolveCliLaunch,
   resolveConfiguredAccountHomes,
+  validateCodexForkThreadId,
 } from './provider-runtime-service'
+
+describe('Codex lifecycle result normalization', () => {
+  it('extracts only a non-empty forked thread identity', () => {
+    expect(codexThreadIdFromResult({ thread: { id: 'fork-123' } })).toBe('fork-123')
+    expect(codexThreadIdFromResult({ thread: {} })).toBeNull()
+    expect(codexThreadIdFromResult(null)).toBeNull()
+  })
+
+  it('rejects oversized, self-referential, and colliding fork identities', () => {
+    const exists = (runtimeId: string) => runtimeId === 'codex:already-owned'
+    expect(() => validateCodexForkThreadId('source', 'source', exists)).toThrow(/source/i)
+    expect(() => validateCodexForkThreadId('source', 'x'.repeat(257), exists)).toThrow(/invalid/i)
+    expect(() => validateCodexForkThreadId('source', 'bad/thread', exists)).toThrow(/invalid/i)
+    expect(() => validateCodexForkThreadId('source', 'already-owned', exists)).toThrow(/already registered/i)
+    expect(validateCodexForkThreadId('source', 'new-thread', exists)).toBe('new-thread')
+  })
+})
 
 describe('Codex stdio app-server transport', () => {
   it('initializes the 0.147 protocol before sending the requested method and closes the child', async () => {
@@ -78,6 +97,24 @@ describe('Claude account-home allowlist resolution', () => {
       CLAUDE_CWM4TX_HOME: 'D:\\ClaudeHomes\\cwm4tx',
       CLAUDE_GP_HOME: 'E:\\ClaudeGP',
       HERMES_CLAUDE_ACCOUNT_HOMES_JSON: '{"ignored":"Z:\\\\missing","bad":5}',
-    }, 'win32', exists)).toEqual({ cwm4tx: 'D:\\ClaudeHomes\\cwm4tx', gp: 'E:\\ClaudeGP' })
+    }, 'win32', exists, {
+      canonicalize: (path) => path,
+      isDirectory: () => true,
+      isLink: () => false,
+    })).toEqual({ cwm4tx: 'D:\\ClaudeHomes\\cwm4tx', gp: 'E:\\ClaudeGP' })
+  })
+
+  it('rejects linked and duplicate canonical account homes', () => {
+    const env = { CLAUDE_CWM4TX_HOME: 'D:\\ClaudeHomes\\cwm4tx', CLAUDE_GP_HOME: 'D:\\ClaudeHomes\\gp' }
+    const base = { isDirectory: () => true, isLink: () => false }
+    expect(() => resolveConfiguredAccountHomes(env, 'win32', () => true, {
+      ...base,
+      canonicalize: () => 'D:\\ClaudeHomes\\shared',
+    })).toThrow(/distinct canonical/)
+    expect(resolveConfiguredAccountHomes(env, 'win32', () => true, {
+      ...base,
+      canonicalize: (path) => path,
+      isLink: (path) => path.toLowerCase().endsWith('\\gp'),
+    })).toEqual({ cwm4tx: 'D:\\ClaudeHomes\\cwm4tx' })
   })
 })

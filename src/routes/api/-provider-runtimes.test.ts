@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(() => []),
   mutate: vi.fn(async () => ({ ok: true })),
   refresh: vi.fn(async () => []),
-  catalog: vi.fn(async () => ({ subscriptionOnly: true, models: [{ id: 'openai-codex/gpt-5.6-sol', account: 'openai-codex', billingClass: 'subscription_included', selectable: true }] })),
+  catalog: vi.fn(async () => ({ subscriptionOnly: true, models: [{ id: 'openai-codex/gpt-5.6-sol', model: 'gpt-5.6-sol', account: 'openai-codex', billingClass: 'subscription_included', selectable: true }] })),
 }))
 vi.mock('../../server/auth-middleware', () => ({ requireLocalOrAuth: mocks.auth, requireProviderRuntimeMutationAuth: mocks.auth }))
 vi.mock('../../server/provider-runtime-service', () => ({ getProviderRuntimeService: () => ({ list: mocks.list, refresh: mocks.refresh, mutate: mocks.mutate }) }))
@@ -33,6 +33,14 @@ describe('/api/provider-runtimes', () => {
     const response = await Route.server.handlers.POST({ request: new Request('http://localhost/api/provider-runtimes', { method: 'POST', body: JSON.stringify({ runtimeId: 'codex:t1', action: 'steer', routeRef: 'openai-api/paid', text: 'hello' }) }) })
     expect(response.status).toBe(400)
     expect(mocks.mutate).not.toHaveBeenCalled()
+  })
+
+  it('binds the catalog provider model into lifecycle execution', async () => {
+    const { Route } = await import('./provider-runtimes')
+    const requestBody = { runtimeId: 'codex:t1', action: 'archive', routeRef: 'openai-codex/gpt-5.6-sol' }
+    const response = await Route.server.handlers.POST({ request: new Request('http://localhost/api/provider-runtimes', { method: 'POST', body: JSON.stringify(requestBody) }) })
+    expect(response.status).toBe(200)
+    expect(mocks.mutate).toHaveBeenCalledWith({ ...requestBody, providerModel: 'gpt-5.6-sol' })
   })
 
   it('returns inventory with deferred messaging and runtime ownership choices', async () => {
