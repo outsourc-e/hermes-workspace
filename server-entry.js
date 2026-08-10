@@ -44,6 +44,10 @@ const port = parseInt(process.env.PORT || '3000', 10)
 // on a LAN / Tailscale / public surface must opt in explicitly with
 // HOST=0.0.0.0 *and* set CLAUDE_PASSWORD (enforced below). See #122.
 const host = process.env.HOST || '127.0.0.1'
+// Publish the effective bind for server-side request guards. The default was
+// previously implicit, so route code could not distinguish a loopback-only
+// deployment from an unknown/fail-open peer.
+process.env.HOST = host
 
 function isNonLoopbackHost(h) {
   if (!h) return false

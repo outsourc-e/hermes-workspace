@@ -75,6 +75,7 @@ import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-hist
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
+import { Route as ApiProviderRuntimesRouteImport } from './routes/api/provider-runtimes'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
 import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-npc'
@@ -501,6 +502,11 @@ const ApiSendRoute = ApiSendRouteImport.update({
 const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
   id: '/api/provider-usage',
   path: '/api/provider-usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProviderRuntimesRoute = ApiProviderRuntimesRouteImport.update({
+  id: '/api/provider-runtimes',
+  path: '/api/provider-runtimes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
@@ -1055,6 +1061,7 @@ export interface FileRoutesByFullPath {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/provider-runtimes': typeof ApiProviderRuntimesRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1218,6 +1225,7 @@ export interface FileRoutesByTo {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/provider-runtimes': typeof ApiProviderRuntimesRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1383,6 +1391,7 @@ export interface FileRoutesById {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/provider-runtimes': typeof ApiProviderRuntimesRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1549,6 +1558,7 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/provider-runtimes'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1712,6 +1722,7 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/provider-runtimes'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1876,6 +1887,7 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/provider-runtimes'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -2041,6 +2053,7 @@ export interface RootRouteChildren {
   ApiPlaygroundNpcRoute: typeof ApiPlaygroundNpcRoute
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
+  ApiProviderRuntimesRoute: typeof ApiProviderRuntimesRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
@@ -2573,6 +2586,13 @@ declare module '@tanstack/react-router' {
       path: '/api/provider-usage'
       fullPath: '/api/provider-usage'
       preLoaderRoute: typeof ApiProviderUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/provider-runtimes': {
+      id: '/api/provider-runtimes'
+      path: '/api/provider-runtimes'
+      fullPath: '/api/provider-runtimes'
+      preLoaderRoute: typeof ApiProviderRuntimesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/preview-file': {
@@ -3526,6 +3546,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPlaygroundNpcRoute: ApiPlaygroundNpcRoute,
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
+  ApiProviderRuntimesRoute: ApiProviderRuntimesRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,

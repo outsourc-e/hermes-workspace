@@ -19,7 +19,9 @@ describe('profile model settings readback', () => {
       provider: 'custom',
       routeRef: 'claude-cwm4tx/opus-5',
       reasoningEffort: 'max',
-      maxOutputTokens: 32768,
+      maxOutputTokens: 32_768,
+      codexRuntime: 'hermes_default',
+      codexRuntimeConfigured: 'hermes_default',
     })
   })
 
@@ -32,5 +34,11 @@ describe('profile model settings readback', () => {
     expect(
       extractProfileModelSettings({ model: 'legacy-model' }).routeRef,
     ).toBe('legacy-model')
+  })
+
+  it('reads Codex runtime ownership with a safe effective fallback', () => {
+    expect(extractProfileModelSettings({ workspace: { codex_runtime: 'codex_app_server' } })).toMatchObject({ codexRuntime: 'codex_app_server', codexRuntimeConfigured: 'codex_app_server' })
+    expect(extractProfileModelSettings({ workspace: { codex_runtime: 'future_runtime' } })).toMatchObject({ codexRuntime: 'hermes_default', codexRuntimeConfigured: 'future_runtime' })
+    expect(extractProfileModelSettings({})).toMatchObject({ codexRuntime: 'hermes_default', codexRuntimeConfigured: 'hermes_default' })
   })
 })

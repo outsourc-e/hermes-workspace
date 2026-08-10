@@ -276,6 +276,15 @@ export function requireLocalOrAuth(request: Request): boolean {
   return isAuthenticated(request)
 }
 
+/** Strong boundary for provider-native mutations that can spawn tools or consume quota. */
+export function requireProviderRuntimeMutationAuth(request: Request): boolean {
+  if (isPasswordProtectionEnabled()) return isAuthenticated(request)
+  const configuredBind = (process.env.HERMES_HOST || process.env.HOST || '').trim().toLowerCase()
+  const requestHost = new URL(request.url).hostname.toLowerCase()
+  const loopbackNames = new Set(['127.0.0.1', '::1', '[::1]', 'localhost'])
+  return loopbackNames.has(configuredBind) && loopbackNames.has(requestHost)
+}
+
 /**
  * Whether session cookies should set the `Secure` attribute.
  *

@@ -13,6 +13,8 @@ export type ProfileSummary = {
   routeRef?: string
   reasoningEffort?: string
   maxOutputTokens?: number
+  codexRuntime?: 'hermes_default' | 'codex_app_server'
+  codexRuntimeConfigured?: string
   description?: string
   systemPrompt?: string
   skillCount: number
@@ -57,6 +59,8 @@ export function extractProfileModelSettings(config: Record<string, unknown>): {
   routeRef?: string
   reasoningEffort?: string
   maxOutputTokens?: number
+  codexRuntime: 'hermes_default' | 'codex_app_server'
+  codexRuntimeConfigured: string
 } {
   let model: string | undefined
   let provider: string | undefined
@@ -107,7 +111,26 @@ export function extractProfileModelSettings(config: Record<string, unknown>): {
       ? agent.reasoning_effort.trim() || undefined
       : undefined
 
-  return { model, provider, routeRef, reasoningEffort, maxOutputTokens }
+  const configuredCodexRuntime =
+    typeof workspace.codex_runtime_configured === 'string'
+      ? workspace.codex_runtime_configured.trim()
+      : typeof workspace.codex_runtime === 'string'
+        ? workspace.codex_runtime.trim()
+        : 'hermes_default'
+  const codexRuntime =
+    configuredCodexRuntime === 'codex_app_server'
+      ? 'codex_app_server'
+      : 'hermes_default'
+
+  return {
+    model,
+    provider,
+    routeRef,
+    reasoningEffort,
+    maxOutputTokens,
+    codexRuntime,
+    codexRuntimeConfigured: configuredCodexRuntime || 'hermes_default',
+  }
 }
 
 function getHermesRoot(): string {

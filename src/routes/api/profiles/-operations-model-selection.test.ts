@@ -179,9 +179,9 @@ describe('Operations profile model mutations', () => {
     expect(response.status).toBe(200)
     expect(mocks.updateProfileConfig).toHaveBeenCalledWith('worker', {
       system_prompt: 'Safe prompt',
-      model: { provider: 'openai-codex', default: 'gpt-5.6-sol' },
+      model: { provider: 'openai-codex', default: 'gpt-5.6-sol', openai_runtime: 'hermes_default' },
       agent: { reasoning_effort: 'low' },
-      workspace: { route_ref: 'openai-codex/gpt-5.6-sol' },
+      workspace: { route_ref: 'openai-codex/gpt-5.6-sol', codex_runtime: 'hermes_default' },
     })
   })
 })

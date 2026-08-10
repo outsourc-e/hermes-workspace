@@ -68,10 +68,18 @@ describe('Operations agent model selection', () => {
       model: {
         provider: 'openai-codex',
         default: 'gpt-5.6-sol',
+        openai_runtime: 'hermes_default',
       },
       agent: { reasoning_effort: 'high' },
-      workspace: { route_ref: 'openai-codex/gpt-5.6-sol' },
+      workspace: { route_ref: 'openai-codex/gpt-5.6-sol', codex_runtime: 'hermes_default' },
     })
+  })
+
+  it('persists explicit Codex app-server ownership and preserves unknown legacy values safely', () => {
+    expect(operationsModelSelectionPatch({ routeRef: 'openai-codex/gpt-5.6-sol', codexRuntime: 'codex_app_server' }, {}, catalog).workspace)
+      .toEqual({ route_ref: 'openai-codex/gpt-5.6-sol', codex_runtime: 'codex_app_server' })
+    expect(operationsModelSelectionPatch({ routeRef: 'openai-codex/gpt-5.6-sol', codexRuntime: 'future_runtime' }, {}, catalog).workspace)
+      .toEqual({ route_ref: 'openai-codex/gpt-5.6-sol', codex_runtime: 'hermes_default', codex_runtime_configured: 'future_runtime' })
   })
 
   it('keeps Claude account identity and configured relay transport', () => {

@@ -8,6 +8,7 @@ export interface OperationsModelSelection {
   routeRef: string
   reasoningEffort?: string
   maxOutputTokens?: number
+  codexRuntime?: string
 }
 
 export function operationsModelSelectionPatch(
@@ -52,14 +53,27 @@ export function operationsModelSelectionPatch(
     }
   }
 
+  const configuredCodexRuntime = selection.codexRuntime?.trim() || 'hermes_default'
+  const knownCodexRuntime = configuredCodexRuntime === 'hermes_default' || configuredCodexRuntime === 'codex_app_server'
+  const workspace = {
+    route_ref: routeRef,
+    ...(routeRef.startsWith('openai-codex/')
+      ? {
+          codex_runtime: knownCodexRuntime ? configuredCodexRuntime : 'hermes_default',
+          ...(knownCodexRuntime ? {} : { codex_runtime_configured: configuredCodexRuntime }),
+        }
+      : {}),
+  }
+
   return {
     model: {
       ...topLevelModelForRef(routeRef, currentConfig),
+      ...(routeRef.startsWith('openai-codex/') ? { openai_runtime: knownCodexRuntime ? configuredCodexRuntime : 'hermes_default' } : {}),
       ...(maxOutputTokens === undefined ? {} : { max_tokens: maxOutputTokens }),
     },
     ...(effort === 'provider_default'
       ? {}
       : { agent: { reasoning_effort: effort } }),
-    workspace: { route_ref: routeRef },
+    workspace,
   }
 }
