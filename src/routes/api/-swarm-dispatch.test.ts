@@ -197,16 +197,14 @@ describe('buildHermesTmuxLaunchCommand', () => {
 })
 
 describe('buildHermesChatQueryArgs', () => {
-  it('passes the prompt immediately after -q so flags are not parsed as the query', () => {
+  it('keeps prompts out of process arguments', () => {
     const prompt = 'STATE: DONE\nRESULT: ok'
-    const args = buildHermesChatQueryArgs(prompt)
+    const args = buildHermesChatQueryArgs()
 
-    expect(args.slice(0, 3)).toEqual(['chat', '-q', prompt])
     expect(args).toContain('-Q')
     expect(args).toContain('--source')
-    expect(args[1]).toBe('-q')
-    expect(args[2]).toBe(prompt)
-    expect(args[3]).toBe('-Q')
+    expect(args).not.toContain('-q')
+    expect(args).not.toContain(prompt)
   })
 })
 

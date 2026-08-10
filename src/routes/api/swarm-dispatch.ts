@@ -32,6 +32,8 @@ import { rosterByWorkerId } from '../../server/swarm-roster'
 import type { SwarmRosterWorker } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
+import { sendToWorker, startWorkerProcess } from '../../server/swarm-lifecycle'
+import { buildSafeChildEnv } from '../../server/worker-process-host'
 import {
   ensureSwarmProfileConfig,
   syncSwarmProfileModel,
@@ -789,6 +791,19 @@ async function sendPromptToLiveSession(
   prompt: string,
 ): Promise<WorkerResult | null> {
   const startedAt = Date.now()
+  let sent = await sendToWorker(workerId, prompt)
+  if (!sent.ok) {
+    const started = await startWorkerProcess(workerId)
+    if (!started.ok) {
+      return { workerId, ok: false, output: '', error: started.error ?? sent.error ?? 'Owned worker host failed to start', durationMs: Date.now() - startedAt, exitCode: null, delivery: 'tmux' }
+    }
+    await sleep(1_500)
+    sent = await sendToWorker(workerId, prompt)
+  }
+  return { workerId, ok: sent.ok, output: sent.ok ? 'Delivered through the durable worker process host' : '', error: sent.error ?? null, durationMs: Date.now() - startedAt, exitCode: sent.ok ? 0 : null, delivery: 'tmux' }
+
+  /* Legacy tmux transport retained temporarily for fixture compatibility; it
+     is unreachable because the durable process host is the sole authority. */
   const ensured = await ensureLiveTmuxSession(workerId)
   if (!ensured.ok) return null
 
@@ -915,15 +930,11 @@ async function sendPromptToLiveSession(
   }
 }
 
-export function buildHermesChatQueryArgs(prompt: string): string[] {
-  // `hermes chat -q` requires the query as the *immediate* next argv item.
-  // Keeping the prompt adjacent to -q prevents argparse from interpreting
-  // following flags (for example -Q) as a missing query and failing with:
-  // "argument -q/--query: expected one argument".
+export function buildHermesChatQueryArgs(): string[] {
+  // Legacy one-shot construction intentionally contains no prompt. Active
+  // dispatch is stdin/tmux-buffer based through WorkerProcessHost.
   return [
     'chat',
-    '-q',
-    prompt,
     '-Q',
     '--yolo',
     '--ignore-rules',
@@ -1074,6 +1085,16 @@ function runWorker(
         return
       }
 
+      const unavailable: WorkerResult = {
+        workerId, ok: false, output: '',
+        error: 'Persistent worker host is unavailable; one-shot argv dispatch is disabled',
+        durationMs: Date.now() - startedAt, exitCode: null, delivery: 'oneshot',
+      }
+      markDispatchResult(workerId, unavailable)
+      recordDispatchBlock(workerId, assignment, unavailable, options)
+      resolve(unavailable)
+      return
+
       if (!existsSync(profilePath)) {
         const result: WorkerResult = {
           workerId,
@@ -1092,11 +1113,8 @@ function runWorker(
 
       const useWrapper = existsSync(wrapperPath)
       const cmd = useWrapper ? wrapperPath : resolveHermesBin()
-      const args = buildHermesChatQueryArgs(prompt)
-      const env: NodeJS.ProcessEnv = {
-        ...process.env,
-        HERMES_HOME: profilePath,
-      }
+      const args = buildHermesChatQueryArgs()
+      const env: NodeJS.ProcessEnv = buildSafeChildEnv(process.env, { HERMES_HOME: profilePath })
       const ghToken = resolveGithubToken()
       if (ghToken) {
         env.GH_TOKEN = ghToken

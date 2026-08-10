@@ -4,11 +4,16 @@ const authMocks = vi.hoisted(() => ({
   isAuthenticated: vi.fn(() => true),
   requireLocalOrAuth: vi.fn(() => false),
 }))
+const lifecycleMocks = vi.hoisted(() => ({
+  startWorkerProcess: vi.fn(),
+  sendToWorker: vi.fn(),
+}))
 
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: (_path: string) => (options: unknown) => options,
 }))
 vi.mock('../../server/auth-middleware', () => authMocks)
+vi.mock('../../server/swarm-lifecycle', () => lifecycleMocks)
 
 async function handlers() {
   const module = await import('./swarm-dispatch')
@@ -27,6 +32,8 @@ describe('/api/swarm-dispatch authorization', () => {
     })
 
     expect(authMocks.requireLocalOrAuth).toHaveBeenCalledOnce()
+    expect(lifecycleMocks.startWorkerProcess).not.toHaveBeenCalled()
+    expect(lifecycleMocks.sendToWorker).not.toHaveBeenCalled()
     expect(response.status).toBe(401)
   })
 })

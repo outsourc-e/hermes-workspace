@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { readWorkerMessages, type SwarmChatMessage } from '../../server/swarm-chat-reader'
 import { rosterByWorkerId } from '../../server/swarm-roster'
+import { getWorkerProcessHost } from '../../server/worker-process-host'
 
 type DirectChatRequest = {
   workerId?: unknown
@@ -158,25 +159,8 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
 }
 
 async function sendPromptToLiveSession(workerId: string, prompt: string): Promise<{ ok: true; delivery: 'tmux' } | { ok: false; error: string }> {
-  const ensured = await ensureLiveTmuxSession(workerId)
-  if (!ensured.ok) return { ok: false, error: ensured.error }
-  const { tmuxBin, sessionName } = ensured
-  const bufferName = `swarm-direct-chat-${workerId}`
-  const normalizedPrompt = prompt.replace(/\r\n/g, '\n')
-
-  const loaded = await execFileAsync(tmuxBin, ['load-buffer', '-b', bufferName, '-'], 8_000, normalizedPrompt)
-  if (!loaded.ok) return { ok: false, error: loaded.error }
-
-  const cleared = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-u'])
-  if (!cleared.ok) return { ok: false, error: cleared.error }
-
-  const pasted = await execFileAsync(tmuxBin, ['paste-buffer', '-d', '-b', bufferName, '-t', sessionName])
-  if (!pasted.ok) return { ok: false, error: pasted.error }
-
-  await sleep(120)
-  const entered = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'Enter'])
-  if (!entered.ok) return { ok: false, error: entered.error }
-
+  const sent = await getWorkerProcessHost().send(workerId, prompt)
+  if (!sent.ok) return { ok: false, error: sent.error ?? 'Worker host rejected the prompt' }
   return { ok: true, delivery: 'tmux' }
 }
 

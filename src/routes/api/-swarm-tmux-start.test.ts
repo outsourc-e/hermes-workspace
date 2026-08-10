@@ -12,8 +12,10 @@ describe('/api/swarm-tmux-start Windows compatibility', () => {
     expect(source).not.toContain('No wrapper for')
   })
 
-  it('starts an interactive pane and sends the Hermes launch command into it', () => {
-    expect(source).toContain('buildTmuxNewSessionArgs')
-    expect(source).toContain('buildTmuxSendKeysArgs')
+  it('delegates process ownership instead of constructing tmux sessions in the route', () => {
+    expect(source).toContain('startWorkerProcess(workerId)')
+    expect(source).toContain('getWorkerProcessHost().status(workerId)')
+    expect(source).not.toContain('buildTmuxNewSessionArgs')
+    expect(source).not.toContain('buildTmuxSendKeysArgs')
   })
 })

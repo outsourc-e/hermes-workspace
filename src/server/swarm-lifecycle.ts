@@ -1,12 +1,12 @@
-import {  execFile, execFileSync, spawn } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
 import { resolveManagedPythonBin } from './managed-python'
 import { SWARM_MEMORY_ROOT } from './swarm-environment'
 import { appendSwarmMemoryEvent } from './swarm-memory'
-import type {ChildProcess} from 'node:child_process';
+import { getWorkerProcessHost } from './worker-process-host'
+import { resolveSwarmHermesBin } from './swarm-tmux-launch'
 
 export type SwarmContextState = 'healthy' | 'watch' | 'handoff_required' | 'renew_required'
 
@@ -143,185 +143,29 @@ export function getSwarmLifecycleStatus(workerId: string, policy = DEFAULT_POLIC
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Cross-platform worker process management
-// Replaces tmux with native child_process.spawn so workers run on Windows.
-// On Linux/macOS with tmux available, falls back to the tmux path.
-// ═══════════════════════════════════════════════════════════════
-
-// Active worker processes keyed by workerId
-const workerProcesses = new Map<string, ChildProcess>()
-
-function isWindows(): boolean {
-  return process.platform === 'win32'
+/** Send a prompt through the durable process-host authority. */
+export async function sendToWorker(workerId: string, prompt: string): Promise<{ ok: boolean; error?: string }> {
+  const result = await getWorkerProcessHost().send(workerId, prompt)
+  return { ok: result.ok, error: result.error }
 }
 
-function workerLogPath(workerId: string): string {
-  const dir = join(getProfilesDir(), workerId, 'logs')
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  return join(dir, 'worker.log')
-}
-
-function appendWorkerLog(workerId: string, text: string): void {
-  try {
-    appendFileSync(workerLogPath(workerId), text + '\n', 'utf8')
-  } catch {
-    // best-effort logging
-  }
-}
-
-function tmuxBin(): string | null {
-  if (isWindows()) return null
-  const local = join(homedir(), '.local', 'bin', 'tmux')
-  return existsSync(local) ? local : 'tmux'
-}
-
-function hasTmux(): boolean {
-  if (isWindows()) return false
-  try {
-    execFileSync(tmuxBin()!, ['list-sessions'], { stdio: 'ignore' })
-    return true
-  } catch {
-    return false
-  }
-}
-
-// Use native process spawn on Windows, tmux on Linux/macOS when available
-function useNativeProcess(): boolean {
-  return isWindows() || !hasTmux()
-}
-
-/** Send a prompt to a worker's stdin (native) or tmux pane (Unix fallback) */
-export function sendToWorker(workerId: string, prompt: string): Promise<{ ok: boolean; error?: string }> {
-  if (useNativeProcess()) {
-    return sendToWorkerProcess(workerId, prompt)
-  }
-  return sendTmux(workerId, prompt)
-}
-
-function sendToWorkerProcess(workerId: string, prompt: string): Promise<{ ok: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const proc = workerProcesses.get(workerId)
-    if (!proc || !proc.stdin?.writable) {
-      resolve({ ok: false, error: `Worker ${workerId} process not running or stdin not writable` })
-      return
-    }
-    appendWorkerLog(workerId, `[dispatch] ${prompt}`)
-    proc.stdin.write(prompt + '\n', (err) => {
-      if (err) resolve({ ok: false, error: err.message })
-      else resolve({ ok: true })
-    })
-  })
-}
-
-function sendTmux(workerId: string, prompt: string): Promise<{ ok: boolean; error?: string }> {
-  const session = `swarm-${workerId}`
-  return new Promise((resolve) => {
-    const tmux = tmuxBin()
-    if (!tmux) return resolve({ ok: false, error: 'tmux not available on this platform' })
-    const child = execFile(tmux, ['load-buffer', '-b', `swarm-lifecycle-${workerId}`, '-'], (loadErr, _stdout, stderr) => {
-      if (loadErr) return resolve({ ok: false, error: stderr?.toString() || loadErr.message })
-      execFile(tmux, ['send-keys', '-t', session, 'C-u'], () => {
-        execFile(tmux, ['paste-buffer', '-d', '-b', `swarm-lifecycle-${workerId}`, '-t', session], (pasteErr, _out2, err2) => {
-          if (pasteErr) return resolve({ ok: false, error: err2?.toString() || pasteErr.message })
-          setTimeout(() => execFile(tmux, ['send-keys', '-t', session, 'Enter'], (enterErr, _out3, err3) => {
-            if (enterErr) return resolve({ ok: false, error: err3?.toString() || enterErr.message })
-            resolve({ ok: true })
-          }), 150)
-        })
-      })
-    })
-    child.stdin?.end(prompt)
-  })
-}
-
-async function killWorkerProcess(workerId: string): Promise<{ ok: boolean; error?: string }> {
-  const proc = workerProcesses.get(workerId)
-  if (!proc) return { ok: false, error: 'No active process' }
-  return new Promise((resolve) => {
-    proc.kill('SIGTERM')
-    const timeout = setTimeout(() => {
-      try { proc.kill('SIGKILL') } catch { /* */ }
-      workerProcesses.delete(workerId)
-      resolve({ ok: true })
-    }, 2000)
-    proc.on('exit', () => {
-      clearTimeout(timeout)
-      workerProcesses.delete(workerId)
-      resolve({ ok: true })
-    })
-  })
-}
-
-async function startWorkerProcess(workerId: string): Promise<{ ok: boolean; error?: string }> {
-  if (useNativeProcess()) {
-    return startWorkerProcessNative(workerId)
-  }
-  return tmuxStart(workerId)
-}
-
-async function stopWorkerProcess(workerId: string): Promise<{ ok: boolean; error?: string }> {
-  if (useNativeProcess()) {
-    return killWorkerProcess(workerId)
-  }
-  return tmuxKill(workerId)
-}
-
-function startWorkerProcessNative(workerId: string): { ok: boolean; error?: string } {
-  if (workerProcesses.has(workerId)) {
-    return { ok: false, error: `Worker ${workerId} already has an active process` }
-  }
-  
-  const profilesDir = getProfilesDir()
-  const profilePath = join(profilesDir, workerId)
-  if (!existsSync(profilePath)) {
-    return { ok: false, error: `Profile not found: ${profilePath}` }
-  }
-
-  // Build wrapper command: use hermes-agent CLI with the worker profile
-  const hermesCmd = process.env.HERMES_CLI_PATH || 'hermes'
-  const args = ['--tui', '--profile', workerId]
-  
-  const logPath = workerLogPath(workerId)
-  const logDir = join(profilePath, 'logs')
-  if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true })
-
-  const proc = spawn(hermesCmd, args, {
+export async function startWorkerProcess(workerId: string): Promise<{ ok: boolean; error?: string }> {
+  const profilePath = join(getProfilesDir(), workerId)
+  if (!existsSync(profilePath)) return { ok: false, error: `Profile not found: ${profilePath}` }
+  const hermesBin = process.env.HERMES_CLI_PATH || resolveSwarmHermesBin()
+  const result = await getWorkerProcessHost().start({
+    workerId,
+    command: hermesBin,
+    args: ['chat', '--tui'],
     cwd: profilePath,
-    env: {
-      ...process.env,
-      HERMES_PROFILE: workerId,
-    },
-    detached: isWindows(), // Windows needs detached for independent process tree
-    stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: isWindows(), // Don't show terminal window on Windows
+    env: { HERMES_HOME: profilePath, HERMES_CLI_BIN: hermesBin, HERMES_PROFILE: workerId },
   })
+  return { ok: result.ok, error: result.error }
+}
 
-  if (!proc.pid) {
-    return { ok: false, error: 'Failed to spawn worker process' }
-  }
-
-  workerProcesses.set(workerId, proc)
-
-  // Log stdout/stderr
-  proc.stdout?.on('data', (data: Buffer) => {
-    appendWorkerLog(workerId, `[stdout] ${data.toString().trimEnd()}`)
-  })
-  proc.stderr?.on('data', (data: Buffer) => {
-    appendWorkerLog(workerId, `[stderr] ${data.toString().trimEnd()}`)
-  })
-
-  proc.on('exit', (code, signal) => {
-    appendWorkerLog(workerId, `[exit] code=${code} signal=${signal}`)
-    workerProcesses.delete(workerId)
-  })
-
-  proc.on('error', (err) => {
-    appendWorkerLog(workerId, `[error] ${err.message}`)
-    workerProcesses.delete(workerId)
-  })
-
-  return { ok: true }
+export async function stopWorkerProcess(workerId: string): Promise<{ ok: boolean; error?: string }> {
+  const result = await getWorkerProcessHost().stop(workerId)
+  return { ok: result.ok, error: result.error }
 }
 
 function readRuntimeMissionContext(workerId: string): { missionId: string | null; assignmentId: string | null } {
@@ -376,28 +220,6 @@ export function lifecycleHandoffPath(workerId: string): string {
   return handoffPath(workerId)
 }
 
-function tmuxKill(workerId: string): Promise<{ ok: boolean; error?: string }> {
-  const session = `swarm-${workerId}`
-  return new Promise((resolve) => {
-    execFile(tmuxBin(), ['kill-session', '-t', session], (err, _out, stderr) => {
-      if (err) return resolve({ ok: false, error: stderr?.toString() || err.message })
-      resolve({ ok: true })
-    })
-  })
-}
-
-function tmuxStart(workerId: string): Promise<{ ok: boolean; error?: string }> {
-  const session = `swarm-${workerId}`
-  const wrapper = join(homedir(), '.local', 'bin', workerId)
-  if (!existsSync(wrapper)) return Promise.resolve({ ok: false, error: `Wrapper not found: ${wrapper}` })
-  return new Promise((resolve) => {
-    execFile(tmuxBin(), ['new-session', '-d', '-s', session, wrapper], (err, _out, stderr) => {
-      if (err) return resolve({ ok: false, error: stderr?.toString() || err.message })
-      resolve({ ok: true })
-    })
-  })
-}
-
 export async function renewWorker(workerId: string): Promise<{ ok: boolean; restarted: boolean; resumeSent: boolean; error?: string; handoffPath: string }> {
   const hp = handoffPath(workerId)
   if (!existsSync(hp)) {
@@ -405,7 +227,7 @@ export async function renewWorker(workerId: string): Promise<{ ok: boolean; rest
   }
   const killed = await stopWorkerProcess(workerId)
   if (!killed.ok) {
-    // Process may already be gone; continue.
+    return { ok: false, restarted: false, resumeSent: false, error: killed.error ?? 'Worker stop could not be verified', handoffPath: hp }
   }
   await new Promise((resolve) => setTimeout(resolve, 600))
   const started = await startWorkerProcess(workerId)
