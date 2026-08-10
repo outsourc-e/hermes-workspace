@@ -37,6 +37,7 @@ import {
   getDiscoveredModels,
   getLocalProviderDef,
 } from '../../server/local-provider-discovery'
+import { resolveCurrentGatewayModel } from '../../server/configured-primary-model'
 import { openaiChat } from '../../server/openai-compat-api'
 import { streamResponses } from '../../server/responses-api'
 import { selectPortableConversationHistory } from '../../server/portable-history'
@@ -840,7 +841,12 @@ export const Route = createFileRoute('/api/send-stream')({
             : 'enhanced'
           : getChatMode()
         let localBaseUrl: string | undefined
-        const requestModel = typeof body.model === 'string' ? body.model : ''
+        // Gateway advertises `hermes-agent` as a compatibility alias, but Codex
+        // cannot accept that alias as a provider model. Resolve omitted/default/
+        // virtual values from this server's active Hermes configuration before
+        // either transport forwards the request. Explicit picker values stay exact.
+        const requestedModel = resolveCurrentGatewayModel(body.model)
+        const requestModel = requestedModel ?? ''
         const bareModel = requestModel.includes('/')
           ? requestModel.split('/').slice(1).join('/')
           : requestModel
@@ -1655,10 +1661,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 // authority check. Bootstrap sends have no binding yet and keep
                 // their local-session creation path until projection succeeds.
                 await revalidateCardMutationAuthority()
-                ensureLocalSession(
-                  portableSessionKey,
-                  typeof body.model === 'string' ? body.model : undefined,
-                )
+                ensureLocalSession(portableSessionKey, requestedModel)
 
                 if (
                   portableBootstrapSessionKey &&
@@ -1835,10 +1838,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       const responsesStream = streamResponses({
                         input: scopedMessage,
                         conversationHistory: effectiveHistory,
-                        model:
-                          typeof body.model === 'string'
-                            ? body.model
-                            : undefined,
+                        model: requestedModel,
                         sessionId: portableSessionKey,
                         signal: abortController.signal,
                       })
@@ -1976,11 +1976,7 @@ export const Route = createFileRoute('/api/send-stream')({
 
                   await revalidateCardMutationAuthority()
                   const streamPending = openaiChat(portableMessages, {
-                    model: localBaseUrl
-                      ? bareModel
-                      : typeof body.model === 'string'
-                        ? body.model
-                        : undefined,
+                    model: localBaseUrl ? bareModel : requestedModel,
                     temperature:
                       typeof body.temperature === 'number'
                         ? body.temperature
@@ -2432,8 +2428,7 @@ export const Route = createFileRoute('/api/send-stream')({
                   sessionKey,
                   {
                     message: scopedMessage,
-                    model:
-                      typeof body.model === 'string' ? body.model : undefined,
+                    model: requestedModel,
                     system_message: thinking,
                     attachments: attachments || undefined,
                   },

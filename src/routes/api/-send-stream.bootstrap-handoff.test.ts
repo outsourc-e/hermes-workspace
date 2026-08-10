@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   buildResolvedSessionHeaders: vi.fn(() => ({})),
   openaiChat: vi.fn(),
   streamResponses: vi.fn(),
+  resolveCurrentGatewayModel: vi.fn(),
   getDiscoveredModels: vi.fn(),
   getLocalProviderDef: vi.fn(),
   getChatMode: vi.fn(),
@@ -129,6 +130,10 @@ vi.mock('../../server/local-session-store', () => ({
 vi.mock('../../server/local-provider-discovery', () => ({
   getDiscoveredModels: mocks.getDiscoveredModels,
   getLocalProviderDef: mocks.getLocalProviderDef,
+}))
+
+vi.mock('../../server/configured-primary-model', () => ({
+  resolveCurrentGatewayModel: mocks.resolveCurrentGatewayModel,
 }))
 
 vi.mock('../../server/openai-compat-api', () => ({
@@ -276,6 +281,14 @@ describe('send-stream bootstrap session handoff', () => {
     mocks.observeChildLifecycle.mockResolvedValue(null)
     mocks.getMessages.mockResolvedValue([])
     mocks.getChatMode.mockReturnValue('enhanced')
+    mocks.resolveCurrentGatewayModel.mockImplementation(
+      (requestedModel: unknown) =>
+        typeof requestedModel === 'string' &&
+        requestedModel !== 'hermes-agent' &&
+        requestedModel !== 'default'
+          ? requestedModel
+          : 'configured-primary-model',
+    )
     mocks.getDiscoveredModels.mockReturnValue([])
     mocks.getLocalProviderDef.mockReturnValue(undefined)
     mocks.appendRunText.mockResolvedValue(null)
@@ -311,6 +324,30 @@ describe('send-stream bootstrap session handoff', () => {
           data: { run_id: 'run-1', session_id: 'created-session' },
         })
       },
+    )
+  })
+
+  it('resolves the virtual hermes-agent model to the configured primary model before gateway send', async () => {
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: 'new',
+          message: 'use the configured model',
+          model: 'hermes-agent',
+        }),
+      }),
+    })
+    await response.text()
+
+    expect(mocks.resolveCurrentGatewayModel).toHaveBeenCalledWith(
+      'hermes-agent',
+    )
+    expect(mocks.streamChat).toHaveBeenCalledWith(
+      'created-session',
+      expect.objectContaining({ model: 'configured-primary-model' }),
+      expect.any(Object),
     )
   })
 
