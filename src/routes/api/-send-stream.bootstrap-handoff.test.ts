@@ -37,7 +37,10 @@ const mocks = vi.hoisted(() => ({
   buildResolvedSessionHeaders: vi.fn(() => ({})),
   openaiChat: vi.fn(),
   streamResponses: vi.fn(),
+  isConfiguredDefaultModelRequest: vi.fn(),
+  rememberConfiguredSessionModel: vi.fn(),
   resolveCurrentGatewayModel: vi.fn(),
+  resolveSessionGatewayModel: vi.fn(),
   getDiscoveredModels: vi.fn(),
   getLocalProviderDef: vi.fn(),
   getChatMode: vi.fn(),
@@ -133,7 +136,10 @@ vi.mock('../../server/local-provider-discovery', () => ({
 }))
 
 vi.mock('../../server/configured-primary-model', () => ({
+  isConfiguredDefaultModelRequest: mocks.isConfiguredDefaultModelRequest,
+  rememberConfiguredSessionModel: mocks.rememberConfiguredSessionModel,
   resolveCurrentGatewayModel: mocks.resolveCurrentGatewayModel,
+  resolveSessionGatewayModel: mocks.resolveSessionGatewayModel,
 }))
 
 vi.mock('../../server/openai-compat-api', () => ({
@@ -281,11 +287,23 @@ describe('send-stream bootstrap session handoff', () => {
     mocks.observeChildLifecycle.mockResolvedValue(null)
     mocks.getMessages.mockResolvedValue([])
     mocks.getChatMode.mockReturnValue('enhanced')
+    mocks.isConfiguredDefaultModelRequest.mockImplementation(
+      (requestedModel: unknown) =>
+        typeof requestedModel !== 'string' ||
+        ['hermes-agent', 'default', ''].includes(requestedModel.trim()),
+    )
     mocks.resolveCurrentGatewayModel.mockImplementation(
       (requestedModel: unknown) =>
         typeof requestedModel === 'string' &&
         requestedModel !== 'hermes-agent' &&
         requestedModel !== 'default'
+          ? requestedModel
+          : 'configured-primary-model',
+    )
+    mocks.resolveSessionGatewayModel.mockImplementation(
+      (_sessionKey: string, requestedModel: unknown) =>
+        typeof requestedModel === 'string' &&
+        !['hermes-agent', 'default', ''].includes(requestedModel.trim())
           ? requestedModel
           : 'configured-primary-model',
     )
@@ -327,24 +345,64 @@ describe('send-stream bootstrap session handoff', () => {
     )
   })
 
-  it('resolves the virtual hermes-agent model to the configured primary model before gateway send', async () => {
-    const response = await handler({
-      request: new Request('http://workspace.test/api/send-stream', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          sessionKey: 'new',
-          message: 'use the configured model',
-          model: 'hermes-agent',
+  it('loads the configured model once for a New Session and reuses it for follow-up messages', async () => {
+    const send = async (body: Record<string, unknown>) => {
+      const response = await handler({
+        request: new Request('http://workspace.test/api/send-stream', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
         }),
-      }),
-    })
-    await response.text()
+      })
+      await response.text()
+    }
 
-    expect(mocks.resolveCurrentGatewayModel).toHaveBeenCalledWith(
+    await send({
+      sessionKey: 'new',
+      message: 'use the configured model',
+      model: 'hermes-agent',
+    })
+
+    expect(mocks.resolveCurrentGatewayModel).toHaveBeenCalledTimes(1)
+    expect(mocks.createSession).toHaveBeenCalledWith({
+      model: 'configured-primary-model',
+    })
+    expect(mocks.rememberConfiguredSessionModel).toHaveBeenCalledWith(
+      'created-session',
+      'configured-primary-model',
+    )
+
+    const cardId = 'remote:created-card'
+    const segmentKey = 'remote:created-segment'
+    mocks.resolveSessionCard.mockResolvedValueOnce({
+      card: {
+        cardId,
+        canonicalSegmentKey: segmentKey,
+        canonicalSource: 'remote',
+        canonicalTransport: 'gateway',
+        continuationSegmentKeys: [cardId, segmentKey],
+        continuationCount: 2,
+        relationshipKind: 'root',
+      },
+      sourceBySegmentKey: new Map([[segmentKey, 'remote']]),
+      upstreamKeyBySegmentKey: new Map([[segmentKey, 'created-session']]),
+      collection: { completeness: 'complete', retryable: false },
+    })
+
+    await send({
+      cardId,
+      sessionKey: segmentKey,
+      friendlyId: cardId,
+      message: 'reuse the session model',
+      model: 'hermes-agent',
+    })
+
+    expect(mocks.resolveCurrentGatewayModel).toHaveBeenCalledTimes(1)
+    expect(mocks.resolveSessionGatewayModel).toHaveBeenLastCalledWith(
+      'created-session',
       'hermes-agent',
     )
-    expect(mocks.streamChat).toHaveBeenCalledWith(
+    expect(mocks.streamChat).toHaveBeenLastCalledWith(
       'created-session',
       expect.objectContaining({ model: 'configured-primary-model' }),
       expect.any(Object),

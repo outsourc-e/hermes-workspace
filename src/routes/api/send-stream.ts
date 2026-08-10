@@ -37,7 +37,12 @@ import {
   getDiscoveredModels,
   getLocalProviderDef,
 } from '../../server/local-provider-discovery'
-import { resolveCurrentGatewayModel } from '../../server/configured-primary-model'
+import {
+  isConfiguredDefaultModelRequest,
+  rememberConfiguredSessionModel,
+  resolveCurrentGatewayModel,
+  resolveSessionGatewayModel,
+} from '../../server/configured-primary-model'
 import { openaiChat } from '../../server/openai-compat-api'
 import { streamResponses } from '../../server/responses-api'
 import { selectPortableConversationHistory } from '../../server/portable-history'
@@ -842,10 +847,14 @@ export const Route = createFileRoute('/api/send-stream')({
           : getChatMode()
         let localBaseUrl: string | undefined
         // Gateway advertises `hermes-agent` as a compatibility alias, but Codex
-        // cannot accept that alias as a provider model. Resolve omitted/default/
-        // virtual values from this server's active Hermes configuration before
-        // either transport forwards the request. Explicit picker values stay exact.
-        const requestedModel = resolveCurrentGatewayModel(body.model)
+        // cannot accept that alias as a provider model. New conversations resolve
+        // the active Hermes default once; later messages reuse the concrete model
+        // remembered for their session. Explicit picker values always stay exact.
+        const requestedModel =
+          rawSessionKey === 'new' ||
+          (!rawSessionKey && isConfiguredDefaultModelRequest(body.model))
+            ? resolveCurrentGatewayModel(body.model)
+            : resolveSessionGatewayModel(sessionKey, body.model)
         const requestModel = requestedModel ?? ''
         const bareModel = requestModel.includes('/')
           ? requestModel.split('/').slice(1).join('/')
@@ -878,6 +887,7 @@ export const Route = createFileRoute('/api/send-stream')({
           // escape through routing, SSE, headers, or run persistence until a
           // fresh complete local Card projection maps it authoritatively.
           sessionKey = crypto.randomUUID()
+          rememberConfiguredSessionModel(sessionKey, requestedModel)
         }
         const resolvePortableBootstrapCard = async (
           upstreamSessionKey: string,
@@ -1128,12 +1138,17 @@ export const Route = createFileRoute('/api/send-stream')({
             }
           } else {
             try {
-              const created = await waitWithinStreamLifetime(createSession())
+              const created = await waitWithinStreamLifetime(
+                createSession(
+                  requestedModel ? { model: requestedModel } : undefined,
+                ),
+              )
               ensureStreamTransportAvailable()
               if (!created.id) {
                 throw new Error('Gateway did not create a main session')
               }
               sessionKey = created.id
+              rememberConfiguredSessionModel(sessionKey, requestedModel)
             } catch (error) {
               if (error === streamTimeoutError) {
                 return finishPreStreamResponse(streamTimeoutResponse())
@@ -2175,11 +2190,15 @@ export const Route = createFileRoute('/api/send-stream')({
                   sessionKey = reused
                   resolvedFriendlyId = reused
                 } else {
-                  const session =
-                    await waitWithinStreamLifetime(createSession())
+                  const session = await waitWithinStreamLifetime(
+                    createSession(
+                      requestedModel ? { model: requestedModel } : undefined,
+                    ),
+                  )
                   ensureStreamTransportAvailable()
                   sessionKey = session.id
                   resolvedFriendlyId = session.id
+                  rememberConfiguredSessionModel(sessionKey, requestedModel)
                 }
               }
 

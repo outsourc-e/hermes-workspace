@@ -27,6 +27,44 @@ function isVirtualOrGenericModel(model: string): boolean {
   )
 }
 
+/** Whether this request needs a configured default instead of a real selection. */
+export function isConfiguredDefaultModelRequest(
+  requestedModel: unknown,
+): boolean {
+  return isVirtualOrGenericModel(readString(requestedModel))
+}
+
+/**
+ * The configured default is chosen only while a new conversation is created.
+ * Retaining that concrete model per session prevents follow-up messages that
+ * carry an omitted/default/virtual value from rereading Hermes config.
+ */
+const configuredModelBySession = new Map<string, string>()
+
+export function rememberConfiguredSessionModel(
+  sessionKey: string,
+  model: string | undefined,
+): void {
+  const key = sessionKey.trim()
+  const resolved = readString(model)
+  if (!key || isVirtualOrGenericModel(resolved)) return
+  configuredModelBySession.set(key, resolved)
+}
+
+export function resolveSessionGatewayModel(
+  sessionKey: string,
+  requestedModel: unknown,
+): string | undefined {
+  const requested = readString(requestedModel)
+  if (!isVirtualOrGenericModel(requested)) return requested
+  return configuredModelBySession.get(sessionKey.trim())
+}
+
+/** Test-only cache reset; production cache lasts for the Workspace process. */
+export function clearConfiguredSessionModelsForTest(): void {
+  configuredModelBySession.clear()
+}
+
 /**
  * Resolve the configured primary provider/model from Hermes' active config.
  * The Gateway's OpenAI-compatible `hermes-agent` value is a compatibility
@@ -57,10 +95,15 @@ export function resolveConfiguredGatewayModel(
   return resolveConfiguredPrimaryModel(config)?.model
 }
 
-/** Read the current server's Hermes config once for a request boundary. */
+/**
+ * Read the current server's Hermes config only when creating a new
+ * conversation. Explicit selections return without a config-file read.
+ */
 export function resolveCurrentGatewayModel(
   requestedModel: unknown,
 ): string | undefined {
+  const requested = readString(requestedModel)
+  if (!isVirtualOrGenericModel(requested)) return requested
   const { config } = readHermesConfigFiles(resolveHermesConfigPaths())
-  return resolveConfiguredGatewayModel(requestedModel, config)
+  return resolveConfiguredGatewayModel(requested, config)
 }

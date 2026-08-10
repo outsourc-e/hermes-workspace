@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  clearConfiguredSessionModelsForTest,
+  rememberConfiguredSessionModel,
   resolveConfiguredGatewayModel,
   resolveConfiguredPrimaryModel,
+  resolveSessionGatewayModel,
 } from './configured-primary-model'
 
 describe('configured primary model resolution', () => {
@@ -33,6 +36,23 @@ describe('configured primary model resolution', () => {
     expect(resolveConfiguredGatewayModel(' default ', config)).toBe(
       'gpt-5.6-terra',
     )
+  })
+
+  it('uses a New Session concrete model for later virtual requests without config resolution', () => {
+    clearConfiguredSessionModelsForTest()
+    rememberConfiguredSessionModel('session-1', 'gpt-5.6-terra')
+
+    expect(resolveSessionGatewayModel('session-1', 'hermes-agent')).toBe(
+      'gpt-5.6-terra',
+    )
+    expect(resolveSessionGatewayModel('session-1', undefined)).toBe(
+      'gpt-5.6-terra',
+    )
+    expect(resolveSessionGatewayModel('session-1', 'gpt-5.4-mini')).toBe(
+      'gpt-5.4-mini',
+    )
+
+    clearConfiguredSessionModelsForTest()
   })
 
   it('preserves an explicit real model selection', () => {
