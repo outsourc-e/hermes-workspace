@@ -508,8 +508,10 @@ export function useRealtimeChatHistory({
   const mergeCardHistoryMessages = useChatStore(
     (s) => s.mergeCardHistoryMessages,
   )
-  const clearSession = useChatStore((s) => s.clearSession)
-  const clearCard = useChatStore((s) => s.clearCard)
+  const clearRealtimeBuffer = useChatStore((s) => s.clearRealtimeBuffer)
+  const clearCardRealtimeBuffer = useChatStore(
+    (s) => s.clearCardRealtimeBuffer,
+  )
   const lastEventAt = useChatStore((s) => s.lastEventAt)
   const realtimeMessages = useChatStore(
     (s) =>
@@ -651,7 +653,10 @@ export function useRealtimeChatHistory({
     }
   }, [effectiveSessionKey, enabled, getHistoryQueryKey, queryClient])
 
-  // Clear realtime buffer when session changes
+  // Release only messages that history can backfill after navigating between
+  // sessions. A full clear also drops Card-owned streaming runs and persisted
+  // waiting state, so it makes a still-running agent look idle when the user
+  // returns to the Card.
   useEffect(() => {
     if (!browserOwnerKey || browserOwnerKey === 'new') return undefined
     if (delayedClearSessionTimeoutRef.current) {
@@ -659,8 +664,6 @@ export function useRealtimeChatHistory({
       delayedClearSessionTimeoutRef.current = null
     }
 
-    // Clear on unmount/session change after a delay
-    // to allow history to catch up
     return () => {
       if (isUnmountingRef.current) return
       if (delayedClearSessionTimeoutRef.current) {
@@ -669,14 +672,14 @@ export function useRealtimeChatHistory({
       delayedClearSessionTimeoutRef.current = setTimeout(() => {
         delayedClearSessionTimeoutRef.current = null
         if (activeBrowserOwnerRef.current === browserOwnerKey) return
-        if (effectiveCardId) clearCard(effectiveCardId)
-        else clearSession(effectiveSessionKey)
+        if (effectiveCardId) clearCardRealtimeBuffer(effectiveCardId)
+        else clearRealtimeBuffer(effectiveSessionKey)
       }, 5000)
     }
   }, [
     browserOwnerKey,
-    clearCard,
-    clearSession,
+    clearCardRealtimeBuffer,
+    clearRealtimeBuffer,
     effectiveCardId,
     effectiveSessionKey,
   ])

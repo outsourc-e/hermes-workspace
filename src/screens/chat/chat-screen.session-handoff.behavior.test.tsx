@@ -3879,7 +3879,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
-  it('still cancels a stream on unrelated route navigation and leaves state on the origin', async () => {
+  it('keeps an active stream alive on unrelated route navigation and isolates its state on the origin', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -3920,36 +3920,17 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       sessionKey: 'backend-parent',
       transport: 'send-stream',
     })
-    // A destination wait restored from storage must remain unverified while
-    // this unrelated local stream is still being cancelled.
-    useChatStore.getState().setSessionWaiting('other-session', 'stale-run')
-    queryContext.activeRunAutoComplete = false
     React.act(() => {
       container
         .querySelector<HTMLElement>('[data-testid="navigate-away"]')!
         .click()
     })
 
-    expect(
-      queryContext.messageListSnapshots.some(
-        (snapshot: { sessionKey?: string; waitingForResponse?: boolean }) =>
-          snapshot.sessionKey === 'other-session' &&
-          snapshot.waitingForResponse === true,
-      ),
-    ).toBe(false)
-
-    await waitForAssertion(() =>
-      expect(stream.getRequestSignal()?.aborted).toBe(true),
+    expect(stream.getRequestSignal()?.aborted).toBe(false)
+    expect(hasPendingGeneration()).toBe(true)
+    expect(useChatStore.getState().isSessionWaiting('backend-parent')).toBe(
+      true,
     )
-    await waitForAssertion(() => {
-      expect(hasPendingGeneration()).toBe(false)
-      expect(useChatStore.getState().isSessionWaiting('backend-parent')).toBe(
-        false,
-      )
-      expect(useChatStore.getState().isSessionWaiting('other-session')).toBe(
-        true,
-      )
-    })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeDefined()
     expect(
       useChatStore.getState().getRealtimeMessages('backend-parent'),

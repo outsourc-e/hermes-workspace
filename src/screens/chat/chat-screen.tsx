@@ -2044,37 +2044,10 @@ export function ChatScreen({
     handoffTimeoutMs: modelsQuery.data?.streamHandoffTimeoutMs,
   })
 
-  // Cancel any in-flight stream when the user navigates between sessions or
-  // starts a new chat. Without this, an SSE stream from session A keeps
-  // running after the user navigates away — and any chunks it had already
-  // buffered before our abort takes effect could land in session B (the
-  // newly active session). See #297 (cross-session response contamination).
-  // Note: useStreamingMessage also has its own generation-token guard for
-  // the buffered-chunk race, but cancelling here is the cleaner contract
-  // (an in-flight response that the user navigated away from is no longer
-  // wanted in either session).
-  const navCancelKeyRef = useRef<string | null>(null)
-  useEffect(() => {
-    const navKey = `${activeCanonicalKey}::${isNewChat ? 'new' : activeFriendlyId}`
-    if (navCancelKeyRef.current === null) {
-      navCancelKeyRef.current = navKey
-      return
-    }
-    if (navCancelKeyRef.current !== navKey) {
-      navCancelKeyRef.current = navKey
-      const expectedHandoff = streamHandoffRouteRef.current
-      if (
-        expectedHandoff &&
-        activeFriendlyId === expectedHandoff.friendlyId &&
-        (activeCanonicalKey === expectedHandoff.sessionKey ||
-          activeCanonicalKey === expectedHandoff.friendlyId)
-      ) {
-        streamHandoffRouteRef.current = null
-        return
-      }
-      cancelStreaming()
-    }
-  }, [activeCanonicalKey, activeFriendlyId, isNewChat, cancelStreaming])
+  // A stream is owned by the Card/session that started it, not by the currently
+  // selected route. `useStreamingMessage` records that owner and dispatches each
+  // event back to it, so changing Chats must not abort an accepted agent run.
+  // Explicit Stop and starting a replacement send still call cancelStreaming().
 
   const activeIsRealtimeStreaming = isPortableMode
     ? localIsStreaming

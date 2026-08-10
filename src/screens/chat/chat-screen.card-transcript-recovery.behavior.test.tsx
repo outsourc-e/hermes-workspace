@@ -568,12 +568,60 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
   })
 
   afterEach(async () => {
+    vi.useRealTimers()
     while (mounted.length > 0) mounted.pop()?.()
     // ChatContainer schedules ResizeObserver setup in requestAnimationFrame.
     // Flush that queued callback before removing the test polyfills.
     await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  it('keeps active Card tool and waiting state when switching to another Card', async () => {
+    mockHttp()
+    const activeRunId = 'run-background-card'
+    const activeToolId = 'tool-background-card'
+    const mountedScreen = await mountChatScreen(defaultInput())
+    React.act(() => {
+      useChatStore.getState().setCardWaiting(parentCard.cardId, activeRunId)
+      useChatStore.getState().processCardEvent(parentCard.cardId, {
+        type: 'tool',
+        phase: 'calling',
+        name: 'terminal',
+        toolCallId: activeToolId,
+        args: { command: 'sleep 30' },
+        sessionKey: parentCard.canonicalSegmentKey,
+        runId: activeRunId,
+      })
+    })
+    vi.useFakeTimers()
+    mountedScreen.update({
+      activeFriendlyId: siblingCard.cardId,
+      activeCard: siblingCard,
+      sessionCardList: cardList([parentCard, siblingCard]),
+      forcedSessionKey: siblingCard.canonicalSegmentKey,
+    })
+
+    React.act(() => {
+      vi.advanceTimersByTime(5_000)
+    })
+
+    expect(useChatStore.getState().isCardWaiting(parentCard.cardId)).toBe(true)
+    expect(
+      useChatStore.getState().getCardStreamingStates(parentCard.cardId),
+    ).toEqual([
+      expect.objectContaining({
+        runId: activeRunId,
+        toolCalls: [
+          expect.objectContaining({
+            id: activeToolId,
+            name: 'terminal',
+            phase: 'calling',
+          }),
+        ],
+      }),
+    ])
+    vi.useRealTimers()
   })
 
   it.each([
