@@ -2113,28 +2113,18 @@ type ReconcileSessionCardHistoryOptions = {
 }
 
 /**
- * Reconcile one Card-history response without crossing an asynchronous durable
- * snapshot boundary. Partial/retryable readers use this path for cold v3
- * hydration; complete production writers must use the durable variant below.
+ * Reconcile one Card-history response synchronously from server and query-cache
+ * state only. Durable snapshot hydration belongs to the async boundary below.
  */
 export function reconcileSessionCardHistoryResponse(
   server: SessionCardHistoryResponse,
   options: ReconcileSessionCardHistoryOptions = {},
 ): SessionCardHistoryResponse {
-  const isComplete = isAuthoritativeCompleteSessionCardHistory(server)
-  const isIntentionalRecentWindow =
-    isDisplayableRecentSessionCardHistory(server)
-  let persistedMessages = mergePartialPersistedCardHistory(
+  const persistedMessages = mergePartialPersistedCardHistory(
     server,
     options.previous,
     options.continuationSegmentKeys,
   )
-  if (!isComplete && !isIntentionalRecentWindow) {
-    persistedMessages = mergeCardHistoryMessages(
-      readCardTranscriptSnapshot(server.cardId)?.messages ?? [],
-      persistedMessages,
-    )
-  }
   const recoveryMessages =
     options.recoveryMessages ??
     readCardTranscriptRecovery({ cardId: server.cardId })?.messages ??
@@ -2162,10 +2152,45 @@ export async function reconcileSessionCardHistoryResponseDurably(
   server: SessionCardHistoryResponse,
   options: ReconcileSessionCardHistoryOptions = {},
 ): Promise<SessionCardHistoryResponse> {
-  if (
-    !isAuthoritativeCompleteSessionCardHistory(server) ||
-    options.recoveryMessages
-  ) {
+  const isComplete = isAuthoritativeCompleteSessionCardHistory(server)
+  if (!isComplete) {
+    const shouldHydrateSnapshot =
+      !isDisplayableRecentSessionCardHistory(server) &&
+      (server.completeness === 'partial' || server.retryable)
+    if (!shouldHydrateSnapshot) {
+      return reconcileSessionCardHistoryResponse(server, options)
+    }
+
+    const snapshot = await readCardTranscriptSnapshot(server.cardId)
+    if (!snapshot) return reconcileSessionCardHistoryResponse(server, options)
+    const persistedMessages = mergeCardHistoryMessages(
+      snapshot.messages,
+      mergePartialPersistedCardHistory(
+        server,
+        options.previous,
+        options.continuationSegmentKeys,
+      ),
+    )
+    const recoveryMessages =
+      options.recoveryMessages ??
+      readCardTranscriptRecovery({ cardId: server.cardId })?.messages ??
+      []
+    return mergeSessionCardHistoryResponse(
+      {
+        ...server,
+        messages: persistedMessages,
+        persistedMessages,
+        ...(options.previous?.completeSnapshotDurability
+          ? {
+              completeSnapshotDurability:
+                options.previous.completeSnapshotDurability,
+            }
+          : {}),
+      },
+      recoveryMessages,
+    )
+  }
+  if (options.recoveryMessages) {
     return reconcileSessionCardHistoryResponse(server, options)
   }
 

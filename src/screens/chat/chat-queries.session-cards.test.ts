@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import { SessionCardService } from '../../server/session-card-service'
@@ -25,6 +26,7 @@ import {
   moveSessionCardHistoryMessages,
   recentSessionCardHistoryWindowSignature,
   reconcileSessionCardHistoryResponse,
+  reconcileSessionCardHistoryResponseDurably,
   sessionCardQueryKeys,
   updateSessionCardMetadata,
 } from './chat-queries'
@@ -34,6 +36,10 @@ import {
   readCardTranscriptRecovery,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
+import {
+  readCardTranscriptSnapshot,
+  writeCardTranscriptSnapshot,
+} from './card-transcript-snapshot'
 import type { SessionCardHistoryResponse } from './chat-queries'
 import type { SessionCard } from './types'
 
@@ -2042,6 +2048,119 @@ describe('Session Card fetchers', () => {
       expect.objectContaining({ id: 'server-partial' }),
       expect.objectContaining({ id: 'cached-optimistic' }),
     ])
+  })
+
+  it('durably hydrates partial Card history from the awaited v4 snapshot while synchronous reconciliation stays cache-only', async () => {
+    const durableCardId = 'remote:v4-query-hydration'
+    const durableMessage = {
+      id: 'durable-v4',
+      role: 'user' as const,
+      content: [],
+    }
+    const partialMessage = {
+      id: 'server-partial-v4',
+      role: 'assistant' as const,
+      content: [],
+    }
+    const partial = {
+      sessionKey: durableCardId,
+      cardId: durableCardId,
+      canonicalSegmentKey: durableCardId,
+      messages: [partialMessage],
+      completeness: 'partial' as const,
+      retryable: true,
+      missingSegments: [
+        {
+          segmentKey: durableCardId,
+          retryable: true as const,
+          error: 'temporarily unavailable',
+        },
+      ],
+    }
+    await writeCardTranscriptSnapshot(durableCardId, [durableMessage])
+
+    expect(
+      reconcileSessionCardHistoryResponse(partial, {
+        recoveryMessages: [],
+      }).messages,
+    ).toEqual([partialMessage])
+
+    let settled = false
+    const hydration = reconcileSessionCardHistoryResponseDurably(partial, {
+      recoveryMessages: [],
+    }).finally(() => {
+      settled = true
+    })
+    expect(settled).toBe(false)
+    await expect(hydration).resolves.toMatchObject({
+      messages: [durableMessage, partialMessage],
+      persistedMessages: [durableMessage, partialMessage],
+    })
+    expect(settled).toBe(true)
+
+    const completeMessage = {
+      id: 'authoritative-complete-v4',
+      role: 'assistant' as const,
+      content: [],
+    }
+    await expect(
+      reconcileSessionCardHistoryResponseDurably({
+        ...partial,
+        messages: [completeMessage],
+        completeness: 'complete',
+        retryable: false,
+        missingSegments: [],
+      }),
+    ).resolves.toMatchObject({
+      messages: [completeMessage],
+      completeSnapshotDurability: 'verified',
+    })
+    await expect(readCardTranscriptSnapshot(durableCardId)).resolves.toMatchObject({
+      version: 4,
+      messages: [completeMessage],
+    })
+
+    await expect(
+      reconcileSessionCardHistoryResponseDurably({
+        ...partial,
+        messages: [],
+      }, {
+        recoveryMessages: [],
+      }),
+    ).resolves.toMatchObject({
+      messages: [completeMessage],
+      persistedMessages: [completeMessage],
+    })
+  })
+
+  it('surfaces v4 database hydration failure without inventing a local fallback', async () => {
+    const failingCardId = 'remote:v4-query-database-failure'
+    vi.stubGlobal('indexedDB', {
+      open: () => {
+        throw new Error('query snapshot database offline')
+      },
+    })
+
+    await expect(
+      reconcileSessionCardHistoryResponseDurably(
+        {
+          sessionKey: failingCardId,
+          cardId: failingCardId,
+          canonicalSegmentKey: failingCardId,
+          messages: [],
+          completeness: 'partial',
+          retryable: true,
+          missingSegments: [
+            {
+              segmentKey: failingCardId,
+              retryable: true,
+              error: 'temporarily unavailable',
+            },
+          ],
+        },
+        { recoveryMessages: [] },
+      ),
+    ).rejects.toThrow('query snapshot database offline')
   })
 
   it('retains prior persisted Card rows after a subsequent partial response and keeps recovery last', () => {
