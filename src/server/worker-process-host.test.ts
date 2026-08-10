@@ -126,9 +126,9 @@ describe('WorkerProcessHost durable registry', () => {
     const host = createWorkerProcessHost({
       platform: 'win32', registryFile: registryFile(), spawn: spawnMock() as never, isPidAlive: () => true,
     })
-    await host.start({ ...startSpec(), args: ['--secret-token'], env: { ANTHROPIC_AUTH_TOKEN: 'do-not-store' } })
+    await host.start({ ...startSpec(), args: ['--prompt', 'do-not-store'], env: { ANTHROPIC_AUTH_TOKEN: 'fake' } })
     const persisted = readFileSync(registryFile(), 'utf8')
-    expect(persisted).not.toContain('secret-token')
+    expect(persisted).not.toContain('--prompt')
     expect(persisted).not.toContain('do-not-store')
   })
 
