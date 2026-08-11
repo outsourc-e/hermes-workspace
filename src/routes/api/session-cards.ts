@@ -6,6 +6,7 @@ import {
   sessionCardService,
 } from '../../server/session-card-service'
 import { createSession } from '../../server/claude-api'
+import { resolveCurrentGatewayModel } from '../../server/configured-primary-model'
 import { issueNewSessionCardDiscardCapability } from '../../server/new-session-card-discard'
 import {
   internalFailure,
@@ -121,7 +122,14 @@ export const Route = createFileRoute('/api/session-cards')({
         }
 
         try {
-          const session = await createSession()
+          // The Gateway compatibility alias is not a provider model for Codex.
+          // Persist the concrete Dashboard New Chat default when creating the
+          // Card's empty backing session, so the first stream cannot inherit the
+          // unusable alias from session creation.
+          const configuredModel = resolveCurrentGatewayModel('hermes-agent')
+          const session = await createSession(
+            configuredModel ? { model: configuredModel } : undefined,
+          )
           const upstreamSessionKey = session.id.trim()
           if (!upstreamSessionKey) {
             return internalFailure('Unable to create Session Card')

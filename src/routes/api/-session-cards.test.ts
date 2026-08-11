@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   completeBranchReplay: vi.fn(),
   reconcileBranchReplay: vi.fn(),
   createSession: vi.fn(),
+  resolveCurrentGatewayModel: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -89,6 +90,10 @@ vi.mock('../../server/claude-api', () => ({
   forkSession: mocks.forkSession,
   deleteSession: mocks.deleteSession,
   deleteEmptyGatewaySession: mocks.deleteEmptyGatewaySession,
+}))
+
+vi.mock('../../server/configured-primary-model', () => ({
+  resolveCurrentGatewayModel: mocks.resolveCurrentGatewayModel,
 }))
 
 type GetHandler = (context: {
@@ -325,6 +330,7 @@ beforeEach(() => {
   })
   mocks.resolveRemoteCardByUpstreamSession.mockResolvedValue(resolvedCard())
   mocks.createSession.mockResolvedValue({ id: 'created-upstream-session' })
+  mocks.resolveCurrentGatewayModel.mockReturnValue('configured-primary-model')
   mocks.ensureGatewayProbed.mockResolvedValue({ sessionFork: true })
   mocks.readBranchReplay.mockImplementation(
     (_cardId: string, requestKeyHash: string) =>
@@ -492,7 +498,12 @@ describe('POST /api/session-cards', () => {
     })
 
     expect(response.status).toBe(200)
-    expect(mocks.createSession).toHaveBeenCalledWith()
+    expect(mocks.resolveCurrentGatewayModel).toHaveBeenCalledWith(
+      'hermes-agent',
+    )
+    expect(mocks.createSession).toHaveBeenCalledWith({
+      model: 'configured-primary-model',
+    })
     expect(mocks.invalidateTopology).toHaveBeenCalledTimes(1)
     expect(mocks.resolveRemoteCardByUpstreamSession).toHaveBeenCalledWith(
       'created-upstream-session',
