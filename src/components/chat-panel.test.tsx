@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
+import 'fake-indexeddb/auto'
 import React from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ChatPanel } from './chat-panel'
+import { resetWorkspaceChatIndexedDb } from '@/screens/chat/card-transcript-indexeddb'
 import type { SessionCard } from '@/screens/chat/types'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 
@@ -194,7 +196,9 @@ function renderPanel() {
   })
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  const database = await resetWorkspaceChatIndexedDb()
+  database.close()
   mocks.navigate.mockReset()
   mocks.chatScreenProps.length = 0
   mocks.queryOptions = undefined
@@ -548,7 +552,7 @@ describe('ChatPanel Card routing', () => {
     },
   ])(
     'does not render an interactive raw chat while post-bootstrap Card mapping is $name',
-    ({ queryState, expectedState }) => {
+    async ({ queryState, expectedState }) => {
       mocks.workspaceState.chatPanelCardId = 'new'
       mocks.queryState = queryState
 
@@ -579,7 +583,9 @@ describe('ChatPanel Card routing', () => {
         })
       })
 
-      expect(screen.queryByTestId('chat-screen')).toBeNull()
+      await waitFor(() =>
+        expect(screen.queryByTestId('chat-screen')).toBeNull(),
+      )
       expect(screen.getByText(expectedState)).toBeTruthy()
       React.act(() =>
         fireEvent.click(screen.getByRole('button', { name: 'Retry' })),

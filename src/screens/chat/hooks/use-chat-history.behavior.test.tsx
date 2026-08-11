@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
+import 'fake-indexeddb/auto'
+
 import React, { useEffect } from 'react'
 import { QueryClient } from '@tanstack/react-query'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { waitFor } from '@testing-library/dom'
 
 import { getChatSessionSourceState } from '../chat-screen-utils'
 import { persistPendingMessage, readPendingMessage } from '../pending-send'
+import { resetWorkspaceChatIndexedDb } from '../card-transcript-indexeddb'
 import { useChatHistory } from './use-chat-history'
 import type { QueryClient as QueryClientType } from '@tanstack/react-query'
 
@@ -142,7 +146,9 @@ async function flushQueries() {
 }
 
 describe('useChatHistory cold session source behavior', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const database = await resetWorkspaceChatIndexedDb()
+    database.close()
     window.localStorage.clear()
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = String(input)
@@ -241,7 +247,7 @@ describe('useChatHistory cold session source behavior', () => {
       __optimisticId: 'opt-first-turn-client',
       status: 'error',
     }
-    expect(
+    await expect(
       persistPendingMessage({
         sessionKey: 'new',
         friendlyId: 'new',
@@ -249,8 +255,8 @@ describe('useChatHistory cold session source behavior', () => {
         attachments: [],
         optimisticMessage,
       }),
-    ).toBe(true)
-    expect(JSON.stringify(readPendingMessage('new', 'new'))).toContain(
+    ).resolves.toBe(true)
+    expect(JSON.stringify(await readPendingMessage('new', 'new'))).toContain(
       'first turn survives',
     )
     expect(window.localStorage.getItem('claude_pending_msg_new')).toBeNull()
@@ -266,7 +272,9 @@ describe('useChatHistory cold session source behavior', () => {
         root.render(<PendingNewHistoryHarness queryClient={queryClient} />)
       })
       await flushQueries()
-      expect(container.textContent).toContain('first turn survives')
+      await waitFor(() =>
+        expect(container.textContent).toContain('first turn survives'),
+      )
       expect(container.textContent).toContain('Retry message')
       React.act(() => root.unmount())
       document.body.removeChild(container)

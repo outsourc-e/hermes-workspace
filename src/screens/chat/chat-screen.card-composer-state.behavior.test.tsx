@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import 'fake-indexeddb/auto'
+
 import React, { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -16,6 +18,7 @@ import { useChatStore } from '../../stores/chat-store'
 import { useSessionModelStore } from '../../stores/session-model-store'
 import { ChatScreen } from './chat-screen'
 import { registerNewSessionCardForPrimaryModel } from './new-session-discard'
+import { resetWorkspaceChatIndexedDb } from './card-transcript-indexeddb'
 import {
   cardDraftStorageKey,
   cardThinkingStorageKey,
@@ -410,7 +413,9 @@ function change(element: Element, value: string) {
 }
 
 describe('mounted Card-owned ChatScreen composer state', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const database = await resetWorkspaceChatIndexedDb()
+    database.close()
     installBrowserPolyfills()
     window.localStorage.clear()
     window.sessionStorage.clear()

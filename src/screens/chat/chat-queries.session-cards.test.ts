@@ -40,6 +40,7 @@ import {
   readCardTranscriptSnapshot,
   writeCardTranscriptSnapshot,
 } from './card-transcript-snapshot'
+import { resetWorkspaceChatIndexedDb } from './card-transcript-indexeddb'
 import type { SessionCardHistoryResponse } from './chat-queries'
 import type { SessionCard } from './types'
 
@@ -92,7 +93,9 @@ function completeCardResolutions(cards: Array<{ cardId: string }>) {
   }))
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  const database = await resetWorkspaceChatIndexedDb()
+  database.close()
   clearCardTranscriptRecoveryMemory()
 })
 
@@ -2115,18 +2118,23 @@ describe('Session Card fetchers', () => {
       messages: [completeMessage],
       completeSnapshotDurability: 'verified',
     })
-    await expect(readCardTranscriptSnapshot(durableCardId)).resolves.toMatchObject({
+    await expect(
+      readCardTranscriptSnapshot(durableCardId),
+    ).resolves.toMatchObject({
       version: 4,
       messages: [completeMessage],
     })
 
     await expect(
-      reconcileSessionCardHistoryResponseDurably({
-        ...partial,
-        messages: [],
-      }, {
-        recoveryMessages: [],
-      }),
+      reconcileSessionCardHistoryResponseDurably(
+        {
+          ...partial,
+          messages: [],
+        },
+        {
+          recoveryMessages: [],
+        },
+      ),
     ).resolves.toMatchObject({
       messages: [completeMessage],
       persistedMessages: [completeMessage],
@@ -2332,7 +2340,7 @@ describe('Session Card fetchers', () => {
     })
   })
 
-  it('moves bootstrap transient messages from legacy history into Card history', () => {
+  it('moves bootstrap transient messages from legacy history into Card history', async () => {
     const queryClient = new QueryClient()
     const legacyKey = chatQueryKeys.history('remote:root', 'remote:tip')
     const cardKey = sessionCardQueryKeys.history('remote:root')
@@ -2348,7 +2356,7 @@ describe('Session Card fetchers', () => {
       ],
     })
 
-    moveLegacyHistoryMessagesToSessionCard(
+    await moveLegacyHistoryMessagesToSessionCard(
       queryClient,
       'remote:root',
       'remote:tip',
@@ -2365,7 +2373,7 @@ describe('Session Card fetchers', () => {
     queryClient.clear()
   })
 
-  it('keeps optimistic-only and partial caches non-authoritative', () => {
+  it('keeps optimistic-only and partial caches non-authoritative', async () => {
     const queryClient = new QueryClient()
     const key = sessionCardQueryKeys.history('remote:root')
     const optimisticMessage = {
@@ -2375,7 +2383,7 @@ describe('Session Card fetchers', () => {
       __optimistic: true,
     }
 
-    appendSessionCardHistoryMessage(
+    await appendSessionCardHistoryMessage(
       queryClient,
       'remote:root',
       'remote:tip',
@@ -2406,7 +2414,7 @@ describe('Session Card fetchers', () => {
       ],
     }
     queryClient.setQueryData(key, partial)
-    appendSessionCardHistoryMessage(
+    await appendSessionCardHistoryMessage(
       queryClient,
       'remote:root',
       'remote:tip',
@@ -2598,10 +2606,12 @@ describe('Session Card fetchers', () => {
         .findAll({ queryKey: sessionCardQueryKeys.history('remote:root') }),
     ).toHaveLength(1)
     expect(
-      (await readCardTranscriptRecovery(
-        { cardId: 'remote:root' },
-        { now: 100 },
-      ))?.messages,
+      (
+        await readCardTranscriptRecovery(
+          { cardId: 'remote:root' },
+          { now: 100 },
+        )
+      )?.messages,
     ).toEqual([overlay])
     expect(JSON.stringify(stableKey)).not.toContain('remote:tip')
     expect(JSON.stringify(stableKey)).not.toContain('remote:next')
