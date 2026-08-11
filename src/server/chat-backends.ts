@@ -36,7 +36,13 @@ async function* streamClaudeChat(
     done: false,
     failure: null,
   }
+  let receivedAssistantContent = false
   let notify: (() => void) | null = null
+  const wake = () => {
+    const waiting = notify
+    notify = null
+    waiting?.()
+  }
 
   void streamChat(
     options.sessionId,
@@ -54,33 +60,31 @@ async function* streamClaudeChat(
           typeof data.delta === 'string' &&
           data.delta
         ) {
+          receivedAssistantContent = true
           queue.push(data.delta)
-          notify?.()
-          notify = null
+          wake()
         }
         if (
           event === 'assistant.completed' &&
           typeof data.content === 'string' &&
           data.content &&
-          queue.length === 0
+          !receivedAssistantContent
         ) {
+          receivedAssistantContent = true
           queue.push(data.content)
-          notify?.()
-          notify = null
+          wake()
         }
       },
     },
   ).then(
     () => {
       state.done = true
-      notify?.()
-      notify = null
+      wake()
     },
     (error: unknown) => {
       state.failure = error instanceof Error ? error : new Error(String(error))
       state.done = true
-      notify?.()
-      notify = null
+      wake()
     },
   )
 
@@ -92,6 +96,10 @@ async function* streamClaudeChat(
 
     await new Promise<void>((resolve) => {
       notify = resolve
+      // Re-check after registering the waiter so an update that arrived at the
+      // wait boundary cannot leave the generator asleep. The outer loop remains
+      // the predicate guard for harmless/spurious wakeups.
+      if (queue.length > 0 || state.done) wake()
     })
   }
 
