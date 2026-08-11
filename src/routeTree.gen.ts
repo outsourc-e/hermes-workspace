@@ -17,6 +17,7 @@ import { Route as Swarm2RouteImport } from './routes/swarm2'
 import { Route as SwarmRouteImport } from './routes/swarm'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as RunsRouteImport } from './routes/runs'
 import { Route as ReserveRouteImport } from './routes/reserve'
 import { Route as ProfilesRouteImport } from './routes/profiles'
 import { Route as PlaygroundRouteImport } from './routes/playground'
@@ -74,6 +75,7 @@ import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
+import { Route as ApiRuntimeRunsRouteImport } from './routes/api/runtime-runs'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiProviderRuntimesRouteImport } from './routes/api/provider-runtimes'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
@@ -211,6 +213,11 @@ const SkillsRoute = SkillsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RunsRoute = RunsRouteImport.update({
+  id: '/runs',
+  path: '/runs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReserveRoute = ReserveRouteImport.update({
@@ -497,6 +504,11 @@ const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
 const ApiSendRoute = ApiSendRouteImport.update({
   id: '/api/send',
   path: '/api/send',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRuntimeRunsRoute = ApiRuntimeRunsRouteImport.update({
+  id: '/api/runtime-runs',
+  path: '/api/runtime-runs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
@@ -1014,6 +1026,7 @@ export interface FileRoutesByFullPath {
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
   '/reserve': typeof ReserveRouteWithChildren
+  '/runs': typeof RunsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/swarm': typeof SwarmRoute
@@ -1063,6 +1076,7 @@ export interface FileRoutesByFullPath {
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-runtimes': typeof ApiProviderRuntimesRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/runtime-runs': typeof ApiRuntimeRunsRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1179,6 +1193,7 @@ export interface FileRoutesByTo {
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
   '/reserve': typeof ReserveRouteWithChildren
+  '/runs': typeof RunsRoute
   '/skills': typeof SkillsRoute
   '/swarm': typeof SwarmRoute
   '/swarm2': typeof Swarm2Route
@@ -1227,6 +1242,7 @@ export interface FileRoutesByTo {
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-runtimes': typeof ApiProviderRuntimesRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/runtime-runs': typeof ApiRuntimeRunsRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1344,6 +1360,7 @@ export interface FileRoutesById {
   '/playground': typeof PlaygroundRoute
   '/profiles': typeof ProfilesRoute
   '/reserve': typeof ReserveRouteWithChildren
+  '/runs': typeof RunsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/swarm': typeof SwarmRoute
@@ -1393,6 +1410,7 @@ export interface FileRoutesById {
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-runtimes': typeof ApiProviderRuntimesRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/runtime-runs': typeof ApiRuntimeRunsRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1511,6 +1529,7 @@ export interface FileRouteTypes {
     | '/playground'
     | '/profiles'
     | '/reserve'
+    | '/runs'
     | '/settings'
     | '/skills'
     | '/swarm'
@@ -1560,6 +1579,7 @@ export interface FileRouteTypes {
     | '/api/preview-file'
     | '/api/provider-runtimes'
     | '/api/provider-usage'
+    | '/api/runtime-runs'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1676,6 +1696,7 @@ export interface FileRouteTypes {
     | '/playground'
     | '/profiles'
     | '/reserve'
+    | '/runs'
     | '/skills'
     | '/swarm'
     | '/swarm2'
@@ -1724,6 +1745,7 @@ export interface FileRouteTypes {
     | '/api/preview-file'
     | '/api/provider-runtimes'
     | '/api/provider-usage'
+    | '/api/runtime-runs'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1840,6 +1862,7 @@ export interface FileRouteTypes {
     | '/playground'
     | '/profiles'
     | '/reserve'
+    | '/runs'
     | '/settings'
     | '/skills'
     | '/swarm'
@@ -1889,6 +1912,7 @@ export interface FileRouteTypes {
     | '/api/preview-file'
     | '/api/provider-runtimes'
     | '/api/provider-usage'
+    | '/api/runtime-runs'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -2006,6 +2030,7 @@ export interface RootRouteChildren {
   PlaygroundRoute: typeof PlaygroundRoute
   ProfilesRoute: typeof ProfilesRoute
   ReserveRoute: typeof ReserveRouteWithChildren
+  RunsRoute: typeof RunsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
   SwarmRoute: typeof SwarmRoute
@@ -2055,6 +2080,7 @@ export interface RootRouteChildren {
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
   ApiProviderRuntimesRoute: typeof ApiProviderRuntimesRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
+  ApiRuntimeRunsRoute: typeof ApiRuntimeRunsRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
@@ -2180,6 +2206,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/runs': {
+      id: '/runs'
+      path: '/runs'
+      fullPath: '/runs'
+      preLoaderRoute: typeof RunsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reserve': {
@@ -2579,6 +2612,13 @@ declare module '@tanstack/react-router' {
       path: '/api/send'
       fullPath: '/api/send'
       preLoaderRoute: typeof ApiSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/runtime-runs': {
+      id: '/api/runtime-runs'
+      path: '/api/runtime-runs'
+      fullPath: '/api/runtime-runs'
+      preLoaderRoute: typeof ApiRuntimeRunsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/provider-usage': {
@@ -3499,6 +3539,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlaygroundRoute: PlaygroundRoute,
   ProfilesRoute: ProfilesRoute,
   ReserveRoute: ReserveRouteWithChildren,
+  RunsRoute: RunsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
   SwarmRoute: SwarmRoute,
@@ -3548,6 +3589,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPreviewFileRoute: ApiPreviewFileRoute,
   ApiProviderRuntimesRoute: ApiProviderRuntimesRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
+  ApiRuntimeRunsRoute: ApiRuntimeRunsRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,

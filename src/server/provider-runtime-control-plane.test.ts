@@ -12,11 +12,11 @@ import {
   importClaudeAgents,
   importCodexThreads,
   normalizeClaudeAgents,
-  normalizeCodexThreads,
   normalizeCodexRuntimeSelection,
+  normalizeCodexThreads,
   providerRuntimeRequest,
-  type ProviderRuntimeRecord,
 } from './provider-runtime-control-plane'
+import type { ClaudeRun, ProviderRuntimeRecord } from './provider-runtime-control-plane'
 
 let dir: string
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'provider-runtime-')) })
@@ -92,44 +92,47 @@ describe('durable one-writer leases', () => {
 describe('capabilities and explicit Codex runtime selection', () => {
   it('marks direct messaging deferred and preserves unknown legacy selection safely', () => {
     expect(capabilityMatrix('codex_thread', 'win32').crossSessionMessage).toMatchObject({ state: 'unsupported', deferred: true })
+    expect(capabilityMatrix('codex_thread', 'win32').fork).toMatchObject({ state: 'unsupported', deferred: true })
     expect(normalizeCodexRuntimeSelection(undefined)).toEqual({ configured: 'hermes_default', effective: 'hermes_default', known: true })
     expect(normalizeCodexRuntimeSelection('future_runtime')).toEqual({ configured: 'future_runtime', effective: 'hermes_default', known: false })
   })
 })
 
 describe('provider lifecycle adapters', () => {
-  it('enables bounded one-shot Codex thread lifecycle while keeping active-turn controls disabled', async () => {
+  it('enables bounded Codex resume/archive while rejecting fork and active-turn controls before invocation', async () => {
     const leases = new DurableRuntimeLeases(join(dir, 'leases'), () => 10)
     const invoke = vi.fn(async () => ({ ok: true, result: { thread: { id: 'thread-fork' } } }))
     const adapter = new CodexRuntimeAdapter({ invoke, leases, ownerToken: 'server' })
     expect(await adapter.status('thread-1')).toMatchObject({ ok: true })
     expect(invoke).toHaveBeenLastCalledWith('thread/read', { threadId: 'thread-1', includeTurns: false })
     expect(await adapter.mutate('codex:thread-1', 'resume', { providerModel: 'gpt-5.6-sol' })).toMatchObject({ ok: true })
-    let forkRegisteredWhileLeased = false
-    expect(await adapter.mutate('codex:thread-1', 'fork', {
-      providerModel: 'gpt-5.6-sol',
-      onForkCreated: () => { forkRegisteredWhileLeased = leases.get('codex:thread-1') !== null },
-    })).toMatchObject({ ok: true })
-    expect(forkRegisteredWhileLeased).toBe(true)
+    const onForkCreated = vi.fn()
+    const forkResult = await adapter.mutate('codex:thread-1', 'fork', {
+      providerModel: 'gpt-5.6-sol', onForkCreated,
+    })
+    expect(forkResult).toMatchObject({ ok: false })
+    expect(String(forkResult.error).toLowerCase()).toContain('disabled')
+    expect(onForkCreated).not.toHaveBeenCalled()
     expect(await adapter.mutate('codex:thread-1', 'archive', {})).toMatchObject({ ok: true })
     expect(invoke).toHaveBeenNthCalledWith(2, 'thread/resume', { threadId: 'thread-1', model: 'gpt-5.6-sol' })
-    expect(invoke).toHaveBeenNthCalledWith(3, 'thread/fork', { threadId: 'thread-1', model: 'gpt-5.6-sol' })
-    expect(invoke).toHaveBeenNthCalledWith(4, 'thread/archive', { threadId: 'thread-1' })
+    expect(invoke).toHaveBeenNthCalledWith(3, 'thread/archive', { threadId: 'thread-1' })
     expect(await adapter.mutate('codex:thread-1', 'steer', { text: 'bounded', turnId: 'turn-7' })).toMatchObject({ ok: false })
     expect(await adapter.mutate('codex:thread-1', 'interrupt', { turnId: 'turn-7' })).toMatchObject({ ok: false })
-    expect(invoke).toHaveBeenCalledTimes(4)
+    expect(invoke).toHaveBeenCalledTimes(3)
     expect(leases.get('codex:thread-1')).toBeNull()
   })
 
-  it('retains an abandoned Codex lease when fork registration is ambiguous', async () => {
+  it('does not acquire a lease or invoke the provider for disabled Codex fork', async () => {
     const leases = new DurableRuntimeLeases(join(dir, 'leases'), () => 10)
-    const adapter = new CodexRuntimeAdapter({ invoke: vi.fn(async () => ({ ok: true, result: {} })), leases, ownerToken: 'server' })
-    expect(await adapter.mutate('codex:thread-2', 'fork', { onForkCreated: () => { throw new Error('registry unavailable') } })).toMatchObject({ ok: false })
-    expect(leases.get('codex:thread-2')).toMatchObject({ abandoned: true })
+    const invoke = vi.fn(async () => ({ ok: true, result: {} }))
+    const adapter = new CodexRuntimeAdapter({ invoke, leases, ownerToken: 'server' })
+    expect(await adapter.mutate('codex:thread-2', 'fork', { onForkCreated: vi.fn() })).toMatchObject({ ok: false })
+    expect(invoke).not.toHaveBeenCalled()
+    expect(leases.get('codex:thread-2')).toBeNull()
   })
 
   it('passes Claude prompts via stdin with official UUID resume/fork flags and strips API credentials', async () => {
-    const run = vi.fn(async () => ({ ok: true, stdout: '{"session_id":"11111111-1111-4111-8111-111111111111"}', stderr: '' }))
+    const run = vi.fn<ClaudeRun>(async () => ({ ok: true, stdout: '{"session_id":"11111111-1111-4111-8111-111111111111"}', stderr: '' }))
     const claudeLeases = new DurableRuntimeLeases(join(dir, 'leases'))
     const adapter = new ClaudeRuntimeAdapter({
       run, leases: claudeLeases, ownerToken: 'server',
@@ -145,6 +148,7 @@ describe('provider lifecycle adapters', () => {
       onCreated: (_sessionId, runtimeId) => { registeredWhileLeased = claudeLeases.get(runtimeId) !== null },
     })).ok).toBe(true)
     expect(registeredWhileLeased).toBe(true)
+    expect(run).toHaveBeenCalledTimes(1)
     const created = run.mock.calls[0][0]
     expect(created.args).toEqual(['-p', '--session-id', '11111111-1111-4111-8111-111111111111', '--model', 'opus', '--output-format', 'json'])
     expect(created.args).not.toContain('secret')

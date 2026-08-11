@@ -4,10 +4,43 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   codexThreadIdFromResult,
   createCodexStdioInvoker,
+  hydrateRuntimeLeases,
   resolveCliLaunch,
   resolveConfiguredAccountHomes,
+  runtimeKindMatchesId,
   validateCodexForkThreadId,
 } from './provider-runtime-service'
+import type { ProviderRuntimeRecord } from './provider-runtime-control-plane'
+
+describe('runtime dispatch identity', () => {
+  it('accepts only exact persisted-kind and runtime-ID-prefix pairs', () => {
+    expect(runtimeKindMatchesId({ kind: 'hermes_profile', runtimeId: 'hermes:worker-a' })).toBe(true)
+    expect(runtimeKindMatchesId({ kind: 'claude_session', runtimeId: 'claude:cwm4tx:session-1' })).toBe(true)
+    expect(runtimeKindMatchesId({ kind: 'codex_thread', runtimeId: 'codex:thread-1' })).toBe(true)
+    expect(runtimeKindMatchesId({ kind: 'stale_kind', runtimeId: 'codex:thread-1' } as never)).toBe(false)
+    expect(runtimeKindMatchesId({ kind: 'claude_session', runtimeId: 'codex:thread-1' })).toBe(false)
+    expect(runtimeKindMatchesId({ kind: 'codex_thread', runtimeId: 'unknown:thread-1' })).toBe(false)
+  })
+})
+
+describe('authoritative runtime lease projection', () => {
+  it('overlays durable leases without mutating registry records', () => {
+    const record = {
+      runtimeId: 'codex:thread-1', kind: 'codex_thread', routeRef: null, accountAlias: 'openai-codex',
+      externalId: 'thread-1', model: null, cwd: null, worktree: null, hostKind: 'stdio', hostStatus: 'idle',
+      capabilities: {}, lease: null, parentRuntimeId: null, kanbanTaskId: null, createdAt: 1, updatedAt: 2,
+    } as ProviderRuntimeRecord
+    const lease = { owner: 'workspace-1', acquiredAt: 3, expiresAt: 4, abandoned: true }
+    const getLease = vi.fn(() => lease)
+
+    const hydrated = hydrateRuntimeLeases([record], getLease)
+
+    expect(hydrated[0]).toEqual({ ...record, lease })
+    expect(hydrated[0]).not.toBe(record)
+    expect(record.lease).toBeNull()
+    expect(getLease).toHaveBeenCalledWith('codex:thread-1')
+  })
+})
 
 describe('Codex lifecycle result normalization', () => {
   it('extracts only a non-empty forked thread identity', () => {

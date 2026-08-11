@@ -586,6 +586,7 @@ function ChatSidebarComponent({
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
+  const isRunsActive = pathname === '/runs'
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
@@ -840,6 +841,13 @@ function ChatSidebarComponent({
       icon: UserMultipleIcon,
       label: 'Operations',
       active: isOperationsActive,
+    },
+    {
+      kind: 'link',
+      to: '/runs',
+      icon: Clock01Icon,
+      label: 'Runs',
+      active: isRunsActive,
     },
     {
       kind: 'link',

@@ -11,13 +11,11 @@ import {
   CodexRuntimeAdapter,
   DurableRuntimeLeases,
   ProviderRuntimeRegistry,
+  capabilityMatrix,
   importClaudeAgents,
   importCodexThreads,
-  capabilityMatrix,
-  type ClaudeRun,
-  type CodexInvoke,
-  type ProviderRuntimeRecord,
 } from './provider-runtime-control-plane'
+import type { ClaudeRun, CodexInvoke, ProviderRuntimeRecord } from './provider-runtime-control-plane'
 
 const MAX_DIAGNOSTIC = 2_000
 const MAX_STDIO = 2 * 1024 * 1024
@@ -53,10 +51,10 @@ function verifiedWorktree(path: string): string | null {
 }
 
 type RuntimeService = {
-  list(): Array<ProviderRuntimeRecord>
-  refresh(): Promise<Array<{ source: string; ok: boolean; count: number; error?: string }>>
-  mutate(body: Record<string, unknown>): Promise<unknown>
-  recoverLease(runtimeId: string): { ok: boolean; error?: string }
+  list: () => Array<ProviderRuntimeRecord>
+  refresh: () => Promise<Array<{ source: string; ok: boolean; count: number; error?: string }>>
+  mutate: (body: Record<string, unknown>) => Promise<unknown>
+  recoverLease: (runtimeId: string) => { ok: boolean; error?: string }
 }
 
 export function resolveCliLaunch(
@@ -212,6 +210,27 @@ export function createCodexStdioInvoker(input: {
   })
 }
 
+export function hydrateRuntimeLeases(
+  records: Array<ProviderRuntimeRecord>,
+  getLease: (runtimeId: string) => ProviderRuntimeRecord['lease'],
+): Array<ProviderRuntimeRecord> {
+  return records.map((record) => ({ ...record, lease: getLease(record.runtimeId) }))
+}
+
+export function runtimeKindMatchesId(record: Pick<ProviderRuntimeRecord, 'kind' | 'runtimeId'>): boolean {
+  const prefixes: Record<string, string> = {
+    hermes_profile: 'hermes',
+    claude_session: 'claude',
+    codex_thread: 'codex',
+  }
+  const prefix = prefixes[String(record.kind)]
+  return typeof prefix === 'string' && record.runtimeId.startsWith(`${prefix}:`)
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0
+}
+
 let singleton: RuntimeService | null = null
 
 export function getProviderRuntimeService(): RuntimeService {
@@ -226,7 +245,7 @@ export function getProviderRuntimeService(): RuntimeService {
   const codex = new CodexRuntimeAdapter({ invoke: invokeCodex, leases, ownerToken })
   const claude = new ClaudeRuntimeAdapter({ run: runClaude, leases, ownerToken, accountHomes })
   singleton = {
-    list: () => registry.list(),
+    list: () => hydrateRuntimeLeases(registry.list(), (runtimeId) => leases.get(runtimeId)),
     recoverLease: (runtimeId) => leases.recoverExpired(runtimeId),
     async refresh() {
       const workerRecords = await getWorkerProcessHost().list()
@@ -237,7 +256,7 @@ export function getProviderRuntimeService(): RuntimeService {
         hostStatus: worker.status,
         capabilities: capabilityMatrix('hermes_profile'), lease: null,
         parentRuntimeId: null, kanbanTaskId: null,
-        createdAt: worker.startedAt ?? worker.updatedAt, updatedAt: worker.updatedAt,
+        createdAt: worker.startedAt, updatedAt: worker.updatedAt,
       }])
       const claudeImports = Object.entries(accountHomes).map(async ([accountAlias, home]) => ({
         source: `claude:${accountAlias}`,
@@ -266,6 +285,7 @@ export function getProviderRuntimeService(): RuntimeService {
         registry.merge([{ ...existing, kanbanTaskId: taskId || null, updatedAt: Date.now() }])
         return { ok: true, runtimeId, kanbanTaskId: taskId || null }
       }
+      if (existing && !runtimeKindMatchesId(existing)) return { ok: false, error: 'Runtime kind and identity do not match' }
       if (existing?.routeRef && existing.routeRef !== routeRef) return { ok: false, error: 'Runtime routeRef does not match the requested route' }
       if (existing?.kind === 'claude_session' && existing.accountAlias !== accountAlias) return { ok: false, error: 'Runtime account identity does not match' }
       if (!providerModel || providerModel.length > 200) return { ok: false, error: 'A validated provider model is required' }
@@ -301,7 +321,7 @@ export function getProviderRuntimeService(): RuntimeService {
         })
         if (result.ok && existing) {
           if (action === 'fork') {
-            if (!forkRuntimeId) return { ok: false, error: 'Codex fork registration was not confirmed' }
+            if (!isNonEmptyString(forkRuntimeId)) return { ok: false, error: 'Codex fork registration was not confirmed' }
             return { ...result, runtimeId: forkRuntimeId }
           }
           registry.merge([{

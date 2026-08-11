@@ -79,6 +79,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/operations'),
   },
   {
+    id: 'runs',
+    label: 'Runs',
+    icon: Clock01Icon,
+    to: '/runs',
+    match: (p: string) => p.startsWith('/runs'),
+  },
+  {
     id: 'swarm',
     label: 'Swarm',
     icon: UserGroupIcon,

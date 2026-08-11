@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { MOBILE_HAMBURGER_NAV_ITEMS } from './mobile-hamburger-menu'
 import { MOBILE_NAV_TABS } from './mobile-tab-bar'
-import { DESKTOP_SIDEBAR_BACKDROP_CLASS } from './workspace-shell'
+import { DESKTOP_SIDEBAR_BACKDROP_CLASS, isEmbeddedWorkspaceSurface } from './workspace-shell'
 
 describe('workspace shell sidebar backdrop', () => {
+  it('tolerates routes without search state when detecting embedded surfaces', () => {
+    expect(isEmbeddedWorkspaceSurface(undefined)).toBe(false)
+    expect(isEmbeddedWorkspaceSurface({ embed: '1' })).toBe(true)
+  })
+
   it('only spans the desktop sidebar width, not the full viewport', () => {
     expect(DESKTOP_SIDEBAR_BACKDROP_CLASS).toContain('w-[300px]')
     expect(DESKTOP_SIDEBAR_BACKDROP_CLASS).not.toContain('inset-0')

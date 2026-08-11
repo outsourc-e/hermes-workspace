@@ -59,6 +59,12 @@ const TerminalWorkspace = lazy(() =>
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
   'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
 
+export function isEmbeddedWorkspaceSurface(search: unknown): boolean {
+  if (!search || typeof search !== 'object') return false
+  const value = search as Record<string, unknown>
+  return value.embed === '1' || value.embed === 'true' || value.mode === 'embed'
+}
+
 type WorkspaceShellProps = {
   children?: React.ReactNode
 }
@@ -179,6 +185,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (pathname.startsWith('/jobs')) return 'Jobs'
     if (pathname.startsWith('/conductor')) return 'Conductor'
     if (pathname.startsWith('/operations')) return 'Operations'
+    if (pathname.startsWith('/runs')) return 'Runs'
     if (pathname.startsWith('/swarm2') || pathname === '/swarm') return 'Swarm'
     if (pathname.startsWith('/echo-studio')) return 'Echo Studio'
     if (pathname.startsWith('/memory')) return 'Memory'
@@ -197,8 +204,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const isOnTerminalRoute = pathname.startsWith('/terminal')
   const isOnPlaygroundRoute = pathname === '/playground' || pathname.startsWith('/playground/')
   const isOnHermesWorldLandingRoute = pathname === '/hermes-world' || pathname.startsWith('/hermes-world/') || pathname === '/world' || pathname.startsWith('/world/')
-  const isEmbeddedSurface =
-    search?.embed === '1' || search?.embed === 'true' || search?.mode === 'embed'
+  const isEmbeddedSurface = isEmbeddedWorkspaceSurface(search)
   const isChromeFreeSurface = isEmbeddedSurface || isOnHermesWorldLandingRoute
   const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =

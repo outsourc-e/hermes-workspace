@@ -47,7 +47,8 @@ export function capabilityMatrix(kind: RuntimeKind, platform: NodeJS.Platform = 
     for (const operation of ['create', 'resume', 'send', 'interrupt', 'attach'] as const) result[operation] = { state: 'supported', explanation: 'Owned by the Hermes worker process host.' }
     result.fork = { state: 'degraded', explanation: 'Forking uses a new Hermes profile rather than provider-native state.' }
   } else if (kind === 'codex_thread') {
-    for (const operation of ['resume', 'fork', 'archive'] as const) result[operation] = { state: 'experimental', explanation: 'Schema-verified through a bounded local app-server request; prompts and remote transport are not used.' }
+    for (const operation of ['resume', 'archive'] as const) result[operation] = { state: 'experimental', explanation: 'Schema-verified through a bounded local app-server request; prompts and remote transport are not used.' }
+    result.fork = { state: 'unsupported', explanation: 'Disabled until provider fork identity has crash-safe durable recovery or idempotency.', deferred: true }
     for (const operation of ['steer', 'interrupt'] as const) result[operation] = { state: 'unsupported', explanation: 'Disabled until Workspace owns one persistent app-server connection for the active turn.' }
     result.create = { state: 'unsupported', explanation: 'Select model.openai_runtime=codex_app_server for the next Hermes profile restart.' }
     result.attach = { state: 'degraded', explanation: 'Attach exposes metadata; Hermes does not take over the provider tool loop.' }
@@ -56,7 +57,7 @@ export function capabilityMatrix(kind: RuntimeKind, platform: NodeJS.Platform = 
     result.fork = { state: 'unsupported', explanation: 'Disabled until the new fork UUID can be captured and registered distinctly.' }
     result.interrupt = { state: 'unsupported', explanation: 'No verified graceful interrupt channel is owned by Workspace.' }
     result.send = { state: 'degraded', explanation: 'Input is available only while Workspace owns the child stdin.' }
-    result.archive = { state: 'degraded', explanation: 'Archive is represented as stopped metadata.' }
+    result.archive = { state: 'unsupported', explanation: 'Archive is not implemented by the isolated Claude runtime adapter.' }
     result.discoverPeers = platform === 'win32'
       ? { state: 'unsupported', explanation: 'Claude ListAgents is not claimed on Windows.' }
       : { state: 'experimental', explanation: 'Discovery is read-only and fixture-tested.' }

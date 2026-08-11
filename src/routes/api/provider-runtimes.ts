@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { requireProviderRuntimeMutationAuth } from '../../server/auth-middleware'
 import { getProviderRuntimeService } from '../../server/provider-runtime-service'
+import { writeRuntimeRouteSnapshot } from '../../server/runtime-route-cache'
 import { loadSubscriptionCatalog } from '../../server/subscription-model-catalog'
 
 const MAX_TEXT = 32_000
@@ -42,7 +43,12 @@ export const Route = createFileRoute('/api/provider-runtimes')({
         if (!body || typeof body !== 'object') return Response.json({ ok: false, error: 'Invalid request' }, { status: 400 })
         if ((body as Record<string, unknown>).action === 'refresh') {
           const refresh = await getProviderRuntimeService().refresh()
-          return inventoryResponse(refresh)
+          const catalog = await loadSubscriptionCatalog()
+          const availableRoutes = catalog.models
+            .filter((entry) => entry.selectable && entry.billingClass === 'subscription_included')
+            .map((entry) => ({ id: entry.id, account: entry.account, model: entry.model, status: entry.status }))
+          writeRuntimeRouteSnapshot(availableRoutes)
+          return inventoryResponse(refresh, availableRoutes)
         }
         if ((body as Record<string, unknown>).action === 'recover-lease') {
           const runtimeId = (body as Record<string, unknown>).runtimeId
@@ -52,7 +58,7 @@ export const Route = createFileRoute('/api/provider-runtimes')({
         }
         if ((body as Record<string, unknown>).action === 'link_kanban') {
           const result = await getProviderRuntimeService().mutate(body as Record<string, unknown>)
-          const ok = Boolean((result as { ok?: unknown })?.ok)
+          const ok = Boolean((result as { ok?: unknown }).ok)
           return Response.json({ ok, result }, { status: ok ? 200 : 409 })
         }
         const raw = body as Record<string, unknown>
@@ -65,7 +71,7 @@ export const Route = createFileRoute('/api/provider-runtimes')({
         }
         const catalog = await loadSubscriptionCatalog()
         const route = catalog.models.find((entry) => entry.id === routeRef)
-        if (!catalog.subscriptionOnly || !route?.selectable || route.billingClass !== 'subscription_included') {
+        if (!catalog.subscriptionOnly || !route?.selectable || route.status !== 'available' || route.billingClass !== 'subscription_included') {
           return Response.json({ ok: false, error: 'routeRef is not an assignable subscription-included route' }, { status: 400 })
         }
         const accountAlias = typeof raw.accountAlias === 'string' ? raw.accountAlias : ''
