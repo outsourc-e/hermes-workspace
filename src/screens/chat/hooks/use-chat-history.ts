@@ -424,9 +424,17 @@ export function useChatHistory({
 
   useEffect(() => {
     cleanupExpiredPendingSends()
-    setPersistedPending(
-      readPendingMessage(sessionKeyForHistory, activeFriendlyId),
-    )
+    let cancelled = false
+    void readPendingMessage(sessionKeyForHistory, activeFriendlyId)
+      .then((pending) => {
+        if (!cancelled) setPersistedPending(pending)
+      })
+      .catch(() => {
+        if (!cancelled) setPersistedPending(null)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [activeFriendlyId, sessionKeyForHistory])
 
   const rawHistoryMessages = useMemo(() => {
@@ -448,7 +456,7 @@ export function useChatHistory({
       optimisticMessages[optimisticMessages.length - 1]
     if (!latestOptimisticMessage) return
 
-    persistPendingMessage({
+    void persistPendingMessage({
       sessionKey: sessionKeyForHistory,
       friendlyId: activeFriendlyId,
       message: textFromMessage(latestOptimisticMessage),
@@ -456,6 +464,9 @@ export function useChatHistory({
         ? latestOptimisticMessage.attachments
         : [],
       optimisticMessage: latestOptimisticMessage,
+    }).catch(() => {
+      // History hydration cannot turn a failed durability admission into a
+      // browser-owned pending row.
     })
   }, [activeFriendlyId, rawHistoryMessages, sessionKeyForHistory])
 
@@ -470,8 +481,11 @@ export function useChatHistory({
         persistedPending.optimisticMessage,
       )
     ) {
-      clearPendingMessage(persistedPending.sessionKey)
-      setPersistedPending(null)
+      void clearPendingMessage(persistedPending.sessionKey)
+        .then(() => setPersistedPending(null))
+        .catch(() => {
+          // Keep the pending row mounted until durable deletion succeeds.
+        })
     }
   }, [persistedPending, rawHistoryMessages])
 

@@ -1,16 +1,25 @@
 import {
+  handoffPendingSendAtomically,
+  handoffPendingSendToCardRecoveryAtomically,
+  mutatePendingSendAtomically,
+  readPendingSend as readIndexedDbPendingSend,
+} from './card-transcript-indexeddb'
+import type {
+  PortableValue,
+  V4CardRecoveryRecord,
+  V4PendingSendRecord,
+} from './card-transcript-indexeddb'
+import {
   CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES,
-  cardTranscriptMessagesMatch,
   isCardTranscriptRecoveryMessagePortable,
-  replaceCardTranscriptRecoveryMessages,
+  mergeCardTranscriptRecoveryMessages,
+  readCardTranscriptRecovery,
   sanitizeCardOwnedMessage,
 } from './card-transcript-recovery'
-import {
-  clearMessageJournal,
-  readMessageJournal,
-  removeMessageJournalValues,
-  writeMessageJournal,
-} from './durable-message-journal'
+import type {
+  CardTranscriptRecoveryEnvelope,
+  CardTranscriptRecoveryOwner,
+} from './card-transcript-recovery'
 import type { ChatAttachment, ChatMessage } from './types'
 
 export type PendingSendPayload = {
@@ -21,50 +30,56 @@ export type PendingSendPayload = {
   message: string
   attachments: Array<ChatAttachment>
   optimisticMessage: ChatMessage
-  /** Durable bootstrap transcript retained until a verified Card migration. */
   recoveryMessages?: Array<ChatMessage>
+}
+
+type PendingSendV4Payload = {
+  [key: string]: PortableValue
+  version: 4
+  sessionKey: string
+  friendlyId: string
+  provisionalOwnerId: string
+  message: string
+  attachments: Array<PortableValue>
+  optimisticMessage: PortableValue
+  recoveryMessages: Array<PortableValue>
+}
+
+type StoredPendingSend = Omit<PendingSendPayload, 'recoveryMessages'> & {
+  version: 4
+  revision: number
+  writeId: string
+  updatedAt: number
+  ownerKey: string
+  recoveryMessages: Array<ChatMessage>
 }
 
 let pendingSend: PendingSendPayload | null = null
 let pendingGeneration = false
 let recentSession: { friendlyId: string; at: number } | null = null
 
-const PENDING_MESSAGE_STORAGE_PREFIX = 'claude_pending_msg_'
-const LEGACY_NEW_CHAT_PROVISIONAL_STORAGE_KEY =
-  'workspace.chat-provisional-send.v1:new-chat'
-const NEW_CHAT_PROVISIONAL_STORAGE_PREFIX =
-  'workspace.chat-provisional-send.v2:new-chat:'
 const NEW_CHAT_PROVISIONAL_OWNER_SESSION_KEY =
-  'workspace.chat-provisional-owner.v1'
+  'workspace.chat-provisional-owner.v4'
+const MAX_CAS_ATTEMPTS = 8
+const NO_PENDING_CHANGE = Symbol('no-pending-change')
 let fallbackProvisionalOwnerId = ''
 
-type PersistedPendingSendPayload = PendingSendPayload & {
-  storedAt: number
-}
-
-function canUseLocalStorage() {
-  return (
-    typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
-  )
-}
-
-function normalizedProvisionalOwnerId(value: unknown): string {
+function normalized(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
 function createProvisionalOwnerId(): string {
-  try {
-    return crypto.randomUUID()
-  } catch {
-    return `bootstrap-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-  }
+  return crypto.randomUUID()
 }
 
 /** Stable for one browser tab, but independent from sibling `/chat/new` tabs. */
 export function getNewChatProvisionalOwnerId(): string {
-  if (typeof window === 'undefined') return createProvisionalOwnerId()
+  if (typeof window === 'undefined') {
+    fallbackProvisionalOwnerId ||= createProvisionalOwnerId()
+    return fallbackProvisionalOwnerId
+  }
   try {
-    const existing = normalizedProvisionalOwnerId(
+    const existing = normalized(
       window.sessionStorage.getItem(NEW_CHAT_PROVISIONAL_OWNER_SESSION_KEY),
     )
     if (existing) return existing
@@ -80,306 +95,37 @@ export function getNewChatProvisionalOwnerId(): string {
   }
 }
 
-function pendingJournalIdentity(message: ChatMessage): string {
-  const role = message.role ?? 'unknown'
-  const runId = pendingMessageRunId(message)
-  if (runId) return `${role}:run:${runId}`
-  const clientId = pendingMessageClientId(message)
-  if (clientId) {
-    return `${role}:client:${clientId}:${JSON.stringify({ content: message.content, attachments: message.attachments ?? [] })}`
-  }
-  const raw = message as Record<string, unknown>
-  for (const key of ['stableId', 'stable_id', 'id', 'messageId']) {
-    const value = raw[key]
-    if (typeof value === 'string' && value.trim()) {
-      return `${role}:${key}:${value.trim()}`
-    }
-  }
-  const serialized = JSON.stringify(message)
-  let hash = 2166136261
-  for (let index = 0; index < serialized.length; index += 1) {
-    hash ^= serialized.charCodeAt(index)
-    hash = Math.imul(hash, 16777619)
-  }
-  return `${role}:value:${(hash >>> 0).toString(36)}`
-}
-
-function readPendingJournal(key: string): Array<ChatMessage> {
-  if (!canUseLocalStorage()) return []
-  return readMessageJournal(
-    key,
-    [window.localStorage],
-    pendingJournalIdentity,
-    (value) => {
-      const message = sanitizeCardOwnedMessage(value as ChatMessage)
-      return isCardTranscriptRecoveryMessagePortable(message) ? message : null
-    },
-  )
-}
-
-function getPendingStorageKey(sessionKey: string, provisionalOwnerId = '') {
-  if (sessionKey === 'new') {
-    const ownerId =
-      normalizedProvisionalOwnerId(provisionalOwnerId) ||
-      getNewChatProvisionalOwnerId()
-    return `${NEW_CHAT_PROVISIONAL_STORAGE_PREFIX}${encodeURIComponent(ownerId)}`
-  }
-  return `${PENDING_MESSAGE_STORAGE_PREFIX}${sessionKey || 'main'}`
-}
-
-function isPendingStorageKey(key: string | null): key is string {
-  if (!key || key.includes(':entry:')) return false
-  return (
-    key === LEGACY_NEW_CHAT_PROVISIONAL_STORAGE_KEY ||
-    key.startsWith(NEW_CHAT_PROVISIONAL_STORAGE_PREFIX) ||
-    key.startsWith(PENDING_MESSAGE_STORAGE_PREFIX)
-  )
-}
-
-function toPendingSendPayload(
-  parsed: Record<string, unknown>,
-): PendingSendPayload | null {
-  const optimisticMessage = parsed.optimisticMessage
-  if (
-    typeof parsed.sessionKey !== 'string' ||
-    typeof parsed.friendlyId !== 'string' ||
-    typeof parsed.message !== 'string' ||
-    !optimisticMessage ||
-    typeof optimisticMessage !== 'object'
-  ) {
-    return null
-  }
-
-  const provisionalOwnerId = normalizedProvisionalOwnerId(
-    parsed.provisionalOwnerId,
-  )
-  if (parsed.sessionKey === 'new' && !provisionalOwnerId) return null
-
-  const sanitizedOptimisticMessage = sanitizeCardOwnedMessage(
-    optimisticMessage as ChatMessage,
-  )
-  if (!isCardTranscriptRecoveryMessagePortable(sanitizedOptimisticMessage)) {
-    return null
-  }
-  const recoveryMessages = Array.isArray(parsed.recoveryMessages)
-    ? parsed.recoveryMessages.map((message) =>
-        sanitizeCardOwnedMessage(message as ChatMessage),
-      )
-    : [sanitizedOptimisticMessage]
-  if (
-    recoveryMessages.some(
-      (message) => !isCardTranscriptRecoveryMessagePortable(message),
-    )
-  ) {
-    return null
-  }
-
-  return {
-    sessionKey: parsed.sessionKey,
-    friendlyId: parsed.friendlyId,
-    ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
-    message: parsed.message,
-    attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
-    optimisticMessage: sanitizedOptimisticMessage,
-    recoveryMessages:
-      recoveryMessages.length > 0
-        ? recoveryMessages
-        : [sanitizedOptimisticMessage],
-  }
-}
-
-export function getPendingRecoveryMessages(
-  payload: PendingSendPayload,
-): Array<ChatMessage> {
-  const candidates =
-    payload.recoveryMessages && payload.recoveryMessages.length > 0
-      ? payload.recoveryMessages
-      : [payload.optimisticMessage]
-  const messages: Array<ChatMessage> = []
-  for (const candidate of candidates) {
-    const sanitized = sanitizeCardOwnedMessage(candidate)
-    if (!isCardTranscriptRecoveryMessagePortable(sanitized)) continue
-    const matchingIndex = messages.findIndex((message) =>
-      cardTranscriptMessagesMatch(message, sanitized),
-    )
-    if (matchingIndex >= 0) messages[matchingIndex] = sanitized
-    else messages.push(sanitized)
-  }
-  return messages
-}
-
-function writePendingSendToStorage(
-  payload: PendingSendPayload,
-  reserveTerminal = false,
-): boolean {
-  if (!canUseLocalStorage()) return false
-
-  cleanupExpiredPendingSends()
-
-  const provisionalOwnerId =
-    payload.sessionKey === 'new'
-      ? normalizedProvisionalOwnerId(payload.provisionalOwnerId) ||
-        getNewChatProvisionalOwnerId()
-      : undefined
-  const ownedPayload: PendingSendPayload = {
-    ...payload,
-    ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
-  }
-
-  // A provisional owner can accept another turn before a Card handoff. Preserve
-  // only this tab's prior rows; sibling `/new` tabs use independent keys.
-  let existing: PendingSendPayload | null = null
-  const key = getPendingStorageKey(
-    ownedPayload.sessionKey,
-    ownedPayload.provisionalOwnerId,
-  )
+/** Clear only the opaque tab locator; no payload is ever stored in sessionStorage. */
+export function resetNewChatProvisionalOwnerId(): void {
+  fallbackProvisionalOwnerId = ''
+  if (typeof window === 'undefined') return
   try {
-    const raw = window.localStorage.getItem(key)
-    existing = raw
-      ? toPendingSendPayload(JSON.parse(raw) as Record<string, unknown>)
-      : null
+    window.sessionStorage.removeItem(NEW_CHAT_PROVISIONAL_OWNER_SESSION_KEY)
   } catch {
-    existing = null
-  }
-  const recoveryMessages = getPendingRecoveryMessages({
-    ...ownedPayload,
-    recoveryMessages: [
-      ...(existing ? getPendingRecoveryMessages(existing) : []),
-      ...readPendingJournal(key),
-      ...getPendingRecoveryMessages(ownedPayload),
-    ],
-  })
-  // Reserve one row for the terminal assistant before admitting the user send.
-  // The follow-up terminal append may consume that row, but neither path may
-  // evict a previously accepted recovery turn.
-  if (
-    recoveryMessages.length === 0 ||
-    recoveryMessages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES ||
-    (reserveTerminal &&
-      recoveryMessages.length >= CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES)
-  ) {
-    return false
-  }
-  const optimisticClientId = pendingMessageClientId(
-    ownedPayload.optimisticMessage,
-  )
-  const optimisticMessage = recoveryMessages.find(
-    (message) => pendingMessageClientId(message) === optimisticClientId,
-  )
-  if (!optimisticMessage) return false
-
-  const record: PersistedPendingSendPayload = {
-    ...ownedPayload,
-    optimisticMessage,
-    recoveryMessages,
-    storedAt: Date.now(),
-  }
-
-  try {
-    const journalWrite = writeMessageJournal(
-      key,
-      recoveryMessages,
-      [window.localStorage],
-      pendingJournalIdentity,
-    )
-    if (!journalWrite.persistentVerified) return false
-    const serialized = JSON.stringify(record)
-    window.localStorage.setItem(key, serialized)
-    // The per-message journal is the cross-context authority. The aggregate
-    // record is retained for transport metadata and legacy readers.
-    if (window.localStorage.getItem(key) !== serialized) {
-      throw new Error('pending-send aggregate readback mismatch')
-    }
-    return true
-  } catch {
-    if (reserveTerminal) {
-      removeRejectedPendingMessage(
-        ownedPayload.sessionKey,
-        optimisticClientId,
-        ownedPayload.provisionalOwnerId,
-      )
-    }
-    return false
+    // A denied locator does not authorize a payload fallback.
   }
 }
 
-function readPendingSendFromStorageByFriendlyId(
-  friendlyId: string,
-): PendingSendPayload | null {
-  if (!canUseLocalStorage() || !friendlyId) return null
-
-  try {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index)
-      if (!isPendingStorageKey(key)) continue
-      const raw = window.localStorage.getItem(key)
-      if (!raw) continue
-      try {
-        const parsed = JSON.parse(raw) as PersistedPendingSendPayload
-        if (parsed.friendlyId !== friendlyId) continue
-        return toPendingSendPayload(parsed)
-      } catch {
-        window.localStorage.removeItem(key)
-      }
-    }
-  } catch {
-    // Ignore storage read failures.
-  }
-
-  return null
-}
-
-function removePendingSendFromStorageByFriendlyId(friendlyId: string) {
-  if (!canUseLocalStorage() || !friendlyId) return
-
-  try {
-    const keysToDelete: Array<string> = []
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index)
-      if (!isPendingStorageKey(key)) continue
-      const raw = window.localStorage.getItem(key)
-      if (!raw) continue
-      try {
-        const parsed = JSON.parse(raw) as PersistedPendingSendPayload
-        if (parsed.friendlyId === friendlyId) {
-          keysToDelete.push(key)
-        }
-      } catch {
-        keysToDelete.push(key)
-      }
-    }
-    for (const key of keysToDelete) {
-      window.localStorage.removeItem(key)
-    }
-  } catch {
-    // Ignore storage cleanup failures.
-  }
-}
-
-export function cleanupExpiredPendingSends() {
-  // Intentionally retained as a compatibility no-op. Pending, failed,
-  // cancelled, and retryable turns have no safe time-based deletion point.
-}
-
-export function persistPendingMessage(payload: PendingSendPayload): boolean {
-  return writePendingSendToStorage(payload, true)
-}
-
-/** Append terminal bootstrap output without relinquishing provisional ownership. */
-export function appendPendingRecoveryMessage(
+export function pendingSendOwnerKey(
   sessionKey: string,
-  friendlyId: string,
-  message: ChatMessage,
   provisionalOwnerId = '',
-): boolean {
-  const source = readPendingMessage(sessionKey, friendlyId, provisionalOwnerId)
-  if (!source) return false
-  const sanitized = sanitizeCardOwnedMessage(message)
-  if (!isCardTranscriptRecoveryMessagePortable(sanitized)) return false
-  return writePendingSendToStorage({
-    ...source,
-    recoveryMessages: [...getPendingRecoveryMessages(source), sanitized],
-  })
+): string {
+  const normalizedSessionKey = normalized(sessionKey)
+  if (!normalizedSessionKey) throw new Error('Pending-send session key is required')
+  if (normalizedSessionKey === 'new') {
+    const ownerId = normalized(provisionalOwnerId) || getNewChatProvisionalOwnerId()
+    return `new:${ownerId}`
+  }
+  return `session:${normalizedSessionKey}`
+}
+
+function pendingMessageClientId(message: ChatMessage): string {
+  const raw = message as Record<string, unknown>
+  return (
+    normalized(raw.clientId) ||
+    normalized(raw.client_id) ||
+    normalized(raw.idempotencyKey)
+  )
 }
 
 function pendingMessageRunId(message: ChatMessage): string {
@@ -391,41 +137,8 @@ function pendingMessageRunId(message: ChatMessage): string {
     'providerRunId',
     'provider_run_id',
   ]) {
-    const value = raw[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
-  }
-  return ''
-}
-
-/** Persist the newest bootstrap assistant prefix without accumulating copies. */
-export function checkpointPendingRecoveryMessage(
-  sessionKey: string,
-  friendlyId: string,
-  message: ChatMessage,
-  provisionalOwnerId = '',
-): boolean {
-  const source = readPendingMessage(sessionKey, friendlyId, provisionalOwnerId)
-  if (!source) return false
-  const sanitized = sanitizeCardOwnedMessage(message)
-  if (!isCardTranscriptRecoveryMessagePortable(sanitized)) return false
-  const runId = pendingMessageRunId(sanitized)
-  const recoveryMessages = getPendingRecoveryMessages(source)
-  const index = recoveryMessages.findIndex(
-    (candidate) =>
-      candidate.role === 'assistant' &&
-      Boolean(runId) &&
-      pendingMessageRunId(candidate) === runId,
-  )
-  if (index >= 0) recoveryMessages[index] = sanitized
-  else recoveryMessages.push(sanitized)
-  return writePendingSendToStorage({ ...source, recoveryMessages })
-}
-
-function pendingMessageClientId(message: ChatMessage): string {
-  const raw = message as Record<string, unknown>
-  for (const key of ['clientId', 'client_id', 'idempotencyKey']) {
-    const value = raw[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
+    const value = normalized(raw[key])
+    if (value) return value
   }
   return ''
 }
@@ -450,156 +163,378 @@ function lastPendingUserMessage(
   return undefined
 }
 
-/** Remove one user turn that failed the bootstrap pre-transport admission gate. */
-export function removeRejectedPendingMessage(
+export function getPendingRecoveryMessages(
+  payload: PendingSendPayload,
+): Array<ChatMessage> {
+  const candidates =
+    payload.recoveryMessages && payload.recoveryMessages.length > 0
+      ? payload.recoveryMessages
+      : [payload.optimisticMessage]
+  return mergeCardTranscriptRecoveryMessages(
+    [],
+    candidates
+      .map(sanitizeCardOwnedMessage)
+      .filter(isCardTranscriptRecoveryMessagePortable),
+  )
+}
+
+function isPortableAttachment(value: unknown): value is ChatAttachment {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  return Object.values(value).every((entry) => entry !== undefined)
+}
+
+function parsePendingRecord(
+  value: unknown,
+  ownerKey: string,
+): StoredPendingSend {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Pending-send v4 record is malformed')
+  }
+  const record = value as Record<string, unknown>
+  const payload = record.payload
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('Pending-send v4 payload is malformed')
+  }
+  const raw = payload as Record<string, unknown>
+  if (
+    record.schema !== 4 ||
+    record.ownerKey !== ownerKey ||
+    typeof record.revision !== 'number' ||
+    !Number.isSafeInteger(record.revision) ||
+    record.revision <= 0 ||
+    !normalized(record.writeId) ||
+    typeof record.updatedAt !== 'number' ||
+    !Number.isFinite(record.updatedAt) ||
+    record.updatedAt <= 0 ||
+    raw.version !== 4 ||
+    !normalized(raw.sessionKey) ||
+    typeof raw.friendlyId !== 'string' ||
+    typeof raw.provisionalOwnerId !== 'string' ||
+    typeof raw.message !== 'string' ||
+    !Array.isArray(raw.attachments) ||
+    !raw.attachments.every(isPortableAttachment) ||
+    !Array.isArray(raw.recoveryMessages) ||
+    !raw.optimisticMessage ||
+    typeof raw.optimisticMessage !== 'object'
+  ) {
+    throw new Error('Pending-send v4 metadata is invalid')
+  }
+  const optimisticMessage = sanitizeCardOwnedMessage(
+    raw.optimisticMessage as ChatMessage,
+  )
+  const recoveryMessages = raw.recoveryMessages.map((message) =>
+    sanitizeCardOwnedMessage(message as ChatMessage),
+  )
+  if (
+    !isCardTranscriptRecoveryMessagePortable(optimisticMessage) ||
+    recoveryMessages.some(
+      (message) => !isCardTranscriptRecoveryMessagePortable(message),
+    )
+  ) {
+    throw new Error('Pending-send v4 messages are invalid')
+  }
+  return {
+    version: 4,
+    ownerKey,
+    revision: record.revision,
+    writeId: String(record.writeId),
+    updatedAt: record.updatedAt,
+    sessionKey: String(raw.sessionKey),
+    friendlyId: String(raw.friendlyId),
+    ...(normalized(raw.provisionalOwnerId)
+      ? { provisionalOwnerId: String(raw.provisionalOwnerId) }
+      : {}),
+    message: String(raw.message),
+    attachments: raw.attachments as Array<ChatAttachment>,
+    optimisticMessage,
+    recoveryMessages,
+  }
+}
+
+function makePendingRecord(
+  ownerKey: string,
+  payload: PendingSendPayload,
+  previous: StoredPendingSend | null,
+): V4PendingSendRecord<PendingSendV4Payload> {
+  const provisionalOwnerId =
+    payload.sessionKey === 'new'
+      ? normalized(payload.provisionalOwnerId) || getNewChatProvisionalOwnerId()
+      : ''
+  const recoveryMessages = getPendingRecoveryMessages(payload)
+  const updatedAt = Date.now()
+  return {
+    schema: 4,
+    ownerKey,
+    revision: (previous?.revision ?? 0) + 1,
+    writeId: crypto.randomUUID(),
+    updatedAt,
+    payload: {
+      version: 4,
+      sessionKey: payload.sessionKey,
+      friendlyId: payload.friendlyId,
+      provisionalOwnerId,
+      message: payload.message,
+      attachments: payload.attachments as Array<PortableValue>,
+      optimisticMessage: payload.optimisticMessage as PortableValue,
+      recoveryMessages: recoveryMessages as Array<PortableValue>,
+    },
+  }
+}
+
+function isCasFailure(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('compare-and-swap failed')
+}
+
+export async function readPendingMessage(
+  sessionKey: string,
+  friendlyId?: string,
+  provisionalOwnerId = '',
+): Promise<PendingSendPayload | null> {
+  if (!normalized(sessionKey)) return null
+  const ownerKey = pendingSendOwnerKey(sessionKey, provisionalOwnerId)
+  const stored = await readIndexedDbPendingSend(ownerKey)
+  if (!stored) return null
+  const parsed = parsePendingRecord(stored, ownerKey)
+  if (friendlyId && parsed.friendlyId !== friendlyId) return null
+  return {
+    sessionKey: parsed.sessionKey,
+    friendlyId: parsed.friendlyId,
+    ...(parsed.provisionalOwnerId
+      ? { provisionalOwnerId: parsed.provisionalOwnerId }
+      : {}),
+    message: parsed.message,
+    attachments: parsed.attachments,
+    optimisticMessage: parsed.optimisticMessage,
+    recoveryMessages: parsed.recoveryMessages,
+  }
+}
+
+async function readStoredPending(
+  sessionKey: string,
+  provisionalOwnerId = '',
+): Promise<StoredPendingSend | null> {
+  const ownerKey = pendingSendOwnerKey(sessionKey, provisionalOwnerId)
+  const stored = await readIndexedDbPendingSend(ownerKey)
+  return stored ? parsePendingRecord(stored, ownerKey) : null
+}
+
+async function mutatePending(
+  sessionKey: string,
+  provisionalOwnerId: string,
+  update: (
+    current: StoredPendingSend | null,
+  ) => PendingSendPayload | null | typeof NO_PENDING_CHANGE,
+): Promise<StoredPendingSend | null> {
+  const ownerKey = pendingSendOwnerKey(sessionKey, provisionalOwnerId)
+  for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+    const current = await readStoredPending(sessionKey, provisionalOwnerId)
+    const next = update(current)
+    if (next === NO_PENDING_CHANGE) return current
+    const replacement = next ? makePendingRecord(ownerKey, next, current) : null
+    try {
+      await mutatePendingSendAtomically({
+        ownerKey,
+        expectedWriteId: current?.writeId ?? null,
+        mutation: replacement
+          ? { type: 'replace', record: replacement }
+          : { type: 'delete' },
+      })
+      return replacement ? parsePendingRecord(replacement, ownerKey) : null
+    } catch (error) {
+      if (isCasFailure(error) && attempt + 1 < MAX_CAS_ATTEMPTS) continue
+      throw error
+    }
+  }
+  throw new Error('Pending-send compare-and-swap retries exhausted')
+}
+
+export async function persistPendingMessage(
+  payload: PendingSendPayload,
+): Promise<boolean> {
+  const provisionalOwnerId =
+    payload.sessionKey === 'new'
+      ? normalized(payload.provisionalOwnerId) || getNewChatProvisionalOwnerId()
+      : ''
+  const optimistic = sanitizeCardOwnedMessage(payload.optimisticMessage)
+  if (!isCardTranscriptRecoveryMessagePortable(optimistic)) return false
+  let admitted = false
+  const result = await mutatePending(
+    payload.sessionKey,
+    provisionalOwnerId,
+    (current) => {
+      admitted = false
+      const recoveryMessages = mergeCardTranscriptRecoveryMessages(
+        current?.recoveryMessages ?? [],
+        getPendingRecoveryMessages({ ...payload, optimisticMessage: optimistic }),
+      )
+      if (
+        recoveryMessages.length === 0 ||
+        recoveryMessages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES
+      ) {
+        return NO_PENDING_CHANGE
+      }
+      const clientId = pendingMessageClientId(optimistic)
+      const admittedMessage = recoveryMessages.find(
+        (message) => pendingMessageClientId(message) === clientId,
+      )
+      if (!admittedMessage) return NO_PENDING_CHANGE
+      admitted = true
+      return {
+        ...payload,
+        ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
+        optimisticMessage: admittedMessage,
+        recoveryMessages,
+      }
+    },
+  )
+  return result !== null && admitted
+}
+
+export async function appendPendingRecoveryMessage(
+  sessionKey: string,
+  friendlyId: string,
+  message: ChatMessage,
+  provisionalOwnerId = '',
+): Promise<boolean> {
+  const sanitized = sanitizeCardOwnedMessage(message)
+  if (!isCardTranscriptRecoveryMessagePortable(sanitized)) return false
+  let appended = false
+  const result = await mutatePending(
+    sessionKey,
+    provisionalOwnerId,
+    (current) => {
+      appended = false
+      if (!current || current.friendlyId !== friendlyId) {
+        return NO_PENDING_CHANGE
+      }
+      const recoveryMessages = mergeCardTranscriptRecoveryMessages(
+        current.recoveryMessages,
+        [sanitized],
+      )
+      if (recoveryMessages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES) {
+        throw new Error('Pending-send recovery capacity exceeded')
+      }
+      appended = true
+      return { ...current, recoveryMessages }
+    },
+  )
+  return result !== null && appended
+}
+
+export async function checkpointPendingRecoveryMessage(
+  sessionKey: string,
+  friendlyId: string,
+  message: ChatMessage,
+  provisionalOwnerId = '',
+): Promise<boolean> {
+  const sanitized = sanitizeCardOwnedMessage(message)
+  if (!isCardTranscriptRecoveryMessagePortable(sanitized)) return false
+  let checkpointed = false
+  const result = await mutatePending(
+    sessionKey,
+    provisionalOwnerId,
+    (current) => {
+      checkpointed = false
+      if (!current || current.friendlyId !== friendlyId) {
+        return NO_PENDING_CHANGE
+      }
+      const recoveryMessages = [...current.recoveryMessages]
+      const runId = pendingMessageRunId(sanitized)
+      const index = recoveryMessages.findIndex(
+        (candidate) =>
+          candidate.role === 'assistant' &&
+          Boolean(runId) &&
+          pendingMessageRunId(candidate) === runId,
+      )
+      if (index >= 0) recoveryMessages[index] = sanitized
+      else recoveryMessages.push(sanitized)
+      if (recoveryMessages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES) {
+        throw new Error('Pending-send recovery capacity exceeded')
+      }
+      checkpointed = true
+      return { ...current, recoveryMessages }
+    },
+  )
+  return result !== null && checkpointed
+}
+
+export async function removeRejectedPendingMessage(
   sessionKey: string,
   clientId: string,
   provisionalOwnerId = '',
-): void {
-  const normalizedClientId = clientId.trim()
-  if (!canUseLocalStorage() || !sessionKey || !normalizedClientId) return
-
-  const key = getPendingStorageKey(sessionKey, provisionalOwnerId)
-  const journalMessages = readPendingJournal(key)
-  removeMessageJournalValues(
-    key,
-    journalMessages.filter(
-      (message) => pendingMessageClientId(message) === normalizedClientId,
-    ),
-    [window.localStorage],
-    pendingJournalIdentity,
-  )
-
-  try {
-    const raw = window.localStorage.getItem(key)
-    if (raw) {
-      const parsed = JSON.parse(raw) as PersistedPendingSendPayload
-      const payload = toPendingSendPayload(parsed)
-      if (payload) {
-        const priorMessages = getPendingRecoveryMessages(payload)
-        const recoveryMessages = priorMessages.filter(
-          (message) => pendingMessageClientId(message) !== normalizedClientId,
-        )
-        if (
-          pendingMessageClientId(payload.optimisticMessage) ===
-          normalizedClientId
-        ) {
-          const replacement = lastPendingUserMessage(recoveryMessages)
-          if (!replacement) {
-            window.localStorage.removeItem(key)
-          } else {
-            const record: PersistedPendingSendPayload = {
-              ...payload,
-              message: pendingMessageText(replacement),
-              attachments: Array.isArray(replacement.attachments)
-                ? replacement.attachments
-                : [],
-              optimisticMessage: replacement,
-              recoveryMessages,
-              storedAt:
-                typeof parsed.storedAt === 'number'
-                  ? parsed.storedAt
-                  : Date.now(),
-            }
-            window.localStorage.setItem(key, JSON.stringify(record))
-          }
-        } else if (recoveryMessages.length !== priorMessages.length) {
-          window.localStorage.setItem(
-            key,
-            JSON.stringify({ ...parsed, recoveryMessages }),
-          )
-        }
-      }
-    }
-  } catch {
-    // Cleanup is best effort when browser storage becomes unavailable.
-  }
-
-  if (
-    pendingSend?.sessionKey === sessionKey &&
-    (!provisionalOwnerId ||
-      pendingSend.provisionalOwnerId === provisionalOwnerId)
-  ) {
-    const recoveryMessages = getPendingRecoveryMessages(pendingSend).filter(
+): Promise<void> {
+  const normalizedClientId = normalized(clientId)
+  if (!normalizedClientId) return
+  await mutatePending(sessionKey, provisionalOwnerId, (current) => {
+    if (!current) return null
+    const recoveryMessages = current.recoveryMessages.filter(
       (message) => pendingMessageClientId(message) !== normalizedClientId,
     )
-    if (
-      pendingMessageClientId(pendingSend.optimisticMessage) ===
-      normalizedClientId
-    ) {
-      const replacement = lastPendingUserMessage(recoveryMessages)
-      pendingSend = replacement
-        ? {
-            ...pendingSend,
-            message: pendingMessageText(replacement),
-            attachments: Array.isArray(replacement.attachments)
-              ? replacement.attachments
-              : [],
-            optimisticMessage: replacement,
-            recoveryMessages,
-          }
-        : null
-    } else {
-      pendingSend = { ...pendingSend, recoveryMessages }
+    if (recoveryMessages.length === 0) return null
+    const optimisticMessage =
+      pendingMessageClientId(current.optimisticMessage) === normalizedClientId
+        ? lastPendingUserMessage(recoveryMessages)
+        : current.optimisticMessage
+    if (!optimisticMessage) return null
+    return {
+      ...current,
+      message: pendingMessageText(optimisticMessage),
+      attachments: optimisticMessage.attachments ?? [],
+      optimisticMessage,
+      recoveryMessages,
     }
-  }
+  })
 }
 
-/** Update the durable provisional/legacy overlay before a route can remount. */
-export function updatePendingMessageByClientId(
+export async function updatePendingMessageByClientId(
+  sessionKey: string,
   clientId: string,
   updater: (message: ChatMessage) => ChatMessage,
-): boolean {
-  if (!canUseLocalStorage() || !clientId) return false
+  provisionalOwnerId = '',
+): Promise<boolean> {
   let updated = false
-  try {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index)
-      if (!isPendingStorageKey(key)) continue
-      const raw = window.localStorage.getItem(key)
-      if (!raw) continue
-      try {
-        const parsed = JSON.parse(raw) as PersistedPendingSendPayload
-        const payload = toPendingSendPayload(parsed)
-        if (
-          !payload ||
-          pendingMessageClientId(payload.optimisticMessage) !== clientId
-        ) {
-          continue
-        }
-        const optimisticMessage = sanitizeCardOwnedMessage(
-          updater(payload.optimisticMessage),
-        )
-        const recoveryMessages = getPendingRecoveryMessages(payload).map(
-          (message) =>
-            pendingMessageClientId(message) === clientId
-              ? optimisticMessage
-              : message,
-        )
-        const next = { ...parsed, optimisticMessage, recoveryMessages }
-        window.localStorage.setItem(key, JSON.stringify(next))
-        if (
-          pendingSend &&
-          pendingMessageClientId(pendingSend.optimisticMessage) === clientId
-        ) {
-          pendingSend = {
-            ...pendingSend,
-            optimisticMessage,
-            recoveryMessages,
-          }
-        }
+  const result = await mutatePending(
+    sessionKey,
+    provisionalOwnerId,
+    (current) => {
+      if (!current) return null
+      const recoveryMessages = current.recoveryMessages.map((message) => {
+        if (pendingMessageClientId(message) !== clientId) return message
         updated = true
-      } catch {
-        // One malformed/stale sibling record must not block the provisional owner.
-      }
-    }
-  } catch {
-    return updated
-  }
-  return updated
+        return sanitizeCardOwnedMessage(updater(message))
+      })
+      if (!updated) return current
+      const optimisticMessage =
+        pendingMessageClientId(current.optimisticMessage) === clientId
+          ? sanitizeCardOwnedMessage(updater(current.optimisticMessage))
+          : current.optimisticMessage
+      return { ...current, optimisticMessage, recoveryMessages }
+    },
+  )
+  return result !== null && updated
 }
 
-export function handoffPendingSend(
+function recoveryHandoffRecord(
+  owner: CardTranscriptRecoveryOwner,
+  messages: Array<ChatMessage>,
+  current: CardTranscriptRecoveryEnvelope | null,
+): V4CardRecoveryRecord {
+  const updatedAt = Date.now()
+  return {
+    schema: 4,
+    cardId: owner.cardId,
+    revision: (current?.revision ?? 0) + 1,
+    writeId: crypto.randomUUID(),
+    updatedAt,
+    payload: {
+      version: 4,
+      createdAt: current?.createdAt ?? updatedAt,
+      messages: messages as Array<PortableValue>,
+    },
+  }
+}
+
+export async function handoffPendingSend(
   fromSessionKey: string,
   toSessionKey: string,
   toFriendlyId: string,
@@ -607,172 +542,164 @@ export function handoffPendingSend(
     verifiedCardDestination?: boolean
     provisionalOwnerId?: string
   } = {},
-) {
-  const normalizedFrom = fromSessionKey.trim()
-  const normalizedTo = toSessionKey.trim()
-  const normalizedFriendlyId = toFriendlyId.trim() || normalizedTo
-  if (!normalizedFrom || !normalizedTo || normalizedFrom === normalizedTo)
-    return
-
-  const persisted = readPendingMessage(
-    normalizedFrom,
-    undefined,
+): Promise<boolean> {
+  const sourceSessionKey = normalized(fromSessionKey)
+  const destinationSessionKey = normalized(toSessionKey)
+  const destinationFriendlyId = normalized(toFriendlyId) || destinationSessionKey
+  if (
+    !sourceSessionKey ||
+    !destinationSessionKey ||
+    sourceSessionKey === destinationSessionKey
+  ) {
+    return false
+  }
+  const sourceOwnerKey = pendingSendOwnerKey(
+    sourceSessionKey,
     options.provisionalOwnerId,
   )
-  const source =
-    pendingSend?.sessionKey === normalizedFrom &&
-    (!options.provisionalOwnerId ||
-      pendingSend.provisionalOwnerId === options.provisionalOwnerId)
-      ? pendingSend
-      : persisted
-  if (!source) return
 
-  // A bootstrap owner can move only into a verified source-qualified Card.
-  // Never replace the provisional key with a raw canonical segment key.
-  if (normalizedFrom === 'new') {
-    if (
-      !options.verifiedCardDestination ||
-      (!normalizedFriendlyId.startsWith('remote:') &&
-        !normalizedFriendlyId.startsWith('local:'))
-    ) {
-      return
-    }
-    const migrated = replaceCardTranscriptRecoveryMessages(
-      { cardId: normalizedFriendlyId },
-      getPendingRecoveryMessages(source),
+  for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+    const source = await readStoredPending(
+      sourceSessionKey,
+      options.provisionalOwnerId,
     )
-    if (!migrated) return
-    if (pendingSend?.sessionKey === normalizedFrom) pendingSend = null
-    clearPendingMessage(normalizedFrom, source.provisionalOwnerId)
-    return
-  }
-
-  const next: PendingSendPayload = {
-    ...source,
-    sessionKey: normalizedTo,
-    friendlyId: normalizedFriendlyId,
-  }
-  // Never delete the provisional owner until the authoritative destination
-  // record has landed. A quota/storage failure must leave the first turn
-  // recoverable on /chat/new rather than losing both copies during handoff.
-  if (!writePendingSendToStorage(next)) return
-  pendingSend = pendingSend?.sessionKey === normalizedFrom ? next : pendingSend
-  clearPendingMessage(normalizedFrom, source.provisionalOwnerId)
-}
-
-export function readPendingMessage(
-  sessionKey: string,
-  friendlyId?: string,
-  provisionalOwnerId = '',
-): PendingSendPayload | null {
-  if (!canUseLocalStorage() || !sessionKey) return null
-
-  cleanupExpiredPendingSends()
-
-  const key = getPendingStorageKey(sessionKey, provisionalOwnerId)
-  try {
-    const raw = window.localStorage.getItem(key)
-    if (!raw) {
-      return friendlyId && sessionKey !== 'new'
-        ? readPendingSendFromStorageByFriendlyId(friendlyId)
-        : null
-    }
-    const parsed = JSON.parse(raw) as PersistedPendingSendPayload
-    if (friendlyId && parsed.friendlyId !== friendlyId) {
-      return sessionKey === 'new'
-        ? null
-        : readPendingSendFromStorageByFriendlyId(friendlyId)
-    }
-    const payload = toPendingSendPayload(parsed)
-    if (!payload) return null
-    return {
-      ...payload,
-      recoveryMessages: getPendingRecoveryMessages({
-        ...payload,
-        recoveryMessages: [
-          ...getPendingRecoveryMessages(payload),
-          ...readPendingJournal(key),
-        ],
-      }),
-    }
-  } catch {
+    if (!source) return true
     try {
-      window.localStorage.removeItem(key)
-    } catch {
-      // Ignore storage cleanup failures.
+      if (sourceSessionKey === 'new') {
+        const recoveryOwner = { cardId: destinationFriendlyId }
+        if (
+          !options.verifiedCardDestination ||
+          (!destinationFriendlyId.startsWith('remote:') &&
+            !destinationFriendlyId.startsWith('local:'))
+        ) {
+          return false
+        }
+        const currentRecovery = await readCardTranscriptRecovery(recoveryOwner)
+        const messages = mergeCardTranscriptRecoveryMessages(
+          currentRecovery?.messages ?? [],
+          source.recoveryMessages,
+        )
+        if (messages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES) {
+          throw new Error('Card recovery capacity exceeded during handoff')
+        }
+        await handoffPendingSendToCardRecoveryAtomically({
+          sourceOwnerKey,
+          expectedPendingWriteId: source.writeId,
+          recoveryCardId: destinationFriendlyId,
+          expectedRecoveryWriteId: currentRecovery?.writeId ?? null,
+          recoveryMutation: {
+            type: 'merge',
+            record: recoveryHandoffRecord(
+              recoveryOwner,
+              messages,
+              currentRecovery,
+            ),
+          },
+        })
+      } else {
+        const destinationOwnerKey = pendingSendOwnerKey(destinationSessionKey)
+        const destination = await readStoredPending(destinationSessionKey)
+        const nextPayload: PendingSendPayload = {
+          ...source,
+          sessionKey: destinationSessionKey,
+          friendlyId: destinationFriendlyId,
+          recoveryMessages: mergeCardTranscriptRecoveryMessages(
+            destination?.recoveryMessages ?? [],
+            source.recoveryMessages,
+          ),
+        }
+        const destinationRecord = makePendingRecord(
+          destinationOwnerKey,
+          nextPayload,
+          destination,
+        )
+        await handoffPendingSendAtomically({
+          sourceOwnerKey,
+          expectedSourceWriteId: source.writeId,
+          destination: destinationRecord,
+          ...(destination
+            ? {
+                existingDestinationMerge: {
+                  expectedWriteId: destination.writeId,
+                  record: destinationRecord,
+                },
+              }
+            : {}),
+        })
+      }
+      if (pendingSend?.sessionKey === sourceSessionKey) pendingSend = null
+      return true
+    } catch (error) {
+      if (isCasFailure(error) && attempt + 1 < MAX_CAS_ATTEMPTS) continue
+      throw error
     }
-    return null
   }
+  throw new Error('Pending-send handoff compare-and-swap retries exhausted')
 }
 
-export function clearPendingMessage(
+export async function clearPendingMessage(
   sessionKey: string,
   provisionalOwnerId = '',
-) {
-  if (!canUseLocalStorage() || !sessionKey) return
-  try {
-    const key = getPendingStorageKey(sessionKey, provisionalOwnerId)
-    clearMessageJournal(key, [window.localStorage])
-    window.localStorage.removeItem(key)
-  } catch {
-    // Ignore storage cleanup failures.
-  }
+): Promise<void> {
+  if (!normalized(sessionKey)) return
+  await mutatePending(sessionKey, provisionalOwnerId, () => null)
 }
 
-export function stashPendingSend(payload: PendingSendPayload) {
-  pendingSend = payload
-  writePendingSendToStorage(payload)
+export async function stashPendingSend(
+  payload: PendingSendPayload,
+): Promise<boolean> {
+  const persisted = await persistPendingMessage(payload)
+  if (persisted) pendingSend = payload
+  return persisted
 }
 
-export function hasPendingSend() {
+export function hasPendingSend(): boolean {
   return pendingSend !== null
 }
 
-export function setPendingGeneration(value: boolean) {
+export function setPendingGeneration(value: boolean): void {
   pendingGeneration = value
 }
 
-export function hasPendingGeneration() {
+export function hasPendingGeneration(): boolean {
   return pendingGeneration
 }
 
-export function resetPendingSend() {
-  if (pendingSend?.sessionKey) {
-    clearPendingMessage(pendingSend.sessionKey, pendingSend.provisionalOwnerId)
-  }
+export async function resetPendingSend(): Promise<void> {
+  const current = pendingSend
   pendingSend = null
   pendingGeneration = false
+  if (current?.sessionKey) {
+    await clearPendingMessage(current.sessionKey, current.provisionalOwnerId)
+  }
+  resetNewChatProvisionalOwnerId()
 }
 
-export function clearPendingSendForSession(
+export async function clearPendingSendForSession(
   sessionKey: string,
   friendlyId: string,
-) {
-  if (sessionKey) {
-    clearPendingMessage(sessionKey)
-  } else if (friendlyId) {
-    removePendingSendFromStorageByFriendlyId(friendlyId)
-  }
-
-  if (!pendingSend) return
-  if (sessionKey && pendingSend.sessionKey === sessionKey) {
-    resetPendingSend()
-    return
-  }
-  if (friendlyId && pendingSend.friendlyId === friendlyId) {
-    resetPendingSend()
+): Promise<void> {
+  if (normalized(sessionKey)) await clearPendingMessage(sessionKey)
+  if (
+    pendingSend &&
+    ((sessionKey && pendingSend.sessionKey === sessionKey) ||
+      (friendlyId && pendingSend.friendlyId === friendlyId))
+  ) {
+    pendingSend = null
   }
 }
 
-export function setRecentSession(friendlyId: string) {
+export function cleanupExpiredPendingSends(): void {
+  // Clean v4 pending rows have no time-based deletion policy.
+}
+
+export function setRecentSession(friendlyId: string): void {
   recentSession = { friendlyId, at: Date.now() }
 }
 
-export function isRecentSession(friendlyId: string, maxAgeMs = 15000) {
-  if (!recentSession) return false
-  if (recentSession.friendlyId !== friendlyId) return false
-  if (Date.now() - recentSession.at > maxAgeMs) return false
-  return true
+export function isRecentSession(friendlyId: string, maxAgeMs = 15000): boolean {
+  if (!recentSession || recentSession.friendlyId !== friendlyId) return false
+  return Date.now() - recentSession.at <= maxAgeMs
 }
 
 export function consumePendingSend(
@@ -780,12 +707,10 @@ export function consumePendingSend(
   friendlyId?: string,
 ): PendingSendPayload | null {
   if (!pendingSend) return null
-  if (sessionKey && pendingSend.sessionKey === sessionKey) {
-    const payload = pendingSend
-    pendingSend = null
-    return payload
-  }
-  if (friendlyId && pendingSend.friendlyId === friendlyId) {
+  if (
+    (sessionKey && pendingSend.sessionKey === sessionKey) ||
+    (friendlyId && pendingSend.friendlyId === friendlyId)
+  ) {
     const payload = pendingSend
     pendingSend = null
     return payload

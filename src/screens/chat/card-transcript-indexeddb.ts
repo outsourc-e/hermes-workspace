@@ -182,14 +182,14 @@ function keyPathMatches(
   )
 }
 
-function hasExactV4Schema(database: IDBDatabase): boolean {
+function hasExactV4Schema(database: IDBDatabase): Promise<boolean> {
   const expectedNames = Object.values(WORKSPACE_CHAT_STORE_NAMES).sort()
   const actualNames = Array.from(database.objectStoreNames).sort()
   if (
     expectedNames.length !== actualNames.length ||
     expectedNames.some((name, index) => name !== actualNames[index])
   ) {
-    return false
+    return Promise.resolve(false)
   }
 
   try {
@@ -206,16 +206,32 @@ function hasExactV4Schema(database: IDBDatabase): boolean {
     const pending = transaction.objectStore(
       WORKSPACE_CHAT_STORE_NAMES.pendingSends,
     )
-    return (
+    const matches =
       keyPathMatches(latest.keyPath, 'cardId') &&
       keyPathMatches(recovery.keyPath, 'cardId') &&
       keyPathMatches(journal.keyPath, ['ownerKey', 'entryKey']) &&
       journal.indexNames.contains(JOURNAL_OWNER_INDEX) &&
       keyPathMatches(journal.index(JOURNAL_OWNER_INDEX).keyPath, 'ownerKey') &&
       keyPathMatches(pending.keyPath, 'ownerKey')
-    )
+
+    // Opening a transaction solely to inspect key paths still leaves that
+    // transaction active until its completion event. Do not hand the database
+    // to callers before it settles: tests and production reset callers may
+    // close the returned handle immediately, and a hidden validation
+    // transaction would otherwise keep that handle alive and block deletion.
+    return new Promise((resolve) => {
+      let settled = false
+      const finish = (result: boolean) => {
+        if (settled) return
+        settled = true
+        resolve(result)
+      }
+      transaction.oncomplete = () => finish(matches)
+      transaction.onerror = () => finish(false)
+      transaction.onabort = () => finish(false)
+    })
   } catch {
-    return false
+    return Promise.resolve(false)
   }
 }
 
@@ -245,18 +261,28 @@ export function openWorkspaceChatIndexedDb(): Promise<IDBDatabase> {
       reject(new Error('Workspace chat database open was blocked'))
     }
     request.onsuccess = () => {
+      const database = request.result
+      // Reset/version upgrades must never be held hostage by an in-flight
+      // operation. Closing on versionchange marks this connection close-pending;
+      // IndexedDB then lets its current transaction settle before deletion.
+      database.onversionchange = () => database.close()
       if (settled) {
-        request.result.close()
+        database.close()
         return
       }
-      if (!hasExactV4Schema(request.result)) {
+      void hasExactV4Schema(database).then((valid) => {
+        if (settled) {
+          database.close()
+          return
+        }
         settled = true
-        request.result.close()
-        reject(new Error('Workspace chat database v4 schema is invalid'))
-        return
-      }
-      settled = true
-      resolve(request.result)
+        if (!valid) {
+          database.close()
+          reject(new Error('Workspace chat database v4 schema is invalid'))
+          return
+        }
+        resolve(database)
+      })
     }
   })
 }

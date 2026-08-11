@@ -222,7 +222,7 @@ export function resolveSessionCardDetailRouteState({
     : { status: 'unavailable', reason: 'projection' }
 }
 
-export function applySessionRouteResolution({
+export async function applySessionRouteResolution({
   queryClient,
   activeFriendlyId,
   fallbackSessionKey,
@@ -239,20 +239,25 @@ export function applySessionRouteResolution({
       : payload.fromSessionKey.trim()
 
   if (payload.reason !== 'canonical') {
-    moveHistoryMessages(
-      queryClient,
-      activeFriendlyId,
-      sourceSessionKey,
-      payload.friendlyId,
-      payload.sessionKey,
-    )
-    handoffPendingSend(
+    const handedOff = await handoffPendingSend(
       sourceSessionKey,
       payload.sessionKey,
       payload.friendlyId,
       {
         verifiedCardDestination: payload.reason === 'bootstrap',
       },
+    )
+    if (!handedOff) {
+      throw new Error(
+        'The conversation route was not changed because pending recovery could not be handed off safely.',
+      )
+    }
+    moveHistoryMessages(
+      queryClient,
+      activeFriendlyId,
+      sourceSessionKey,
+      payload.friendlyId,
+      payload.sessionKey,
     )
   }
 

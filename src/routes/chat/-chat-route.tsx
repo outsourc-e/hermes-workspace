@@ -117,9 +117,9 @@ export function ChatRoute() {
   }, [isNewChat, queryClient])
 
   const handleSessionResolved = useCallback(
-    function handleSessionResolved(payload: SessionRouteResolutionPayload) {
+    async function handleSessionResolved(payload: SessionRouteResolutionPayload) {
       const currentRoute = latestResolvedRouteRef.current
-      const transition = applySessionRouteResolution({
+      const transition = await applySessionRouteResolution({
         queryClient,
         activeFriendlyId: currentRoute.friendlyId,
         fallbackSessionKey: currentRoute.sessionKey,

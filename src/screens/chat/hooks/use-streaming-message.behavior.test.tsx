@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import 'fake-indexeddb/auto'
 import React, { useEffect } from 'react'
 import { QueryClient } from '@tanstack/react-query'
 import { createRoot } from 'react-dom/client'
@@ -8,8 +9,11 @@ import { applySessionRouteResolution } from '../../../routes/chat/-session-route
 import { useChatStore } from '../../../stores/chat-store'
 import { chatQueryKeys } from '../chat-queries'
 import { shouldPinMainSession } from '../chat-screen-utils'
+import { resetWorkspaceChatIndexedDb } from '../card-transcript-indexeddb'
+import { readCardTranscriptRecovery } from '../card-transcript-recovery'
 import {
   consumePendingSend,
+  readPendingMessage,
   resetPendingSend,
   stashPendingSend,
 } from '../pending-send'
@@ -132,10 +136,12 @@ function controlledSseResponse() {
 }
 
 describe('useStreamingMessage authoritative handoff behavior', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     window.localStorage.clear()
     window.sessionStorage.clear()
-    resetPendingSend()
+    await resetPendingSend()
+    const database = await resetWorkspaceChatIndexedDb()
+    database.close()
     useChatStore.getState().clearSession('new')
     useChatStore.getState().clearSession('main')
     useChatStore.getState().clearSession('backend-parent')
@@ -148,9 +154,9 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
     useChatStore.getState().clearCard('remote:concurrent-card')
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks()
-    resetPendingSend()
+    await resetPendingSend()
   })
 
   it('completes an assistant overlay with immutable identity derived from the run', async () => {
@@ -395,7 +401,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
       activeFriendlyId: 'new',
       fromSessionKey: 'new',
       fallbackSessionKey: 'new',
-      targetFriendlyId: 'canonical-child',
+      targetFriendlyId: 'remote:parent-card',
       cardId: 'remote:parent-card',
       reason: 'bootstrap' as const,
       portableMode: false,
@@ -456,7 +462,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
         sessionKey: fromSessionKey,
         messages: [optimisticMessage],
       })
-      stashPendingSend({
+      await stashPendingSend({
         sessionKey: fromSessionKey,
         friendlyId: activeFriendlyId,
         message: 'continue',
@@ -519,13 +525,13 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
         controller = next
       }
       const onSessionResolved = vi.fn(
-        (payload: {
+        async (payload: {
           fromSessionKey: string
           sessionKey: string
           friendlyId: string
           reason: 'bootstrap' | 'stream-handoff'
         }) => {
-          const transition = applySessionRouteResolution({
+          const transition = await applySessionRouteResolution({
             queryClient,
             activeFriendlyId,
             fallbackSessionKey,
@@ -564,20 +570,29 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
           idempotencyKey: 'client-1',
         })
       })
+      expect(onSessionResolved).toHaveBeenCalledTimes(1)
+      await onSessionResolved.mock.results[0]!.value
 
       expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
       expect(
         queryClient.getQueryData<HistoryResponse>(targetHistoryKey)?.messages,
       ).toEqual([optimisticMessage])
-      const pendingAfterResolution =
-        fromSessionKey === 'new'
-          ? consumePendingSend('new', 'new')
-          : consumePendingSend('canonical-child', targetFriendlyId)
-      expect(pendingAfterResolution).toMatchObject({
-        sessionKey: fromSessionKey === 'new' ? 'new' : 'canonical-child',
-        friendlyId: fromSessionKey === 'new' ? 'new' : targetFriendlyId,
-        message: 'continue',
-      })
+      if (fromSessionKey === 'new') {
+        expect(await readPendingMessage('new', 'new')).toBeNull()
+        expect(
+          (
+            await readCardTranscriptRecovery({ cardId: targetFriendlyId })
+          )?.messages,
+        ).toMatchObject([optimisticMessage])
+      } else {
+        expect(
+          await readPendingMessage('canonical-child', targetFriendlyId),
+        ).toMatchObject({
+          sessionKey: 'canonical-child',
+          friendlyId: targetFriendlyId,
+          message: 'continue',
+        })
+      }
       expect(
         useChatStore.getState().getRealtimeMessages(fromSessionKey),
       ).toEqual([])
@@ -643,7 +658,7 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
         sessionKey: 'backend-parent',
         messages: [optimisticMessage],
       })
-      stashPendingSend({
+      await stashPendingSend({
         sessionKey: 'backend-parent',
         friendlyId: 'friendly-route',
         message: 'stay put',

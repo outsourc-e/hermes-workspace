@@ -263,13 +263,13 @@ type PortableHistoryMessage = {
 
 type UseStreamingMessageOptions = {
   pinMainSession?: boolean
-  onStarted?: (payload: { runId: string | null }) => void
+  onStarted?: (payload: { runId: string | null }) => void | Promise<void>
   onChunk?: (text: string, fullText: string) => void
   /** Must durably checkpoint the full assistant prefix before it is displayed. */
-  onCheckpoint?: (message: ChatMessage) => boolean
-  onComplete?: (message: ChatMessage) => void
-  onInterrupted?: (message: ChatMessage) => void
-  onError?: (error: string) => void
+  onCheckpoint?: (message: ChatMessage) => boolean | Promise<boolean>
+  onComplete?: (message: ChatMessage) => void | Promise<void>
+  onInterrupted?: (message: ChatMessage) => void | Promise<void>
+  onError?: (error: string) => void | Promise<void>
   onThinking?: (thinking: string) => void
   onTool?: (tool: unknown) => void
   onMessageAccepted?: (
@@ -285,7 +285,7 @@ type UseStreamingMessageOptions = {
     sessionKey: string
     friendlyId: string
     reason: 'bootstrap' | 'stream-handoff'
-  }) => void
+  }) => void | Promise<void>
   activeCard?: SessionCard
   sessionCards?: ReadonlyArray<SessionCard>
   onCardHandoff?: (
@@ -365,11 +365,29 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   // should be promoted to the route identity. Prevents concrete sessions
   // from being overridden by api-* derivations (#297).
   const requestedSessionKeyRef = useRef<string>('')
+  const checkpointQueueRef = useRef<Promise<void>>(Promise.resolve())
+
+  const enqueueCheckpoint = useCallback(
+    (message: ChatMessage): Promise<boolean> => {
+      let accepted = true
+      const task = checkpointQueueRef.current.then(async () => {
+        accepted = (await onCheckpoint?.(message)) ?? true
+      })
+      checkpointQueueRef.current = task.catch(() => {})
+      return task.then(() => accepted)
+    },
+    [onCheckpoint],
+  )
+
+  const drainCheckpointQueue = useCallback(async (): Promise<void> => {
+    await checkpointQueueRef.current
+  }, [])
 
   const registerSendStreamRun = useChatStore((s) => s.registerSendStreamRun)
   const unregisterSendStreamRun = useChatStore((s) => s.unregisterSendStreamRun)
   const processStoreEvent = useChatStore((s) => s.processEvent)
   const processCardEvent = useChatStore((s) => s.processCardEvent)
+  const handoffSession = useChatStore((s) => s.handoffSession)
   const clearStreamingSession = useChatStore((s) => s.clearStreamingSession)
   const clearCardStreaming = useChatStore((s) => s.clearCardStreaming)
   const claimSessionStateForCard = useChatStore(
@@ -468,7 +486,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     lifecyclePhaseRef.current = 'accepted'
   }, [])
 
-  const sealInterruptedStream = useCallback((): ChatMessage | null => {
+  const sealInterruptedStream = useCallback(async (): Promise<ChatMessage | null> => {
+    await drainCheckpointQueue()
     const partialText = fullTextRef.current
     if (!partialText || finishedRef.current) return null
     const runId = activeRunIdRef.current
@@ -495,7 +514,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     // Recovery persistence must land before the store consumes `done` and
     // clears active streaming persistence. Otherwise a reload in that narrow
     // terminal window can lose the accumulated assistant partial.
-    onInterrupted?.(interruptedMessage)
+    await onInterrupted?.(interruptedMessage)
     processBrowserEvent({
       type: 'done',
       state: 'interrupted',
@@ -505,12 +524,18 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       transport: 'send-stream',
     })
     return interruptedMessage
-  }, [onInterrupted, processBrowserEvent])
+  }, [drainCheckpointQueue, onInterrupted, processBrowserEvent])
 
   const markFailed = useCallback(
-    (message: string) => {
+    async (message: string) => {
       if (finishedRef.current) return
-      sealInterruptedStream()
+      let visibleMessage = message
+      try {
+        await sealInterruptedStream()
+      } catch {
+        visibleMessage =
+          'Response stopped because recovery storage is unavailable'
+      }
       finishedRef.current = true
       eventSourceRef.current?.abort()
       eventSourceRef.current = null
@@ -522,9 +547,14 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       setState((prev) => ({
         ...prev,
         isStreaming: false,
-        error: message,
+        error: visibleMessage,
       }))
-      onError?.(message)
+      try {
+        await onError?.(visibleMessage)
+      } catch {
+        // The stream is already terminal. Preserve the safe local error rather
+        // than converting a recovery-status write failure into transport state.
+      }
       useChatStore.getState().setHeartbeatActivity(null)
     },
     [
@@ -574,7 +604,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           schedulePostAcceptanceTimeout(reason)
           return
         }
-        markFailed(
+        void markFailed(
           reason === 'handoff'
             ? 'Run stalled after handoff'
             : 'No activity received after message was accepted',
@@ -671,8 +701,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   )
 
   const finishStream = useCallback(
-    (payload?: unknown) => {
+    async (payload?: unknown) => {
       if (finishedRef.current) return
+      await drainCheckpointQueue()
       finishedRef.current = true
       eventSourceRef.current = null
       stopFrame()
@@ -723,14 +754,27 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           : {}),
       }
 
-      onComplete?.(message)
+      try {
+        await onComplete?.(message)
+      } catch {
+        setState((prev) => ({
+          ...prev,
+          error: 'Response completed, but recovery storage is unavailable',
+        }))
+      }
       useChatStore.getState().setHeartbeatActivity(null)
     },
-    [clearHandoffTimer, onComplete, stopFrame, unregisterSendStreamRun],
+    [
+      clearHandoffTimer,
+      drainCheckpointQueue,
+      onComplete,
+      stopFrame,
+      unregisterSendStreamRun,
+    ],
   )
 
   const applySessionHandoff = useCallback(
-    (
+    async (
       fromSessionKey: string,
       resolvedSessionKey: string,
       resolvedFriendlyId: string,
@@ -754,13 +798,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         verifiedCardAuthority &&
         verifiedCardAuthority.cardId === resolvedFriendlyId &&
         verifiedCardAuthority.canonicalSegmentKey === resolvedSessionKey
-      if (hasVerifiedCardAuthority) {
-        claimSessionStateForCard(fromSessionKey, verifiedCardAuthority.cardId)
-        activeCardIdRef.current = verifiedCardAuthority.cardId
-        activeStreamCardRef.current = verifiedCardAuthority
-      }
-      activeSessionKeyRef.current = resolvedSessionKey
-      onSessionResolved?.({
+      await onSessionResolved?.({
         fromSessionKey,
         sessionKey: resolvedSessionKey,
         friendlyId: resolvedFriendlyId || resolvedSessionKey,
@@ -768,12 +806,24 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           ? 'bootstrap'
           : 'stream-handoff',
       })
+      if (
+        SESSION_BOOTSTRAP_KEYS.has(requestedSessionKeyRef.current) &&
+        !SESSION_BOOTSTRAP_KEYS.has(fromSessionKey)
+      ) {
+        handoffSession(fromSessionKey, resolvedSessionKey)
+      }
+      if (hasVerifiedCardAuthority) {
+        claimSessionStateForCard(fromSessionKey, verifiedCardAuthority.cardId)
+        activeCardIdRef.current = verifiedCardAuthority.cardId
+        activeStreamCardRef.current = verifiedCardAuthority
+      }
+      activeSessionKeyRef.current = resolvedSessionKey
     },
-    [claimSessionStateForCard, onSessionResolved, pinMainSession],
+    [claimSessionStateForCard, handoffSession, onSessionResolved, pinMainSession],
   )
 
   const processEvent = useCallback(
-    (event: string, data: unknown) => {
+    async (event: string, data: unknown) => {
       const payload = data as Record<string, unknown>
 
       // [DEBUG TUI] Log every SSE event so we can see whether tool.* events arrive
@@ -825,7 +875,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             sessionKey: activeSessionKeyRef.current,
             transport: 'send-stream',
           })
-          onStarted?.({ runId: runId ?? null })
+          await onStarted?.({ runId: runId ?? null })
           break
         }
         case 'card_handoff': {
@@ -862,6 +912,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           // The Card cache/recovery move must agree before the live store and
           // stream baseline advance. A missing consumer fails closed.
           if (onCardHandoff?.(handoff, targetCardAuthority) !== true) break
+          await onSessionResolved?.({
+            fromSessionKey: handoff.fromSegmentKey,
+            sessionKey: handoff.canonicalSegmentKey,
+            friendlyId: handoff.cardId,
+            reason: 'stream-handoff',
+          })
           activeRunIdRef.current = handoff.runId
           registerSendStreamRun(handoff.runId)
           // Same-Card continuation: only the ephemeral transport segment moves.
@@ -869,12 +925,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           activeSessionKeyRef.current = handoff.canonicalSegmentKey
           activeCardIdRef.current = handoff.cardId
           activeStreamCardRef.current = targetCardAuthority
-          onSessionResolved?.({
-            fromSessionKey: handoff.fromSegmentKey,
-            sessionKey: handoff.canonicalSegmentKey,
-            friendlyId: handoff.cardId,
-            reason: 'stream-handoff',
-          })
           break
         }
         case 'session_handoff': {
@@ -885,7 +935,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             activeRunIdRef.current = handoff.runId
             registerSendStreamRun(handoff.runId)
           }
-          applySessionHandoff(
+          await applySessionHandoff(
             handoff.fromSessionKey,
             handoff.sessionKey,
             handoff.friendlyId,
@@ -897,7 +947,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const text = (payload as { text?: string }).text ?? ''
           if (text) {
             if (
-              onCheckpoint?.({
+              !(await enqueueCheckpoint({
                 role: 'assistant',
                 content: [{ type: 'text', text }],
                 timestamp: Date.now(),
@@ -909,9 +959,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
                       stableId: `stream-run:${activeRunIdRef.current}`,
                     }
                   : {}),
-              }) === false
+              }))
             ) {
-              markFailed(
+              await markFailed(
                 'Response stopped because recovery storage is unavailable',
               )
               break
@@ -939,7 +989,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
               ? newText
               : fullTextRef.current + newText
             if (
-              onCheckpoint?.({
+              !(await enqueueCheckpoint({
                 role: 'assistant',
                 content: [{ type: 'text', text: accumulated }],
                 timestamp: Date.now(),
@@ -951,9 +1001,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
                       stableId: `stream-run:${activeRunIdRef.current}`,
                     }
                   : {}),
-              }) === false
+              }))
             ) {
-              markFailed(
+              await markFailed(
                 'Response stopped because recovery storage is unavailable',
               )
               break
@@ -1129,23 +1179,26 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             text: doneState === 'error' ? `Error: ${errorMessage}` : 'Complete',
           })
           if (doneState === 'error') {
-            markFailed(errorMessage ?? 'Stream error')
+            await markFailed(errorMessage ?? 'Stream error')
             break
           }
+          await finishStream(payload)
           processBrowserEvent({
             type: 'done',
             state: doneState ?? 'final',
             errorMessage,
             message: payload.message as Record<string, unknown> | undefined,
-            runId: activeRunIdRef.current ?? undefined,
+            runId:
+              typeof payload.runId === 'string'
+                ? payload.runId
+                : (activeRunIdRef.current ?? undefined),
             sessionKey: activeSessionKeyRef.current,
             transport: 'send-stream',
           })
-          finishStream(payload)
           break
         }
         case 'complete': {
-          finishStream(payload)
+          await finishStream(payload)
           break
         }
         case 'error': {
@@ -1160,7 +1213,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           }
           const errorMessage =
             (payload as { message?: string }).message ?? 'Stream error'
-          markFailed(errorMessage)
+          await markFailed(errorMessage)
           break
         }
         case 'timeout': {
@@ -1171,7 +1224,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           ) {
             transitionToHandoff()
           } else {
-            markFailed('Request timed out')
+            await markFailed('Request timed out')
           }
           break
         }
@@ -1184,7 +1237,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
         case 'close': {
           if (fullTextRef.current) {
-            finishStream()
+            await finishStream()
           } else if (
             lifecyclePhaseRef.current === 'accepted' ||
             lifecyclePhaseRef.current === 'active' ||
@@ -1192,7 +1245,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           ) {
             transitionToHandoff()
           } else {
-            markFailed('Hermes Agent connection closed')
+            await markFailed('Hermes Agent connection closed')
           }
           break
         }
@@ -1201,10 +1254,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     [
       activeCard,
       applySessionHandoff,
+      enqueueCheckpoint,
       finishStream,
       markFailed,
       onCardHandoff,
-      onCheckpoint,
+      onSessionResolved,
       onStarted,
       onThinking,
       onTool,
@@ -1239,7 +1293,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       if (eventSourceRef.current) {
         // Seal in-progress response before aborting so recovery survives the
         // old reader being superseded by a new send.
-        sealInterruptedStream()
+        await sealInterruptedStream()
         eventSourceRef.current.abort()
       }
 
@@ -1377,10 +1431,20 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             }
 
             if (!currentEvent || !currentData) continue
+            let parsedData: unknown
             try {
-              processEventRef.current(currentEvent, JSON.parse(currentData))
+              parsedData = JSON.parse(currentData)
             } catch {
               // Ignore invalid SSE data.
+              continue
+            }
+            try {
+              await processEventRef.current(currentEvent, parsedData)
+            } catch {
+              await markFailed(
+                'Response stopped because recovery storage is unavailable',
+              )
+              break
             }
           }
         }
@@ -1397,11 +1461,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             !fullTextRef.current &&
             (lifecyclePhase === 'accepted' || lifecyclePhase === 'active')
           ) {
-            markFailed(
+            await markFailed(
               'Connection closed before response was received. The backend may still be processing — check server logs or retry.',
             )
           } else {
-            finishStream()
+            await finishStream()
           }
         }
       } catch (err) {
@@ -1422,7 +1486,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           return
         }
         const errorMessage = err instanceof Error ? err.message : String(err)
-        markFailed(errorMessage)
+        await markFailed(errorMessage)
       }
     },
     [
@@ -1440,8 +1504,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     ],
   )
 
-  const cancelStreaming = useCallback(() => {
-    sealInterruptedStream()
+  const cancelStreaming = useCallback(async () => {
+    await sealInterruptedStream()
     if (eventSourceRef.current) {
       eventSourceRef.current.abort()
       eventSourceRef.current = null
@@ -1450,8 +1514,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     resetActiveStreamState()
   }, [resetActiveStreamState, sealInterruptedStream])
 
-  const resetStreaming = useCallback(() => {
-    cancelStreaming()
+  const resetStreaming = useCallback(async () => {
+    await cancelStreaming()
     setState({
       isStreaming: false,
       streamingMessageId: null,

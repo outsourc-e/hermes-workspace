@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import 'fake-indexeddb/auto'
 import React, { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -14,12 +15,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useChatStore } from '../../stores/chat-store'
 import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
 import {
-  CARD_TRANSCRIPT_RECOVERY_VERSION,
-  cardTranscriptRecoveryStorageKey,
   clearCardTranscriptRecoveryMemory,
   readCardTranscriptRecovery,
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
+import {
+  WORKSPACE_CHAT_STORE_NAMES,
+  resetWorkspaceChatIndexedDb,
+} from './card-transcript-indexeddb'
 import { ChatScreen } from './chat-screen'
 import {
   appendSessionCardHistoryMessage,
@@ -187,29 +190,11 @@ type CardHistoryWire = {
   loadedSegmentKeys?: Array<string>
 }
 
-type CardTranscriptRecoveryWire = {
-  version: typeof CARD_TRANSCRIPT_RECOVERY_VERSION
-  cardId: string
-  createdAt: number
-  revision: number
-  messages: Array<ChatMessage>
-}
-
-function seedCardTranscriptRecovery(
+async function seedCardTranscriptRecovery(
   card: Pick<SessionCard, 'cardId' | 'canonicalSegmentKey'>,
   messages: Array<ChatMessage>,
-) {
-  const wire: CardTranscriptRecoveryWire = {
-    version: CARD_TRANSCRIPT_RECOVERY_VERSION,
-    cardId: card.cardId,
-    createdAt: Date.now(),
-    revision: 1,
-    messages,
-  }
-  window.sessionStorage.setItem(
-    cardTranscriptRecoveryStorageKey({ cardId: card.cardId }),
-    JSON.stringify(wire),
-  )
+): Promise<void> {
+  await replaceCardTranscriptRecoveryMessages({ cardId: card.cardId }, messages)
 }
 
 type ScreenInput = {
@@ -549,7 +534,9 @@ function submitSelection(text: string) {
 }
 
 describe('mounted Session Card transcript recovery lifecycle', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const database = await resetWorkspaceChatIndexedDb()
+    database.close()
     clearCardTranscriptRecoveryMemory()
     installBrowserPolyfills()
     window.localStorage.clear()
@@ -675,7 +662,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       )
 
       await mountChatScreen(defaultInput())
-      await waitFor(() =>
+      await waitFor(async () =>
         expect(screen.getAllByText('continue')).toHaveLength(2),
       )
       expect(
@@ -751,7 +738,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
     await mountChatScreen(defaultInput())
 
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(screen.getByText('persisted partial message')).toBeTruthy()
       expect(screen.getByRole('status').textContent).toContain(
         'History is incomplete for this Session Card. Available messages remain visible. 1 part could not be loaded.',
@@ -781,7 +768,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       }
       resolveRetry()
     })
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(screen.getByText('persisted partial message')).toBeTruthy()
       expect(screen.getByRole('status').textContent).toContain(
         '2 parts could not be loaded.',
@@ -793,7 +780,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
   it('warns when a complete transcript is visible but its durable snapshot fails, then clears after a verified retry', async () => {
     const completeText = 'complete transcript visible before durable retry'
-    replaceCardTranscriptRecoveryMessages({ cardId: parentCard.cardId }, [
+    await replaceCardTranscriptRecoveryMessages({ cardId: parentCard.cardId }, [
       {
         role: 'user',
         content: [
@@ -815,25 +802,24 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
         },
       ]),
     )
-    const originalSetItem = Storage.prototype.setItem
-    const storageSpy = vi
-      .spyOn(Storage.prototype, 'setItem')
-      .mockImplementation(function (this: Storage, key, value) {
-        if (
-          this === window.localStorage &&
-          key.startsWith('workspace.card-transcript-snapshot.v3:')
-        ) {
+    const originalPut = IDBObjectStore.prototype.put
+    const snapshotWriteSpy = vi
+      .spyOn(IDBObjectStore.prototype, 'put')
+      .mockImplementation(function (this: IDBObjectStore, value, key) {
+        if (this.name === WORKSPACE_CHAT_STORE_NAMES.latestCardSnapshots) {
           throw new DOMException(
             'persistent transcript snapshot denied',
             'QuotaExceededError',
           )
         }
-        return originalSetItem.call(this, key, value)
+        return key === undefined
+          ? originalPut.call(this, value)
+          : originalPut.call(this, value, key)
       })
 
     const mountedChat = await mountChatScreen(defaultInput())
 
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(screen.getByText(completeText)).toBeTruthy()
       expect(
         screen.getByText(
@@ -842,13 +828,13 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       ).toBeTruthy()
     })
 
-    storageSpy.mockRestore()
+    snapshotWriteSpy.mockRestore()
     await React.act(async () => {
       await mountedChat.queryClient.refetchQueries({
         queryKey: sessionCardQueryKeys.history(parentCard.cardId),
       })
     })
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(
         screen.queryByText(
           'Transcript recovery storage is unavailable. This complete transcript is not guaranteed to survive a reload until storage recovers.',
@@ -875,7 +861,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     )
     const mountedChat = await mountChatScreen(defaultInput())
 
-    await waitFor(() => expect(screen.getByText(completeText)).toBeTruthy())
+    await waitFor(async () => expect(screen.getByText(completeText)).toBeTruthy())
     expect(
       screen.queryByText(
         'Transcript recovery storage is unavailable. This complete transcript is not guaranteed to survive a reload until storage recovers.',
@@ -959,7 +945,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
     await mountChatScreen(defaultInput())
 
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(
         screen.getByText('persisted partial stream after remount'),
       ).toBeTruthy()
@@ -1001,7 +987,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     )
 
     const mountedScreen = await mountChatScreen(defaultInput(), queryClient)
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('optimistic before echo')).toBeTruthy(),
     )
     await React.act(async () => {
@@ -1017,7 +1003,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
   it('removes uniquely acknowledged optimistic and terminal overlays when Card history preserves client identity', async () => {
     const sentAt = Date.now()
-    seedCardTranscriptRecovery(parentCard, [
+    await seedCardTranscriptRecovery(parentCard, [
       message('user', 'ordinary server user acknowledgement', {
         timestamp: sentAt,
         clientId: 'local-client-ack',
@@ -1061,7 +1047,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     )
 
     const mountedScreen = await mountChatScreen(defaultInput())
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(
         screen.getByText('ordinary server user acknowledgement'),
       ).toBeTruthy()
@@ -1077,9 +1063,9 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
         exact: true,
       })
     })
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(
-        readCardTranscriptRecovery({ cardId: parentCard.cardId }),
+        await readCardTranscriptRecovery({ cardId: parentCard.cardId }),
       ).toBeNull(),
     )
     expect(
@@ -1112,7 +1098,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     })
 
     const mountedScreen = await mountChatScreen(defaultInput())
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('terminal answer survives lag')).toBeTruthy(),
     )
     await React.act(async () => {
@@ -1149,7 +1135,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       })
     })
 
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(
         screen.getByText('first concurrent production stream'),
       ).toBeTruthy()
@@ -1168,7 +1154,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       })
     })
 
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(
         screen.getByText('second concurrent production stream'),
       ).toBeTruthy()
@@ -1234,10 +1220,10 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
     const mountedScreen = await mountChatScreen(defaultInput())
     submitSelection('produce a partial error response')
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(screen.getByText('partial answer before error')).toBeTruthy()
       expect(
-        readCardTranscriptRecovery({ cardId: parentCard.cardId })?.messages,
+        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))?.messages,
       ).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1254,7 +1240,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     useChatStore.getState().clearCardRealtimeBuffer(parentCard.cardId)
     useChatStore.getState().clearCardStreaming(parentCard.cardId)
     await mountChatScreen(defaultInput())
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('partial answer before error')).toBeTruthy(),
     )
     expectCardOnlyTranscriptBoundary(requests)
@@ -1318,15 +1304,15 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
     const mountedScreen = await mountChatScreen(defaultInput())
     submitSelection('produce a cancellable partial response')
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('partial answer before cancel')).toBeTruthy(),
     )
     React.act(() =>
       fireEvent.click(screen.getByRole('button', { name: 'Stop generating' })),
     )
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(
-        readCardTranscriptRecovery({ cardId: parentCard.cardId })?.messages,
+        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))?.messages,
       ).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1343,7 +1329,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     useChatStore.getState().clearCardRealtimeBuffer(parentCard.cardId)
     useChatStore.getState().clearCardStreaming(parentCard.cardId)
     await mountChatScreen(defaultInput())
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('partial answer before cancel')).toBeTruthy(),
     )
     expectCardOnlyTranscriptBoundary(requests)
@@ -1351,7 +1337,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
   it('restores a Card-scoped user overlay after a reload with a new query client', async () => {
     const requests = mockHttp()
-    seedCardTranscriptRecovery(parentCard, [
+    await seedCardTranscriptRecovery(parentCard, [
       message('user', 'user overlay after reload', {
         clientId: 'reload-user',
         status: 'sent',
@@ -1359,7 +1345,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     ])
 
     await mountChatScreen(defaultInput())
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('user overlay after reload')).toBeTruthy(),
     )
     expectCardOnlyTranscriptBoundary(requests)
@@ -1367,73 +1353,69 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
   it('restores a terminal assistant overlay after remount', async () => {
     const requests = mockHttp()
-    seedCardTranscriptRecovery(parentCard, [
+    await seedCardTranscriptRecovery(parentCard, [
       message('assistant', 'assistant overlay after remount', {
         __streamingStatus: 'complete',
       }),
     ])
 
     await mountChatScreen(defaultInput())
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('assistant overlay after remount')).toBeTruthy(),
     )
     expectCardOnlyTranscriptBoundary(requests)
   })
 
-  it('does not resurrect an unverified journal write after rejected admission and a cold remount', async () => {
+  it('does not resurrect an unverified Card recovery write after rejected admission and a cold remount', async () => {
     const baselineText = 'accepted baseline survives rejected admission'
-    const rejectedText = 'candidate whose journal readback fails'
+    const rejectedText = 'candidate whose recovery readback fails'
     expect(
-      replaceCardTranscriptRecoveryMessages({ cardId: parentCard.cardId }, [
+      await replaceCardTranscriptRecoveryMessages({ cardId: parentCard.cardId }, [
         message('user', baselineText, { clientId: 'accepted-baseline' }),
       ]),
     ).not.toBeNull()
 
     const requests = mockHttp()
-    const originalSetItem = Storage.prototype.setItem
-    const originalGetItem = Storage.prototype.getItem
-    const originalRemoveItem = Storage.prototype.removeItem
-    let persistentJournalUnavailable = false
-    const setItemSpy = vi
-      .spyOn(Storage.prototype, 'setItem')
-      .mockImplementation(function (this: Storage, key, value) {
-        originalSetItem.call(this, key, value)
+    const originalPut = IDBObjectStore.prototype.put
+    const originalGet = IDBObjectStore.prototype.get
+    let rejectNextRecoveryReadback = false
+    const recoveryPutSpy = vi
+      .spyOn(IDBObjectStore.prototype, 'put')
+      .mockImplementation(function (this: IDBObjectStore, value, key) {
         if (
-          this === window.localStorage &&
-          key.includes(':entry:') &&
-          value.includes(rejectedText)
+          this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+          JSON.stringify(value).includes(rejectedText)
         ) {
-          persistentJournalUnavailable = true
+          rejectNextRecoveryReadback = true
         }
+        return key === undefined
+          ? originalPut.call(this, value)
+          : originalPut.call(this, value, key)
       })
-    const getItemSpy = vi
-      .spyOn(Storage.prototype, 'getItem')
-      .mockImplementation(function (this: Storage, key) {
-        if (this === window.localStorage && persistentJournalUnavailable) {
-          throw new DOMException(
-            'persistent storage unavailable',
-            'SecurityError',
-          )
+    const recoveryReadSpy = vi
+      .spyOn(IDBObjectStore.prototype, 'get')
+      .mockImplementation(function (this: IDBObjectStore, query) {
+        if (
+          rejectNextRecoveryReadback &&
+          this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+          query === parentCard.cardId
+        ) {
+          rejectNextRecoveryReadback = false
+          throw new Error('forced Card recovery readback failure')
         }
-        return originalGetItem.call(this, key)
-      })
-    const removeItemSpy = vi
-      .spyOn(Storage.prototype, 'removeItem')
-      .mockImplementation(function (this: Storage, key) {
-        if (this === window.localStorage && persistentJournalUnavailable) {
-          throw new DOMException(
-            'persistent storage unavailable',
-            'SecurityError',
-          )
-        }
-        return originalRemoveItem.call(this, key)
+        return originalGet.call(this, query)
       })
 
     const mountedScreen = await mountChatScreen(defaultInput())
-    await waitFor(() => expect(screen.getByText(baselineText)).toBeTruthy())
+    await waitFor(async () => expect(screen.getByText(baselineText)).toBeTruthy())
     submitSelection(rejectedText)
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(screen.queryByText(rejectedText)).toBeNull()
+      expect(
+        screen.getByText(
+          'This message was not sent because it could not be saved safely. Free browser storage and try again.',
+        ),
+      ).toBeTruthy()
       expect(requests).not.toContain('/api/send-stream')
     })
 
@@ -1442,12 +1424,11 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     window.sessionStorage.clear()
     useChatStore.getState().clearCardRealtimeBuffer(parentCard.cardId)
     useChatStore.getState().clearCardStreaming(parentCard.cardId)
-    setItemSpy.mockRestore()
-    getItemSpy.mockRestore()
-    removeItemSpy.mockRestore()
+    recoveryPutSpy.mockRestore()
+    recoveryReadSpy.mockRestore()
 
     await mountChatScreen(defaultInput())
-    await waitFor(() => expect(screen.getByText(baselineText)).toBeTruthy())
+    await waitFor(async () => expect(screen.getByText(baselineText)).toBeTruthy())
     expect(screen.queryByText(rejectedText)).toBeNull()
     expect(requests).not.toContain('/api/send-stream')
   })
@@ -1481,13 +1462,13 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
     const mountedScreen = await mountChatScreen(defaultInput())
     submitSelection('retry this durable Card message')
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(screen.getByText('retry this durable Card message')).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Retry message' })).toBeTruthy()
       expect(sendAttempts).toBe(1)
     })
     expect(
-      readCardTranscriptRecovery({ cardId: parentCard.cardId })?.messages,
+      (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))?.messages,
     ).toMatchObject([
       expect.objectContaining({
         role: 'user',
@@ -1508,7 +1489,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     useChatStore.getState().clearCardStreaming(parentCard.cardId)
 
     await mountChatScreen(defaultInput())
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(
         screen.getByRole('button', { name: 'Retry message' }),
       ).toBeTruthy(),
@@ -1516,7 +1497,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     React.act(() =>
       fireEvent.click(screen.getByRole('button', { name: 'Retry message' })),
     )
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(sendAttempts).toBe(2)
       expect(screen.getByRole('button', { name: 'Retry message' })).toBeTruthy()
     })
@@ -1578,26 +1559,35 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
     const mountedScreen = await mountChatScreen(defaultInput())
     submitSelection('first repeated terminal run')
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(
-        readCardTranscriptRecovery({ cardId: parentCard.cardId })?.messages,
+        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))?.messages,
       ).toHaveLength(2),
     )
     submitSelection('second repeated terminal run')
-    await waitFor(() => {
-      const recovery = readCardTranscriptRecovery({ cardId: parentCard.cardId })
+    await waitFor(async () => {
+      const recovery = await readCardTranscriptRecovery({ cardId: parentCard.cardId })
       expect(recovery?.messages).toHaveLength(4)
-      expect(
-        recovery?.messages.filter((entry) => entry.role === 'assistant'),
-      ).toMatchObject([
-        { runId: runIds[0], stableId: `stream-run:${runIds[0]}` },
-        { runId: runIds[1], stableId: `stream-run:${runIds[1]}` },
+      const assistants = recovery?.messages.filter(
+        (entry) => entry.role === 'assistant',
+      )
+      expect(assistants).toMatchObject([
+        {
+          runId: runIds[0],
+          stableId: `stream-run:${runIds[0]}`,
+          __streamingStatus: 'complete',
+        },
+        {
+          runId: runIds[1],
+          stableId: `stream-run:${runIds[1]}`,
+          __streamingStatus: 'complete',
+        },
       ])
+      expect(JSON.stringify(assistants)).toContain('"safe":"run-repeat-second"')
     })
-    const recoveryKey = cardTranscriptRecoveryStorageKey({
-      cardId: parentCard.cardId,
-    })
-    const persisted = window.sessionStorage.getItem(recoveryKey) ?? ''
+    const persisted = JSON.stringify(
+      await readCardTranscriptRecovery({ cardId: parentCard.cardId }),
+    )
     expect(persisted).not.toContain('remote:raw-session-')
     expect(persisted).not.toContain('remote:raw-segment-')
     expect(persisted).not.toContain('remote:raw-canonical-')
@@ -1609,7 +1599,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     useChatStore.getState().clearCardRealtimeBuffer(parentCard.cardId)
     useChatStore.getState().clearCardStreaming(parentCard.cardId)
     await mountChatScreen(defaultInput())
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getAllByText('Identical terminal answer')).toHaveLength(2),
     )
     expectCardOnlyTranscriptBoundary(requests)
@@ -1629,7 +1619,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
         __streamingStatus: 'complete',
       }),
     ]
-    seedCardTranscriptRecovery(parentCard, overlays)
+    await seedCardTranscriptRecovery(parentCard, overlays)
     for (const overlay of overlays) {
       appendSessionCardHistoryMessage(
         queryClient,
@@ -1651,18 +1641,18 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       [parentCard],
     )
 
-    const recoveryStorageKey = cardTranscriptRecoveryStorageKey({
+    const recovery = await readCardTranscriptRecovery({
       cardId: parentCard.cardId,
     })
-    expect(window.sessionStorage.getItem(recoveryStorageKey)).not.toBeNull()
-    expect(recoveryStorageKey).not.toContain(parentCard.canonicalSegmentKey)
-    expect(recoveryStorageKey).not.toContain(successorCard.canonicalSegmentKey)
+    expect(recovery).not.toBeNull()
+    expect(JSON.stringify(recovery)).not.toContain(parentCard.canonicalSegmentKey)
+    expect(JSON.stringify(recovery)).not.toContain(successorCard.canonicalSegmentKey)
 
     const mountedScreen = await mountChatScreen(
       defaultInput(successorCard),
       queryClient,
     )
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(screen.getByText('same Card user handoff overlay')).toBeTruthy()
       expect(
         screen.getByText('same Card assistant handoff overlay'),
@@ -1671,7 +1661,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
 
     mountedScreen.unmount()
     await mountChatScreen(defaultInput(successorCard))
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(screen.getByText('same Card user handoff overlay')).toBeTruthy()
       expect(
         screen.getByText('same Card assistant handoff overlay'),
@@ -1717,14 +1707,14 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       defaultInput(parentWithChild),
       queryClient,
     )
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('parent overlay retained')).toBeTruthy(),
     )
     await mountedScreen.update({
       ...defaultInput(parentWithChild),
       inspectedChildCardId: childCard.cardId,
     })
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(screen.getByText('child transcript')).toBeTruthy()
       expect(screen.getByRole('status').textContent).toContain(
         'History is incomplete for the inspected child Card.',
@@ -1742,7 +1732,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
         }),
       ),
     )
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(
         requests.filter((url) =>
           url.startsWith(
@@ -1753,7 +1743,7 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       expect(screen.getByText('child transcript')).toBeTruthy()
     })
     await mountedScreen.update(defaultInput(parentWithChild))
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('parent overlay retained')).toBeTruthy(),
     )
     expectCardOnlyTranscriptBoundary(requests, [parentWithChild])
@@ -1781,11 +1771,11 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       defaultInput(parentCard),
       queryClient,
     )
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.getByText('must stay on origin Card')).toBeTruthy(),
     )
     await mountedScreen.update(defaultInput(siblingCard))
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(screen.queryByText('must stay on origin Card')).toBeNull(),
     )
     expectCardOnlyTranscriptBoundary(requests, [parentCard, siblingCard])

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import 'fake-indexeddb/auto'
 import React from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
@@ -16,6 +17,7 @@ import {
   clearCardTranscriptRecoveryMemory,
   readCardTranscriptRecovery,
 } from '@/screens/chat/card-transcript-recovery'
+import { resetWorkspaceChatIndexedDb } from '@/screens/chat/card-transcript-indexeddb'
 import { swarmDirectChatContentDigest } from '@/lib/swarm-direct-chat-delivery'
 
 const RAW_SEGMENT_ONE = 'local:raw-worker-segment-one'
@@ -352,7 +354,7 @@ function latestMappedQuery(): QueryOptions | undefined {
     .find((options) => options.queryKey[0] === 'chat')
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   window.localStorage.clear()
   window.sessionStorage.clear()
   clearCardTranscriptRecoveryMemory()
@@ -364,6 +366,8 @@ beforeEach(() => {
   mocks.composerReset.mockReset()
   mocks.composerSetValue.mockReset()
   mocks.composerSetAttachments.mockReset()
+  const database = await resetWorkspaceChatIndexedDb()
+  database.close()
 })
 
 afterEach(() => {
@@ -645,7 +649,9 @@ it('binds a valid send to the current local Card and refreshes only that owner h
   })
   expect(JSON.stringify(mocks.mutationResults)).not.toContain('local:builder"')
   expect(
-    readCardTranscriptRecovery({ cardId: rootOwner.cardId })?.messages.at(-1),
+    (
+      await readCardTranscriptRecovery({ cardId: rootOwner.cardId })
+    )?.messages.at(-1),
   ).toMatchObject({
     clientId: '00000000-0000-4000-8000-000000000001',
     __swarmDeliveryAcknowledgement: {
@@ -715,18 +721,22 @@ it('delivers attachment-only submissions after admitting them into Card recovery
     await Promise.resolve()
   })
 
-  const recovery = readCardTranscriptRecovery({ cardId: rootOwner.cardId })
-  expect(recovery?.messages.at(-1)).toMatchObject({
-    role: 'user',
-    attachments: [
-      {
-        id: 'swarm-attachment-1',
-        name: 'evidence.txt',
-        contentType: 'text/plain',
-        size: 5,
-        dataUrl: 'data:text/plain;base64,aGVsbG8=',
-      },
-    ],
+  await waitFor(async () => {
+    const recovery = await readCardTranscriptRecovery({
+      cardId: rootOwner.cardId,
+    })
+    expect(recovery?.messages.at(-1)).toMatchObject({
+      role: 'user',
+      attachments: [
+        {
+          id: 'swarm-attachment-1',
+          name: 'evidence.txt',
+          contentType: 'text/plain',
+          size: 5,
+          dataUrl: 'data:text/plain;base64,aGVsbG8=',
+        },
+      ],
+    })
   })
   expect(mocks.queryData?.messages.at(-1)).toMatchObject({
     role: 'user',
@@ -779,8 +789,8 @@ it('fails closed before transport when Card recovery storage cannot admit the at
       screen.getByRole('button', { name: 'Send attachment' }),
     ).toBeTruthy(),
   )
-  const storageWrite = vi
-    .spyOn(Storage.prototype, 'setItem')
+  const indexedDbWrite = vi
+    .spyOn(IDBObjectStore.prototype, 'put')
     .mockImplementation(() => {
       throw new DOMException('denied', 'QuotaExceededError')
     })
@@ -803,14 +813,16 @@ it('fails closed before transport when Card recovery storage cannot admit the at
       ([input]) => String(input) === '/api/swarm-direct-chat',
     ),
   ).toBe(false)
-  expect(readCardTranscriptRecovery({ cardId: rootOwner.cardId })).toBeNull()
+  expect(
+    await readCardTranscriptRecovery({ cardId: rootOwner.cardId }),
+  ).toBeNull()
   expect(screen.getByLabelText('Swarm composer draft').textContent).toBe(
     'Review the evidence',
   )
   expect(
     screen.getByLabelText('Swarm composer attachment count').textContent,
   ).toBe('1')
-  storageWrite.mockRestore()
+  indexedDbWrite.mockRestore()
 })
 
 it('preserves the mounted Swarm draft and attachments when delivery fails after durable admission', async () => {
@@ -862,9 +874,11 @@ it('preserves the mounted Swarm draft and attachments when delivery fails after 
   expect(
     screen.getByLabelText('Swarm composer attachment count').textContent,
   ).toBe('1')
-  await waitFor(() =>
+  await waitFor(async () =>
     expect(
-      readCardTranscriptRecovery({ cardId: rootOwner.cardId })?.messages.at(-1),
+      (
+        await readCardTranscriptRecovery({ cardId: rootOwner.cardId })
+      )?.messages.at(-1),
     ).toMatchObject({
       clientId: '00000000-0000-4000-8000-000000000003',
       status: 'sending',

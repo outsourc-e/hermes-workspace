@@ -2545,7 +2545,7 @@ describe('Session Card fetchers', () => {
     queryClient.clear()
   })
 
-  it('keeps one Card recovery and query owner across a same-Card handoff', () => {
+  it('keeps one Card recovery and query owner across a same-Card handoff', async () => {
     const queryClient = new QueryClient()
     const stableKey = sessionCardQueryKeys.history('remote:root')
     const overlay = {
@@ -2553,7 +2553,7 @@ describe('Session Card fetchers', () => {
       content: [{ type: 'text' as const, text: 'must survive' }],
       clientId: 'client-recovery',
     }
-    replaceCardTranscriptRecoveryMessages(
+    await replaceCardTranscriptRecoveryMessages(
       { cardId: 'remote:root' },
       [overlay],
       { now: 100 },
@@ -2598,8 +2598,10 @@ describe('Session Card fetchers', () => {
         .findAll({ queryKey: sessionCardQueryKeys.history('remote:root') }),
     ).toHaveLength(1)
     expect(
-      readCardTranscriptRecovery({ cardId: 'remote:root' }, { now: 100 })
-        ?.messages,
+      (await readCardTranscriptRecovery(
+        { cardId: 'remote:root' },
+        { now: 100 },
+      ))?.messages,
     ).toEqual([overlay])
     expect(JSON.stringify(stableKey)).not.toContain('remote:tip')
     expect(JSON.stringify(stableKey)).not.toContain('remote:next')

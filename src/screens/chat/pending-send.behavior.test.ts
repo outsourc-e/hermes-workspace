@@ -1,38 +1,29 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import 'fake-indexeddb/auto'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  clearCardTranscriptRecoveryMemory,
+  CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES,
   readCardTranscriptRecovery,
+  replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import {
   appendPendingRecoveryMessage,
+  checkpointPendingRecoveryMessage,
   getNewChatProvisionalOwnerId,
-  getPendingRecoveryMessages,
   handoffPendingSend,
+  pendingSendOwnerKey,
   persistPendingMessage,
   readPendingMessage,
   resetPendingSend,
 } from './pending-send'
+import {
+  readPendingSend as readIndexedDbPendingSend,
+  resetWorkspaceChatIndexedDb,
+} from './card-transcript-indexeddb'
 import type { ChatMessage } from './types'
 
-function bootstrapUser(): ChatMessage {
-  return {
-    role: 'user',
-    content: [{ type: 'text', text: 'bootstrap question' }],
-    timestamp: 1,
-    clientId: 'client-bootstrap',
-    client_id: 'client-bootstrap',
-    __optimisticId: 'opt-client-bootstrap',
-    status: 'sent',
-  }
-}
-
-function provisionalUser(
-  clientId: string,
-  text: string,
-  timestamp: number,
-): ChatMessage {
+function user(clientId: string, text: string, timestamp = 1): ChatMessage {
   return {
     role: 'user',
     content: [{ type: 'text', text }],
@@ -40,418 +31,198 @@ function provisionalUser(
     clientId,
     client_id: clientId,
     __optimisticId: `opt-${clientId}`,
-    status: 'sent',
+    status: 'sending',
   }
 }
 
-function persistBootstrap(): void {
-  const optimisticMessage = bootstrapUser()
-  expect(
-    persistPendingMessage({
-      sessionKey: 'new',
-      friendlyId: 'new',
-      message: 'bootstrap question',
-      attachments: [],
-      optimisticMessage,
-    }),
-  ).toBe(true)
-}
-
-function persistOwnedBootstrap(
+function payload(
   provisionalOwnerId: string,
-  clientId: string,
-  text: string,
-  timestamp: number,
-): void {
-  const optimisticMessage = provisionalUser(clientId, text, timestamp)
-  expect(
-    persistPendingMessage({
-      sessionKey: 'new',
-      friendlyId: 'new',
-      provisionalOwnerId,
-      message: text,
-      attachments: [],
-      optimisticMessage,
-    }),
-  ).toBe(true)
+  clientId = 'client-bootstrap',
+  text = 'bootstrap question',
+) {
+  const optimisticMessage = user(clientId, text)
+  return {
+    sessionKey: 'new',
+    friendlyId: 'new',
+    provisionalOwnerId,
+    message: text,
+    attachments: [],
+    optimisticMessage,
+  }
 }
 
-function currentProvisionalStorageKey(): string {
-  const key = Array.from({ length: window.localStorage.length }, (_, index) =>
-    window.localStorage.key(index),
-  ).find(
-    (candidate) =>
-      candidate?.startsWith('workspace.chat-provisional-send.v2:new-chat:') &&
-      !candidate.includes(':entry:'),
-  )
-  if (!key) throw new Error('missing provisional aggregate storage key')
-  return key
-}
-
-describe('bootstrap pending-send recovery ownership', () => {
-  beforeEach(() => {
-    resetPendingSend()
+describe('pending-send v4 IndexedDB ownership', () => {
+  beforeEach(async () => {
     window.localStorage.clear()
     window.sessionStorage.clear()
-    clearCardTranscriptRecoveryMemory()
-    vi.restoreAllMocks()
+    await resetPendingSend()
+    const database = await resetWorkspaceChatIndexedDb()
+    database.close()
   })
 
-  it('durably appends a sanitized terminal assistant without clearing provisional ownership', () => {
-    persistBootstrap()
+  it('admits the first turn to IndexedDB without a browser payload mirror', async () => {
+    const provisionalOwnerId = getNewChatProvisionalOwnerId()
+    expect(await persistPendingMessage(payload(provisionalOwnerId))).toBe(true)
 
+    expect(await readPendingMessage('new', 'new', provisionalOwnerId)).toMatchObject({
+      provisionalOwnerId,
+      message: 'bootstrap question',
+    })
     expect(
-      appendPendingRecoveryMessage('new', 'new', {
-        role: 'assistant',
-        content: [{ type: 'text', text: 'durable answer' }],
-        timestamp: 2,
-        runId: 'run-bootstrap',
-        stableId: 'stream-run:run-bootstrap',
-        sessionKey: 'remote:raw-session',
-        metadata: {
-          canonicalSegmentKey: 'remote:raw-segment',
-          safe: true,
-        },
-      } as ChatMessage),
-    ).toBe(true)
-
-    const pending = readPendingMessage('new', 'new')
-    expect(getPendingRecoveryMessages(pending!)).toMatchObject([
-      { role: 'user', clientId: 'client-bootstrap' },
-      {
-        role: 'assistant',
-        runId: 'run-bootstrap',
-        stableId: 'stream-run:run-bootstrap',
-      },
-    ])
-    const serialized = window.localStorage.getItem(
-      currentProvisionalStorageKey(),
-    )
-    expect(serialized).toContain('durable answer')
-    expect(serialized).not.toContain('remote:raw-session')
-    expect(serialized).not.toContain('remote:raw-segment')
-  })
-
-  it('retains every accepted provisional turn across multiple no-handoff sends', () => {
-    persistBootstrap()
-    expect(
-      appendPendingRecoveryMessage('new', 'new', {
-        role: 'assistant',
-        content: [{ type: 'text', text: 'first answer' }],
-        timestamp: 2,
-        runId: 'run-first',
-      }),
-    ).toBe(true)
-
-    const second = provisionalUser('client-second', 'second question', 3)
-    expect(
-      persistPendingMessage({
-        sessionKey: 'new',
-        friendlyId: 'new',
-        message: 'second question',
-        attachments: [],
-        optimisticMessage: second,
-      }),
-    ).toBe(true)
-    expect(
-      appendPendingRecoveryMessage('new', 'new', {
-        role: 'assistant',
-        content: [{ type: 'text', text: 'second answer' }],
-        timestamp: 4,
-        runId: 'run-second',
-      }),
-    ).toBe(true)
-
-    expect(
-      getPendingRecoveryMessages(readPendingMessage('new', 'new')!).map(
-        (entry) => entry.content?.[0],
+      await readIndexedDbPendingSend(
+        pendingSendOwnerKey('new', provisionalOwnerId),
       ),
-    ).toMatchObject([
-      { text: 'bootstrap question' },
-      { text: 'first answer' },
-      { text: 'second question' },
-      { text: 'second answer' },
-    ])
-  })
-
-  it('unions divergent provisional turns when a stale tab writes last', () => {
-    persistBootstrap()
-    const key = currentProvisionalStorageKey()
-    const staleRaw = window.localStorage.getItem(key)
-    const first = provisionalUser('client-first-tab', 'first tab turn', 2)
+    ).toMatchObject({ schema: 4 })
+    expect(window.localStorage).toHaveLength(0)
+    expect(window.sessionStorage).toHaveLength(1)
     expect(
-      persistPendingMessage({
-        sessionKey: 'new',
-        friendlyId: 'new',
-        message: 'first tab turn',
-        attachments: [],
-        optimisticMessage: first,
-      }),
-    ).toBe(true)
-    const originalGetItem = Storage.prototype.getItem
-    let servedStaleAggregate = false
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (
-      this: Storage,
-      storageKey,
-    ) {
-      if (
-        this === window.localStorage &&
-        storageKey === key &&
-        !servedStaleAggregate
-      ) {
-        servedStaleAggregate = true
-        return staleRaw
-      }
-      return originalGetItem.call(this, storageKey)
-    })
-    const second = provisionalUser('client-second-tab', 'second tab turn', 3)
-    expect(
-      persistPendingMessage({
-        sessionKey: 'new',
-        friendlyId: 'new',
-        message: 'second tab turn',
-        attachments: [],
-        optimisticMessage: second,
-      }),
-    ).toBe(true)
-    vi.mocked(Storage.prototype.getItem).mockRestore()
-
-    const texts = getPendingRecoveryMessages(
-      readPendingMessage('new', 'new')!,
-    ).map(
-      (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
-    )
-    expect(texts).toEqual(
-      expect.arrayContaining([
-        'bootstrap question',
-        'first tab turn',
-        'second tab turn',
-      ]),
+      window.sessionStorage.getItem('workspace.chat-provisional-owner.v4'),
+    ).toBe(provisionalOwnerId)
+    expect(window.sessionStorage.getItem('workspace.chat-provisional-owner.v4')).not.toContain(
+      'bootstrap question',
     )
   })
 
-  it('rolls back a journaled bootstrap turn when the aggregate admission write fails', () => {
-    persistBootstrap()
-    const key = currentProvisionalStorageKey()
-    const originalSetItem = Storage.prototype.setItem
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      storageKey,
-      value,
-    ) {
-      if (
-        this === window.localStorage &&
-        storageKey === key &&
-        value.includes('client-rejected-after-journal')
-      ) {
-        throw new DOMException('aggregate quota failure', 'QuotaExceededError')
-      }
-      return originalSetItem.call(this, storageKey, value)
-    })
-
-    const rejected = provisionalUser(
-      'client-rejected-after-journal',
-      'must not resurrect after aggregate rejection',
-      2,
-    )
-    expect(
-      persistPendingMessage({
-        sessionKey: 'new',
-        friendlyId: 'new',
-        message: 'must not resurrect after aggregate rejection',
-        attachments: [],
-        optimisticMessage: rejected,
-      }),
-    ).toBe(false)
-
-    vi.mocked(Storage.prototype.setItem).mockRestore()
-    expect(
-      getPendingRecoveryMessages(readPendingMessage('new', 'new')!),
-    ).toEqual([bootstrapUser()])
-    expect(
-      Array.from({ length: window.localStorage.length }, (_, index) =>
-        window.localStorage.getItem(window.localStorage.key(index) ?? ''),
-      ).join('\n'),
-    ).not.toContain('client-rejected-after-journal')
-  })
-
-  it('hands off only the originating provisional tab and leaves a sibling tab recoverable after tab close', () => {
-    const ownerA = 'bootstrap-tab-a'
-    const ownerB = 'bootstrap-tab-b'
-    persistOwnedBootstrap(ownerA, 'client-tab-a', 'tab A question', 1)
-    persistOwnedBootstrap(ownerB, 'client-tab-b', 'tab B question', 2)
+  it('appends and checkpoints a sanitized assistant before terminal cleanup', async () => {
+    const provisionalOwnerId = 'owner-checkpoint'
+    await persistPendingMessage(payload(provisionalOwnerId))
 
     expect(
-      appendPendingRecoveryMessage(
+      await appendPendingRecoveryMessage(
         'new',
         'new',
         {
           role: 'assistant',
-          content: [{ type: 'text', text: 'tab A answer' }],
+          content: [{ type: 'text', text: 'partial' }],
+          timestamp: 2,
+          runId: 'run-1',
+          stableId: 'stream-run:run-1',
+          sessionKey: 'remote:raw-segment',
+          __streamingStatus: 'streaming',
+        },
+        provisionalOwnerId,
+      ),
+    ).toBe(true)
+    expect(
+      await checkpointPendingRecoveryMessage(
+        'new',
+        'new',
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'complete' }],
           timestamp: 3,
-          runId: 'run-tab-a',
+          runId: 'run-1',
+          stableId: 'stream-run:run-1',
+          __streamingStatus: 'complete',
         },
-        ownerA,
-      ),
-    ).toBe(true)
-    expect(
-      appendPendingRecoveryMessage(
-        'new',
-        'new',
-        {
-          role: 'assistant',
-          content: [{ type: 'text', text: 'tab B answer' }],
-          timestamp: 4,
-          runId: 'run-tab-b',
-        },
-        ownerB,
+        provisionalOwnerId,
       ),
     ).toBe(true)
 
-    handoffPendingSend('new', 'remote:segment-a', 'remote:card-a', {
-      verifiedCardDestination: true,
-      provisionalOwnerId: ownerA,
-    })
-
-    expect(readPendingMessage('new', 'new', ownerA)).toBeNull()
-    expect(
-      getPendingRecoveryMessages(readPendingMessage('new', 'new', ownerB)!).map(
-        (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
-      ),
-    ).toEqual(['tab B question', 'tab B answer'])
-    expect(
-      readCardTranscriptRecovery({ cardId: 'remote:card-a' })?.messages.map(
-        (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
-      ),
-    ).toEqual(['tab A question', 'tab A answer'])
-
-    window.sessionStorage.clear()
-    expect(
-      getPendingRecoveryMessages(readPendingMessage('new', 'new', ownerB)!).map(
-        (entry) => (entry.content?.[0] as { text?: string } | undefined)?.text,
-      ),
-    ).toEqual(['tab B question', 'tab B answer'])
+    const pending = await readPendingMessage('new', 'new', provisionalOwnerId)
+    expect(pending?.recoveryMessages).toHaveLength(2)
+    expect(JSON.stringify(pending)).not.toContain('remote:raw-segment')
+    expect(JSON.stringify(pending)).toContain('complete')
+    expect(JSON.stringify(pending)).not.toContain('partial')
   })
 
-  it('allocates a new automatic owner for a new tab lifetime without overwriting the closed tab', () => {
-    const firstOwner = getNewChatProvisionalOwnerId()
-    persistOwnedBootstrap(firstOwner, 'client-first-life', 'first tab life', 1)
+  it('retains every accepted provisional turn for one owner', async () => {
+    const provisionalOwnerId = 'owner-multi-turn'
+    expect(
+      await persistPendingMessage(
+        payload(provisionalOwnerId, 'client-first', 'first'),
+      ),
+    ).toBe(true)
+    expect(
+      await persistPendingMessage(
+        payload(provisionalOwnerId, 'client-second', 'second'),
+      ),
+    ).toBe(true)
 
-    window.sessionStorage.clear()
-    const secondOwner = getNewChatProvisionalOwnerId()
-    expect(secondOwner).not.toBe(firstOwner)
-    persistOwnedBootstrap(
-      secondOwner,
-      'client-second-life',
-      'second tab life',
-      2,
+    const pending = await readPendingMessage('new', 'new', provisionalOwnerId)
+    expect(pending?.recoveryMessages?.map((entry) => entry.clientId)).toEqual([
+      'client-first',
+      'client-second',
+    ])
+  })
+
+  it('isolates simultaneous provisional owners', async () => {
+    await Promise.all([
+      persistPendingMessage(payload('owner-a', 'client-a', 'from a')),
+      persistPendingMessage(payload('owner-b', 'client-b', 'from b')),
+    ])
+
+    expect((await readPendingMessage('new', 'new', 'owner-a'))?.message).toBe(
+      'from a',
     )
-
-    expect(
-      getPendingRecoveryMessages(
-        readPendingMessage('new', 'new', firstOwner)!,
-      )[0],
-    ).toMatchObject({ clientId: 'client-first-life' })
-    expect(
-      getPendingRecoveryMessages(
-        readPendingMessage('new', 'new', secondOwner)!,
-      )[0],
-    ).toMatchObject({ clientId: 'client-second-life' })
+    expect((await readPendingMessage('new', 'new', 'owner-b'))?.message).toBe(
+      'from b',
+    )
   })
 
-  it('fails admission before transport instead of evicting retryable recovery rows', () => {
-    persistBootstrap()
-    for (let index = 1; index < 48; index += 1) {
-      const appended = appendPendingRecoveryMessage('new', 'new', {
-        role: 'assistant',
-        content: [{ type: 'text', text: `retained-${index}` }],
-        timestamp: index + 1,
-        runId: `run-retained-${index}`,
-      })
-      if (!appended) throw new Error(`recovery append failed at ${index}`)
+  it('rejects over-capacity admission without deleting accepted pending recovery', async () => {
+    const provisionalOwnerId = 'owner-capacity'
+    const accepted = Array.from(
+      { length: CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES },
+      (_, index) => user(`client-${index}`, `accepted-${index}`, index),
+    )
+    const first = payload(provisionalOwnerId, 'client-0', 'accepted-0')
+    first.optimisticMessage = accepted[0]!
+    expect(await persistPendingMessage(first)).toBe(true)
+    for (const acceptedMessage of accepted.slice(1)) {
+      expect(
+        await appendPendingRecoveryMessage(
+          'new',
+          'new',
+          acceptedMessage,
+          provisionalOwnerId,
+        ),
+      ).toBe(true)
     }
-    expect(
-      getPendingRecoveryMessages(readPendingMessage('new', 'new')!),
-    ).toHaveLength(48)
 
-    const admitted = provisionalUser(
-      'client-last-admitted',
-      'last admitted',
-      500,
-    )
     expect(
-      persistPendingMessage({
-        sessionKey: 'new',
-        friendlyId: 'new',
-        message: 'last admitted',
-        attachments: [],
-        optimisticMessage: admitted,
-      }),
-    ).toBe(true)
-    expect(
-      appendPendingRecoveryMessage('new', 'new', {
-        role: 'assistant',
-        content: [{ type: 'text', text: 'reserved terminal' }],
-        timestamp: 501,
-        runId: 'run-reserved-terminal',
-      }),
-    ).toBe(true)
-    const beforeRejectedSend = getPendingRecoveryMessages(
-      readPendingMessage('new', 'new')!,
-    )
-    expect(beforeRejectedSend).toHaveLength(50)
-
-    const rejected = provisionalUser('client-rejected', 'must not send', 502)
-    expect(
-      persistPendingMessage({
-        sessionKey: 'new',
-        friendlyId: 'new',
-        message: 'must not send',
-        attachments: [],
-        optimisticMessage: rejected,
-      }),
+      await persistPendingMessage(
+        payload(provisionalOwnerId, 'client-overflow', 'overflow'),
+      ),
     ).toBe(false)
     expect(
-      getPendingRecoveryMessages(readPendingMessage('new', 'new')!),
-    ).toEqual(beforeRejectedSend)
+      (await readPendingMessage('new', 'new', provisionalOwnerId))
+        ?.recoveryMessages,
+    ).toEqual(accepted)
   })
 
-  it('retains provisional recovery for an unverified or legacy destination', () => {
-    persistBootstrap()
+  it('retains provisional recovery for an unverified destination', async () => {
+    const provisionalOwnerId = 'owner-unverified'
+    await persistPendingMessage(payload(provisionalOwnerId))
 
-    handoffPendingSend('new', 'remote:raw-segment', 'remote:card-a')
-    handoffPendingSend('new', 'remote:raw-segment', 'legacy-friendly', {
-      verifiedCardDestination: true,
-    })
-
-    expect(readPendingMessage('new', 'new')).not.toBeNull()
-    expect(readPendingMessage('remote:raw-segment', 'remote:card-a')).toBeNull()
-    expect(readCardTranscriptRecovery({ cardId: 'remote:card-a' })).toBeNull()
-  })
-
-  it('clears provisional ownership only after verified Card migration lands', () => {
-    persistBootstrap()
     expect(
-      appendPendingRecoveryMessage('new', 'new', {
-        role: 'assistant',
-        content: [{ type: 'text', text: 'migrate me' }],
-        timestamp: 2,
-        runId: 'run-migrate',
-        stableId: 'stream-run:run-migrate',
+      await handoffPendingSend('new', 'remote:segment', 'remote:card-a', {
+        provisionalOwnerId,
+        verifiedCardDestination: false,
+      }),
+    ).toBe(false)
+    expect(await readPendingMessage('new', 'new', provisionalOwnerId)).not.toBeNull()
+    expect(await readCardTranscriptRecovery({ cardId: 'remote:card-a' })).toBeNull()
+  })
+
+  it('atomically promotes pending recovery before deleting the provisional owner', async () => {
+    const provisionalOwnerId = 'owner-handoff'
+    const existing = user('client-existing', 'existing Card turn', 0)
+    await replaceCardTranscriptRecoveryMessages(
+      { cardId: 'remote:card-a' },
+      [existing],
+    )
+    await persistPendingMessage(payload(provisionalOwnerId))
+
+    expect(
+      await handoffPendingSend('new', 'remote:segment', 'remote:card-a', {
+        provisionalOwnerId,
+        verifiedCardDestination: true,
       }),
     ).toBe(true)
-
-    handoffPendingSend('new', 'remote:raw-segment', 'remote:card-a', {
-      verifiedCardDestination: true,
-    })
-
-    expect(readPendingMessage('new', 'new')).toBeNull()
-    expect(readPendingMessage('remote:raw-segment', 'remote:card-a')).toBeNull()
+    expect(await readPendingMessage('new', 'new', provisionalOwnerId)).toBeNull()
     expect(
-      readCardTranscriptRecovery({ cardId: 'remote:card-a' })?.messages,
-    ).toMatchObject([{ role: 'user' }, { role: 'assistant' }])
-    expect(
-      window.localStorage.getItem('claude_pending_msg_remote:raw-segment'),
-    ).toBeNull()
+      (await readCardTranscriptRecovery({ cardId: 'remote:card-a' }))?.messages,
+    ).toEqual(expect.arrayContaining([existing, user('client-bootstrap', 'bootstrap question')]))
   })
 })

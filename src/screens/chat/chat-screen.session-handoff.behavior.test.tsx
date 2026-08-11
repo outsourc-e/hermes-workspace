@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import 'fake-indexeddb/auto'
+import { IDBFactory } from 'fake-indexeddb'
 import React, { useCallback, useRef, useState } from 'react'
 import {
   QueryClient,
@@ -17,6 +19,7 @@ import {
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
+import { resetWorkspaceChatIndexedDb } from './card-transcript-indexeddb'
 import { chatQueryKeys, sessionCardQueryKeys } from './chat-queries'
 import { ChatScreen } from './chat-screen'
 import {
@@ -537,7 +540,27 @@ vi.mock('./hooks/use-chat-history', () => ({
         (queryContext.newRouteResolvesLegacyMain && activeFriendlyId === 'new'
           ? 'main'
           : activeSessionKey))
-    const pending = readPendingMessage(sessionKey, activeFriendlyId)
+    const [pending, setPending] = React.useState<
+      Awaited<ReturnType<typeof readPendingMessage>>
+    >(null)
+    React.useEffect(() => {
+      let cancelled = false
+      const refreshPending = () => {
+        void readPendingMessage(sessionKey, activeFriendlyId).then((next) => {
+          if (!cancelled) {
+            setPending((current) =>
+              JSON.stringify(current) === JSON.stringify(next) ? current : next,
+            )
+          }
+        })
+      }
+      refreshPending()
+      window.addEventListener('test:pending-refresh', refreshPending)
+      return () => {
+        cancelled = true
+        window.removeEventListener('test:pending-refresh', refreshPending)
+      }
+    }, [activeFriendlyId, sessionKey])
     const historyMessages = pending ? getPendingRecoveryMessages(pending) : []
     return {
       historyQuery: {
@@ -640,14 +663,14 @@ class StubEventSource {
   close() {}
 }
 
-async function waitForAssertion(assertion: () => void) {
+async function waitForAssertion(assertion: () => void | Promise<void>) {
   let lastError: unknown
   for (let attempt = 0; attempt < 50; attempt += 1) {
     await React.act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 0))
     })
     try {
-      assertion()
+      await assertion()
       return
     } catch (error) {
       lastError = error
@@ -727,9 +750,9 @@ function ChatRouteHarness({
   const [route, setRoute] = useState(initialRoute)
   const latestRouteRef = useRef(initialRoute)
   const handleSessionResolved = useCallback(
-    (payload: SessionRouteResolutionPayload) => {
+    async (payload: SessionRouteResolutionPayload) => {
       const currentRoute = latestRouteRef.current
-      const transition = applySessionRouteResolution({
+      const transition = await applySessionRouteResolution({
         queryClient,
         activeFriendlyId: currentRoute.friendlyId,
         fallbackSessionKey: currentRoute.sessionKey,
@@ -914,15 +937,18 @@ function createReaderHarness(
 }
 
 describe('ChatScreen authoritative session handoff route lifecycle', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     ;(
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true
     vi.stubGlobal('EventSource', StubEventSource)
+    vi.stubGlobal('indexedDB', new IDBFactory())
     window.localStorage.clear()
     window.sessionStorage.clear()
     clearCardTranscriptRecoveryMemory()
-    resetPendingSend()
+    await resetPendingSend()
+    const database = await resetWorkspaceChatIndexedDb()
+    database.close()
     navigate.mockReset()
     vi.mocked(showErrorToast).mockReset()
     cardMutationMocks.archiveSessionCard
@@ -978,10 +1004,10 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     }
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
-    resetPendingSend()
+    await resetPendingSend()
   })
 
   it('exposes the header metadata callback only for root Cards and never PATCHes an orphan', async () => {
@@ -1795,7 +1821,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
 
     const optimisticMessage =
       queryClient.getQueryData<HistoryResponse>(sourceHistoryKey)!.messages[0]!
-    persistPendingMessage({
+    await persistPendingMessage({
       sessionKey: 'backend-parent',
       friendlyId: 'friendly-route',
       message: 'continue',
@@ -1838,7 +1864,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       'run-1',
     )
     expect(
-      readPendingMessage('canonical-child', 'child-friendly'),
+      await readPendingMessage('canonical-child', 'child-friendly'),
     ).toMatchObject({
       sessionKey: 'canonical-child',
       friendlyId: 'child-friendly',
@@ -2300,7 +2326,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         .findAll({ queryKey: sessionCardQueryKeys.history('remote:parent') }),
     ).toHaveLength(1)
     expect(
-      readCardTranscriptRecovery({ cardId: 'remote:parent' })?.messages,
+      (await readCardTranscriptRecovery({ cardId: 'remote:parent' }))?.messages,
     ).toHaveLength(1)
     expect(
       useChatStore.getState().getCardRealtimeMessages('remote:parent'),
@@ -2628,25 +2654,28 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryContext.newRouteResolvesLegacyMain = true
     const sourceHistoryKey = chatQueryKeys.history('new', 'new')
     const intermediateHistoryKey = chatQueryKeys.history(
-      'intermediate-friendly',
+      'remote:successor-card',
       'backend-a',
     )
     const targetCardHistoryKey =
-      sessionCardQueryKeys.history('successor-friendly')
+      sessionCardQueryKeys.history('remote:successor-card')
     const stream = createReaderHarness([
       {
         fromSessionKey: 'new',
         sessionKey: 'backend-a',
-        friendlyId: 'intermediate-friendly',
+        friendlyId: 'remote:successor-card',
         runId: 'run-chain',
       },
       {
         fromSessionKey: 'backend-a',
         sessionKey: 'backend-b',
-        friendlyId: 'successor-friendly',
+        friendlyId: 'remote:successor-card',
         runId: 'run-chain',
       },
     ])
+    let recoveryBeforeBootstrapRoute:
+      | ReturnType<typeof readCardTranscriptRecovery>
+      | undefined
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
@@ -2655,6 +2684,13 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         <QueryClientProvider client={queryClient}>
           <ChatRouteHarness
             initialRoute={{ friendlyId: 'new', sessionKey: 'new' }}
+            onRouteResolution={(payload) => {
+              if (payload.sessionKey === 'backend-a') {
+                recoveryBeforeBootstrapRoute = readCardTranscriptRecovery({
+                  cardId: 'remote:successor-card',
+                })
+              }
+            }}
           />
         </QueryClientProvider>,
       )
@@ -2675,7 +2711,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     })
     const optimisticMessage =
       queryClient.getQueryData<HistoryResponse>(sourceHistoryKey)!.messages[0]!
-    persistPendingMessage({
+    await persistPendingMessage({
       sessionKey: 'new',
       friendlyId: 'new',
       message: 'continue',
@@ -2699,19 +2735,26 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           ?.getAttribute('data-session-key'),
       ).toBe('backend-b')
     })
-    expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
-    expect(queryClient.getQueryData(intermediateHistoryKey)).toBeUndefined()
+    expect(recoveryBeforeBootstrapRoute).toBeDefined()
     expectAcknowledgedUserMessage(
-      queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
-        ?.messages,
+      (await recoveryBeforeBootstrapRoute)?.messages,
       optimisticMessage,
       'run-chain',
     )
-    expect(readPendingMessage('backend-b', 'successor-friendly')).toBeNull()
-    expect(readPendingMessage('new', 'new')).toMatchObject({
-      sessionKey: 'new',
-      friendlyId: 'new',
-    })
+    expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
+    expect(queryClient.getQueryData(intermediateHistoryKey)).toBeUndefined()
+    await waitForAssertion(() =>
+      expectAcknowledgedUserMessage(
+        queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
+          ?.messages,
+        optimisticMessage,
+        'run-chain',
+      ),
+    )
+    expect(
+      await readPendingMessage('backend-b', 'remote:successor-card'),
+    ).toBeNull()
+    expect(await readPendingMessage('new', 'new')).toBeNull()
     expect(useChatStore.getState().getRealtimeMessages('new')).toMatchObject([
       userMessage('live-chain', 'chain message'),
     ])
@@ -2898,11 +2941,13 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       ).toBe('remote:created-segment')
     })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
-    expectAcknowledgedUserMessage(
-      queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
-        ?.messages,
-      optimisticMessage,
-      'run-bootstrap-card',
+    await waitForAssertion(() =>
+      expectAcknowledgedUserMessage(
+        queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
+          ?.messages,
+        optimisticMessage,
+        'run-bootstrap-card',
+      ),
     )
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)
@@ -2996,11 +3041,13 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       ).toBe('local:created-segment')
     })
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
-    expectAcknowledgedUserMessage(
-      queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
-        ?.messages,
-      optimisticMessage,
-      'run-portable-bootstrap-card',
+    await waitForAssertion(() =>
+      expectAcknowledgedUserMessage(
+        queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
+          ?.messages,
+        optimisticMessage,
+        'run-portable-bootstrap-card',
+      ),
     )
     expect(stream.reader.cancel).not.toHaveBeenCalled()
     expect(stream.getRequestSignal()?.aborted).toBe(false)
@@ -3059,7 +3106,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     )
     const optimisticMessage =
       queryClient.getQueryData<HistoryResponse>(sourceHistoryKey)!.messages[0]!
-    persistPendingMessage({
+    await persistPendingMessage({
       sessionKey: 'backend-parent',
       friendlyId: 'friendly-route',
       message: 'continue',
@@ -3084,7 +3131,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       'run-collision',
     )
     expect(
-      readPendingMessage('friendly-route', 'friendly-route'),
+      await readPendingMessage('friendly-route', 'friendly-route'),
     ).toMatchObject({ sessionKey: 'friendly-route' })
     expect(useChatStore.getState().isSessionWaiting('backend-parent')).toBe(
       true,
@@ -3134,16 +3181,16 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         .click()
     })
 
-    await waitForAssertion(() => {
-      expect(readPendingMessage('new', 'new')?.optimisticMessage).toMatchObject(
-        {
-          role: 'user',
-          status: 'error',
-        },
-      )
+    await waitForAssertion(async () => {
+      expect(
+        (await readPendingMessage('new', 'new'))?.optimisticMessage,
+      ).toMatchObject({
+        role: 'user',
+        status: 'error',
+      })
       expect(showErrorToast).toHaveBeenCalledWith('bootstrap unavailable')
     })
-    expect(JSON.stringify(readPendingMessage('new', 'new'))).toContain(
+    expect(JSON.stringify(await readPendingMessage('new', 'new'))).toContain(
       'continue',
     )
     expect(window.localStorage.getItem('claude_pending_msg_new')).toBeNull()
@@ -3222,9 +3269,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         .querySelector<HTMLElement>('[data-testid="send-message"]')!
         .click()
     })
-    await waitForAssertion(() => {
+    await waitForAssertion(async () => {
       expect(
-        getPendingRecoveryMessages(readPendingMessage('new', 'new')!),
+        getPendingRecoveryMessages((await readPendingMessage('new', 'new'))!),
       ).toMatchObject([
         { role: 'user' },
         {
@@ -3233,13 +3280,16 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
           stableId: 'stream-run:run-no-handoff',
         },
       ])
-      expect(
-        first.container.querySelector('[data-testid="chat-transcript"]')
-          ?.textContent,
-      ).toContain('Recovered answer')
+      const transcript = first.container.querySelector(
+        '[data-testid="chat-transcript"]',
+      )?.textContent
+      if (!transcript?.includes('Recovered answer')) {
+        window.dispatchEvent(new Event('test:pending-refresh'))
+      }
+      expect(transcript).toContain('Recovered answer')
     })
     expect(sendStream).toHaveBeenCalledTimes(1)
-    expect(JSON.stringify(readPendingMessage('new', 'new'))).toContain(
+    expect(JSON.stringify(await readPendingMessage('new', 'new'))).toContain(
       'Recovered answer',
     )
 
@@ -3295,9 +3345,13 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         .click()
     })
 
-    expect(readPendingMessage('new', 'new')?.optimisticMessage).toMatchObject({
-      role: 'user',
-      status: 'error',
+    await waitForAssertion(async () => {
+      expect(
+        (await readPendingMessage('new', 'new'))?.optimisticMessage,
+      ).toMatchObject({
+        role: 'user',
+        status: 'error',
+      })
     })
     expect(navigate).not.toHaveBeenCalled()
 
@@ -3306,7 +3360,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     queryClient.clear()
   })
 
-  it('rejects an attachment before send when its recovery representation is unsafe', () => {
+  it('rejects an attachment before send when its recovery representation is unsafe', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -3356,14 +3410,16 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         ([input]) => String(input) === '/api/send-stream',
       ),
     ).toBe(false)
-    expect(readCardTranscriptRecovery({ cardId: activeCard.cardId })).toBeNull()
+    expect(
+      await readCardTranscriptRecovery({ cardId: activeCard.cardId }),
+    ).toBeNull()
 
     React.act(() => root.unmount())
     document.body.removeChild(container)
     queryClient.clear()
   })
 
-  it('never resurrects a rejected pre-transport turn after transient storage recovery and remount', () => {
+  it('never resurrects a rejected pre-transport turn after transient storage recovery and remount', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -3389,27 +3445,13 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       missingSegments: [],
     })
     expect(
-      replaceCardTranscriptRecoveryMessages({ cardId: activeCard.cardId }, [
-        baseline,
-      ]),
+      await replaceCardTranscriptRecoveryMessages(
+        { cardId: activeCard.cardId },
+        [baseline],
+      ),
     ).not.toBeNull()
-    const originalSetItem = Storage.prototype.setItem
-    let denyRejectedPersistentWrite = true
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      key,
-      value,
-    ) {
-      if (
-        denyRejectedPersistentWrite &&
-        this === window.localStorage &&
-        key.includes(':entry:') &&
-        value.includes('"text":"continue"')
-      ) {
-        denyRejectedPersistentWrite = false
-        throw new DOMException('transient quota failure', 'QuotaExceededError')
-      }
-      return originalSetItem.call(this, key, value)
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => {
+      throw new DOMException('transient quota failure', 'QuotaExceededError')
     })
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -3435,9 +3477,11 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         .click()
     })
 
-    expect(showErrorToast).toHaveBeenCalledWith(
-      expect.stringContaining('could not be saved safely'),
-    )
+    await waitForAssertion(() => {
+      expect(showErrorToast).toHaveBeenCalledWith(
+        expect.stringContaining('could not be saved safely'),
+      )
+    })
     expect(queryContext.composerReset).not.toHaveBeenCalled()
     expect(
       fetchSpy.mock.calls.some(
@@ -3445,7 +3489,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       ),
     ).toBe(false)
     expect(
-      readCardTranscriptRecovery({ cardId: activeCard.cardId })?.messages,
+      (await readCardTranscriptRecovery({ cardId: activeCard.cardId }))?.messages,
     ).toEqual([baseline])
 
     React.act(() => root.unmount())
@@ -3489,7 +3533,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     remountClient.clear()
   })
 
-  it('rolls back a bootstrap journal append when aggregate admission fails before transport', () => {
+  it('rolls back a bootstrap journal append when aggregate admission fails before transport', async () => {
     const provisionalOwnerId = getNewChatProvisionalOwnerId()
     const baseline: ChatMessage = {
       role: 'user',
@@ -3501,7 +3545,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       timestamp: 1,
     }
     expect(
-      persistPendingMessage({
+      await persistPendingMessage({
         sessionKey: 'new',
         friendlyId: 'new',
         provisionalOwnerId,
@@ -3511,22 +3555,11 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       }),
     ).toBe(true)
 
-    const originalSetItem = Storage.prototype.setItem
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      key,
-      value,
-    ) {
-      if (
-        this === window.localStorage &&
-        key.startsWith('workspace.chat-provisional-send.v2:new-chat:') &&
-        !key.includes(':entry:') &&
-        value.includes('"text":"continue"')
-      ) {
+    const indexedDbWrite = vi
+      .spyOn(IDBObjectStore.prototype, 'put')
+      .mockImplementationOnce(() => {
         throw new DOMException('aggregate quota failure', 'QuotaExceededError')
-      }
-      return originalSetItem.call(this, key, value)
-    })
+      })
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('{}', { status: 200 }))
@@ -3552,9 +3585,11 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         .click()
     })
 
-    expect(showErrorToast).toHaveBeenCalledWith(
-      expect.stringContaining('could not be saved safely'),
-    )
+    await waitForAssertion(() => {
+      expect(showErrorToast).toHaveBeenCalledWith(
+        expect.stringContaining('could not be saved safely'),
+      )
+    })
     expect(queryContext.composerReset).not.toHaveBeenCalled()
     expect(
       fetchSpy.mock.calls.some(
@@ -3563,14 +3598,14 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     ).toBe(false)
     expect(
       getPendingRecoveryMessages(
-        readPendingMessage('new', 'new', provisionalOwnerId)!,
+        (await readPendingMessage('new', 'new', provisionalOwnerId))!,
       ),
     ).toEqual([baseline])
 
     React.act(() => root.unmount())
     document.body.removeChild(container)
     queryClient.clear()
-    vi.mocked(Storage.prototype.setItem).mockRestore()
+    indexedDbWrite.mockRestore()
 
     const remountClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -3588,11 +3623,13 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
         </QueryClientProvider>,
       )
     })
-    const transcript = remountContainer.querySelector(
-      '[data-testid="chat-transcript"]',
-    )?.textContent
-    expect(transcript).toContain('accepted bootstrap baseline')
-    expect(transcript).not.toContain('continue')
+    await waitForAssertion(() => {
+      const transcript = remountContainer.querySelector(
+        '[data-testid="chat-transcript"]',
+      )?.textContent
+      expect(transcript).toContain('accepted bootstrap baseline')
+      expect(transcript).not.toContain('continue')
+    })
 
     React.act(() => remountRoot.unmount())
     document.body.removeChild(remountContainer)
@@ -3781,7 +3818,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       })
     })
     expect(
-      readCardTranscriptRecovery({ cardId: activeCard.cardId })?.messages,
+      (await readCardTranscriptRecovery({ cardId: activeCard.cardId }))?.messages,
     ).toMatchObject([
       {
         role: 'user',
@@ -3833,7 +3870,7 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       __optimisticId: 'opt-stale-client',
       status: 'sending',
     }
-    stashPendingSend({
+    await stashPendingSend({
       sessionKey: 'remote:old-tip',
       friendlyId: activeCard.cardId,
       message: 'stale pending turn',

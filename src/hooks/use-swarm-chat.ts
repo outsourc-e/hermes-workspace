@@ -677,6 +677,7 @@ export function useSwarmChat({
 
   const dispatch = useMutation({
     mutationFn: async (input: SwarmDirectChatInput) => {
+      let outcome
       try {
         const mapping = resolveSwarmSessionCardMapping(
           await fetchSessionCards(),
@@ -684,7 +685,7 @@ export function useSwarmChat({
         )
         const cardBinding = directChatBindingForMapping(mapping, workerId)
         if (!cardBinding) throw new Error(SAFE_SEND_ERROR)
-        const outcome = await sendDirectChat(
+        outcome = await sendDirectChat(
           workerId,
           input.clientId,
           input.prompt || 'Please review the attached content.',
@@ -692,17 +693,23 @@ export function useSwarmChat({
           limit,
           cardBinding,
         )
-        if (outcome.userAcknowledgement) {
-          acknowledgeDeliveredCardTranscriptRecoveryMessage(
+      } catch {
+        throw new Error(SAFE_SEND_ERROR)
+      }
+      if (outcome.userAcknowledgement) {
+        try {
+          await acknowledgeDeliveredCardTranscriptRecoveryMessage(
             { cardId: input.cardOwner.cardId },
             input.clientId,
             outcome.userAcknowledgement,
           )
+        } catch {
+          // Transport is already complete. Keep the recovery row and let the
+          // next authoritative snapshot acknowledge it rather than reporting
+          // the delivered message as unsent.
         }
-        return { cardOwner: outcome.cardOwner }
-      } catch {
-        throw new Error(SAFE_SEND_ERROR)
       }
+      return { cardOwner: outcome.cardOwner }
     },
     onSuccess: async (outcome) => {
       await Promise.all([
@@ -734,12 +741,17 @@ export function useSwarmChat({
       throw new Error(SAFE_RECOVERY_ERROR)
     }
     const recoveryOwner = { cardId: activeOwner.cardId }
-    const persisted = appendCardTranscriptRecoveryMessage(
-      recoveryOwner,
-      optimistic.optimisticMessage,
-    )
+    let persisted = null
+    try {
+      persisted = await appendCardTranscriptRecoveryMessage(
+        recoveryOwner,
+        optimistic.optimisticMessage,
+      )
+    } catch {
+      throw new Error(SAFE_RECOVERY_ERROR)
+    }
     if (!persisted) {
-      removeRejectedCardTranscriptRecoveryMessage(
+      await removeRejectedCardTranscriptRecoveryMessage(
         recoveryOwner,
         optimistic.clientId,
       )
@@ -752,7 +764,7 @@ export function useSwarmChat({
       activeOwner.cardId,
     )
     if (!optimisticRow) {
-      removeRejectedCardTranscriptRecoveryMessage(
+      await removeRejectedCardTranscriptRecoveryMessage(
         recoveryOwner,
         optimistic.clientId,
       )

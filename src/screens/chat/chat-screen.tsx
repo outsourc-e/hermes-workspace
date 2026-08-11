@@ -904,7 +904,16 @@ export function ChatScreen({
     refetchOnWindowFocus: true,
   })
   const historyQuery = activeCard ? cardHistoryQuery : legacyHistoryQuery
-  const bootstrapPending = isNewChat ? readPendingMessage('new', 'new') : null
+  const bootstrapPendingOwnerId = isNewChat
+    ? getNewChatProvisionalOwnerId()
+    : ''
+  const bootstrapPendingQuery = useQuery({
+    queryKey: ['chat', 'pending-send-v4', bootstrapPendingOwnerId],
+    queryFn: () =>
+      readPendingMessage('new', 'new', bootstrapPendingOwnerId),
+    enabled: isNewChat && Boolean(bootstrapPendingOwnerId),
+  })
+  const bootstrapPending = bootstrapPendingQuery.data ?? null
   const bootstrapRecoveryMessages = bootstrapPending
     ? getPendingRecoveryMessages(bootstrapPending)
     : []
@@ -1392,9 +1401,11 @@ export function ChatScreen({
       const targetSessionKey = sessionKey ?? activeSend?.sessionKey
       if (targetCardId) {
         useChatStore.getState().clearCardWaiting(targetCardId)
-      } else if (targetSessionKey) {
+      }
+      if (targetSessionKey) {
         useChatStore.getState().clearSessionWaiting(targetSessionKey)
-      } else {
+      }
+      if (!targetCardId && !targetSessionKey) {
         setWaitingForResponse(false)
       }
     },
@@ -1696,7 +1707,7 @@ export function ChatScreen({
       [activeCard, queryClient, sessionCards],
     ),
     onSessionResolved: useCallback(
-      ({
+      async ({
         fromSessionKey,
         sessionKey,
         friendlyId,
@@ -1721,6 +1732,29 @@ export function ChatScreen({
           sessionKey === activeFriendlyId &&
           friendlyId === activeFriendlyId &&
           currentAuthoritativeSessionKey === sessionKey
+        if (!alreadyResolved) {
+          // Stage the expected route before the outer route owner can navigate.
+          // Its callback may synchronously rerender this screen before this
+          // continuation resumes; otherwise the route-key effect can mistake an
+          // authoritative handoff for unrelated navigation and clear the stream.
+          streamHandoffRouteRef.current = { sessionKey, friendlyId }
+          try {
+            await onSessionResolved?.({
+              fromSessionKey,
+              sessionKey,
+              friendlyId,
+              reason,
+            })
+          } catch (error) {
+            if (
+              streamHandoffRouteRef.current?.sessionKey === sessionKey &&
+              streamHandoffRouteRef.current.friendlyId === friendlyId
+            ) {
+              streamHandoffRouteRef.current = null
+            }
+            throw error
+          }
+        }
         if (activeSend) {
           activeSendRef.current = {
             ...activeSend,
@@ -1740,7 +1774,6 @@ export function ChatScreen({
           liveStreamSessionKeyRef.current = sessionKey
         }
         if (alreadyResolved) return
-        streamHandoffRouteRef.current = { sessionKey, friendlyId }
         if (reason === 'bootstrap') {
           // The server only emits a bootstrap handoff after a fresh
           // authoritative Card projection. Refresh the route's Card list as
@@ -1749,17 +1782,8 @@ export function ChatScreen({
             queryKey: sessionCardQueryKeys.lists,
           })
         }
-        onSessionResolved?.({
-          fromSessionKey,
-          sessionKey,
-          friendlyId,
-          reason,
-        })
         if (reason === 'bootstrap') {
-          // The parent route first moves `new/new` to this resolved legacy
-          // key. Promote that transient message into the Card cache that the
-          // destination route actually renders.
-          moveLegacyHistoryMessagesToSessionCard(
+          await moveLegacyHistoryMessagesToSessionCard(
             queryClient,
             friendlyId,
             sessionKey,
@@ -1788,7 +1812,7 @@ export function ChatScreen({
       ],
     ),
     onStarted: useCallback(
-      ({ runId }: { runId: string | null }) => {
+      async ({ runId }: { runId: string | null }) => {
         const activeSend = activeSendRef.current
         if (!activeSend?.clientId) return
         const markAccepted = (message: ChatMessage): ChatMessage => ({
@@ -1801,7 +1825,7 @@ export function ChatScreen({
           runId: runId ?? message.runId,
         })
         if (activeSend.cardId) {
-          updateSessionCardTransientMessageByClientId(
+          await updateSessionCardTransientMessageByClientId(
             queryClient,
             activeSend.cardId,
             activeSend.sessionKey,
@@ -1814,18 +1838,23 @@ export function ChatScreen({
             activeSend.clientId,
             markAccepted,
           )
+          await updatePendingMessageByClientId(
+            activeSend.sessionKey,
+            activeSend.clientId,
+            markAccepted,
+            activeSend.provisionalOwnerId,
+          )
         }
-        updatePendingMessageByClientId(activeSend.clientId, markAccepted)
         setSending(false)
       },
       [queryClient],
     ),
-    onCheckpoint: useCallback((checkpointMessage: ChatMessage) => {
+    onCheckpoint: useCallback(async (checkpointMessage: ChatMessage) => {
       const activeSend = activeSendRef.current
       if (!activeSend) return false
       if (activeSend.cardId) {
         return Boolean(
-          checkpointCardTranscriptRecoveryMessage(
+          await checkpointCardTranscriptRecoveryMessage(
             { cardId: activeSend.cardId },
             checkpointMessage,
           ),
@@ -1839,7 +1868,7 @@ export function ChatScreen({
       )
     }, []),
     onComplete: useCallback(
-      (completedMessage: ChatMessage) => {
+      async (completedMessage: ChatMessage) => {
         const activeSend = activeSendRef.current
         const completedSessionKey = activeSend?.sessionKey
         const completedCardId = activeSend?.cardId
@@ -1857,12 +1886,12 @@ export function ChatScreen({
           let terminalPersisted = true
           if (activeSend.cardId) {
             terminalPersisted = Boolean(
-              checkpointCardTranscriptRecoveryMessage(
+              await checkpointCardTranscriptRecoveryMessage(
                 { cardId: activeSend.cardId },
                 completedMessage,
               ),
             )
-            appendSessionCardTransientMessage(
+            await appendSessionCardTransientMessage(
               queryClient,
               activeSend.cardId,
               activeSend.sessionKey,
@@ -1874,14 +1903,14 @@ export function ChatScreen({
             // A successful bootstrap stream may complete before any Card
             // handoff. Retain both sides of the turn until a verified Card
             // migration owns them, so remounting cannot erase the answer.
-            terminalPersisted = checkpointPendingRecoveryMessage(
+            terminalPersisted = await checkpointPendingRecoveryMessage(
               'new',
               'new',
               completedMessage,
               activeSend.provisionalOwnerId,
             )
           } else {
-            clearPendingSendForSession(
+            await clearPendingSendForSession(
               activeSend.sessionKey,
               activeSend.friendlyId,
             )
@@ -1907,24 +1936,24 @@ export function ChatScreen({
       [queryClient, streamFinish],
     ),
     onInterrupted: useCallback(
-      (interruptedMessage: ChatMessage) => {
+      async (interruptedMessage: ChatMessage) => {
         const activeSend = activeSendRef.current
         if (!activeSend) return
         const persisted = activeSend.cardId
           ? Boolean(
-              checkpointCardTranscriptRecoveryMessage(
+              await checkpointCardTranscriptRecoveryMessage(
                 { cardId: activeSend.cardId },
                 interruptedMessage,
               ),
             )
-          : checkpointPendingRecoveryMessage(
+          : await checkpointPendingRecoveryMessage(
               activeSend.sessionKey,
               activeSend.friendlyId,
               interruptedMessage,
               activeSend.provisionalOwnerId,
             )
         if (activeSend.cardId) {
-          appendSessionCardTransientMessage(
+          await appendSessionCardTransientMessage(
             queryClient,
             activeSend.cardId,
             activeSend.sessionKey,
@@ -1941,7 +1970,7 @@ export function ChatScreen({
       [queryClient],
     ),
     onError: useCallback(
-      (messageText: string) => {
+      async (messageText: string) => {
         const activeSend = activeSendRef.current
         const failedSessionKey = activeSend?.sessionKey
         const failedCardId = activeSend?.cardId
@@ -1951,7 +1980,7 @@ export function ChatScreen({
             status: 'error',
           })
           if (activeSend.cardId) {
-            updateSessionCardTransientMessageByClientId(
+            await updateSessionCardTransientMessageByClientId(
               queryClient,
               activeSend.cardId,
               activeSend.sessionKey,
@@ -1964,8 +1993,13 @@ export function ChatScreen({
               activeSend.clientId,
               markFailed,
             )
+            await updatePendingMessageByClientId(
+              activeSend.sessionKey,
+              activeSend.clientId,
+              markFailed,
+              activeSend.provisionalOwnerId,
+            )
           }
-          updatePendingMessageByClientId(activeSend.clientId, markFailed)
         }
         activeSendRef.current = null
         liveStreamSessionKeyRef.current = null
@@ -2576,20 +2610,29 @@ export function ChatScreen({
     if (!sessionsQuery.isSuccess) return
     if (sessions.length === 0) return
     if (!shouldRedirectToNew) return
-    resetPendingSend()
-    clearHistoryMessages(
-      queryClient,
-      activeFriendlyId,
-      sessionKeyForHistory || activeFriendlyId,
-    )
-    navigate({
-      to: '/chat/$sessionKey',
-      // Nonbootstrap legacy identities cannot become a Card route by selecting
-      // an arbitrary raw session-list row. Restart only from the explicit
-      // bootstrap sentinel, which may later advance through a verified handoff.
-      params: { sessionKey: 'new' },
-      replace: true,
-    })
+    void (async () => {
+      try {
+        await resetPendingSend()
+      } catch {
+        setError(
+          'The conversation was not reset because pending recovery could not be cleared safely.',
+        )
+        return
+      }
+      clearHistoryMessages(
+        queryClient,
+        activeFriendlyId,
+        sessionKeyForHistory || activeFriendlyId,
+      )
+      navigate({
+        to: '/chat/$sessionKey',
+        // Nonbootstrap legacy identities cannot become a Card route by selecting
+        // an arbitrary raw session-list row. Restart only from the explicit
+        // bootstrap sentinel, which may later advance through a verified handoff.
+        params: { sessionKey: 'new' },
+        replace: true,
+      })
+    })()
   }, [
     activeCard,
     activeFriendlyId,
@@ -2673,7 +2716,7 @@ export function ChatScreen({
    * Response arrives via SSE stream, not via this function.
    */
   const sendMessage = useCallback(
-    function sendMessage(
+    async function sendMessage(
       sessionKey: string,
       friendlyId: string,
       body: string,
@@ -2726,7 +2769,7 @@ export function ChatScreen({
         )
         optimisticClientId = clientId
         if (activeCard && activeCardCanonicalSegmentKey) {
-          appendSessionCardTransientMessage(
+          await appendSessionCardTransientMessage(
             queryClient,
             activeCard.cardId,
             activeCardCanonicalSegmentKey,
@@ -2841,7 +2884,7 @@ export function ChatScreen({
         : isGatewayDefaultAlias(currentModel)
           ? undefined
           : currentModel
-      void startStreaming({
+      await startStreaming({
         sessionKey,
         friendlyId,
         cardId: activeCard?.cardId,
@@ -2854,11 +2897,6 @@ export function ChatScreen({
         fastMode,
         model: requestModel || undefined,
         idempotencyKey: optimisticClientId || crypto.randomUUID(),
-      }).catch((err: unknown) => {
-        const messageText = err instanceof Error ? err.message : String(err)
-        if (import.meta.env.DEV) {
-          console.warn('[chat] send-stream failed', messageText)
-        }
       })
     },
     [
@@ -2905,35 +2943,44 @@ export function ChatScreen({
       }
       return false
     })
-    if (!alreadyHasOptimistic) {
-      if (activeCard && activeCardCanonicalSegmentKey) {
-        appendSessionCardTransientMessage(
-          queryClient,
-          activeCard.cardId,
-          activeCardCanonicalSegmentKey,
-          pending.optimisticMessage,
-        )
-      } else {
-        appendHistoryMessage(
-          queryClient,
-          transportFriendlyId,
+    void (async () => {
+      try {
+        if (!alreadyHasOptimistic) {
+          if (activeCard && activeCardCanonicalSegmentKey) {
+            await appendSessionCardTransientMessage(
+              queryClient,
+              activeCard.cardId,
+              activeCardCanonicalSegmentKey,
+              pending.optimisticMessage,
+            )
+          } else {
+            appendHistoryMessage(
+              queryClient,
+              transportFriendlyId,
+              currentSessionKey,
+              pending.optimisticMessage,
+            )
+          }
+        }
+        setWaitingForResponse(true)
+        await sendMessage(
           currentSessionKey,
-          pending.optimisticMessage,
+          transportFriendlyId,
+          pending.message,
+          pending.attachments,
+          false,
+          true,
+          typeof pending.optimisticMessage.clientId === 'string'
+            ? pending.optimisticMessage.clientId
+            : '',
+        )
+      } catch {
+        setWaitingForResponse(false)
+        setError(
+          'This message was not sent because its recovery state could not be saved safely.',
         )
       }
-    }
-    setWaitingForResponse(true)
-    sendMessage(
-      currentSessionKey,
-      transportFriendlyId,
-      pending.message,
-      pending.attachments,
-      false,
-      true,
-      typeof pending.optimisticMessage.clientId === 'string'
-        ? pending.optimisticMessage.clientId
-        : '',
-    )
+    })()
   }, [
     activeCard,
     activeCardCanonicalSegmentKey,
@@ -3162,7 +3209,7 @@ export function ChatScreen({
   )
 
   const send = useCallback(
-    (
+    async (
       body: string,
       attachments: Array<ChatComposerAttachment>,
       fastMode: boolean,
@@ -3237,57 +3284,51 @@ export function ChatScreen({
       const provisionalOwnerId = isNewChat ? getNewChatProvisionalOwnerId() : ''
 
       let persisted = false
-      if (activeCard) {
-        persisted = Boolean(
-          appendCardTranscriptRecoveryMessage(
-            { cardId: activeCard.cardId },
-            durableOptimisticMessage,
-          ),
-        )
-        if (persisted) {
-          appendSessionCardTransientMessage(
-            queryClient,
-            activeCard.cardId,
-            sessionKeyForSend,
-            durableOptimisticMessage,
-            { persistRecovery: false },
+      try {
+        if (activeCard) {
+          persisted = Boolean(
+            await appendCardTranscriptRecoveryMessage(
+              { cardId: activeCard.cardId },
+              durableOptimisticMessage,
+            ),
           )
+          if (persisted) {
+            await appendSessionCardTransientMessage(
+              queryClient,
+              activeCard.cardId,
+              sessionKeyForSend,
+              durableOptimisticMessage,
+              { persistRecovery: false },
+            )
+          } else {
+            await removeRejectedCardTranscriptRecoveryMessage(
+              { cardId: activeCard.cardId },
+              durableClientId,
+            )
+          }
         } else {
-          // A failed admission may still have reached session/memory recovery
-          // before the persistent-mirror verification failed. Remove only this
-          // rejected client identity; normal union writers would resurrect it.
-          removeRejectedCardTranscriptRecoveryMessage(
-            { cardId: activeCard.cardId },
-            durableClientId,
-          )
+          persisted = await persistPendingMessage({
+            sessionKey: sessionKeyForSend,
+            friendlyId: isNewChat ? 'new' : transportFriendlyId,
+            ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
+            message: trimmedBody,
+            attachments: attachmentPayload,
+            optimisticMessage: durableOptimisticMessage,
+          })
+          if (persisted) {
+            appendHistoryMessage(
+              queryClient,
+              isNewChat ? 'new' : transportFriendlyId,
+              sessionKeyForSend,
+              durableOptimisticMessage,
+            )
+          }
         }
-      } else {
-        persisted = persistPendingMessage({
-          sessionKey: sessionKeyForSend,
-          friendlyId: isNewChat ? 'new' : transportFriendlyId,
-          ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
-          message: trimmedBody,
-          attachments: attachmentPayload,
-          optimisticMessage: durableOptimisticMessage,
-        })
-        if (persisted) {
-          appendHistoryMessage(
-            queryClient,
-            isNewChat ? 'new' : transportFriendlyId,
-            sessionKeyForSend,
-            durableOptimisticMessage,
-          )
-        }
+      } catch {
+        persisted = false
       }
 
       if (!persisted) {
-        if (!activeCard) {
-          removeRejectedPendingMessage(
-            sessionKeyForSend,
-            durableClientId,
-            provisionalOwnerId,
-          )
-        }
         const safeMessage =
           attachmentPayload.length > 0
             ? 'This message was not sent because its attachments could not be saved for recovery. Free browser storage or remove the attachments, then try again.'
@@ -3311,7 +3352,7 @@ export function ChatScreen({
       if (isMobile) hapticTap()
       requestAnimationFrame(() => scrollChatToBottom('smooth'))
 
-      sendMessage(
+      await sendMessage(
         sessionKeyForSend,
         isNewChat ? 'new' : transportFriendlyId,
         trimmedBody,
@@ -3345,7 +3386,7 @@ export function ChatScreen({
     ],
   )
 
-  const handleAbortStreaming = useCallback(() => {
+  const handleAbortStreaming = useCallback(async () => {
     const activeSend = activeSendRef.current
     if (activeSend?.clientId) {
       const markCancelled = (message: ChatMessage): ChatMessage => ({
@@ -3353,7 +3394,7 @@ export function ChatScreen({
         status: 'error',
       })
       if (activeSend.cardId) {
-        updateSessionCardTransientMessageByClientId(
+        await updateSessionCardTransientMessageByClientId(
           queryClient,
           activeSend.cardId,
           activeSend.sessionKey,
@@ -3367,9 +3408,16 @@ export function ChatScreen({
           markCancelled,
         )
       }
-      updatePendingMessageByClientId(activeSend.clientId, markCancelled)
+      if (!activeSend.cardId) {
+        await updatePendingMessageByClientId(
+          activeSend.sessionKey,
+          activeSend.clientId,
+          markCancelled,
+          activeSend.provisionalOwnerId,
+        )
+      }
     }
-    cancelStreaming()
+    await cancelStreaming()
     activeSendRef.current = null
     setSending(false)
     setPendingGeneration(false)

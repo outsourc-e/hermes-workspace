@@ -1,10 +1,15 @@
-import {
-  clearMessageJournal,
-  readMessageJournal,
-  removeMessageJournalValues,
-  writeMessageJournal,
-} from './durable-message-journal'
 import { parsePortableAttachmentDataUrl } from './attachment-envelope'
+import {
+  mutateCardRecoveryAtomically,
+  readCardRecovery as readIndexedDbCardRecovery,
+  readLatestCardSnapshot,
+  writeSnapshotAndAcknowledgeRecoveryAtomically,
+} from './card-transcript-indexeddb'
+import type {
+  PortableValue,
+  V4CardRecoveryRecord,
+  V4LatestCardSnapshotRecord,
+} from './card-transcript-indexeddb'
 import type { ChatAttachment, ChatMessage } from './types'
 import type { SwarmDirectChatUserAcknowledgement } from '@/lib/swarm-direct-chat-delivery'
 import {
@@ -13,73 +18,36 @@ import {
   swarmDirectChatContentDigest,
 } from '@/lib/swarm-direct-chat-delivery'
 
-export const CARD_TRANSCRIPT_RECOVERY_VERSION = 2 as const
-export const CARD_TRANSCRIPT_RECOVERY_PREFIX =
-  'workspace.card-transcript-recovery.v2'
-const LEGACY_CARD_TRANSCRIPT_RECOVERY_PREFIX =
-  'workspace.card-transcript-recovery.v1'
+export const CARD_TRANSCRIPT_RECOVERY_VERSION = 4 as const
 export const CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES = 50
 export const CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGE_CHARS = 256 * 1024
 export const CARD_TRANSCRIPT_RECOVERY_MAX_ENVELOPE_CHARS = 2 * 1024 * 1024
 export const CARD_TRANSCRIPT_RECOVERY_MAX_ATTACHMENTS = 8
 export const CARD_TRANSCRIPT_RECOVERY_MAX_ATTACHMENT_CHARS = 512 * 1024
 export const CARD_TRANSCRIPT_RECOVERY_MAX_TEXT_CHARS = 128 * 1024
-const CARD_TRANSCRIPT_RECOVERY_MAX_MEMORY_OWNERS = 32
+const MAX_CAS_ATTEMPTS = 8
 
-export type CardTranscriptRecoveryOwner = {
-  cardId: string
-}
-
+export type CardTranscriptRecoveryOwner = { cardId: string }
 export type CardTranscriptRecoveryEnvelope = {
-  version: typeof CARD_TRANSCRIPT_RECOVERY_VERSION
+  version: 4
   cardId: string
   createdAt: number
   messages: Array<ChatMessage>
-  /** Monotonic browser commit identity used to select the newest mirror. */
-  revision?: number
+  revision: number
+  writeId: string
+  updatedAt: number
 }
 
-type RecoveryOptions = {
-  storage?: Storage
-  now?: number
+type CardTranscriptRecoveryPayload = {
+  version: 4
+  createdAt: number
+  messages: Array<PortableValue>
 }
 
-// Card-owned fail-closed overlay for storage-denied writes. Existing
-// failed owners are never evicted; new owners fail closed at the hard bound.
-const memoryRecovery = new Map<string, CardTranscriptRecoveryEnvelope>()
+type RecoveryOptions = { now?: number }
 
-/** Test/process-lifecycle seam; normal callers clear one exact Card owner. */
-export function clearCardTranscriptRecoveryMemory(): void {
-  memoryRecovery.clear()
-}
-
-function memoryRecoveryKey(owner: CardTranscriptRecoveryOwner): string {
-  return owner.cardId
-}
-
-function rememberMemoryRecovery(
-  owner: CardTranscriptRecoveryOwner,
-  envelope: CardTranscriptRecoveryEnvelope,
-): void {
-  const key = memoryRecoveryKey(owner)
-  if (
-    !memoryRecovery.has(key) &&
-    memoryRecovery.size >= CARD_TRANSCRIPT_RECOVERY_MAX_MEMORY_OWNERS
-  ) {
-    return
-  }
-  memoryRecovery.set(key, envelope)
-}
-
-function readMemoryRecovery(
-  owner: CardTranscriptRecoveryOwner,
-  _now: number,
-): CardTranscriptRecoveryEnvelope | null {
-  const key = memoryRecoveryKey(owner)
-  const envelope = memoryRecovery.get(key)
-  if (!envelope) return null
-  return envelope
-}
+/** Test/process seam retained without an in-memory durability authority. */
+export async function clearCardTranscriptRecoveryMemory(): Promise<void> {}
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -168,45 +136,6 @@ export function isValidCardTranscriptRecoveryOwner(
   owner: CardTranscriptRecoveryOwner,
 ): boolean {
   return sourceQualifiedIdentity(owner.cardId) !== null
-}
-
-export function cardTranscriptRecoveryStorageKey(
-  owner: CardTranscriptRecoveryOwner,
-): string {
-  return `${CARD_TRANSCRIPT_RECOVERY_PREFIX}:${encodeURIComponent(owner.cardId)}`
-}
-
-function clearLegacyRecovery(storage: Storage): void {
-  try {
-    for (let index = storage.length - 1; index >= 0; index -= 1) {
-      const key = storage.key(index)
-      if (key?.startsWith(`${LEGACY_CARD_TRANSCRIPT_RECOVERY_PREFIX}:`)) {
-        storage.removeItem(key)
-      }
-    }
-  } catch {
-    // Legacy cleanup is best effort when browser storage is unavailable.
-  }
-}
-
-function resolveDefaultRecoveryStorages(
-  explicitStorage: Storage | undefined,
-): Array<Storage> {
-  if (explicitStorage) return [explicitStorage]
-  if (typeof window === 'undefined') return []
-  const storages: Array<Storage> = []
-  for (const candidate of [
-    () => window.sessionStorage,
-    () => window.localStorage,
-  ]) {
-    try {
-      const storage = candidate()
-      if (!storages.includes(storage)) storages.push(storage)
-    } catch {
-      // One browser store may be denied while the independent mirror works.
-    }
-  }
-  return storages
 }
 
 function timestamp(message: ChatMessage): number | null {
@@ -683,451 +612,6 @@ function dedupeMessages(messages: Array<ChatMessage>): Array<ChatMessage> {
   return deduped
 }
 
-export function parseCardTranscriptRecovery(
-  value: unknown,
-  expectedOwner: CardTranscriptRecoveryOwner,
-  _now = Date.now(),
-): CardTranscriptRecoveryEnvelope | null {
-  if (!isValidCardTranscriptRecoveryOwner(expectedOwner) || !record(value)) {
-    return null
-  }
-  if (value.version !== CARD_TRANSCRIPT_RECOVERY_VERSION) return null
-  if (value.cardId !== expectedOwner.cardId) {
-    return null
-  }
-  if (!isValidCardTranscriptRecoveryOwner(expectedOwner)) return null
-  if (
-    typeof value.createdAt !== 'number' ||
-    !Number.isFinite(value.createdAt) ||
-    value.createdAt <= 0 ||
-    typeof value.revision !== 'number' ||
-    !Number.isSafeInteger(value.revision) ||
-    value.revision <= 0
-  ) {
-    return null
-  }
-  if (!Array.isArray(value.messages)) {
-    return null
-  }
-  const sanitizedMessages = value.messages.map((message) =>
-    sanitizeCardOwnedMessage(message as ChatMessage),
-  )
-  if (
-    sanitizedMessages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES ||
-    sanitizedMessages.some((message) => !validMessage(message))
-  )
-    return null
-
-  const envelope: CardTranscriptRecoveryEnvelope = {
-    version: CARD_TRANSCRIPT_RECOVERY_VERSION,
-    cardId: expectedOwner.cardId,
-    createdAt: value.createdAt,
-    messages: dedupeMessages(sanitizedMessages),
-    revision: value.revision,
-  }
-  try {
-    if (
-      JSON.stringify(envelope).length >
-      CARD_TRANSCRIPT_RECOVERY_MAX_ENVELOPE_CHARS
-    ) {
-      return null
-    }
-  } catch {
-    return null
-  }
-  return envelope
-}
-
-export function readCardTranscriptRecovery(
-  owner: CardTranscriptRecoveryOwner,
-  options: RecoveryOptions = {},
-): CardTranscriptRecoveryEnvelope | null {
-  if (!isValidCardTranscriptRecoveryOwner(owner)) return null
-  const now = options.now ?? Date.now()
-  const memory = readMemoryRecovery(owner, now)
-  const storages = resolveDefaultRecoveryStorages(options.storage)
-  if (storages.length === 0) return memory
-  const key = cardTranscriptRecoveryStorageKey(owner)
-  let newest: CardTranscriptRecoveryEnvelope | null = null
-  let newestRawLength = -1
-
-  for (const storage of storages) {
-    clearLegacyRecovery(storage)
-    let raw: string | null
-    try {
-      raw = storage.getItem(key)
-    } catch {
-      continue
-    }
-    if (!raw) continue
-    if (raw.length > CARD_TRANSCRIPT_RECOVERY_MAX_ENVELOPE_CHARS) {
-      try {
-        storage.removeItem(key)
-      } catch {
-        // Storage can become unavailable between operations.
-      }
-      continue
-    }
-    try {
-      const envelope = parseCardTranscriptRecovery(JSON.parse(raw), owner, now)
-      if (envelope) {
-        const revision = envelope.revision ?? envelope.createdAt
-        const newestRevision = newest?.revision ?? newest?.createdAt ?? -1
-        if (
-          !newest ||
-          revision > newestRevision ||
-          (revision === newestRevision && raw.length > newestRawLength)
-        ) {
-          newest = envelope
-          newestRawLength = raw.length
-        }
-        try {
-          const sanitizedRaw = JSON.stringify(envelope)
-          if (sanitizedRaw !== raw) storage.setItem(key, sanitizedRaw)
-        } catch {
-          // A valid durable record remains usable if normalization is denied.
-        }
-        continue
-      }
-    } catch {
-      // Remove malformed data below.
-    }
-    try {
-      storage.removeItem(key)
-    } catch {
-      // Ignore unavailable storage while rejecting the record.
-    }
-  }
-
-  const journalMessages = readMessageJournal(
-    key,
-    storages,
-    recoveryMessageIdentity,
-    (value) => {
-      const sanitized = sanitizeCardOwnedMessage(value as ChatMessage)
-      return validMessage(sanitized) ? sanitized : null
-    },
-  )
-  if (journalMessages.length > 0) {
-    const mergedMessages = dedupeMessages(journalMessages)
-    newest = {
-      version: CARD_TRANSCRIPT_RECOVERY_VERSION,
-      cardId: owner.cardId,
-      createdAt: newest?.createdAt ?? Math.max(1, now),
-      revision: newest?.revision ?? 1,
-      messages: mergedMessages,
-    }
-  }
-
-  if (!memory) return newest
-  if (!newest) return memory
-  const memoryRevision = memory.revision ?? 0
-  const durableRevision = newest.revision ?? 0
-  if (memoryRevision > durableRevision) {
-    return {
-      ...memory,
-      messages: dedupeMessages([...newest.messages, ...memory.messages]),
-    }
-  }
-  return {
-    ...newest,
-    messages: dedupeMessages([...memory.messages, ...newest.messages]),
-  }
-}
-
-export function clearCardTranscriptRecovery(
-  owner: CardTranscriptRecoveryOwner,
-  options: Pick<RecoveryOptions, 'storage'> = {},
-): void {
-  if (!isValidCardTranscriptRecoveryOwner(owner)) return
-  memoryRecovery.delete(memoryRecoveryKey(owner))
-  const storages = resolveDefaultRecoveryStorages(options.storage)
-  const key = cardTranscriptRecoveryStorageKey(owner)
-  clearMessageJournal(key, storages)
-  for (const storage of storages) {
-    clearLegacyRecovery(storage)
-    try {
-      storage.removeItem(key)
-    } catch {
-      // Ignore unavailable storage.
-    }
-  }
-}
-
-let recoveryRevision = 0
-
-function nextRecoveryRevision(previousRevision: number): number | null {
-  const next = Math.max(recoveryRevision, previousRevision) + 1
-  if (!Number.isSafeInteger(next) || next <= 0) return null
-  recoveryRevision = next
-  return next
-}
-
-function hasRecoveryClientIdentity(
-  message: ChatMessage,
-  clientId: string,
-): boolean {
-  return (
-    message.role === 'user' &&
-    identifierSet(message, [
-      'clientId',
-      'client_id',
-      'idempotencyKey',
-      'nonce',
-      '__optimisticId',
-    ]).has(clientId)
-  )
-}
-
-/**
- * Roll back one user turn that failed the pre-transport durability gate.
- *
- * This intentionally bypasses the normal unioning writer: a rejected turn is
- * not accepted recovery state and must be removed by immutable client identity
- * from every in-process and browser-owned recovery authority without replacing
- * or evicting previously accepted rows.
- */
-export function removeRejectedCardTranscriptRecoveryMessage(
-  owner: CardTranscriptRecoveryOwner,
-  clientId: string,
-  options: RecoveryOptions = {},
-): CardTranscriptRecoveryEnvelope | null {
-  const normalizedClientId = normalizedString(clientId)
-  if (!isValidCardTranscriptRecoveryOwner(owner) || !normalizedClientId) {
-    return null
-  }
-
-  const key = cardTranscriptRecoveryStorageKey(owner)
-  const storages = resolveDefaultRecoveryStorages(options.storage)
-  const journalMessages = readMessageJournal(
-    key,
-    storages,
-    recoveryMessageIdentity,
-    (value) => {
-      const sanitized = sanitizeCardOwnedMessage(value as ChatMessage)
-      return validMessage(sanitized) ? sanitized : null
-    },
-  )
-  removeMessageJournalValues(
-    key,
-    journalMessages.filter((message) =>
-      hasRecoveryClientIdentity(message, normalizedClientId),
-    ),
-    storages,
-    recoveryMessageIdentity,
-  )
-
-  const memoryKey = memoryRecoveryKey(owner)
-  const memory = memoryRecovery.get(memoryKey)
-  if (memory) {
-    const remaining = memory.messages.filter(
-      (message) => !hasRecoveryClientIdentity(message, normalizedClientId),
-    )
-    if (remaining.length === 0) memoryRecovery.delete(memoryKey)
-    else if (remaining.length !== memory.messages.length) {
-      memoryRecovery.set(memoryKey, { ...memory, messages: remaining })
-    }
-  }
-
-  for (const storage of storages) {
-    let envelope: CardTranscriptRecoveryEnvelope | null = null
-    try {
-      const raw = storage.getItem(key)
-      envelope = raw
-        ? parseCardTranscriptRecovery(JSON.parse(raw), owner, options.now)
-        : null
-    } catch {
-      continue
-    }
-    if (!envelope) continue
-    const remaining = envelope.messages.filter(
-      (message) => !hasRecoveryClientIdentity(message, normalizedClientId),
-    )
-    if (remaining.length === envelope.messages.length) continue
-    if (remaining.length === 0) {
-      try {
-        storage.removeItem(key)
-      } catch {
-        // A denied mirror must not block cleanup in independent mirrors.
-      }
-      continue
-    }
-    const revision = nextRecoveryRevision(envelope.revision ?? 0)
-    if (revision === null) continue
-    const rollbackTime = options.now ?? Date.now()
-    const nextEnvelope: CardTranscriptRecoveryEnvelope = {
-      ...envelope,
-      createdAt:
-        Number.isFinite(rollbackTime) && rollbackTime > 0
-          ? rollbackTime
-          : envelope.createdAt,
-      messages: remaining,
-      revision,
-    }
-    try {
-      storage.setItem(key, JSON.stringify(nextEnvelope))
-    } catch {
-      // Continue removing the rejected identity from independent mirrors.
-    }
-  }
-
-  return readCardTranscriptRecovery(owner, options)
-}
-
-/**
- * Persist the exact server-observed echo for one already delivered Swarm turn.
- * The recovery row remains until complete Card history proves the echo (and,
- * for attachments, full attachment fidelity), so this cannot create a
- * delivery-success durability gap.
- */
-export function acknowledgeDeliveredCardTranscriptRecoveryMessage(
-  owner: CardTranscriptRecoveryOwner,
-  clientId: string,
-  acknowledgementValue: unknown,
-  options: RecoveryOptions = {},
-): CardTranscriptRecoveryEnvelope | null {
-  const normalizedClientId = normalizedString(clientId)
-  const acknowledgement = parseSwarmDirectChatUserAcknowledgement(
-    acknowledgementValue,
-    normalizedClientId,
-  )
-  if (
-    !isValidCardTranscriptRecoveryOwner(owner) ||
-    !normalizedClientId ||
-    !acknowledgement
-  ) {
-    return null
-  }
-  const existing = readCardTranscriptRecovery(owner, options)
-  if (!existing) return null
-  if (
-    !existing.messages.some(
-      (message) =>
-        hasRecoveryClientIdentity(message, normalizedClientId) &&
-        swarmAcknowledgementAttachmentsMatchRecovery(message, acknowledgement),
-    )
-  ) {
-    return null
-  }
-  const messages = existing.messages.map((message) => {
-    if (
-      !hasRecoveryClientIdentity(message, normalizedClientId) ||
-      !swarmAcknowledgementAttachmentsMatchRecovery(message, acknowledgement)
-    ) {
-      return message
-    }
-    return {
-      ...message,
-      status: 'sent',
-      __swarmDeliveryAcknowledgement: acknowledgement,
-    }
-  })
-  const persisted = replaceCardTranscriptRecoveryMessages(
-    owner,
-    messages,
-    options,
-  )
-  const acknowledged = persisted?.messages.find((message) =>
-    hasRecoveryClientIdentity(message, normalizedClientId),
-  )
-  return parseSwarmDirectChatUserAcknowledgement(
-    (acknowledged as Record<string, unknown> | undefined)
-      ?.__swarmDeliveryAcknowledgement,
-    normalizedClientId,
-  )
-    ? persisted
-    : null
-}
-
-export function replaceCardTranscriptRecoveryMessages(
-  owner: CardTranscriptRecoveryOwner,
-  messages: Array<ChatMessage>,
-  options: RecoveryOptions = {},
-): CardTranscriptRecoveryEnvelope | null {
-  if (!isValidCardTranscriptRecoveryOwner(owner)) return null
-  const sanitizedMessages = messages.map(sanitizeCardOwnedMessage)
-  if (sanitizedMessages.some((message) => !validMessage(message))) return null
-  const existing = readCardTranscriptRecovery(owner, options)
-  const deduped = dedupeMessages([
-    ...(existing?.messages ?? []),
-    ...sanitizedMessages,
-  ])
-  // Capacity is an admission boundary, never an eviction policy. Silently
-  // dropping the oldest unacknowledged turn would make an accepted send
-  // unrecoverable, so callers must fail closed before transport instead.
-  if (deduped.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES) return null
-  if (deduped.length === 0) {
-    clearCardTranscriptRecovery(owner, { storage: options.storage })
-    return null
-  }
-  const createdAt = options.now ?? Date.now()
-  if (!Number.isFinite(createdAt) || createdAt <= 0) return null
-  const revision = nextRecoveryRevision(existing?.revision ?? 0)
-  if (revision === null) return null
-  const envelope: CardTranscriptRecoveryEnvelope = {
-    version: CARD_TRANSCRIPT_RECOVERY_VERSION,
-    cardId: owner.cardId,
-    createdAt,
-    messages: deduped,
-    revision,
-  }
-  const storages = resolveDefaultRecoveryStorages(options.storage)
-  if (storages.length === 0) {
-    rememberMemoryRecovery(owner, envelope)
-    return null
-  }
-  let serialized: string
-  try {
-    serialized = JSON.stringify(envelope)
-  } catch {
-    return null
-  }
-  if (serialized.length > CARD_TRANSCRIPT_RECOVERY_MAX_ENVELOPE_CHARS) {
-    rememberMemoryRecovery(owner, envelope)
-    return null
-  }
-  const key = cardTranscriptRecoveryStorageKey(owner)
-  const journalWrite = writeMessageJournal(
-    key,
-    deduped,
-    storages,
-    recoveryMessageIdentity,
-  )
-  const durable = options.storage
-    ? journalWrite.anyVerified
-    : journalWrite.persistentVerified
-  if (!durable) {
-    rememberMemoryRecovery(owner, envelope)
-    return null
-  }
-  for (const storage of storages) {
-    clearLegacyRecovery(storage)
-    try {
-      storage.setItem(key, serialized)
-      // Journal rows are authoritative across contexts; the aggregate envelope
-      // is a compact compatibility mirror and may be replaced by another tab.
-      storage.getItem(key)
-    } catch {
-      // The verified per-message journal remains readable in this mirror.
-    }
-  }
-  memoryRecovery.delete(memoryRecoveryKey(owner))
-  return envelope
-}
-
-export function appendCardTranscriptRecoveryMessage(
-  owner: CardTranscriptRecoveryOwner,
-  message: ChatMessage,
-  options: RecoveryOptions = {},
-): CardTranscriptRecoveryEnvelope | null {
-  if (!validMessage(message)) return null
-  const existing = readCardTranscriptRecovery(owner, options)
-  return replaceCardTranscriptRecoveryMessages(
-    owner,
-    [...(existing?.messages ?? []), message],
-    options,
-  )
-}
 
 function messageRunIdentity(message: ChatMessage): string {
   const raw = message as Record<string, unknown>
@@ -1144,27 +628,20 @@ function messageRunIdentity(message: ChatMessage): string {
   return ''
 }
 
-/** Replace one in-flight assistant checkpoint by immutable run identity. */
-export function checkpointCardTranscriptRecoveryMessage(
-  owner: CardTranscriptRecoveryOwner,
+function hasRecoveryClientIdentity(
   message: ChatMessage,
-  options: RecoveryOptions = {},
-): CardTranscriptRecoveryEnvelope | null {
-  const sanitized = sanitizeCardOwnedMessage(message)
-  if (!validMessage(sanitized)) return null
-  const runId = messageRunIdentity(sanitized)
-  if (!runId || sanitized.role !== 'assistant') {
-    return appendCardTranscriptRecoveryMessage(owner, sanitized, options)
-  }
-  const existing = readCardTranscriptRecovery(owner, options)
-  const messages = [...(existing?.messages ?? [])]
-  const index = messages.findIndex(
-    (candidate) =>
-      candidate.role === 'assistant' && messageRunIdentity(candidate) === runId,
+  clientId: string,
+): boolean {
+  return (
+    message.role === 'user' &&
+    identifierSet(message, [
+      'clientId',
+      'client_id',
+      'idempotencyKey',
+      'nonce',
+      '__optimisticId',
+    ]).has(clientId)
   )
-  if (index >= 0) messages[index] = sanitized
-  else messages.push(sanitized)
-  return replaceCardTranscriptRecoveryMessages(owner, messages, options)
 }
 
 /** Preflight the exact scrubbed message representation used for recovery. */
@@ -1390,17 +867,11 @@ export type CardTranscriptAcknowledgementProjection =
     acknowledgedMessages: Array<ChatMessage>
   }
 
-/**
- * Compute attachment-enriched authoritative rows and acknowledgement candidates
- * without changing recovery storage. Durable snapshot callers use this exact
- * projection before crossing the recovery-removal boundary.
- */
-export function projectAcknowledgedCardTranscriptRecoveryMessages(
-  owner: CardTranscriptRecoveryOwner,
+
+function projectAcknowledgedCardTranscriptRecoveryMessagesFromEnvelope(
   authoritativeMessages: Array<ChatMessage>,
-  options: RecoveryOptions = {},
+  sourceRecovery: CardTranscriptRecoveryEnvelope | null,
 ): CardTranscriptAcknowledgementProjection {
-  const sourceRecovery = readCardTranscriptRecovery(owner, options)
   if (!sourceRecovery) {
     return {
       authoritativeMessages,
@@ -1472,101 +943,386 @@ export function projectAcknowledgedCardTranscriptRecoveryMessages(
   }
 }
 
+
+function nowValue(options: RecoveryOptions = {}): number {
+  const value = options.now ?? Date.now()
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error('Card recovery timestamp is invalid')
+  }
+  return value
+}
+
+function writeId(): string {
+  return crypto.randomUUID()
+}
+
+function isCasFailure(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('compare-and-swap failed')
+}
+
+function parseRecoveryRecord(
+  value: unknown,
+  expectedOwner: CardTranscriptRecoveryOwner,
+): CardTranscriptRecoveryEnvelope {
+  if (!record(value)) throw new Error('Card recovery v4 record is malformed')
+  const payload = value.payload
+  if (
+    value.schema !== 4 ||
+    value.cardId !== expectedOwner.cardId ||
+    typeof value.revision !== 'number' ||
+    !Number.isSafeInteger(value.revision) ||
+    value.revision <= 0 ||
+    typeof value.writeId !== 'string' ||
+    !value.writeId.trim() ||
+    typeof value.updatedAt !== 'number' ||
+    !Number.isFinite(value.updatedAt) ||
+    value.updatedAt <= 0 ||
+    !record(payload) ||
+    payload.version !== 4 ||
+    typeof payload.createdAt !== 'number' ||
+    !Number.isFinite(payload.createdAt) ||
+    payload.createdAt <= 0 ||
+    !Array.isArray(payload.messages)
+  ) {
+    throw new Error('Card recovery v4 record metadata is invalid')
+  }
+  const messages = payload.messages.map((candidate) =>
+    sanitizeCardOwnedMessage(candidate as ChatMessage),
+  )
+  if (
+    messages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES ||
+    messages.some((message) => !validMessage(message))
+  ) {
+    throw new Error('Card recovery v4 payload is invalid')
+  }
+  return {
+    version: 4,
+    cardId: expectedOwner.cardId,
+    createdAt: payload.createdAt,
+    messages: dedupeMessages(messages),
+    revision: value.revision,
+    writeId: value.writeId,
+    updatedAt: value.updatedAt,
+  }
+}
+
+function recoveryRecord(
+  owner: CardTranscriptRecoveryOwner,
+  messages: Array<ChatMessage>,
+  previous: CardTranscriptRecoveryEnvelope | null,
+  options: RecoveryOptions = {},
+): V4CardRecoveryRecord<CardTranscriptRecoveryPayload> {
+  const timestamp = nowValue(options)
+  return {
+    schema: 4,
+    cardId: owner.cardId,
+    revision: (previous?.revision ?? 0) + 1,
+    writeId: writeId(),
+    updatedAt: timestamp,
+    payload: {
+      version: 4,
+      createdAt: previous?.createdAt ?? timestamp,
+      messages: messages as Array<PortableValue>,
+    },
+  }
+}
+
+function envelopeFromRecord(
+  value: V4CardRecoveryRecord<CardTranscriptRecoveryPayload>,
+  owner: CardTranscriptRecoveryOwner,
+): CardTranscriptRecoveryEnvelope {
+  return parseRecoveryRecord(value, owner)
+}
+
+export function parseCardTranscriptRecovery(
+  value: unknown,
+  expectedOwner: CardTranscriptRecoveryOwner,
+): CardTranscriptRecoveryEnvelope | null {
+  if (!isValidCardTranscriptRecoveryOwner(expectedOwner)) return null
+  try {
+    return parseRecoveryRecord(value, expectedOwner)
+  } catch {
+    return null
+  }
+}
+
+export async function readCardTranscriptRecovery(
+  owner: CardTranscriptRecoveryOwner,
+  _options: RecoveryOptions = {},
+): Promise<CardTranscriptRecoveryEnvelope | null> {
+  if (!isValidCardTranscriptRecoveryOwner(owner)) return null
+  const stored = await readIndexedDbCardRecovery(owner.cardId)
+  if (!stored) return null
+  return parseRecoveryRecord(stored, owner)
+}
+
+async function mutateRecovery(
+  owner: CardTranscriptRecoveryOwner,
+  update: (
+    current: CardTranscriptRecoveryEnvelope | null,
+  ) => Array<ChatMessage> | null,
+  options: RecoveryOptions = {},
+): Promise<CardTranscriptRecoveryEnvelope | null> {
+  if (!isValidCardTranscriptRecoveryOwner(owner)) return null
+  for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+    const current = await readCardTranscriptRecovery(owner, options)
+    const messages = update(current)
+    const replacement = messages?.length
+      ? recoveryRecord(owner, messages, current, options)
+      : null
+    try {
+      await mutateCardRecoveryAtomically({
+        cardId: owner.cardId,
+        expectedWriteId: current?.writeId ?? null,
+        mutation: replacement
+          ? { type: 'replace', record: replacement }
+          : { type: 'delete' },
+      })
+      return replacement ? envelopeFromRecord(replacement, owner) : null
+    } catch (error) {
+      if (isCasFailure(error) && attempt + 1 < MAX_CAS_ATTEMPTS) continue
+      throw error
+    }
+  }
+  throw new Error('Card recovery compare-and-swap retries exhausted')
+}
+
+export async function clearCardTranscriptRecovery(
+  owner: CardTranscriptRecoveryOwner,
+  options: RecoveryOptions = {},
+): Promise<void> {
+  await mutateRecovery(owner, () => null, options)
+}
+
+export async function replaceCardTranscriptRecoveryMessages(
+  owner: CardTranscriptRecoveryOwner,
+  messages: Array<ChatMessage>,
+  options: RecoveryOptions = {},
+): Promise<CardTranscriptRecoveryEnvelope | null> {
+  const sanitized = messages.map(sanitizeCardOwnedMessage)
+  if (sanitized.some((message) => !validMessage(message))) return null
+  return mutateRecovery(
+    owner,
+    (current) => {
+      const merged = dedupeMessages([...(current?.messages ?? []), ...sanitized])
+      if (merged.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES) {
+        throw new Error('Card recovery capacity exceeded')
+      }
+      return merged
+    },
+    options,
+  )
+}
+
+export async function appendCardTranscriptRecoveryMessage(
+  owner: CardTranscriptRecoveryOwner,
+  message: ChatMessage,
+  options: RecoveryOptions = {},
+): Promise<CardTranscriptRecoveryEnvelope | null> {
+  const sanitized = sanitizeCardOwnedMessage(message)
+  if (!validMessage(sanitized)) return null
+  return replaceCardTranscriptRecoveryMessages(owner, [sanitized], options)
+}
+
+export async function checkpointCardTranscriptRecoveryMessage(
+  owner: CardTranscriptRecoveryOwner,
+  message: ChatMessage,
+  options: RecoveryOptions = {},
+): Promise<CardTranscriptRecoveryEnvelope | null> {
+  const sanitized = sanitizeCardOwnedMessage(message)
+  if (!validMessage(sanitized)) return null
+  return mutateRecovery(
+    owner,
+    (current) => {
+      const messages = [...(current?.messages ?? [])]
+      const runId = messageRunIdentity(sanitized)
+      const index = messages.findIndex(
+        (candidate) =>
+          candidate.role === 'assistant' &&
+          Boolean(runId) &&
+          messageRunIdentity(candidate) === runId,
+      )
+      if (index >= 0) messages[index] = sanitized
+      else messages.push(sanitized)
+      if (messages.length > CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES) {
+        throw new Error('Card recovery capacity exceeded')
+      }
+      return messages
+    },
+    options,
+  )
+}
+
+export async function removeRejectedCardTranscriptRecoveryMessage(
+  owner: CardTranscriptRecoveryOwner,
+  clientId: string,
+  options: RecoveryOptions = {},
+): Promise<CardTranscriptRecoveryEnvelope | null> {
+  const normalizedClientId = normalizedString(clientId)
+  if (!normalizedClientId) return readCardTranscriptRecovery(owner, options)
+  return mutateRecovery(
+    owner,
+    (current) =>
+      (current?.messages ?? []).filter(
+        (message) => !hasRecoveryClientIdentity(message, normalizedClientId),
+      ),
+    options,
+  )
+}
+
+export async function acknowledgeDeliveredCardTranscriptRecoveryMessage(
+  owner: CardTranscriptRecoveryOwner,
+  clientId: string,
+  acknowledgementValue: unknown,
+  options: RecoveryOptions = {},
+): Promise<CardTranscriptRecoveryEnvelope | null> {
+  const normalizedClientId = normalizedString(clientId)
+  const acknowledgement = parseSwarmDirectChatUserAcknowledgement(
+    acknowledgementValue,
+    normalizedClientId,
+  )
+  if (!acknowledgement) return readCardTranscriptRecovery(owner, options)
+  return mutateRecovery(
+    owner,
+    (current) =>
+      (current?.messages ?? []).map((message) =>
+        hasRecoveryClientIdentity(message, normalizedClientId) &&
+        swarmAcknowledgementAttachmentsMatchRecovery(message, acknowledgement)
+          ? {
+              ...message,
+              status: 'sent',
+              __swarmDeliveryAcknowledgement: acknowledgement,
+            }
+          : message,
+      ),
+    options,
+  )
+}
+
+export async function projectAcknowledgedCardTranscriptRecoveryMessages(
+  owner: CardTranscriptRecoveryOwner,
+  authoritativeMessages: Array<ChatMessage>,
+  options: RecoveryOptions = {},
+): Promise<CardTranscriptAcknowledgementProjection> {
+  return projectAcknowledgedCardTranscriptRecoveryMessagesFromEnvelope(
+    authoritativeMessages,
+    await readCardTranscriptRecovery(owner, options),
+  )
+}
+
 function sameRecoveryEnvelope(
   left: CardTranscriptRecoveryEnvelope | null,
   right: CardTranscriptRecoveryEnvelope | null,
 ): boolean {
-  if (!left || !right) return left === right
-  try {
-    return JSON.stringify(left) === JSON.stringify(right)
-  } catch {
-    return false
-  }
+  return left?.writeId === right?.writeId
 }
 
-/**
- * Apply only the acknowledgement decision whose exact enriched projection was
- * already verified durable. A recovery change since projection keeps the newer
- * journal intact instead of acknowledging data outside that durability proof.
- */
-export function acknowledgeProjectedCardTranscriptRecoveryMessages(
+export async function acknowledgeProjectedCardTranscriptRecoveryMessages(
   owner: CardTranscriptRecoveryOwner,
   projection: CardTranscriptAcknowledgementProjection,
   options: RecoveryOptions = {},
-): CardTranscriptAcknowledgement {
-  const recovery = projection.sourceRecovery
-  const currentRecovery = readCardTranscriptRecovery(owner, options)
-  if (!sameRecoveryEnvelope(currentRecovery, recovery)) {
-    return {
-      authoritativeMessages: projection.authoritativeMessages,
-      recovery: currentRecovery,
-    }
+): Promise<CardTranscriptAcknowledgement> {
+  const current = await readCardTranscriptRecovery(owner, options)
+  if (!sameRecoveryEnvelope(current, projection.sourceRecovery)) {
+    return { authoritativeMessages: projection.authoritativeMessages, recovery: current }
   }
-  if (!recovery || projection.acknowledgedMessages.length === 0) {
-    return {
-      authoritativeMessages: projection.authoritativeMessages,
+  const acknowledged = new Set(projection.acknowledgedMessages.map(recoveryMessageIdentity))
+  const recovery = await mutateRecovery(
+    owner,
+    (latest) =>
+      (latest?.messages ?? []).filter(
+        (message) => !acknowledged.has(recoveryMessageIdentity(message)),
+      ),
+    options,
+  )
+  return { authoritativeMessages: projection.authoritativeMessages, recovery }
+}
+
+function snapshotMetadata(previous: unknown): { revision: number } {
+  if (
+    record(previous) &&
+    previous.schema === 4 &&
+    typeof previous.revision === 'number' &&
+    Number.isSafeInteger(previous.revision) &&
+    previous.revision > 0
+  ) {
+    return { revision: previous.revision + 1 }
+  }
+  return { revision: 1 }
+}
+
+export async function writeSnapshotAndAcknowledgeCardTranscriptRecovery(
+  owner: CardTranscriptRecoveryOwner,
+  authoritativeMessages: Array<ChatMessage>,
+  options: RecoveryOptions = {},
+): Promise<CardTranscriptAcknowledgement> {
+  const sanitizedAuthoritative = authoritativeMessages.map(sanitizeCardOwnedMessage)
+  for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+    const recovery = await readCardTranscriptRecovery(owner, options)
+    const projection = projectAcknowledgedCardTranscriptRecoveryMessagesFromEnvelope(
+      sanitizedAuthoritative,
       recovery,
+    )
+    const previousSnapshot = await readLatestCardSnapshot(owner.cardId)
+    const timestamp = nowValue(options)
+    const snapshot: V4LatestCardSnapshotRecord = {
+      schema: 4,
+      cardId: owner.cardId,
+      revision: snapshotMetadata(previousSnapshot).revision,
+      writeId: writeId(),
+      updatedAt: timestamp,
+      payload: {
+        version: 4,
+        messages: projection.authoritativeMessages as Array<PortableValue>,
+      },
     }
-  }
-
-  const storages = resolveDefaultRecoveryStorages(options.storage)
-  const key = cardTranscriptRecoveryStorageKey(owner)
-  removeMessageJournalValues(
-    key,
-    projection.acknowledgedMessages,
-    storages,
-    recoveryMessageIdentity,
-  )
-  memoryRecovery.delete(memoryRecoveryKey(owner))
-  for (const storage of storages) {
+    const remaining = projection.recovery?.messages ?? []
+    const replacement = remaining.length
+      ? recoveryRecord(owner, remaining, recovery, options)
+      : null
     try {
-      storage.removeItem(key)
-    } catch {
-      // Journal rows remain the authority if compact-envelope cleanup fails.
+      await writeSnapshotAndAcknowledgeRecoveryAtomically({
+        snapshot,
+        expectedRecoveryWriteId: recovery?.writeId ?? null,
+        recoveryMutation: replacement
+          ? { type: 'replace', record: replacement }
+          : { type: 'delete' },
+      })
+      return {
+        authoritativeMessages: projection.authoritativeMessages,
+        recovery: replacement ? envelopeFromRecord(replacement, owner) : null,
+      }
+    } catch (error) {
+      if (isCasFailure(error) && attempt + 1 < MAX_CAS_ATTEMPTS) continue
+      throw error
     }
   }
-  const remaining = projection.recovery?.messages ?? []
-  const nextRecovery =
-    remaining.length > 0
-      ? replaceCardTranscriptRecoveryMessages(owner, remaining, options)
-      : readCardTranscriptRecovery(owner, options)
-  return {
-    authoritativeMessages: projection.authoritativeMessages,
-    recovery: nextRecovery,
-  }
+  throw new Error('Snapshot acknowledgement compare-and-swap retries exhausted')
 }
 
-/**
- * Consume ordinary history acknowledgements as one bounded, ordered sequence.
- * Each authoritative row can acknowledge at most one recovery row. This makes
- * repeated equal text deterministic: two persisted pairs acknowledge two local
- * pairs, while one persisted pair leaves the truly additional local pair.
- */
-export function reconcileAcknowledgedCardTranscriptRecoveryMessages(
+export async function reconcileAcknowledgedCardTranscriptRecoveryMessages(
   owner: CardTranscriptRecoveryOwner,
   authoritativeMessages: Array<ChatMessage>,
   options: RecoveryOptions = {},
-): CardTranscriptAcknowledgement {
-  const projection = projectAcknowledgedCardTranscriptRecoveryMessages(
+): Promise<CardTranscriptAcknowledgement> {
+  const projection = await projectAcknowledgedCardTranscriptRecoveryMessages(
     owner,
     authoritativeMessages,
     options,
   )
-  return acknowledgeProjectedCardTranscriptRecoveryMessages(
-    owner,
-    projection,
-    options,
-  )
+  return acknowledgeProjectedCardTranscriptRecoveryMessages(owner, projection, options)
 }
 
-export function removeAcknowledgedCardTranscriptRecoveryMessages(
+export async function removeAcknowledgedCardTranscriptRecoveryMessages(
   owner: CardTranscriptRecoveryOwner,
   authoritativeMessages: Array<ChatMessage>,
   options: RecoveryOptions = {},
-): CardTranscriptRecoveryEnvelope | null {
-  return reconcileAcknowledgedCardTranscriptRecoveryMessages(
-    owner,
-    authoritativeMessages,
-    options,
+): Promise<CardTranscriptRecoveryEnvelope | null> {
+  return (
+    await reconcileAcknowledgedCardTranscriptRecoveryMessages(
+      owner,
+      authoritativeMessages,
+      options,
+    )
   ).recovery
 }

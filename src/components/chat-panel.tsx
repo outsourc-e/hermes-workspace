@@ -161,8 +161,8 @@ export function ChatPanel() {
   ])
 
   const handleSessionResolved = useCallback(
-    (payload: SessionRouteResolutionPayload) => {
-      const transition = applySessionRouteResolution({
+    async (payload: SessionRouteResolutionPayload) => {
+      const transition = await applySessionRouteResolution({
         queryClient,
         activeFriendlyId,
         fallbackSessionKey: bootstrapRecovery?.sessionKey ?? activeFriendlyId,

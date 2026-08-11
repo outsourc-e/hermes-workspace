@@ -1,11 +1,10 @@
 import { normalizeSessions, readError } from './utils'
 import {
-  acknowledgeProjectedCardTranscriptRecoveryMessages,
   appendCardTranscriptRecoveryMessage,
   mergeCardTranscriptRecoveryMessages,
-  projectAcknowledgedCardTranscriptRecoveryMessages,
   readCardTranscriptRecovery,
   replaceCardTranscriptRecoveryMessages,
+  writeSnapshotAndAcknowledgeCardTranscriptRecovery,
 } from './card-transcript-recovery'
 import {
   readCardTranscriptSnapshot,
@@ -2126,9 +2125,7 @@ export function reconcileSessionCardHistoryResponse(
     options.continuationSegmentKeys,
   )
   const recoveryMessages =
-    options.recoveryMessages ??
-    readCardTranscriptRecovery({ cardId: server.cardId })?.messages ??
-    []
+    options.recoveryMessages ?? []
   const persistedServer = {
     ...server,
     messages: persistedMessages,
@@ -2158,7 +2155,14 @@ export async function reconcileSessionCardHistoryResponseDurably(
       !isDisplayableRecentSessionCardHistory(server) &&
       (server.completeness === 'partial' || server.retryable)
     if (!shouldHydrateSnapshot) {
-      return reconcileSessionCardHistoryResponse(server, options)
+      const recovery =
+        options.recoveryMessages ??
+        (await readCardTranscriptRecovery({ cardId: server.cardId }))?.messages ??
+        []
+      return reconcileSessionCardHistoryResponse(server, {
+        ...options,
+        recoveryMessages: recovery,
+      })
     }
 
     const snapshot = await readCardTranscriptSnapshot(server.cardId)
@@ -2173,7 +2177,7 @@ export async function reconcileSessionCardHistoryResponseDurably(
     )
     const recoveryMessages =
       options.recoveryMessages ??
-      readCardTranscriptRecovery({ cardId: server.cardId })?.messages ??
+      (await readCardTranscriptRecovery({ cardId: server.cardId }))?.messages ??
       []
     return mergeSessionCardHistoryResponse(
       {
@@ -2200,16 +2204,14 @@ export async function reconcileSessionCardHistoryResponseDurably(
     options.previous,
     options.continuationSegmentKeys,
   )
-  const recoveryBeforeSnapshot = readCardTranscriptRecovery(owner)
-  const projection = projectAcknowledgedCardTranscriptRecoveryMessages(
-    owner,
-    authoritativeMessages,
-  )
-  const snapshot = await writeCardTranscriptSnapshot(
-    server.cardId,
-    projection.authoritativeMessages,
-  )
-  if (!snapshot) {
+  const recoveryBeforeSnapshot = await readCardTranscriptRecovery(owner)
+  let acknowledgement
+  try {
+    acknowledgement = await writeSnapshotAndAcknowledgeCardTranscriptRecovery(
+      owner,
+      authoritativeMessages,
+    )
+  } catch {
     const persistedServer = {
       ...server,
       messages: authoritativeMessages,
@@ -2223,15 +2225,10 @@ export async function reconcileSessionCardHistoryResponseDurably(
       recoveryBeforeSnapshot?.messages ?? [],
     )
   }
-
-  const acknowledgement = acknowledgeProjectedCardTranscriptRecoveryMessages(
-    owner,
-    projection,
-  )
   const persistedServer = {
     ...server,
-    messages: projection.authoritativeMessages,
-    persistedMessages: projection.authoritativeMessages,
+    messages: acknowledgement.authoritativeMessages,
+    persistedMessages: acknowledgement.authoritativeMessages,
     completeSnapshotDurability: 'verified' as const,
   }
   return mergeSessionCardHistoryResponse(
@@ -2273,15 +2270,15 @@ export function updateSessionCardHistoryMessages(
   })
 }
 
-export function appendSessionCardHistoryMessage(
+export async function appendSessionCardHistoryMessage(
   queryClient: QueryClient,
   cardId: string,
   canonicalSegmentKey: string,
   message: ChatMessage,
   options: { persistRecovery?: boolean } = {},
-) {
+): Promise<void> {
   if (options.persistRecovery ?? true) {
-    appendCardTranscriptRecoveryMessage({ cardId }, message)
+    await appendCardTranscriptRecoveryMessage({ cardId }, message)
   }
   updateSessionCardHistoryMessages(
     queryClient,
@@ -2291,15 +2288,15 @@ export function appendSessionCardHistoryMessage(
   )
 }
 
-/** Persist and cache one explicit local Card overlay synchronously. */
-export function appendSessionCardTransientMessage(
+/** Persist and cache one explicit local Card overlay. */
+export async function appendSessionCardTransientMessage(
   queryClient: QueryClient,
   cardId: string,
   sessionKey: string,
   message: ChatMessage,
   options: { persistRecovery?: boolean } = {},
-): void {
-  appendSessionCardHistoryMessage(queryClient, cardId, sessionKey, message, {
+): Promise<void> {
+  await appendSessionCardHistoryMessage(queryClient, cardId, sessionKey, message, {
     persistRecovery: options.persistRecovery ?? true,
   })
 }
@@ -2309,7 +2306,7 @@ export function moveSessionCardHistoryMessages(
   handoff: SessionCardHandoffTransition,
   activeCard: SessionCardHandoffAuthority,
   sessionCards: ReadonlyArray<SessionCard> = [],
-  options: { recoveryStorage?: Storage; now?: number } = {},
+  _options: { now?: number } = {},
 ): boolean {
   const { cardId, fromSegmentKey, canonicalSegmentKey } = handoff
   if (
@@ -2322,15 +2319,8 @@ export function moveSessionCardHistoryMessages(
   ) {
     return false
   }
-  // Recovery and browser cache ownership remain on the stable Card ID. The
-  // successor segment updates only transport metadata in the same cache row.
-  readCardTranscriptRecovery(
-    { cardId },
-    {
-      storage: options.recoveryStorage,
-      now: options.now,
-    },
-  )
+  // Recovery ownership remains on the stable Card ID. The successor segment
+  // updates only transport metadata in the same cache row.
   const historyKey = sessionCardQueryKeys.history(cardId)
   const fromData =
     queryClient.getQueryData<SessionCardHistoryResponse>(historyKey)
@@ -2847,13 +2837,13 @@ export function updateHistoryMessageByClientIdEverywhere(
   }
 }
 
-export function updateSessionCardTransientMessageByClientId(
+export async function updateSessionCardTransientMessageByClientId(
   queryClient: QueryClient,
   cardId: string,
   canonicalSegmentKey: string,
   clientId: string,
   updater: (message: ChatMessage) => ChatMessage,
-): boolean {
+): Promise<boolean> {
   if (
     !normalizeId(cardId) ||
     !normalizeId(canonicalSegmentKey) ||
@@ -2863,7 +2853,7 @@ export function updateSessionCardTransientMessageByClientId(
   }
 
   const owner = { cardId }
-  const recovery = readCardTranscriptRecovery(owner)
+  const recovery = await readCardTranscriptRecovery(owner)
   const recoveredMatch =
     recovery?.messages.some((message) =>
       isMatchingClientMessage(message, clientId, clientId),
@@ -2873,7 +2863,7 @@ export function updateSessionCardTransientMessageByClientId(
       if (!isMatchingClientMessage(message, clientId, clientId)) return message
       return updater(message)
     })
-    replaceCardTranscriptRecoveryMessages(owner, messages)
+    await replaceCardTranscriptRecoveryMessages(owner, messages)
   }
 
   const cached = queryClient.getQueryData<SessionCardHistoryResponse>(
@@ -2904,7 +2894,7 @@ export function updateSessionCardTransientMessageByClientId(
           isMatchingClientMessage(message, clientId, clientId),
         )
       if (updatedCacheMatch) {
-        appendCardTranscriptRecoveryMessage(owner, updatedCacheMatch)
+        await appendCardTranscriptRecoveryMessage(owner, updatedCacheMatch)
       }
     }
   }
@@ -3007,6 +2997,14 @@ export function moveSessionCardHistoryToCard(
   const toKey = sessionCardQueryKeys.history(toCardId)
   const fromData = queryClient.getQueryData<SessionCardHistoryResponse>(fromKey)
   if (!fromData) return
+  if (fromCardId === toCardId) {
+    queryClient.setQueryData(fromKey, {
+      ...fromData,
+      sessionKey: toCanonicalSegmentKey,
+      canonicalSegmentKey: toCanonicalSegmentKey,
+    } satisfies SessionCardHistoryResponse)
+    return
+  }
   const toData = queryClient.getQueryData<SessionCardHistoryResponse>(toKey)
   queryClient.setQueryData(toKey, {
     ...fromData,
@@ -3029,12 +3027,12 @@ export function moveSessionCardHistoryToCard(
  * a Card route. The Card entry remains partial until the server supplies a
  * complete history response.
  */
-export function moveLegacyHistoryMessagesToSessionCard(
+export async function moveLegacyHistoryMessagesToSessionCard(
   queryClient: QueryClient,
   friendlyId: string,
   sessionKey: string,
   cardId = friendlyId,
-) {
+): Promise<void> {
   const fromKey = chatQueryKeys.history(friendlyId, sessionKey)
   const fromData = queryClient.getQueryData<HistoryResponse>(fromKey)
   if (!fromData) return
@@ -3054,7 +3052,7 @@ export function moveLegacyHistoryMessagesToSessionCard(
   if (transient.length === 0) return
 
   for (const message of transient) {
-    appendCardTranscriptRecoveryMessage({ cardId }, message)
+    await appendCardTranscriptRecoveryMessage({ cardId }, message)
   }
   updateSessionCardHistoryMessages(
     queryClient,

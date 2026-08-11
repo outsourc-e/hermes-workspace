@@ -303,13 +303,13 @@ export function useRealtimeChatHistory({
             __realtimeSource: source,
           }
           if (effectiveCardId) {
-            appendSessionCardHistoryMessage(
+            void appendSessionCardHistoryMessage(
               queryClient,
               effectiveCardId,
               effectiveSessionKey,
               realtimeMessage,
               { persistRecovery: false },
-            )
+            ).catch(() => {})
           }
         }
         onUserMessage?.(message, source)
@@ -325,7 +325,7 @@ export function useRealtimeChatHistory({
       ],
     ),
     onDone: useCallback(
-      (
+      async (
         _state: string,
         eventSessionKey: string,
         streamingSnapshot: StreamingState | null,
@@ -435,7 +435,7 @@ export function useRealtimeChatHistory({
                 : null
 
             if (completedAssistant && effectiveCardId) {
-              appendSessionCardTransientMessage(
+              await appendSessionCardTransientMessage(
                 queryClient,
                 effectiveCardId,
                 effectiveSessionKey,
