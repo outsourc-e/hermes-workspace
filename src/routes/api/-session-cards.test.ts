@@ -520,6 +520,23 @@ describe('POST /api/session-cards', () => {
     expect(JSON.stringify(body)).not.toContain('created-upstream-session')
   })
 
+  it('fails closed instead of creating a Session Card with the virtual gateway default', async () => {
+    mocks.resolveCurrentGatewayModel.mockReturnValue(undefined)
+
+    const response = await createHandler({
+      request: jsonRequest('/api/session-cards', 'POST', '{}'),
+      params: {},
+    })
+
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Configured primary model is unavailable',
+    })
+    expect(mocks.createSession).not.toHaveBeenCalled()
+    expect(mocks.invalidateTopology).not.toHaveBeenCalled()
+  })
+
   it('requires an empty JSON object before creating a Session Card', async () => {
     const invalidBody = await createHandler({
       request: jsonRequest('/api/session-cards', 'POST', '{"title":"ignored"}'),

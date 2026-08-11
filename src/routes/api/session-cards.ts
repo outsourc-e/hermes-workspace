@@ -127,9 +127,10 @@ export const Route = createFileRoute('/api/session-cards')({
           // Card's empty backing session, so the first stream cannot inherit the
           // unusable alias from session creation.
           const configuredModel = resolveCurrentGatewayModel('hermes-agent')
-          const session = await createSession(
-            configuredModel ? { model: configuredModel } : undefined,
-          )
+          if (!configuredModel) {
+            return internalFailure('Configured primary model is unavailable')
+          }
+          const session = await createSession({ model: configuredModel })
           const upstreamSessionKey = session.id.trim()
           if (!upstreamSessionKey) {
             return internalFailure('Unable to create Session Card')

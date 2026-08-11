@@ -475,7 +475,7 @@ describe('checked-in Electron production server bundle', () => {
     const resolveExisting = route.indexOf(
       'sessionCardService.resolveRemoteCardByUpstreamSession(',
     )
-    const createNew = route.indexOf('createSession()')
+    const createNew = route.indexOf('createSession(')
     const firstProviderMutation = Math.min(
       ...[
         'const responsesStream = streamResponses(',
@@ -495,6 +495,18 @@ describe('checked-in Electron production server bundle', () => {
     expect(createNew).toBeGreaterThan(listExisting)
     expect(resolveExisting).toBeLessThan(firstProviderMutation)
     expect(createNew).toBeLessThan(firstProviderMutation)
+  })
+
+  it('ships New Session creation with a concrete configured model and no virtual-default fallback', () => {
+    const route = bundledRoute(bundle, '/api/session-cards')
+    const unavailableModel = route.indexOf(
+      'Configured primary model is unavailable',
+    )
+    const createSessionWithModel =
+      /createSession\(\{\s*model:/u.exec(route)?.index ?? -1
+
+    expect(unavailableModel).toBeGreaterThanOrEqual(0)
+    expect(createSessionWithModel).toBeGreaterThan(unavailableModel)
   })
 
   it('ships raw Swarm hardening across dispatch, lifecycle, start, and scroll routes', () => {

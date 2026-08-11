@@ -9,6 +9,7 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resolveCurrentGatewayModel } from './server/configured-primary-model'
 
 type ArtifactFunction = (...args: Array<unknown>) => unknown
 
@@ -191,6 +192,12 @@ function loadExecutableElectronArtifact(): ElectronServerArtifact {
   }
 }
 
+// The generated server reads auth configuration while this module loads. Keep
+// the artifact harness independent of the operator's protected Workspace.
+const inheritedHermesPassword = process.env.HERMES_PASSWORD
+const inheritedClaudePassword = process.env.CLAUDE_PASSWORD
+process.env.HERMES_PASSWORD = ''
+process.env.CLAUDE_PASSWORD = ''
 const artifact = loadExecutableElectronArtifact()
 const artifactStateDir = mkdtempSync(
   resolve(process.cwd(), '.electron-artifact-state-'),
@@ -592,6 +599,16 @@ describe('checked-in Electron server bundle behavior', () => {
 
   afterAll(() => {
     rmSync(artifactStateDir, { recursive: true, force: true })
+    if (inheritedHermesPassword === undefined) {
+      delete process.env.HERMES_PASSWORD
+    } else {
+      process.env.HERMES_PASSWORD = inheritedHermesPassword
+    }
+    if (inheritedClaudePassword === undefined) {
+      delete process.env.CLAUDE_PASSWORD
+    } else {
+      process.env.CLAUDE_PASSWORD = inheritedClaudePassword
+    }
   })
 
   beforeEach(() => {
@@ -862,7 +879,7 @@ describe('checked-in Electron server bundle behavior', () => {
     expect(stream).toContain('event: done')
     expect(localStoreActions.ensureLocalSession).toHaveBeenCalledWith(
       'builder',
-      undefined,
+      resolveCurrentGatewayModel('hermes-agent'),
     )
     expect(localStoreActions.appendLocalMessage).toHaveBeenNthCalledWith(
       1,
