@@ -847,13 +847,24 @@ export const Route = createFileRoute('/api/send-stream')({
           : getChatMode()
         let localBaseUrl: string | undefined
         // Gateway advertises `hermes-agent` as a compatibility alias, but Codex
-        // cannot accept that alias as a provider model. New conversations resolve
-        // the active Hermes default once; later messages reuse the concrete model
-        // remembered for their session. Explicit picker values always stay exact.
-        const requestedModel =
-          isExplicitBootstrapSend && isConfiguredDefaultModelRequest(body.model)
+        // cannot accept that alias as a provider model. A browser-created Card
+        // already has Card authority before its first message, so it is not the
+        // legacy `new` bootstrap route. Resolve an omitted/default/virtual model
+        // from the active Hermes configuration when that Card has no remembered
+        // concrete model yet, then retain it for subsequent turns. Explicit picker
+        // values always stay exact.
+        const isDefaultModelRequest = isConfiguredDefaultModelRequest(
+          body.model,
+        )
+        const sessionModel = resolveSessionGatewayModel(sessionKey, body.model)
+        const configuredModel =
+          isDefaultModelRequest && (isExplicitBootstrapSend || !sessionModel)
             ? resolveCurrentGatewayModel(body.model)
-            : resolveSessionGatewayModel(sessionKey, body.model)
+            : undefined
+        const requestedModel = configuredModel ?? sessionModel
+        if (configuredModel && !isExplicitBootstrapSend) {
+          rememberConfiguredSessionModel(sessionKey, configuredModel)
+        }
         const requestModel = requestedModel ?? ''
         const bareModel = requestModel.includes('/')
           ? requestModel.split('/').slice(1).join('/')

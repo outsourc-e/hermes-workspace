@@ -409,6 +409,54 @@ describe('send-stream bootstrap session handoff', () => {
     )
   })
 
+  it('resolves a virtual first-send model for a browser-created Session Card', async () => {
+    const cardId = 'remote:browser-created-card'
+    const segmentKey = 'remote:browser-created-segment'
+    mocks.resolveSessionGatewayModel.mockReturnValueOnce(undefined)
+    mocks.resolveSessionCard.mockResolvedValueOnce({
+      card: {
+        cardId,
+        canonicalSegmentKey: segmentKey,
+        canonicalSource: 'remote',
+        canonicalTransport: 'gateway',
+        continuationSegmentKeys: [cardId, segmentKey],
+        continuationCount: 2,
+        relationshipKind: 'root',
+      },
+      sourceBySegmentKey: new Map([[segmentKey, 'remote']]),
+      upstreamKeyBySegmentKey: new Map([[segmentKey, 'created-session']]),
+      collection: { completeness: 'complete', retryable: false },
+    })
+
+    const response = await handler({
+      request: new Request('http://workspace.test/api/send-stream', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cardId,
+          sessionKey: segmentKey,
+          friendlyId: cardId,
+          message: 'use the Dashboard New Chat default',
+          model: 'hermes-agent',
+        }),
+      }),
+    })
+    await response.text()
+
+    expect(mocks.resolveCurrentGatewayModel).toHaveBeenCalledWith(
+      'hermes-agent',
+    )
+    expect(mocks.rememberConfiguredSessionModel).toHaveBeenCalledWith(
+      'created-session',
+      'configured-primary-model',
+    )
+    expect(mocks.streamChat).toHaveBeenLastCalledWith(
+      'created-session',
+      expect.objectContaining({ model: 'configured-primary-model' }),
+      expect.any(Object),
+    )
+  })
+
   it('preserves an explicit New Session model without loading Hermes config', async () => {
     const response = await handler({
       request: new Request('http://workspace.test/api/send-stream', {
