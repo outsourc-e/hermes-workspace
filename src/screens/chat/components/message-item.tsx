@@ -249,6 +249,7 @@ type InlineToolSection = {
   type: string
   input?: Record<string, unknown>
   preview?: string
+  hasPersistedResult?: boolean
   outputText: string
   errorText?: string
   state:
@@ -401,6 +402,169 @@ function mapToolCallToToolPart(
   }
 }
 
+function toolPartToInlineSection(
+  toolPart: ToolPart,
+  fallbackKey: string,
+  hasPersistedResult = false,
+): InlineToolSection {
+  const rawOutput = toolPart.output
+  let outputText = ''
+  if (rawOutput) {
+    if (typeof rawOutput.output === 'string') {
+      outputText = rawOutput.output
+    } else {
+      outputText = JSON.stringify(rawOutput, null, 2)
+    }
+  }
+  return {
+    key: toolPart.toolCallId || fallbackKey,
+    type: toolPart.type,
+    input: toolPart.input,
+    outputText,
+    errorText: toolPart.errorText,
+    state: toolPart.state,
+    ...(hasPersistedResult ? { hasPersistedResult: true } : {}),
+  }
+}
+
+export function toolResultCallId(message: ChatMessage): string {
+  const raw = message as Record<string, unknown>
+  for (const key of ['toolCallId', 'tool_call_id', 'toolUseId', 'tool_use_id']) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+export function toolResultName(message: ChatMessage): string {
+  const raw = message as Record<string, unknown>
+  for (const key of ['toolName', 'tool_name']) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+export function buildAttachedToolSections(
+  attachedToolMessages: Array<ChatMessage>,
+): Array<InlineToolSection> {
+  const resultsByCallId = new Map<string, ChatMessage>()
+  for (const message of attachedToolMessages) {
+    const callId = toolResultCallId(message)
+    if (
+      (message.role === 'tool' || message.role === 'toolResult') &&
+      callId
+    ) {
+      resultsByCallId.set(callId, message)
+    }
+  }
+
+  const representedCallIds = new Set<string>()
+  const sections: Array<InlineToolSection> = []
+  for (const message of attachedToolMessages) {
+    const calls = getToolCallsFromMessage(message)
+    if (message.role === 'assistant' && calls.length > 0) {
+      for (const call of calls) {
+        if (call.id) representedCallIds.add(call.id)
+        const resultMessage = call.id
+          ? resultsByCallId.get(call.id)
+          : undefined
+        const section = toolPartToInlineSection(
+          mapToolCallToToolPart(call, resultMessage),
+          call.id || `attached-tool-${sections.length}`,
+          resultMessage !== undefined,
+        )
+        sections.push(section)
+      }
+      continue
+    }
+    if (message.role !== 'tool' && message.role !== 'toolResult') continue
+    const callId = toolResultCallId(message)
+    if (callId && representedCallIds.has(callId)) continue
+    const messageText = textFromMessage(message)
+    const outputText = extractToolResultText(message) || messageText
+    const toolType =
+      toolResultName(message) || parseToolNameFromMessageText(messageText)
+    sections.push({
+      key:
+        callId ||
+        (typeof (message as any).id === 'string' && (message as any).id) ||
+        `${toolType}-${sections.length}`,
+      type: toolType,
+      input: readToolArgs(message.details),
+      hasPersistedResult: true,
+      outputText,
+      errorText: message.isError ? outputText || 'Unknown error' : undefined,
+      state: message.isError ? 'output-error' : 'output-available',
+    })
+  }
+  return sections
+}
+
+function completedToolState(
+  left: InlineToolSection['state'],
+  right: InlineToolSection['state'],
+): InlineToolSection['state'] {
+  if (left === 'output-error' || right === 'output-error') return 'output-error'
+  if (left === 'output-available' || right === 'output-available') {
+    return 'output-available'
+  }
+  if (left === 'input-available' || right === 'input-available') {
+    return 'input-available'
+  }
+  return 'input-streaming'
+}
+
+export function deduplicateInlineToolSections(
+  sections: Array<InlineToolSection>,
+): Array<InlineToolSection> {
+  const merged = new Map<string, InlineToolSection>()
+  for (const section of sections) {
+    const existing = merged.get(section.key)
+    if (!existing) {
+      merged.set(section.key, section)
+      continue
+    }
+    const persistedSection = section.hasPersistedResult
+      ? section
+      : existing.hasPersistedResult
+        ? existing
+        : null
+    if (persistedSection) {
+      const enrichmentSection =
+        persistedSection === section ? existing : section
+      merged.set(section.key, {
+        ...enrichmentSection,
+        ...persistedSection,
+        type:
+          persistedSection.type && persistedSection.type !== 'unknown'
+            ? persistedSection.type
+            : enrichmentSection.type,
+        input: persistedSection.input ?? enrichmentSection.input,
+        preview: enrichmentSection.preview ?? persistedSection.preview,
+        hasPersistedResult: true,
+        outputText: persistedSection.outputText,
+        errorText: persistedSection.errorText,
+        state: persistedSection.state,
+      })
+      continue
+    }
+    merged.set(section.key, {
+      ...existing,
+      type:
+        section.type && section.type !== 'unknown'
+          ? section.type
+          : existing.type,
+      input: section.input ?? existing.input,
+      preview: existing.preview ?? section.preview,
+      outputText: section.outputText || existing.outputText,
+      errorText: section.errorText ?? existing.errorText,
+      state: completedToolState(existing.state, section.state),
+    })
+  }
+  return [...merged.values()]
+}
+
 function toolCallsSignature(message: ChatMessage): string {
   const toolCalls = getToolCallsFromMessage(message)
   return toolCalls
@@ -422,7 +586,7 @@ function toolResultSignature(result: ChatMessage | undefined): string {
     .join('')
     .trim()
   const details = result.details ? JSON.stringify(result.details) : ''
-  return `${result.toolCallId ?? ''}|${result.toolName ?? ''}|${result.isError ? '1' : '0'}|${text}|${details}`
+  return `${toolResultCallId(result)}|${toolResultName(result)}|${result.isError ? '1' : '0'}|${text}|${details}`
 }
 
 function toolResultsSignature(
@@ -2392,31 +2556,7 @@ function MessageItemComponent({
     })
   }, [toolCalls, toolResultsByCallId])
   const attachedToolSections = useMemo<Array<InlineToolSection>>(
-    () =>
-      attachedToolMessages.map((toolMessage, index) => {
-        const messageText = textFromMessage(toolMessage)
-        const outputText = extractToolResultText(toolMessage) || messageText
-        const errorText = toolMessage.isError
-          ? outputText || 'Unknown error'
-          : undefined
-        const toolType =
-          (typeof toolMessage.toolName === 'string' &&
-            toolMessage.toolName.trim()) ||
-          parseToolNameFromMessageText(messageText)
-        return {
-          key:
-            (typeof (toolMessage as any).id === 'string' &&
-              (toolMessage as any).id) ||
-            (typeof toolMessage.toolCallId === 'string' &&
-              toolMessage.toolCallId) ||
-            `${toolType}-${index}`,
-          type: toolType,
-          input: readToolArgs(toolMessage.details),
-          outputText,
-          errorText,
-          state: toolMessage.isError ? 'output-error' : 'output-available',
-        }
-      }),
+    () => buildAttachedToolSections(attachedToolMessages),
     [attachedToolMessages],
   )
   const streamToolSections = useMemo<Array<InlineToolSection>>(
@@ -2451,31 +2591,28 @@ function MessageItemComponent({
     [effectiveStreamToolCalls, effectiveIsStreaming],
   )
   const inlineToolSections = useMemo<Array<InlineToolSection>>(
-    () => [
-      ...streamToolSections,
-      ...toolParts.map((toolPart, index) => {
-        const rawOutput = toolPart.output
-        let outputText = ''
-        if (rawOutput) {
-          if (typeof rawOutput.output === 'string') {
-            outputText = rawOutput.output
-          } else {
-            outputText = JSON.stringify(rawOutput, null, 2)
-          }
-        }
-
-        return {
-          key: toolPart.toolCallId || `${toolPart.type}-${index}`,
-          type: toolPart.type,
-          input: toolPart.input,
-          outputText,
-          errorText: toolPart.errorText,
-          state: toolPart.state,
-        }
-      }),
-      ...attachedToolSections,
+    () =>
+      deduplicateInlineToolSections([
+        ...streamToolSections,
+        ...toolParts.map((toolPart, index) => {
+          const hasPersistedResult = Boolean(
+            toolPart.toolCallId &&
+              toolResultsByCallId?.has(toolPart.toolCallId),
+          )
+          return toolPartToInlineSection(
+            toolPart,
+            `${toolPart.type}-${index}`,
+            hasPersistedResult,
+          )
+        }),
+        ...attachedToolSections,
+      ]),
+    [
+      attachedToolSections,
+      streamToolSections,
+      toolParts,
+      toolResultsByCallId,
     ],
-    [attachedToolSections, streamToolSections, toolParts],
   )
   // When streaming is done, force all tool sections to completed state
   // Prevents stuck timers from race conditions where tool.completed SSE

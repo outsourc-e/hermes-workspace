@@ -5,10 +5,49 @@ import type {
   SessionCardHandoffTransition,
 } from '../chat-queries'
 import type { ChatAttachment, ChatMessage, SessionCard } from '../types'
+import type {
+  StreamingState as ChatStoreStreamingState,
+  ChatStreamEvent,
+} from '@/stores/chat-store'
 import { useChatStore } from '@/stores/chat-store'
 import { pushActivity } from '@/components/inspector/activity-store'
 
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
+
+type StreamToolCallSummary = ChatStoreStreamingState['toolCalls'][number]
+
+function mergeStreamToolCallSummary(
+  current: Array<StreamToolCallSummary>,
+  event: Extract<ChatStreamEvent, { type: 'tool' }>,
+  fallbackIdentity: string,
+): Array<StreamToolCallSummary> {
+  const id =
+    (typeof event.toolCallId === 'string' && event.toolCallId.trim()) ||
+    `${event.name || 'tool'}-${event.runId || fallbackIdentity}-${current.length}`
+  const existingIndex = current.findIndex((toolCall) => toolCall.id === id)
+  const existing = current[existingIndex]
+  const next: StreamToolCallSummary = existing
+    ? {
+        ...existing,
+        phase: event.phase,
+        args: event.args ?? existing.args,
+        preview: event.preview ?? existing.preview,
+        result: event.result ?? existing.result,
+      }
+    : {
+        id,
+        name: event.name,
+        phase: event.phase,
+        args: event.args,
+        preview: event.preview,
+        result: event.result,
+      }
+
+  if (existingIndex < 0) return [...current, next]
+  const merged = [...current]
+  merged[existingIndex] = next
+  return merged
+}
 
 function isExactNonblankIdentity(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.trim() === value
@@ -329,6 +368,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const frameRef = useRef<number | null>(null)
   const finishedRef = useRef(false)
   const thinkingRef = useRef<string>('')
+  const terminalToolCallsRef = useRef<Array<StreamToolCallSummary>>([])
   const activeRunIdRef = useRef<string | null>(null)
   const recoveryIdRef = useRef<string>('')
   const delayedUnregisterTimerRef = useRef<ReturnType<
@@ -376,6 +416,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
   const processBrowserEvent = useCallback(
     (event: Parameters<typeof processStoreEvent>[0]) => {
+      if (event.type === 'tool') {
+        terminalToolCallsRef.current = mergeStreamToolCallSummary(
+          terminalToolCallsRef.current,
+          event,
+          activeRunIdRef.current || activeSessionKeyRef.current,
+        )
+      }
       const cardId = activeCardIdRef.current
       if (cardId) processCardEvent(cardId, event)
       else processStoreEvent(event)
@@ -434,6 +481,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       renderedTextRef.current = ''
       targetTextRef.current = ''
       thinkingRef.current = ''
+      terminalToolCallsRef.current = []
       stepUsageRef.current = {}
       lifecyclePhaseRef.current = 'idle'
       acceptedAtRef.current = null
@@ -471,6 +519,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       const partialText = fullTextRef.current
       if (!partialText || finishedRef.current) return null
       const runId = activeRunIdRef.current
+      const terminalToolCalls = terminalToolCallsRef.current
       const interruptedMessage: ChatMessage = {
         role: 'assistant',
         content: [
@@ -488,6 +537,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         __streamingStatus: 'interrupted',
         recoveryId: recoveryIdRef.current,
         ...stepUsageRef.current,
+        ...(terminalToolCalls.length > 0
+          ? { __streamToolCalls: terminalToolCalls }
+          : {}),
         ...(runId ? { runId, stableId: `stream-run:${runId}` } : {}),
       }
 
@@ -706,6 +758,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       const finalText = fullTextRef.current
       const thinking = thinkingRef.current
+      const terminalToolCalls = terminalToolCallsRef.current
       renderedTextRef.current = finalText
       targetTextRef.current = finalText
 
@@ -726,6 +779,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         recoveryId: recoveryIdRef.current,
         ...stepUsageRef.current,
         ...(payload as Record<string, unknown>),
+        ...(terminalToolCalls.length > 0
+          ? { __streamToolCalls: terminalToolCalls }
+          : {}),
         ...(completedRunId
           ? {
               runId: completedRunId,

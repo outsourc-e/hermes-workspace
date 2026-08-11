@@ -18,7 +18,7 @@ import {
   getToolCallsFromMessage,
   textFromMessage,
 } from '../utils'
-import { MessageItem } from './message-item'
+import { MessageItem, toolResultCallId } from './message-item'
 import { TuiActivityCard } from './tui-activity-card'
 import { ScrollToBottomButton } from './scroll-to-bottom-button'
 import { ResearchCard } from './research-card'
@@ -576,6 +576,18 @@ export function buildDisplayEntries(
   return entries
 }
 
+export function buildToolResultsByCallId(
+  messages: Array<ChatMessage>,
+): Map<string, ChatMessage> {
+  const results = new Map<string, ChatMessage>()
+  for (const message of messages) {
+    if (message.role !== 'tool' && message.role !== 'toolResult') continue
+    const toolCallId = toolResultCallId(message)
+    if (toolCallId) results.set(toolCallId, message)
+  }
+  return results
+}
+
 export function getTrailingToolOnlyTurnSummary(messages: Array<ChatMessage>): {
   count: number
   toolNames: Array<string>
@@ -640,6 +652,65 @@ function escapeAttributeSelector(value: string): string {
   }
 
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+export function shouldIncludeDisplayMessage(
+  message: ChatMessage,
+  hideSystemMessages = false,
+): boolean {
+  const cleanedText = textFromMessage(message).trim()
+
+  if (message.role === 'assistant') {
+    if (cleanedText === 'HEARTBEAT_OK') return false
+    if (cleanedText === 'NO_REPLY') return false
+    if (/^NO_?(?:REPLY)?$/i.test(cleanedText)) return false
+    return true
+  }
+
+  if (message.role === 'user') {
+    const rawText = (Array.isArray(message.content) ? message.content : [])
+      .map((part) => (part.type === 'text' ? String(part.text ?? '') : ''))
+      .join('')
+      .trim()
+    const hasAttachments =
+      Array.isArray((message as any).attachments) &&
+      (message as any).attachments.length > 0
+    const hasInlineImages =
+      Array.isArray((message as any).inlineImages) &&
+      (message as any).inlineImages.length > 0
+    const isPendingOptimisticUserMessage =
+      typeof (message as any).__optimisticId === 'string' ||
+      message.status === 'sending' ||
+      message.status === 'queued'
+
+    if (cleanedText.length === 0 && !hasAttachments && !hasInlineImages) {
+      if (!isPendingOptimisticUserMessage) return false
+    }
+
+    const isSystemPrefixed = /^System:/i.test(rawText)
+    if (hideSystemMessages && isSystemPrefixed) return false
+    if (
+      hideSystemMessages &&
+      shouldHideSystemInjectedUserMessage(cleanedText)
+    ) {
+      return false
+    }
+    if (!isSystemPrefixed) return true
+
+    const normalizedText = cleanedText.toLowerCase()
+    const containsSystemFailure =
+      normalizedText.includes('exec failed') ||
+      normalizedText.includes('serverrestart') ||
+      normalizedText.includes('signal sigkill')
+    const matchesHeartbeatPrompt =
+      /read heartbeat\.md if it exists.*?reply heartbeat_ok\./is.test(
+        cleanedText,
+      )
+
+    if (containsSystemFailure || matchesHeartbeatPrompt) return false
+  }
+
+  return true
 }
 
 type ChatMessageListProps = {
@@ -922,70 +993,11 @@ function ChatMessageListComponent({
     }
   }, [])
 
-  // Filter messages — toolResult handled by grouping into assistant bubble below
+  // Filter messages — tool results are preserved for grouping into assistant bubbles.
   const displayMessages = useMemo(() => {
-    const filteredMessages = messages.filter((msg) => {
-      // Hide tool messages — rendered as pills on the assistant message instead
-      if (msg.role === 'tool') return false
-
-      const cleanedText = textFromMessage(msg).trim()
-
-      if (msg.role === 'assistant') {
-        if (cleanedText === 'HEARTBEAT_OK') return false
-        // Hide NO_REPLY messages (agent had nothing to say, or used message tool instead)
-        if (cleanedText === 'NO_REPLY') return false
-        // Hide truncated NO_REPLY variants (e.g. "NO_" or "NO")
-        if (/^NO_?(?:REPLY)?$/i.test(cleanedText)) return false
-        return true
-      }
-
-      if (msg.role === 'user') {
-        const rawText = (Array.isArray(msg.content) ? msg.content : [])
-          .map((part) => (part.type === 'text' ? String(part.text ?? '') : ''))
-          .join('')
-          .trim()
-        const hasAttachments =
-          Array.isArray((msg as any).attachments) &&
-          (msg as any).attachments.length > 0
-        const hasInlineImages =
-          Array.isArray((msg as any).inlineImages) &&
-          (msg as any).inlineImages.length > 0
-        const isPendingOptimisticUserMessage =
-          typeof (msg as any).__optimisticId === 'string' ||
-          msg.status === 'sending' ||
-          msg.status === 'queued'
-
-        // Keep optimistic/pending user messages visible for the whole response cycle,
-        // even if the server hasn't echoed normalized text content back yet.
-        if (cleanedText.length === 0 && !hasAttachments && !hasInlineImages) {
-          if (!isPendingOptimisticUserMessage) return false
-        }
-
-        const isSystemPrefixed = /^System:/i.test(rawText)
-        if (hideSystemMessages && isSystemPrefixed) return false
-        if (
-          hideSystemMessages &&
-          shouldHideSystemInjectedUserMessage(cleanedText)
-        ) {
-          return false
-        }
-        if (!isSystemPrefixed) return true
-
-        const normalizedText = cleanedText.toLowerCase()
-        const containsSystemFailure =
-          normalizedText.includes('exec failed') ||
-          normalizedText.includes('serverrestart') ||
-          normalizedText.includes('signal sigkill')
-        const matchesHeartbeatPrompt =
-          /read heartbeat\.md if it exists.*?reply heartbeat_ok\./is.test(
-            cleanedText,
-          )
-
-        if (containsSystemFailure || matchesHeartbeatPrompt) return false
-      }
-
-      return true
-    })
+    const filteredMessages = messages.filter((message) =>
+      shouldIncludeDisplayMessage(message, hideSystemMessages),
+    )
 
     const seenMessageIds = new Set<string>()
     const deduped = filteredMessages.filter((message) => {
@@ -1192,15 +1204,7 @@ function ChatMessageListComponent({
   }, [])
 
   const toolResultsByCallId = useMemo(() => {
-    const map = new Map<string, ChatMessage>()
-    for (const message of messages) {
-      if (message.role !== 'toolResult') continue
-      const toolCallId = message.toolCallId
-      if (typeof toolCallId === 'string' && toolCallId.trim().length > 0) {
-        map.set(toolCallId, message)
-      }
-    }
-    return map
+    return buildToolResultsByCallId(messages)
   }, [messages])
 
   const hasUserVisibleTextMessages = useMemo(() => {
@@ -1240,8 +1244,8 @@ function ChatMessageListComponent({
         count += 1
       }
 
-      if (message.role !== 'toolResult') continue
-      const toolCallId = (message.toolCallId || '').trim()
+      if (message.role !== 'tool' && message.role !== 'toolResult') continue
+      const toolCallId = toolResultCallId(message)
       if (toolCallId.length > 0 && seenToolCallIds.has(toolCallId)) continue
       if (toolCallId.length > 0) {
         seenToolCallIds.add(toolCallId)

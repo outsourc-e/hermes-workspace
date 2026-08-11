@@ -2,6 +2,7 @@ import { normalizeSessions, readError } from './utils'
 import {
   appendCardTranscriptRecoveryMessage,
   mergeCardTranscriptRecoveryMessages,
+  mergeSnapshotBackedStreamToolCalls,
   readCardTranscriptRecovery,
   replaceCardTranscriptRecoveryMessages,
   writeSnapshotAndAcknowledgeCardTranscriptRecovery,
@@ -2167,13 +2168,16 @@ export async function reconcileSessionCardHistoryResponseDurably(
 
     const snapshot = await readCardTranscriptSnapshot(server.cardId)
     if (!snapshot) return reconcileSessionCardHistoryResponse(server, options)
-    const persistedMessages = mergeCardHistoryMessages(
-      snapshot.messages,
-      mergePartialPersistedCardHistory(
-        server,
-        options.previous,
-        options.continuationSegmentKeys,
+    const persistedMessages = mergeSnapshotBackedStreamToolCalls(
+      mergeCardHistoryMessages(
+        snapshot.messages,
+        mergePartialPersistedCardHistory(
+          server,
+          options.previous,
+          options.continuationSegmentKeys,
+        ),
       ),
+      snapshot.messages,
     )
     const recoveryMessages =
       options.recoveryMessages ??
@@ -2199,10 +2203,16 @@ export async function reconcileSessionCardHistoryResponseDurably(
   }
 
   const owner = { cardId: server.cardId }
-  const authoritativeMessages = mergePartialPersistedCardHistory(
-    server,
-    options.previous,
-    options.continuationSegmentKeys,
+  const snapshotBeforeAcknowledgement = await readCardTranscriptSnapshot(
+    server.cardId,
+  )
+  const authoritativeMessages = mergeSnapshotBackedStreamToolCalls(
+    mergePartialPersistedCardHistory(
+      server,
+      options.previous,
+      options.continuationSegmentKeys,
+    ),
+    snapshotBeforeAcknowledgement?.messages ?? [],
   )
   const recoveryBeforeSnapshot = await readCardTranscriptRecovery(owner)
   let acknowledgement

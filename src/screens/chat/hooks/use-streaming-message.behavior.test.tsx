@@ -7,10 +7,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { applySessionRouteResolution } from '../../../routes/chat/-session-route-state'
 import { useChatStore } from '../../../stores/chat-store'
-import { chatQueryKeys } from '../chat-queries'
+import {
+  chatQueryKeys,
+  reconcileSessionCardHistoryResponseDurably,
+} from '../chat-queries'
 import { shouldPinMainSession } from '../chat-screen-utils'
 import { resetWorkspaceChatIndexedDb } from '../card-transcript-indexeddb'
-import { readCardTranscriptRecovery } from '../card-transcript-recovery'
+import {
+  checkpointCardTranscriptRecoveryMessage,
+  readCardTranscriptRecovery,
+} from '../card-transcript-recovery'
+import { readCardTranscriptSnapshot } from '../card-transcript-snapshot'
 import {
   consumePendingSend,
   readPendingMessage,
@@ -18,6 +25,7 @@ import {
   stashPendingSend,
 } from '../pending-send'
 import { useStreamingMessage } from './use-streaming-message'
+import type { SessionCardHistoryResponse } from '../chat-queries'
 import type { ChatMessage, HistoryResponse, SessionCard } from '../types'
 import type { AuthoritativeCardHandoff } from './use-streaming-message'
 
@@ -226,6 +234,123 @@ describe('useStreamingMessage authoritative handoff behavior', () => {
     )
     React.act(() => root.unmount())
     document.body.removeChild(container)
+  })
+
+  it('persists stream tool summaries through terminal recovery, authoritative reconciliation, and reload', async () => {
+    const encoder = new TextEncoder()
+    const reader = {
+      read: vi
+        .fn()
+        .mockResolvedValueOnce({
+          done: false,
+          value: encoder.encode(
+            [
+              'event: started',
+              'data: {"runId":"run-tools","sessionKey":"remote:tool-segment"}',
+              '',
+              'event: tool',
+              'data: {"runId":"run-tools","toolCallId":"tool-1","name":"read_file","phase":"complete","result":"file contents"}',
+              '',
+              'event: chunk',
+              'data: {"text":"Finished","runId":"run-tools"}',
+              '',
+              'event: done',
+              'data: {"state":"complete","sessionKey":"remote:tool-segment","runId":"run-tools"}',
+              '',
+              '',
+            ].join('\n'),
+          ),
+        })
+        .mockResolvedValueOnce({ done: true, value: undefined }),
+      cancel: vi.fn().mockResolvedValue(undefined),
+    }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+      text: () => Promise.resolve(''),
+    } as unknown as Response)
+
+    const owner = { cardId: 'remote:tool-card' }
+    const card = rootCard(owner.cardId, 'remote:tool-segment')
+    const onComplete = vi.fn(async (message: ChatMessage) => {
+      await checkpointCardTranscriptRecoveryMessage(owner, message)
+    })
+    let controller: StreamingController | null = null
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <StreamingHarness
+          onReady={(next) => {
+            controller = next
+          }}
+          onSessionResolved={vi.fn()}
+          onAbort={vi.fn()}
+          pinMainSession={false}
+          activeCard={card}
+          sessionCards={[card]}
+          onComplete={onComplete}
+        />,
+      )
+    })
+
+    await React.act(async () => {
+      await controller!.startStreaming({
+        sessionKey: card.canonicalSegmentKey,
+        friendlyId: card.cardId,
+        cardId: card.cardId,
+        message: 'continue',
+      })
+    })
+
+    const terminalMessage = onComplete.mock.calls[0]?.[0] as ChatMessage
+    const expectedToolCalls = [
+      {
+        id: 'tool-1',
+        name: 'read_file',
+        phase: 'complete',
+        result: 'file contents',
+      },
+    ]
+    expect(terminalMessage).toMatchObject({
+      runId: 'run-tools',
+      stableId: 'stream-run:run-tools',
+      __streamToolCalls: expectedToolCalls,
+    })
+    expect((await readCardTranscriptRecovery(owner))?.messages[0]).toMatchObject(
+      { __streamToolCalls: expectedToolCalls },
+    )
+
+    const authoritative: ChatMessage = {
+      id: 'server-tools',
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Finished' }],
+      timestamp: terminalMessage.timestamp,
+    }
+    const server: SessionCardHistoryResponse = {
+      ...owner,
+      sessionKey: card.canonicalSegmentKey,
+      canonicalSegmentKey: card.canonicalSegmentKey,
+      messages: [authoritative],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+    const reconciled = await reconcileSessionCardHistoryResponseDurably(server)
+    expect(reconciled.messages[0]).toEqual({
+      ...authoritative,
+      __streamToolCalls: expectedToolCalls,
+    })
+    expect(await readCardTranscriptRecovery(owner)).toBeNull()
+    expect((await readCardTranscriptSnapshot(owner.cardId))?.messages).toEqual(
+      reconciled.messages,
+    )
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    const reloaded = await reconcileSessionCardHistoryResponseDurably(server)
+    expect(reloaded.messages).toEqual(reconciled.messages)
   })
 
   it('keeps two actual send-stream readers independent through interleaved production events and sibling termination', async () => {

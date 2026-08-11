@@ -19,6 +19,8 @@ import {
   resetWorkspaceChatIndexedDb,
 } from './card-transcript-indexeddb'
 import { readCardTranscriptSnapshot } from './card-transcript-snapshot'
+import { reconcileSessionCardHistoryResponseDurably } from './chat-queries'
+import type { SessionCardHistoryResponse } from './chat-queries'
 import type {
   CardTranscriptRecoveryOwner,
 } from './card-transcript-recovery'
@@ -209,6 +211,218 @@ describe('Card transcript recovery v4 IndexedDB contract', () => {
     expect(acknowledgement.recovery).toBeNull()
     expect(await readCardTranscriptRecovery(owner)).toBeNull()
     expect((await readCardTranscriptSnapshot(owner.cardId))?.messages).toHaveLength(1)
+  })
+
+  it('persists stream-only tool activity by exact authoritative identity', async () => {
+    const toolCalls = [
+      {
+        id: 'tool-1',
+        name: 'read_file',
+        phase: 'complete',
+        args: { path: '/tmp/example.txt' },
+        result: 'file contents',
+      },
+    ]
+    await appendCardTranscriptRecoveryMessage(
+      owner,
+      message('assistant', 'tool-backed response', {
+        runId: 'run-snapshot-tools',
+        stableId: 'stream-run:run-snapshot-tools',
+        __streamingStatus: 'complete',
+        __streamToolCalls: toolCalls,
+      }),
+      { now },
+    )
+    const authoritative = message('assistant', 'tool-backed response', {
+      id: 'server-assistant-snapshot-tools',
+    })
+    const server: SessionCardHistoryResponse = {
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [authoritative],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+
+    const reconciled = await reconcileSessionCardHistoryResponseDurably(server)
+
+    expect(reconciled.messages).toEqual([
+      { ...authoritative, __streamToolCalls: toolCalls },
+    ])
+    expect(await readCardTranscriptRecovery(owner)).toBeNull()
+    expect((await readCardTranscriptSnapshot(owner.cardId))?.messages).toEqual(
+      reconciled.messages,
+    )
+
+    const reloaded = await reconcileSessionCardHistoryResponseDurably(server)
+    expect(reloaded.messages).toEqual(reconciled.messages)
+
+    const newerEqualText = await reconcileSessionCardHistoryResponseDurably({
+      ...server,
+      messages: [
+        message('assistant', 'tool-backed response', {
+          id: 'server-assistant-newer-equal-text',
+        }),
+      ],
+    })
+    expect(newerEqualText.messages[0]).not.toHaveProperty('__streamToolCalls')
+  })
+
+  it('merges newer recovered tool calls into an existing snapshot summary', async () => {
+    const toolA = {
+      id: 'tool-a',
+      name: 'read_file',
+      phase: 'complete',
+      result: 'A',
+    }
+    const toolB = {
+      id: 'tool-b',
+      name: 'web_search',
+      phase: 'complete',
+      result: 'B',
+    }
+    const recoveryFields = {
+      runId: 'run-partial-tools',
+      stableId: 'stream-run:run-partial-tools',
+      __streamingStatus: 'complete',
+    }
+    const authoritative = message('assistant', 'partial tool response', {
+      id: 'server-partial-tools',
+    })
+    const server: SessionCardHistoryResponse = {
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [authoritative],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+
+    await appendCardTranscriptRecoveryMessage(
+      owner,
+      message('assistant', 'partial tool response', {
+        ...recoveryFields,
+        __streamToolCalls: [toolA],
+      }),
+      { now },
+    )
+    await reconcileSessionCardHistoryResponseDurably(server)
+
+    await appendCardTranscriptRecoveryMessage(
+      owner,
+      message('assistant', 'partial tool response', {
+        ...recoveryFields,
+        __streamToolCalls: [toolA, toolB],
+      }),
+      { now: now + 1 },
+    )
+    const reconciled = await reconcileSessionCardHistoryResponseDurably(server)
+
+    expect(reconciled.messages[0]?.__streamToolCalls).toEqual([toolA, toolB])
+    expect(await readCardTranscriptRecovery(owner)).toBeNull()
+    expect(
+      (await readCardTranscriptSnapshot(owner.cardId))?.messages[0]
+        ?.__streamToolCalls,
+    ).toEqual([toolA, toolB])
+  })
+
+  it('does not restore snapshot tools across different identity fields', async () => {
+    const toolCalls = [
+      {
+        id: 'tool-cross-field',
+        name: 'read_file',
+        phase: 'complete',
+        result: 'result',
+      },
+    ]
+    await appendCardTranscriptRecoveryMessage(
+      owner,
+      message('assistant', 'equal text', {
+        runId: 'run-cross-field',
+        stableId: 'stream-run:run-cross-field',
+        __streamingStatus: 'complete',
+        __streamToolCalls: toolCalls,
+      }),
+      { now },
+    )
+    const server: SessionCardHistoryResponse = {
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: [
+        message('assistant', 'equal text', {
+          id: 'shared-value-in-different-fields',
+        }),
+      ],
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    }
+    await reconcileSessionCardHistoryResponseDurably(server)
+
+    const newerEqualText = await reconcileSessionCardHistoryResponseDurably({
+      ...server,
+      messages: [
+        message('assistant', 'equal text', {
+          stableId: 'shared-value-in-different-fields',
+        }),
+      ],
+    })
+
+    expect(newerEqualText.messages[0]).not.toHaveProperty('__streamToolCalls')
+  })
+
+  it('retires snapshot-backed tool rows before recovery reaches capacity', async () => {
+    const recoveryMessages = Array.from(
+      { length: CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES },
+      (_unused, index) =>
+        message('assistant', `tool response ${index}`, {
+          runId: `capacity-run-${index}`,
+          stableId: `stream-run:capacity-run-${index}`,
+          __streamingStatus: 'complete',
+          __streamToolCalls: [
+            {
+              id: `capacity-tool-${index}`,
+              name: 'read_file',
+              phase: 'complete',
+              result: `result ${index}`,
+            },
+          ],
+        }),
+    )
+    await replaceCardTranscriptRecoveryMessages(owner, recoveryMessages, {
+      now,
+    })
+    const authoritativeMessages = recoveryMessages.map((recovery, index) =>
+      message('assistant', `tool response ${index}`, {
+        id: `server-capacity-${index}`,
+        timestamp: recovery.timestamp,
+      }),
+    )
+
+    await reconcileSessionCardHistoryResponseDurably({
+      sessionKey: 'remote:segment-a',
+      ...owner,
+      canonicalSegmentKey: 'remote:segment-a',
+      messages: authoritativeMessages,
+      completeness: 'complete',
+      retryable: false,
+      missingSegments: [],
+    })
+
+    expect(await readCardTranscriptRecovery(owner)).toBeNull()
+    await expect(
+      appendCardTranscriptRecoveryMessage(
+        owner,
+        message('user', 'the next accepted turn', {
+          clientId: 'after-capacity',
+        }),
+        { now },
+      ),
+    ).resolves.not.toBeNull()
   })
 
   it('clears exactly the requested Card owner', async () => {

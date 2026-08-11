@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildAttachedToolSections,
   buildInlineToolRenderPlan,
   compactInlineToolRenderPlan,
+  deduplicateInlineToolSections,
   detectAssistantCorruptionWarning,
 } from './message-item'
+import {
+  buildDisplayEntries,
+  shouldIncludeDisplayMessage,
+} from './chat-message-list'
 import type { ChatMessage } from '../types'
 
 describe('buildInlineToolRenderPlan', () => {
@@ -147,6 +153,223 @@ describe('compactInlineToolRenderPlan', () => {
         ],
       },
     ])
+  })
+})
+
+describe('completed tool summary normalization', () => {
+  it('counts one persisted call/result pair and its recovered stream summary once', () => {
+    const entries = buildDisplayEntries([
+      {
+        id: 'persisted-call-row',
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: 'tool-1',
+            name: 'read_file',
+            arguments: { path: '/tmp/example.txt' },
+          },
+        ],
+        timestamp: 1,
+      } as ChatMessage,
+      {
+        id: 'persisted-result-row',
+        role: 'toolResult',
+        toolCallId: 'tool-1',
+        toolName: 'read_file',
+        content: [{ type: 'text', text: 'file contents' }],
+        timestamp: 2,
+      } as ChatMessage,
+      {
+        id: 'final-assistant-row',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Done.' }],
+        timestamp: 3,
+      } as ChatMessage,
+    ])
+
+    expect(entries).toHaveLength(1)
+    const persistedSections = buildAttachedToolSections(
+      entries[0]!.attachedToolMessages,
+    )
+    const sections = deduplicateInlineToolSections([
+      {
+        key: 'tool-1',
+        type: 'read_file',
+        input: { path: '/tmp/example.txt' },
+        outputText: 'stream copy',
+        state: 'output-available',
+      },
+      ...persistedSections,
+    ])
+
+    expect(sections).toEqual([
+      expect.objectContaining({
+        key: 'tool-1',
+        type: 'read_file',
+        outputText: 'file contents',
+        state: 'output-available',
+      }),
+    ])
+  })
+
+  it('normalizes production snake_case tool-result aliases before deduplication', () => {
+    const productionMessages = [
+      {
+        id: 'persisted-call-row',
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: 'tool-1',
+            name: 'read_file',
+            arguments: { path: '/tmp/example.txt' },
+          },
+        ],
+        timestamp: 1,
+      } as ChatMessage,
+      {
+        id: 'persisted-result-row',
+        role: 'tool',
+        tool_call_id: 'tool-1',
+        tool_name: 'read_file',
+        content: [{ type: 'text', text: 'fresh persisted output' }],
+        timestamp: 2,
+      } as ChatMessage,
+      {
+        id: 'final-assistant-row',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Done.' }],
+        timestamp: 3,
+      } as ChatMessage,
+    ]
+    const filteredMessages = productionMessages.filter((message) =>
+      shouldIncludeDisplayMessage(message),
+    )
+    expect(filteredMessages.map((message) => message.role)).toEqual([
+      'assistant',
+      'tool',
+      'assistant',
+    ])
+    const entries = buildDisplayEntries(filteredMessages)
+
+    const persistedSections = buildAttachedToolSections(
+      entries[0]!.attachedToolMessages,
+    )
+    const sections = deduplicateInlineToolSections([
+      {
+        key: 'tool-1',
+        type: 'read_file',
+        outputText: 'stale stream output',
+        state: 'output-available',
+      },
+      ...persistedSections,
+    ])
+
+    expect(sections).toHaveLength(1)
+    expect(sections[0]).toEqual(
+      expect.objectContaining({
+        key: 'tool-1',
+        type: 'read_file',
+        outputText: 'fresh persisted output',
+        state: 'output-available',
+      }),
+    )
+  })
+
+  it('lets an empty persisted success clear stale stream output', () => {
+    const persistedSections = buildAttachedToolSections([
+      {
+        id: 'persisted-call-row',
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: 'call-1',
+            name: 'write_file',
+            arguments: { path: '/tmp/example.txt' },
+          },
+        ],
+        timestamp: 1,
+      } as ChatMessage,
+      {
+        id: 'persisted-result-row',
+        role: 'tool',
+        tool_call_id: 'call-1',
+        tool_name: 'write_file',
+        content: [],
+        isError: false,
+        timestamp: 2,
+      } as ChatMessage,
+    ])
+
+    const sections = deduplicateInlineToolSections([
+      {
+        key: 'call-1',
+        type: 'write_file',
+        outputText: 'stale stream output that never persisted',
+        state: 'output-available',
+      },
+      ...persistedSections,
+    ])
+
+    expect(sections).toHaveLength(1)
+    expect(sections[0]).toEqual(
+      expect.objectContaining({
+        key: 'call-1',
+        outputText: '',
+        errorText: undefined,
+        state: 'output-available',
+      }),
+    )
+  })
+
+  it('lets a persisted success clear stale stream error state and text', () => {
+    const persistedSections = buildAttachedToolSections([
+      {
+        id: 'persisted-call-row',
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: 'call-1',
+            name: 'write_file',
+            arguments: { path: '/tmp/example.txt' },
+          },
+        ],
+        timestamp: 1,
+      } as ChatMessage,
+      {
+        id: 'persisted-result-row',
+        role: 'tool',
+        tool_call_id: 'call-1',
+        tool_name: 'write_file',
+        content: [{ type: 'text', text: 'persisted success' }],
+        isError: false,
+        timestamp: 2,
+      } as ChatMessage,
+    ])
+
+    const sections = deduplicateInlineToolSections([
+      ...persistedSections,
+      {
+        key: 'call-1',
+        type: 'write_file',
+        outputText: 'stale stream failure',
+        errorText: 'stale stream failure',
+        state: 'output-error',
+      },
+    ])
+
+    expect(sections).toHaveLength(1)
+    expect(sections[0]).toEqual(
+      expect.objectContaining({
+        key: 'call-1',
+        outputText: 'persisted success',
+        errorText: undefined,
+        state: 'output-available',
+      }),
+    )
   })
 })
 

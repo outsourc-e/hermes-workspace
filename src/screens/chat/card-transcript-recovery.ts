@@ -788,10 +788,80 @@ function mergeAcknowledgedAttachments(
   return merged
 }
 
+function streamToolCalls(message: ChatMessage): Array<Record<string, unknown>> {
+  return Array.isArray(message.__streamToolCalls)
+    ? (message.__streamToolCalls as Array<Record<string, unknown>>)
+    : []
+}
+
+function streamToolCallIdentity(toolCall: Record<string, unknown>): string {
+  for (const key of ['id', 'toolCallId', 'tool_call_id', 'callId', 'call_id']) {
+    const value = normalizedString(toolCall[key])
+    if (value) return value
+  }
+  return ''
+}
+
+function mergeDefinedToolCallFields(
+  existing: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged = { ...existing }
+  for (const [key, value] of Object.entries(incoming)) {
+    if (value !== undefined) merged[key] = value
+  }
+  return merged
+}
+
+/**
+ * Merge compact stream evidence by stable call identity. Calls without a stable
+ * identity remain distinct rather than being collapsed by an index/type guess.
+ * Defined incoming fields are newer and win; existing fields fill omissions.
+ */
+function mergeStreamToolCalls(
+  existing: Array<Record<string, unknown>>,
+  incoming: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  const merged = existing.map((toolCall) => ({ ...toolCall }))
+  const indexesByIdentity = new Map<string, number>()
+  for (const [index, toolCall] of merged.entries()) {
+    const identity = streamToolCallIdentity(toolCall)
+    if (identity && !indexesByIdentity.has(identity)) {
+      indexesByIdentity.set(identity, index)
+    }
+  }
+  for (const toolCall of incoming) {
+    const identity = streamToolCallIdentity(toolCall)
+    const existingIndex = identity ? indexesByIdentity.get(identity) : undefined
+    if (existingIndex === undefined) {
+      if (identity) indexesByIdentity.set(identity, merged.length)
+      merged.push({ ...toolCall })
+      continue
+    }
+    merged[existingIndex] = mergeDefinedToolCallFields(
+      merged[existingIndex]!,
+      toolCall,
+    )
+  }
+  return merged
+}
+
 function mergeAcknowledgedRecoveryProjection(
   authoritativeMessage: ChatMessage,
   recoveryMessage: ChatMessage,
 ): ChatMessage {
+  const recoveredStreamToolCalls = streamToolCalls(recoveryMessage)
+  const mergedStreamToolCalls = mergeStreamToolCalls(
+    streamToolCalls(authoritativeMessage),
+    recoveredStreamToolCalls,
+  )
+  const streamEnriched: ChatMessage =
+    recoveredStreamToolCalls.length > 0
+      ? {
+          ...authoritativeMessage,
+          __streamToolCalls: mergedStreamToolCalls,
+        }
+      : authoritativeMessage
   const acknowledgement = swarmDeliveryAcknowledgement(recoveryMessage)
   const deliveryMatched = swarmDeliveryAcknowledgementMatches(
     recoveryMessage,
@@ -799,13 +869,13 @@ function mergeAcknowledgedRecoveryProjection(
   )
   const enriched: ChatMessage = deliveryMatched
     ? {
-        ...authoritativeMessage,
+        ...streamEnriched,
         content: recoveryMessage.content,
         ...(acknowledgement
           ? { __swarmDeliveryAcknowledgement: acknowledgement }
           : {}),
       }
-    : authoritativeMessage
+    : streamEnriched
   if ((recoveryMessage.attachments?.length ?? 0) === 0) return enriched
   return {
     ...enriched,
@@ -814,6 +884,53 @@ function mergeAcknowledgedRecoveryProjection(
       recoveryMessage,
     ),
   }
+}
+
+const AUTHORITATIVE_IDENTITY_FIELDS = [
+  ['id'],
+  ['messageId', 'message_id'],
+  ['stableId', 'stable_id'],
+] as const
+
+function hasSameAuthoritativeIdentityField(
+  left: ChatMessage,
+  right: ChatMessage,
+): boolean {
+  return AUTHORITATIVE_IDENTITY_FIELDS.some((aliases) =>
+    intersects(identifierSet(left, aliases), identifierSet(right, aliases)),
+  )
+}
+
+/**
+ * Reapply browser-owned stream tool metadata only to the same authoritative
+ * server message that previously received it. Content or timestamp similarity
+ * is intentionally insufficient because repeated assistant text is common.
+ * Identity aliases are compared within their semantic field, never as one
+ * unordered bag where an `id` could collide with an unrelated `stableId`.
+ */
+export function mergeSnapshotBackedStreamToolCalls(
+  authoritativeMessages: Array<ChatMessage>,
+  snapshotMessages: Array<ChatMessage>,
+): Array<ChatMessage> {
+  return authoritativeMessages.map((authoritativeMessage) => {
+    const matches = snapshotMessages.filter((snapshotMessage) => {
+      if (snapshotMessage.role !== authoritativeMessage.role) return false
+      if (streamToolCalls(snapshotMessage).length === 0) return false
+      return hasSameAuthoritativeIdentityField(
+        authoritativeMessage,
+        snapshotMessage,
+      )
+    })
+    if (matches.length !== 1) return authoritativeMessage
+    const mergedToolCalls = mergeStreamToolCalls(
+      streamToolCalls(matches[0]!),
+      streamToolCalls(authoritativeMessage),
+    )
+    return {
+      ...authoritativeMessage,
+      __streamToolCalls: mergedToolCalls,
+    }
+  })
 }
 
 function authoritativeAttachmentFidelityAcknowledges(
